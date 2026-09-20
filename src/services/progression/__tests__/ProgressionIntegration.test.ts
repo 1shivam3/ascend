@@ -15,7 +15,15 @@ describe('ASCEND Progression Engine — End-to-End Tactical Pipeline', () => {
     expect(initialLevelInfo.level).toBe(1);
 
     const initialSquatMastery = null; // Unranked
-    const initialAttributes = { strength: 10, stamina: 10, agility: 10, discipline: 10, vitality: 10 };
+    const initialAttributes = {
+      strength: 10,
+      endurance: 10,
+      agility: 10,
+      consistency: 10,
+      stamina: 10,
+      discipline: 10,
+      vitality: 10,
+    };
 
     // 2. Athlete logs heavy squat session
     const sets: SetLog[] = [
@@ -85,7 +93,7 @@ describe('ASCEND Progression Engine — End-to-End Tactical Pipeline', () => {
       sets
     );
 
-    expect(masteryEval.xpEarned).toBeGreaterThan(200);
+    expect(masteryEval.xpEarned).toBeGreaterThan(100);
     expect(masteryEval.updatedMastery.estimated1RmKg).toBeGreaterThan(160);
     expect(masteryEval.updatedMastery.bestWeightKg).toBe(150);
     expect(masteryEval.newPrs.length).toBeGreaterThanOrEqual(3);

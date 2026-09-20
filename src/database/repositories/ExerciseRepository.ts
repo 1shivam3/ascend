@@ -1,10 +1,11 @@
 import { getDatabase } from '../sqlite';
 import { Exercise, EquipmentTier, MovementPattern, ExerciseTier } from '../../types/domain.types';
+import { SqliteExerciseRow } from '../types';
 
 export class ExerciseRepository {
   static async getAll(): Promise<Exercise[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync<SqliteExerciseRow>(
       'SELECT * FROM exercise_catalog ORDER BY name ASC;'
     );
 
@@ -14,7 +15,7 @@ export class ExerciseRepository {
   static async search(query: string = '', muscle?: string, equipment?: string): Promise<Exercise[]> {
     const db = await getDatabase();
     let sql = 'SELECT * FROM exercise_catalog WHERE 1=1';
-    const params: any[] = [];
+    const params: string[] = [];
 
     if (query.trim().length > 0) {
       sql += ' AND (name LIKE ? OR primary_muscle LIKE ?)';
@@ -32,13 +33,13 @@ export class ExerciseRepository {
     }
 
     sql += ' ORDER BY name ASC;';
-    const rows = await db.getAllAsync<any>(sql, params);
+    const rows = await db.getAllAsync<SqliteExerciseRow>(sql, params);
     return rows.map(this.mapRowToExercise);
   }
 
   static async getById(id: string): Promise<Exercise | null> {
     const db = await getDatabase();
-    const row = await db.getFirstAsync<any>(
+    const row = await db.getFirstAsync<SqliteExerciseRow>(
       'SELECT * FROM exercise_catalog WHERE id = ?;',
       [id]
     );
@@ -46,7 +47,7 @@ export class ExerciseRepository {
     return row ? this.mapRowToExercise(row) : null;
   }
 
-  private static mapRowToExercise(row: any): Exercise {
+  private static mapRowToExercise(row: SqliteExerciseRow): Exercise {
     let secondaryMuscles: string[] = [];
     try {
       secondaryMuscles = JSON.parse(row.secondary_muscles);

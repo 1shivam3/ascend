@@ -12,9 +12,9 @@ export default function TabsLayout() {
           backgroundColor: THEME.colors.surface,
           borderTopColor: THEME.colors.border,
           borderTopWidth: 1,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: 60,
+          paddingBottom: 6,
+          paddingTop: 6,
         },
         tabBarActiveTintColor: THEME.colors.cyan,
         tabBarInactiveTintColor: THEME.colors.textMuted,
@@ -28,45 +28,45 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'HUD',
+          title: 'HOME',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>⚡</Text>
+            <Text style={{ fontSize: 16, color }}>⚡</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="workouts"
-        options={{
-          title: 'ROUTINES',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>📋</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="exercises"
-        options={{
-          title: 'MASTERY',
-          tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>⚔️</Text>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="quests"
+        name="quests/index"
         options={{
           title: 'QUESTS',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>🎯</Text>
+            <Text style={{ fontSize: 16, color }}>🎯</Text>
           ),
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="workout/index"
+        options={{
+          title: 'WORKOUT',
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 16, color }}>📋</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="progress"
+        options={{
+          title: 'PROGRESS',
+          tabBarIcon: ({ color }) => (
+            <Text style={{ fontSize: 16, color }}>⚔️</Text>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile/index"
         options={{
           title: 'PROFILE',
           tabBarIcon: ({ color }) => (
-            <Text style={{ fontSize: 18, color }}>🛡️</Text>
+            <Text style={{ fontSize: 16, color }}>🛡️</Text>
           ),
         }}
       />

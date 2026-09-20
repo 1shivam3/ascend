@@ -6,13 +6,12 @@ const MAX_PLAUSIBLE_WEIGHT_KG = 550; // Cap to world record threshold
 const MAX_PLAUSIBLE_REPS = 100;
 
 /**
- * Calculates Estimated One-Rep Max using the Dampened Hybrid Brzycki-Epley Curve.
+ * Calculates Estimated One-Rep Max using the canonical Epley Formula:
+ * e1RM = weight * (1 + reps / 30)
  * 
- * - Reps = 1: 1RM = Weight
- * - Reps 2-10: Average of Epley and Brzycki formulas for maximum empirical accuracy
- * - Reps > 10: Epley with a power dampening factor (10/r)^0.12 to suppress endurance skewing
+ * Example: 100 kg * 5 reps = 100 * (1 + 5/30) = 116.666... ≈ 116.7 kg.
  */
-export function calculateEstimated1RM(weightKg: number, reps: number): number {
+export function calculateEpley1RM(weightKg: number, reps: number): number {
   if (weightKg <= 0 || reps <= 0) return 0;
   
   const w = Math.min(weightKg, MAX_PLAUSIBLE_WEIGHT_KG);
@@ -22,17 +21,30 @@ export function calculateEstimated1RM(weightKg: number, reps: number): number {
     return Math.round(w * 10) / 10;
   }
 
-  if (r >= 2 && r <= 10) {
-    const epley = w * (1 + r / 30);
-    const brzycki = (w * 36) / (37 - r);
-    const hybrid = (epley + brzycki) / 2;
-    return Math.round(hybrid * 10) / 10;
-  }
+  const e1rm = w * (1 + r / 30);
+  return Math.round(e1rm * 10) / 10;
+}
 
-  // r > 10
-  const dampening = Math.pow(10 / r, 0.12);
-  const dampenedEpley = w * (1 + r / 30) * dampening;
-  return Math.round(dampenedEpley * 10) / 10;
+/**
+ * Calculates Estimated 1RM. Uses the deterministic Epley standard across ASCEND.
+ */
+export function calculateEstimated1RM(weightKg: number, reps: number): number {
+  return calculateEpley1RM(weightKg, reps);
+}
+
+/**
+ * Calculates Relative Strength ratio: estimated1RM / bodyweight
+ * Example: 116.7 kg e1RM / 70 kg bodyweight = 1.67x
+ */
+export function calculateRelativeStrength(
+  estimated1RmKg: number,
+  bodyweightKg: number
+): number | null {
+  if (!bodyweightKg || bodyweightKg <= 0 || !estimated1RmKg || estimated1RmKg <= 0) {
+    return null;
+  }
+  const ratio = estimated1RmKg / bodyweightKg;
+  return Math.round(ratio * 100) / 100;
 }
 
 export function kgToLbs(kg: number): number {

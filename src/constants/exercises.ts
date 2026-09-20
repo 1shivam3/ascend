@@ -492,4 +492,141 @@ export const STARTER_EXERCISES: Exercise[] = [
     instructions: 'Kneel with wheel in hands. Roll forward keeping hollow body posterior pelvic tilt, pull back with core.',
     isCustom: false,
   },
+
+  // CARDIO & ATHLETIC CONDITIONING
+  {
+    id: 'ex-running',
+    name: 'Running',
+    slug: 'running',
+    primaryMuscle: 'Legs',
+    secondaryMuscles: ['Calves', 'Cardio'],
+    equipment: 'OTHER',
+    movementPattern: 'CARDIO',
+    tier: 'ACCESSORY',
+    instructions: 'Maintain steady cadenced stride, upright spine, and rhythmic aerobic breathing.',
+    isCustom: false,
+  },
+  {
+    id: 'ex-cycling',
+    name: 'Cycling',
+    slug: 'cycling',
+    primaryMuscle: 'Quads',
+    secondaryMuscles: ['Hamstrings', 'Cardio'],
+    equipment: 'MACHINE',
+    movementPattern: 'CARDIO',
+    tier: 'ACCESSORY',
+    instructions: 'Adjust saddle to hip height. Maintain consistent RPM cadence and targeted power output.',
+    isCustom: false,
+  },
+  {
+    id: 'ex-rowing',
+    name: 'Rowing Machine',
+    slug: 'rowing-machine',
+    primaryMuscle: 'Back',
+    secondaryMuscles: ['Legs', 'Cardio', 'Lats'],
+    equipment: 'MACHINE',
+    movementPattern: 'CARDIO',
+    tier: 'ACCESSORY',
+    instructions: 'Drive with legs, swing hips open, pull handle to lower ribs. Reverse smoothly.',
+    isCustom: false,
+  },
+  {
+    id: 'ex-kb-swing',
+    name: 'Kettlebell Swing',
+    slug: 'kettlebell-swing',
+    primaryMuscle: 'Hamstrings',
+    secondaryMuscles: ['Glutes', 'Core', 'Grip'],
+    equipment: 'KETTLEBELL',
+    movementPattern: 'HINGE',
+    tier: 'ACCESSORY',
+    instructions: 'Hinge back deeply with bell between knees. Snap hips forward explosively to chest height.',
+    isCustom: false,
+  },
+  {
+    id: 'ex-box-jump',
+    name: 'Box Jump',
+    slug: 'box-jump',
+    primaryMuscle: 'Quads',
+    secondaryMuscles: ['Calves', 'Glutes'],
+    equipment: 'BODYWEIGHT',
+    movementPattern: 'SQUAT',
+    tier: 'ACCESSORY',
+    instructions: 'Drop into athletic quarter-squat, explode upward with arms forward, land softly in balance.',
+    isCustom: false,
+  },
 ];
+
+export function inferProgressionType(ex: Pick<Exercise, 'equipment' | 'tier' | 'movementPattern'>) {
+  if (ex.movementPattern === 'CARDIO') {
+    return {
+      progressionType: 'CARDIO' as const,
+      supports1Rm: false,
+      supportsRelativeStrength: false,
+      isBodyweight: false,
+    };
+  }
+  if (ex.movementPattern === 'ATHLETIC' || ex.equipment === 'KETTLEBELL') {
+    return {
+      progressionType: 'ATHLETIC' as const,
+      supports1Rm: false,
+      supportsRelativeStrength: false,
+      isBodyweight: false,
+    };
+  }
+  if (ex.equipment === 'BODYWEIGHT') {
+    return {
+      progressionType: 'BODYWEIGHT' as const,
+      supports1Rm: false,
+      supportsRelativeStrength: false,
+      isBodyweight: true,
+    };
+  }
+  if (ex.equipment === 'MACHINE') {
+    return {
+      progressionType: 'MACHINE' as const,
+      supports1Rm: false,
+      supportsRelativeStrength: false,
+      isBodyweight: false,
+    };
+  }
+  if (ex.tier === 'ISOLATION' || ex.movementPattern === 'ISOLATION') {
+    return {
+      progressionType: 'ISOLATION' as const,
+      supports1Rm: false,
+      supportsRelativeStrength: false,
+      isBodyweight: false,
+    };
+  }
+  if (ex.equipment === 'BARBELL') {
+    return {
+      progressionType: 'BARBELL_COMPOUND' as const,
+      supports1Rm: true,
+      supportsRelativeStrength: true,
+      isBodyweight: false,
+    };
+  }
+  if (ex.equipment === 'DUMBBELL') {
+    return {
+      progressionType: 'DUMBBELL_COMPOUND' as const,
+      supports1Rm: true,
+      supportsRelativeStrength: false,
+      isBodyweight: false,
+    };
+  }
+  return {
+    progressionType: 'ISOLATION' as const,
+    supports1Rm: false,
+    supportsRelativeStrength: false,
+    isBodyweight: false,
+  };
+}
+
+// Ensure all starter exercises are enriched
+for (const ex of STARTER_EXERCISES) {
+  const inferred = inferProgressionType(ex);
+  ex.progressionType = ex.progressionType || inferred.progressionType;
+  ex.supports1Rm = ex.supports1Rm !== undefined ? ex.supports1Rm : inferred.supports1Rm;
+  ex.supportsRelativeStrength = ex.supportsRelativeStrength !== undefined ? ex.supportsRelativeStrength : inferred.supportsRelativeStrength;
+  ex.isBodyweight = ex.isBodyweight !== undefined ? ex.isBodyweight : inferred.isBodyweight;
+}
+

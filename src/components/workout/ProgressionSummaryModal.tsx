@@ -95,23 +95,76 @@ export const ProgressionSummaryModal: React.FC<ProgressionSummaryModalProps> = (
               </View>
             )}
 
+            {/* Unlocked Achievements Highlight */}
+            {result.newlyUnlockedAchievements && result.newlyUnlockedAchievements.length > 0 && (
+              <View style={[styles.prCard, { borderColor: THEME.colors.emerald }]}>
+                <Text style={[styles.cardHeader, { color: THEME.colors.emerald }]}>
+                  🎖️ ACHIEVEMENTS UNLOCKED ({result.newlyUnlockedAchievements.length})
+                </Text>
+                {result.newlyUnlockedAchievements.map(ach => (
+                  <View key={ach.id} style={styles.prItemRow}>
+                    <Text style={{ fontSize: 18, marginRight: 8 }}>{ach.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.prExerciseName}>{ach.title}</Text>
+                      <Text style={{ color: THEME.colors.textMuted, fontSize: 11 }}>{ach.description}</Text>
+                    </View>
+                    <TacticalBadge label={`+${ach.xpReward} XP`} color={THEME.colors.emerald} size="sm" />
+                  </View>
+                ))}
+              </View>
+            )}
+
             {/* Exercise Mastery Progress */}
             <View style={styles.masteryCard}>
-              <Text style={styles.cardHeader}>EXERCISE MASTERY PROGRESS</Text>
+              <Text style={styles.cardHeader}>LIFT MASTERY PROGRESSION</Text>
               {result.exerciseMasteryUpdates.map(u => (
                 <View key={u.exerciseId} style={styles.masteryItem}>
                   <View style={styles.masteryTopRow}>
-                    <Text style={styles.masteryExerciseName}>{u.exerciseName}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {u.newRank && (
+                        <TacticalBadge label={`RANK ${u.newRank}`} color={THEME.colors.cyan} size="sm" />
+                      )}
+                      <Text style={styles.masteryExerciseName}>{u.exerciseName}</Text>
+                    </View>
                     <Text style={styles.masteryXpGain}>+{u.xpEarned} MXP</Text>
                   </View>
 
                   <View style={styles.masteryLevelRow}>
                     <Text style={styles.masteryLevelText}>
-                      Lift Level {u.newLevel}
+                      Level {u.newLevel}
                       {u.didLevelUp ? ` (Level Up from ${u.oldLevel}!)` : ''}
                     </Text>
-                    <Text style={styles.mastery1RmText}>Est. 1RM: {u.new1RmKg} kg</Text>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      {u.relativeStrength ? (
+                        <Text style={[styles.mastery1RmText, { color: THEME.colors.cyan }]}>
+                          {u.relativeStrength}x BW
+                        </Text>
+                      ) : null}
+                      <Text style={styles.mastery1RmText}>1RM: {u.new1RmKg} kg</Text>
+                    </View>
                   </View>
+
+                  {/* Rank Ascension Notice */}
+                  {u.didRankUp && u.oldRank && u.newRank && (
+                    <View style={styles.rankUpBanner}>
+                      <Text style={styles.rankUpBannerText}>
+                        ⚡ RANK ASCENSION: {u.oldRank} ➔ {u.newRank}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Unlocked Milestones Notice */}
+                  {u.unlockedMilestones && u.unlockedMilestones.length > 0 && (
+                    <View style={styles.milestonesList}>
+                      {u.unlockedMilestones.map(m => (
+                        <View key={m.id} style={styles.milestoneNoticeRow}>
+                          <Text style={styles.milestoneNoticeIcon}>⭐</Text>
+                          <Text style={styles.milestoneNoticeTitle}>{m.title}</Text>
+                          <Text style={styles.milestoneNoticeXp}>+{m.rewardXp} XP</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
               ))}
             </View>
@@ -125,20 +178,16 @@ export const ProgressionSummaryModal: React.FC<ProgressionSummaryModalProps> = (
                   <Text style={styles.attrValue}>+{result.attributesDelta.strength}</Text>
                 </View>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>STA</Text>
-                  <Text style={styles.attrValue}>+{result.attributesDelta.stamina}</Text>
+                  <Text style={styles.attrLabel}>END</Text>
+                  <Text style={styles.attrValue}>+{result.attributesDelta.endurance ?? result.attributesDelta.stamina ?? 0}</Text>
                 </View>
                 <View style={styles.attrItem}>
                   <Text style={styles.attrLabel}>AGI</Text>
                   <Text style={styles.attrValue}>+{result.attributesDelta.agility}</Text>
                 </View>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>DIS</Text>
-                  <Text style={styles.attrValue}>+{result.attributesDelta.discipline}</Text>
-                </View>
-                <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>VIT</Text>
-                  <Text style={styles.attrValue}>+{result.attributesDelta.vitality}</Text>
+                  <Text style={styles.attrLabel}>CON</Text>
+                  <Text style={styles.attrValue}>+{result.attributesDelta.consistency ?? result.attributesDelta.discipline ?? 0}</Text>
                 </View>
               </View>
             </View>
@@ -388,5 +437,48 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     marginTop: 2,
+  },
+  rankUpBanner: {
+    backgroundColor: 'rgba(255, 184, 0, 0.15)',
+    borderRadius: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 184, 0, 0.4)',
+  },
+  rankUpBannerText: {
+    color: '#FFB800',
+    fontSize: 11,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  milestonesList: {
+    marginTop: 4,
+    gap: 3,
+  },
+  milestoneNoticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 240, 255, 0.08)',
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    gap: 6,
+  },
+  milestoneNoticeIcon: {
+    fontSize: 11,
+  },
+  milestoneNoticeTitle: {
+    color: THEME.colors.textPrimary,
+    fontSize: 11,
+    fontWeight: '700',
+    flex: 1,
+  },
+  milestoneNoticeXp: {
+    color: '#10B981',
+    fontSize: 11,
+    fontWeight: '800',
   },
 });

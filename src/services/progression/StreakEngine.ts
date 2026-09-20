@@ -1,3 +1,5 @@
+import { PROGRESSION_CONFIG } from '../../config/progression.config';
+
 export interface StreakEvaluationResult {
   currentStreak: number;
   longestStreak: number;
@@ -21,7 +23,56 @@ export class StreakEngine {
   };
 
   /**
+   * Converts any Date object, ISO string, or timestamp into a normalized
+   * calendar date string 'YYYY-MM-DD' in the specified timezone (defaults to system local or UTC).
+   */
+  static getCalendarDateString(
+    input: Date | string | number,
+    timeZone?: string
+  ): string {
+    const date = typeof input === 'object' ? input : new Date(input);
+    if (isNaN(date.getTime())) {
+      throw new Error(`Invalid date provided to getCalendarDateString: ${input}`);
+    }
+
+    if (timeZone) {
+      try {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        });
+        return formatter.format(date);
+      } catch {
+        // Fallback to UTC if timezone is invalid
+      }
+    }
+
+    // Default UTC YYYY-MM-DD
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  /**
+   * Calculates the exact calendar day difference between two 'YYYY-MM-DD' strings.
+   * Eliminates DST and timezone hour drift by computing difference in whole calendar days.
+   */
+  static getCalendarDayDifference(fromDateStr: string, toDateStr: string): number {
+    const [fromY, fromM, fromD] = fromDateStr.split('T')[0].split('-').map(Number);
+    const [toY, toM, toD] = toDateStr.split('T')[0].split('-').map(Number);
+
+    const fromUtcDay = Math.floor(Date.UTC(fromY, fromM - 1, fromD) / 86400000);
+    const toUtcDay = Math.floor(Date.UTC(toY, toM - 1, toD) / 86400000);
+
+    return toUtcDay - fromUtcDay;
+  }
+
+  /**
    * Evaluates streak updates following workout completion or daily check-in.
+   * Completely calendar-date and timezone safe.
    */
   static evaluateStreak(
     lastWorkoutDateStr: string | null,
@@ -31,12 +82,14 @@ export class StreakEngine {
     streakFreezeTokens: number,
     isScheduledRestDayYesterday: boolean = false
   ): StreakEvaluationResult {
-    // If first workout ever
+    const cleanCurrentDate = currentDateStr.split('T')[0];
+
+    // First workout ever
     if (!lastWorkoutDateStr) {
       return {
         currentStreak: 1,
         longestStreak: Math.max(1, longestStreak),
-        streakFreezeTokens: Math.min(2, streakFreezeTokens),
+        streakFreezeTokens: Math.min(PROGRESSION_CONFIG.streak.maxFreezeTokensHeld, streakFreezeTokens),
         tokensConsumed: 0,
         tokensEarned: 0,
         isMilestone: false,
@@ -44,12 +97,8 @@ export class StreakEngine {
       };
     }
 
-    const lastDate = new Date(lastWorkoutDateStr);
-    const currentDate = new Date(currentDateStr);
-    
-    // Normalize to UTC midnight dates
-    const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    const cleanLastDate = lastWorkoutDateStr.split('T')[0];
+    const diffDays = this.getCalendarDayDifference(cleanLastDate, cleanCurrentDate);
 
     let updatedStreak = currentStreak;
     let tokens = streakFreezeTokens;
@@ -57,8 +106,8 @@ export class StreakEngine {
     let tokensEarned = 0;
     let restDayGraceApplied = false;
 
-    if (diffDays === 0) {
-      // Multiple workouts in same day do not increase streak
+    if (diffDays <= 0) {
+      // Multiple workouts on the same calendar day do not advance or break streak
       return {
         currentStreak,
         longestStreak,
@@ -71,7 +120,7 @@ export class StreakEngine {
     }
 
     if (diffDays === 1) {
-      // Normal consecutive day
+      // Consecutive calendar day
       updatedStreak += 1;
     } else if (diffDays === 2 && isScheduledRestDayYesterday) {
       // Rest Day Grace applied!
@@ -84,12 +133,16 @@ export class StreakEngine {
       updatedStreak += 1;
       restDayGraceApplied = true;
     } else {
-      // Streak broken
+      // Streak broken (missed days with no freeze token)
       updatedStreak = 1;
     }
 
-    // Award +1 freeze token every 14 streak days (max 2 held)
-    if (updatedStreak > 0 && updatedStreak % 14 === 0 && tokens < 2) {
+    // Award +1 freeze token every configured days (e.g. 14 days)
+    if (
+      updatedStreak > 0 &&
+      updatedStreak % PROGRESSION_CONFIG.streak.daysPerFreezeTokenEarned === 0 &&
+      tokens < PROGRESSION_CONFIG.streak.maxFreezeTokensHeld
+    ) {
       tokens += 1;
       tokensEarned += 1;
     }

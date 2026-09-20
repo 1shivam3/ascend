@@ -1,8 +1,11 @@
+import { PROGRESSION_CONFIG } from '../../config/progression.config';
 import { CharacterAttributes, WorkoutSession } from '../../types/domain.types';
 
 export class AttributeEngine {
   /**
-   * Computes updated 5-core attributes (1-100 scale) based on rolling training history.
+   * Computes updated 4-core attributes (Strength, Endurance, Agility, Consistency)
+   * on a 10-100 scale based on training activities and PROGRESSION_CONFIG rules.
+   * Also provides legacy compatibility mappings (stamina, discipline, vitality).
    */
   static computeAttributes(
     currentAttributes: CharacterAttributes,
@@ -11,39 +14,47 @@ export class AttributeEngine {
     scheduledRestDaysRespected: number = 0,
     plannedRestDays: number = 1
   ): CharacterAttributes {
-    // 1. Strength Calculation
-    // Driven by heavy compound volume and peak sets with high weight
+    const config = PROGRESSION_CONFIG.attributes;
+
+    // 1. Strength metrics: heavy compound volume, peak load / Wilks
     let heavyCompoundVolume = 0;
     let maxWilksScoreEstimate = 1.0;
 
-    // 2. Stamina Calculation
-    // Driven by total reps, high-rep sets (>10 reps), and workout density (volume/min)
+    // 2. Endurance metrics: total reps and session density
     let totalReps = 0;
     let totalDurationMinutes = 0;
     let totalVolume = 0;
 
-    // 3. Agility Calculation
-    // Driven by bodyweight/calisthenics volume and unilateral exercises
+    // 3. Agility metrics: bodyweight volume, unilateral movements
     let bodyweightVolume = 0;
     let unilateralSets = 0;
     let totalSets = 0;
 
     for (const workout of recentWorkouts) {
-      totalVolume += workout.totalVolumeKg;
-      totalReps += workout.totalReps;
-      totalSets += workout.totalSets;
-      totalDurationMinutes += Math.max(1, Math.round(workout.durationSeconds / 60));
+      if (workout.status !== 'COMPLETED') continue;
 
-      for (const exLog of workout.exercises) {
-        const isCompound = exLog.exercise?.tier === 'COMPOUND_PRIMARY';
+      totalVolume += workout.totalVolumeKg || 0;
+      totalReps += workout.totalReps || 0;
+      totalSets += workout.totalSets || 0;
+      totalDurationMinutes += Math.max(1, Math.round((workout.durationSeconds || 0) / 60));
+
+      for (const exLog of workout.exercises || []) {
+        const isCompound =
+          exLog.exercise?.tier === 'COMPOUND_PRIMARY' ||
+          exLog.exercise?.movementPattern === 'SQUAT' ||
+          exLog.exercise?.movementPattern === 'HINGE' ||
+          exLog.exercise?.movementPattern === 'PUSH_HORIZONTAL';
+
         const isBodyweight = exLog.exercise?.equipment === 'BODYWEIGHT';
-        const isUnilateral = exLog.exercise?.movementPattern === 'LUNGE';
+        const isUnilateral =
+          exLog.exercise?.movementPattern === 'LUNGE' ||
+          (exLog.exercise?.name && exLog.exercise.name.toLowerCase().includes('unilateral'));
 
-        for (const set of exLog.sets) {
+        for (const set of exLog.sets || []) {
           if (!set.completed) continue;
           const vol = set.weightKg * set.reps;
 
-          if (isCompound && (set.rpe === null || set.rpe >= 7.5)) {
+          if (isCompound && (set.rpe === null || set.rpe === undefined || set.rpe >= 7.5)) {
             heavyCompoundVolume += vol;
             if (set.weightKg > 150) maxWilksScoreEstimate = Math.max(maxWilksScoreEstimate, 2.2);
             else if (set.weightKg > 100) maxWilksScoreEstimate = Math.max(maxWilksScoreEstimate, 1.6);
@@ -60,36 +71,68 @@ export class AttributeEngine {
       }
     }
 
-    // Mathematical attribute models clamped between 10 and 100
-    // STR: 10 + 25 * log10(1 + heavyCompoundVolume / 20000) + 15 * (wilks / 2.5)
-    const strLog = Math.log10(1 + heavyCompoundVolume / 20000);
-    const calculatedStr = Math.round(10 + (28 * strLog) + (14 * (maxWilksScoreEstimate / 2.5)));
-    const strength = Math.min(100, Math.max(currentAttributes.strength, calculatedStr));
+    // Mathematical attribute calculations driven by PROGRESSION_CONFIG
+    // STRENGTH: 10 + (28 * log10(1 + volume / 25000)) + (14 * (wilks / 2.5))
+    const strLog = Math.log10(1 + heavyCompoundVolume / config.strength.logDivisor);
+    const calculatedStr = Math.round(
+      config.minAttributeScore +
+        config.strength.volumeMultiplier * strLog +
+        config.strength.wilksMultiplier * (maxWilksScoreEstimate / config.strength.wilksScale)
+    );
+    const strength = Math.min(
+      config.maxAttributeScore,
+      Math.max(currentAttributes.strength || config.minAttributeScore, calculatedStr)
+    );
 
-    // STA: 10 + 30 * (totalReps / 2000) + 20 * (avgDensity / 120)
+    // ENDURANCE: 10 + (30 * (totalReps / 2000)) + (20 * (avgDensity / 120))
     const avgDensity = totalDurationMinutes > 0 ? totalVolume / totalDurationMinutes : 0;
-    const calculatedSta = Math.round(10 + (30 * (totalReps / 2000)) + (20 * (avgDensity / 120)));
-    const stamina = Math.min(100, Math.max(currentAttributes.stamina, calculatedSta));
+    const calculatedEnd = Math.round(
+      config.minAttributeScore +
+        config.endurance.repsMultiplier * (totalReps / config.endurance.repsDivisor) +
+        config.endurance.densityMultiplier * (avgDensity / config.endurance.densityDivisor)
+    );
+    const prevEnd = currentAttributes.endurance || currentAttributes.stamina || config.minAttributeScore;
+    const endurance = Math.min(config.maxAttributeScore, Math.max(prevEnd, calculatedEnd));
 
-    // AGI: 10 + 40 * (bwRatio) + 30 * (unilateralRatio)
+    // AGILITY: 10 + (40 * bwRatio) + (30 * uniRatio)
     const bwRatio = totalVolume > 0 ? bodyweightVolume / totalVolume : 0.1;
     const uniRatio = totalSets > 0 ? unilateralSets / totalSets : 0.1;
-    const calculatedAgi = Math.round(10 + (40 * bwRatio) + (30 * uniRatio));
-    const agility = Math.min(100, Math.max(currentAttributes.agility, calculatedAgi));
+    const calculatedAgi = Math.round(
+      config.minAttributeScore +
+        config.agility.bodyweightRatioMultiplier * bwRatio +
+        config.agility.unilateralRatioMultiplier * uniRatio
+    );
+    const agility = Math.min(
+      config.maxAttributeScore,
+      Math.max(currentAttributes.agility || config.minAttributeScore, calculatedAgi)
+    );
 
-    // DIS: 10 + 45 * (streak / 30) + 35 * completionRatio
-    const calculatedDis = Math.round(10 + (45 * Math.min(1, currentStreak / 30)) + 30);
-    const discipline = Math.min(100, Math.max(currentAttributes.discipline, calculatedDis));
+    // CONSISTENCY: 10 + (45 * (streak / 30)) + adherenceBonus
+    const calculatedCon = Math.round(
+      config.minAttributeScore +
+        config.consistency.streakMultiplier * Math.min(1, currentStreak / config.consistency.streakDaysDivisor) +
+        config.consistency.baseAdherenceBonus
+    );
+    const prevCon = currentAttributes.consistency || currentAttributes.discipline || config.minAttributeScore;
+    const consistency = Math.min(config.maxAttributeScore, Math.max(prevCon, calculatedCon));
 
-    // VIT: 10 + 40 * (restRespected / plannedRest) + 30 * recoveryConsistency
-    const restRatio = plannedRestDays > 0 ? Math.min(1, scheduledRestDaysRespected / plannedRestDays) : 0.5;
-    const calculatedVit = Math.round(10 + (45 * restRatio) + 25);
-    const vitality = Math.min(100, Math.max(currentAttributes.vitality, calculatedVit));
+    // Backward-compatibility aliases
+    const stamina = endurance;
+    const discipline = consistency;
+    const vitality = Math.min(
+      config.maxAttributeScore,
+      Math.max(
+        currentAttributes.vitality || config.minAttributeScore,
+        Math.round((endurance + consistency) / 2)
+      )
+    );
 
     return {
       strength,
-      stamina,
+      endurance,
       agility,
+      consistency,
+      stamina,
       discipline,
       vitality,
     };

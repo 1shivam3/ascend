@@ -8,21 +8,23 @@ interface AttributeRadarProps {
 }
 
 const ATTRIBUTE_CONFIG = [
-  { key: 'strength', label: 'STR', name: 'Strength', color: '#FF3366', icon: '⚡' },
-  { key: 'stamina', label: 'STA', name: 'Stamina', color: '#FFB800', icon: '🔥' },
-  { key: 'agility', label: 'AGI', name: 'Agility', color: '#00F0FF', icon: '🌪️' },
-  { key: 'discipline', label: 'DIS', name: 'Discipline', color: '#8B5CF6', icon: '🛡️' },
-  { key: 'vitality', label: 'VIT', name: 'Vitality', color: '#10B981', icon: '❤️' },
+  { key: 'strength', fallbackKey: 'strength', label: 'STR', name: 'Strength', color: '#FF3366', icon: '⚡' },
+  { key: 'endurance', fallbackKey: 'stamina', label: 'END', name: 'Endurance', color: '#FFB800', icon: '🔥' },
+  { key: 'agility', fallbackKey: 'agility', label: 'AGI', name: 'Agility', color: '#00F0FF', icon: '🌪️' },
+  { key: 'consistency', fallbackKey: 'discipline', label: 'CON', name: 'Consistency', color: '#8B5CF6', icon: '🛡️' },
 ] as const;
 
 export const AttributeRadar: React.FC<AttributeRadarProps> = ({ attributes }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionHeader}>TACTICAL ATTRIBUTES (1–100)</Text>
+      <Text style={styles.sectionHeader}>CORE ATTRIBUTES (10–100)</Text>
 
       <View style={styles.grid}>
         {ATTRIBUTE_CONFIG.map(attr => {
-          const value = attributes[attr.key as keyof CharacterAttributes] || 10;
+          const value =
+            attributes[attr.key as keyof CharacterAttributes] ??
+            attributes[attr.fallbackKey as keyof CharacterAttributes] ??
+            10;
           const fillPercent = Math.min(100, Math.max(10, value));
 
           return (

@@ -1,210 +1,339 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { THEME } from '../../../constants/theme';
-import { TacticalCard } from '../../../components/ui/TacticalCard';
-import { TacticalBadge } from '../../../components/ui/TacticalBadge';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { QuestRepository } from '../../../database/repositories/QuestRepository';
+import { UserQuestProgress, QuestState } from '../../../types/quest.types';
+import { ScreenContainer } from '../../../components/layout/ScreenContainer';
+import { Heading, Text, Caption, MonoText } from '../../../components/ui/Typography';
+import { Card } from '../../../components/ui/Card';
+import { Badge } from '../../../components/ui/Badge';
+import { ProgressBar } from '../../../components/ui/ProgressBar';
+
+type FilterTab = 'ALL' | 'IN_PROGRESS' | 'AVAILABLE' | 'COMPLETED' | 'LOCKED';
+
+const FILTER_TABS: { label: string; key: FilterTab }[] = [
+  { label: 'ALL', key: 'ALL' },
+  { label: 'ACTIVE', key: 'IN_PROGRESS' },
+  { label: 'AVAILABLE', key: 'AVAILABLE' },
+  { label: 'COMPLETED', key: 'COMPLETED' },
+  { label: 'LOCKED', key: 'LOCKED' },
+];
 
 export default function QuestsScreen() {
+  const profile = useAuthStore(s => s.profile);
+  const [quests, setQuests] = useState<UserQuestProgress[]>([]);
+  const [selectedFilter, setSelectedFilter] = useState<FilterTab>('ALL');
+  const [refreshing, setRefreshing] = useState(false);
+  const [timeUntilReset, setTimeUntilReset] = useState('');
+
+  // Real-time calculation of daily reset countdown (Midnight UTC/Local)
+  useEffect(() => {
+    const updateCountdown = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setHours(24, 0, 0, 0);
+      const diffMs = tomorrow.getTime() - now.getTime();
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+      setTimeUntilReset(
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+      );
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadQuests = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const userLevel = profile.globalLevel || 1;
+      const data = await QuestRepository.getQuestsWithState(profile.id, userLevel);
+      setQuests(data);
+    } catch (err) {
+      console.error('Failed to load quests with state:', err);
+    }
+  }, [profile?.id, profile?.globalLevel]);
+
+  useEffect(() => {
+    loadQuests();
+  }, [loadQuests]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadQuests();
+    setRefreshing(false);
+  };
+
+  const filteredQuests = quests.filter(q => {
+    if (selectedFilter === 'ALL') return true;
+    return q.state === selectedFilter;
+  });
+
+  const getStateBadgeVariant = (state?: QuestState) => {
+    switch (state) {
+      case 'COMPLETED':
+        return 'emerald';
+      case 'IN_PROGRESS':
+        return 'amber';
+      case 'AVAILABLE':
+        return 'cyan';
+      case 'LOCKED':
+        return 'neutral';
+      case 'EXPIRED':
+        return 'crimson';
+      default:
+        return 'cyan';
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title}>TACTICAL DIRECTIVES</Text>
-          <Text style={styles.subtitle}>Daily objectives, weekly feats, and ascension campaigns</Text>
+    <ScreenContainer scrollable={false}>
+      {/* Directives Header */}
+      <View style={styles.header}>
+        <Heading level={1} style={styles.title}>TACTICAL DIRECTIVES</Heading>
+        <Caption style={styles.subtitle}>
+          Daily mission parameters, weekly feats, and ascension campaigns
+        </Caption>
+
+        <View style={styles.resetRow}>
+          <Caption upper color={THEME.colors.textMuted}>DAILY PROTOCOL RESET IN:</Caption>
+          <MonoText color={THEME.colors.cyan} style={styles.resetTimer}>
+            {timeUntilReset || '00:00:00'}
+          </MonoText>
         </View>
 
-        {/* Daily Directives */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionHeader}>DAILY DIRECTIVES</Text>
-            <Text style={styles.resetTimer}>RESETS IN 09:24:12</Text>
-          </View>
+        {/* Filter Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+          {FILTER_TABS.map(tab => {
+            const count = tab.key === 'ALL'
+              ? quests.length
+              : quests.filter(q => q.state === tab.key).length;
 
-          <TacticalCard style={styles.questCard}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>Field Deployment</Text>
-              <TacticalBadge label="+75 XP" color={THEME.colors.cyan} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Complete and record any active workout session today.</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '0%' }]} />
-              </View>
-              <Text style={styles.progressText}>0 / 1</Text>
-            </View>
-          </TacticalCard>
+            const isSelected = selectedFilter === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => setSelectedFilter(tab.key)}
+                style={[styles.filterPill, isSelected && styles.filterPillActive]}
+              >
+                <Text
+                  color={isSelected ? THEME.colors.cyan : THEME.colors.textSecondary}
+                  style={styles.filterText}
+                >
+                  {tab.label} ({count})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
-          <TacticalCard style={styles.questCard}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>Tonnage Threshold</Text>
-              <TacticalBadge label="+75 XP" color={THEME.colors.cyan} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Accumulate at least 4,000 kg total volume in a single session.</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '0%' }]} />
-              </View>
-              <Text style={styles.progressText}>0 / 4,000 kg</Text>
-            </View>
-          </TacticalCard>
+      {/* Directives List */}
+      <ScrollView
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={THEME.colors.cyan}
+            colors={[THEME.colors.cyan]}
+          />
+        }
+      >
+        {filteredQuests.length === 0 ? (
+          <Card variant="surface" style={styles.emptyCard}>
+            <Heading level={3} align="center" style={styles.emptyTitle}>
+              No Directives in {selectedFilter} State
+            </Heading>
+            <Caption align="center" style={styles.emptyDesc}>
+              Complete workouts to advance in-progress directives or wait for the next daily cycle reset.
+            </Caption>
+          </Card>
+        ) : (
+          filteredQuests.map(uq => {
+            const quest = uq.quest;
+            const state = uq.state || 'AVAILABLE';
+            const percent = Math.min(100, Math.round((uq.currentProgress / uq.targetValue) * 100));
+            const isLocked = state === 'LOCKED';
+            const isCompleted = state === 'COMPLETED';
 
-          <TacticalCard style={styles.questCard}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>Limit Exertion</Text>
-              <TacticalBadge label="+75 XP" color={THEME.colors.amber} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Log at least 1 set taken to true technical failure (Type: F).</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '0%' }]} />
-              </View>
-              <Text style={styles.progressText}>0 / 1 Set</Text>
-            </View>
-          </TacticalCard>
-        </View>
+            return (
+              <Card
+                key={uq.id}
+                variant="surface"
+                accentBorder={isCompleted ? THEME.colors.emerald : isLocked ? THEME.colors.borderSubtle : THEME.colors.border}
+                style={[styles.questCard, isLocked && styles.cardLocked]}
+              >
+                <View style={styles.questTopRow}>
+                  <View style={styles.titleGroup}>
+                    <Heading
+                      level={3}
+                      color={isLocked ? THEME.colors.textMuted : THEME.colors.textPrimary}
+                      style={styles.questTitle}
+                    >
+                      {quest?.title}
+                    </Heading>
+                    <View style={styles.badgeRow}>
+                      <Badge
+                        label={state}
+                        variant={getStateBadgeVariant(state)}
+                        size="sm"
+                        dot={state === 'IN_PROGRESS'}
+                      />
+                      <Badge
+                        label={quest?.type || 'MISSION'}
+                        variant="neutral"
+                        size="sm"
+                      />
+                    </View>
+                  </View>
 
-        {/* Weekly Feats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>WEEKLY FEATS</Text>
+                  <Badge
+                    label={`+${quest?.xpReward} XP`}
+                    variant={isLocked ? 'neutral' : (quest?.badgeVariant || 'cyan')}
+                    size="sm"
+                  />
+                </View>
 
-          <TacticalCard style={styles.questCard}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>Iron Consistency</Text>
-              <TacticalBadge label="+250 XP" color={THEME.colors.emerald} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Complete 4 scheduled workouts this calendar week.</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '25%' }]} />
-              </View>
-              <Text style={styles.progressText}>1 / 4 Days</Text>
-            </View>
-          </TacticalCard>
+                <Text
+                  color={isLocked ? THEME.colors.textMuted : THEME.colors.textSecondary}
+                  style={styles.questDesc}
+                >
+                  {quest?.description}
+                </Text>
 
-          <TacticalCard style={styles.questCard}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>Compound Domination</Text>
-              <TacticalBadge label="+250 XP" color={THEME.colors.emerald} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Log 20 total sets across primary compound lifts (Squat/Bench/Deadlift).</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '40%' }]} />
-              </View>
-              <Text style={styles.progressText}>8 / 20 Sets</Text>
-            </View>
-          </TacticalCard>
-        </View>
-
-        {/* Campaign Ascension Milestones */}
-        <View style={styles.section}>
-          <Text style={styles.sectionHeader}>ASCENSION CAMPAIGN MILESTONES</Text>
-
-          <TacticalCard style={styles.questCard} accentColor={THEME.colors.violet}>
-            <View style={styles.questTopRow}>
-              <Text style={styles.questTitle}>The Big Three Mastery</Text>
-              <TacticalBadge label="+500 XP" color={THEME.colors.violet} size="sm" />
-            </View>
-            <Text style={styles.questDesc}>Reach Lift Level 10 on Bench Press, Back Squat, and Conventional Deadlift.</Text>
-            <View style={styles.progressRow}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: '33%', backgroundColor: THEME.colors.violet }]} />
-              </View>
-              <Text style={styles.progressText}>1 / 3 Movements</Text>
-            </View>
-          </TacticalCard>
-        </View>
+                {isLocked ? (
+                  <View style={styles.lockedRow}>
+                    <Caption color={THEME.colors.textMuted}>🔒 REQUIRES GLOBAL LEVEL {quest?.minLevelRequired || 5}</Caption>
+                  </View>
+                ) : isCompleted ? (
+                  <View style={styles.completedRow}>
+                    <Caption color={THEME.colors.emerald}>✓ DIRECTIVE SECURED • XP MINTED</Caption>
+                  </View>
+                ) : (
+                  <ProgressBar
+                    progressPercent={percent}
+                    color={state === 'IN_PROGRESS' ? THEME.colors.amber : THEME.colors.cyan}
+                    size="sm"
+                    label={`${uq.currentProgress.toLocaleString()} / ${uq.targetValue.toLocaleString()} ${quest?.unit}`}
+                    showPercent
+                  />
+                )}
+              </Card>
+            );
+          })
+        )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: THEME.colors.background,
-  },
-  scrollContent: {
-    padding: THEME.spacing.md,
-    paddingBottom: 40,
-  },
   header: {
-    marginBottom: THEME.spacing.md,
-    marginTop: THEME.spacing.sm,
+    paddingBottom: THEME.spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.colors.borderSubtle,
   },
   title: {
-    color: THEME.colors.cyan,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 2,
+    letterSpacing: 1.5,
   },
   subtitle: {
-    color: THEME.colors.textSecondary,
-    fontSize: 12,
     marginTop: 2,
+    marginBottom: THEME.spacing.xs,
   },
-  section: {
-    marginBottom: THEME.spacing.md,
-  },
-  sectionHeaderRow: {
+  resetRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: THEME.spacing.xs,
-  },
-  sectionHeader: {
-    color: THEME.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: THEME.spacing.xs,
+    justifyContent: 'space-between',
+    backgroundColor: THEME.colors.surfaceElevated,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: THEME.borderRadius.sharp,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    marginBottom: THEME.spacing.sm,
   },
   resetTimer: {
-    color: THEME.colors.cyan,
-    fontSize: 10,
+    fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+  },
+  filterRow: {
+    flexDirection: 'row',
+  },
+  filterPill: {
+    backgroundColor: THEME.colors.surfaceElevated,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: THEME.borderRadius.sharp,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    marginRight: 8,
+  },
+  filterPillActive: {
+    borderColor: THEME.colors.cyan,
+    backgroundColor: THEME.colors.cyanSubtle,
+  },
+  filterText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  listContent: {
+    paddingTop: THEME.spacing.sm,
+    paddingBottom: 40,
+  },
+  emptyCard: {
+    padding: 32,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  emptyTitle: {
+    marginBottom: 6,
+  },
+  emptyDesc: {
+    maxWidth: 280,
+    lineHeight: 18,
   },
   questCard: {
-    marginBottom: THEME.spacing.xs,
+    marginBottom: THEME.spacing.sm,
+    padding: THEME.spacing.md,
+  },
+  cardLocked: {
+    opacity: 0.65,
   },
   questTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  titleGroup: {
+    flex: 1,
+    marginRight: 10,
   },
   questTitle: {
-    color: THEME.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
   },
   questDesc: {
-    color: THEME.colors.textSecondary,
     fontSize: 12,
     lineHeight: 18,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  lockedRow: {
+    paddingVertical: 4,
   },
-  progressTrack: {
-    flex: 1,
-    height: 6,
-    backgroundColor: THEME.colors.background,
-    borderRadius: THEME.borderRadius.full,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: THEME.colors.cyan,
-    borderRadius: THEME.borderRadius.full,
-  },
-  progressText: {
-    color: THEME.colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+  completedRow: {
+    paddingVertical: 4,
   },
 });

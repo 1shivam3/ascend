@@ -26,7 +26,7 @@ export const LevelOrb: React.FC<LevelOrbProps> = ({ totalXp }) => {
       <View style={styles.infoContainer}>
         <View style={styles.rankRow}>
           <Text style={[styles.rankTitle, { color: rank.definition.color }]}>
-            {rank.definition.title.toUpperCase()} {rank.tier !== 'ASCENDANT' ? `DIV ${rank.division}` : ''}
+            {rank.definition.title.toUpperCase()} {rank.tier !== 'SSS' ? `DIV ${rank.division}` : ''}
           </Text>
         </View>
 

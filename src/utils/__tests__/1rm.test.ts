@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { calculateEstimated1RM, calculateBarbellPlates, kgToLbs, lbsToKg } from '../1rm';
+import { calculateEstimated1RM, calculateEpley1RM, calculateRelativeStrength, calculateBarbellPlates, kgToLbs, lbsToKg } from '../1rm';
 
-describe('1RM Calculator — Dampened Hybrid Brzycki-Epley', () => {
+describe('1RM Calculator — Canonical Epley Formula', () => {
   it('returns weight for single rep (r = 1)', () => {
     expect(calculateEstimated1RM(100, 1)).toBe(100);
     expect(calculateEstimated1RM(220, 1)).toBe(220);
@@ -13,29 +13,37 @@ describe('1RM Calculator — Dampened Hybrid Brzycki-Epley', () => {
     expect(calculateEstimated1RM(-50, 5)).toBe(0);
   });
 
-  it('calculates hybrid value for 2 to 10 reps', () => {
-    // 100kg x 5 reps
-    // Epley: 100 * (1 + 5/30) = 116.666
-    // Brzycki: (100 * 36) / (37 - 5) = 3600 / 32 = 112.5
-    // Hybrid: (116.666 + 112.5) / 2 = 114.58 -> rounded 114.6
+  it('calculates exact Epley value for 100kg x 5 reps (116.7kg)', () => {
+    // 100kg x 5 reps: 100 * (1 + 5/30) = 116.666... -> rounded to 116.7
     const e1rm = calculateEstimated1RM(100, 5);
-    expect(e1rm).toBeCloseTo(114.6, 1);
+    expect(e1rm).toBe(116.7);
+    expect(calculateEpley1RM(100, 5)).toBe(116.7);
   });
 
-  it('applies dampening penalty for high reps (>10) to avoid endurance inflation', () => {
-    // 100kg x 20 reps
-    // Unconstrained Epley: 100 * (1 + 20/30) = 166.7kg
-    // Dampened with (10/20)^0.12 = 0.920
-    // Expected: ~153.4kg
-    const dampened = calculateEstimated1RM(100, 20);
-    expect(dampened).toBeLessThan(166.7);
-    expect(dampened).toBeGreaterThan(140);
+  it('calculates Epley value for high reps', () => {
+    // 100kg x 20 reps: 100 * (1 + 20/30) = 166.7kg
+    const e1rm = calculateEstimated1RM(100, 20);
+    expect(e1rm).toBe(166.7);
   });
 
   it('clamps extreme outlier inputs', () => {
     // 1000kg should be clamped to MAX_PLAUSIBLE_WEIGHT_KG (550kg)
     const result = calculateEstimated1RM(1000, 1);
     expect(result).toBe(550);
+  });
+});
+
+describe('Relative Strength Ratio', () => {
+  it('calculates ratio accurately', () => {
+    // 116.7 kg e1RM / 70 kg bodyweight = 1.67x
+    expect(calculateRelativeStrength(116.7, 70)).toBe(1.67);
+    // 140 kg squat / 70 kg bodyweight = 2.0x
+    expect(calculateRelativeStrength(140, 70)).toBe(2.0);
+  });
+
+  it('returns null for missing or non-positive bodyweight or 1RM', () => {
+    expect(calculateRelativeStrength(100, 0)).toBeNull();
+    expect(calculateRelativeStrength(0, 75)).toBeNull();
   });
 });
 

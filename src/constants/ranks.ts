@@ -1,64 +1,8 @@
-import { RankTier } from '../types/domain.types';
+import { PROGRESSION_CONFIG, RankTier, RankDefinition } from '../config/progression.config';
 
-export interface RankDefinition {
-  tier: RankTier;
-  title: string;
-  minLevel: number;
-  maxLevel: number;
-  color: string;
-  description: string;
-}
+export type { RankTier, RankDefinition };
 
-export const RANKS: Record<RankTier, RankDefinition> = {
-  INITIATE: {
-    tier: 'INITIATE',
-    title: 'Initiate',
-    minLevel: 1,
-    maxLevel: 19,
-    color: '#94A3B8', // Steel
-    description: 'The foundation of discipline. Awakening physical potential.',
-  },
-  ADEPT: {
-    tier: 'ADEPT',
-    title: 'Adept',
-    minLevel: 20,
-    maxLevel: 39,
-    color: '#10B981', // Matrix Emerald
-    description: 'Consistent execution. Biomechanical precision emerging.',
-  },
-  VANGUARD: {
-    tier: 'VANGUARD',
-    title: 'Vanguard',
-    minLevel: 40,
-    maxLevel: 59,
-    color: '#00F0FF', // Electric Cyan
-    description: 'Frontline iron capability. Demonstrates dominant power and work capacity.',
-  },
-  CENTURION: {
-    tier: 'CENTURION',
-    title: 'Centurion',
-    minLevel: 60,
-    maxLevel: 79,
-    color: '#8B5CF6', // Hyper Violet
-    description: 'Master of the physical vessel. Elite volume resistance and progressive overload.',
-  },
-  SOVEREIGN: {
-    tier: 'SOVEREIGN',
-    title: 'Sovereign',
-    minLevel: 80,
-    maxLevel: 99,
-    color: '#FFB800', // Solar Amber
-    description: 'Unmatched strength and athletic fortitude. A living apex performer.',
-  },
-  ASCENDANT: {
-    tier: 'ASCENDANT',
-    title: 'Ascendant',
-    minLevel: 100,
-    maxLevel: 999,
-    color: '#FF3366', // Celestial Crimson
-    description: 'Transcendence of mortal limits. Real-world athletic mastery achieved.',
-  },
-};
+export const RANKS = PROGRESSION_CONFIG.ranks;
 
 export const MASTERY_TIERS = [
   { minLevel: 1, maxLevel: 19, title: 'Novice', color: '#94A3B8' },
@@ -69,28 +13,41 @@ export const MASTERY_TIERS = [
   { minLevel: 100, maxLevel: 999, title: 'Paragon', color: '#FF3366' },
 ] as const;
 
-export function getRankForLevel(level: number): { tier: RankTier; division: number; definition: RankDefinition } {
+/**
+ * Deterministically determines Rank Tier (E, D, C, B, A, S, SS, SSS) and Division (IV, III, II, I)
+ * from explicit configurable thresholds in PROGRESSION_CONFIG.
+ */
+export function getRankForLevel(level: number): {
+  tier: RankTier;
+  division: number;
+  definition: RankDefinition;
+} {
   const safeLevel = Math.max(1, Math.floor(level));
-  
-  let tier: RankTier = 'INITIATE';
-  if (safeLevel >= 100) tier = 'ASCENDANT';
-  else if (safeLevel >= 80) tier = 'SOVEREIGN';
-  else if (safeLevel >= 60) tier = 'CENTURION';
-  else if (safeLevel >= 40) tier = 'VANGUARD';
-  else if (safeLevel >= 20) tier = 'ADEPT';
-  
-  const def = RANKS[tier];
-  
-  if (tier === 'ASCENDANT') {
-    return { tier, division: 1, definition: def };
+
+  const rankEntries = Object.values(PROGRESSION_CONFIG.ranks) as RankDefinition[];
+  let matchedRank = rankEntries.find(r => safeLevel >= r.minLevel && safeLevel <= r.maxLevel);
+
+  if (!matchedRank) {
+    if (safeLevel >= 100) {
+      matchedRank = PROGRESSION_CONFIG.ranks.SSS;
+    } else {
+      matchedRank = PROGRESSION_CONFIG.ranks.E;
+    }
   }
-  
-  // Calculate division IV, III, II, I (5 levels per division)
-  const offset = safeLevel - def.minLevel; // 0 to 19
-  const divIndex = Math.floor(offset / 5); // 0, 1, 2, 3
-  const division = 4 - divIndex; // 4, 3, 2, 1
-  
-  return { tier, division, definition: def };
+
+  // SSS-Rank represents ultimate ascension (single division)
+  if (matchedRank.tier === 'SSS') {
+    return { tier: matchedRank.tier, division: 1, definition: matchedRank };
+  }
+
+  // Calculate division IV, III, II, I across tier level span
+  const span = Math.max(1, matchedRank.maxLevel - matchedRank.minLevel + 1);
+  const offset = safeLevel - matchedRank.minLevel;
+  const step = Math.max(1, Math.ceil(span / 4));
+  const divIndex = Math.min(3, Math.floor(offset / step));
+  const division = 4 - divIndex;
+
+  return { tier: matchedRank.tier, division, definition: matchedRank };
 }
 
 export function getMasteryTierForLevel(level: number) {
@@ -98,3 +55,22 @@ export function getMasteryTierForLevel(level: number) {
   const found = MASTERY_TIERS.find(t => safeLevel >= t.minLevel && safeLevel <= t.maxLevel);
   return found || MASTERY_TIERS[MASTERY_TIERS.length - 1];
 }
+
+export function getExerciseRankFromLevel(level: number): {
+  tier: RankTier;
+  color: string;
+  title: string;
+} {
+  const safeLevel = Math.max(1, Math.floor(level));
+  const ranks = PROGRESSION_CONFIG.mastery.exerciseRanks;
+
+  if (safeLevel <= 10) return ranks.E;
+  if (safeLevel <= 20) return ranks.D;
+  if (safeLevel <= 30) return ranks.C;
+  if (safeLevel <= 40) return ranks.B;
+  if (safeLevel <= 50) return ranks.A;
+  if (safeLevel <= 60) return ranks.S;
+  if (safeLevel <= 80) return ranks.SS;
+  return ranks.SSS;
+}
+

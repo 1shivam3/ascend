@@ -4,19 +4,34 @@ import { WorkoutSession } from '../../../types/domain.types';
 
 describe('AttributeEngine — 5 Core Attributes', () => {
   it('initializes default attributes within valid bounds (10-100)', () => {
-    const defaultAttrs = { strength: 10, stamina: 10, agility: 10, discipline: 10, vitality: 10 };
+    const defaultAttrs = {
+      strength: 10,
+      endurance: 10,
+      agility: 10,
+      consistency: 10,
+      stamina: 10,
+      discipline: 10,
+      vitality: 10,
+    };
     const updated = AttributeEngine.computeAttributes(defaultAttrs, [], 0, 0, 1);
 
     expect(updated.strength).toBeGreaterThanOrEqual(10);
     expect(updated.strength).toBeLessThanOrEqual(100);
-    expect(updated.stamina).toBeGreaterThanOrEqual(10);
+    expect(updated.endurance).toBeGreaterThanOrEqual(10);
     expect(updated.agility).toBeGreaterThanOrEqual(10);
-    expect(updated.discipline).toBeGreaterThanOrEqual(10);
-    expect(updated.vitality).toBeGreaterThanOrEqual(10);
+    expect(updated.consistency).toBeGreaterThanOrEqual(10);
   });
 
   it('boosts Strength when heavy compound workouts are completed', () => {
-    const initialAttrs = { strength: 10, stamina: 10, agility: 10, discipline: 10, vitality: 10 };
+    const initialAttrs = {
+      strength: 10,
+      endurance: 10,
+      agility: 10,
+      consistency: 10,
+      stamina: 10,
+      discipline: 10,
+      vitality: 10,
+    };
     const heavySession: WorkoutSession = {
       id: 'w1',
       userId: 'u1',

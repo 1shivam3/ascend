@@ -1,4 +1,5 @@
-import { CharacterAttributes, RankTier } from './domain.types';
+import { CharacterAttributes, RankTier, PrType } from './domain.types';
+import { UserQuestProgress } from './quest.types';
 
 export interface LevelInfo {
   level: number;
@@ -12,6 +13,7 @@ export interface MasteryLevelInfo {
   masteryTierTitle: string;
   currentLevelXp: number;
   xpRequiredForNextLevel: number;
+  xpToNextLevel?: number;
   progressPercent: number;
 }
 
@@ -34,10 +36,19 @@ export interface WorkoutProgressionResult {
     oldLevel: number;
     newLevel: number;
     didLevelUp: boolean;
+    oldRank?: RankTier;
+    newRank?: RankTier;
+    didRankUp?: boolean;
+    relativeStrength?: number | null;
     new1RmKg: number;
     prsBroken: {
-      type: 'MAX_WEIGHT' | 'MAX_REPS' | 'MAX_VOLUME' | 'MAX_ESTIMATED_1RM';
+      type: PrType;
       value: number;
+    }[];
+    unlockedMilestones?: {
+      id: string;
+      title: string;
+      rewardXp: number;
     }[];
   }[];
   prsBrokenCount: number;
@@ -46,4 +57,7 @@ export interface WorkoutProgressionResult {
     longestStreak: number;
     isMilestone: boolean;
   };
+  questsUpdated?: UserQuestProgress[];
+  completedQuests?: UserQuestProgress[];
+  newlyUnlockedAchievements?: import('../config/achievements.config').AchievementConfig[];
 }
