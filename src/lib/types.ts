@@ -108,3 +108,10 @@ export interface OverallLevel {
   title: OverallTitle;
   averageRatio: number;
 }
+
+export interface MacroGoals {
+  calories: number;
+  proteinG: number;
+  carbsG?: number;
+  fatG?: number;
+}

@@ -31,6 +31,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const [targetWeightInput, setTargetWeightInput] = useState('');
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [plateModalWeight, setPlateModalWeight] = useState<number | null>(null);
+  const [plateModalMeta, setPlateModalMeta] = useState<{ exerciseName?: string; bestSetWeight?: number; milestoneWeight?: number } | null>(null);
 
   // Form State
   const [exercise, setExercise] = useState('');
@@ -239,7 +240,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setPlateModalWeight(100)}
+            onClick={() => {
+              setPlateModalWeight(100);
+              setPlateModalMeta(null);
+            }}
             className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
             title="Barbell Plate Calculator"
           >
@@ -358,9 +362,24 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                       {display1RM} {userUnit}
                     </span>
                   </div>
-                  <div className="border-l border-border/60">
-                    <span className="text-2xs text-text-muted block uppercase">Best Set</span>
-                    <span className="text-xs font-semibold text-text-primary">
+                  <div
+                    onClick={() => {
+                      if (item.bestSet.weight > 0) {
+                        setPlateModalWeight(item.bestSet.weight);
+                        setPlateModalMeta({
+                          exerciseName: item.exercise,
+                          bestSetWeight: item.bestSet.weight,
+                          milestoneWeight: item.nextMilestone || display1RM,
+                        });
+                      }
+                    }}
+                    className="border-l border-border/60 cursor-pointer hover:bg-bg-elevated/50 transition-colors rounded p-0.5 group"
+                    title="Tap to calculate plates for Best Working Set"
+                  >
+                    <span className="text-2xs text-text-muted block uppercase flex items-center justify-center gap-0.5 group-hover:text-accent">
+                      Best Set <Dumbbell className="w-2.5 h-2.5 text-accent/70" />
+                    </span>
+                    <span className="text-xs font-semibold text-text-primary group-hover:text-accent">
                       {item.bestSet.weight} × {item.bestSet.reps}
                     </span>
                   </div>
@@ -399,9 +418,16 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => setPlateModalWeight(item.nextMilestone || display1RM)}
+                        onClick={() => {
+                          setPlateModalWeight(item.nextMilestone || display1RM);
+                          setPlateModalMeta({
+                            exerciseName: item.exercise,
+                            bestSetWeight: item.bestSet.weight,
+                            milestoneWeight: item.nextMilestone || display1RM,
+                          });
+                        }}
                         className="text-text-muted hover:text-accent p-0.5 rounded transition-colors flex items-center gap-0.5 text-2xs"
-                        title="Calculate Barbell Plates for Milestone"
+                        title="Calculate Barbell Plates (Best Set or Milestone)"
                       >
                         <Dumbbell className="w-3.5 h-3.5 text-accent" />
                         <span className="hidden sm:inline">Plates</span>
@@ -654,9 +680,15 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       {/* Barbell Plate Loading Calculator Modal */}
       <PlateCalculatorModal
         isOpen={plateModalWeight !== null}
-        onClose={() => setPlateModalWeight(null)}
+        onClose={() => {
+          setPlateModalWeight(null);
+          setPlateModalMeta(null);
+        }}
         initialWeight={plateModalWeight || 100}
         initialUnit={userUnit}
+        exerciseName={plateModalMeta?.exerciseName}
+        bestSetWeight={plateModalMeta?.bestSetWeight}
+        milestoneWeight={plateModalMeta?.milestoneWeight}
       />
     </div>
   );

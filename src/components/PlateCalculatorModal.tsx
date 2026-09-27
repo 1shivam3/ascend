@@ -9,6 +9,9 @@ interface PlateCalculatorModalProps {
   onClose: () => void;
   initialWeight?: number;
   initialUnit?: 'kg' | 'lbs';
+  exerciseName?: string;
+  bestSetWeight?: number;
+  milestoneWeight?: number;
 }
 
 export default function PlateCalculatorModal({
@@ -16,10 +19,14 @@ export default function PlateCalculatorModal({
   onClose,
   initialWeight = 100,
   initialUnit = 'kg',
+  exerciseName,
+  bestSetWeight,
+  milestoneWeight,
 }: PlateCalculatorModalProps) {
   const [unit, setUnit] = useState<'kg' | 'lbs'>(initialUnit);
   const [barWeight, setBarWeight] = useState<number>(initialUnit === 'kg' ? 20 : 45);
   const [targetWeight, setTargetWeight] = useState<number>(initialWeight || 100);
+  const [showWarmupRamp, setShowWarmupRamp] = useState<boolean>(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -40,6 +47,19 @@ export default function PlateCalculatorModal({
       setTargetWeight(Math.round(targetWeight * 2.20462) || 225);
     }
   };
+
+  const warmupSets = useMemo(() => {
+    if (targetWeight <= barWeight) return [];
+    const step = unit === 'kg' ? 2.5 : 5;
+    const roundToStep = (wt: number) => Math.max(barWeight, Math.round(wt / step) * step);
+    return [
+      { label: 'Set 1 (Empty Bar)', weight: barWeight, reps: '10 reps', pct: 'Warmup' },
+      { label: 'Set 2 (50%)', weight: roundToStep(targetWeight * 0.5), reps: '5 reps', pct: '50%' },
+      { label: 'Set 3 (70%)', weight: roundToStep(targetWeight * 0.7), reps: '3 reps', pct: '70%' },
+      { label: 'Set 4 (85%)', weight: roundToStep(targetWeight * 0.85), reps: '1-2 reps', pct: '85%' },
+      { label: 'Work Set (100%)', weight: targetWeight, reps: 'Work reps', pct: '100%' },
+    ];
+  }, [targetWeight, barWeight, unit]);
 
   const calculation = useMemo(() => {
     return calculatePlates(targetWeight, barWeight, unit);
@@ -78,6 +98,47 @@ export default function PlateCalculatorModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Exercise Context & Presets (Working Set vs Milestone) */}
+        {(exerciseName || bestSetWeight || milestoneWeight) && (
+          <div className="p-2.5 rounded-lg bg-bg-secondary/70 border border-border/80 flex flex-col gap-1.5 font-mono text-xs">
+            {exerciseName && (
+              <span className="font-bold text-accent text-xs capitalize">
+                {exerciseName}
+              </span>
+            )}
+            <div className="flex gap-2">
+              {bestSetWeight && (
+                <button
+                  type="button"
+                  onClick={() => setTargetWeight(bestSetWeight)}
+                  className={`flex-1 py-1.5 px-2 rounded-lg border text-2xs transition-colors flex flex-col items-center justify-center ${
+                    targetWeight === bestSetWeight
+                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                      : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <span className="text-[10px] text-text-muted">Best Working Set</span>
+                  <span className="font-bold">{bestSetWeight} {unit}</span>
+                </button>
+              )}
+              {milestoneWeight && (
+                <button
+                  type="button"
+                  onClick={() => setTargetWeight(milestoneWeight)}
+                  className={`flex-1 py-1.5 px-2 rounded-lg border text-2xs transition-colors flex flex-col items-center justify-center ${
+                    targetWeight === milestoneWeight
+                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                      : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <span className="text-[10px] text-text-muted">Target / 1RM</span>
+                  <span className="font-bold">{milestoneWeight} {unit}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bar & Target Weight Controls */}
         <div className="space-y-3">
@@ -294,6 +355,61 @@ export default function PlateCalculatorModal({
             </p>
           )}
         </div>
+
+        {/* Warm-up Ramp Sets Generator */}
+        {warmupSets.length > 0 && (
+          <div className="space-y-1.5 border-t border-border/60 pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-2xs font-mono uppercase text-text-muted font-bold block">
+                WARM-UP RAMP GENERATOR
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowWarmupRamp(!showWarmupRamp)}
+                className="text-2xs font-mono text-accent hover:underline"
+              >
+                {showWarmupRamp ? 'Hide' : 'Show Ramp'}
+              </button>
+            </div>
+
+            {showWarmupRamp && (
+              <div className="space-y-1 animate-fade-in font-mono text-xs">
+                {warmupSets.map((ws, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex items-center justify-between p-2 rounded-lg border transition-colors ${
+                      targetWeight === ws.weight
+                        ? 'bg-accent/10 border-accent/60 text-accent font-bold'
+                        : 'bg-bg-secondary border-border/70 text-text-secondary hover:bg-bg-elevated'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xs text-text-muted w-8">{ws.pct}</span>
+                      <span className="font-bold text-text-primary">
+                        {ws.weight} {unit}
+                      </span>
+                      <span className="text-text-muted text-2xs">({ws.reps})</span>
+                    </div>
+
+                    {targetWeight !== ws.weight ? (
+                      <button
+                        type="button"
+                        onClick={() => setTargetWeight(ws.weight)}
+                        className="px-2 py-0.5 rounded bg-bg-elevated border border-border text-2xs text-text-primary hover:border-accent hover:text-accent transition-colors"
+                      >
+                        Load Plates
+                      </button>
+                    ) : (
+                      <span className="text-2xs text-accent font-semibold px-2 py-0.5">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"

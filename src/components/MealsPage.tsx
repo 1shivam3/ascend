@@ -3,8 +3,8 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { estimateMacros, calculateMealMacros } from '@/lib/macros';
-import { Plus, X, ChevronDown, ChevronUp, Trash2, Utensils, ArrowLeft } from 'lucide-react';
-import { MealEntry, FoodItem } from '@/lib/types';
+import { Plus, X, ChevronDown, ChevronUp, Trash2, Utensils, ArrowLeft, Target, Sparkles, Edit3 } from 'lucide-react';
+import { MealEntry, FoodItem, MacroGoals } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { useToast } from '@/components/ui/Toast';
 
@@ -13,13 +13,23 @@ interface MealsPageProps {
 }
 
 export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
+  const profile = useStore((state) => state.profile);
   const meals = useStore((state) => state.meals);
+  const macroGoals = useStore((state) => state.macroGoals);
   const addMeal = useStore((state) => state.addMeal);
   const deleteMeal = useStore((state) => state.deleteMeal);
+  const setMacroGoals = useStore((state) => state.setMacroGoals);
   const toast = useToast();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
+  
+  // Goals State
+  const [goalCalories, setGoalCalories] = useState('');
+  const [goalProtein, setGoalProtein] = useState('');
+  const [goalCarbs, setGoalCarbs] = useState('');
+  const [goalFat, setGoalFat] = useState('');
   
   // Form State
   const [mealName, setMealName] = useState('');
@@ -89,6 +99,68 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setFoods([]);
   };
   
+  const handleOpenGoalsModal = () => {
+    if (macroGoals) {
+      setGoalCalories(macroGoals.calories ? String(macroGoals.calories) : '');
+      setGoalProtein(macroGoals.proteinG ? String(macroGoals.proteinG) : '');
+      setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
+      setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
+    } else {
+      const bw = profile?.bodyweightKg || 75;
+      const cal = Math.round(bw * 32);
+      const prot = Math.round(bw * 2);
+      const fat = Math.round(bw * 0.9);
+      const carb = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
+      setGoalCalories(String(cal));
+      setGoalProtein(String(prot));
+      setGoalCarbs(String(carb));
+      setGoalFat(String(fat));
+    }
+    setIsGoalsModalOpen(true);
+  };
+
+  const handleAutoCalculateGoals = () => {
+    const bw = profile?.bodyweightKg || 75;
+    const cal = Math.round(bw * 32);
+    const prot = Math.round(bw * 2);
+    const fat = Math.round(bw * 0.9);
+    const carb = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
+    setGoalCalories(String(cal));
+    setGoalProtein(String(prot));
+    setGoalCarbs(String(carb));
+    setGoalFat(String(fat));
+    toast.info(`Targets calibrated for ${bw}kg bodyweight (2g/kg protein).`, 'Targets Calculated');
+  };
+
+  const handleSaveGoals = () => {
+    const cal = parseFloat(goalCalories);
+    const prot = parseFloat(goalProtein);
+    const carb = parseFloat(goalCarbs);
+    const fat = parseFloat(goalFat);
+
+    if (isNaN(cal) || cal <= 0 || isNaN(prot) || prot <= 0) {
+      toast.error('Please enter valid target calories and protein.', 'Invalid Targets');
+      return;
+    }
+
+    const newGoals: MacroGoals = {
+      calories: Math.round(cal),
+      proteinG: Math.round(prot),
+      carbsG: !isNaN(carb) && carb > 0 ? Math.round(carb) : undefined,
+      fatG: !isNaN(fat) && fat > 0 ? Math.round(fat) : undefined,
+    };
+
+    setMacroGoals(newGoals);
+    toast.success(`Daily goals set: ${newGoals.calories} kcal & ${newGoals.proteinG}g protein.`, 'Goals Saved');
+    setIsGoalsModalOpen(false);
+  };
+
+  const handleClearGoals = () => {
+    setMacroGoals(null);
+    toast.info('Daily macro targets cleared.', 'Targets Reset');
+    setIsGoalsModalOpen(false);
+  };
+  
   const todayDate = new Date().toISOString().split('T')[0];
   const todayMeals = meals.filter(m => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap(m => m.foods));
@@ -144,27 +216,123 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </header>
 
-      {/* Today's Summary */}
-      <section className="mb-6">
-        <h2 className="section-title mb-2.5">TODAY&apos;S TOTALS</h2>
+      {/* Today's Summary & Goals */}
+      <section className="mb-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title mb-0">TODAY&apos;S TOTALS &amp; GOALS</h2>
+          <button
+            type="button"
+            onClick={handleOpenGoalsModal}
+            className="text-2xs font-mono text-accent hover:underline flex items-center gap-1 font-semibold"
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>{macroGoals ? 'Edit Targets' : 'Set Targets'}</span>
+          </button>
+        </div>
+
+        {/* 4-Stat Grid */}
         <div className="card grid grid-cols-4 gap-2 text-center py-4 bg-bg-card border border-border">
           <div className="flex flex-col">
             <span className="text-2xl font-bold text-accent font-mono">{Math.round(todayMacros.calories)}</span>
             <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">CALORIES</span>
+            {macroGoals && (
+              <span className="text-[10px] font-mono text-text-muted mt-0.5">
+                / {macroGoals.calories}
+              </span>
+            )}
           </div>
           <div className="flex flex-col border-l border-border">
             <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.proteinG)}g</span>
             <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">PROTEIN</span>
+            {macroGoals && (
+              <span className="text-[10px] font-mono text-text-muted mt-0.5">
+                / {macroGoals.proteinG}g
+              </span>
+            )}
           </div>
           <div className="flex flex-col border-l border-border">
             <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.carbsG)}g</span>
             <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">CARBS</span>
+            {macroGoals && macroGoals.carbsG ? (
+              <span className="text-[10px] font-mono text-text-muted mt-0.5">
+                / {macroGoals.carbsG}g
+              </span>
+            ) : null}
           </div>
           <div className="flex flex-col border-l border-border">
             <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.fatG)}g</span>
             <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">FAT</span>
+            {macroGoals && macroGoals.fatG ? (
+              <span className="text-[10px] font-mono text-text-muted mt-0.5">
+                / {macroGoals.fatG}g
+              </span>
+            ) : null}
           </div>
         </div>
+
+        {/* Macro Progress Bars (if targets set) or Prompt (if not set) */}
+        {macroGoals ? (
+          <div className="card p-3.5 space-y-2.5 bg-bg-secondary/60 border border-border/80 text-xs font-mono">
+            {/* Calories bar */}
+            <div>
+              <div className="flex justify-between items-center text-2xs mb-1">
+                <span className="text-text-secondary flex items-center gap-1 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-accent inline-block" />
+                  Calories Progress
+                </span>
+                <span className="font-bold text-text-primary">
+                  {Math.round(todayMacros.calories)} / {macroGoals.calories} kcal ({Math.min(100, Math.round((todayMacros.calories / macroGoals.calories) * 100))}%)
+                </span>
+              </div>
+              <div className="level-bar">
+                <div
+                  className="level-bar-fill bg-accent"
+                  style={{ width: `${Math.min(100, Math.round((todayMacros.calories / macroGoals.calories) * 100))}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Protein bar */}
+            <div>
+              <div className="flex justify-between items-center text-2xs mb-1">
+                <span className="text-text-secondary flex items-center gap-1 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                  Protein Target
+                </span>
+                <span className="font-bold text-text-primary">
+                  {Math.round(todayMacros.proteinG)} / {macroGoals.proteinG} g ({Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%)
+                </span>
+              </div>
+              <div className="level-bar">
+                <div
+                  className="level-bar-fill bg-emerald-400"
+                  style={{ width: `${Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div
+            onClick={handleOpenGoalsModal}
+            className="p-3 rounded-xl bg-bg-secondary border border-dashed border-border/80 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
+                <Target className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-primary">Set Daily Macro Targets</p>
+                <p className="text-[11px] text-text-muted font-mono">Calibrate daily calories &amp; protein for cutting or bulking</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="text-xs font-mono font-semibold text-accent underline ml-2 flex-shrink-0"
+            >
+              Configure
+            </button>
+          </div>
+        )}
       </section>
 
       <section>
@@ -404,6 +572,134 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   Save Meal
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Macro Targets Modal */}
+      {isGoalsModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsGoalsModalOpen(false)}>
+          <div
+            className="modal-content p-5 space-y-4 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-text-primary leading-tight">
+                    Daily Macro Targets
+                  </h3>
+                  <p className="text-2xs text-text-muted font-mono">Caloric &amp; protein pacing</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGoalsModalOpen(false)}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Quick Auto-Calculate Banner */}
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border/70 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold text-text-primary flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-accent" />
+                  Auto-Calculate
+                </p>
+                <p className="text-[11px] text-text-muted font-mono">
+                  Based on {profile?.bodyweightKg || 75}kg bodyweight
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoCalculateGoals}
+                className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors"
+              >
+                Apply
+              </button>
+            </div>
+
+            {/* Input Fields */}
+            <div className="space-y-3 font-mono">
+              <div>
+                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  Daily Calorie Target (kcal)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g. 2500"
+                  value={goalCalories}
+                  onChange={(e) => setGoalCalories(e.target.value)}
+                  className="w-full text-base font-bold text-text-primary"
+                />
+              </div>
+
+              <div>
+                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  Protein Target (grams)
+                </label>
+                <input
+                  type="number"
+                  placeholder="e.g. 160"
+                  value={goalProtein}
+                  onChange={(e) => setGoalProtein(e.target.value)}
+                  className="w-full text-base font-bold text-text-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Carbs (g, optional)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 260"
+                    value={goalCarbs}
+                    onChange={(e) => setGoalCarbs(e.target.value)}
+                    className="w-full text-sm font-bold text-text-primary"
+                  />
+                </div>
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Fat (g, optional)
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 70"
+                    value={goalFat}
+                    onChange={(e) => setGoalFat(e.target.value)}
+                    className="w-full text-sm font-bold text-text-primary"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex gap-2">
+              {macroGoals && (
+                <button
+                  type="button"
+                  onClick={handleClearGoals}
+                  className="btn-danger py-2 px-3 text-xs font-mono"
+                  title="Remove daily targets"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleSaveGoals}
+                className="btn-primary flex-1 py-2 text-xs font-bold font-mono uppercase"
+              >
+                Save Targets
+              </button>
             </div>
           </div>
         </div>

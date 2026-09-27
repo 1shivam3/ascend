@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry } from './types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry, MacroGoals } from './types';
 
 export * from './types';
 
@@ -12,6 +12,7 @@ interface AppState {
   bodyMetrics: BodyMetricEntry[];
   theme: Theme;
   prTargets: Record<string, number>;
+  macroGoals: MacroGoals | null;
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
   
@@ -34,6 +35,8 @@ interface AppState {
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
 
+  setMacroGoals: (goals: MacroGoals | null) => void;
+
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
   updateBodyMetrics: (weightKg: number, heightCm?: number) => void;
@@ -52,6 +55,7 @@ export const useAppStore = create<AppState>()(
       bodyMetrics: [],
       theme: 'dark',
       prTargets: {},
+      macroGoals: null,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
       
@@ -108,6 +112,8 @@ export const useAppStore = create<AppState>()(
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
 
+      setMacroGoals: (goals) => set({ macroGoals: goals }),
+
       addBodyMetric: (entry) => set((state) => ({ bodyMetrics: [entry, ...state.bodyMetrics] })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
       updateBodyMetrics: (weightKg, heightCm) => set((state) => {
@@ -137,6 +143,7 @@ export const useAppStore = create<AppState>()(
           meals: [],
           bodyMetrics: [],
           prTargets: {},
+          macroGoals: null,
           hasCompletedOnboarding: false,
         });
         if (typeof window !== 'undefined') {
@@ -156,6 +163,7 @@ export const useAppStore = create<AppState>()(
             meals: Array.isArray(data.meals) ? data.meals : state.meals,
             bodyMetrics: Array.isArray(data.bodyMetrics) ? data.bodyMetrics : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
+            macroGoals: data.macroGoals !== undefined ? data.macroGoals : state.macroGoals,
             theme: data.theme || state.theme,
             hasCompletedOnboarding:
               data.hasCompletedOnboarding !== undefined
@@ -195,6 +203,7 @@ export const useAppStore = create<AppState>()(
         bodyMetrics: state.bodyMetrics,
         theme: state.theme,
         prTargets: state.prTargets,
+        macroGoals: state.macroGoals,
         hasCompletedOnboarding: state.hasCompletedOnboarding
       })
     }

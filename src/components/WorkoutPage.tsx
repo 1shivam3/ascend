@@ -1,11 +1,26 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseList } from '@/lib/strength-standards';
-import { Plus, X, ChevronDown, ChevronUp, Calendar, Trash2, ArrowLeft } from 'lucide-react';
+import { getExerciseList, calculateOneRepMax } from '@/lib/strength-standards';
+import {
+  Plus,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  Trash2,
+  ArrowLeft,
+  Timer,
+  Play,
+  Pause,
+  RotateCcw,
+  Dumbbell,
+  Sparkles
+} from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet } from '@/lib/store';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import { useToast } from '@/components/ui/Toast';
 
 interface WorkoutPageProps {
@@ -14,14 +29,23 @@ interface WorkoutPageProps {
 
 export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const profile = useStore((state) => state.profile);
+  const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
+  const addPR = useStore((state) => state.addPR);
   const toast = useToast();
   
   const userUnit = profile?.unit || 'kg';
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+
+  // Rest Timer State
+  const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
+  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(90);
+  const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
+  const [isRestExpanded, setIsRestExpanded] = useState<boolean>(false);
   
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -79,6 +103,76 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
     setExercises(newExercises);
   };
   
+  // Audio Beep for Rest Timer completion
+  const playBeep = () => {
+    try {
+      if (typeof window === 'undefined') return;
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const audioCtx = new AudioContextClass();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.8);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8);
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    } catch {}
+  };
+
+  // Rest Timer Countdown Effect
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    if (isRestRunning && restSecondsLeft > 0) {
+      interval = setInterval(() => {
+        setRestSecondsLeft((prev) => {
+          if (prev <= 1) {
+            playBeep();
+            toast.info('⏰ Rest time is up! Ready for your next set.', 'Rest Period Complete');
+            setIsRestRunning(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isRestRunning, restSecondsLeft, toast]);
+
+  const startTimer = (seconds: number) => {
+    setRestTotalSeconds(seconds);
+    setRestSecondsLeft(seconds);
+    setIsRestRunning(true);
+    setIsRestExpanded(true);
+  };
+
+  const togglePauseTimer = () => {
+    setIsRestRunning(!isRestRunning);
+  };
+
+  const resetTimer = () => {
+    setIsRestRunning(false);
+    setRestSecondsLeft(restTotalSeconds);
+  };
+
+  const adjustTimer = (deltaSeconds: number) => {
+    setRestSecondsLeft((prev) => Math.max(0, prev + deltaSeconds));
+  };
+
+  const formatTimer = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    const remainder = secs % 60;
+    return `${String(mins).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+  };
+
   const handleSaveWorkout = () => {
     const validExercises = exercises.filter(e => e.name.trim() && e.sets.length > 0);
     if (validExercises.length === 0) {
@@ -86,17 +180,72 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
       return;
     }
     
+    const workoutId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `w_${Date.now()}`;
     const newWorkout: WorkoutEntry = {
-      id: crypto.randomUUID(),
+      id: workoutId,
       date,
       exercises: validExercises
     };
     
     addWorkout(newWorkout);
-    toast.success(
-      `Logged workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''}!`,
-      'Workout Saved'
-    );
+
+    // Auto-PR Detection across all exercises in this workout
+    let newPRCount = 0;
+    for (const ex of validExercises) {
+      const exName = ex.name.trim();
+      const existingPRs = prs.filter(p => p.exercise.toLowerCase() === exName.toLowerCase());
+      const currentBest1RMKg = existingPRs.length > 0 ? Math.max(...existingPRs.map(p => p.oneRepMax)) : 0;
+
+      let topSetInWorkout = { weightKg: 0, weightLbs: 0, reps: 0, e1RMKg: 0, rawWeight: 0, unit: userUnit };
+
+      for (const s of ex.sets) {
+        const wNum = s.weight;
+        const rNum = s.reps;
+        if (wNum > 0 && rNum > 0) {
+          const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
+          const wLbs = s.unit === 'lbs' ? wNum : wNum * 2.20462;
+          const e1RM = calculateOneRepMax(wKg, rNum);
+          if (e1RM > topSetInWorkout.e1RMKg) {
+            topSetInWorkout = {
+              weightKg: Math.round(wKg * 10) / 10,
+              weightLbs: Math.round(wLbs * 10) / 10,
+              reps: rNum,
+              e1RMKg: Math.round(e1RM * 10) / 10,
+              rawWeight: wNum,
+              unit: s.unit
+            };
+          }
+        }
+      }
+
+      if (topSetInWorkout.e1RMKg > currentBest1RMKg && topSetInWorkout.e1RMKg > 0) {
+        const prId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pr_${Date.now()}_${Math.random()}`;
+        addPR({
+          id: prId,
+          exercise: exName,
+          weightKg: topSetInWorkout.weightKg,
+          weightLbs: topSetInWorkout.weightLbs,
+          reps: topSetInWorkout.reps,
+          oneRepMax: topSetInWorkout.e1RMKg,
+          date,
+          notes: 'Auto-detected from workout session'
+        });
+        newPRCount++;
+      }
+    }
+
+    if (newPRCount > 0) {
+      toast.success(
+        `🎉 ${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
+        'New PR Milestone'
+      );
+    } else {
+      toast.success(
+        `Logged workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''}!`,
+        'Workout Saved'
+      );
+    }
+
     setIsModalOpen(false);
     setDate(new Date().toISOString().split('T')[0]);
     setExercises([]);
@@ -107,8 +256,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   }, [workouts]);
   
   return (
-    <div className="page animate-fade-in">
-      <header className="flex justify-between items-center mb-6">
+    <div className="page animate-fade-in space-y-4">
+      <header className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2.5">
           {onNavigate && (
             <button
@@ -126,6 +275,14 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsPlateModalOpen(true)}
+            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            title="Plate Calculator & Warmup Ramp"
+          >
+            <Dumbbell className="w-4 h-4 text-accent" />
+          </button>
           <ThemeToggle />
           <button className="btn-primary flex items-center gap-1.5" onClick={() => {
             if (exercises.length === 0) handleAddExercise();
@@ -137,6 +294,106 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           </button>
         </div>
       </header>
+
+      {/* Rest Interval Timer Widget */}
+      <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-secondary to-bg-card border border-border/80">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
+              <Timer className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-primary font-mono block">
+                REST INTERVAL TIMER
+              </span>
+              <span className="text-[10px] text-text-muted font-mono">
+                {isRestRunning ? 'Rest in progress...' : 'Pace your sets & recovery'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 font-mono">
+            {restSecondsLeft > 0 ? (
+              <div className="flex items-center gap-2">
+                <span className="text-base font-extrabold text-accent">
+                  {formatTimer(restSecondsLeft)}
+                </span>
+                <button
+                  type="button"
+                  onClick={togglePauseTimer}
+                  className="p-1 rounded bg-bg-elevated hover:bg-bg-secondary text-text-primary transition-colors"
+                  title={isRestRunning ? 'Pause' : 'Resume'}
+                >
+                  {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={resetTimer}
+                  className="p-1 rounded bg-bg-elevated hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
+                  title="Reset timer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <span className="text-2xs text-text-muted">Tap interval:</span>
+            )}
+          </div>
+        </div>
+
+        {/* Preset Chips */}
+        <div className="flex items-center gap-1.5 pt-2.5 overflow-x-auto scrollbar-none font-mono">
+          {[60, 90, 120, 180].map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => startTimer(s)}
+              className={`flex-1 py-1 px-2 rounded-lg text-2xs font-semibold border transition-colors ${
+                restTotalSeconds === s && restSecondsLeft > 0
+                  ? 'bg-accent/20 border-accent text-accent'
+                  : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
+              }`}
+            >
+              {s >= 60 ? `${s / 60}m` : `${s}s`}
+            </button>
+          ))}
+          {restSecondsLeft > 0 && (
+            <div className="flex gap-1 ml-1">
+              <button
+                type="button"
+                onClick={() => adjustTimer(-15)}
+                className="py-1 px-1.5 rounded-lg text-2xs bg-bg-secondary border border-border text-text-muted hover:text-text-primary"
+                title="-15 seconds"
+              >
+                -15s
+              </button>
+              <button
+                type="button"
+                onClick={() => adjustTimer(15)}
+                className="py-1 px-1.5 rounded-lg text-2xs bg-bg-secondary border border-border text-accent hover:border-accent"
+                title="+15 seconds"
+              >
+                +15s
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Live Progress Bar */}
+        {restSecondsLeft > 0 && restTotalSeconds > 0 && (
+          <div className="mt-2.5">
+            <div className="level-bar">
+              <div
+                className="level-bar-fill bg-accent"
+                style={{
+                  width: `${Math.min(100, Math.max(0, (restSecondsLeft / restTotalSeconds) * 100))}%`,
+                  transition: 'width 1s linear',
+                }}
+              />
+            </div>
+          </div>
+        )}
+      </section>
 
       <section>
         {sortedWorkouts.length === 0 ? (
@@ -326,6 +583,14 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
       <datalist id="exercises-list">
         {availableExercises.map(ex => <option key={ex} value={ex} />)}
       </datalist>
+
+      {/* Barbell Plate Loading & Warmup Sets Calculator Modal */}
+      <PlateCalculatorModal
+        isOpen={isPlateModalOpen}
+        onClose={() => setIsPlateModalOpen(false)}
+        initialUnit={userUnit}
+        initialWeight={userUnit === 'kg' ? 100 : 225}
+      />
     </div>
   );
 }

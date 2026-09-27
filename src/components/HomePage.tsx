@@ -239,6 +239,33 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </p>
       </section>
 
+      {/* Empty State Onboarding Guidance when 0 PRs logged */}
+      {(!prs || prs.length === 0) && (
+        <section className="card p-4 border border-accent/40 bg-gradient-to-r from-accent/15 via-accent/5 to-transparent space-y-3 animate-fade-in shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center text-accent flex-shrink-0 mt-0.5">
+              <Trophy className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-text-primary leading-tight">
+                Calibrate Your Strength Level
+              </h3>
+              <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                Log your first Bench, Squat, or Deadlift to calculate your calibrated rank, official DOTS score, and milestone targets.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigate('prs')}
+            className="btn-primary w-full py-2.5 text-xs font-bold font-mono tracking-wider uppercase flex items-center justify-center gap-2"
+          >
+            <span>Log Your First PR</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </section>
+      )}
+
       {/* Split Stat Banner */}
       <section className="card p-4 flex items-center justify-between">
         <div>
