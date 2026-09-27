@@ -5,9 +5,11 @@ import { useStore } from '@/lib/store';
 import { ChevronRight, Dumbbell, ArrowRight, RotateCcw, Upload, Ruler } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { PersonalRecord, BodyMetricEntry } from '@/lib/types';
+import { useToast } from '@/components/ui/Toast';
 
 export default function OnboardingScreen() {
   const { setProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
+  const toast = useToast();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
@@ -145,7 +147,10 @@ export default function OnboardingScreen() {
               <button
                 type="button"
                 onClick={() => {
-                  importAllData(backupSnapshot);
+                  const ok = importAllData(backupSnapshot);
+                  if (ok) {
+                    toast.success('Restored athlete profile and records from previous install!', 'Auto-Restore Complete');
+                  }
                 }}
                 className="btn-primary flex-1 py-1.5 text-xs font-bold"
               >
@@ -192,7 +197,7 @@ export default function OnboardingScreen() {
             </button>
 
             {/* Restore from File Option */}
-            <div className="pt-2 text-center border-t border-border/40">
+            <div className="pt-2 text-center border-t border-border/40 space-y-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -208,18 +213,42 @@ export default function OnboardingScreen() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
+
+                  if (file.size > 20 * 1024 * 1024) {
+                    toast.error('Backup file exceeds the 20MB limit.', 'File Too Large');
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                    return;
+                  }
+
                   const reader = new FileReader();
                   reader.onload = (event) => {
                     try {
                       const content = event.target?.result as string;
                       const parsed = JSON.parse(content);
-                      importAllData(parsed);
-                    } catch {}
+                      const ok = importAllData(parsed);
+                      if (ok) {
+                        toast.success('Backup file restored successfully!', 'Data Restored');
+                      } else {
+                        toast.error('Invalid backup file structure.', 'Restore Failed');
+                      }
+                    } catch {
+                      toast.error('Could not parse JSON backup file.', 'Invalid JSON');
+                    }
                   };
                   reader.readAsText(file);
                 }}
                 className="hidden"
               />
+
+              {/* Legal & Medical Notice */}
+              <p className="text-[10px] text-text-muted font-mono leading-relaxed pt-1">
+                By entering ASCEND, you acknowledge our{' '}
+                <a href="/terms" target="_blank" className="underline hover:text-accent">Terms</a>
+                {', '}
+                <a href="/privacy" target="_blank" className="underline hover:text-accent">Privacy Policy</a>
+                {', and '}
+                <a href="/disclaimer" target="_blank" className="underline hover:text-accent">Medical Disclaimer</a>.
+              </p>
             </div>
           </div>
         )}

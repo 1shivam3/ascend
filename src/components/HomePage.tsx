@@ -21,7 +21,7 @@ import DOTSCard from '@/components/DOTSCard';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import DataVaultModal from '@/components/DataVaultModal';
-import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
+import LegalHubModal from '@/components/LegalHubModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { getBigThreeStats } from '@/lib/dots';
@@ -349,7 +349,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           onClick={() => setIsPrivacyModalOpen(true)}
           className="text-text-muted hover:text-text-primary underline transition-colors"
         >
-          Privacy &amp; Terms
+          Legal, Safety &amp; Terms
         </button>
         <button
           type="button"
@@ -380,8 +380,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onClose={() => setIsDataVaultModalOpen(false)}
       />
 
-      {/* Privacy Policy & Legal Terms Modal */}
-      <PrivacyPolicyModal
+      {/* Legal & Compliance Hub Modal */}
+      <LegalHubModal
         isOpen={isPrivacyModalOpen}
         onClose={() => setIsPrivacyModalOpen(false)}
       />

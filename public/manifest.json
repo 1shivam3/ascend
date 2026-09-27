@@ -1,11 +1,19 @@
 {
-  "name": "ASCEND - Track PRs & Strength Level",
+  "id": "com.ascend.powerlifting",
+  "name": "ASCEND - Elite Powerlifting & Strength Tracker",
   "short_name": "ASCEND",
-  "description": "Rank your PRs from level 1 to 100, track workouts, and estimate meal macros.",
+  "description": "Calibrate your 1RM, track personal records, calculate DOTS scores, log workouts, and monitor bodyweight with 100% offline device privacy.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#08080a",
+  "theme_color": "#08080a",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["fitness", "health", "sports", "lifestyle"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icon.svg",
