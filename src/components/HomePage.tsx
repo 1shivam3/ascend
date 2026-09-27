@@ -184,8 +184,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </button>
       </section>
 
-      {/* LeetCode-style Gym Calendar Heatmap */}
-      <WorkoutHeatmap />
+      {/* Monthly Gym Activity Calendar */}
+      <WorkoutHeatmap onNavigate={onNavigate} />
 
       {/* Top Lifts Showcase */}
       {topLifts.length > 0 && (
