@@ -1,906 +1,749 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, StyleSheet, TextInput, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { THEME } from '../../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useTheme } from '../../../constants/theme';
 import { ExerciseRepository } from '../../../database/repositories/ExerciseRepository';
 import { MasteryRepository } from '../../../database/repositories/MasteryRepository';
 import { WorkoutRepository } from '../../../database/repositories/WorkoutRepository';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { Exercise, ExerciseMastery, PersonalRecord, PrimaryGoal } from '../../../types/domain.types';
-import { MasteryEngine } from '../../../services/progression/MasteryEngine';
-import { normalizeGoal } from '../../../utils/validation/onboardingSchema';
+import { Exercise, ExerciseMastery, WorkoutSession, SetType } from '../../../types/domain.types';
+import { FitnessProgressionService } from '../../../services/progression/FitnessProgressionService';
+import {
+  ProgressAnalyticsService,
+  ChartMetric,
+  ChartTimeRange,
+  ChartQueryResult,
+  CategorizedPrsResult,
+  CategorizedPrItem,
+} from '../../../services/progress/ProgressAnalyticsService';
 import { ScreenContainer } from '../../../components/layout/ScreenContainer';
-import { Heading, Text, Caption, StatText, MonoText } from '../../../components/ui/Typography';
+import { Heading, Text, Caption, MonoText } from '../../../components/ui/Typography';
 import { Card } from '../../../components/ui/Card';
+import { StatCard } from '../../../components/ui/StatCard';
 import { Badge } from '../../../components/ui/Badge';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
-import { VolumeBarChart } from '../../../components/hud/VolumeBarChart';
-import { TrendSparkline } from '../../../components/hud/TrendSparkline';
-import { PROGRESSION_CONFIG } from '../../../config/progression.config';
-
-const MUSCLE_FILTERS = ['ALL', 'Chest', 'Back', 'Quads', 'Hamstrings', 'Shoulders', 'Arms', 'Core'];
-const EQUIPMENT_FILTERS = ['ALL', 'BARBELL', 'DUMBBELL', 'CABLE', 'MACHINE', 'BODYWEIGHT'];
-type SortOption = 'HIGHEST_LEVEL' | 'RECENTLY_PERFORMED' | 'HIGHEST_1RM' | 'ALPHABETICAL';
-
-const SORT_OPTIONS: { id: SortOption; label: string }[] = [
-  { id: 'HIGHEST_LEVEL', label: 'Highest Level' },
-  { id: 'RECENTLY_PERFORMED', label: 'Recent' },
-  { id: 'HIGHEST_1RM', label: 'Highest 1RM' },
-  { id: 'ALPHABETICAL', label: 'A-Z' },
-];
+import { SectionHeader } from '../../../components/ui/SectionHeader';
+import { InteractiveProgressChart } from '../../../components/progress/InteractiveProgressChart';
+import { CategorizedPRsView } from '../../../components/progress/CategorizedPRsView';
+import { UnifiedProgressionModal } from '../../../components/progression/UnifiedProgressionModal';
+import { LogWeightModal } from '../../../components/modals/LogWeightModal';
+import { CustomDateRangeModal } from '../../../components/modals/CustomDateRangeModal';
+import { ChartDataDetailsModal } from '../../../components/modals/ChartDataDetailsModal';
+import { EditWorkoutRecordModal } from '../../../components/modals/EditWorkoutRecordModal';
+import { FitnessComparisonCard } from '../../../components/comparison/FitnessComparisonCard';
+import { FitnessComparisonModal } from '../../../components/comparison/FitnessComparisonModal';
+import { FitnessComparisonService } from '../../../services/comparison/FitnessComparisonService';
+import { FitnessComparisonEvaluation } from '../../../types/comparison.types';
 
 export default function ProgressScreen() {
   const router = useRouter();
-  const profile = useAuthStore(s => s.profile);
+  const { colors, borderRadius, isDark } = useTheme();
+  const profile = useAuthStore((s) => s.profile);
   const userId = profile?.id;
+  const currentWeight = profile?.weightKg || 75;
 
   const [refreshing, setRefreshing] = useState(false);
   const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [masteryMap, setMasteryMap] = useState<Record<string, ExerciseMastery>>({});
-  const [personalRecords, setPersonalRecords] = useState<PersonalRecord[]>([]);
-  const [exerciseCatalogMap, setExerciseCatalogMap] = useState<Record<string, Exercise>>({});
 
-  // Analytics Metrics
+  // Interactive Graph State
+  const [selectedMetric, setSelectedMetric] = useState<ChartMetric>('ESTIMATED_1RM');
+  const [selectedRange, setSelectedRange] = useState<ChartTimeRange>('30D');
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string>('ALL');
+  const [customStartDate, setCustomStartDate] = useState<string | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<string | undefined>(undefined);
+  const [chartQueryResult, setChartQueryResult] = useState<ChartQueryResult | null>(null);
+  const [loadingChart, setLoadingChart] = useState(false);
+
+  // Categorized PRs
+  const [categorizedPrs, setCategorizedPrs] = useState<CategorizedPrsResult | null>(null);
+
+  // Workout History & Editing
+  const [workoutHistory, setWorkoutHistory] = useState<WorkoutSession[]>([]);
+  const [editingWorkout, setEditingWorkout] = useState<WorkoutSession | null>(null);
+
+  // Pillar Metrics
   const [weeklyCount, setWeeklyCount] = useState(0);
   const [monthlyCount, setMonthlyCount] = useState(0);
   const [weeklyVolumeKg, setWeeklyVolumeKg] = useState(0);
-  const [volumeHistory, setVolumeHistory] = useState<{ date: string; volumeKg: number }[]>([]);
+  const [lifetimeWorkoutsCount, setLifetimeWorkoutsCount] = useState(0);
+  const [enduranceMetrics, setEnduranceMetrics] = useState({
+    sessionDensityRepsPerMin: 0,
+    weeklyTonnageKg: 0,
+    highRepSetsCount: 0,
+    bestDistanceMeters: 0,
+  });
+  const [mobilityMetrics, setMobilityMetrics] = useState({
+    mobilityScore: 10,
+    warmupSetsCount: 0,
+    unilateralSetsCount: 0,
+    mobilityWorkoutsCount: 0,
+  });
 
-  // Search, Filter & Sort State
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMuscle, setSelectedMuscle] = useState('ALL');
-  const [selectedEquipment, setSelectedEquipment] = useState('ALL');
-  const [selectedSort, setSelectedSort] = useState<SortOption>('HIGHEST_LEVEL');
+  // Modal Visibility State
+  const [progressionModalVisible, setProgressionModalVisible] = useState(false);
+  const [logWeightModalVisible, setLogWeightModalVisible] = useState(false);
+  const [customRangeModalVisible, setCustomRangeModalVisible] = useState(false);
+  const [chartDetailsModalVisible, setChartDetailsModalVisible] = useState(false);
+  const [editRecordModalVisible, setEditRecordModalVisible] = useState(false);
 
-  const loadData = useCallback(async () => {
+  // Transparent Comparison State
+  const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
+  const [comparisonEvaluation, setComparisonEvaluation] = useState<FitnessComparisonEvaluation | null>(null);
+  const [comparisonExerciseId, setComparisonExerciseId] = useState<string>('ex-bench-press');
+
+  // Load Comparison Data
+  const loadComparison = useCallback(async (exerciseId: string) => {
     try {
-      const allEx = await ExerciseRepository.getAll();
-      const exMap: Record<string, Exercise> = {};
-      allEx.forEach(e => {
-        exMap[e.id] = e;
+      const evaluation = await FitnessComparisonService.evaluateUserComparison({
+        userId,
+        exerciseId,
+        bodyweightKg: currentWeight,
       });
-      setExerciseCatalogMap(exMap);
-
-      const list = await ExerciseRepository.search(
-        searchQuery,
-        selectedMuscle === 'ALL' ? undefined : selectedMuscle,
-        selectedEquipment === 'ALL' ? undefined : selectedEquipment
-      );
-      setExercises(list);
-
-      if (userId) {
-        const [masteries, prs, stats, history] = await Promise.all([
-          MasteryRepository.getAllMasteries(userId),
-          MasteryRepository.getAllPersonalRecords(userId),
-          WorkoutRepository.getWeeklyMonthlyStats(userId),
-          WorkoutRepository.getVolumeHistory(userId, 7),
-        ]);
-
-        const mMap: Record<string, ExerciseMastery> = {};
-        masteries.forEach(m => {
-          mMap[m.exerciseId] = m;
-        });
-        setMasteryMap(mMap);
-        setPersonalRecords(prs);
-
-        setWeeklyCount(stats.weeklyCount);
-        setMonthlyCount(stats.monthlyCount);
-        setWeeklyVolumeKg(stats.weeklyVolumeKg);
-        setVolumeHistory(history);
-      }
+      setComparisonEvaluation(evaluation);
     } catch (err) {
-      console.error('Failed to load progress telemetry:', err);
+      console.error('Failed to evaluate fitness comparison:', err);
     }
-  }, [searchQuery, selectedMuscle, selectedEquipment, userId]);
+  }, [userId, currentWeight]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const targetId = selectedExerciseId !== 'ALL' ? selectedExerciseId : 'ex-bench-press';
+    setComparisonExerciseId(targetId);
+    loadComparison(targetId);
+  }, [selectedExerciseId, loadComparison]);
+
+  // 1. Load Core Exercise Catalog
+  useEffect(() => {
+    ExerciseRepository.getAll().then((list) => {
+      setExercises(list);
+    });
+  }, []);
+
+  // 2. Load Chart Data whenever query parameters change
+  const fetchChartData = useCallback(async () => {
+    if (!userId) return;
+    try {
+      setLoadingChart(true);
+      const res = await ProgressAnalyticsService.getChartData(userId, {
+        metric: selectedMetric,
+        exerciseId: selectedExerciseId,
+        timeRange: selectedRange,
+        customStartDate,
+        customEndDate,
+      });
+      setChartQueryResult(res);
+    } catch (err) {
+      console.error('Failed to load progress chart telemetry:', err);
+    } finally {
+      setLoadingChart(false);
+    }
+  }, [userId, selectedMetric, selectedExerciseId, selectedRange, customStartDate, customEndDate]);
+
+  useEffect(() => {
+    fetchChartData();
+  }, [fetchChartData]);
+
+  // 3. Load All Telemetry & Pillars
+  const loadAllTelemetry = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const [
+        prs,
+        history,
+        weeklyMonthly,
+        lifetime,
+        endurance,
+        mobility,
+      ] = await Promise.all([
+        ProgressAnalyticsService.getCategorizedPersonalRecords(userId),
+        WorkoutRepository.getRecentWorkouts(userId, 15),
+        WorkoutRepository.getWeeklyMonthlyStats(userId),
+        WorkoutRepository.getLifetimeStats(userId),
+        ProgressAnalyticsService.getEnduranceMetrics(userId),
+        ProgressAnalyticsService.getMobilityMetrics(userId),
+      ]);
+
+      setCategorizedPrs(prs);
+      setWorkoutHistory(history);
+      setWeeklyCount(weeklyMonthly.weeklyCount);
+      setMonthlyCount(weeklyMonthly.monthlyCount);
+      setWeeklyVolumeKg(weeklyMonthly.weeklyVolumeKg);
+      setLifetimeWorkoutsCount(lifetime?.totalWorkouts || 0);
+      setEnduranceMetrics(endurance);
+      setMobilityMetrics(mobility);
+    } catch (err) {
+      console.error('Failed to load telemetry pillars:', err);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    loadAllTelemetry();
+  }, [loadAllTelemetry]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([
+      fetchChartData(),
+      loadAllTelemetry(),
+      loadComparison(comparisonExerciseId),
+    ]);
     setRefreshing(false);
   };
 
-  // Sort exercises based on selectedSort
-  const sortedExercises = useMemo(() => {
-    const list = [...exercises];
-    return list.sort((a, b) => {
-      const mA = masteryMap[a.id];
-      const mB = masteryMap[b.id];
+  // Record Editing Handlers
+  const handleUpdateSet = async (
+    setId: string,
+    updates: { weightKg: number; reps: number; rpe?: number | null; setType?: SetType }
+  ) => {
+    if (!userId) return;
+    await ProgressAnalyticsService.updateSetRecord(userId, setId, updates);
+    await Promise.all([loadAllTelemetry(), fetchChartData()]);
+    // Refresh editing workout if active
+    if (editingWorkout) {
+      const refreshed = await WorkoutRepository.getWorkoutById(editingWorkout.id);
+      setEditingWorkout(refreshed);
+    }
+  };
 
-      switch (selectedSort) {
-        case 'HIGHEST_LEVEL': {
-          const lvlA = mA?.masteryLevel ?? 0;
-          const lvlB = mB?.masteryLevel ?? 0;
-          if (lvlA !== lvlB) return lvlB - lvlA;
-          return (mB?.masteryXp ?? 0) - (mA?.masteryXp ?? 0);
-        }
-        case 'RECENTLY_PERFORMED': {
-          const dateA = mA?.lastTrainedAt ? new Date(mA.lastTrainedAt).getTime() : 0;
-          const dateB = mB?.lastTrainedAt ? new Date(mB.lastTrainedAt).getTime() : 0;
-          return dateB - dateA;
-        }
-        case 'HIGHEST_1RM': {
-          const rmA = mA?.estimated1RmKg ?? 0;
-          const rmB = mB?.estimated1RmKg ?? 0;
-          return rmB - rmA;
-        }
-        case 'ALPHABETICAL':
-        default:
-          return a.name.localeCompare(b.name);
-      }
+  const handleDeleteSet = async (setId: string) => {
+    if (!userId) return;
+    await ProgressAnalyticsService.deleteSetRecord(userId, setId);
+    await Promise.all([loadAllTelemetry(), fetchChartData()]);
+    if (editingWorkout) {
+      const refreshed = await WorkoutRepository.getWorkoutById(editingWorkout.id);
+      setEditingWorkout(refreshed);
+    }
+  };
+
+  const handleDeleteWorkout = async (workoutId: string) => {
+    if (!userId) return;
+    await ProgressAnalyticsService.deleteWorkoutSession(userId, workoutId);
+    setEditingWorkout(null);
+    setEditRecordModalVisible(false);
+    await Promise.all([loadAllTelemetry(), fetchChartData()]);
+  };
+
+  const handleSaveWeight = async (weightKg: number) => {
+    if (!userId) return;
+    await ProgressAnalyticsService.logBodyweight(userId, weightKg);
+    await Promise.all([loadAllTelemetry(), fetchChartData()]);
+  };
+
+  // Unified Progression Status
+  const totalXp = profile?.totalXp || 0;
+  const unifiedStatus = useMemo(() => {
+    return FitnessProgressionService.evaluateUnifiedProgression({
+      totalXp,
+      attributes: profile?.attributes || {
+        strength: 10,
+        endurance: 10,
+        mobility: 10,
+        consistency: 10,
+        agility: 10,
+        stamina: 10,
+        discipline: 10,
+        vitality: 10,
+      },
+      verifiedSessionsCount: lifetimeWorkoutsCount,
+      athleteBodyweightKg: profile?.weightKg || 75,
     });
-  }, [exercises, masteryMap, selectedSort]);
+  }, [totalXp, profile?.attributes, lifetimeWorkoutsCount, profile?.weightKg]);
 
-  // Target days per week from profile preferences
   const targetDays = profile?.trainingPreferences?.daysPerWeek || 4;
-  const consistencyPercent = Math.min(100, Math.round((weeklyCount / Math.max(1, targetDays)) * 100));
-
-  const primaryGoal: PrimaryGoal = profile?.primary_goal
-    ? normalizeGoal(profile.primary_goal)
-    : profile?.primaryGoal
-    ? normalizeGoal(profile.primaryGoal)
-    : normalizeGoal(profile?.goal || 'GET_STRONGER');
-
-  const totalDistanceMeters = useMemo(() => {
-    return Object.values(masteryMap).reduce((acc, m) => acc + (m.totalDistanceMeters || 0), 0);
-  }, [masteryMap]);
-
-  const totalBodyweightReps = useMemo(() => {
-    return Object.values(masteryMap).reduce((acc, m) => {
-      const ex = exerciseCatalogMap[m.exerciseId];
-      if (ex && (ex.equipment === 'BODYWEIGHT' || ex.isBodyweight)) {
-        return acc + (m.totalReps || 0);
-      }
-      return acc;
-    }, 0);
-  }, [masteryMap, exerciseCatalogMap]);
-
-  const totalPrCount = useMemo(() => personalRecords.length, [personalRecords]);
-
-  // Transform volume history for VolumeBarChart
-  const chartDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-  const chartData = volumeHistory.length > 0
-    ? volumeHistory.map((h, i) => ({
-        label: chartDays[i % chartDays.length] || 'D',
-        value: h.volumeKg,
-      }))
-    : [
-        { label: 'M', value: 0 },
-        { label: 'T', value: 0 },
-        { label: 'W', value: 0 },
-        { label: 'T', value: 0 },
-        { label: 'F', value: 0 },
-        { label: 'S', value: 0 },
-        { label: 'S', value: 0 },
-      ];
-
-  const strengthPoints = volumeHistory.length > 1
-    ? volumeHistory.map(v => Math.max(20, Math.round(v.volumeKg / 50)))
-    : [100, 105, 102, 110, 115];
-
-  const currentWeight = profile?.weightKg || 75;
-  const bodyweightPoints = [currentWeight - 0.4, currentWeight - 0.2, currentWeight, currentWeight + 0.1, currentWeight];
+  const consistencyPercent = Math.min(
+    100,
+    Math.round((weeklyCount / Math.max(1, targetDays)) * 100)
+  );
 
   return (
-    <ScreenContainer scrollable={false}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={THEME.colors.cyan}
-            colors={[THEME.colors.cyan]}
-          />
-        }
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Heading level={1} style={styles.title}>
-            {primaryGoal === 'ENDURANCE'
-              ? 'ENDURANCE TELEMETRY // MASTERY'
-              : primaryGoal === 'CALISTHENICS'
-              ? 'BODYWEIGHT TELEMETRY // MASTERY'
-              : primaryGoal === 'ATHLETIC_PERFORMANCE' || primaryGoal === 'SPORT_PERFORMANCE'
-              ? 'ATHLETIC TELEMETRY // MASTERY'
-              : 'MY LIFTS // EXERCISE MASTERY'}
+    <ScreenContainer
+      scrollable
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+      contentContainerStyle={styles.scrollContent}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <Heading level={1} style={styles.screenTitle}>
+            Progress
           </Heading>
-          <Caption style={styles.subtitle}>
-            Independent exercise levels (1-100+), rank tiers, performance telemetry, and personal records
+          <Caption style={{ color: colors.textSecondary, marginTop: 2 }}>
+            Long-term physical adaptations, PRs & verified history
           </Caption>
         </View>
 
-        {/* Tactical KPI Metrics Grid */}
-        <View style={styles.kpiGrid}>
-          {primaryGoal === 'ENDURANCE' ? (
-            <>
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>TOTAL DISTANCE</Caption>
-                <StatText size="md" color={THEME.colors.emerald}>
-                  {(totalDistanceMeters / 1000).toFixed(1)} km
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>AEROBIC ACCUMULATION</Caption>
-              </Card>
+        <TouchableOpacity
+          onPress={() => setLogWeightModalVisible(true)}
+          style={[
+            styles.logWeightBtn,
+            {
+              backgroundColor: isDark ? 'rgba(16,185,129,0.15)' : '#E6F7F0',
+              borderColor: colors.emerald,
+              borderRadius: borderRadius.sm,
+            },
+          ]}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="speedometer-outline" size={14} color={colors.emerald} />
+          <Text style={{ fontSize: 11, fontWeight: '700', color: colors.emerald }}>
+            + Log Weight
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY SESSIONS</Caption>
-                <StatText size="md" color={THEME.colors.cyan}>{weeklyCount} / {targetDays}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>TARGET: {targetDays} / WK</Caption>
-              </Card>
+      {/* Top Unified Progression & Rank Standing Card */}
+      <TouchableOpacity
+        activeOpacity={0.88}
+        onPress={() => setProgressionModalVisible(true)}
+        style={{ marginBottom: 16 }}
+      >
+        <Card
+          variant="elevated"
+          style={{
+            borderColor: isDark ? `${unifiedStatus.effectiveRank.color}44` : colors.border,
+            borderWidth: 1.5,
+            padding: 14,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View
+                style={{
+                  paddingHorizontal: 7,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                  backgroundColor: `${unifiedStatus.effectiveRank.color}22`,
+                  borderWidth: 1,
+                  borderColor: `${unifiedStatus.effectiveRank.color}66`,
+                }}
+              >
+                <Text style={{ color: unifiedStatus.effectiveRank.color, fontSize: 11, fontWeight: '800' }}>
+                  RANK {unifiedStatus.effectiveRank.tier}
+                </Text>
+              </View>
+              <Badge
+                label={unifiedStatus.confirmationStatus}
+                variant={unifiedStatus.confirmationStatus === 'CONFIRMED' ? 'emerald' : 'amber'}
+                size="sm"
+              />
+            </View>
+            <Text style={{ color: colors.accent, fontSize: 11, fontWeight: '700' }}>
+              Full Telemetry →
+            </Text>
+          </View>
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>MONTHLY SESSIONS</Caption>
-                <StatText size="md">{monthlyCount}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>THIS CALENDAR MO</Caption>
-              </Card>
+          <View style={{ marginTop: 6 }}>
+            <Heading level={3} style={{ color: colors.textPrimary }}>
+              {unifiedStatus.effectiveRank.title}
+            </Heading>
+            <Caption style={{ color: colors.textSecondary, marginTop: 2 }}>
+              Level {unifiedStatus.currentLevel} • {unifiedStatus.nextMilestone.summaryMessage}
+            </Caption>
+          </View>
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>CONSISTENCY</Caption>
-                <StatText size="md" color={consistencyPercent >= 80 ? THEME.colors.emerald : THEME.colors.amber}>
-                  {consistencyPercent}%
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>ADHERENCE INDEX</Caption>
-              </Card>
-            </>
-          ) : primaryGoal === 'CALISTHENICS' ? (
-            <>
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>BODYWEIGHT REPS</Caption>
-                <StatText size="md" color={THEME.colors.cyan}>
-                  {totalBodyweightReps > 999 ? `${(totalBodyweightReps / 1000).toFixed(1)}k` : totalBodyweightReps}
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>STRICT GYMNASTIC REPS</Caption>
-              </Card>
+          {/* 4 Dimension Mini Bars */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted }}>STR</Text>
+                <MonoText style={{ fontSize: 9, color: colors.accent }}>{unifiedStatus.attributes.strength}</MonoText>
+              </View>
+              <ProgressBar progressPercent={unifiedStatus.attributes.strength} size="sm" color={colors.accent} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted }}>END</Text>
+                <MonoText style={{ fontSize: 9, color: colors.skyText }}>{unifiedStatus.attributes.endurance}</MonoText>
+              </View>
+              <ProgressBar progressPercent={unifiedStatus.attributes.endurance} size="sm" color={colors.skyText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted }}>MOB</Text>
+                <MonoText style={{ fontSize: 9, color: colors.lavenderText }}>{unifiedStatus.attributes.mobility ?? 10}</MonoText>
+              </View>
+              <ProgressBar progressPercent={unifiedStatus.attributes.mobility ?? 10} size="sm" color={colors.lavenderText} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: colors.textMuted }}>CON</Text>
+                <MonoText style={{ fontSize: 9, color: colors.amber }}>{unifiedStatus.attributes.consistency}</MonoText>
+              </View>
+              <ProgressBar progressPercent={unifiedStatus.attributes.consistency} size="sm" color={colors.amber} />
+            </View>
+          </View>
+        </Card>
+      </TouchableOpacity>
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY SESSIONS</Caption>
-                <StatText size="md" color={THEME.colors.cyan}>{weeklyCount} / {targetDays}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>TARGET: {targetDays} / WK</Caption>
-              </Card>
+      {/* SECTION 1: Interactive Performance Analytics Graph */}
+      <View style={styles.sectionMargin}>
+        <SectionHeader
+          title="PERFORMANCE ANALYTICS"
+          actionText="Controls & Filters"
+        />
+        <InteractiveProgressChart
+          queryResult={chartQueryResult}
+          selectedMetric={selectedMetric}
+          selectedRange={selectedRange}
+          selectedExerciseId={selectedExerciseId}
+          exercises={exercises}
+          onSelectMetric={setSelectedMetric}
+          onSelectRange={setSelectedRange}
+          onSelectExercise={(eid) => setSelectedExerciseId(eid || 'ALL')}
+          onOpenCustomRangeModal={() => setCustomRangeModalVisible(true)}
+          onOpenDetailsModal={() => setChartDetailsModalVisible(true)}
+          loading={loadingChart}
+        />
+      </View>
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>MASTERED SKILLS</Caption>
-                <StatText size="md" color={THEME.colors.emerald}>
-                  {Object.values(masteryMap).filter(m => m.masteryLevel >= 5).length}
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>LVL 5+ MOVEMENTS</Caption>
-              </Card>
+      {/* SECTION 2: 8 Fitness Adaptation Pillars Grid */}
+      <View style={styles.sectionMargin}>
+        <SectionHeader title="KEY ADAPTATION PILLARS" />
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>CONSISTENCY</Caption>
-                <StatText size="md" color={consistencyPercent >= 80 ? THEME.colors.emerald : THEME.colors.amber}>
-                  {consistencyPercent}%
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>ADHERENCE INDEX</Caption>
-              </Card>
-            </>
-          ) : primaryGoal === 'ATHLETIC_PERFORMANCE' || primaryGoal === 'SPORT_PERFORMANCE' ? (
-            <>
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>POWER BREAKTHROUGHS</Caption>
-                <StatText size="md" color={THEME.colors.amber}>{totalPrCount}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>RECORDS SET</Caption>
-              </Card>
+        {/* Row 1: Strength Progress & Body-Weight Trends */}
+        <View style={styles.kpiRow}>
+          {/* Pillar 1: Strength Progress */}
+          <StatCard
+            label="Strength Progress"
+            value={unifiedStatus.attributes.strength}
+            unit="pts"
+            trend={
+              (unifiedStatus.maxRelativeCompoundRatio ?? 0) > 0
+                ? `${(unifiedStatus.maxRelativeCompoundRatio ?? 0).toFixed(2)}x BW`
+                : 'Developing'
+            }
+            trendDirection="up"
+            icon={<Ionicons name="flash-outline" size={18} color={colors.accent} />}
+            accentColor={colors.accent}
+            style={{ flex: 1 }}
+          />
 
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY SESSIONS</Caption>
-                <StatText size="md" color={THEME.colors.cyan}>{weeklyCount} / {targetDays}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>TARGET: {targetDays} / WK</Caption>
-              </Card>
-
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY WORK LOAD</Caption>
-                <StatText size="md" color={THEME.colors.emerald}>
-                  {weeklyVolumeKg > 999 ? `${(weeklyVolumeKg / 1000).toFixed(1)}k` : weeklyVolumeKg}
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>KG TONNAGE</Caption>
-              </Card>
-
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>CONSISTENCY</Caption>
-                <StatText size="md" color={consistencyPercent >= 80 ? THEME.colors.emerald : THEME.colors.amber}>
-                  {consistencyPercent}%
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>ADHERENCE INDEX</Caption>
-              </Card>
-            </>
-          ) : (
-            <>
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY SESSIONS</Caption>
-                <StatText size="md" color={THEME.colors.cyan}>{weeklyCount} / {targetDays}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>TARGET: {targetDays} / WK</Caption>
-              </Card>
-
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>MONTHLY SESSIONS</Caption>
-                <StatText size="md">{monthlyCount}</StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>THIS CALENDAR MO</Caption>
-              </Card>
-
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>WEEKLY VOLUME</Caption>
-                <StatText size="md" color={THEME.colors.emerald}>
-                  {weeklyVolumeKg > 999 ? `${(weeklyVolumeKg / 1000).toFixed(1)}k` : weeklyVolumeKg}
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>KG TONNAGE</Caption>
-              </Card>
-
-              <Card variant="surface" style={styles.kpiCard}>
-                <Caption upper style={styles.kpiLabel}>CONSISTENCY</Caption>
-                <StatText size="md" color={consistencyPercent >= 80 ? THEME.colors.emerald : THEME.colors.amber}>
-                  {consistencyPercent}%
-                </StatText>
-                <Caption color={THEME.colors.textMuted} style={styles.kpiSub}>ADHERENCE INDEX</Caption>
-              </Card>
-            </>
-          )}
+          {/* Pillar 2: Body-Weight Trends */}
+          <StatCard
+            label="Body Weight"
+            value={currentWeight.toFixed(1)}
+            unit="kg"
+            trend="Scale Trend"
+            icon={<Ionicons name="speedometer-outline" size={18} color={colors.emerald} />}
+            accentColor={colors.emerald}
+            style={{ flex: 1 }}
+          />
         </View>
 
-        {/* Training Volume Bar Chart */}
-        <View style={styles.section}>
-          <Caption upper style={styles.sectionHeader}>TRAINING VOLUME (RECENT SESSIONS)</Caption>
-          <Card variant="surface" style={styles.chartCard}>
-            <VolumeBarChart data={chartData} height={120} />
+        {/* Row 2: Workout Consistency & Training Volume */}
+        <View style={[styles.kpiRow, { marginTop: 10 }]}>
+          {/* Pillar 3: Workout Consistency */}
+          <StatCard
+            label="Consistency"
+            value={`${weeklyCount} / ${targetDays}`}
+            unit="sessions"
+            trend={`${consistencyPercent}% Target`}
+            trendDirection={consistencyPercent >= 80 ? 'up' : 'neutral'}
+            icon={<Ionicons name="calendar-outline" size={18} color={colors.amber} />}
+            accentColor={colors.amber}
+            style={{ flex: 1 }}
+          />
+
+          {/* Pillar 7: Training Volume */}
+          <StatCard
+            label="Weekly Volume"
+            value={weeklyVolumeKg > 999 ? `${(weeklyVolumeKg / 1000).toFixed(1)}k` : weeklyVolumeKg}
+            unit="kg"
+            trend="Total Load"
+            icon={<Ionicons name="layers-outline" size={18} color={colors.skyText} />}
+            accentColor={colors.skyText}
+            style={{ flex: 1 }}
+          />
+        </View>
+
+        {/* Row 3: Endurance Progress & Mobility Assessment Progress */}
+        <View style={[styles.kpiRow, { marginTop: 10 }]}>
+          {/* Pillar 5: Endurance Progress */}
+          <StatCard
+            label="Endurance Density"
+            value={enduranceMetrics.sessionDensityRepsPerMin}
+            unit="reps/min"
+            trend={`${enduranceMetrics.highRepSetsCount} High-Rep`}
+            icon={<Ionicons name="repeat-outline" size={18} color={colors.skyText} />}
+            accentColor={colors.skyText}
+            style={{ flex: 1 }}
+          />
+
+          {/* Pillar 6: Mobility Assessment Progress */}
+          <StatCard
+            label="Mobility Rating"
+            value={mobilityMetrics.mobilityScore}
+            unit="/ 100"
+            trend={`${mobilityMetrics.warmupSetsCount} Warmups`}
+            icon={<Ionicons name="body-outline" size={18} color={colors.lavenderText} />}
+            accentColor={colors.lavenderText}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </View>
+
+      {/* SECTION: Transparent Population & Cohort Benchmarks */}
+      <View style={styles.sectionMargin}>
+        <SectionHeader
+          title="POPULATION & COHORT BENCHMARKS"
+          actionText="Inspect Transparency"
+          onActionPress={() => setComparisonModalVisible(true)}
+        />
+        <FitnessComparisonCard
+          evaluation={comparisonEvaluation}
+          onOpenModal={() => setComparisonModalVisible(true)}
+        />
+      </View>
+
+      {/* SECTION 4: Personal Records (5 Separated Categories) */}
+      <View style={styles.sectionMargin}>
+        <SectionHeader
+          title="PERSONAL RECORD BREAKTHROUGHS"
+          actionText={categorizedPrs?.totalCount ? `${categorizedPrs.totalCount} Verified` : undefined}
+        />
+        <CategorizedPRsView
+          prsResult={categorizedPrs}
+          onSelectPr={(pr) => {
+            // Filter graph to this exercise
+            setSelectedExerciseId(pr.exerciseId);
+            Haptics.selectionAsync();
+          }}
+        />
+      </View>
+
+      {/* SECTION 8: Workout History & Record Management */}
+      <View style={styles.sectionMargin}>
+        <SectionHeader
+          title="WORKOUT HISTORY & RECORDS"
+          actionText="Edit & Clean Up"
+        />
+
+        {workoutHistory.length === 0 ? (
+          <Card variant="surface" style={styles.emptyHistoryBox}>
+            <Ionicons name="barbell-outline" size={32} color={colors.textMuted} style={{ marginBottom: 6 }} />
+            <Text style={{ color: colors.textSecondary, fontWeight: '700' }}>No Completed Sessions</Text>
+            <Caption style={{ color: colors.textMuted, textAlign: 'center', marginTop: 2 }}>
+              Finish a workout session in Train to build your verified historical log.
+            </Caption>
           </Card>
-        </View>
-
-        {/* Trends Row */}
-        <View style={styles.section}>
-          <View style={styles.trendRow}>
-            <View style={{ flex: 1 }}>
-              <TrendSparkline
-                data={strengthPoints}
-                label="STRENGTH OUTPUT"
-                currentValue={`${strengthPoints[strengthPoints.length - 1]} pts`}
-                delta="+5.2%"
-                strokeColor={THEME.colors.cyan}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <TrendSparkline
-                data={bodyweightPoints}
-                label="BODYWEIGHT"
-                currentValue={`${currentWeight.toFixed(1)} kg`}
-                delta="+0.3 kg"
-                strokeColor={THEME.colors.violet}
-              />
-            </View>
-          </View>
-        </View>
-
-        {/* Personal Records Breakthrough Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Caption upper style={styles.sectionHeader}>PERSONAL RECORD BREAKTHROUGHS</Caption>
-            <Badge label={`${personalRecords.length} PRS`} variant="amber" size="sm" />
-          </View>
-
-          {personalRecords.length === 0 ? (
-            <Card variant="surface" style={styles.emptyPrCard}>
-              <Caption align="center">
-                No personal record breakthroughs logged yet. Train with progressive overload to set PR milestones.
-              </Caption>
-            </Card>
-          ) : (
-            personalRecords.slice(0, 4).map(pr => {
-              const ex = exerciseCatalogMap[pr.exerciseId];
-              const exName = ex?.name || 'Movement Telemetry';
-              const dateStr = pr.achievedAt ? new Date(pr.achievedAt).toLocaleDateString() : 'Recent';
-
-              let formattedVal = `${pr.value} KG`;
-              if (pr.prType === 'MAX_REPS') {
-                formattedVal = `${pr.value} REPS`;
-              } else if (pr.prType === 'BEST_DISTANCE') {
-                formattedVal = pr.value >= 1000 ? `${(pr.value / 1000).toFixed(2)} KM` : `${pr.value} M`;
-              } else if (pr.prType === 'BEST_PACE') {
-                const mins = Math.floor(pr.value / 60);
-                const secs = Math.round(pr.value % 60);
-                formattedVal = `${mins}:${secs.toString().padStart(2, '0')} /KM`;
-              }
+        ) : (
+          <View style={styles.historyList}>
+            {workoutHistory.map((w) => {
+              const durMins = Math.round(w.durationSeconds / 60);
+              const dateFormatted = new Date(w.startedAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              });
 
               return (
-                <Card key={pr.id} variant="surface" style={styles.prCard}>
-                  <View style={styles.prLeft}>
-                    <Text style={styles.prIcon}>🏆</Text>
-                    <View>
-                      <Heading level={3} style={styles.prExName}>{exName}</Heading>
-                      <Caption color={THEME.colors.textMuted}>{dateStr}</Caption>
+                <Card key={w.id} variant="surface" style={styles.historyCard}>
+                  <View style={styles.historyCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textPrimary }}>
+                        {w.title}
+                      </Text>
+                      <Caption style={{ color: colors.textMuted, marginTop: 2 }}>
+                        {dateFormatted} • {durMins} min • {w.totalSets} sets • {Math.round(w.totalVolumeKg)} kg vol
+                      </Caption>
                     </View>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        setEditingWorkout(w);
+                        setEditRecordModalVisible(true);
+                        Haptics.selectionAsync();
+                      }}
+                      style={[
+                        styles.manageRecordBtn,
+                        {
+                          backgroundColor: colors.surfaceElevated,
+                          borderColor: colors.border,
+                          borderWidth: 1,
+                          borderRadius: borderRadius.sm,
+                        },
+                      ]}
+                      activeOpacity={0.75}
+                    >
+                      <Ionicons name="create-outline" size={14} color={colors.accent} />
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: colors.accent }}>
+                        Edit / Clean Up
+                      </Text>
+                    </TouchableOpacity>
                   </View>
-                  <View style={styles.prRight}>
-                    <Badge label={pr.prType.replace('MAX_', '').replace('BEST_', '')} variant="amber" size="sm" />
-                    <MonoText color={THEME.colors.amber} style={styles.prValue}>
-                      {formattedVal}
-                    </MonoText>
+
+                  {/* Exercise Chips */}
+                  <View style={styles.exChipRow}>
+                    {w.exercises.slice(0, 4).map((el, i) => (
+                      <View
+                        key={el.id || i}
+                        style={[
+                          styles.exChip,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.borderSubtle,
+                            borderRadius: borderRadius.xs,
+                          },
+                        ]}
+                      >
+                        <Text style={{ fontSize: 11, color: colors.textSecondary }}>
+                          {el.exercise?.name || 'Movement'} ({el.sets.length}s)
+                        </Text>
+                      </View>
+                    ))}
+                    {w.exercises.length > 4 && (
+                      <View style={[styles.exChip, { borderRadius: borderRadius.xs }]}>
+                        <Text style={{ fontSize: 10, color: colors.textMuted }}>
+                          +{w.exercises.length - 4} more
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </Card>
               );
-            })
-          )}
-        </View>
-
-        {/* Lift Mastery Directory Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
-            <Caption upper style={styles.sectionHeader}>LIFT MASTERY DIRECTORY</Caption>
-            <Caption color={THEME.colors.cyan}>{sortedExercises.length} MOVEMENTS</Caption>
-          </View>
-
-          {/* Search Bar */}
-          <View style={styles.searchBar}>
-            <Text style={styles.searchIcon}>🔍</Text>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search movements or muscles..."
-              placeholderTextColor={THEME.colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Caption color={THEME.colors.textMuted} style={styles.clearText}>✕</Caption>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Sort Selector Pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sortScroll}>
-            {SORT_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.id}
-                onPress={() => setSelectedSort(opt.id)}
-                style={[
-                  styles.sortPill,
-                  selectedSort === opt.id && styles.sortPillActive,
-                ]}
-              >
-                <Text
-                  color={selectedSort === opt.id ? '#000' : THEME.colors.textSecondary}
-                  style={styles.sortText}
-                >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Muscle Filter Pills */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-            {MUSCLE_FILTERS.map(m => (
-              <TouchableOpacity
-                key={m}
-                onPress={() => setSelectedMuscle(m)}
-                style={[
-                  styles.filterPill,
-                  selectedMuscle === m && styles.filterPillActive,
-                ]}
-              >
-                <Text
-                  color={selectedMuscle === m ? THEME.colors.cyan : THEME.colors.textSecondary}
-                  style={styles.filterText}
-                >
-                  {m}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-
-          {/* Exercises List */}
-          <View style={styles.directoryList}>
-            {sortedExercises.map(ex => {
-              const mastery = masteryMap[ex.id];
-              const xp = mastery?.masteryXp ?? 0;
-              const progress = MasteryEngine.getExerciseProgress(xp);
-              const rankColor = PROGRESSION_CONFIG.mastery.exerciseRanks[progress.rank]?.color || THEME.colors.cyan;
-              const isTrained = Boolean(mastery && mastery.totalSessions > 0);
-
-              const isCardio = ex.progressionType === 'CARDIO' || ex.movementPattern === 'CARDIO';
-              const isBodyweight = ex.isBodyweight || ex.progressionType === 'BODYWEIGHT';
-
-              const trend = mastery?.trend || (isTrained ? 'MAINTAINING' : 'NEW');
-              const trendConfig: Record<string, { label: string; color: string }> = {
-                IMPROVING: { label: '▲ IMPROVING', color: THEME.colors.emerald },
-                MAINTAINING: { label: '● MAINTAINING', color: THEME.colors.cyan },
-                REGRESSING: { label: '▼ REGRESSING', color: THEME.colors.amber },
-                NEW: { label: '★ NEW', color: THEME.colors.textMuted },
-              };
-              const trendInfo = trendConfig[trend] || trendConfig.NEW;
-
-              return (
-                <TouchableOpacity
-                  key={ex.id}
-                  activeOpacity={0.85}
-                  onPress={() => router.push(`/progress/${ex.id}` as any)}
-                >
-                  <Card variant="surface" style={styles.movementCard}>
-                    {/* Top Row: Name, Progression Category, and Rank/Level/Trend Badges */}
-                    <View style={styles.cardTopRow}>
-                      <View style={styles.nameContainer}>
-                        <Heading level={3} style={styles.exerciseName}>{ex.name}</Heading>
-                        <View style={styles.badgeRow}>
-                          <Badge label={ex.primaryMuscle} size="sm" variant="cyan" />
-                          <Badge label={ex.equipment} size="sm" variant="neutral" />
-                          {ex.progressionType && (
-                            <Badge label={ex.progressionType.replace(/_/g, ' ')} size="sm" variant="neutral" />
-                          )}
-                        </View>
-                      </View>
-
-                      {/* Lift Level, Rank, and Trend Badges */}
-                      <View style={styles.badgesCol}>
-                        <View style={{ flexDirection: 'row', gap: 4 }}>
-                          <View style={[styles.rankPill, { borderColor: rankColor, backgroundColor: `${rankColor}15` }]}>
-                            <Text style={[styles.rankPillText, { color: rankColor }]}>
-                              RANK {progress.rank}
-                            </Text>
-                          </View>
-                          <View style={styles.levelPill}>
-                            <Text style={styles.levelPillText}>LVL {progress.level}</Text>
-                          </View>
-                        </View>
-                        <View style={[styles.trendPill, { borderColor: trendInfo.color, backgroundColor: `${trendInfo.color}15` }]}>
-                          <Text style={[styles.trendPillText, { color: trendInfo.color }]}>
-                            {trendInfo.label}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* XP Progress Bar to next level */}
-                    <View style={styles.xpProgressContainer}>
-                      <ProgressBar
-                        progressPercent={progress.progressPercent}
-                        color={rankColor}
-                        size="sm"
-                        label={`${progress.currentLevelXp.toLocaleString()} / ${progress.xpRequiredForNextLevel.toLocaleString()} XP (${progress.progressPercent}%)`}
-                      />
-                    </View>
-
-                    {/* Category-Tailored Stats Telemetry Grid */}
-                    {isTrained ? (
-                      <View style={styles.telemetryGrid}>
-                        {isCardio ? (
-                          <>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>BEST DIST</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.cyan }]}>
-                                {mastery.bestDistanceMeters && mastery.bestDistanceMeters >= 1000
-                                  ? `${(mastery.bestDistanceMeters / 1000).toFixed(2)} km`
-                                  : `${mastery.bestDistanceMeters || 0} m`}
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>BEST PACE</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.emerald }]}>
-                                {mastery.bestPaceSecondsPerKm && mastery.bestPaceSecondsPerKm > 0
-                                  ? `${Math.floor(mastery.bestPaceSecondsPerKm / 60)}:${(Math.round(mastery.bestPaceSecondsPerKm) % 60).toString().padStart(2, '0')}/km`
-                                  : '--:--'}
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>TOTAL TIME</Caption>
-                              <Text style={styles.telemetryVal}>
-                                {Math.round((mastery.totalDurationSeconds || 0) / 60)} min
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>SESSIONS</Caption>
-                              <Text style={styles.telemetryVal}>{mastery.totalSessions}</Text>
-                            </View>
-                          </>
-                        ) : isBodyweight ? (
-                          <>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>BEST REPS</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.cyan }]}>{mastery.bestReps} reps</Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>ADDED WT</Caption>
-                              <Text style={styles.telemetryVal}>{mastery.bestWeightKg} kg</Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>TOTAL REPS</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.emerald }]}>{mastery.totalReps}</Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>SESSIONS</Caption>
-                              <Text style={styles.telemetryVal}>{mastery.totalSessions}</Text>
-                            </View>
-                          </>
-                        ) : (
-                          <>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>EST. 1RM</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.cyan }]}>
-                                {mastery.estimated1RmKg} kg
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>BEST SET</Caption>
-                              <Text style={styles.telemetryVal}>
-                                {mastery.bestWeightKg}kg × {mastery.bestReps}
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>TOTAL VOL</Caption>
-                              <Text style={[styles.telemetryVal, { color: THEME.colors.emerald }]}>
-                                {mastery.totalVolumeKg > 999 ? `${(mastery.totalVolumeKg / 1000).toFixed(1)}k` : mastery.totalVolumeKg} kg
-                              </Text>
-                            </View>
-                            <View style={styles.telemetryItem}>
-                              <Caption style={styles.telemetryLabel}>SESSIONS</Caption>
-                              <Text style={styles.telemetryVal}>{mastery.totalSessions}</Text>
-                            </View>
-                          </>
-                        )}
-                      </View>
-                    ) : (
-                      <View style={styles.untrainedContainer}>
-                        <Caption style={styles.untrainedText}>
-                          Unranked Initiate • Log completed sets to start earning lift XP
-                        </Caption>
-                      </View>
-                    )}
-                  </Card>
-                </TouchableOpacity>
-              );
             })}
           </View>
-        </View>
-      </ScrollView>
+        )}
+      </View>
+
+      <View style={{ height: 40 }} />
+
+      {/* MODALS */}
+      <UnifiedProgressionModal
+        visible={progressionModalVisible}
+        status={unifiedStatus}
+        onClose={() => setProgressionModalVisible(false)}
+      />
+
+      <LogWeightModal
+        visible={logWeightModalVisible}
+        currentWeightKg={currentWeight}
+        onClose={() => setLogWeightModalVisible(false)}
+        onSave={handleSaveWeight}
+      />
+
+      <CustomDateRangeModal
+        visible={customRangeModalVisible}
+        initialStartDate={customStartDate}
+        initialEndDate={customEndDate}
+        onClose={() => setCustomRangeModalVisible(false)}
+        onApply={(s, e) => {
+          setCustomStartDate(s);
+          setCustomEndDate(e);
+          setSelectedRange('CUSTOM');
+        }}
+      />
+
+      <ChartDataDetailsModal
+        visible={chartDetailsModalVisible}
+        queryResult={chartQueryResult}
+        exerciseName={exercises.find((e) => e.id === selectedExerciseId)?.name}
+        onClose={() => setChartDetailsModalVisible(false)}
+      />
+
+      <EditWorkoutRecordModal
+        visible={editRecordModalVisible}
+        workout={editingWorkout}
+        onClose={() => {
+          setEditRecordModalVisible(false);
+          setEditingWorkout(null);
+        }}
+        onUpdateSet={handleUpdateSet}
+        onDeleteSet={handleDeleteSet}
+        onDeleteWorkout={handleDeleteWorkout}
+      />
+
+      <FitnessComparisonModal
+        visible={comparisonModalVisible}
+        initialExerciseId={comparisonExerciseId}
+        userId={userId}
+        userBodyweightKg={currentWeight}
+        onClose={() => setComparisonModalVisible(false)}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
   scrollContent: {
-    paddingBottom: 40,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 36,
   },
   header: {
-    marginBottom: THEME.spacing.sm,
-    marginTop: THEME.spacing.xs,
-  },
-  title: {
-    letterSpacing: 1.5,
-  },
-  subtitle: {
-    marginTop: 2,
-  },
-  kpiGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginVertical: THEME.spacing.sm,
-  },
-  kpiCard: {
-    width: '48.5%',
-    padding: 10,
-  },
-  kpiLabel: {
-    fontSize: 8,
-    marginBottom: 4,
-  },
-  kpiSub: {
-    fontSize: 9,
-    marginTop: 2,
-  },
-  section: {
-    marginTop: THEME.spacing.md,
-  },
-  sectionHeader: {
-    letterSpacing: 1.5,
-    marginBottom: THEME.spacing.xs,
-  },
-  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: THEME.spacing.xs,
+    marginBottom: 16,
   },
-  chartCard: {
-    padding: 12,
-  },
-  trendRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  emptyPrCard: {
-    padding: 16,
-  },
-  prCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: THEME.spacing.xs,
-  },
-  prLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  prIcon: {
-    fontSize: 18,
-  },
-  prExName: {
-    fontSize: 14,
-  },
-  prRight: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  prValue: {
-    fontSize: 12,
+  screenTitle: {
+    fontSize: 28,
     fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  searchBar: {
+  logWeightBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.surfaceElevated,
-    borderRadius: THEME.borderRadius.sm,
-    paddingHorizontal: 12,
-    height: 42,
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: THEME.spacing.xs,
   },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: 8,
+  sectionMargin: {
+    marginTop: 20,
   },
-  searchInput: {
-    flex: 1,
-    color: THEME.colors.textPrimary,
-    fontSize: 14,
-  },
-  clearText: {
-    padding: 4,
-    fontWeight: '700',
-  },
-  sortScroll: {
+  kpiRow: {
     flexDirection: 'row',
-    marginBottom: THEME.spacing.xs,
+    gap: 10,
   },
-  sortPill: {
-    backgroundColor: THEME.colors.surfaceElevated,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginRight: 8,
+  emptyHistoryBox: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sortPillActive: {
-    backgroundColor: THEME.colors.cyan,
-    borderColor: THEME.colors.cyan,
+  historyList: {
+    gap: 10,
   },
-  sortText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  filterScroll: {
-    flexDirection: 'row',
-    marginBottom: THEME.spacing.xs,
-  },
-  filterPill: {
-    backgroundColor: THEME.colors.surfaceElevated,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.borderRadius.sharp,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginRight: 8,
-  },
-  filterPillActive: {
-    borderColor: THEME.colors.cyan,
-    backgroundColor: THEME.colors.cyanSubtle,
-  },
-  filterText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  directoryList: {
-    marginTop: THEME.spacing.xs,
-  },
-  movementCard: {
-    marginBottom: THEME.spacing.sm,
+  historyCard: {
     padding: 14,
   },
-  cardTopRow: {
+  historyCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    gap: 8,
   },
-  nameContainer: {
-    flex: 1,
-    marginRight: 10,
+  manageRecordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
-  exerciseName: {
-    marginBottom: 4,
-    fontSize: 15,
-  },
-  badgeRow: {
+  exChipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginTop: 2,
+    marginTop: 10,
   },
-  badgesCol: {
-    alignItems: 'flex-end',
-    gap: 4,
-  },
-  rankPill: {
-    paddingHorizontal: 8,
+  exChip: {
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 6,
     borderWidth: 1,
-  },
-  rankPillText: {
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  levelPill: {
-    backgroundColor: THEME.colors.surfaceElevated,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  levelPillText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  trendPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-  },
-  trendPillText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  xpProgressContainer: {
-    marginVertical: 10,
-  },
-  telemetryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  telemetryItem: {
-    alignItems: 'center',
-  },
-  telemetryLabel: {
-    fontSize: 8,
-    fontWeight: '800',
-    color: THEME.colors.textMuted,
-    marginBottom: 2,
-  },
-  telemetryVal: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: THEME.colors.textPrimary,
-  },
-  untrainedContainer: {
-    paddingVertical: 4,
-  },
-  untrainedText: {
-    fontStyle: 'italic',
-    color: THEME.colors.textMuted,
   },
 });

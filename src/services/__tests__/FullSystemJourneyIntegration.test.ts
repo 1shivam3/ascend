@@ -12,8 +12,9 @@ import { SocialFeedService } from '../social/SocialFeedService';
 import { ChallengeEngine } from '../challenges/ChallengeEngine';
 import { ChallengeRepository } from '../../database/repositories/ChallengeRepository';
 import { LeaderboardService } from '../leaderboard/LeaderboardService';
-import { HealthIntegrationService } from '../health/HealthIntegrationService';
-import { MockHealthConnectAdapter } from '../health/HealthConnectAdapter';
+import { StepCounterService } from '../step/StepCounterService';
+import { MockStepCounterAdapter } from '../step/StepCounterAdapter';
+import { StepRepository } from '../../database/repositories/StepRepository';
 import { HealthQuestBridge } from '../health/HealthQuestBridge';
 import { ActivityFeedRepository } from '../../database/repositories/ActivityFeedRepository';
 import { PrivacyRepository } from '../../database/repositories/PrivacyRepository';
@@ -51,6 +52,7 @@ const { mockDb, tables } = vi.hoisted(() => {
     health_records: [] as any[],
     health_sync_state: [] as any[],
     sync_queue: [] as any[],
+    daily_step_summaries: [] as any[],
   };
 
   const db = {
@@ -322,6 +324,26 @@ const { mockDb, tables } = vi.hoisted(() => {
         return { changes: 0 };
       }
 
+      // Daily Step Summaries
+      if (s.startsWith('INSERT INTO daily_step_summaries')) {
+        const [id, user_id, date, today_steps, step_goal, last_sensor_value, baseline, last_updated_at, synced_at, created_at] = params;
+        const idx = state.daily_step_summaries.findIndex(row => row.user_id === user_id && row.date === date);
+        const record = { id, user_id, date, today_steps, step_goal, last_sensor_value, baseline, last_updated_at, synced_at, created_at };
+        if (idx >= 0) state.daily_step_summaries[idx] = record;
+        else state.daily_step_summaries.push(record);
+        return { changes: 1 };
+      }
+
+      if (s.startsWith('UPDATE daily_step_summaries SET step_goal =')) {
+        const [step_goal, user_id, date] = params;
+        const row = state.daily_step_summaries.find(r => r.user_id === user_id && r.date === date);
+        if (row) {
+          row.step_goal = step_goal;
+          return { changes: 1 };
+        }
+        return { changes: 0 };
+      }
+
       // Generic UPDATE migrations for guest migration
       if (s.startsWith('UPDATE') && s.includes('user_id = ?')) {
         const [newId, oldId] = params;
@@ -406,6 +428,10 @@ const { mockDb, tables } = vi.hoisted(() => {
         const [uid] = params;
         const p = state.profiles.find(x => x.id === uid);
         return p ? { leaderboard_opt_in: p.leaderboard_opt_in } : null;
+      }
+      if (s.startsWith('SELECT * FROM daily_step_summaries WHERE user_id = ? AND date = ?')) {
+        const [uid, dt] = params;
+        return state.daily_step_summaries.find(r => r.user_id === uid && r.date === dt) || null;
       }
       if (s.startsWith('SELECT id, status FROM local_sync_queue WHERE idempotency_key = ?')) {
         const [key] = params;
@@ -851,63 +877,46 @@ describe('Full-System Journey Integration & Post-Expansion Audit', () => {
     expect(friendsBoard.some(e => e.id === userA)).toBe(true);
   });
 
-  it('Phase 8: Health Connect Activity & Strict Gym XP Quarantine', async () => {
-    const mockAdapter = new MockHealthConnectAdapter('AVAILABLE');
-    HealthIntegrationService.setAdapter(mockAdapter);
+  it('Phase 8: Native Step Counter Activity, Hardware Baseline Calibration & Strict Gym XP Quarantine', async () => {
+    const mockAdapter = new MockStepCounterAdapter(true, true);
+    mockAdapter.setRawSensorValue(10000);
+    StepCounterService.setAdapter(mockAdapter);
 
-    const t0 = new Date(Date.now() - 7200 * 1000).toISOString();
-    const t1 = new Date(Date.now() - 3600 * 1000).toISOString();
+    // Initial calibration: Sensor has 10,000 steps since boot
+    const initState = await StepCounterService.initialize(userA);
+    expect(initState.status).toBe('READY');
+    expect(initState.todaySteps).toBe(0);
+    expect(initState.baseline).toBe(10000);
+    expect(initState.lastSensorValue).toBe(10000);
 
-    mockAdapter.seedRecords('STEPS', [
-      {
-        id: 'hc-step-1',
-        userId: userA,
-        recordType: 'STEPS',
-        sourceClient: 'com.garmin.connect',
-        externalId: 'garmin-step-8k',
-        startTime: t0,
-        endTime: t1,
-        value: 8500,
-        unit: 'count',
-      },
-    ]);
+    // User walks 6,500 steps throughout the day (hardware sensor advances from 10,000 to 16,500)
+    mockAdapter.emitSensorEvent(16500);
 
-    mockAdapter.seedRecords('EXERCISE_SESSION', [
-      {
-        id: 'hc-run-1',
-        userId: userA,
-        recordType: 'EXERCISE_SESSION',
-        sourceClient: 'com.garmin.connect',
-        externalId: 'garmin-run-5k',
-        startTime: t0,
-        endTime: t1,
-        value: 30,
-        unit: 'count',
-        metadata: {
-          exerciseType: 'RUNNING',
-          durationMinutes: 30,
-          distanceMeters: 5000,
-        },
-      },
-    ]);
+    // Allow async event handler to complete
+    await new Promise((r) => setTimeout(r, 50));
 
-    // Connect with steps and cardio permissions
-    await HealthIntegrationService.connect(userA, ['READ_STEPS', 'READ_EXERCISE']);
-    const syncResult = await HealthIntegrationService.sync(userA);
+    const currentState = StepCounterService.getState(userA);
+    expect(currentState?.todaySteps).toBe(6500);
+    expect(currentState?.lastSensorValue).toBe(16500);
 
-    expect(syncResult.ingested).toBeGreaterThan(0);
+    // Verify local SQLite persistence
+    const savedSummary = await StepRepository.getTodaySummary(userA);
+    expect(savedSummary).toBeDefined();
+    expect(savedSummary?.todaySteps).toBe(6500);
 
-    // STRICT GUARD: Zero gym workout XP or strength mastery awarded
+    // STRICT GUARD: Zero gym workout XP or strength mastery awarded for steps
     const gymXpTxs = tables.xp_transactions.filter(
-      t => t.user_id === userA && t.source_type === 'WORKOUT' && t.source_id.startsWith('hc-')
+      t => t.user_id === userA && t.source_type === 'WORKOUT' && t.description?.toLowerCase().includes('step')
     );
     expect(gymXpTxs).toHaveLength(0);
 
     // PRIVACY: Zero health telemetry published to public social feed
     const healthFeedItems = tables.activity_feed.filter(
-      a => a.user_id === userA && (a.title.includes('Health') || a.title.includes('bpm'))
+      a => a.user_id === userA && (a.title.includes('Health') || a.title.includes('bpm') || a.title.includes('Step'))
     );
     expect(healthFeedItems).toHaveLength(0);
+
+    StepCounterService.cleanup();
   });
 
   it('Phase 9: Guest User Migration Cascade Across Expansion Tables', async () => {
@@ -929,6 +938,7 @@ describe('Full-System Journey Integration & Post-Expansion Audit', () => {
     tables.activity_feed.push({ id: 'af-guest-1', user_id: guestId, event_type: 'WORKOUT_COMPLETED', title: 'Guest Workout' });
     tables.friendships.push({ id: 'f-guest-1', user_id: guestId, friend_id: userB });
     tables.health_records.push({ id: 'hr-guest-1', user_id: guestId, record_type: 'STEPS', value: 4000 });
+    tables.daily_step_summaries.push({ id: 'step-guest-1', user_id: guestId, date: '2026-09-22', today_steps: 4200, step_goal: 10000 });
     tables.challenges.push({ id: 'c-guest-1', created_by: guestId, title: 'Guest Cup' });
     tables.challenge_participants.push({ id: 'cp-guest-1', challenge_id: 'c-guest-1', user_id: guestId, progress: 2 });
 
@@ -944,6 +954,9 @@ describe('Full-System Journey Integration & Post-Expansion Audit', () => {
 
     const health = tables.health_records.find(h => h.id === 'hr-guest-1');
     expect(health?.user_id).toBe(authId);
+
+    const stepSummary = tables.daily_step_summaries.find(s => s.id === 'step-guest-1');
+    expect(stepSummary?.user_id).toBe(authId);
   });
 
   it('Phase 10: Offline Ingestion & Sync Idempotency', async () => {

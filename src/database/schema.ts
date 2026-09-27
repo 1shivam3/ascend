@@ -26,11 +26,28 @@ CREATE TABLE IF NOT EXISTS profiles (
   leaderboard_opt_in INTEGER NOT NULL DEFAULT 0,
   auth_id TEXT,
   friend_code TEXT UNIQUE,
+  active_title TEXT,
+  active_title_id TEXT,
+  avatar_config TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_profiles_friend_code ON profiles (friend_code);
+
+CREATE TABLE IF NOT EXISTS user_titles (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  title_id TEXT NOT NULL,
+  unlocked_at TEXT NOT NULL,
+  is_active INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES profiles (id) ON DELETE CASCADE,
+  UNIQUE(user_id, title_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_titles_user ON user_titles (user_id);
 
 CREATE TABLE IF NOT EXISTS user_settings (
   id TEXT PRIMARY KEY,
@@ -41,6 +58,7 @@ CREATE TABLE IF NOT EXISTS user_settings (
   default_rest_seconds INTEGER NOT NULL DEFAULT 90,
   push_notifications_enabled INTEGER NOT NULL DEFAULT 1,
   streak_freeze_auto_use INTEGER NOT NULL DEFAULT 1,
+  theme_mode TEXT NOT NULL DEFAULT 'light',
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -454,6 +472,9 @@ CREATE TABLE IF NOT EXISTS challenges (
   status TEXT NOT NULL DEFAULT 'ACTIVE',
   config TEXT NOT NULL DEFAULT '{}',
   reward_xp INTEGER NOT NULL DEFAULT 250,
+  reward_title_id TEXT,
+  reward_title_name TEXT,
+  reward_badge TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
@@ -527,5 +548,23 @@ CREATE TABLE IF NOT EXISTS health_sync_state (
 );
 
 CREATE INDEX IF NOT EXISTS idx_health_sync_state_user ON health_sync_state (user_id);
+
+CREATE TABLE IF NOT EXISTS daily_step_summaries (
+  id TEXT PRIMARY KEY NOT NULL,
+  user_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  today_steps INTEGER NOT NULL DEFAULT 0,
+  step_goal INTEGER NOT NULL DEFAULT 10000,
+  last_sensor_value REAL NOT NULL DEFAULT 0,
+  baseline REAL NOT NULL DEFAULT 0,
+  last_updated_at TEXT NOT NULL,
+  synced_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES profiles (id) ON DELETE CASCADE,
+  UNIQUE(user_id, date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_step_summaries_user_date ON daily_step_summaries (user_id, date);
 `;
+
 

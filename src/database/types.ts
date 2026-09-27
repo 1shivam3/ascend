@@ -126,6 +126,19 @@ export interface SqliteProfileRow {
   onboarding_completed: number;
   auth_id: string | null;
   friend_code?: string | null;
+  active_title?: string | null;
+  active_title_id?: string | null;
+  avatar_config?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SqliteUserTitleRow {
+  id: string;
+  user_id: string;
+  title_id: string;
+  unlocked_at: string;
+  is_active: number;
   created_at: string;
   updated_at: string;
 }
@@ -139,6 +152,7 @@ export interface SqliteUserSettingsRow {
   default_rest_seconds: number;
   push_notifications_enabled: number;
   streak_freeze_auto_use: number;
+  theme_mode?: string;
   created_at: string;
   updated_at: string;
 }
@@ -333,6 +347,9 @@ export interface SqliteChallengeRow {
   status: string;
   config: string;
   reward_xp: number;
+  reward_title_id?: string | null;
+  reward_title_name?: string | null;
+  reward_badge?: string | null;
   created_at: string;
   updated_at: string;
 }

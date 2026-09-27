@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../constants/theme';
 
 export interface BadgeProps {
   label: string;
-  variant?: 'neutral' | 'cyan' | 'amber' | 'emerald' | 'crimson' | 'violet';
+  variant?: 'neutral' | 'cyan' | 'amber' | 'emerald' | 'crimson' | 'violet' | 'accent' | 'peach' | 'mint' | 'lavender' | 'sky';
   dot?: boolean;
   size?: 'sm' | 'md';
   style?: StyleProp<ViewStyle>;
@@ -17,21 +17,77 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   style,
 }) => {
+  const { colors, borderRadius, isDark } = useTheme();
+
   const getBadgeColors = () => {
     switch (variant) {
+      case 'accent':
+        return {
+          color: colors.accent,
+          bg: colors.accentSubtle,
+          border: isDark ? 'rgba(142, 164, 50, 0.35)' : 'rgba(114, 132, 36, 0.20)',
+        };
+      case 'peach':
+        return {
+          color: colors.peachText,
+          bg: colors.peach,
+          border: isDark ? 'rgba(251, 191, 36, 0.3)' : 'rgba(180, 83, 9, 0.15)',
+        };
+      case 'mint':
+        return {
+          color: colors.mintText,
+          bg: colors.mint,
+          border: isDark ? 'rgba(52, 211, 153, 0.3)' : 'rgba(4, 120, 87, 0.15)',
+        };
+      case 'lavender':
+        return {
+          color: colors.lavenderText,
+          bg: colors.lavender,
+          border: isDark ? 'rgba(167, 139, 250, 0.3)' : 'rgba(109, 40, 217, 0.15)',
+        };
+      case 'sky':
+        return {
+          color: colors.skyText,
+          bg: colors.sky,
+          border: isDark ? 'rgba(56, 189, 248, 0.3)' : 'rgba(3, 105, 161, 0.15)',
+        };
       case 'cyan':
-        return { color: THEME.colors.cyan, bg: THEME.colors.cyanSubtle, border: THEME.colors.cyan };
+        return {
+          color: colors.cyan,
+          bg: colors.cyanSubtle,
+          border: isDark ? 'rgba(56, 189, 248, 0.3)' : colors.border,
+        };
       case 'amber':
-        return { color: THEME.colors.amber, bg: THEME.colors.amberSubtle, border: THEME.colors.amber };
+        return {
+          color: colors.amber,
+          bg: colors.amberSubtle,
+          border: isDark ? 'rgba(245, 158, 11, 0.3)' : colors.border,
+        };
       case 'emerald':
-        return { color: THEME.colors.emerald, bg: THEME.colors.emeraldSubtle, border: THEME.colors.emerald };
+        return {
+          color: colors.emerald,
+          bg: colors.emeraldSubtle,
+          border: isDark ? 'rgba(16, 185, 129, 0.3)' : colors.border,
+        };
       case 'crimson':
-        return { color: THEME.colors.crimson, bg: THEME.colors.crimsonSubtle, border: THEME.colors.crimson };
+        return {
+          color: colors.crimson,
+          bg: colors.crimsonSubtle,
+          border: isDark ? 'rgba(239, 68, 68, 0.3)' : colors.border,
+        };
       case 'violet':
-        return { color: THEME.colors.violet, bg: THEME.colors.violetSubtle, border: THEME.colors.violet };
+        return {
+          color: colors.violet,
+          bg: colors.violetSubtle,
+          border: isDark ? 'rgba(139, 92, 246, 0.3)' : colors.border,
+        };
       case 'neutral':
       default:
-        return { color: THEME.colors.textSecondary, bg: THEME.colors.surfaceElevated, border: THEME.colors.border };
+        return {
+          color: colors.textSecondary,
+          bg: colors.surfaceElevated,
+          border: colors.border,
+        };
     }
   };
 
@@ -45,15 +101,14 @@ export const Badge: React.FC<BadgeProps> = ({
         {
           backgroundColor: bg,
           borderColor: border,
+          borderRadius: borderRadius.sm,
           paddingHorizontal: isSmall ? 6 : 9,
           paddingVertical: isSmall ? 2 : 4,
         },
         style,
       ]}
     >
-      {dot && (
-        <View style={[styles.dot, { backgroundColor: color }]} />
-      )}
+      {dot && <View style={[styles.dot, { backgroundColor: color }]} />}
       <Text
         style={[
           styles.text,
@@ -74,7 +129,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    borderRadius: THEME.borderRadius.sharp,
     borderWidth: 1,
   },
   dot: {
@@ -84,7 +138,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   text: {
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },

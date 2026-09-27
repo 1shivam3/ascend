@@ -7,7 +7,7 @@ import { Card } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { AIGenerationService } from '../../services/ai/AIGenerationService';
 import { AIWorkoutPlan } from '../../services/ai/schemas';
-import { DEFAULT_USER_ID } from '../../database/migrations/init';
+import { useAuthStore } from '../../store/useAuthStore';
 
 interface Props {
   goal: string;
@@ -39,7 +39,8 @@ export function StepGeneratePlan({ goal, experience, daysPerWeek, durationMin, o
     }, 500);
 
     // Call AI Generation Service with deterministic fallback guarantee
-    AIGenerationService.generatePlan(DEFAULT_USER_ID, {
+    const activeUserId = useAuthStore.getState().userId || 'operative';
+    AIGenerationService.generatePlan(activeUserId, {
       goal,
       experience,
       days_per_week: daysPerWeek,

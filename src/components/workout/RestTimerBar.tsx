@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { THEME } from '../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../constants/theme';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 
 export const RestTimerBar: React.FC = () => {
+  const { colors, borderRadius, isDark } = useTheme();
   const {
     isRestTimerRunning,
     restTimerSecondsRemaining,
@@ -25,36 +27,116 @@ export const RestTimerBar: React.FC = () => {
 
   if (!isRestTimerRunning) return null;
 
-  const minutes = Math.floor(restTimerSecondsRemaining / 60);
-  const seconds = restTimerSecondsRemaining % 60;
-  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  
-  const progressRatio = restTimerTotalSeconds > 0 
-    ? Math.min(1, restTimerSecondsRemaining / restTimerTotalSeconds) 
-    : 0;
+  const isOvertime = restTimerSecondsRemaining <= 0;
+  const absSeconds = Math.abs(restTimerSecondsRemaining);
+  const minutes = Math.floor(absSeconds / 60);
+  const seconds = absSeconds % 60;
+  const formattedTime = `${isOvertime ? '+' : ''}${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+  const progressRatio =
+    restTimerTotalSeconds > 0
+      ? Math.max(0, Math.min(1, restTimerSecondsRemaining / restTimerTotalSeconds))
+      : 0;
 
   return (
-    <View style={styles.container}>
-      {/* Progress line */}
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${progressRatio * 100}%` }]} />
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+        },
+      ]}
+    >
+      {/* Progress track */}
+      <View style={[styles.progressTrack, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#E5E7EB' }]}>
+        <View
+          style={[
+            styles.progressFill,
+            {
+              width: `${progressRatio * 100}%`,
+              backgroundColor: isOvertime ? colors.emerald : colors.cyan,
+            },
+          ]}
+        />
       </View>
 
       <View style={styles.contentRow}>
+        {/* Time and guidance label */}
         <View style={styles.timeSection}>
-          <Text style={styles.timerLabel}>REST TIMER</Text>
-          <Text style={styles.timerDigits}>{formattedTime}</Text>
+          <View style={styles.headerLabelRow}>
+            <Ionicons
+              name={isOvertime ? 'checkmark-circle-outline' : 'timer-outline'}
+              size={13}
+              color={isOvertime ? colors.emerald : colors.cyan}
+            />
+            <Text
+              style={[
+                styles.timerLabel,
+                { color: isOvertime ? colors.emerald : colors.cyan },
+              ]}
+            >
+              {isOvertime ? 'RECOVERED • READY' : 'SELF-DIRECTED REST'}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.timerDigits,
+              { color: isOvertime ? colors.emerald : colors.textPrimary },
+            ]}
+          >
+            {formattedTime}
+          </Text>
+          <Text style={[styles.reassuranceText, { color: colors.textMuted }]}>
+            Rest as needed • No XP penalty
+          </Text>
         </View>
 
+        {/* Tactile gym controls */}
         <View style={styles.controlsRow}>
-          <TouchableOpacity onPress={() => addRestSeconds(30)} style={styles.controlBtn}>
-            <Text style={styles.controlBtnText}>+30s</Text>
+          <TouchableOpacity
+            onPress={() => addRestSeconds(30)}
+            style={[
+              styles.controlBtn,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                borderRadius: borderRadius.sm,
+              },
+            ]}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Text style={[styles.controlBtnText, { color: colors.textPrimary }]}>+30s</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => addRestSeconds(-15)} style={styles.controlBtn}>
-            <Text style={styles.controlBtnText}>-15s</Text>
+
+          <TouchableOpacity
+            onPress={() => addRestSeconds(-15)}
+            style={[
+              styles.controlBtn,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                borderRadius: borderRadius.sm,
+              },
+            ]}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Text style={[styles.controlBtnText, { color: colors.textPrimary }]}>-15s</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={skipRestTimer} style={styles.skipBtn}>
-            <Text style={styles.skipBtnText}>SKIP</Text>
+
+          <TouchableOpacity
+            onPress={skipRestTimer}
+            style={[
+              styles.dismissBtn,
+              {
+                backgroundColor: isDark ? 'rgba(0, 229, 255, 0.12)' : `${colors.cyan}18`,
+                borderColor: colors.cyan,
+                borderRadius: borderRadius.sm,
+              },
+            ]}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+          >
+            <Text style={[styles.dismissBtnText, { color: colors.cyan }]}>DONE ✓</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -64,22 +146,19 @@ export const RestTimerBar: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: THEME.colors.surfaceElevated,
     borderTopWidth: 1,
-    borderColor: THEME.colors.border,
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical: THEME.spacing.sm,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   progressTrack: {
     height: 3,
-    backgroundColor: THEME.colors.background,
     marginBottom: 8,
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: THEME.colors.cyan,
   },
   contentRow: {
     flexDirection: 'row',
@@ -89,45 +168,51 @@ const styles = StyleSheet.create({
   timeSection: {
     justifyContent: 'center',
   },
+  headerLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 1,
+  },
   timerLabel: {
-    color: THEME.colors.textMuted,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   timerDigits: {
-    color: THEME.colors.cyan,
     fontSize: 22,
     fontWeight: '900',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  reassuranceText: {
+    fontSize: 10,
+    fontWeight: '500',
+    marginTop: 1,
   },
   controlsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
+    alignItems: 'center',
   },
   controlBtn: {
-    backgroundColor: THEME.colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: THEME.borderRadius.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
+    minWidth: 44,
+    alignItems: 'center',
   },
   controlBtnText: {
-    color: THEME.colors.textPrimary,
     fontSize: 12,
     fontWeight: '700',
   },
-  skipBtn: {
-    backgroundColor: 'rgba(255, 51, 102, 0.15)',
+  dismissBtn: {
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: THEME.borderRadius.sm,
+    paddingVertical: 7,
     borderWidth: 1,
-    borderColor: THEME.colors.crimson,
+    alignItems: 'center',
   },
-  skipBtnText: {
-    color: THEME.colors.crimson,
+  dismissBtnText: {
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,

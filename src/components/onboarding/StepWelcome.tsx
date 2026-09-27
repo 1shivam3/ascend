@@ -64,7 +64,7 @@ export function StepWelcome({ onNext }: Props) {
           onPress={onNext}
         />
         <Caption align="center" style={styles.disclaimer}>
-          No account required to begin. Operative data is stored locally.
+          Calibrating biometrics and physical programming for your operative profile.
         </Caption>
       </View>
     </View>

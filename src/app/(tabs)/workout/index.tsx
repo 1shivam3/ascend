@@ -1,25 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, RefreshControl, ScrollView } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  RefreshControl,
+} from 'react-native';
 import { useRouter } from 'expo-router';
-import { THEME } from '../../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../../constants/theme';
 import { useWorkoutStore } from '../../../store/useWorkoutStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { TemplateRepository } from '../../../database/repositories/TemplateRepository';
 import { WorkoutTemplate } from '../../../types/domain.types';
 import { ScreenContainer } from '../../../components/layout/ScreenContainer';
 import { Heading, Text, Caption, MonoText } from '../../../components/ui/Typography';
-import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
+import { Button, PrimaryButton } from '../../../components/ui/Button';
 import { Badge } from '../../../components/ui/Badge';
+import { SectionHeader } from '../../../components/ui/SectionHeader';
+import { Divider } from '../../../components/ui/Divider';
 import { TemplateBuilderModal } from '../../../components/workout/TemplateBuilderModal';
-import { DEFAULT_USER_ID } from '../../../database/migrations/init';
+import { ProgramGenerationModal } from '../../../components/workout/ProgramGenerationModal';
 
 type TabFilter = 'ALL' | 'CUSTOM' | 'PRESETS';
 
 export default function WorkoutScreen() {
   const router = useRouter();
-  const profile = useAuthStore(s => s.profile);
-  const userId = profile?.id || DEFAULT_USER_ID;
+  const { colors, borderRadius, shadows, isDark } = useTheme();
+  const profile = useAuthStore((s) => s.profile);
+  const userId = profile?.id || '';
 
   const {
     isActive,
@@ -36,6 +46,9 @@ export default function WorkoutScreen() {
   // Template Builder State
   const [builderVisible, setBuilderVisible] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<WorkoutTemplate | null>(null);
+
+  // Program Generator State
+  const [programGenVisible, setProgramGenVisible] = useState(false);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -62,7 +75,10 @@ export default function WorkoutScreen() {
         'Session in Progress',
         'You already have an active workout in progress. Discard or finish it before starting a new routine.',
         [
-          { text: 'Resume Active', onPress: () => router.push('/modals/active-workout' as any) },
+          {
+            text: 'Resume Active',
+            onPress: () => router.push('/modals/active-workout' as any),
+          },
           { text: 'Cancel', style: 'cancel' },
         ]
       );
@@ -121,7 +137,7 @@ export default function WorkoutScreen() {
     setBuilderVisible(true);
   };
 
-  const filteredTemplates = templates.filter(t => {
+  const filteredTemplates = templates.filter((t) => {
     if (selectedTab === 'CUSTOM') return !t.isPreset;
     if (selectedTab === 'PRESETS') return t.isPreset;
     return true;
@@ -129,60 +145,258 @@ export default function WorkoutScreen() {
 
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  const formattedDuration = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const formattedDuration = `${String(minutes).padStart(2, '0')}:${String(
+    seconds
+  ).padStart(2, '0')}`;
 
   return (
-    <ScreenContainer scrollable refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.cyan} />}>
+    <ScreenContainer
+      scrollable
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+          colors={[colors.accent]}
+        />
+      }
+      contentContainerStyle={styles.scrollContent}
+    >
+      {/* Header with Title & Action */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Heading level={1} style={styles.title}>WORKOUT PROTOCOLS</Heading>
-            <Caption style={styles.subtitle}>Custom training routines, combat splits & supersets</Caption>
-          </View>
-          <TouchableOpacity onPress={() => handleOpenBuilder()} style={styles.createBtn}>
-            <Text style={styles.createBtnText}>+ CREATE</Text>
-          </TouchableOpacity>
+        <View style={styles.headerTitleCol}>
+          <Heading level={1} style={styles.screenTitle}>
+            Train
+          </Heading>
+          <Caption style={{ color: colors.textSecondary, marginTop: 2 }}>
+            Structured routines, splits & supersets
+          </Caption>
         </View>
+        <Button
+          title="Create"
+          variant="secondary"
+          size="sm"
+          icon={<Ionicons name="add" size={16} color={colors.textPrimary} />}
+          onPress={() => handleOpenBuilder()}
+          accessibilityLabel="Create New Protocol"
+        />
       </View>
 
-      {/* Active Workout Resume Card */}
+      {/* Active Session Notification Banner */}
       {isActive && (
-        <Card variant="glass" accentBorder={THEME.colors.cyan} style={styles.activeCard}>
-          <View style={styles.activeHeader}>
-            <View style={styles.activeIndicatorRow}>
-              <View style={styles.activeDot} />
-              <Heading level={3} color={THEME.colors.textPrimary}>SESSION IN PROGRESS</Heading>
+        <Card
+          variant="surface"
+          style={[
+            styles.activeBanner,
+            {
+              borderColor: colors.accent,
+              borderWidth: 1.5,
+            },
+          ]}
+        >
+          <View style={styles.activeTopRow}>
+            <View style={styles.activeIndicatorGroup}>
+              <View
+                style={[
+                  styles.activeDot,
+                  { backgroundColor: colors.emerald },
+                ]}
+              />
+              <Caption
+                upper
+                style={[
+                  styles.activeBadgeText,
+                  { color: colors.emerald },
+                ]}
+              >
+                SESSION IN PROGRESS
+              </Caption>
             </View>
-            <Badge label="ACTIVE" variant="cyan" size="sm" />
+            <MonoText
+              style={[
+                styles.activeTimerText,
+                { color: isDark ? colors.textPrimary : colors.accent },
+              ]}
+            >
+              {formattedDuration}
+            </MonoText>
           </View>
 
-          <Text color={THEME.colors.textSecondary} style={styles.activeMeta}>
-            {activeWorkout?.title} • {formattedDuration} elapsed • {activeWorkout?.exercises.length || 0} exercises
-          </Text>
+          <Heading level={2} style={styles.activeTitle}>
+            {activeWorkout?.name || 'Tactical Protocol'}
+          </Heading>
+          <Caption style={{ color: colors.textSecondary, marginBottom: 12 }}>
+            {activeWorkout?.exercises.length || 0} exercises deployed • In-flight telemetry
+          </Caption>
 
-          <Button
-            title="RESUME ACTIVE WORKOUT →"
-            variant="primary"
-            size="md"
+          <PrimaryButton
+            title="Resume Session →"
             onPress={() => router.push('/modals/active-workout' as any)}
-            style={{ marginTop: 10 }}
           />
         </Card>
       )}
 
-      {/* Quick Launch & Filter Navigation */}
+      {/* Custom Program Generator / Architect Hero Card */}
+      <TouchableOpacity
+        onPress={() => setProgramGenVisible(true)}
+        activeOpacity={0.85}
+        style={{ marginBottom: 12 }}
+      >
+        <Card
+          variant="surface"
+          style={[
+            styles.architectCard,
+            {
+              backgroundColor: colors.accentSubtle,
+              borderColor: colors.accent,
+              borderWidth: 1,
+            },
+          ]}
+        >
+          <View style={styles.architectLeft}>
+            <View
+              style={[
+                styles.architectIconBox,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : '#FFFFFF',
+                  borderRadius: borderRadius.sm,
+                },
+              ]}
+            >
+              <Ionicons
+                name="sparkles"
+                size={20}
+                color={colors.accent}
+              />
+            </View>
+            <View style={styles.architectTextCol}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                <Text
+                  style={[
+                    styles.architectTitle,
+                    { color: colors.textPrimary },
+                  ]}
+                >
+                  Custom Program Architect
+                </Text>
+                <Badge label="SMART" variant="accent" size="sm" />
+              </View>
+              <Caption style={{ color: colors.textSecondary }}>
+                10-point questionnaire • Personalized split • 100% control
+              </Caption>
+            </View>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.accent}
+          />
+        </Card>
+      </TouchableOpacity>
+
+      {/* Quick Launch / Ad-Hoc Session */}
+      <TouchableOpacity onPress={handleStartCustom} activeOpacity={0.85}>
+        <Card
+          variant="surface"
+          style={[
+            styles.quickLaunchCard,
+            {
+              backgroundColor: colors.mint,
+              borderColor: isDark ? colors.border : 'transparent',
+              borderWidth: 1,
+            },
+          ]}
+        >
+          <View style={styles.quickLaunchLeft}>
+            <View
+              style={[
+                styles.quickLaunchIconBox,
+                {
+                  backgroundColor: isDark ? colors.surfaceElevated : colors.surfaceMuted,
+                  borderRadius: borderRadius.sm,
+                },
+              ]}
+            >
+              <Ionicons
+                name="flash"
+                size={20}
+                color={colors.mintText}
+              />
+            </View>
+            <View style={styles.quickLaunchTextCol}>
+              <Text
+                style={[
+                  styles.quickLaunchTitle,
+                  { color: colors.mintText },
+                ]}
+              >
+                Free-Form Workout
+              </Text>
+              <Caption
+                style={{
+                  color: colors.mintText,
+                  opacity: 0.85,
+                }}
+              >
+                Start empty session • Add exercises on the fly
+              </Caption>
+            </View>
+          </View>
+          <Ionicons
+            name="arrow-forward"
+            size={18}
+            color={colors.mintText}
+          />
+        </Card>
+      </TouchableOpacity>
+
+      {/* Filter Segmented Control Bar */}
       <View style={styles.filterSection}>
-        <View style={styles.tabsRow}>
-          {(['ALL', 'CUSTOM', 'PRESETS'] as TabFilter[]).map(tab => {
+        <View
+          style={[
+            styles.segmentedControl,
+            {
+              backgroundColor: isDark ? colors.surfaceElevated : '#E5E7EB',
+              borderRadius: borderRadius.md,
+            },
+          ]}
+        >
+          {(['ALL', 'CUSTOM', 'PRESETS'] as TabFilter[]).map((tab) => {
             const isSelected = selectedTab === tab;
+            const label =
+              tab === 'CUSTOM'
+                ? 'My Routines'
+                : tab === 'PRESETS'
+                ? 'Presets'
+                : 'All Routines';
             return (
               <TouchableOpacity
                 key={tab}
                 onPress={() => setSelectedTab(tab)}
-                style={[styles.tabBtn, isSelected && styles.tabBtnActive]}
+                style={[
+                  styles.segmentBtn,
+                  {
+                    backgroundColor: isSelected
+                      ? colors.surface
+                      : 'transparent',
+                    borderRadius: borderRadius.sm,
+                  },
+                  isSelected ? shadows.card : null,
+                ]}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.tabBtnText, isSelected && styles.tabBtnTextActive]}>
-                  {tab === 'CUSTOM' ? 'MY ROUTINES' : tab === 'PRESETS' ? 'SYSTEM PRESETS' : 'ALL ROUTINES'}
+                <Text
+                  style={[
+                    styles.segmentText,
+                    {
+                      color: isSelected
+                        ? colors.textPrimary
+                        : colors.textMuted,
+                      fontWeight: isSelected ? '700' : '500',
+                    },
+                  ]}
+                >
+                  {label}
                 </Text>
               </TouchableOpacity>
             );
@@ -190,103 +404,210 @@ export default function WorkoutScreen() {
         </View>
       </View>
 
-      {/* Free-form Quick Start Card */}
-      <TouchableOpacity onPress={handleStartCustom} activeOpacity={0.8}>
-        <Card variant="elevated" style={styles.quickStartCard}>
-          <View style={styles.quickStartLeft}>
-            <Text style={styles.quickStartIcon}>⚡</Text>
-            <View>
-              <Text style={styles.quickStartTitle}>QUICK EMPTY SESSION</Text>
-              <Caption style={styles.quickStartSub}>Ad-hoc deployment • Add exercises on the fly</Caption>
-            </View>
-          </View>
-          <Badge label="LAUNCH →" variant="cyan" size="sm" />
-        </Card>
-      </TouchableOpacity>
+      {/* Section Header */}
+      <SectionHeader
+        title={
+          selectedTab === 'CUSTOM'
+            ? 'MY ROUTINES'
+            : selectedTab === 'PRESETS'
+            ? 'STANDARD PRESETS'
+            : 'ALL ROUTINES'
+        }
+      />
 
-      {/* Routine Templates List */}
+      {/* Routines List */}
       <View style={styles.templateListSection}>
         {filteredTemplates.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>No routines found</Text>
-            <Caption style={styles.emptySub}>
-              Tap "+ CREATE" in the header to construct your first custom workout routine with supersets.
+          <Card variant="surface" style={styles.emptyContainer}>
+            <Ionicons
+              name="barbell-outline"
+              size={36}
+              color={colors.textMuted}
+              style={{ marginBottom: 8 }}
+            />
+            <Heading level={3} style={{ marginBottom: 4 }}>
+              No Routines Found
+            </Heading>
+            <Caption style={{ textAlign: 'center', color: colors.textSecondary }}>
+              Tap "+ Create" above to build a custom routine with personalized sets, reps, and supersets.
             </Caption>
           </Card>
         ) : (
-          filteredTemplates.map(tpl => {
-            const hasSupersets = tpl.exercises.some(e => Boolean(e.supersetId));
+          filteredTemplates.map((tpl) => {
+            const hasSupersets = tpl.exercises.some((e) => Boolean(e.supersetId));
             return (
-              <Card key={tpl.id} variant="elevated" style={styles.templateCard}>
-                <View style={styles.templateCardHeader}>
-                  <View style={styles.templateTitleCol}>
-                    <View style={styles.templateBadgeRow}>
-                      <Badge label={tpl.splitType} variant="cyan" size="sm" />
-                      {tpl.isPreset && <Badge label="PRESET" variant="neutral" size="sm" />}
-                      {hasSupersets && <Badge label="SUPERSET" variant="amber" size="sm" />}
+              <Card key={tpl.id} variant="surface" style={styles.templateCard}>
+                {/* Header info */}
+                <View style={styles.templateHeader}>
+                  <View style={styles.templateInfo}>
+                    <View style={styles.badgeRow}>
+                      <Badge label={tpl.splitType} variant="accent" size="sm" />
+                      {tpl.isPreset && (
+                        <Badge label="SYSTEM" variant="neutral" size="sm" />
+                      )}
+                      {hasSupersets && (
+                        <Badge label="SUPERSET" variant="amber" size="sm" />
+                      )}
                     </View>
-                    <Heading level={3} style={styles.templateName}>{tpl.name}</Heading>
+                    <Heading level={2} style={styles.templateName}>
+                      {tpl.name}
+                    </Heading>
                   </View>
 
-                  <View style={styles.templateMetaCol}>
-                    <MonoText style={styles.templateDuration}>{tpl.estimatedDurationMin} MIN</MonoText>
-                    <Caption style={styles.templateCount}>{tpl.exercises.length} Exercises</Caption>
+                  <View style={styles.templateDurationCol}>
+                    <View style={styles.durationRow}>
+                      <Ionicons
+                        name="time-outline"
+                        size={14}
+                        color={colors.textSecondary}
+                      />
+                      <Caption style={{ color: colors.textSecondary, fontWeight: '700' }}>
+                        {tpl.estimatedDurationMin} min
+                      </Caption>
+                    </View>
+                    <Caption style={{ color: colors.textMuted, marginTop: 2 }}>
+                      {tpl.exercises.length} exercises
+                    </Caption>
                   </View>
                 </View>
 
                 {tpl.description ? (
-                  <Caption style={styles.templateDesc}>{tpl.description}</Caption>
+                  <Caption style={{ color: colors.textSecondary, marginBottom: 8 }}>
+                    {tpl.description}
+                  </Caption>
                 ) : null}
 
-                {/* Exercise Preview Chips */}
-                <View style={styles.exercisePreviewBox}>
-                  {tpl.exercises.map((e, idx) => (
-                    <View key={e.id || idx} style={styles.exercisePreviewItem}>
-                      <Text style={styles.previewBullet}>•</Text>
-                      <Text style={styles.previewName}>{e.exercise?.name || 'Exercise'}</Text>
-                      <Caption style={styles.previewSets}>
-                        {e.targetSets}×{e.targetReps}
-                      </Caption>
+                {/* Exercise preview sequence */}
+                <View
+                  style={[
+                    styles.exerciseSequence,
+                    {
+                      backgroundColor: isDark
+                        ? 'rgba(255, 255, 255, 0.04)'
+                        : colors.surfaceElevated,
+                      borderRadius: borderRadius.md,
+                      borderColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  {tpl.exercises.slice(0, 4).map((e, idx) => (
+                    <View key={e.id || idx} style={styles.sequenceItem}>
+                      <View
+                        style={[
+                          styles.sequenceBullet,
+                          {
+                            backgroundColor: colors.accent,
+                          },
+                        ]}
+                      />
+                      <Text style={styles.sequenceName} numberOfLines={1}>
+                        {e.exercise?.name || 'Exercise'}
+                      </Text>
+                      <MonoText
+                        style={[styles.sequenceSets, { color: colors.textSecondary }]}
+                      >
+                        {e.targetSets} × {e.targetReps}
+                      </MonoText>
                       {e.supersetId && (
-                        <View style={styles.previewSsBadge}>
-                          <Text style={styles.previewSsText}>{e.supersetId}</Text>
+                        <View
+                          style={[
+                            styles.supersetTag,
+                            {
+                              backgroundColor: `${colors.amber}20`,
+                              borderColor: `${colors.amber}40`,
+                            },
+                          ]}
+                        >
+                          <MonoText style={{ color: colors.amber, fontSize: 9 }}>
+                            {e.supersetId}
+                          </MonoText>
                         </View>
                       )}
                     </View>
                   ))}
+                  {tpl.exercises.length > 4 ? (
+                    <Caption style={{ color: colors.textMuted, marginTop: 2 }}>
+                      +{tpl.exercises.length - 4} more movements
+                    </Caption>
+                  ) : null}
                 </View>
 
-                {/* Action Row */}
+                <Divider marginVertical={10} />
+
+                {/* Actions row */}
                 <View style={styles.templateActionsRow}>
                   <Button
-                    title="START ROUTINE"
+                    title="Start Routine"
                     variant="primary"
                     size="sm"
+                    icon={
+                      <Ionicons
+                        name="play"
+                        size={14}
+                        color={colors.primaryButtonText}
+                      />
+                    }
                     onPress={() => handleStartTemplate(tpl)}
-                    style={styles.startRoutineBtn}
+                    style={styles.launchBtn}
                   />
 
                   <View style={styles.secondaryActions}>
                     {!tpl.isPreset && (
                       <TouchableOpacity
                         onPress={() => handleOpenBuilder(tpl)}
-                        style={styles.actionIconBtn}
+                        style={[
+                          styles.actionPill,
+                          {
+                            backgroundColor: colors.surfaceElevated,
+                            borderColor: colors.border,
+                            borderRadius: borderRadius.sm,
+                          },
+                        ]}
+                        activeOpacity={0.7}
                       >
-                        <Text style={styles.actionIconText}>EDIT</Text>
+                        <Ionicons
+                          name="pencil-outline"
+                          size={14}
+                          color={colors.textSecondary}
+                        />
                       </TouchableOpacity>
                     )}
                     <TouchableOpacity
                       onPress={() => handleCloneTemplate(tpl.id)}
-                      style={styles.actionIconBtn}
+                      style={[
+                        styles.actionPill,
+                        {
+                          backgroundColor: colors.surfaceElevated,
+                          borderColor: colors.border,
+                          borderRadius: borderRadius.sm,
+                        },
+                      ]}
+                      activeOpacity={0.7}
                     >
-                      <Text style={styles.actionIconText}>CLONE</Text>
+                      <Ionicons
+                        name="copy-outline"
+                        size={14}
+                        color={colors.textSecondary}
+                      />
                     </TouchableOpacity>
                     {!tpl.isPreset && (
                       <TouchableOpacity
                         onPress={() => handleDeleteTemplate(tpl.id, tpl.name)}
-                        style={[styles.actionIconBtn, styles.deleteActionBtn]}
+                        style={[
+                          styles.actionPill,
+                          {
+                            backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                            borderColor: 'rgba(239, 68, 68, 0.3)',
+                            borderRadius: borderRadius.sm,
+                          },
+                        ]}
+                        activeOpacity={0.7}
                       >
-                        <Text style={styles.deleteActionText}>DEL</Text>
+                        <Ionicons
+                          name="trash-outline"
+                          size={14}
+                          color={colors.crimson}
+                        />
                       </TouchableOpacity>
                     )}
                   </View>
@@ -309,252 +630,239 @@ export default function WorkoutScreen() {
           await loadTemplates();
         }}
       />
+
+      {/* Custom Program Generation & Architecture Modal */}
+      <ProgramGenerationModal
+        visible={programGenVisible}
+        userId={userId}
+        onClose={() => setProgramGenVisible(false)}
+        onPlanCreated={async () => {
+          setSelectedTab('CUSTOM');
+          await loadTemplates();
+        }}
+      />
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingVertical: THEME.spacing.md,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
-  headerTop: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  title: {
-    letterSpacing: 1.5,
+  headerTitleCol: {
+    flex: 1,
   },
-  subtitle: {
-    marginTop: 2,
+  screenTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   createBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: 'rgba(0, 240, 255, 0.15)',
-    borderRadius: THEME.borderRadius.sharp,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: THEME.colors.cyan,
   },
   createBtnText: {
-    color: THEME.colors.cyan,
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontWeight: '700',
   },
-  activeCard: {
-    marginBottom: THEME.spacing.md,
-    padding: THEME.spacing.md,
+  activeBanner: {
+    marginBottom: 16,
+    padding: 16,
   },
-  activeHeader: {
+  activeTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
   },
-  activeIndicatorRow: {
+  activeIndicatorGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   activeDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: THEME.colors.cyan,
   },
-  activeMeta: {
-    fontSize: 13,
-    marginBottom: 4,
-  },
-  filterSection: {
-    marginBottom: THEME.spacing.md,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    backgroundColor: THEME.colors.surface,
-    borderRadius: THEME.borderRadius.sm,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: 'center',
-    borderRadius: THEME.borderRadius.sharp,
-  },
-  tabBtnActive: {
-    backgroundColor: THEME.colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: THEME.colors.borderSubtle,
-  },
-  tabBtnText: {
-    fontSize: 11,
+  activeBadgeText: {
+    fontSize: 10,
+    letterSpacing: 0.8,
     fontWeight: '800',
-    color: THEME.colors.textMuted,
-    letterSpacing: 0.5,
   },
-  tabBtnTextActive: {
-    color: THEME.colors.cyan,
+  activeTimerText: {
+    fontSize: 13,
+    fontWeight: '800',
   },
-  quickStartCard: {
+  activeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  architectCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: THEME.spacing.md,
-    marginBottom: THEME.spacing.md,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.25)',
-    backgroundColor: 'rgba(0, 240, 255, 0.04)',
+    justifyContent: 'space-between',
+    padding: 16,
   },
-  quickStartLeft: {
+  architectLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
-  quickStartIcon: {
-    fontSize: 22,
+  architectIconBox: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickStartTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-    color: THEME.colors.textPrimary,
+  architectTextCol: {
+    flex: 1,
   },
-  quickStartSub: {
-    fontSize: 11,
-    color: THEME.colors.textSecondary,
+  architectTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  quickLaunchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    marginBottom: 16,
+  },
+  quickLaunchLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  quickLaunchIconBox: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickLaunchTextCol: {
+    flex: 1,
+  },
+  quickLaunchTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  filterSection: {
+    marginBottom: 14,
+  },
+  segmentedControl: {
+    flexDirection: 'row',
+    padding: 3,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  segmentText: {
+    fontSize: 12,
   },
   templateListSection: {
-    gap: THEME.spacing.md,
+    gap: 12,
   },
-  emptyCard: {
-    padding: THEME.spacing.xl,
+  emptyContainer: {
     alignItems: 'center',
-    backgroundColor: THEME.colors.surface,
-  },
-  emptyTitle: {
-    fontWeight: '800',
-    fontSize: 15,
-    color: THEME.colors.textPrimary,
-    marginBottom: 4,
-  },
-  emptySub: {
-    textAlign: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 20,
   },
   templateCard: {
-    padding: THEME.spacing.md,
-    borderWidth: 1,
-    borderColor: THEME.colors.border,
-    backgroundColor: THEME.colors.surface,
+    padding: 16,
   },
-  templateCardHeader: {
+  templateHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 6,
+    marginBottom: 8,
   },
-  templateTitleCol: {
+  templateInfo: {
     flex: 1,
+    marginRight: 10,
   },
-  templateBadgeRow: {
+  badgeRow: {
     flexDirection: 'row',
     gap: 6,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   templateName: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '800',
   },
-  templateMetaCol: {
+  templateDurationCol: {
     alignItems: 'flex-end',
   },
-  templateDuration: {
-    color: THEME.colors.cyan,
-    fontSize: 12,
-    fontWeight: '900',
-  },
-  templateCount: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-  templateDesc: {
-    marginBottom: THEME.spacing.sm,
-  },
-  exercisePreviewBox: {
-    backgroundColor: THEME.colors.surfaceElevated,
-    borderRadius: THEME.borderRadius.sm,
-    padding: THEME.spacing.sm,
-    marginVertical: THEME.spacing.sm,
-    gap: 4,
-  },
-  exercisePreviewItem: {
+  durationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+  },
+  exerciseSequence: {
+    padding: 10,
+    marginTop: 4,
+    borderWidth: 1,
     gap: 6,
   },
-  previewBullet: {
-    color: THEME.colors.cyan,
-    fontSize: 10,
+  sequenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  previewName: {
-    color: THEME.colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '700',
+  sequenceBullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  sequenceName: {
+    fontSize: 13,
+    fontWeight: '600',
     flex: 1,
   },
-  previewSets: {
-    color: THEME.colors.textSecondary,
-    fontSize: 11,
+  sequenceSets: {
+    fontSize: 12,
   },
-  previewSsBadge: {
-    backgroundColor: 'rgba(255, 184, 0, 0.15)',
+  supersetTag: {
     paddingHorizontal: 4,
     paddingVertical: 1,
-    borderRadius: 2,
+    borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(255, 184, 0, 0.3)',
-  },
-  previewSsText: {
-    color: THEME.colors.amber,
-    fontSize: 8,
-    fontWeight: '900',
   },
   templateActionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: THEME.spacing.xs,
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  startRoutineBtn: {
+  launchBtn: {
     flex: 1,
   },
   secondaryActions: {
     flexDirection: 'row',
     gap: 6,
   },
-  actionIconBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 7,
-    backgroundColor: THEME.colors.surfaceElevated,
-    borderRadius: THEME.borderRadius.sharp,
+  actionPill: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-  },
-  actionIconText: {
-    color: THEME.colors.textSecondary,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  deleteActionBtn: {
-    borderColor: 'rgba(255, 51, 102, 0.3)',
-    backgroundColor: 'rgba(255, 51, 102, 0.08)',
-  },
-  deleteActionText: {
-    color: THEME.colors.crimson,
-    fontSize: 10,
-    fontWeight: '800',
   },
 });

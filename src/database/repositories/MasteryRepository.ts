@@ -222,40 +222,161 @@ export class MasteryRepository {
 
     for (const r of rows) {
       const existing = await this.getMastery(userId, r.exercise_id);
-      if (!existing) {
-        // Calculate initial XP and level using unified MasteryEngine
-        const cardioXp = Math.round((r.total_distance_meters || 0) / 100) + Math.round((r.total_duration_seconds || 0) / 30);
-        const initialXp = Math.max(100, Math.round(r.total_sets * 20 + r.total_volume_kg / 100 + cardioXp));
-        const levelInfo = MasteryEngine.getMasteryLevelInfo(initialXp);
-        const rankInfo = MasteryEngine.getExerciseRankFromLevel(levelInfo.level);
+      const cardioXp = Math.round((r.total_distance_meters || 0) / 100) + Math.round((r.total_duration_seconds || 0) / 30);
+      const initialXp = Math.max(100, Math.round(r.total_sets * 20 + r.total_volume_kg / 100 + cardioXp));
+      const levelInfo = MasteryEngine.getMasteryLevelInfo(initialXp);
+      const rankInfo = MasteryEngine.getExerciseRankFromLevel(levelInfo.level);
 
-        await this.upsertMastery({
-          id: `em-${userId}-${r.exercise_id}`,
-          userId,
-          exerciseId: r.exercise_id,
-          masteryLevel: levelInfo.level,
-          masteryXp: initialXp,
-          rank: rankInfo.tier,
-          estimated1RmKg: r.best_e1rm_kg,
-          bestWeightKg: r.best_weight_kg,
-          bestReps: r.best_reps,
-          bestVolumeKg: r.best_weight_kg * r.best_reps,
-          totalSessions: r.total_sessions,
-          totalSets: r.total_sets,
-          totalReps: r.total_reps,
-          totalVolumeKg: r.total_volume_kg,
-          personalRecordsCount: 0,
-          milestonesUnlockedCount: 0,
-          recentPerformance: [],
-          lastTrainedAt: r.last_trained_at,
-          trend: 'MAINTAINING',
-          xpToNextLevel: levelInfo.xpToNextLevel,
-          bestDistanceMeters: r.best_distance_meters,
-          bestDurationSeconds: r.best_duration_seconds,
-          bestPaceSecondsPerKm: r.best_pace_seconds_per_km,
-          totalDistanceMeters: r.total_distance_meters,
-          totalDurationSeconds: r.total_duration_seconds,
-        });
+      await this.upsertMastery({
+        id: existing?.id || `em-${userId}-${r.exercise_id}`,
+        userId,
+        exerciseId: r.exercise_id,
+        masteryLevel: levelInfo.level,
+        masteryXp: initialXp,
+        rank: rankInfo.tier,
+        estimated1RmKg: r.best_e1rm_kg,
+        bestWeightKg: r.best_weight_kg,
+        bestReps: r.best_reps,
+        bestVolumeKg: r.best_weight_kg * r.best_reps,
+        totalSessions: r.total_sessions,
+        totalSets: r.total_sets,
+        totalReps: r.total_reps,
+        totalVolumeKg: r.total_volume_kg,
+        personalRecordsCount: existing?.personalRecordsCount || 0,
+        milestonesUnlockedCount: existing?.milestonesUnlockedCount || 0,
+        recentPerformance: existing?.recentPerformance || [],
+        lastTrainedAt: r.last_trained_at,
+        trend: existing?.trend || 'MAINTAINING',
+        xpToNextLevel: levelInfo.xpToNextLevel,
+        bestDistanceMeters: r.best_distance_meters,
+        bestDurationSeconds: r.best_duration_seconds,
+        bestPaceSecondsPerKm: r.best_pace_seconds_per_km,
+        totalDistanceMeters: r.total_distance_meters,
+        totalDurationSeconds: r.total_duration_seconds,
+      });
+    }
+  }
+
+  /**
+   * Recalculates personal records from valid historical set logs.
+   * Cleans up orphaned or outdated PRs if an erroneous set was edited or deleted.
+   */
+  static async recalculatePersonalRecords(userId: string, exerciseId?: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+
+    if (exerciseId) {
+      await db.runAsync(`DELETE FROM personal_records WHERE user_id = ? AND exercise_id = ?;`, [userId, exerciseId]);
+    } else {
+      await db.runAsync(`DELETE FROM personal_records WHERE user_id = ?;`, [userId]);
+    }
+
+    const query = exerciseId
+      ? `SELECT sl.id, el.exercise_id, sl.weight_kg, sl.reps, sl.rpe, sl.estimated_1rm_kg, sl.completed_at
+         FROM set_logs sl
+         JOIN exercise_logs el ON el.id = sl.exercise_log_id
+         WHERE sl.user_id = ? AND el.exercise_id = ? AND sl.completed = 1 AND sl.is_skipped = 0
+         ORDER BY sl.completed_at ASC;`
+      : `SELECT sl.id, el.exercise_id, sl.weight_kg, sl.reps, sl.rpe, sl.estimated_1rm_kg, sl.completed_at
+         FROM set_logs sl
+         JOIN exercise_logs el ON el.id = sl.exercise_log_id
+         WHERE sl.user_id = ? AND sl.completed = 1 AND sl.is_skipped = 0
+         ORDER BY sl.completed_at ASC;`;
+    const params = exerciseId ? [userId, exerciseId] : [userId];
+    const sets = await db.getAllAsync<{
+      id: string;
+      exercise_id: string;
+      weight_kg: number;
+      reps: number;
+      rpe: number | null;
+      estimated_1rm_kg: number;
+      completed_at: string;
+    }>(query, params);
+
+    const byExercise: Record<string, typeof sets> = {};
+    for (const s of sets) {
+      if (!byExercise[s.exercise_id]) byExercise[s.exercise_id] = [];
+      byExercise[s.exercise_id].push(s);
+    }
+
+    for (const [exId, exSets] of Object.entries(byExercise)) {
+      let maxWeight = 0;
+      let maxWeightSet: (typeof sets)[0] | null = null;
+
+      let maxReps = 0;
+      let maxRepsSet: (typeof sets)[0] | null = null;
+
+      let maxE1rm = 0;
+      let maxE1rmSet: (typeof sets)[0] | null = null;
+
+      let maxVolume = 0;
+      let maxVolumeSet: (typeof sets)[0] | null = null;
+
+      let tested1Rm = 0;
+      let tested1RmSet: (typeof sets)[0] | null = null;
+
+      let bestWorkingSet = 0;
+      let bestWorkingSetObj: (typeof sets)[0] | null = null;
+
+      for (const s of exSets) {
+        const vol = s.weight_kg * s.reps;
+        if (s.weight_kg > maxWeight) {
+          maxWeight = s.weight_kg;
+          maxWeightSet = s;
+        }
+        if (s.reps > maxReps) {
+          maxReps = s.reps;
+          maxRepsSet = s;
+        }
+        if (s.estimated_1rm_kg > maxE1rm) {
+          maxE1rm = s.estimated_1rm_kg;
+          maxE1rmSet = s;
+        }
+        if (vol > maxVolume) {
+          maxVolume = vol;
+          maxVolumeSet = s;
+        }
+
+        if (s.reps === 1 && (s.rpe === null || s.rpe >= 8.5) && s.weight_kg > tested1Rm) {
+          tested1Rm = s.weight_kg;
+          tested1RmSet = s;
+        }
+
+        if (s.reps >= 2 && vol > bestWorkingSet) {
+          bestWorkingSet = vol;
+          bestWorkingSetObj = s;
+        }
+      }
+
+      const insertPr = async (prType: string, value: number, setObj: (typeof sets)[0] | null) => {
+        if (value <= 0 || !setObj) return;
+        await db.runAsync(
+          `INSERT OR REPLACE INTO personal_records (
+            id, user_id, exercise_id, pr_type, value, set_log_id, achieved_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+          [
+            `pr-${userId}-${exId}-${prType}`,
+            userId,
+            exId,
+            prType,
+            value,
+            setObj.id,
+            setObj.completed_at,
+            now,
+            now,
+          ]
+        );
+      };
+
+      await insertPr('MAX_WEIGHT', maxWeight, maxWeightSet);
+      await insertPr('MAX_REPS', maxReps, maxRepsSet);
+      await insertPr('MAX_ESTIMATED_1RM', maxE1rm, maxE1rmSet);
+      await insertPr('MAX_VOLUME', maxVolume, maxVolumeSet);
+      if (tested1RmSet) {
+        await insertPr('TESTED_1RM', tested1Rm, tested1RmSet);
+      }
+      if (bestWorkingSetObj) {
+        await insertPr('BEST_WORKING_SET', bestWorkingSetObj.weight_kg, bestWorkingSetObj);
       }
     }
   }

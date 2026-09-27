@@ -1,5 +1,6 @@
 import { getDatabase } from '../sqlite';
 import { UserProfile, UserSettings, CharacterAttributes, RankTier, PrimaryGoal } from '../../types/domain.types';
+import { AvatarConfig } from '../../types/avatar.types';
 import { SqliteProfileRow, SqliteUserSettingsRow } from '../types';
 import { normalizeGoal } from '../../utils/validation/onboardingSchema';
 import { PublicUserSummary } from '../../types/social.types';
@@ -18,6 +19,7 @@ export class ProfileRepository {
     let attributes: CharacterAttributes = {
       strength: 10,
       endurance: 10,
+      mobility: 10,
       agility: 10,
       consistency: 10,
       stamina: 10,
@@ -63,11 +65,21 @@ export class ProfileRepository {
       // fallback
     }
 
+    let avatarConfig: AvatarConfig | null = null;
+    try {
+      if (row.avatar_config) {
+        avatarConfig = JSON.parse(row.avatar_config);
+      }
+    } catch {
+      // fallback
+    }
+
     return {
       id: row.id,
       username: row.username,
       displayName: row.display_name,
       avatarUrl: row.avatar_url,
+      avatarConfig,
       goal: row.goal || 'STRENGTH',
       primaryGoal,
       primary_goal: primaryGoal,
@@ -91,6 +103,8 @@ export class ProfileRepository {
       onboardingCompleted: Boolean(row.onboarding_completed),
       authId: row.auth_id || null,
       friendCode: row.friend_code || undefined,
+      activeTitle: row.active_title || null,
+      activeTitleId: row.active_title_id || null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -139,6 +153,23 @@ export class ProfileRepository {
     );
   }
 
+  static async updateActiveTitle(
+    userId: string,
+    titleId: string | null,
+    titleName: string | null
+  ): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE profiles SET
+        active_title = ?,
+        active_title_id = ?,
+        updated_at = ?
+      WHERE id = ?;`,
+      [titleName, titleId, now, userId]
+    );
+  }
+
   static async getSettings(userId: string): Promise<UserSettings | null> {
     const db = await getDatabase();
     const row = await db.getFirstAsync<SqliteUserSettingsRow>(
@@ -156,6 +187,7 @@ export class ProfileRepository {
       defaultRestSeconds: row.default_rest_seconds,
       pushNotificationsEnabled: Boolean(row.push_notifications_enabled),
       streakFreezeAutoUse: Boolean(row.streak_freeze_auto_use),
+      themeMode: (row.theme_mode as 'light' | 'dark' | 'system') || 'light',
     };
   }
 
@@ -168,6 +200,19 @@ export class ProfileRepository {
     );
   }
 
+  static async updateThemeMode(userId: string, mode: 'light' | 'dark' | 'system'): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    try {
+      await db.runAsync(
+        `UPDATE user_settings SET theme_mode = ?, updated_at = ? WHERE user_id = ?;`,
+        [mode, now, userId]
+      );
+    } catch {
+      // Column may not exist on legacy test mocks
+    }
+  }
+
   static async updateWeight(userId: string, weightKg: number): Promise<void> {
     const db = await getDatabase();
     const now = new Date().toISOString();
@@ -177,7 +222,7 @@ export class ProfileRepository {
     );
   }
 
-  static async createOrUpdateProfile(profile: UserProfile): Promise<void> {
+  static async createOrUpdateProfile(profile: UserProfile): Promise<UserProfile> {
     const db = await getDatabase();
     const now = new Date().toISOString();
     const primaryGoal = profile.primary_goal || profile.primaryGoal || normalizeGoal(profile.goal);
@@ -189,8 +234,8 @@ export class ProfileRepository {
         id, username, display_name, avatar_url, goal, primary_goal, secondary_goals, experience, age, height_cm, weight_kg,
         training_preferences, global_level, total_xp, rank_tier, rank_division,
         attributes, current_streak, longest_streak, streak_freeze_tokens, last_workout_date,
-        is_guest, onboarding_completed, auth_id, friend_code, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        is_guest, onboarding_completed, auth_id, friend_code, active_title, active_title_id, avatar_config, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         profile.id,
         profile.username,
@@ -217,9 +262,22 @@ export class ProfileRepository {
         profile.onboardingCompleted ? 1 : 0,
         profile.authId || null,
         friendCode,
+        profile.activeTitle || null,
+        profile.activeTitleId || null,
+        profile.avatarConfig ? JSON.stringify(profile.avatarConfig) : null,
         profile.createdAt || now,
         now,
       ]
+    );
+    return (await this.getProfile(profile.id)) || profile;
+  }
+
+  static async updateAvatarConfig(userId: string, avatarConfig: AvatarConfig): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE profiles SET avatar_config = ?, updated_at = ? WHERE id = ?;`,
+      [JSON.stringify(avatarConfig), now, userId]
     );
   }
 
@@ -229,6 +287,7 @@ export class ProfileRepository {
       username: string;
       displayName?: string;
       avatarUrl?: string;
+      avatarConfig?: AvatarConfig;
       goal: string;
       primaryGoal?: PrimaryGoal;
       primary_goal?: PrimaryGoal;
@@ -265,6 +324,7 @@ export class ProfileRepository {
       username: params.username,
       displayName: params.displayName || params.username,
       avatarUrl: params.avatarUrl || '⚔️',
+      avatarConfig: params.avatarConfig || existing?.avatarConfig || null,
       goal: params.goal,
       primaryGoal,
       primary_goal: primaryGoal,
@@ -284,9 +344,9 @@ export class ProfileRepository {
       longestStreak,
       streakFreezeTokens,
       lastWorkoutDate: null,
-      isGuest: true,
+      isGuest: existing?.isGuest ? false : Boolean(existing?.isGuest ?? false),
       onboardingCompleted: true,
-      authId: null,
+      authId: existing?.authId || userId,
       friendCode,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
@@ -422,5 +482,6 @@ export class ProfileRepository {
     await db.runAsync(`UPDATE challenge_events SET user_id = ? WHERE user_id = ?;`, [authId, guestId]);
     await db.runAsync(`UPDATE health_records SET user_id = ? WHERE user_id = ?;`, [authId, guestId]);
     await db.runAsync(`UPDATE health_sync_state SET user_id = ?, updated_at = ? WHERE user_id = ?;`, [authId, now, guestId]);
+    await db.runAsync(`UPDATE daily_step_summaries SET user_id = ? WHERE user_id = ?;`, [authId, guestId]);
   }
 }

@@ -2,6 +2,7 @@ import { ChallengeRepository } from '../../database/repositories/ChallengeReposi
 import { FriendRepository } from '../../database/repositories/FriendRepository';
 import { XpRepository } from '../../database/repositories/XpRepository';
 import { SyncQueueRepository } from '../../database/repositories/SyncQueueRepository';
+import { TitleRepository } from '../../database/repositories/TitleRepository';
 import { SocialFeedService } from '../social/SocialFeedService';
 import {
   Challenge,
@@ -99,8 +100,8 @@ export class ChallengeEngine {
     const updates: ChallengeProgressUpdate[] = [];
 
     for (const { challenge, participant } of joined) {
-      // Skip if challenge is not active or user already left
-      if (challenge.status !== 'ACTIVE' || participant.status === 'LEFT') {
+      // Skip if challenge is not active or participant is not actively participating
+      if (challenge.status !== 'ACTIVE' || participant.status !== 'ACTIVE') {
         continue;
       }
 
@@ -142,6 +143,15 @@ export class ChallengeEngine {
         isNewlyCompleted || wasCompletedBefore,
         completedAt
       );
+
+      // Unlock title reward if configured
+      if (isNewlyCompleted && challenge.rewardTitleId) {
+        try {
+          await TitleRepository.unlockTitle(userId, challenge.rewardTitleId);
+        } catch (err) {
+          console.warn('[ChallengeEngine] Title reward unlock warning:', err);
+        }
+      }
 
       let rewardXpEarned = 0;
       if (isNewlyCompleted && challenge.rewardXp) {
@@ -313,4 +323,130 @@ export class ChallengeEngine {
   ): Promise<{ challenge: Challenge; participant: ChallengeParticipant }[]> {
     return ChallengeRepository.getJoinedChallenges(userId);
   }
+
+  /**
+   * Pause participation in a challenge.
+   */
+  static async pauseChallenge(userId: string, challengeId: string): Promise<void> {
+    await ChallengeRepository.pauseChallenge(challengeId, userId);
+
+    try {
+      await SyncQueueRepository.enqueue(
+        'challenge_participant',
+        `${challengeId}-${userId}`,
+        'UPDATE',
+        {
+          challenge_id: challengeId,
+          user_id: userId,
+          status: 'PAUSED',
+        },
+        `challenge_participant:${challengeId}:${userId}:pause`
+      );
+    } catch {
+      // Non-blocking sync
+    }
+  }
+
+  /**
+   * Resume participation in a paused challenge.
+   */
+  static async resumeChallenge(userId: string, challengeId: string): Promise<void> {
+    await ChallengeRepository.resumeChallenge(challengeId, userId);
+
+    try {
+      await SyncQueueRepository.enqueue(
+        'challenge_participant',
+        `${challengeId}-${userId}`,
+        'UPDATE',
+        {
+          challenge_id: challengeId,
+          user_id: userId,
+          status: 'ACTIVE',
+        },
+        `challenge_participant:${challengeId}:${userId}:resume`
+      );
+    } catch {
+      // Non-blocking sync
+    }
+  }
+
+  /**
+   * Cancel participation in a challenge.
+   */
+  static async cancelChallenge(userId: string, challengeId: string): Promise<void> {
+    await ChallengeRepository.cancelChallenge(challengeId, userId);
+
+    try {
+      await SyncQueueRepository.enqueue(
+        'challenge_participant',
+        `${challengeId}-${userId}`,
+        'UPDATE',
+        {
+          challenge_id: challengeId,
+          user_id: userId,
+          status: 'CANCELLED',
+        },
+        `challenge_participant:${challengeId}:${userId}:cancel`
+      );
+    } catch {
+      // Non-blocking sync
+    }
+  }
+
+  /**
+   * Manually mark a challenge complete if conditions met.
+   */
+  static async completeChallenge(userId: string, challengeId: string): Promise<void> {
+    const challenge = await ChallengeRepository.getChallenge(challengeId);
+    if (!challenge) throw new Error('Challenge not found');
+
+    await ChallengeRepository.completeChallenge(challengeId, userId);
+
+    if (challenge.rewardTitleId) {
+      try {
+        await TitleRepository.unlockTitle(userId, challenge.rewardTitleId);
+      } catch (err) {
+        console.warn('[ChallengeEngine] Title reward unlock warning:', err);
+      }
+    }
+
+    if (challenge.rewardXp) {
+      try {
+        await XpRepository.recordTransaction(
+          userId,
+          'CHALLENGE',
+          challenge.id,
+          challenge.rewardXp,
+          `Challenge Completed: ${challenge.title}`
+        );
+      } catch (err) {
+        console.warn('[ChallengeEngine] XP reward warning:', err);
+      }
+    }
+
+    try {
+      await SyncQueueRepository.enqueue(
+        'challenge_participant',
+        `${challengeId}-${userId}`,
+        'UPDATE',
+        {
+          challenge_id: challengeId,
+          user_id: userId,
+          status: 'COMPLETED',
+          completed_at: new Date().toISOString(),
+        },
+        `challenge_participant:${challengeId}:${userId}:complete`
+      );
+    } catch {
+      // Non-blocking sync
+    }
+  }
+
+  /**
+   * Fetch all challenges visible to the user along with their participation status.
+   */
+  static async getAllChallengesWithUserStatus(userId: string) {
+    return ChallengeRepository.getAllChallengesWithUserStatus(userId);
+  }
 }
+

@@ -19,11 +19,14 @@ import { PREngine, DetectedPR } from '../services/workout/PREngine';
 import { QuestEngine } from '../services/workout/QuestEngine';
 import { SupersetEngine, NextSupersetTarget } from '../services/workout/SupersetEngine';
 import { getRankForLevel } from '../constants/ranks';
+import { FitnessProgressionService } from '../services/progression/FitnessProgressionService';
+import { ReliableDataEngine } from '../services/progression/ReliableDataEngine';
 import { SocialFeedService } from '../services/social/SocialFeedService';
 import { ChallengeEngine } from '../services/challenges/ChallengeEngine';
 import { AchievementEngine } from '../services/progression/AchievementEngine';
 import { AchievementConfig } from '../config/achievements.config';
 import { DEFAULT_USER_ID } from '../database/migrations/init';
+import { useAuthStore } from './useAuthStore';
 
 interface WorkoutState {
   isActive: boolean;
@@ -58,6 +61,7 @@ interface WorkoutState {
   skipSet: (exerciseLogId: string, setId: string) => Promise<void>;
   toggleSetCompleted: (exerciseLogId: string, setId: string, defaultRestSeconds?: number) => Promise<void>;
   deleteSet: (exerciseLogId: string, setId: string) => void;
+  updateExerciseNotes: (exerciseLogId: string, notes: string) => Promise<void>;
   tickTimer: () => void;
   
   startRestTimer: (seconds: number) => void;
@@ -96,10 +100,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   startWorkout: async (title: string = 'Tactical Training Session', planId: string | null = null) => {
     const workoutId = `w-${Date.now()}`;
     const now = new Date().toISOString();
+    const activeUserId = useAuthStore.getState().userId || DEFAULT_USER_ID;
 
     const newWorkout: WorkoutSession = {
       id: workoutId,
-      userId: DEFAULT_USER_ID,
+      userId: activeUserId,
       planId,
       title,
       startedAt: now,
@@ -264,6 +269,28 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         await WorkoutRepository.skipSet(s.id);
       }
     }
+  },
+
+  updateExerciseNotes: async (exerciseLogId: string, notes: string) => {
+    const { activeWorkout } = get();
+    if (!activeWorkout) return;
+
+    const exIndex = activeWorkout.exercises.findIndex(e => e.id === exerciseLogId);
+    if (exIndex === -1) return;
+
+    const targetEx = activeWorkout.exercises[exIndex];
+    const updatedEx: ExerciseLog = { ...targetEx, notes };
+    const allExercises = [...activeWorkout.exercises];
+    allExercises[exIndex] = updatedEx;
+
+    set({
+      activeWorkout: {
+        ...activeWorkout,
+        exercises: allExercises,
+      },
+    });
+
+    await WorkoutRepository.saveExerciseLog(updatedEx);
   },
 
   addSet: async (exerciseLogId: string, setType: SetType = 'NORMAL') => {
@@ -850,33 +877,51 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       xpEarned: finalXpEarned,
     };
 
+    const athleteBw = currentProfile?.weightKg || 75;
+    const stats = await WorkoutRepository.getLifetimeStats(activeWorkout.userId);
+    const verifiedSessionsCount = (stats?.totalWorkouts || 0) + 1;
+
     const newAttributes = AttributeEngine.computeAttributes(
       currentAttributes,
       [updatedSessionForCalc],
-      streakResult.currentStreak
+      streakResult.currentStreak,
+      0,
+      1,
+      athleteBw
     );
+
+    // Compute Unified Progression Status (coupling level, rank, dimensions, & data verification)
+    const unifiedStatus = FitnessProgressionService.evaluateUnifiedProgression({
+      totalXp: newTotalXp,
+      attributes: newAttributes,
+      verifiedSessionsCount,
+      athleteBodyweightKg: athleteBw,
+    });
 
     const attributesDelta = {
       strength: newAttributes.strength - currentAttributes.strength,
       endurance:
         (newAttributes.endurance ?? newAttributes.stamina ?? 10) -
         (currentAttributes.endurance ?? currentAttributes.stamina ?? 10),
-      agility: newAttributes.agility - currentAttributes.agility,
+      mobility:
+        (newAttributes.mobility ?? 10) -
+        (currentAttributes.mobility ?? 10),
       consistency:
         (newAttributes.consistency ?? newAttributes.discipline ?? 10) -
         (currentAttributes.consistency ?? currentAttributes.discipline ?? 10),
+      agility: newAttributes.agility - currentAttributes.agility,
       stamina: (newAttributes.stamina ?? 10) - (currentAttributes.stamina ?? 10),
       discipline: (newAttributes.discipline ?? 10) - (currentAttributes.discipline ?? 10),
       vitality: (newAttributes.vitality ?? 10) - (currentAttributes.vitality ?? 10),
     };
 
-    // 8. Update profile progression
+    // 8. Update profile progression (using verified effective rank)
     await ProfileRepository.updateProgression(
       activeWorkout.userId,
       newLevelInfo.level,
       newTotalXp,
-      newRank.tier,
-      newRank.division,
+      unifiedStatus.effectiveRank.tier,
+      unifiedStatus.rankDivision,
       newAttributes,
       streakResult.currentStreak,
       streakResult.longestStreak,
@@ -887,7 +932,6 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
     // 8.5. Evaluate declarative achievements (Idempotent progression)
     let newlyUnlockedAchievements: AchievementConfig[] = [];
     try {
-      const stats = await WorkoutRepository.getLifetimeStats(activeWorkout.userId);
       const userMasteries = await MasteryRepository.getAllMasteries(activeWorkout.userId);
       let maxMasteryLevel = 1;
       for (const m of userMasteries) {
@@ -924,8 +968,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       newGlobalLevel: newLevelInfo.level,
       didLevelUp: newLevelInfo.level > oldLevel,
       newRank: {
-        tier: newRank.tier,
-        division: newRank.division,
+        tier: unifiedStatus.effectiveRank.tier,
+        division: unifiedStatus.rankDivision,
       },
       attributesDelta,
       newAttributes,
@@ -939,6 +983,8 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
       questsUpdated: questResult?.updatedQuests,
       completedQuests: questResult?.newlyCompletedQuests,
       newlyUnlockedAchievements,
+      unifiedStatus,
+      isVerifiedSession: true,
     };
 
     // 10. Publish athletic events to activity feed (Privacy-gated, non-blocking)
@@ -1192,10 +1238,11 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
   startWorkoutFromTemplate: async (template: WorkoutTemplate) => {
     const workoutId = `w-${Date.now()}`;
     const now = new Date().toISOString();
+    const activeUserId = useAuthStore.getState().userId || DEFAULT_USER_ID;
 
     const newWorkout: WorkoutSession = {
       id: workoutId,
-      userId: DEFAULT_USER_ID,
+      userId: activeUserId,
       planId: null,
       title: template.name,
       startedAt: now,
@@ -1228,7 +1275,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         sets.push({
           id: setId,
           exerciseLogId: exLogId,
-          userId: DEFAULT_USER_ID,
+          userId: activeUserId,
           setNumber: s,
           setType: 'NORMAL',
           weightKg: targetWeight,
@@ -1245,7 +1292,7 @@ export const useWorkoutStore = create<WorkoutState>((set, get) => ({
         id: exLogId,
         workoutId,
         exerciseId: tEx.exerciseId,
-        userId: DEFAULT_USER_ID,
+        userId: activeUserId,
         orderIndex: i,
         notes: tEx.notes || undefined,
         supersetId: tEx.supersetId || null,

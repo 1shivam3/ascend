@@ -45,19 +45,49 @@ export const TYPOGRAPHY = {
   },
 } as const;
 
-export const TYPOGRAPHY_STYLES: Record<string, TextStyle> = {
-  heroStat: {
+/**
+ * DISPLAY Role:
+ * For levels, ranks, XP, milestones, and major numbers.
+ * Technical, powerful, readable, and athletic.
+ */
+export const DISPLAY_TYPOGRAPHY: Record<string, TextStyle> = {
+  hero: {
     fontSize: TYPOGRAPHY.fontSizes.hero,
     fontWeight: TYPOGRAPHY.fontWeights.black,
     letterSpacing: TYPOGRAPHY.letterSpacing.tighter,
     fontFamily: TYPOGRAPHY.fonts.mono,
   },
-  displayStat: {
+  rank: {
+    fontSize: TYPOGRAPHY.fontSizes.displayLg,
+    fontWeight: TYPOGRAPHY.fontWeights.black,
+    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+    textTransform: 'uppercase',
+  },
+  levelNumber: {
     fontSize: TYPOGRAPHY.fontSizes.displayMd,
     fontWeight: TYPOGRAPHY.fontWeights.black,
+    fontFamily: TYPOGRAPHY.fonts.mono,
     letterSpacing: TYPOGRAPHY.letterSpacing.tighter,
+  },
+  statNumber: {
+    fontSize: TYPOGRAPHY.fontSizes.displaySm,
+    fontWeight: TYPOGRAPHY.fontWeights.bold,
+    fontFamily: TYPOGRAPHY.fonts.mono,
+    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+  },
+  monoMetric: {
+    fontSize: TYPOGRAPHY.fontSizes.xl,
+    fontWeight: TYPOGRAPHY.fontWeights.bold,
     fontFamily: TYPOGRAPHY.fonts.mono,
   },
+};
+
+/**
+ * BODY Role:
+ * For normal UI text, descriptions, lists, forms, and controls.
+ * Clean, readable, balanced contrast.
+ */
+export const BODY_TYPOGRAPHY: Record<string, TextStyle> = {
   h1: {
     fontSize: TYPOGRAPHY.fontSizes.xxl,
     fontWeight: TYPOGRAPHY.fontWeights.extrabold,
@@ -94,6 +124,18 @@ export const TYPOGRAPHY_STYLES: Record<string, TextStyle> = {
     letterSpacing: TYPOGRAPHY.letterSpacing.wider,
     textTransform: 'uppercase',
   },
+};
+
+export const TYPOGRAPHY_STYLES: Record<string, TextStyle> = {
+  heroStat: DISPLAY_TYPOGRAPHY.hero,
+  displayStat: DISPLAY_TYPOGRAPHY.levelNumber,
+  h1: BODY_TYPOGRAPHY.h1,
+  h2: BODY_TYPOGRAPHY.h2,
+  h3: BODY_TYPOGRAPHY.h3,
+  body: BODY_TYPOGRAPHY.body,
+  bodyBold: BODY_TYPOGRAPHY.bodyBold,
+  caption: BODY_TYPOGRAPHY.caption,
+  labelUpper: BODY_TYPOGRAPHY.labelUpper,
   monoNumber: {
     fontSize: TYPOGRAPHY.fontSizes.md,
     fontWeight: TYPOGRAPHY.fontWeights.bold,

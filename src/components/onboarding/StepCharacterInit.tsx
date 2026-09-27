@@ -100,6 +100,13 @@ export function StepCharacterInit({
               );
             })}
           </View>
+
+          {/* 3D Chassis Estimation Disclaimer */}
+          <View style={styles.disclaimerBox}>
+            <Caption style={styles.disclaimerText}>
+              ⚙️ 3D Avatar is estimated from your height ({weightKg ? `${weightKg}kg` : ''}) & goal. Stylized cybernetic model, not a medical body scan. You can fine-tune chassis colors & proportions anytime.
+            </Caption>
+          </View>
         </Card>
 
         {/* Live Calibrated Starting Attributes Radar */}
@@ -195,6 +202,19 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginTop: 6,
     marginBottom: 2,
+  },
+  disclaimerBox: {
+    marginTop: 12,
+    padding: 8,
+    borderRadius: THEME.borderRadius.sharp,
+    backgroundColor: 'rgba(0, 229, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 229, 255, 0.2)',
+  },
+  disclaimerText: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: THEME.colors.textSecondary,
   },
   footerRow: {
     flexDirection: 'row',

@@ -425,4 +425,153 @@ export class WorkoutRepository {
       totalDurationMinutes: Math.round((row?.total_duration || 0) / 60),
     };
   }
+
+  /**
+   * Returns total count of personal records (PRs) achieved by the user.
+   */
+  static async getTotalPrCount(userId: string): Promise<number> {
+    const db = await getDatabase();
+    const row = await db.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) as count FROM set_logs WHERE user_id = ? AND is_pr = 1;`,
+      [userId]
+    );
+    return row?.count || 0;
+  }
+
+  /**
+   * Updates an existing set log entry (weight, reps, rpe, etc.) and updates timestamp.
+   */
+  static async updateSetLog(setId: string, updates: Partial<SetLog>): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+
+    const current = await db.getFirstAsync<SqliteSetLogRow>(
+      `SELECT * FROM set_logs WHERE id = ?;`,
+      [setId]
+    );
+    if (!current) return;
+
+    const weightKg = updates.weightKg !== undefined ? updates.weightKg : current.weight_kg;
+    const reps = updates.reps !== undefined ? updates.reps : current.reps;
+    const rpe = updates.rpe !== undefined ? updates.rpe : current.rpe;
+    const setType = updates.setType !== undefined ? updates.setType : current.set_type;
+    const completed = updates.completed !== undefined ? (updates.completed ? 1 : 0) : current.completed;
+    const isSkipped = updates.isSkipped !== undefined ? (updates.isSkipped ? 1 : 0) : current.is_skipped;
+
+    // Recalculate e1RM using standard Epley if completed and reps <= 10
+    let estimated1RmKg = 0;
+    if (weightKg > 0 && reps > 0) {
+      estimated1RmKg = reps === 1 ? weightKg : reps <= 10 ? Math.round(weightKg * (1 + reps / 30) * 10) / 10 : 0;
+    }
+    if (updates.estimated1RmKg !== undefined) {
+      estimated1RmKg = updates.estimated1RmKg;
+    }
+
+    await db.runAsync(
+      `UPDATE set_logs SET
+        weight_kg = ?,
+        reps = ?,
+        rpe = ?,
+        set_type = ?,
+        estimated_1rm_kg = ?,
+        completed = ?,
+        is_skipped = ?,
+        updated_at = ?
+       WHERE id = ?;`,
+      [weightKg, reps, rpe, setType, estimated1RmKg, completed, isSkipped, now, setId]
+    );
+
+    // Fetch workout ID to recalculate session totals
+    const exLogRow = await db.getFirstAsync<{ workout_id: string }>(
+      `SELECT workout_id FROM exercise_logs WHERE id = ?;`,
+      [current.exercise_log_id]
+    );
+    if (exLogRow?.workout_id) {
+      await this.recalculateWorkoutTotals(exLogRow.workout_id);
+    }
+  }
+
+  /**
+   * Deletes a single set log entry and recalculates workout totals.
+   */
+  static async deleteSetLog(setId: string): Promise<void> {
+    const db = await getDatabase();
+    const current = await db.getFirstAsync<{ exercise_log_id: string }>(
+      `SELECT exercise_log_id FROM set_logs WHERE id = ?;`,
+      [setId]
+    );
+
+    await db.runAsync(`DELETE FROM set_logs WHERE id = ?;`, [setId]);
+
+    if (current?.exercise_log_id) {
+      const exLogRow = await db.getFirstAsync<{ workout_id: string }>(
+        `SELECT workout_id FROM exercise_logs WHERE id = ?;`,
+        [current.exercise_log_id]
+      );
+      if (exLogRow?.workout_id) {
+        await this.recalculateWorkoutTotals(exLogRow.workout_id);
+      }
+    }
+  }
+
+  /**
+   * Recalculates volume, sets, and reps totals for a workout session.
+   */
+  static async recalculateWorkoutTotals(workoutId: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+
+    const totals = await db.getFirstAsync<{
+      total_sets: number;
+      total_reps: number;
+      total_volume: number;
+    }>(
+      `SELECT 
+        COUNT(sl.id) as total_sets,
+        COALESCE(SUM(sl.reps), 0) as total_reps,
+        COALESCE(SUM(sl.weight_kg * sl.reps), 0.0) as total_volume
+       FROM exercise_logs el
+       JOIN set_logs sl ON sl.exercise_log_id = el.id
+       WHERE el.workout_id = ? AND sl.completed = 1 AND sl.is_skipped = 0;`,
+      [workoutId]
+    );
+
+    await db.runAsync(
+      `UPDATE workouts SET
+        total_volume_kg = ?,
+        total_reps = ?,
+        total_sets = ?,
+        updated_at = ?
+       WHERE id = ?;`,
+      [
+        Math.round(totals?.total_volume || 0),
+        totals?.total_reps || 0,
+        totals?.total_sets || 0,
+        now,
+        workoutId,
+      ]
+    );
+  }
+
+  /**
+   * Deletes an entire workout session and cascades deletion to all child exercise and set logs.
+   */
+  static async deleteWorkout(workoutId: string): Promise<boolean> {
+    const db = await getDatabase();
+
+    // Delete sets
+    await db.runAsync(
+      `DELETE FROM set_logs WHERE exercise_log_id IN (
+        SELECT id FROM exercise_logs WHERE workout_id = ?
+      );`,
+      [workoutId]
+    );
+
+    // Delete exercise logs
+    await db.runAsync(`DELETE FROM exercise_logs WHERE workout_id = ?;`, [workoutId]);
+
+    // Delete workout session
+    const res = await db.runAsync(`DELETE FROM workouts WHERE id = ?;`, [workoutId]);
+    return (res?.changes ?? 0) > 0;
+  }
 }

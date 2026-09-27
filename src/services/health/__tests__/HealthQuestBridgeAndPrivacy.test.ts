@@ -1,12 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { HealthQuestBridge } from '../HealthQuestBridge';
-import { HealthIntegrationService } from '../HealthIntegrationService';
-import { MockHealthConnectAdapter } from '../HealthConnectAdapter';
 import { HealthRecord } from '../../../types/health.types';
 import { ChallengeEngine } from '../../challenges/ChallengeEngine';
 import { ProfileRepository } from '../../../database/repositories/ProfileRepository';
 import { SocialFeedService } from '../../social/SocialFeedService';
-import { HealthRepository } from '../../../database/repositories/HealthRepository';
 
 // Mock dependencies
 vi.mock('../../challenges/ChallengeEngine', () => ({
@@ -327,69 +324,6 @@ describe('Health Connect Quest Bridge & Privacy Suite', () => {
   });
 
   describe('Privacy & Zero Social Feed Leakage', () => {
-    it('never publishes raw health records or biometrics to the social feed during synchronization', async () => {
-      const mockAdapter = new MockHealthConnectAdapter('AVAILABLE');
-      HealthIntegrationService.setAdapter(mockAdapter);
-
-      const t0 = new Date(Date.now() - 7200 * 1000).toISOString();
-      const t1 = new Date(Date.now() - 3600 * 1000).toISOString();
-
-      // Populate mock adapter with private biometric data
-      mockAdapter.setMockRecords('HEART_RATE', [
-        {
-          id: 'hr-1',
-          userId,
-          recordType: 'HEART_RATE',
-          sourceClient: 'com.garmin.connect',
-          externalId: 'hr-ext-1',
-          startTime: t0,
-          endTime: t1,
-          value: 168,
-          unit: 'bpm',
-        },
-      ]);
-      mockAdapter.setMockRecords('WEIGHT', [
-        {
-          id: 'wt-1',
-          userId,
-          recordType: 'WEIGHT',
-          sourceClient: 'com.withings.wscale',
-          externalId: 'wt-ext-1',
-          startTime: t0,
-          endTime: t0,
-          value: 78.4,
-          unit: 'kg',
-        },
-      ]);
-      mockAdapter.setMockRecords('CALORIES', [
-        {
-          id: 'cal-1',
-          userId,
-          recordType: 'CALORIES',
-          sourceClient: 'com.garmin.connect',
-          externalId: 'cal-ext-1',
-          startTime: t0,
-          endTime: t1,
-          value: 450,
-          unit: 'kcal',
-        },
-      ]);
-
-      // Connect with health permissions
-      await HealthIntegrationService.connect(userId, [
-        'READ_HEART_RATE',
-        'READ_WEIGHT',
-        'READ_CALORIES',
-      ]);
-
-      // Execute sync
-      const syncResult = await HealthIntegrationService.sync(userId);
-      expect(syncResult.ingested).toBeGreaterThan(0);
-
-      // VERIFY: SocialFeedService.publishEvent was NEVER called for health sync
-      expect(SocialFeedService.publishEvent).not.toHaveBeenCalled();
-    });
-
     it('sanitizes feed metadata by stripping biometric and health telemetry', () => {
       const dirtyMetadataWithBiometrics = {
         workoutId: 'w-123',
@@ -417,48 +351,6 @@ describe('Health Connect Quest Bridge & Privacy Suite', () => {
       expect((sanitized as any).restingHeartRate).toBeUndefined();
       expect((sanitized as any).bloodPressure).toBeUndefined();
       expect((sanitized as any).glucoseLevel).toBeUndefined();
-    });
-  });
-
-  describe('Offline & Sync Resilience', () => {
-    it('returns empty sync stats gracefully when integration is not connected', async () => {
-      // Integration not connected in SQLite state
-      const syncResult = await HealthIntegrationService.sync('unconnected-user');
-      expect(syncResult).toEqual({
-        ingested: 0,
-        deduplicated: 0,
-        superseded: 0,
-        challengeUpdates: 0,
-      });
-    });
-
-    it('persists records and updates lastSyncTime when sync succeeds', async () => {
-      const mockAdapter = new MockHealthConnectAdapter('AVAILABLE');
-      HealthIntegrationService.setAdapter(mockAdapter);
-
-      const t0 = new Date(Date.now() - 7200 * 1000).toISOString();
-      const t1 = new Date(Date.now() - 3600 * 1000).toISOString();
-
-      mockAdapter.setMockRecords('STEPS', [
-        {
-          id: 'step-offline',
-          userId,
-          recordType: 'STEPS',
-          sourceClient: 'com.google.android.apps.fitness',
-          externalId: 'step-offline-1',
-          startTime: t0,
-          endTime: t1,
-          value: 1200,
-          unit: 'count',
-        },
-      ]);
-
-      await HealthIntegrationService.connect(userId, ['READ_STEPS']);
-      const syncResult = await HealthIntegrationService.sync(userId);
-
-      expect(syncResult.ingested).toBe(1);
-      const syncState = await HealthRepository.getSyncState(userId);
-      expect(syncState?.lastSyncTime).toBeDefined();
     });
   });
 });

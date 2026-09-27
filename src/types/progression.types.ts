@@ -17,6 +17,61 @@ export interface MasteryLevelInfo {
   progressPercent: number;
 }
 
+export interface DimensionalProgress {
+  dimension: 'strength' | 'endurance' | 'mobility' | 'consistency';
+  label: string;
+  score: number; // 10-100
+  target: number;
+  satisfied: boolean;
+  unit?: string;
+  description: string;
+}
+
+export interface DimensionHighlight {
+  dimension: string;
+  title: string;
+  score: number;
+  description: string;
+  actionRecommendation: string;
+}
+
+export interface NextMilestoneRequirements {
+  nextRankTier: RankTier;
+  nextRankTitle: string;
+  levelProgress: {
+    current: number;
+    required: number;
+    percent: number;
+  };
+  relativeStrengthProgress?: {
+    current: number;
+    required: number;
+    percent: number;
+  };
+  dimensions: DimensionalProgress[];
+  summaryMessage: string;
+}
+
+export interface UnifiedProgressionStatus {
+  currentLevel: number;
+  currentLevelXp: number;
+  xpRequiredForNextLevel: number;
+  progressPercent: number;
+  nominalRank: import('../config/progression.config').RankDefinition;
+  effectiveRank: import('../config/progression.config').RankDefinition;
+  rankDivision: number;
+  confirmationStatus: 'CONFIRMED' | 'PROVISIONAL';
+  verifiedSessionsCount: number;
+  sessionsNeededForConfirmation: number;
+  ascensionBlocked: boolean;
+  blockedReasons: string[];
+  attributes: CharacterAttributes;
+  topStrength: DimensionHighlight;
+  areaForImprovement: DimensionHighlight;
+  nextMilestone: NextMilestoneRequirements;
+  maxRelativeCompoundRatio?: number;
+}
+
 export interface WorkoutProgressionResult {
   xpEarned: number;
   newTotalXp: number;
@@ -60,4 +115,6 @@ export interface WorkoutProgressionResult {
   questsUpdated?: UserQuestProgress[];
   completedQuests?: UserQuestProgress[];
   newlyUnlockedAchievements?: import('../config/achievements.config').AchievementConfig[];
+  unifiedStatus?: UnifiedProgressionStatus;
+  isVerifiedSession?: boolean;
 }

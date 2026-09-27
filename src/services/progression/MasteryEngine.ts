@@ -273,8 +273,9 @@ export class MasteryEngine {
         newPrs.push({ prType: 'MAX_VOLUME', value: setVolume, setLogId: set.id });
       }
 
-      // 5. Estimated 1RM PR (only for exercises that support 1RM)
-      if (supports1Rm && set.weightKg > 0 && set.reps > 0) {
+      // 5. Estimated 1RM PR (strictly for exercises that support 1RM and reps <= 10)
+      const maxRepsFor1Rm = PROGRESSION_CONFIG.dataReliability.maxRepsForEstimated1RM;
+      if (supports1Rm && set.weightKg > 0 && set.reps > 0 && set.reps <= maxRepsFor1Rm) {
         const e1rm = calculateEstimated1RM(set.weightKg, set.reps);
         if (e1rm > currentBest1Rm) {
           currentBest1Rm = e1rm;
@@ -304,6 +305,7 @@ export class MasteryEngine {
     const isCardio = exercise?.progressionType === 'CARDIO' || exercise?.movementPattern === 'CARDIO';
     const isBodyweight = exercise?.isBodyweight || exercise?.progressionType === 'BODYWEIGHT';
     const supports1Rm = exercise?.supports1Rm !== false && !isCardio && !isBodyweight;
+    const maxRepsFor1Rm = PROGRESSION_CONFIG.dataReliability.maxRepsForEstimated1RM;
 
     // Deduplicate rapid duplicate clicks
     const { validSets } = AntiExploitEngine.deduplicateSets(sets);
@@ -355,7 +357,7 @@ export class MasteryEngine {
         if (set.weightKg > bestSetWeight) bestSetWeight = set.weightKg;
         if (set.reps > bestSetReps) bestSetReps = set.reps;
         if (volume > bestSetVolume) bestSetVolume = volume;
-        if (supports1Rm && set.weightKg > 0 && set.reps > 0) {
+        if (supports1Rm && set.weightKg > 0 && set.reps > 0 && set.reps <= maxRepsFor1Rm) {
           const e1rm = calculateEstimated1RM(set.weightKg, set.reps);
           if (e1rm > peakSession1Rm) peakSession1Rm = e1rm;
         }

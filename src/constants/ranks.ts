@@ -4,6 +4,11 @@ export type { RankTier, RankDefinition };
 
 export const RANKS = PROGRESSION_CONFIG.ranks;
 
+export function getRankColor(tier: string): string {
+  const normalized = (tier || 'E').toUpperCase() as RankTier;
+  return PROGRESSION_CONFIG.ranks[normalized]?.color || '#94A3B8';
+}
+
 export const MASTERY_TIERS = [
   { minLevel: 1, maxLevel: 19, title: 'Novice', color: '#94A3B8' },
   { minLevel: 20, maxLevel: 39, title: 'Apprentice', color: '#10B981' },

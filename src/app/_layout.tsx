@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -13,24 +13,26 @@ import { useWorkoutStore } from '../store/useWorkoutStore';
 import { SyncEngine } from '../services/sync/SyncEngine';
 import { Heading, Text, Caption } from '../components/ui/Typography';
 
-import { useRouter } from 'expo-router';
-
 export default function RootLayout() {
   const router = useRouter();
+  const segments = useSegments();
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const profile = useAuthStore(s => s.profile);
-  const loadProfile = useAuthStore(s => s.loadProfile);
-  const loadSettings = useSettingsStore(s => s.loadSettings);
-  const restoreActiveWorkout = useWorkoutStore(s => s.restoreActiveWorkout);
+  const { isAuthenticated, profile, isLoading, initializeAuth } = useAuthStore();
+  const loadSettings = useSettingsStore((s) => s.loadSettings);
+  const restoreActiveWorkout = useWorkoutStore((s) => s.restoreActiveWorkout);
 
   useEffect(() => {
     async function prepare() {
       try {
         await initializeDatabase();
-        await loadProfile();
-        await loadSettings();
+        await initializeAuth();
+
+        const activeUserId = useAuthStore.getState().userId;
+        if (activeUserId) {
+          await loadSettings(activeUserId);
+        }
 
         // Initialize background sync engine
         SyncEngine.init();
@@ -38,7 +40,7 @@ export default function RootLayout() {
         setIsReady(true);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Initialization failed';
-        console.error('Failed to initialize database:', err);
+        console.error('Failed to initialize ASCEND runtime:', err);
         setError(message);
       }
     }
@@ -48,23 +50,39 @@ export default function RootLayout() {
     return () => {
       SyncEngine.destroy();
     };
-  }, [loadProfile, loadSettings]);
+  }, [initializeAuth, loadSettings]);
 
-  // Restore active workout from SQLite on startup
+  // Restore active workout from SQLite on startup if authenticated
   useEffect(() => {
-    if (isReady && profile?.id) {
+    if (isReady && isAuthenticated && profile?.id) {
       restoreActiveWorkout(profile.id).catch(() => {});
     }
-  }, [isReady, profile?.id, restoreActiveWorkout]);
+  }, [isReady, isAuthenticated, profile?.id, restoreActiveWorkout]);
 
-  // Navigate to onboarding if user has not completed onboarding
+  // Strict Navigation Gating
+  // Unauthenticated -> /auth only
+  // Authenticated + incomplete profile -> /onboarding
+  // Authenticated + completed profile -> /(tabs)
   useEffect(() => {
-    if (isReady && profile) {
-      if (!profile.onboardingCompleted) {
+    if (!isReady || isLoading) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+    const inOnboarding = segments[0] === 'onboarding';
+
+    if (!isAuthenticated) {
+      if (!inAuthGroup) {
+        router.replace('/auth' as any);
+      }
+    } else if (!profile?.onboardingCompleted) {
+      if (!inOnboarding) {
         router.replace('/onboarding' as any);
       }
+    } else {
+      if (inAuthGroup || inOnboarding) {
+        router.replace('/(tabs)' as any);
+      }
     }
-  }, [isReady, profile, router]);
+  }, [isReady, isLoading, isAuthenticated, profile?.onboardingCompleted, segments, router]);
 
   if (error) {
     return (
@@ -79,7 +97,7 @@ export default function RootLayout() {
     );
   }
 
-  if (!isReady) {
+  if (!isReady || isLoading) {
     return (
       <View style={styles.centerContainer}>
         <Heading level={1} color={THEME.colors.cyan} style={styles.logoText}>
@@ -104,8 +122,13 @@ export default function RootLayout() {
             animation: 'fade',
           }}
         >
+          <Stack.Screen name="auth/index" options={{ headerShown: false }} />
+          <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="onboarding/index" options={{ headerShown: false, gestureEnabled: false }} />
+          <Stack.Screen
+            name="onboarding/index"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
           <Stack.Screen
             name="modals/active-workout"
             options={{

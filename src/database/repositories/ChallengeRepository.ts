@@ -130,8 +130,8 @@ export class ChallengeRepository {
     await db.runAsync(
       `INSERT INTO challenges (
         id, title, description, type, metric, target, start_at, end_at,
-        visibility, created_by, status, config, reward_xp, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        visibility, created_by, status, config, reward_xp, reward_title_id, reward_title_name, reward_badge, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         challenge.id,
         challenge.title,
@@ -146,6 +146,9 @@ export class ChallengeRepository {
         challenge.status,
         JSON.stringify(challenge.config || {}),
         challenge.rewardXp || 250,
+        challenge.rewardTitleId || null,
+        challenge.rewardTitleName || null,
+        challenge.rewardBadge || null,
         now,
         now,
       ]
@@ -171,7 +174,7 @@ export class ChallengeRepository {
     const now = new Date().toISOString();
 
     if (existing) {
-      if (existing.status === 'LEFT') {
+      if (existing.status === 'LEFT' || existing.status === 'CANCELLED' || existing.status === 'PAUSED') {
         // Re-activate participation
         await db.runAsync(
           `UPDATE challenge_participants 
@@ -209,6 +212,65 @@ export class ChallengeRepository {
       completedAt: null,
       lastUpdatedAt: now,
     };
+  }
+
+  /**
+   * Pause participation in a challenge. Progress is preserved, but further
+   * workouts will not count toward it until resumed.
+   */
+  static async pauseChallenge(challengeId: string, userId: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE challenge_participants 
+       SET status = 'PAUSED', last_updated_at = ?
+       WHERE challenge_id = ? AND user_id = ?;`,
+      [now, challengeId, userId]
+    );
+  }
+
+  /**
+   * Resume participation in a paused challenge.
+   */
+  static async resumeChallenge(challengeId: string, userId: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE challenge_participants 
+       SET status = 'ACTIVE', last_updated_at = ?
+       WHERE challenge_id = ? AND user_id = ?;`,
+      [now, challengeId, userId]
+    );
+  }
+
+  /**
+   * Cancel participation in a challenge.
+   */
+  static async cancelChallenge(challengeId: string, userId: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE challenge_participants 
+       SET status = 'CANCELLED', last_updated_at = ?
+       WHERE challenge_id = ? AND user_id = ?;`,
+      [now, challengeId, userId]
+    );
+
+    await this.recalculateRanks(challengeId);
+  }
+
+  /**
+   * Mark a challenge as completed by an operative.
+   */
+  static async completeChallenge(challengeId: string, userId: string): Promise<void> {
+    const db = await getDatabase();
+    const now = new Date().toISOString();
+    await db.runAsync(
+      `UPDATE challenge_participants 
+       SET status = 'COMPLETED', completed_at = ?, last_updated_at = ?
+       WHERE challenge_id = ? AND user_id = ?;`,
+      [now, now, challengeId, userId]
+    );
   }
 
   /**
@@ -392,6 +454,77 @@ export class ChallengeRepository {
     });
   }
 
+  /**
+   * Fetch all challenges visible to the user along with their participation status.
+   */
+  static async getAllChallengesWithUserStatus(
+    userId: string
+  ): Promise<(Challenge & {
+    participant?: ChallengeParticipant;
+    userStatus: 'AVAILABLE' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+    participantsCount: number;
+  })[]> {
+    const db = await getDatabase();
+    const rows = await db.getAllAsync<
+      SqliteChallengeRow & {
+        p_id?: string;
+        p_progress?: number;
+        p_rank?: number;
+        p_status?: string;
+        p_joined_at?: string;
+        p_completed_at?: string;
+        p_last_updated_at?: string;
+        participants_count?: number;
+      }
+    >(
+      `SELECT c.*,
+              cp.id as p_id, cp.progress as p_progress, cp.rank as p_rank, cp.status as p_status,
+              cp.joined_at as p_joined_at, cp.completed_at as p_completed_at, cp.last_updated_at as p_last_updated_at,
+              (SELECT COUNT(*) FROM challenge_participants cp2 WHERE cp2.challenge_id = c.id AND cp2.status != 'LEFT') as participants_count
+       FROM challenges c
+       LEFT JOIN challenge_participants cp ON cp.challenge_id = c.id AND cp.user_id = ?
+       ORDER BY c.created_at DESC;`,
+      [userId]
+    );
+
+    return rows.map(r => {
+      const challenge = this.mapChallengeRow(r);
+      let participant: ChallengeParticipant | undefined = undefined;
+      let userStatus: 'AVAILABLE' | 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' = 'AVAILABLE';
+
+      if (r.p_id && r.p_status && r.p_status !== 'LEFT') {
+        participant = {
+          id: r.p_id,
+          challengeId: r.id,
+          userId,
+          progress: Number(r.p_progress || 0),
+          rank: r.p_rank || 1,
+          status: r.p_status as ParticipantStatus,
+          joinedAt: r.p_joined_at || '',
+          completedAt: r.p_completed_at || null,
+          lastUpdatedAt: r.p_last_updated_at || '',
+        };
+
+        if (r.p_status === 'COMPLETED' || (r.p_completed_at !== null && r.p_completed_at !== undefined)) {
+          userStatus = 'COMPLETED';
+        } else if (r.p_status === 'PAUSED') {
+          userStatus = 'PAUSED';
+        } else if (r.p_status === 'CANCELLED') {
+          userStatus = 'CANCELLED';
+        } else if (r.p_status === 'ACTIVE') {
+          userStatus = 'ACTIVE';
+        }
+      }
+
+      return {
+        ...challenge,
+        participant,
+        userStatus,
+        participantsCount: r.participants_count || 0,
+      };
+    });
+  }
+
   private static mapChallengeRow(row: SqliteChallengeRow): Challenge {
     let config = {};
     try {
@@ -414,6 +547,9 @@ export class ChallengeRepository {
       status: row.status as ChallengeStatus,
       config,
       rewardXp: row.reward_xp,
+      rewardTitleId: row.reward_title_id || undefined,
+      rewardTitleName: row.reward_title_name || undefined,
+      rewardBadge: row.reward_badge || undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

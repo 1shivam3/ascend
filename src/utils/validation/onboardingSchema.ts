@@ -10,6 +10,8 @@ export const PRIMARY_GOALS = [
   'GENERAL_FITNESS',
   'SPORT_PERFORMANCE',
   'CALISTHENICS',
+  'MOBILITY',
+  'COMBINATION',
   'CUSTOM',
 ] as const;
 
@@ -47,6 +49,8 @@ export function normalizeGoal(goal: string): PrimaryGoal {
     case 'GENERAL_FITNESS':
     case 'SPORT_PERFORMANCE':
     case 'CALISTHENICS':
+    case 'MOBILITY':
+    case 'COMBINATION':
     case 'CUSTOM':
       return goal as PrimaryGoal;
     default:
@@ -182,6 +186,7 @@ export const onboardingSchema = z.object({
   limitations: z.array(z.string()).default([]),
   username: usernameSchema,
   avatarUrl: z.string().default('⚔️'),
+  avatarConfig: z.any().optional(),
 });
 
 export type OnboardingData = z.infer<typeof onboardingSchema>;

@@ -17,6 +17,10 @@ import { Badge } from '../../../components/ui/Badge';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { TrendSparkline } from '../../../components/hud/TrendSparkline';
 import { PROGRESSION_CONFIG } from '../../../config/progression.config';
+import { FitnessComparisonCard } from '../../../components/comparison/FitnessComparisonCard';
+import { FitnessComparisonModal } from '../../../components/comparison/FitnessComparisonModal';
+import { FitnessComparisonService } from '../../../services/comparison/FitnessComparisonService';
+import { FitnessComparisonEvaluation } from '../../../types/comparison.types';
 
 interface RecentSetRow {
   id: string;
@@ -41,6 +45,8 @@ export default function ProgressDetailScreen() {
   const [milestones, setMilestones] = useState<ExerciseMilestone[]>([]);
   const [unlockedMilestones, setUnlockedMilestones] = useState<UserExerciseMilestone[]>([]);
   const [recentSets, setRecentSets] = useState<RecentSetRow[]>([]);
+  const [comparisonEvaluation, setComparisonEvaluation] = useState<FitnessComparisonEvaluation | null>(null);
+  const [comparisonModalVisible, setComparisonModalVisible] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!exerciseId) return;
@@ -49,17 +55,24 @@ export default function ProgressDetailScreen() {
       setExercise(ex);
 
       if (userId) {
-        const [m, prList, msList, unlockedList] = await Promise.all([
+        const [m, prList, msList, unlockedList, compEval] = await Promise.all([
           MasteryRepository.getMastery(userId, exerciseId),
           MasteryRepository.getPersonalRecords(userId, exerciseId),
           MilestoneRepository.getMilestonesForExercise(exerciseId),
           MilestoneRepository.getUserUnlockedMilestones(userId, exerciseId),
+          FitnessComparisonService.evaluateUserComparison({
+            userId,
+            exerciseId,
+            exerciseName: ex?.name,
+            bodyweightKg: profile?.weightKg,
+          }),
         ]);
 
         setMastery(m);
         setPrs(prList);
         setMilestones(msList);
         setUnlockedMilestones(unlockedList);
+        setComparisonEvaluation(compEval);
 
         // Fetch recent sets
         const db = await getDatabase();
@@ -399,6 +412,15 @@ export default function ProgressDetailScreen() {
           </View>
         </View>
 
+        {/* Transparent Population & Cohort Benchmark */}
+        <View style={styles.section}>
+          <Caption upper style={styles.sectionHeader}>POPULATION & COHORT BENCHMARK</Caption>
+          <FitnessComparisonCard
+            evaluation={comparisonEvaluation}
+            onOpenModal={() => setComparisonModalVisible(true)}
+          />
+        </View>
+
         {/* Milestones Checklist Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
@@ -554,6 +576,14 @@ export default function ProgressDetailScreen() {
           </View>
         )}
       </ScrollView>
+
+      <FitnessComparisonModal
+        visible={comparisonModalVisible}
+        initialExerciseId={exerciseId}
+        userId={userId}
+        userBodyweightKg={profile?.weightKg || 75}
+        onClose={() => setComparisonModalVisible(false)}
+      />
     </ScreenContainer>
   );
 }

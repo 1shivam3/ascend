@@ -2,6 +2,8 @@ import { getDatabase } from '../sqlite';
 import { Exercise, EquipmentTier, MovementPattern, ExerciseTier } from '../../types/domain.types';
 import { SqliteExerciseRow } from '../types';
 
+import { STARTER_EXERCISES } from '../../constants/exercises';
+
 export class ExerciseRepository {
   static async getAll(): Promise<Exercise[]> {
     const db = await getDatabase();
@@ -55,16 +57,21 @@ export class ExerciseRepository {
       secondaryMuscles = [];
     }
 
+    const starterMatch = STARTER_EXERCISES.find(e => e.id === row.id);
+
     return {
       id: row.id,
       name: row.name,
       slug: row.slug,
       primaryMuscle: row.primary_muscle,
-      secondaryMuscles,
+      secondaryMuscles: secondaryMuscles.length > 0 ? secondaryMuscles : (starterMatch?.secondaryMuscles || []),
       equipment: row.equipment as EquipmentTier,
       movementPattern: row.movement_pattern as MovementPattern,
       tier: row.tier as ExerciseTier,
-      instructions: row.instructions || undefined,
+      difficulty: starterMatch?.difficulty || 'INTERMEDIATE',
+      instructions: row.instructions || starterMatch?.instructions,
+      commonMistakes: starterMatch?.commonMistakes || [],
+      suitableAlternatives: starterMatch?.suitableAlternatives || [],
       videoUrl: row.video_url || undefined,
       isCustom: Boolean(row.is_custom),
     };

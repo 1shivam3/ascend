@@ -31,7 +31,7 @@ export type ChallengeVisibility = 'PUBLIC' | 'FRIENDS' | 'PRIVATE' | 'GROUP';
 
 export type ChallengeStatus = 'UPCOMING' | 'ACTIVE' | 'COMPLETED' | 'EXPIRED' | 'CANCELLED';
 
-export type ParticipantStatus = 'ACTIVE' | 'COMPLETED' | 'LEFT';
+export type ParticipantStatus = 'ACTIVE' | 'PAUSED' | 'COMPLETED' | 'CANCELLED' | 'LEFT';
 
 export interface ChallengeConfig {
   exerciseId?: string;
@@ -57,6 +57,9 @@ export interface Challenge {
   status: ChallengeStatus;
   config?: ChallengeConfig;
   rewardXp?: number;
+  rewardTitleId?: string;
+  rewardTitleName?: string;
+  rewardBadge?: string;
   participantsCount?: number;
   createdAt: string;
   updatedAt: string;

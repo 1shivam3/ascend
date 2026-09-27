@@ -43,16 +43,27 @@ export type RankTier =
   | 'SSS';
 
 export interface CharacterAttributes {
-  strength: number;    // 10-100 (Peak force, heavy compounds, estimated 1RM/Wilks)
+  strength: number;    // 10-100 (Relative compound strength, 1RM/Wilks)
   endurance: number;   // 10-100 (Work capacity, rep volume, session density)
-  agility: number;     // 10-100 (Relative bodyweight strength, unilateral stability)
+  mobility?: number;   // 10-100 (Mobility sessions, active recovery, full-ROM movement)
   consistency: number; // 10-100 (Calendar adherence, frequency, streak momentum)
+  agility: number;     // 10-100 (Relative bodyweight strength, unilateral stability)
 
   // Backward-compatibility aliases for legacy UI/tests
   stamina: number;
   discipline: number;
   vitality: number;
 }
+
+export type PerformanceMetricType =
+  | 'TESTED_1RM'
+  | 'ESTIMATED_1RM'
+  | 'BEST_WORKING_SET'
+  | 'ENDURANCE_SET';
+
+export type DataVerificationSource = 'VERIFIED_SESSION' | 'SELF_REPORTED';
+
+export type RankConfirmationStatus = 'CONFIRMED' | 'PROVISIONAL';
 
 export type PrimaryGoal =
   | 'BUILD_MUSCLE'
@@ -63,6 +74,8 @@ export type PrimaryGoal =
   | 'GENERAL_FITNESS'
   | 'SPORT_PERFORMANCE'
   | 'CALISTHENICS'
+  | 'MOBILITY'
+  | 'COMBINATION'
   | 'CUSTOM';
 
 export interface TrainingPreferences {
@@ -77,11 +90,14 @@ export interface TrainingPreferences {
   sportName?: string;
 }
 
+import { AvatarConfig } from './avatar.types';
+
 export interface UserProfile {
   id: string;
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  avatarConfig?: AvatarConfig | null;
   goal: string;
   primaryGoal?: PrimaryGoal;
   primary_goal?: PrimaryGoal;
@@ -105,9 +121,13 @@ export interface UserProfile {
   onboardingCompleted: boolean;
   authId?: string | null;
   friendCode?: string;
+  activeTitle?: string | null;
+  activeTitleId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface UserSettings {
   userId: string;
@@ -117,6 +137,7 @@ export interface UserSettings {
   defaultRestSeconds: number;
   pushNotificationsEnabled: boolean;
   streakFreezeAutoUse: boolean;
+  themeMode?: ThemeMode;
 }
 
 export type ProgressionType =
@@ -130,6 +151,8 @@ export type ProgressionType =
   | 'ATHLETIC'
   | 'MOBILITY';
 
+export type ExerciseDifficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -139,11 +162,14 @@ export interface Exercise {
   equipment: EquipmentTier;
   movementPattern: MovementPattern;
   tier: ExerciseTier;
+  difficulty?: ExerciseDifficulty;
   progressionType?: ProgressionType;
   supports1Rm?: boolean;
   supportsRelativeStrength?: boolean;
   isBodyweight?: boolean;
   instructions?: string;
+  commonMistakes?: string[];
+  suitableAlternatives?: string[];
   videoUrl?: string;
   isCustom: boolean;
 }
@@ -301,7 +327,19 @@ export type PrType =
   | 'HIGHEST_VOLUME'
   | 'BEST_DISTANCE'
   | 'BEST_PACE'
-  | 'LONGEST_DURATION';
+  | 'LONGEST_DURATION'
+  | 'TESTED_1RM'
+  | 'ESTIMATED_1RM'
+  | 'BEST_WORKING_SET'
+  | 'REPETITION_PR'
+  | 'VOLUME_PR';
+
+export type CategorizedPrCategory =
+  | 'TESTED_1RM'
+  | 'ESTIMATED_1RM'
+  | 'BEST_WORKING_SET'
+  | 'REPETITION_PR'
+  | 'VOLUME_PR';
 
 export interface PersonalRecord {
   id: string;

@@ -1,10 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, ViewStyle, StyleProp } from 'react-native';
-import { THEME } from '../../constants/theme';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  ViewStyle,
+  StyleProp,
+} from 'react-native';
+import { useTheme } from '../../constants/theme';
 
 export interface CardProps {
   children: React.ReactNode;
-  variant?: 'surface' | 'glass' | 'elevated';
+  variant?: 'surface' | 'glass' | 'elevated' | 'soft' | 'outlined';
   accentBorder?: string;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
@@ -13,37 +19,50 @@ export interface CardProps {
 
 export const Card: React.FC<CardProps> = ({
   children,
-  variant = 'glass',
+  variant = 'surface',
   accentBorder,
   onPress,
   style,
   padding = 'md',
 }) => {
+  const { colors, borderRadius, shadows, spacing, isDark } = useTheme();
+
   const getBackgroundColor = () => {
     switch (variant) {
-      case 'glass': return THEME.colors.surfaceGlass;
-      case 'elevated': return THEME.colors.surfaceElevated;
+      case 'glass':
+        return colors.surfaceGlass;
+      case 'elevated':
+        return colors.surfaceElevated;
+      case 'soft':
+        return isDark ? colors.surfaceElevated : colors.surfaceMuted;
+      case 'outlined':
+        return 'transparent';
       case 'surface':
-      default: return THEME.colors.surface;
+      default:
+        return colors.surface;
     }
   };
 
   const getPadding = () => {
     switch (padding) {
-      case 'none': return 0;
-      case 'sm': return THEME.spacing.sm;
-      case 'lg': return THEME.spacing.lg;
+      case 'none':
+        return 0;
+      case 'sm':
+        return spacing.sm;
+      case 'lg':
+        return spacing.lg;
       case 'md':
-      default: return THEME.spacing.md;
+      default:
+        return spacing.md;
     }
   };
 
   const containerStyle: ViewStyle = {
     backgroundColor: getBackgroundColor(),
     padding: getPadding(),
-    borderRadius: THEME.borderRadius.md,
+    borderRadius: borderRadius.lg, // 18px rounded card
     borderWidth: 1,
-    borderColor: accentBorder || THEME.colors.border,
+    borderColor: accentBorder || colors.border,
   };
 
   if (onPress) {
@@ -51,7 +70,12 @@ export const Card: React.FC<CardProps> = ({
       <TouchableOpacity
         activeOpacity={0.82}
         onPress={onPress}
-        style={[styles.card, containerStyle, style]}
+        style={[
+          styles.card,
+          containerStyle,
+          variant !== 'outlined' ? shadows.card : null,
+          style,
+        ]}
       >
         {children}
       </TouchableOpacity>
@@ -59,7 +83,14 @@ export const Card: React.FC<CardProps> = ({
   }
 
   return (
-    <View style={[styles.card, containerStyle, style]}>
+    <View
+      style={[
+        styles.card,
+        containerStyle,
+        variant !== 'outlined' ? shadows.card : null,
+        style,
+      ]}
+    >
       {children}
     </View>
   );
@@ -67,7 +98,7 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    marginVertical: THEME.spacing.xs,
+    marginVertical: 4,
     overflow: 'hidden',
   },
 });

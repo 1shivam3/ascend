@@ -6,15 +6,18 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
+  Text as RNText,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { THEME } from '../../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../constants/theme';
 import { useWorkoutStore } from '../../store/useWorkoutStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useAndroidBackHandler } from '../../hooks/useAndroidBackHandler';
 import { ExerciseRepository } from '../../database/repositories/ExerciseRepository';
 import { TemplateRepository } from '../../database/repositories/TemplateRepository';
 import { SupersetEngine } from '../../services/workout/SupersetEngine';
+import { ExerciseAlternativeService } from '../../services/workout/ExerciseAlternativeService';
 import { Exercise, SetLog } from '../../types/domain.types';
 import { WorkoutProgressionResult } from '../../types/progression.types';
 import { ExerciseCard } from '../../components/workout/ExerciseCard';
@@ -22,14 +25,18 @@ import { RestTimerBar } from '../../components/workout/RestTimerBar';
 import { PlateCalculatorModal } from '../../components/hud/PlateCalculatorModal';
 import { ProgressionSummaryModal } from '../../components/workout/ProgressionSummaryModal';
 import { PRCelebrationModal } from '../../components/workout/PRCelebrationModal';
+import { ExerciseDetailModal } from '../../components/workout/ExerciseDetailModal';
 import { ScreenContainer } from '../../components/layout/ScreenContainer';
-import { Heading, Text, Caption, StatText, MonoText } from '../../components/ui/Typography';
-import { Button } from '../../components/ui/Button';
+import { Heading, Text, Caption, MonoText } from '../../components/ui/Typography';
+import { Card } from '../../components/ui/Card';
+import { Button, PrimaryButton } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { BottomSheet } from '../../components/ui/BottomSheet';
+import { Divider } from '../../components/ui/Divider';
 
 export default function ActiveWorkoutScreen() {
   const router = useRouter();
+  const { colors, borderRadius, shadows, isDark } = useTheme();
   const {
     activeWorkout,
     elapsedSeconds,
@@ -43,6 +50,7 @@ export default function ActiveWorkoutScreen() {
     skipSet,
     toggleSetCompleted,
     deleteSet,
+    updateExerciseNotes,
     finishWorkout,
     discardWorkout,
     startWorkout,
@@ -52,19 +60,26 @@ export default function ActiveWorkoutScreen() {
     unlinkSuperset,
     focusedSupersetTarget,
     clearFocusedSupersetTarget,
+    isRestTimerRunning,
+    restTimerSecondsRemaining,
   } = useWorkoutStore();
 
-  const loadProfile = useAuthStore(s => s.loadProfile);
+  const loadProfile = useAuthStore((s) => s.loadProfile);
 
   // Modal States
   const [exercisePickerVisible, setExercisePickerVisible] = useState(false);
   const [replacingExerciseLogId, setReplacingExerciseLogId] = useState<string | null>(null);
   const [availableExercises, setAvailableExercises] = useState<Exercise[]>([]);
+  const [recommendedAlternatives, setRecommendedAlternatives] = useState<Exercise[]>([]);
+  const [selectedDetailExercise, setSelectedDetailExercise] = useState<Exercise | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Plate Calculator State
   const [plateCalcVisible, setPlateCalcVisible] = useState(false);
-  const [targetSetForPlates, setTargetSetForPlates] = useState<{ exerciseLogId: string; set: SetLog } | null>(null);
+  const [targetSetForPlates, setTargetSetForPlates] = useState<{
+    exerciseLogId: string;
+    set: SetLog;
+  } | null>(null);
 
   // Progression Summary State
   const [progressionResult, setProgressionResult] = useState<WorkoutProgressionResult | null>(null);
@@ -80,7 +95,7 @@ export default function ActiveWorkoutScreen() {
         { text: 'Minimize to HUD', onPress: () => router.back() },
       ]
     );
-    return true; // prevent default exit
+    return true;
   }, [router]);
 
   useAndroidBackHandler(handleAndroidBack, Boolean(activeWorkout));
@@ -100,6 +115,22 @@ export default function ActiveWorkoutScreen() {
     }
   }, [exercisePickerVisible, searchQuery]);
 
+  // Load recommended biomechanical alternatives when replacing an exercise
+  useEffect(() => {
+    if (replacingExerciseLogId && exercisePickerVisible) {
+      const targetLog = activeWorkout?.exercises.find(
+        (e) => e.id === replacingExerciseLogId
+      );
+      if (targetLog?.exercise) {
+        ExerciseAlternativeService.getSuitableAlternatives(targetLog.exercise).then(
+          setRecommendedAlternatives
+        );
+      }
+    } else {
+      setRecommendedAlternatives([]);
+    }
+  }, [replacingExerciseLogId, exercisePickerVisible, activeWorkout]);
+
   // Auto-init if accessed without active session
   useEffect(() => {
     if (!activeWorkout) {
@@ -113,9 +144,14 @@ export default function ActiveWorkoutScreen() {
       return;
     }
 
-    const completedSets = activeWorkout.exercises.flatMap(e => e.sets).filter(s => s.completed);
+    const completedSets = activeWorkout.exercises
+      .flatMap((e) => e.sets)
+      .filter((s) => s.completed);
     if (completedSets.length === 0) {
-      Alert.alert('No Completed Sets', 'Mark at least one set completed (✓) to mint progression.');
+      Alert.alert(
+        'No Completed Sets',
+        'Mark at least one set completed (✓) to mint progression.'
+      );
       return;
     }
 
@@ -169,97 +205,202 @@ export default function ActiveWorkoutScreen() {
     }
   };
 
-  const handleSaveAsTemplate = async () => {
-    if (!activeWorkout || activeWorkout.exercises.length === 0) {
-      Alert.alert('Empty Session', 'Log at least one exercise before saving as a template.');
-      return;
-    }
-    try {
-      const template = await TemplateRepository.createFromWorkoutSession(
-        activeWorkout.userId,
-        activeWorkout,
-        `${activeWorkout.title} Template`
-      );
-      Alert.alert('Template Saved!', `"${template.name}" has been saved to My Routines.`);
-    } catch (err) {
-      console.error('Failed to save workout template:', err);
-      Alert.alert('Error', 'Failed to save routine template.');
-    }
-  };
-
   // Format Elapsed Time
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
-  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(
+    seconds
+  ).padStart(2, '0')}`;
 
-  // Calculate live session tonnage
-  const currentVolume = activeWorkout?.exercises
-    .flatMap(e => e.sets)
-    .filter(s => s.completed && !s.isSkipped)
-    .reduce((sum, s) => sum + s.weightKg * s.reps, 0) || 0;
+  // Determine current active quest item
+  const exercises = activeWorkout?.exercises || [];
+  let activeExerciseIndex = exercises.findIndex((ex) =>
+    ex.sets.some((s) => !s.completed && !s.isSkipped)
+  );
+  if (activeExerciseIndex === -1 && exercises.length > 0) {
+    activeExerciseIndex = exercises.length - 1;
+  }
+  const activeExercise = exercises[activeExerciseIndex] || null;
+  const activeSetIndex = activeExercise
+    ? activeExercise.sets.findIndex((s) => !s.completed && !s.isSkipped)
+    : -1;
+  const activeSet =
+    activeSetIndex !== -1 && activeExercise
+      ? activeExercise.sets[activeSetIndex]
+      : null;
+
+  // Workout-level stats for header overview
+  const targetMuscleGroups = Array.from(
+    new Set(exercises.map((e) => e.exercise?.primaryMuscle).filter(Boolean))
+  );
+  const targetMusclesLabel =
+    targetMuscleGroups.length > 0 ? targetMuscleGroups.join(' • ') : 'Full Body';
+
+  const allSets = exercises.flatMap((e) => e.sets);
+  const completedSetsCount = allSets.filter((s) => s.completed).length;
+  const totalSetsCount = allSets.length;
+  const estimatedDurationMin = Math.max(
+    15,
+    Math.round(totalSetsCount * 2.5)
+  );
 
   return (
     <ScreenContainer scrollable={false}>
-      {/* Top Tactical Bar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={handleDiscard} style={styles.discardBtn}>
-          <Text color={THEME.colors.crimson} style={styles.discardText}>DISCARD</Text>
+      {/* Top Bar with Timer and Controls */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={handleDiscard}
+          style={styles.discardBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.discardText, { color: colors.crimson }]}>
+            Discard
+          </Text>
         </TouchableOpacity>
 
-        <View style={styles.timerBadge}>
-          <View style={styles.recordDot} />
+        <View
+          style={[
+            styles.timerBadge,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              borderRadius: borderRadius.full,
+            },
+          ]}
+        >
+          <View
+            style={[styles.recordDot, { backgroundColor: colors.crimson }]}
+          />
           <MonoText style={styles.timerDigits}>{formattedTime}</MonoText>
         </View>
 
-        <TouchableOpacity onPress={handleFinish} style={styles.finishBtn}>
-          <Text color="#000000" style={styles.finishText}>FINISH</Text>
+        <TouchableOpacity
+          onPress={handleFinish}
+          style={[
+            styles.finishBtn,
+            {
+              backgroundColor: isDark ? colors.cyan : colors.primary,
+              borderRadius: borderRadius.md,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.finishText,
+              { color: isDark ? '#000000' : '#FFFFFF' },
+            ]}
+          >
+            Finish
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Session Title & Tonnage HUD */}
-      <View style={styles.hudSection}>
-        <View style={styles.titleRow}>
-          <Heading level={3} style={styles.workoutTitle}>
-            {activeWorkout?.title || 'Tactical Training'}
-          </Heading>
-          <TouchableOpacity onPress={handleSaveAsTemplate} style={styles.saveRoutineBtn}>
-            <Text style={styles.saveRoutineText}>+ SAVE ROUTINE</Text>
-          </TouchableOpacity>
-        </View>
+      {/* Focus Quest Command Panel */}
+      {activeExercise && activeSet ? (
+        <View style={styles.questCommandWrap}>
+          <Card
+            variant="surface"
+            style={[
+              styles.questCommandCard,
+              {
+                borderColor: isDark ? colors.cyan : colors.primary,
+                borderWidth: 1.5,
+              },
+            ]}
+          >
+            <View style={styles.questTopHeader}>
+              <Caption
+                upper
+                style={{
+                  color: isDark ? colors.cyan : colors.primary,
+                  fontWeight: '700',
+                  fontSize: 11,
+                }}
+              >
+                EXERCISE {activeExerciseIndex + 1} OF {exercises.length}
+              </Caption>
+              <Caption upper style={{ color: colors.textMuted, fontSize: 10 }}>
+                {activeExercise.exercise?.movementPattern?.replace(/_/g, ' ') ||
+                  'STRENGTH'}
+              </Caption>
+            </View>
 
-        <View style={styles.hudMetricsRow}>
-          <View style={styles.metricItem}>
-            <Caption upper style={styles.metricLabel}>VOLUME</Caption>
-            <StatText size="md" color={THEME.colors.cyan}>{Math.round(currentVolume)} kg</StatText>
-          </View>
-          <View style={styles.metricItem}>
-            <Caption upper style={styles.metricLabel}>MOVEMENTS</Caption>
-            <StatText size="md">{activeWorkout?.exercises.length || 0}</StatText>
-          </View>
-          <View style={styles.metricItem}>
-            <Caption upper style={styles.metricLabel}>SETS DONE</Caption>
-            <StatText size="md" color={THEME.colors.emerald}>
-              {activeWorkout?.exercises.flatMap(e => e.sets).filter(s => s.completed && !s.isSkipped).length || 0}
-            </StatText>
-          </View>
+            <Heading level={2} style={styles.questExerciseTitle} numberOfLines={1}>
+              {activeExercise.exercise?.name || 'Movement'}
+            </Heading>
+
+            <View style={styles.questSetExecutionRow}>
+              <View>
+                <Caption upper style={{ color: colors.textMuted, fontSize: 10 }}>
+                  SET {activeSetIndex + 1} OF {activeExercise.sets.length}
+                </Caption>
+                <RNText
+                  style={[
+                    styles.activeSetNumbers,
+                    { color: isDark ? colors.cyan : colors.textPrimary },
+                  ]}
+                >
+                  {activeSet.weightKg} kg × {activeSet.reps}
+                </RNText>
+              </View>
+
+              {isRestTimerRunning && (
+                <View style={styles.restTimerDisplay}>
+                  <Caption
+                    upper
+                    style={{ color: colors.amber, fontWeight: '700' }}
+                  >
+                    REST
+                  </Caption>
+                  <MonoText
+                    style={[styles.restDigits, { color: colors.amber }]}
+                  >
+                    {Math.floor(restTimerSecondsRemaining / 60)
+                      .toString()
+                      .padStart(2, '0')}
+                    :{(restTimerSecondsRemaining % 60).toString().padStart(2, '0')}
+                  </MonoText>
+                </View>
+              )}
+            </View>
+
+            <PrimaryButton
+              title="Complete Set ✓"
+              onPress={() => toggleSetCompleted(activeExercise.id, activeSet.id)}
+            />
+          </Card>
         </View>
-      </View>
+      ) : null}
 
       {/* Superset Live Navigation Banner */}
       {focusedSupersetTarget && (
         <TouchableOpacity
           onPress={() => clearFocusedSupersetTarget()}
-          style={styles.supersetNavBanner}
+          style={[
+            styles.supersetNavBanner,
+            {
+              backgroundColor: `${colors.amber}18`,
+              borderBottomColor: colors.amber,
+            },
+          ]}
         >
-          <Text style={styles.supersetNavIcon}>⚡</Text>
+          <Ionicons name="flash" size={18} color={colors.amber} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.supersetNavTitle}>
+            <Text style={[styles.supersetNavTitle, { color: colors.amber }]}>
               {focusedSupersetTarget.isRoundComplete
-                ? `SUPERSET ROUND COMPLETE`
-                : `SUPERSET NEXT MOVEMENT`}
+                ? 'Superset Round Complete'
+                : 'Next Superset Movement'}
             </Text>
-            <Caption style={styles.supersetNavSub}>
-              Tap to dismiss • Moving to Set #{focusedSupersetTarget.nextSetNumber}
+            <Caption style={{ color: colors.textSecondary }}>
+              Moving to Set #{focusedSupersetTarget.nextSetNumber}
             </Caption>
           </View>
           <Badge label="NEXT ➔" variant="amber" size="sm" />
@@ -267,13 +408,84 @@ export default function ActiveWorkoutScreen() {
       )}
 
       {/* Exercise Cards List */}
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Workout Overview Header Card */}
+        <View
+          style={[
+            styles.workoutOverviewCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.borderSubtle,
+              borderRadius: borderRadius.lg,
+            },
+          ]}
+        >
+          <View style={styles.overviewTopRow}>
+            <View style={{ flex: 1 }}>
+              <Caption
+                upper
+                style={{
+                  color: isDark ? colors.cyan : colors.primary,
+                  fontWeight: '800',
+                  letterSpacing: 1,
+                  fontSize: 10,
+                }}
+              >
+                ACTIVE PROTOCOL
+              </Caption>
+              <Heading level={2} style={styles.overviewWorkoutTitle}>
+                {activeWorkout?.name || 'Tactical Protocol'}
+              </Heading>
+            </View>
+            <Badge
+              label={`${completedSetsCount}/${totalSetsCount} SETS`}
+              variant={
+                completedSetsCount === totalSetsCount && totalSetsCount > 0
+                  ? 'emerald'
+                  : 'cyan'
+              }
+              size="sm"
+            />
+          </View>
+
+          <View style={styles.overviewMetaRow}>
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="barbell-outline"
+                size={14}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                {targetMusclesLabel}
+              </Text>
+            </View>
+            <View style={styles.metaItem}>
+              <Ionicons
+                name="time-outline"
+                size={14}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                ~{estimatedDurationMin} min est.
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {activeWorkout?.exercises.map((el, idx) => {
           let supersetBadge: string | undefined;
           if (el.supersetId) {
-            const group = activeWorkout.exercises.filter(e => e.supersetId === el.supersetId);
-            const idxInGroup = group.findIndex(e => e.id === el.id);
-            supersetBadge = SupersetEngine.getSupersetBadgeLabel(el.supersetId, Math.max(0, idxInGroup));
+            const group = activeWorkout.exercises.filter(
+              (e) => e.supersetId === el.supersetId
+            );
+            const idxInGroup = group.findIndex((e) => e.id === el.id);
+            supersetBadge = SupersetEngine.getSupersetBadgeLabel(
+              el.supersetId,
+              Math.max(0, idxInGroup)
+            );
           }
 
           return (
@@ -293,25 +505,27 @@ export default function ActiveWorkoutScreen() {
                   }
                 }
               }}
-              onAddSet={setType => addSet(el.id, setType)}
+              onAddSet={(setType) => addSet(el.id, setType)}
               onUpdateSet={(setId, updates) => updateSet(el.id, setId, updates)}
-              onToggleSetCompleted={setId => toggleSetCompleted(el.id, setId)}
-              onDeleteSet={setId => deleteSet(el.id, setId)}
+              onToggleSetCompleted={(setId) => toggleSetCompleted(el.id, setId)}
+              onDeleteSet={(setId) => deleteSet(el.id, setId)}
               onRemoveExercise={() => removeExercise(el.id)}
-              onOpenPlateCalculator={set => handleOpenPlateCalc(el.id, set)}
+              onOpenPlateCalculator={(set) => handleOpenPlateCalc(el.id, set)}
               onReplaceExercise={() => {
                 setReplacingExerciseLogId(el.id);
                 setExercisePickerVisible(true);
               }}
               onSkipExercise={() => skipExercise(el.id)}
-              onSkipSet={setId => skipSet(el.id, setId)}
+              onSkipSet={(setId) => skipSet(el.id, setId)}
+              onUpdateNotes={(notes) => updateExerciseNotes(el.id, notes)}
+              onViewDetails={() => setSelectedDetailExercise(el.exercise || null)}
             />
           );
         })}
 
         {/* Add Movement Button */}
         <Button
-          title="+ ADD MOVEMENT"
+          title="+ Add Exercise"
           size="md"
           variant="secondary"
           onPress={() => {
@@ -342,34 +556,127 @@ export default function ActiveWorkoutScreen() {
           setExercisePickerVisible(false);
           setReplacingExerciseLogId(null);
         }}
-        title={replacingExerciseLogId ? 'REPLACE MOVEMENT' : 'SELECT MOVEMENT'}
+        title={replacingExerciseLogId ? 'Replace Movement' : 'Add Movement'}
       >
+        {/* Recommended biomechanical alternatives when replacing */}
+        {replacingExerciseLogId &&
+          recommendedAlternatives.length > 0 &&
+          !searchQuery.trim() && (
+            <View style={styles.altRecommendationsSection}>
+              <Caption
+                upper
+                style={{
+                  color: isDark ? colors.cyan : colors.primary,
+                  fontWeight: '800',
+                  letterSpacing: 0.5,
+                  fontSize: 10,
+                  marginBottom: 8,
+                }}
+              >
+                RECOMMENDED ALTERNATIVES (BIOMECHANICALLY MATCHED)
+              </Caption>
+              {recommendedAlternatives.slice(0, 4).map((alt) => (
+                <TouchableOpacity
+                  key={alt.id}
+                  style={[
+                    styles.altPickerCard,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: isDark ? 'rgba(0, 229, 255, 0.4)' : colors.border,
+                      borderRadius: borderRadius.md,
+                    },
+                  ]}
+                  onPress={() => handleSelectExercise(alt)}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                      <Heading level={3} style={styles.pickerItemName}>
+                        {alt.name}
+                      </Heading>
+                      <Badge label="SUITABLE" variant="cyan" size="sm" />
+                    </View>
+                    <Caption style={{ color: colors.textSecondary }}>
+                      {alt.primaryMuscle} • {alt.equipment} • {alt.difficulty || 'INTERMEDIATE'}
+                    </Caption>
+                  </View>
+                  <Ionicons
+                    name="swap-horizontal"
+                    size={18}
+                    color={isDark ? colors.cyan : colors.primary}
+                  />
+                </TouchableOpacity>
+              ))}
+              <Divider marginVertical={12} />
+              <Caption
+                upper
+                style={{
+                  color: colors.textMuted,
+                  fontWeight: '800',
+                  letterSpacing: 0.5,
+                  fontSize: 10,
+                  marginBottom: 8,
+                }}
+              >
+                OR SELECT FROM ALL MOVEMENTS
+              </Caption>
+            </View>
+          )}
+
         <TextInput
-          style={styles.pickerSearchInput}
+          style={[
+            styles.pickerSearchInput,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+              borderRadius: borderRadius.md,
+            },
+          ]}
           placeholder="Search exercise name or muscle..."
-          placeholderTextColor={THEME.colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
 
         <View style={styles.pickerList}>
-          {availableExercises.map(ex => (
+          {availableExercises.map((ex) => (
             <TouchableOpacity
               key={ex.id}
-              style={styles.pickerItem}
+              style={[styles.pickerItem, { borderBottomColor: colors.borderSubtle }]}
               onPress={() => handleSelectExercise(ex)}
             >
               <View>
-                <Heading level={3} style={styles.pickerItemName}>{ex.name}</Heading>
-                <Caption style={styles.pickerItemSub}>
+                <Heading level={3} style={styles.pickerItemName}>
+                  {ex.name}
+                </Heading>
+                <Caption style={{ color: colors.textSecondary }}>
                   {ex.primaryMuscle} • {ex.equipment}
                 </Caption>
               </View>
-              <Badge label={ex.movementPattern.replace('_', ' ')} size="sm" variant="cyan" />
+              <Badge
+                label={ex.movementPattern.replace('_', ' ')}
+                size="sm"
+                variant="cyan"
+              />
             </TouchableOpacity>
           ))}
         </View>
       </BottomSheet>
+
+      {/* Exercise Detail Modal */}
+      <ExerciseDetailModal
+        visible={Boolean(selectedDetailExercise)}
+        exercise={selectedDetailExercise}
+        onClose={() => setSelectedDetailExercise(null)}
+        onSelectAlternative={(newEx: Exercise) => {
+          if (replacingExerciseLogId) {
+            handleSelectExercise(newEx);
+          }
+          setSelectedDetailExercise(null);
+        }}
+        isSwapMode={Boolean(replacingExerciseLogId)}
+      />
 
       {/* Live PR Celebration Modal */}
       <PRCelebrationModal
@@ -396,131 +703,104 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical: THEME.spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.border,
-    backgroundColor: THEME.colors.surface,
   },
   discardBtn: {
     padding: 6,
   },
   discardText: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontWeight: '700',
   },
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.colors.surfaceElevated,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: THEME.borderRadius.sharp,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
   },
   recordDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: THEME.colors.crimson,
-    marginRight: 6,
+    marginRight: 8,
   },
   timerDigits: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '800',
   },
   finishBtn: {
-    backgroundColor: THEME.colors.cyan,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: THEME.borderRadius.sharp,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   finishText: {
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontWeight: '700',
   },
-  hudSection: {
-    paddingHorizontal: THEME.spacing.md,
-    paddingVertical: THEME.spacing.sm,
-    backgroundColor: THEME.colors.surfaceElevated,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.borderSubtle,
+  questCommandWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
-  titleRow: {
+  questCommandCard: {
+    padding: 16,
+  },
+  questTopHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  workoutTitle: {
-    flex: 1,
+  questExerciseTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    marginBottom: 8,
   },
-  saveRoutineBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: THEME.borderRadius.sharp,
-    backgroundColor: 'rgba(0, 240, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.3)',
+  questSetExecutionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  saveRoutineText: {
-    color: THEME.colors.cyan,
-    fontSize: 9,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+  activeSetNumbers: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  restTimerDisplay: {
+    alignItems: 'flex-end',
+  },
+  restDigits: {
+    fontSize: 22,
+    fontWeight: '800',
   },
   supersetNavBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 184, 0, 0.15)',
-    paddingHorizontal: THEME.spacing.md,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.amber,
     gap: 10,
   },
-  supersetNavIcon: {
-    fontSize: 18,
-  },
   supersetNavTitle: {
-    color: THEME.colors.amber,
     fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  supersetNavSub: {
-    color: THEME.colors.textSecondary,
-    fontSize: 10,
-  },
-  hudMetricsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricItem: {
-    alignItems: 'flex-start',
-  },
-  metricLabel: {
-    fontSize: 9,
+    fontWeight: '800',
   },
   scrollContent: {
-    padding: THEME.spacing.md,
+    padding: 16,
     paddingBottom: 80,
   },
   addExerciseBtn: {
-    marginTop: THEME.spacing.md,
+    marginTop: 14,
+    minHeight: 48,
   },
   pickerSearchInput: {
-    backgroundColor: THEME.colors.surface,
-    borderRadius: THEME.borderRadius.sm,
     paddingHorizontal: 12,
     height: 44,
-    color: THEME.colors.textPrimary,
     borderWidth: 1,
-    borderColor: THEME.colors.border,
-    marginBottom: THEME.spacing.md,
+    marginBottom: 14,
   },
   pickerList: {
     gap: 4,
@@ -531,12 +811,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: THEME.colors.borderSubtle,
   },
   pickerItemName: {
     marginBottom: 2,
+    fontSize: 15,
   },
-  pickerItemSub: {
-    color: THEME.colors.textSecondary,
+  workoutOverviewCard: {
+    padding: 14,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  overviewTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  overviewWorkoutTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  overviewMetaRow: {
+    flexDirection: 'row',
+    gap: 14,
+    alignItems: 'center',
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  altRecommendationsSection: {
+    marginBottom: 10,
+  },
+  altPickerCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 1,
+    marginBottom: 6,
   },
 });

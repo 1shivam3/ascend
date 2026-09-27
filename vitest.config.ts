@@ -11,6 +11,7 @@ export default defineConfig({
       'react-native': 'react-native-web',
       'expo-secure-store': path.resolve(__dirname, 'src/test-utils/mockSecureStore.ts'),
       'expo-sqlite': path.resolve(__dirname, 'src/test-utils/mockSqlite.ts'),
+      'expo-linking': path.resolve(__dirname, 'src/test-utils/mockLinking.ts'),
     },
   },
 });

@@ -90,6 +90,12 @@ export async function initializeDatabase(): Promise<void> {
     { name: 'duration_seconds', ddl: 'ALTER TABLE set_logs ADD COLUMN duration_seconds INTEGER;' },
     { name: 'pace_seconds_per_km', ddl: 'ALTER TABLE set_logs ADD COLUMN pace_seconds_per_km REAL;' },
     { name: 'friend_code', ddl: 'ALTER TABLE profiles ADD COLUMN friend_code TEXT;' },
+    { name: 'active_title', ddl: 'ALTER TABLE profiles ADD COLUMN active_title TEXT;' },
+    { name: 'active_title_id', ddl: 'ALTER TABLE profiles ADD COLUMN active_title_id TEXT;' },
+    { name: 'avatar_config', ddl: 'ALTER TABLE profiles ADD COLUMN avatar_config TEXT;' },
+    { name: 'reward_title_id', ddl: 'ALTER TABLE challenges ADD COLUMN reward_title_id TEXT;' },
+    { name: 'reward_title_name', ddl: 'ALTER TABLE challenges ADD COLUMN reward_title_name TEXT;' },
+    { name: 'reward_badge', ddl: 'ALTER TABLE challenges ADD COLUMN reward_badge TEXT;' },
   ];
 
   for (const col of columnsToAdd) {
@@ -98,6 +104,53 @@ export async function initializeDatabase(): Promise<void> {
     } catch {
       // Column already exists, safe to continue
     }
+  }
+
+  // Ensure user_titles table exists
+  try {
+    await db.runAsync(
+      `CREATE TABLE IF NOT EXISTS user_titles (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        title_id TEXT NOT NULL,
+        unlocked_at TEXT NOT NULL,
+        is_active INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES profiles (id) ON DELETE CASCADE,
+        UNIQUE(user_id, title_id)
+      );`
+    );
+    await db.runAsync(
+      `CREATE INDEX IF NOT EXISTS idx_user_titles_user ON user_titles (user_id);`
+    );
+  } catch (err) {
+    console.warn('[init] user_titles table creation notice:', err);
+  }
+
+  // Ensure daily_step_summaries table exists
+  try {
+    await db.runAsync(
+      `CREATE TABLE IF NOT EXISTS daily_step_summaries (
+        id TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        today_steps INTEGER NOT NULL DEFAULT 0,
+        step_goal INTEGER NOT NULL DEFAULT 10000,
+        last_sensor_value REAL NOT NULL DEFAULT 0,
+        baseline REAL NOT NULL DEFAULT 0,
+        last_updated_at TEXT NOT NULL,
+        synced_at TEXT,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES profiles (id) ON DELETE CASCADE,
+        UNIQUE(user_id, date)
+      );`
+    );
+    await db.runAsync(
+      `CREATE INDEX IF NOT EXISTS idx_step_summaries_user_date ON daily_step_summaries (user_id, date);`
+    );
+  } catch (err) {
+    console.warn('[init] daily_step_summaries table creation notice:', err);
   }
 
   // Ensure idempotency indices exist
@@ -134,6 +187,12 @@ export async function initializeDatabase(): Promise<void> {
 
   // 5. Seed default privacy_settings for existing profiles
   try {
+    await db.runAsync("ALTER TABLE user_settings ADD COLUMN theme_mode TEXT DEFAULT 'light';");
+  } catch {
+    // Column might already exist or table not initialized yet
+  }
+
+  try {
     const profilesWithoutPrivacy = await db.getAllAsync<{ id: string }>(
       `SELECT p.id FROM profiles p LEFT JOIN privacy_settings ps ON p.id = ps.user_id WHERE ps.id IS NULL;`
     );
@@ -154,101 +213,16 @@ export async function initializeDatabase(): Promise<void> {
     // Table might be initializing
   }
 
-  // 6. Check if default user profile exists
-  const userProfile = await db.getFirstAsync<{ id: string; onboarding_completed: number }>(
-    'SELECT id, onboarding_completed FROM profiles WHERE id = ?;',
-    [DEFAULT_USER_ID]
+  // 6. Tactical Quests Catalog Initialization
+  // In the authenticated-first flow, new users authenticate before entering the app.
+  // We do NOT automatically create a new guest DEFAULT_USER_ID profile.
+  // Legacy installations retain their DEFAULT_USER_ID row if present so useAuthStore can migrate it.
+  const questCount = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM quests;'
   );
 
-  if (!userProfile) {
+  if (!questCount || questCount.count === 0) {
     const now = new Date().toISOString();
-    const defaultFriendCode = generateDefaultFriendCode();
-    const defaultAttributes = JSON.stringify({
-      strength: 10,
-      endurance: 10,
-      agility: 10,
-      consistency: 10,
-      stamina: 10,
-      discipline: 10,
-      vitality: 10,
-    });
-    const defaultPreferences = JSON.stringify({
-      daysPerWeek: 4,
-      sessionDurationMinutes: 60,
-      equipment: ['BARBELL', 'DUMBBELL', 'CABLE', 'MACHINE', 'BODYWEIGHT'],
-      trainingLocation: 'COMMERCIAL_GYM',
-      preferredExerciseIds: [],
-      excludedExerciseIds: [],
-      limitations: [],
-    });
-
-    await db.runAsync(
-      `INSERT INTO profiles (
-        id, username, display_name, avatar_url, goal, experience, age, height_cm, weight_kg,
-        training_preferences, global_level, total_xp, rank_tier, rank_division,
-        attributes, current_streak, longest_streak, streak_freeze_tokens,
-        is_guest, onboarding_completed, leaderboard_opt_in, auth_id, friend_code, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        DEFAULT_USER_ID,
-        'vanguard_one',
-        'Vanguard',
-        '⚔️',
-        'STRENGTH',
-        'INTERMEDIATE',
-        25,
-        175.0,
-        75.0,
-        defaultPreferences,
-        1,
-        0,
-        'E',
-        4,
-        defaultAttributes,
-        0,
-        0,
-        1,
-        1,
-        0, // onboarding_completed is 0 until user finishes onboarding
-        0, // leaderboard_opt_in is 0 (opted-out by default)
-        null,
-        defaultFriendCode,
-        now,
-        now,
-      ]
-    );
-
-    // Also insert initial privacy settings for default user
-    await db.runAsync(
-      `INSERT OR IGNORE INTO privacy_settings (
-        id, user_id, profile_visibility, feed_visibility_default,
-        show_workouts_in_feed, show_prs_in_feed, show_level_ups_in_feed,
-        show_rank_ups_in_feed, show_achievements_in_feed, show_challenges_in_feed,
-        show_evolution_in_feed, allow_friend_requests, show_mastery_on_profile,
-        show_achievements_on_profile, show_streak_on_profile, created_at, updated_at
-      ) VALUES (?, ?, 'FRIENDS', 'FRIENDS', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, ?, ?);`,
-      [`ps-${DEFAULT_USER_ID}`, DEFAULT_USER_ID, now, now]
-    );
-
-    await db.runAsync(
-      `INSERT INTO user_settings (
-        id, user_id, preferred_unit, sound_enabled, haptics_enabled, default_rest_seconds, push_notifications_enabled, streak_freeze_auto_use, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-      [
-        's-default-local',
-        DEFAULT_USER_ID,
-        'kg',
-        1,
-        1,
-        90,
-        1,
-        1,
-        now,
-        now,
-      ]
-    );
-
-    // Seed Tactical Quests
     const defaultQuests = [
       {
         id: 'quest-field-deployment',
@@ -379,24 +353,6 @@ export async function initializeDatabase(): Promise<void> {
           id, title, description, type, category, target_value, unit, xp_reward, badge_variant, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [q.id, q.title, q.description, q.type, q.category, q.targetValue, q.unit, q.xpReward, q.badgeVariant, now]
-      );
-
-      await db.runAsync(
-        `INSERT OR IGNORE INTO user_quests (
-          id, user_id, quest_id, current_progress, target_value, completed, completed_at, last_reset_date, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-        [
-          `uq-${DEFAULT_USER_ID}-${q.id}`,
-          DEFAULT_USER_ID,
-          q.id,
-          0,
-          q.targetValue,
-          0,
-          null,
-          now.split('T')[0],
-          now,
-          now,
-        ]
       );
     }
   }
@@ -550,7 +506,7 @@ async function seedDefaultTemplates(db: any): Promise<void> {
     const presets = [
       {
         id: 'tpl-push-heavy',
-        userId: DEFAULT_USER_ID,
+        userId: 'system',
         name: 'Push Heavy Compound',
         description: 'Pectoral, anterior deltoid, and tricep power foundation.',
         splitType: 'PUSH',
@@ -566,7 +522,7 @@ async function seedDefaultTemplates(db: any): Promise<void> {
       },
       {
         id: 'tpl-pull-power',
-        userId: DEFAULT_USER_ID,
+        userId: 'system',
         name: 'Pull Hypertrophy & Hinge',
         description: 'Posterior chain, lat sweep, and elbow flexor development.',
         splitType: 'PULL',
@@ -582,7 +538,7 @@ async function seedDefaultTemplates(db: any): Promise<void> {
       },
       {
         id: 'tpl-legs-power',
-        userId: DEFAULT_USER_ID,
+        userId: 'system',
         name: 'Legs Quad & Hamstring Focus',
         description: 'Knee flexion, hip hinge, and lower body work capacity.',
         splitType: 'LEGS',
@@ -598,7 +554,7 @@ async function seedDefaultTemplates(db: any): Promise<void> {
       },
       {
         id: 'tpl-upper-superset',
-        userId: DEFAULT_USER_ID,
+        userId: 'system',
         name: 'Upper Body Antagonist Superset',
         description: 'High-density paired antagonist supersets for maximum hypertrophy and work capacity.',
         splitType: 'UPPER',
@@ -648,17 +604,21 @@ async function seedDefaultTemplates(db: any): Promise<void> {
     console.warn('[init] Template seeding error (non-fatal):', err);
   }
 
-  // 12. Seed default system challenges
+  // 12. Seed default system challenges with rolling active dates
   try {
-    const challengeCount = (await (db as any).getFirstAsync(
-      'SELECT COUNT(*) as count FROM challenges WHERE created_by = "SYSTEM";'
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    const activeCount = (await (db as any).getFirstAsync(
+      `SELECT COUNT(*) as count FROM challenges WHERE created_by = "SYSTEM" AND status = "ACTIVE" AND end_at >= ?;`,
+      [nowIso]
     )) as { count: number } | null;
 
-    if (!challengeCount || challengeCount.count === 0) {
-      const now = new Date();
+    if (!activeCount || activeCount.count === 0) {
+      // Create rolling 30-day window from beginning of current month
       const startAt = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endAt = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
-      const createdAt = now.toISOString();
+      const endAt = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59).toISOString();
+      const createdAt = nowIso;
 
       const systemChallenges = [
         {
@@ -672,11 +632,14 @@ async function seedDefaultTemplates(db: any): Promise<void> {
           endAt,
           visibility: 'PUBLIC',
           rewardXp: 300,
+          rewardTitleId: 'title-the-challenger',
+          rewardTitleName: 'The Challenger',
+          rewardBadge: 'Directives Champion',
         },
         {
           id: 'ch-iron-week',
           title: 'IRON WEEK',
-          description: 'Accumulate 20,000 kg total training volume across all compound and accessory lifts.',
+          description: 'Accumulate 20,000 kg total training volume across compound and accessory movements.',
           type: 'TRAINING_VOLUME',
           metric: 'VOLUME_KG',
           target: 20000,
@@ -684,6 +647,9 @@ async function seedDefaultTemplates(db: any): Promise<void> {
           endAt,
           visibility: 'PUBLIC',
           rewardXp: 500,
+          rewardTitleId: 'title-power-builder',
+          rewardTitleName: 'Power Builder',
+          rewardBadge: 'Iron Volume',
         },
         {
           id: 'ch-cardio-rush',
@@ -696,6 +662,9 @@ async function seedDefaultTemplates(db: any): Promise<void> {
           endAt,
           visibility: 'PUBLIC',
           rewardXp: 400,
+          rewardTitleId: 'title-movement-master',
+          rewardTitleName: 'Movement Master',
+          rewardBadge: 'Aerobic Surge',
         },
         {
           id: 'ch-consistency',
@@ -708,6 +677,9 @@ async function seedDefaultTemplates(db: any): Promise<void> {
           endAt,
           visibility: 'PUBLIC',
           rewardXp: 450,
+          rewardTitleId: 'title-consistency-keeper',
+          rewardTitleName: 'Consistency Keeper',
+          rewardBadge: 'Iron Habit',
         },
         {
           id: 'ch-strength-push',
@@ -720,14 +692,25 @@ async function seedDefaultTemplates(db: any): Promise<void> {
           endAt,
           visibility: 'PUBLIC',
           rewardXp: 400,
+          rewardTitleId: 'title-strength-seeker',
+          rewardTitleName: 'Strength Seeker',
+          rewardBadge: 'Heavy Overload',
         },
       ];
 
       for (const ch of systemChallenges) {
         await db.runAsync(
-          `INSERT OR IGNORE INTO challenges (
-            id, title, description, type, metric, target, start_at, end_at, visibility, created_by, status, config, reward_xp, created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SYSTEM', 'ACTIVE', '{}', ?, ?, ?);`,
+          `INSERT INTO challenges (
+            id, title, description, type, metric, target, start_at, end_at, visibility, created_by, status, config, reward_xp, reward_title_id, reward_title_name, reward_badge, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SYSTEM', 'ACTIVE', '{}', ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            start_at = excluded.start_at,
+            end_at = excluded.end_at,
+            status = 'ACTIVE',
+            reward_title_id = excluded.reward_title_id,
+            reward_title_name = excluded.reward_title_name,
+            reward_badge = excluded.reward_badge,
+            updated_at = excluded.updated_at;`,
           [
             ch.id,
             ch.title,
@@ -739,6 +722,9 @@ async function seedDefaultTemplates(db: any): Promise<void> {
             ch.endAt,
             ch.visibility,
             ch.rewardXp,
+            ch.rewardTitleId,
+            ch.rewardTitleName,
+            ch.rewardBadge,
             createdAt,
             createdAt,
           ]

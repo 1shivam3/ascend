@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView, Edge } from 'react-native-safe-area-context';
-import { THEME } from '../../constants/theme';
+import { THEME, useTheme } from '../../constants/theme';
 import { OfflineBanner } from '../feedback/OfflineBanner';
 
 export interface ScreenContainerProps {
@@ -33,6 +33,8 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   keyboardAvoiding = false,
   refreshControl,
 }) => {
+  const { colors } = useTheme();
+
   const content = scrollable ? (
     <ScrollView
       contentContainerStyle={[styles.scrollContent, contentContainerStyle]}
@@ -58,7 +60,7 @@ export const ScreenContainer: React.FC<ScreenContainerProps> = ({
   );
 
   return (
-    <SafeAreaView edges={edges} style={[styles.safeArea, style]}>
+    <SafeAreaView edges={edges} style={[styles.safeArea, { backgroundColor: colors.background }, style]}>
       {showOfflineBanner && <OfflineBanner />}
       {inner}
     </SafeAreaView>

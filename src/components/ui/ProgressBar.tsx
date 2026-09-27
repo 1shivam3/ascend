@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { THEME } from '../../constants/theme';
+import { useTheme } from '../../constants/theme';
 import { Caption, MonoText } from './Typography';
 
 export interface ProgressBarProps {
@@ -15,31 +15,40 @@ export interface ProgressBarProps {
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
   progressPercent,
-  color = THEME.colors.cyan,
-  trackColor = THEME.colors.surfaceElevated,
+  color,
+  trackColor,
   size = 'md',
   label,
   showPercent = false,
   style,
 }) => {
+  const { colors, borderRadius, spacing, isDark } = useTheme();
   const clampedProgress = Math.min(100, Math.max(0, progressPercent));
+
+  const activeColor = color ?? colors.accent;
+  const activeTrackColor =
+    trackColor ??
+    (isDark ? 'rgba(255, 255, 255, 0.08)' : colors.surfaceElevated);
 
   const getHeight = () => {
     switch (size) {
-      case 'sm': return 4;
-      case 'lg': return 12;
+      case 'sm':
+        return 4;
+      case 'lg':
+        return 12;
       case 'md':
-      default: return 7;
+      default:
+        return 8;
     }
   };
 
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { marginVertical: spacing.xs }, style]}>
       {(label || showPercent) && (
         <View style={styles.labelRow}>
           {label ? <Caption upper>{label}</Caption> : <View />}
           {showPercent ? (
-            <MonoText style={styles.percentText} color={color}>
+            <MonoText style={styles.percentText} color={activeColor}>
               {Math.round(clampedProgress)}%
             </MonoText>
           ) : null}
@@ -51,7 +60,9 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
           styles.track,
           {
             height: getHeight(),
-            backgroundColor: trackColor,
+            backgroundColor: activeTrackColor,
+            borderRadius: borderRadius.full,
+            borderColor: colors.borderSubtle,
           },
         ]}
       >
@@ -60,7 +71,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
             styles.fill,
             {
               width: `${clampedProgress}%`,
-              backgroundColor: color,
+              backgroundColor: activeColor,
+              borderRadius: borderRadius.full,
             },
           ]}
         />
@@ -70,9 +82,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: THEME.spacing.xs,
-  },
+  container: {},
   labelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -85,13 +95,10 @@ const styles = StyleSheet.create({
   },
   track: {
     width: '100%',
-    borderRadius: THEME.borderRadius.sharp,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: THEME.colors.borderSubtle,
   },
   fill: {
     height: '100%',
-    borderRadius: THEME.borderRadius.sharp,
   },
 });

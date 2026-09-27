@@ -25,6 +25,19 @@ export const ProgressionSummaryModal: React.FC<ProgressionSummaryModalProps> = (
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {/* Header Celebration */}
             <View style={styles.header}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
+                <Text style={{ fontSize: 13 }}>🛡️</Text>
+                <Text style={{ color: THEME.colors.emerald, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>
+                  VERIFIED TRAINING SESSION
+                </Text>
+                {result.unifiedStatus && (
+                  <TacticalBadge
+                    label={result.unifiedStatus.confirmationStatus}
+                    color={result.unifiedStatus.confirmationStatus === 'CONFIRMED' ? THEME.colors.emerald : THEME.colors.amber}
+                    size="sm"
+                  />
+                )}
+              </View>
               <Text style={styles.headerSubtitle}>SESSION DEBRIEF</Text>
               <Text style={styles.headerTitle}>
                 {result.didLevelUp ? '⚡ LEVEL ASCENSION ⚡' : 'MISSION ACCOMPLISHED'}
@@ -38,7 +51,9 @@ export const ProgressionSummaryModal: React.FC<ProgressionSummaryModalProps> = (
                   <Text style={styles.levelBadgeText}>LVL {result.newGlobalLevel}</Text>
                 </View>
                 <View style={styles.rankInfo}>
-                  <Text style={styles.rankTierText}>{result.newRank.tier}</Text>
+                  <Text style={styles.rankTierText}>
+                    {result.unifiedStatus?.effectiveRank.title || `RANK ${result.newRank.tier}`}
+                  </Text>
                   <Text style={styles.rankDivText}>DIVISION {result.newRank.division}</Text>
                 </View>
                 <View style={styles.xpGainContainer}>
@@ -169,28 +184,58 @@ export const ProgressionSummaryModal: React.FC<ProgressionSummaryModalProps> = (
               ))}
             </View>
 
-            {/* Attributes Delta */}
+            {/* Attributes Delta (4-Core Dimensions) */}
             <View style={styles.attrCard}>
-              <Text style={styles.cardHeader}>ATTRIBUTE REINFORCEMENTS</Text>
+              <Text style={styles.cardHeader}>MULTI-DIMENSIONAL FITNESS ADAPTATION</Text>
               <View style={styles.attrGrid}>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>STR</Text>
+                  <Text style={styles.attrLabel}>STRENGTH</Text>
                   <Text style={styles.attrValue}>+{result.attributesDelta.strength}</Text>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 10, marginTop: 2 }}>
+                    Total: {result.newAttributes.strength}
+                  </Text>
                 </View>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>END</Text>
+                  <Text style={styles.attrLabel}>ENDURANCE</Text>
                   <Text style={styles.attrValue}>+{result.attributesDelta.endurance ?? result.attributesDelta.stamina ?? 0}</Text>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 10, marginTop: 2 }}>
+                    Total: {result.newAttributes.endurance}
+                  </Text>
                 </View>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>AGI</Text>
-                  <Text style={styles.attrValue}>+{result.attributesDelta.agility}</Text>
+                  <Text style={styles.attrLabel}>MOBILITY</Text>
+                  <Text style={styles.attrValue}>+{result.attributesDelta.mobility ?? 0}</Text>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 10, marginTop: 2 }}>
+                    Total: {result.newAttributes.mobility ?? 10}
+                  </Text>
                 </View>
                 <View style={styles.attrItem}>
-                  <Text style={styles.attrLabel}>CON</Text>
+                  <Text style={styles.attrLabel}>CONSISTENCY</Text>
                   <Text style={styles.attrValue}>+{result.attributesDelta.consistency ?? result.attributesDelta.discipline ?? 0}</Text>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 10, marginTop: 2 }}>
+                    Total: {result.newAttributes.consistency}
+                  </Text>
                 </View>
               </View>
             </View>
+
+            {/* Next Milestone Roadmap Card */}
+            {result.unifiedStatus?.nextMilestone && (
+              <View style={[styles.attrCard, { borderColor: `${THEME.colors.cyan}66`, marginTop: 12 }]}>
+                <Text style={[styles.cardHeader, { color: THEME.colors.cyan }]}>
+                  🎯 NEXT RANK ROADMAP: {result.unifiedStatus.nextMilestone.nextRankTitle}
+                </Text>
+                <Text style={{ color: THEME.colors.textSecondary, fontSize: 12, marginBottom: 8, lineHeight: 16 }}>
+                  {result.unifiedStatus.nextMilestone.summaryMessage}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: THEME.colors.textMuted, fontSize: 11 }}>Level Requirement</Text>
+                  <Text style={{ color: THEME.colors.cyan, fontSize: 12, fontWeight: '700' }}>
+                    Lvl {result.unifiedStatus.nextMilestone.levelProgress.current} / {result.unifiedStatus.nextMilestone.levelProgress.required}
+                  </Text>
+                </View>
+              </View>
+            )}
 
             {/* Dismiss CTA */}
             <TacticalButton
