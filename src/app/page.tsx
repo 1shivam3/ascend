@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { LayoutGrid, Dumbbell, Trophy, Calendar, UtensilsCrossed } from 'lucide-react';
+import { Home, Dumbbell, Trophy, UtensilsCrossed } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
 import HomePage from '@/components/HomePage';
@@ -10,9 +10,9 @@ import WorkoutPage from '@/components/WorkoutPage';
 import MealsPage from '@/components/MealsPage';
 
 const tabs = [
-  { id: 'home', label: 'Dashboard', icon: LayoutGrid },
+  { id: 'home', label: 'Home', icon: Home },
   { id: 'prs', label: 'PRs', icon: Trophy },
-  { id: 'workout', label: 'Calendar', icon: Calendar },
+  { id: 'workout', label: 'Workout', icon: Dumbbell },
   { id: 'meals', label: 'Nutrition', icon: UtensilsCrossed },
 ] as const;
 
