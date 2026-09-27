@@ -23,12 +23,21 @@ export type ExerciseRank =
   | 'MASTER'
   | 'GRANDMASTER';
 
+export interface BodyMetricEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  weightKg: number;
+  heightCm?: number;
+  notes?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
   gender: Gender;
   bodyweightKg: number;
   bodyweightLbs: number;
+  heightCm?: number;
   unit: Unit;
   createdAt: string;
 }

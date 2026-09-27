@@ -1,18 +1,37 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
-import { ChevronRight, Dumbbell, ArrowRight } from 'lucide-react';
+import { ChevronRight, Dumbbell, ArrowRight, RotateCcw, Upload, Ruler } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
-import { PersonalRecord } from '@/lib/types';
+import { PersonalRecord, BodyMetricEntry } from '@/lib/types';
 
 export default function OnboardingScreen() {
-  const { setProfile, addMultiplePRs } = useStore();
+  const { setProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('');
+  const [heightCm, setHeightCm] = useState('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+
+  // Emergency snapshot detection & restore
+  const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const snap = localStorage.getItem('ascend_emergency_snapshot');
+        if (snap) {
+          const parsed = JSON.parse(snap);
+          if (parsed?.profile?.name || (Array.isArray(parsed?.prs) && parsed.prs.length > 0)) {
+            setBackupSnapshot(parsed);
+          }
+        }
+      } catch {}
+    }
+  }, []);
 
   // Baseline major lifts
   const [benchWeight, setBenchWeight] = useState('');
@@ -30,6 +49,8 @@ export default function OnboardingScreen() {
 
     const bodyweightKg = unit === 'lbs' ? bw * 0.453592 : bw;
     const bodyweightLbs = unit === 'kg' ? bw * 2.20462 : bw;
+    const parsedHeight = parseFloat(heightCm);
+    const validHeight = !isNaN(parsedHeight) && parsedHeight > 50 && parsedHeight < 260 ? parsedHeight : undefined;
 
     const profileData = {
       id: crypto.randomUUID(),
@@ -37,11 +58,23 @@ export default function OnboardingScreen() {
       gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
+      heightCm: validHeight,
       unit,
       createdAt: new Date().toISOString(),
     };
 
     setProfile(profileData);
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Log initial body metric entry
+    addBodyMetric({
+      id: crypto.randomUUID(),
+      date: today,
+      weightKg: Math.round(bodyweightKg * 10) / 10,
+      heightCm: validHeight,
+      notes: 'Initial Onboarding Calibration',
+    });
 
     if (!skipLifts) {
       const initialPRs: PersonalRecord[] = [];
@@ -95,6 +128,45 @@ export default function OnboardingScreen() {
           </p>
         </div>
 
+        {/* Auto-detected Backup from previous install */}
+        {backupSnapshot && (
+          <div className="card p-4 mb-4 border-accent/40 bg-accent/10 space-y-2.5 animate-fade-in shadow-md">
+            <div className="flex items-center gap-2 text-accent">
+              <RotateCcw className="w-4 h-4" />
+              <span className="font-bold text-xs uppercase font-mono tracking-wider">
+                Backup Detected from Previous Install
+              </span>
+            </div>
+            <p className="text-2xs text-text-secondary font-mono leading-relaxed">
+              Found local data for <strong className="text-text-primary">{backupSnapshot.profile?.name || 'Athlete'}</strong> with{' '}
+              {backupSnapshot.prs?.length || 0} PRs, {backupSnapshot.workouts?.length || 0} workouts, and historical metrics.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  importAllData(backupSnapshot);
+                }}
+                className="btn-primary flex-1 py-1.5 text-xs font-bold"
+              >
+                Restore My Data (1-Tap)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('ascend_emergency_snapshot');
+                  }
+                  setBackupSnapshot(null);
+                }}
+                className="btn-secondary py-1.5 px-3 text-xs"
+              >
+                Start Fresh
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Step 0: Name */}
         {step === 0 && (
           <div className="space-y-5 animate-fade-in card">
@@ -118,6 +190,37 @@ export default function OnboardingScreen() {
               Continue
               <ChevronRight size={16} />
             </button>
+
+            {/* Restore from File Option */}
+            <div className="pt-2 text-center border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-2xs font-mono text-text-muted hover:text-accent flex items-center justify-center gap-1.5 mx-auto transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                <span>Have a backup file? Restore JSON</span>
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (event) => {
+                    try {
+                      const content = event.target?.result as string;
+                      const parsed = JSON.parse(content);
+                      importAllData(parsed);
+                    } catch {}
+                  };
+                  reader.readAsText(file);
+                }}
+                className="hidden"
+              />
+            </div>
           </div>
         )}
 
@@ -156,12 +259,12 @@ export default function OnboardingScreen() {
           </div>
         )}
 
-        {/* Step 2: Bodyweight */}
+        {/* Step 2: Bodyweight & Height */}
         {step === 2 && (
-          <div className="space-y-5 animate-fade-in card">
+          <div className="space-y-4 animate-fade-in card">
             <div>
-              <label className="section-title block mb-2">BODYWEIGHT</label>
-              <p className="text-text-muted text-xs mb-3">
+              <label className="section-title block mb-1">BODYWEIGHT</label>
+              <p className="text-text-muted text-xs mb-2">
                 Your lift levels are scored as a ratio of your bodyweight.
               </p>
               <div className="flex gap-2">
@@ -171,7 +274,7 @@ export default function OnboardingScreen() {
                   value={bodyweight}
                   onChange={(e) => setBodyweight(e.target.value)}
                   placeholder={unit === 'kg' ? '80' : '175'}
-                  className="flex-1 text-base"
+                  className="flex-1 text-base font-mono font-bold"
                   autoFocus
                   min={20}
                   max={500}
@@ -194,6 +297,30 @@ export default function OnboardingScreen() {
                 </div>
               </div>
             </div>
+
+            {/* Height input */}
+            <div>
+              <label className="section-title block mb-1 flex items-center gap-1">
+                <Ruler className="w-3 h-3 text-accent" />
+                HEIGHT (OPTIONAL)
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  min="80"
+                  max="250"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  placeholder="e.g. 178"
+                  className="w-full text-base font-mono py-2 pl-3 pr-10"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted">
+                  cm
+                </span>
+              </div>
+            </div>
+
             <button
               onClick={() => {
                 if (bodyweight && parseFloat(bodyweight) > 0) {

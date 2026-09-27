@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme } from './types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry } from './types';
 
 export * from './types';
 
@@ -9,6 +9,7 @@ interface AppState {
   prs: PersonalRecord[];
   workouts: WorkoutEntry[];
   meals: MealEntry[];
+  bodyMetrics: BodyMetricEntry[];
   theme: Theme;
   prTargets: Record<string, number>;
   hasCompletedOnboarding: boolean;
@@ -32,6 +33,11 @@ interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+
+  addBodyMetric: (entry: BodyMetricEntry) => void;
+  deleteBodyMetric: (id: string) => void;
+  updateBodyMetrics: (weightKg: number, heightCm?: number) => void;
+  clearAllData: () => void;
   
   importAllData: (data: any) => boolean;
 }
@@ -43,6 +49,7 @@ export const useAppStore = create<AppState>()(
       prs: [],
       workouts: [],
       meals: [],
+      bodyMetrics: [],
       theme: 'dark',
       prTargets: {},
       hasCompletedOnboarding: false,
@@ -101,6 +108,44 @@ export const useAppStore = create<AppState>()(
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
 
+      addBodyMetric: (entry) => set((state) => ({ bodyMetrics: [entry, ...state.bodyMetrics] })),
+      deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
+      updateBodyMetrics: (weightKg, heightCm) => set((state) => {
+        const entry: BodyMetricEntry = {
+          id: crypto.randomUUID(),
+          date: new Date().toISOString().split('T')[0],
+          weightKg: Math.round(weightKg * 10) / 10,
+          heightCm: heightCm ? Math.round(heightCm) : undefined,
+        };
+        const updatedProfile = state.profile ? {
+          ...state.profile,
+          bodyweightKg: Math.round(weightKg * 10) / 10,
+          bodyweightLbs: Math.round(weightKg * 2.20462 * 10) / 10,
+          ...(heightCm ? { heightCm: Math.round(heightCm) } : {}),
+        } : null;
+        return {
+          profile: updatedProfile,
+          bodyMetrics: [entry, ...state.bodyMetrics],
+        };
+      }),
+
+      clearAllData: () => {
+        set({
+          profile: null,
+          prs: [],
+          workouts: [],
+          meals: [],
+          bodyMetrics: [],
+          prTargets: {},
+          hasCompletedOnboarding: false,
+        });
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('ascend_store');
+          } catch {}
+        }
+      },
+
       importAllData: (data) => {
         try {
           if (!data || typeof data !== 'object') return false;
@@ -109,6 +154,7 @@ export const useAppStore = create<AppState>()(
             prs: Array.isArray(data.prs) ? data.prs : state.prs,
             workouts: Array.isArray(data.workouts) ? data.workouts : state.workouts,
             meals: Array.isArray(data.meals) ? data.meals : state.meals,
+            bodyMetrics: Array.isArray(data.bodyMetrics) ? data.bodyMetrics : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
             theme: data.theme || state.theme,
             hasCompletedOnboarding:
@@ -146,6 +192,7 @@ export const useAppStore = create<AppState>()(
         prs: state.prs,
         workouts: state.workouts,
         meals: state.meals,
+        bodyMetrics: state.bodyMetrics,
         theme: state.theme,
         prTargets: state.prTargets,
         hasCompletedOnboarding: state.hasCompletedOnboarding

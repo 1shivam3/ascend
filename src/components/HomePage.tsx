@@ -1,7 +1,16 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Trophy, Dumbbell, UtensilsCrossed, ChevronRight, Settings } from 'lucide-react';
+import {
+  Trophy,
+  Dumbbell,
+  UtensilsCrossed,
+  ChevronRight,
+  Info,
+  Scale,
+  HardDrive,
+  X
+} from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getDailyQuote } from '@/lib/quotes';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
@@ -10,7 +19,9 @@ import RankBadge from '@/components/ui/RankBadge';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import DOTSCard from '@/components/DOTSCard';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
-import SettingsModal from '@/components/SettingsModal';
+import BodyMetricsModal from '@/components/BodyMetricsModal';
+import DataVaultModal from '@/components/DataVaultModal';
+import InstallAppBanner from '@/components/InstallAppBanner';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { getBigThreeStats } from '@/lib/dots';
 
@@ -72,10 +83,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
+  const [isDataVaultModalOpen, setIsDataVaultModalOpen] = useState(false);
+  const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
 
   return (
     <div className="page animate-fade-in space-y-4">
+      {/* PWA Install Banner (Top Popup menu for mobile/desktop browsers) */}
+      <InstallAppBanner />
+
       {/* Header */}
       <header className="flex justify-between items-center pt-1">
         <div>
@@ -93,19 +109,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           >
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
-          <button
-            type="button"
-            onClick={() => setIsSettingsModalOpen(true)}
-            className="btn-circle"
-            title="Settings & Data Vault"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
           <ThemeToggle />
         </div>
       </header>
 
-      {/* 2-Column Hero Grid (Matching Reference Images 2 & 4) */}
+      {/* 2-Column Hero Grid */}
       <section className="grid grid-cols-2 gap-3">
         {/* Left Card: Overall Strength Level with Circular Progress Ring */}
         <div
@@ -153,13 +161,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
 
-        {/* Right Card: Body Weight & Ratio */}
-        <div className="card p-4 flex flex-col justify-between select-none">
+        {/* Right Card: Body Weight & Ratio (Tap to update & view history) */}
+        <div
+          onClick={() => setIsBodyMetricsModalOpen(true)}
+          className="card p-4 flex flex-col justify-between select-none cursor-pointer hover:border-accent/40 active:scale-[0.99] transition-all group"
+          title="Tap to update bodyweight & height"
+        >
           <div className="flex items-center justify-between">
-            <span className="section-title mb-0">BODY WEIGHT</span>
-            <span className="text-xs text-accent font-mono font-semibold">
-              {profile?.gender === 'female' ? '♀' : '♂'}
+            <span className="section-title mb-0 flex items-center gap-1 group-hover:text-accent transition-colors">
+              <Scale className="w-3 h-3 text-accent" />
+              BODY WEIGHT
             </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono text-accent underline opacity-80 group-hover:opacity-100">
+                Edit
+              </span>
+              <span className="text-xs text-accent font-mono font-semibold">
+                {profile?.gender === 'female' ? '♀' : '♂'}
+              </span>
+            </div>
           </div>
 
           <div className="mt-2">
@@ -172,15 +192,42 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <span className="text-xs font-mono text-text-muted">
                 {profile?.unit || 'kg'}
               </span>
+              {profile?.heightCm && (
+                <span className="text-2xs font-mono text-text-muted ml-1">
+                  • {Math.round(profile.heightCm)}cm
+                </span>
+              )}
             </div>
-            <p className="text-2xs text-text-muted font-mono mt-0.5">
-              {overallLevel ? `${overallLevel.averageRatio}x BW ratio` : 'Calibrated'}
-            </p>
+
+            {/* Clear Strength-to-Bodyweight Ratio with Info Icon */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowBwRatioInfo(true);
+              }}
+              className="mt-1 flex items-center gap-1 text-2xs text-text-muted hover:text-accent font-mono transition-colors"
+              title="Click to learn what Strength-to-Bodyweight Ratio means"
+            >
+              <span>
+                {overallLevel ? `${overallLevel.averageRatio}x BW Strength` : 'Calibrated'}
+              </span>
+              <Info className="w-3 h-3 text-text-muted hover:text-accent flex-shrink-0" />
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Split Stat Banner (Matching Reference Images 2 & 4) */}
+      {/* Prominent Daily Motivation Quote */}
+      <section className="card p-3.5 border-l-4 border-l-accent bg-bg-secondary/40 shadow-xs">
+        <p className="text-xs text-text-primary italic leading-relaxed font-sans">
+          &ldquo;{quote.text}&rdquo;
+        </p>
+        <p className="text-2xs text-text-muted font-mono text-right mt-1.5 font-semibold">
+          — {quote.author}
+        </p>
+      </section>
+
+      {/* Split Stat Banner */}
       <section className="card p-4 flex items-center justify-between">
         <div>
           <span className="text-xs font-semibold text-text-primary block">
@@ -283,6 +330,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </section>
       )}
 
+      {/* Footer Utility: Local Data Backup & Vault */}
+      <div className="pt-2 pb-6 flex items-center justify-between text-2xs text-text-muted font-mono border-t border-border/40">
+        <span>ASCEND • 100% Offline Device Vault</span>
+        <button
+          type="button"
+          onClick={() => setIsDataVaultModalOpen(true)}
+          className="text-accent hover:underline flex items-center gap-1 font-semibold"
+        >
+          <HardDrive className="w-3.5 h-3.5" />
+          <span>Data Backup &amp; Reset</span>
+        </button>
+      </div>
+
       {/* Barbell Plate Loading Calculator Modal */}
       <PlateCalculatorModal
         isOpen={isPlateModalOpen}
@@ -290,11 +350,70 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         initialUnit={profile?.unit || 'kg'}
       />
 
-      {/* Local Vault Backup & PWA Settings Modal */}
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+      {/* Bodyweight & Height Tracking Modal */}
+      <BodyMetricsModal
+        isOpen={isBodyMetricsModalOpen}
+        onClose={() => setIsBodyMetricsModalOpen(false)}
       />
+
+      {/* Local Vault Backup & Safeguarded Reset Modal */}
+      <DataVaultModal
+        isOpen={isDataVaultModalOpen}
+        onClose={() => setIsDataVaultModalOpen(false)}
+      />
+
+      {/* BW Ratio Info Modal / Tooltip */}
+      {showBwRatioInfo && (
+        <div className="modal-overlay" onClick={() => setShowBwRatioInfo(false)}>
+          <div
+            className="modal-content p-5 space-y-4 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div className="flex items-center gap-2 text-accent">
+                <Info className="w-5 h-5" />
+                <h3 className="font-bold text-base text-text-primary">
+                  What is BW Ratio?
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBwRatioInfo(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-mono">
+              <p>
+                <strong className="text-text-primary">BW Ratio (Bodyweight Ratio)</strong> is your{' '}
+                <strong className="text-accent">pound-for-pound strength multiplier</strong>.
+              </p>
+              <p>
+                It is calculated by dividing your 1-Rep Max by your body weight across your tracked lifts.
+              </p>
+              <div className="p-2.5 rounded-lg bg-bg-secondary border border-border/70 space-y-1 text-2xs">
+                <p>• <strong>0.75× – 1.0×:</strong> Foundation / Trained lifter</p>
+                <p>• <strong>1.0× – 1.5×:</strong> Skilled / Intermediate lifter</p>
+                <p>• <strong>1.5× – 2.0×:</strong> Advanced lifter</p>
+                <p>• <strong>2.0× – 2.5×+:</strong> Elite / Master power lifter</p>
+              </div>
+              <p className="text-2xs text-text-muted">
+                As your lifts go up or your body composition leans down, this multiplier increases!
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowBwRatioInfo(false)}
+              className="btn-primary w-full py-2 text-xs font-bold"
+            >
+              Got It
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
