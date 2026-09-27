@@ -32,6 +32,8 @@ interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+  
+  importAllData: (data: any) => boolean;
 }
 
 export const useAppStore = create<AppState>()(
@@ -97,7 +99,28 @@ export const useAppStore = create<AppState>()(
       deleteWorkout: (id) => set((state) => ({ workouts: state.workouts.filter(w => w.id !== id) })),
       
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
-      deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) }))
+      deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
+
+      importAllData: (data) => {
+        try {
+          if (!data || typeof data !== 'object') return false;
+          set((state) => ({
+            profile: data.profile || state.profile,
+            prs: Array.isArray(data.prs) ? data.prs : state.prs,
+            workouts: Array.isArray(data.workouts) ? data.workouts : state.workouts,
+            meals: Array.isArray(data.meals) ? data.meals : state.meals,
+            prTargets: data.prTargets || state.prTargets,
+            theme: data.theme || state.theme,
+            hasCompletedOnboarding:
+              data.hasCompletedOnboarding !== undefined
+                ? data.hasCompletedOnboarding
+                : state.hasCompletedOnboarding,
+          }));
+          return true;
+        } catch {
+          return false;
+        }
+      },
     }),
     {
       name: 'ascend_store',

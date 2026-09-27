@@ -1,13 +1,16 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { Trophy, Dumbbell, UtensilsCrossed, ChevronRight } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Trophy, Dumbbell, UtensilsCrossed, ChevronRight, Settings } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getDailyQuote } from '@/lib/quotes';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import RankBadge from '@/components/ui/RankBadge';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
+import DOTSCard from '@/components/DOTSCard';
+import PlateCalculatorModal from '@/components/PlateCalculatorModal';
+import SettingsModal from '@/components/SettingsModal';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -64,6 +67,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(weightKg)} kg`;
   };
 
+  const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
   return (
     <div className="page animate-fade-in space-y-5">
       {/* Header */}
@@ -74,7 +80,23 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </h1>
           <p className="text-xs text-text-muted font-mono">{today}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsPlateModalOpen(true)}
+            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            title="Barbell Plate Calculator"
+          >
+            <Dumbbell className="w-4 h-4 text-accent" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsSettingsModalOpen(true)}
+            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            title="Settings & Data Vault"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
           <ThemeToggle />
         </div>
       </header>
@@ -159,6 +181,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         )}
       </section>
 
+      {/* Official Powerlifting DOTS Score */}
+      <DOTSCard onNavigate={onNavigate} />
+
       {/* Quick Action CTA Cards */}
       <section className="grid grid-cols-3 gap-2.5">
         <button
@@ -230,6 +255,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </section>
       )}
+
+      {/* Barbell Plate Loading Calculator Modal */}
+      <PlateCalculatorModal
+        isOpen={isPlateModalOpen}
+        onClose={() => setIsPlateModalOpen(false)}
+        initialUnit={profile?.unit || 'kg'}
+      />
+
+      {/* Local Vault Backup & PWA Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
     </div>
   );
 }

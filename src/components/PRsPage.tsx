@@ -9,10 +9,11 @@ import {
   calculateOneRepMax,
   getNextMilestone
 } from '@/lib/strength-standards';
-import { Plus, Trash2, X, Target, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, X, Target, Edit3, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react';
 import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 
 export default function PRsPage() {
   const { profile, prs, workouts, prTargets, addPR, deletePR, setPRTarget } = useStore();
@@ -22,6 +23,7 @@ export default function PRsPage() {
   const [targetModalExercise, setTargetModalExercise] = useState<string | null>(null);
   const [targetWeightInput, setTargetWeightInput] = useState('');
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+  const [plateModalWeight, setPlateModalWeight] = useState<number | null>(null);
 
   // Form State
   const [exercise, setExercise] = useState('');
@@ -189,7 +191,15 @@ export default function PRsPage() {
           <h1 className="text-2xl font-bold text-text-primary">Personal Records</h1>
           <p className="text-xs text-text-muted mt-0.5">Ranked by real bodyweight standards</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setPlateModalWeight(100)}
+            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            title="Barbell Plate Calculator"
+          >
+            <Dumbbell className="w-4 h-4 text-accent" />
+          </button>
           <ThemeToggle />
           <button
             className="btn-primary flex items-center gap-1.5"
@@ -326,6 +336,14 @@ export default function PRsPage() {
                         title="Edit Target PR"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => setPlateModalWeight(item.nextMilestone || display1RM)}
+                        className="text-text-muted hover:text-accent p-0.5 rounded transition-colors flex items-center gap-0.5 text-2xs"
+                        title="Calculate Barbell Plates for Milestone"
+                      >
+                        <Dumbbell className="w-3.5 h-3.5 text-accent" />
+                        <span className="hidden sm:inline">Plates</span>
                       </button>
                     </div>
                   </div>
@@ -568,6 +586,14 @@ export default function PRsPage() {
           </div>
         </div>
       )}
+
+      {/* Barbell Plate Loading Calculator Modal */}
+      <PlateCalculatorModal
+        isOpen={plateModalWeight !== null}
+        onClose={() => setPlateModalWeight(null)}
+        initialWeight={plateModalWeight || 100}
+        initialUnit={userUnit}
+      />
     </div>
   );
 }
