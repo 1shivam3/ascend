@@ -3,14 +3,20 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { estimateMacros, calculateMealMacros } from '@/lib/macros';
-import { Plus, X, ChevronDown, ChevronUp, Trash2, Utensils } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Trash2, Utensils, ArrowLeft } from 'lucide-react';
 import { MealEntry, FoodItem } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import { useToast } from '@/components/ui/Toast';
 
-export default function MealsPage() {
+interface MealsPageProps {
+  onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+}
+
+export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const meals = useStore((state) => state.meals);
   const addMeal = useStore((state) => state.addMeal);
   const deleteMeal = useStore((state) => state.deleteMeal);
+  const toast = useToast();
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedMeals, setExpandedMeals] = useState<Set<string>>(new Set());
@@ -54,7 +60,14 @@ export default function MealsPage() {
   
   const handleSaveMeal = () => {
     const validFoods = foods.filter(f => f.name.trim());
-    if (!mealName.trim() || validFoods.length === 0) return;
+    if (!mealName.trim()) {
+      toast.error('Please enter a meal name (e.g. Breakfast, Post-Workout).', 'Missing Name');
+      return;
+    }
+    if (validFoods.length === 0) {
+      toast.error('Please add at least one food item.', 'No Food Items');
+      return;
+    }
     
     const today = new Date().toISOString().split('T')[0];
     const newMeal: MealEntry = {
@@ -63,8 +76,14 @@ export default function MealsPage() {
       name: mealName.trim(),
       foods: validFoods
     };
+
+    const mealMacros = calculateMealMacros(validFoods);
     
     addMeal(newMeal);
+    toast.success(
+      `Added ${mealName.trim()} (${Math.round(mealMacros.calories)} kcal, ${Math.round(mealMacros.proteinG)}g protein)!`,
+      'Meal Logged'
+    );
     setIsModalOpen(false);
     setMealName('');
     setFoods([]);
@@ -96,9 +115,21 @@ export default function MealsPage() {
   return (
     <div className="page animate-fade-in">
       <header className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Meals & Macros</h1>
-          <p className="text-xs text-text-muted mt-0.5">Track nutrition & fuel your strength</p>
+        <div className="flex items-center gap-2.5">
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('home')}
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
+              title="Return to Home Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Meals &amp; Macros</h1>
+            <p className="text-2xs text-text-muted font-mono">Track nutrition &amp; fuel your strength</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -199,7 +230,11 @@ export default function MealsPage() {
                             ))}
                             <div className="mt-1 flex justify-end">
                               <button 
-                                onClick={(e) => { e.stopPropagation(); deleteMeal(meal.id); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteMeal(meal.id);
+                                  toast.info(`Deleted ${meal.name} entry.`, 'Meal Removed');
+                                }}
                                 className="text-danger hover:text-danger/80 text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" /> Delete Meal

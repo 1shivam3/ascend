@@ -53,9 +53,9 @@ export default function AppPage() {
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/30">
       <main className="w-full">
         {activeTab === 'home' && <HomePage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
-        {activeTab === 'prs' && <PRsPage />}
-        {activeTab === 'workout' && <WorkoutPage />}
-        {activeTab === 'meals' && <MealsPage />}
+        {activeTab === 'prs' && <PRsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
+        {activeTab === 'workout' && <WorkoutPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
+        {activeTab === 'meals' && <MealsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
       </main>
 
       {/* Floating Pill Bottom Navigation (Matching Reference Images 1, 2, 4) */}

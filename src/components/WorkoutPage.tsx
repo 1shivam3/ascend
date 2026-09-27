@@ -3,15 +3,21 @@
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { getExerciseList } from '@/lib/strength-standards';
-import { Plus, X, ChevronDown, ChevronUp, Calendar, Trash2 } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Calendar, Trash2, ArrowLeft } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet } from '@/lib/store';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import { useToast } from '@/components/ui/Toast';
 
-export default function WorkoutPage() {
+interface WorkoutPageProps {
+  onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+}
+
+export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const profile = useStore((state) => state.profile);
   const workouts = useStore((state) => state.workouts);
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
+  const toast = useToast();
   
   const userUnit = profile?.unit || 'kg';
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -75,7 +81,10 @@ export default function WorkoutPage() {
   
   const handleSaveWorkout = () => {
     const validExercises = exercises.filter(e => e.name.trim() && e.sets.length > 0);
-    if (validExercises.length === 0) return;
+    if (validExercises.length === 0) {
+      toast.error('Please add at least one exercise with sets.', 'Empty Workout');
+      return;
+    }
     
     const newWorkout: WorkoutEntry = {
       id: crypto.randomUUID(),
@@ -84,6 +93,10 @@ export default function WorkoutPage() {
     };
     
     addWorkout(newWorkout);
+    toast.success(
+      `Logged workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''}!`,
+      'Workout Saved'
+    );
     setIsModalOpen(false);
     setDate(new Date().toISOString().split('T')[0]);
     setExercises([]);
@@ -96,9 +109,21 @@ export default function WorkoutPage() {
   return (
     <div className="page animate-fade-in">
       <header className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Workouts</h1>
-          <p className="text-xs text-text-muted mt-0.5">Log your sessions & track consistency</p>
+        <div className="flex items-center gap-2.5">
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('home')}
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
+              title="Return to Home Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Workouts</h1>
+            <p className="text-2xs text-text-muted font-mono">Log your sessions &amp; track consistency</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -157,7 +182,10 @@ export default function WorkoutPage() {
                       
                       <div className="flex justify-end pt-2">
                         <button 
-                          onClick={() => deleteWorkout(workout.id)}
+                          onClick={() => {
+                            deleteWorkout(workout.id);
+                            toast.info(`Deleted workout session from ${workout.date}.`, 'Workout Removed');
+                          }}
                           className="text-danger hover:text-danger/80 text-xs flex items-center gap-1.5 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
                         >
                           <Trash2 className="w-3.5 h-3.5" />

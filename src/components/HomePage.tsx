@@ -21,6 +21,7 @@ import DOTSCard from '@/components/DOTSCard';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import DataVaultModal from '@/components/DataVaultModal';
+import PrivacyPolicyModal from '@/components/PrivacyPolicyModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { getBigThreeStats } from '@/lib/dots';
@@ -85,6 +86,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isDataVaultModalOpen, setIsDataVaultModalOpen] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
 
   return (
@@ -92,14 +94,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* PWA Install Banner (Top Popup menu for mobile/desktop browsers) */}
       <InstallAppBanner />
 
-      {/* Header */}
+      {/* Header with Clickable Logo */}
       <header className="flex justify-between items-center pt-1">
-        <div>
-          <h1 className="text-2xl font-black text-text-primary tracking-tight">
-            ASCEND
-          </h1>
-          <p className="text-xs text-text-muted font-mono">{today}</p>
-        </div>
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="text-left group transition-transform active:scale-95"
+          title="ASCEND - Click to scroll to top"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent group-hover:bg-accent/25 transition-colors">
+              <Dumbbell className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+            </div>
+            <h1 className="text-2xl font-black text-text-primary tracking-tight group-hover:text-accent transition-colors font-mono">
+              ASCEND
+            </h1>
+          </div>
+          <p className="text-xs text-text-muted font-mono mt-0.5">{today}</p>
+        </button>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -332,7 +344,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       {/* Footer Utility: Local Data Backup & Vault */}
       <div className="pt-2 pb-6 flex items-center justify-between text-2xs text-text-muted font-mono border-t border-border/40">
-        <span>ASCEND • 100% Offline Device Vault</span>
+        <button
+          type="button"
+          onClick={() => setIsPrivacyModalOpen(true)}
+          className="text-text-muted hover:text-text-primary underline transition-colors"
+        >
+          Privacy &amp; Terms
+        </button>
         <button
           type="button"
           onClick={() => setIsDataVaultModalOpen(true)}
@@ -360,6 +378,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <DataVaultModal
         isOpen={isDataVaultModalOpen}
         onClose={() => setIsDataVaultModalOpen(false)}
+      />
+
+      {/* Privacy Policy & Legal Terms Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyModalOpen}
+        onClose={() => setIsPrivacyModalOpen(false)}
       />
 
       {/* BW Ratio Info Modal / Tooltip */}

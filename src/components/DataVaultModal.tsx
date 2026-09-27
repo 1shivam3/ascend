@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { useToast } from '@/components/ui/Toast';
 import {
   X,
   Download,
@@ -12,7 +13,7 @@ import {
   Trash2,
   HardDrive,
   AlertTriangle,
-  RotateCcw
+  FolderOpen
 } from 'lucide-react';
 
 interface DataVaultModalProps {
@@ -31,8 +32,11 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const importAllData = useStore((state) => state.importAllData);
   const clearAllData = useStore((state) => state.clearAllData);
 
+  const toast = useToast();
+
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -74,6 +78,10 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
         localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(backupData));
       }
 
+      toast.success(
+        `Exported ${prs.length} PRs, ${workouts.length} workouts & body logs.`,
+        'Backup Downloaded'
+      );
       setMessage({
         text: `Exported ${prs.length} PRs, ${workouts.length} workouts & metrics successfully!`,
         type: 'success',
@@ -81,15 +89,33 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
       setTimeout(() => setMessage(null), 4000);
       return true;
     } catch {
+      toast.error('Failed to generate or download backup file.', 'Export Error');
       setMessage({ text: 'Failed to export backup.', type: 'error' });
       return false;
     }
+  };
+
+  // Initiate file selection with explicit access request
+  const handleRequestFileAccess = () => {
+    setShowFileAccessPrompt(true);
+  };
+
+  const handleConfirmFileAccess = () => {
+    setShowFileAccessPrompt(false);
+    fileInputRef.current?.click();
   };
 
   // 1-Tap Data Restore from file
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check file size (< 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error('File size exceeds the 20MB limit for local backups.', 'File Too Large');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -99,19 +125,31 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
 
         const success = importAllData(parsed);
         if (success) {
+          toast.success(
+            'All personal records, workouts & body metrics restored successfully!',
+            'Data Restored'
+          );
           setMessage({
             text: 'Data restored successfully! All lifts, workouts & metrics updated.',
             type: 'success',
           });
         } else {
+          toast.error(
+            'The selected JSON file does not match the ASCEND backup structure.',
+            'Invalid Structure'
+          );
           setMessage({ text: 'Invalid backup file structure.', type: 'error' });
         }
       } catch {
+        toast.error('Could not read or parse the JSON backup file.', 'Parse Failure');
         setMessage({ text: 'Could not parse backup JSON file.', type: 'error' });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
         setTimeout(() => setMessage(null), 5000);
       }
+    };
+    reader.onerror = () => {
+      toast.error('Device file access was denied or interrupted.', 'Access Denied');
     };
     reader.readAsText(file);
   };
@@ -122,6 +160,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     setTimeout(() => {
       clearAllData();
       setShowDeleteConfirm(false);
+      toast.info('App reset complete. Your backup JSON was saved to your device.', 'Data Cleared');
       onClose();
     }, 500);
   };
@@ -133,13 +172,14 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     }
     clearAllData();
     setShowDeleteConfirm(false);
+    toast.error('All local records were purged from this device.', 'App Reset');
     onClose();
   };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-content p-5 space-y-4 max-w-md w-full"
+        className="modal-content p-5 space-y-4 max-w-md w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -149,7 +189,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <HardDrive className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-text-primary leading-tight">Data Vault & Backup</h2>
+              <h2 className="font-bold text-base text-text-primary leading-tight">Data Vault &amp; Backup</h2>
               <p className="text-2xs text-text-muted font-mono">100% Offline Local Storage</p>
             </div>
           </div>
@@ -180,8 +220,41 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
           </div>
         )}
 
-        {/* Delete Confirmation Safeguard Sheet */}
-        {showDeleteConfirm ? (
+        {/* File Access Permission Prompt */}
+        {showFileAccessPrompt ? (
+          <div className="p-4 rounded-xl bg-accent/10 border border-accent/30 space-y-3 animate-fade-in font-mono">
+            <div className="flex items-center gap-2 text-accent">
+              <FolderOpen className="w-5 h-5 flex-shrink-0" />
+              <h4 className="font-bold text-xs uppercase tracking-wider">
+                Allow Device File Access
+              </h4>
+            </div>
+            <p className="text-2xs text-text-secondary leading-relaxed">
+              ASCEND requests access to select and read your <strong className="text-text-primary">.json backup file</strong> from your device storage.
+            </p>
+            <p className="text-[11px] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60">
+              🔒 <strong>Privacy Notice:</strong> Your backup file is parsed entirely client-side inside your browser and is NEVER transmitted over the internet.
+            </p>
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleConfirmFileAccess}
+                className="btn-primary flex-1 py-2 text-xs font-bold"
+              >
+                Allow &amp; Choose File
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowFileAccessPrompt(false)}
+                className="btn-secondary py-2 px-3 text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : showDeleteConfirm ? (
+          /* Delete Confirmation Safeguard Sheet */
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-3 animate-fade-in">
             <div className="flex items-center gap-2 text-rose-400">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
@@ -195,7 +268,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <button
                 type="button"
                 onClick={handleDeleteWithBackup}
-                className="w-full py-2.5 px-3 rounded-lg bg-accent text-bg-primary font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-98 transition-all shadow-sm"
+                className="w-full py-2.5 px-3 rounded-lg bg-accent text-bg-primary font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-98 transition-all shadow-sm font-mono"
               >
                 <Download className="w-4 h-4" />
                 <span>Download Backup &amp; Delete Data</span>
@@ -204,7 +277,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <button
                 type="button"
                 onClick={handleDeleteWithoutBackup}
-                className="w-full py-2 px-3 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all"
+                className="w-full py-2 px-3 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all font-mono"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Delete Without Backup</span>
@@ -213,7 +286,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="w-full py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors text-center"
+                className="w-full py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors text-center font-mono"
               >
                 Cancel
               </button>
@@ -240,7 +313,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
 
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handleRequestFileAccess}
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-center transition-all active:scale-[0.98]"
                 >
                   <Upload className="w-5 h-5 text-emerald-400" />

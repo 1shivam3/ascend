@@ -9,16 +9,22 @@ import {
   calculateOneRepMax,
   getNextMilestone
 } from '@/lib/strength-standards';
-import { Plus, Trash2, X, Target, Edit3, ChevronDown, ChevronUp, Dumbbell } from 'lucide-react';
+import { Plus, Trash2, X, Target, Edit3, ChevronDown, ChevronUp, Dumbbell, ArrowLeft } from 'lucide-react';
 import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
+import { useToast } from '@/components/ui/Toast';
 
-export default function PRsPage() {
+interface PRsPageProps {
+  onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+}
+
+export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const { profile, prs, workouts, prTargets, addPR, deletePR, setPRTarget } = useStore();
   const userUnit = profile?.unit || 'kg';
+  const toast = useToast();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [targetModalExercise, setTargetModalExercise] = useState<string | null>(null);
@@ -39,11 +45,25 @@ export default function PRsPage() {
 
   const handleSavePR = () => {
     const finalExercise = exercise === 'Custom' ? customExercise.trim() : exercise;
-    if (!finalExercise || !weight || !reps || !date) return;
+    if (!finalExercise) {
+      toast.error('Please select or specify an exercise name.', 'Missing Exercise');
+      return;
+    }
+    if (!weight) {
+      toast.error('Please enter the weight lifted.', 'Missing Weight');
+      return;
+    }
 
     const weightNum = parseFloat(weight);
     const repsNum = parseInt(reps, 10);
-    if (isNaN(weightNum) || isNaN(repsNum) || weightNum <= 0 || repsNum <= 0) return;
+    if (isNaN(weightNum) || weightNum <= 0) {
+      toast.error('Weight lifted must be greater than zero.', 'Invalid Weight');
+      return;
+    }
+    if (isNaN(repsNum) || repsNum <= 0) {
+      toast.error('Reps count must be at least 1.', 'Invalid Reps');
+      return;
+    }
 
     let weightKg = 0;
     let weightLbs = 0;
@@ -69,6 +89,11 @@ export default function PRsPage() {
       notes: notes.trim() || undefined
     });
 
+    toast.success(
+      `${finalExercise}: ${weightNum} ${unit} × ${repsNum} (${Math.round(oneRepMaxKg)} kg 1RM)`,
+      'PR Logged'
+    );
+
     setShowAddModal(false);
     setExercise('');
     setCustomExercise('');
@@ -81,11 +106,18 @@ export default function PRsPage() {
   const handleSaveTarget = () => {
     if (!targetModalExercise || !targetWeightInput) return;
     const targetVal = parseFloat(targetWeightInput);
-    if (!isNaN(targetVal) && targetVal > 0) {
-      // Store target in kg internally for consistent comparisons
-      const targetKg = userUnit === 'lbs' ? targetVal * 0.453592 : targetVal;
-      setPRTarget(targetModalExercise, Math.round(targetKg * 10) / 10);
+    if (isNaN(targetVal) || targetVal <= 0) {
+      toast.error('Please enter a target weight greater than zero.', 'Invalid Target');
+      return;
     }
+
+    const targetKg = userUnit === 'lbs' ? targetVal * 0.453592 : targetVal;
+    setPRTarget(targetModalExercise, Math.round(targetKg * 10) / 10);
+    toast.success(
+      `Next milestone target for ${targetModalExercise} set to ${targetVal} ${userUnit}.`,
+      'Target Updated'
+    );
+
     setTargetModalExercise(null);
     setTargetWeightInput('');
   };
@@ -188,9 +220,21 @@ export default function PRsPage() {
     <div className="page animate-fade-in space-y-6">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-primary">Personal Records</h1>
-          <p className="text-xs text-text-muted mt-0.5">Ranked by real bodyweight standards</p>
+        <div className="flex items-center gap-2.5">
+          {onNavigate && (
+            <button
+              type="button"
+              onClick={() => onNavigate('home')}
+              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
+              title="Return to Home Dashboard"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Personal Records</h1>
+            <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -418,7 +462,10 @@ export default function PRsPage() {
                               )}
                             </div>
                             <button
-                              onClick={() => deletePR(p.id)}
+                              onClick={() => {
+                                deletePR(p.id);
+                                toast.info(`Deleted ${p.exercise} record from ${p.date}.`, 'PR Removed');
+                              }}
                               className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
                               title="Delete record"
                             >
