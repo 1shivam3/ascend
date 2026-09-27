@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { calculatePlates } from '@/lib/plate-calculator';
 import { X, Dumbbell, Minus, Plus, RotateCcw } from 'lucide-react';
 
@@ -20,6 +20,14 @@ export default function PlateCalculatorModal({
   const [unit, setUnit] = useState<'kg' | 'lbs'>(initialUnit);
   const [barWeight, setBarWeight] = useState<number>(initialUnit === 'kg' ? 20 : 45);
   const [targetWeight, setTargetWeight] = useState<number>(initialWeight || 100);
+
+  useEffect(() => {
+    if (isOpen) {
+      setUnit(initialUnit);
+      setBarWeight(initialUnit === 'kg' ? 20 : 45);
+      setTargetWeight(initialWeight || (initialUnit === 'kg' ? 100 : 225));
+    }
+  }, [isOpen, initialWeight, initialUnit]);
 
   // Sync bar weight default when unit switches
   const handleUnitChange = (nextUnit: 'kg' | 'lbs') => {
