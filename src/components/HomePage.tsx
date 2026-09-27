@@ -11,6 +11,8 @@ import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import DOTSCard from '@/components/DOTSCard';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import SettingsModal from '@/components/SettingsModal';
+import CircularProgress from '@/components/ui/CircularProgress';
+import { getBigThreeStats } from '@/lib/dots';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -60,6 +62,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return { topLifts: top, overallLevel: overall };
   }, [prs, profile]);
 
+  const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
+
   const displayWeight = (weightKg: number) => {
     if (profile?.unit === 'lbs') {
       return `${Math.round(weightKg * 2.20462)} lbs`;
@@ -71,20 +75,20 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   return (
-    <div className="page animate-fade-in space-y-5">
+    <div className="page animate-fade-in space-y-4">
       {/* Header */}
       <header className="flex justify-between items-center pt-1">
         <div>
-          <h1 className="text-xl font-bold text-text-primary tracking-tight">
-            Hey, {profile?.name || 'Athlete'}
+          <h1 className="text-2xl font-black text-text-primary tracking-tight">
+            ASCEND
           </h1>
           <p className="text-xs text-text-muted font-mono">{today}</p>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsPlateModalOpen(true)}
-            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            className="btn-circle"
             title="Barbell Plate Calculator"
           >
             <Dumbbell className="w-4 h-4 text-accent" />
@@ -92,7 +96,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => setIsSettingsModalOpen(true)}
-            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+            className="btn-circle"
             title="Settings & Data Vault"
           >
             <Settings className="w-4 h-4" />
@@ -101,84 +105,95 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </header>
 
-      {/* Quote of the Day */}
-      <section className="card border-l-2 border-accent p-4 bg-gradient-to-r from-bg-card to-bg-secondary/40">
-        <p className="italic text-text-secondary text-sm leading-relaxed mb-2 font-serif">
-          &quot;{quote.text}&quot;
-        </p>
-        <p className="text-xs text-text-muted text-right font-mono tracking-wide">
-          — {quote.author}
-        </p>
+      {/* 2-Column Hero Grid (Matching Reference Images 2 & 4) */}
+      <section className="grid grid-cols-2 gap-3">
+        {/* Left Card: Overall Strength Level with Circular Progress Ring */}
+        <div
+          onClick={() => onNavigate('prs')}
+          className="card p-4 flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-all select-none"
+        >
+          <div className="flex items-center justify-between">
+            <CircularProgress
+              value={overallLevel?.level || 0}
+              size={52}
+              strokeWidth={4.5}
+              progressColor="var(--accent)"
+            >
+              <span className="text-xs font-bold text-text-primary">
+                {overallLevel ? overallLevel.level : 0}
+              </span>
+            </CircularProgress>
+            <RankBadge
+              rank={
+                !overallLevel
+                  ? 'FOUNDATION'
+                  : overallLevel.level <= 15
+                  ? 'FOUNDATION'
+                  : overallLevel.level <= 30
+                  ? 'TRAINED'
+                  : overallLevel.level <= 45
+                  ? 'SKILLED'
+                  : overallLevel.level <= 65
+                  ? 'ADVANCED'
+                  : overallLevel.level <= 80
+                  ? 'ELITE'
+                  : overallLevel.level <= 95
+                  ? 'MASTER'
+                  : 'GRANDMASTER'
+              }
+              size="sm"
+            />
+          </div>
+
+          <div className="mt-3">
+            <h3 className="font-bold text-sm text-text-primary font-mono tracking-tight leading-tight">
+              {overallLevel ? overallLevel.title : 'INITIATE'}
+            </h3>
+            <p className="text-2xs text-text-muted font-mono mt-0.5">Overall Strength</p>
+          </div>
+        </div>
+
+        {/* Right Card: Body Weight & Ratio */}
+        <div className="card p-4 flex flex-col justify-between select-none">
+          <div className="flex items-center justify-between">
+            <span className="section-title mb-0">BODY WEIGHT</span>
+            <span className="text-xs text-accent font-mono font-semibold">
+              {profile?.gender === 'female' ? '♀' : '♂'}
+            </span>
+          </div>
+
+          <div className="mt-2">
+            <div className="flex items-baseline gap-1">
+              <span className="text-3xl font-extrabold text-text-primary font-mono tracking-tight">
+                {profile?.unit === 'lbs'
+                  ? Math.round((profile?.bodyweightKg || 75) * 2.20462)
+                  : Math.round(profile?.bodyweightKg || 75)}
+              </span>
+              <span className="text-xs font-mono text-text-muted">
+                {profile?.unit || 'kg'}
+              </span>
+            </div>
+            <p className="text-2xs text-text-muted font-mono mt-0.5">
+              {overallLevel ? `${overallLevel.averageRatio}x BW ratio` : 'Calibrated'}
+            </p>
+          </div>
+        </div>
       </section>
 
-      {/* Overall Level */}
-      <section>
-        {prs && prs.length > 0 && overallLevel ? (
-          <div className="card space-y-3 bg-gradient-to-br from-bg-card via-bg-card to-bg-secondary border border-border">
-            <div className="flex justify-between items-start">
-              <div>
-                <span className="section-title">OVERALL STRENGTH</span>
-                <div className="flex items-baseline gap-2 mt-1">
-                  <span className="text-3xl font-extrabold text-accent font-mono">
-                    LV.{overallLevel.level}
-                  </span>
-                  <span className="text-base font-bold text-text-primary font-mono tracking-wide">
-                    {overallLevel.title}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center">
-                <RankBadge
-                  rank={
-                    overallLevel.level <= 15
-                      ? 'FOUNDATION'
-                      : overallLevel.level <= 30
-                      ? 'TRAINED'
-                      : overallLevel.level <= 45
-                      ? 'SKILLED'
-                      : overallLevel.level <= 65
-                      ? 'ADVANCED'
-                      : overallLevel.level <= 80
-                      ? 'ELITE'
-                      : overallLevel.level <= 95
-                      ? 'MASTER'
-                      : 'GRANDMASTER'
-                  }
-                  size="sm"
-                />
-              </div>
-            </div>
-
-            <div className="level-bar">
-              <div
-                className="level-bar-fill"
-                style={{ width: `${Math.min(100, Math.max(2, overallLevel.level || 0))}%` }}
-              />
-            </div>
-
-            <div className="flex justify-between text-2xs text-text-muted font-mono">
-              <span>{topLifts.length} Core Lifts Evaluated</span>
-              <span>Ratio: {overallLevel.averageRatio}x BW</span>
-            </div>
-          </div>
-        ) : (
-          <div className="card p-5 border border-border/70 text-center space-y-2">
-            <p className="text-sm font-medium text-text-secondary">
-              No lifts recorded yet
-            </p>
-            <p className="text-xs text-text-muted">
-              Add your first PR to unlock your calibrated strength level and title.
-            </p>
-            <button
-              onClick={() => onNavigate('prs')}
-              className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
-            >
-              <Trophy size={14} />
-              Set First PR
-            </button>
-          </div>
-        )}
+      {/* Split Stat Banner (Matching Reference Images 2 & 4) */}
+      <section className="card p-4 flex items-center justify-between">
+        <div>
+          <span className="text-xs font-semibold text-text-primary block">
+            Big 3 Powerlifting Total
+          </span>
+          <span className="text-2xs text-text-muted font-mono">Best Squat + Bench + Deadlift</span>
+        </div>
+        <div className="text-right font-mono border-l border-border/80 pl-4">
+          <span className="text-2xl font-black text-text-primary block">
+            {bigThreeStats.totalKg > 0 ? bigThreeStats.totalKg : '—'}{' '}
+            <span className="text-xs font-normal text-text-muted">kg</span>
+          </span>
+        </div>
       </section>
 
       {/* Official Powerlifting DOTS Score */}
@@ -231,21 +246,33 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div
                 key={`${lift.exercise}-${idx}`}
                 onClick={() => onNavigate('prs')}
-                className="card p-3.5 flex items-center justify-between cursor-pointer hover:border-border-hover transition-colors"
+                className="card p-3.5 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-colors"
               >
-                <div className="flex flex-col gap-1">
-                  <span className="font-semibold text-sm text-text-primary capitalize">
-                    {lift.exercise}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xs font-mono font-bold text-accent">
-                      LV.{lift.levelInfo?.level || 0}
+                <div className="flex items-center gap-3">
+                  <CircularProgress
+                    value={Math.min(100, Math.max(8, lift.levelInfo?.level || 0))}
+                    size={42}
+                    strokeWidth={3.5}
+                    progressColor="var(--accent)"
+                  >
+                    <span className="text-[11px] font-bold text-text-primary">
+                      {idx + 1}
                     </span>
-                    <RankBadge rank={lift.levelInfo?.rank || 'FOUNDATION'} size="sm" />
+                  </CircularProgress>
+                  <div>
+                    <span className="font-semibold text-sm text-text-primary capitalize block leading-tight">
+                      {lift.exercise}
+                    </span>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <span className="text-2xs font-mono font-bold text-accent">
+                        LV.{lift.levelInfo?.level || 0}
+                      </span>
+                      <RankBadge rank={lift.levelInfo?.rank || 'FOUNDATION'} size="sm" />
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-text-primary text-sm">
+                  <span className="font-mono font-bold text-text-primary text-base">
                     {displayWeight(lift.oneRepMax)}
                   </span>
                   <ChevronRight className="w-4 h-4 text-text-muted" />

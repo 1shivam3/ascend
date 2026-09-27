@@ -14,6 +14,7 @@ import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
+import CircularProgress from '@/components/ui/CircularProgress';
 
 export default function PRsPage() {
   const { profile, prs, workouts, prTargets, addPR, deletePR, setPRTarget } = useStore();
@@ -274,16 +275,32 @@ export default function PRsPage() {
                 key={item.exercise}
                 className="card space-y-4 transition-all duration-150 hover:border-border-hover"
               >
-                {/* Header: Name, Level, Rank */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold text-text-primary capitalize">
-                      {item.exercise}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs font-mono font-semibold text-accent">
-                        LEVEL {item.levelInfo.level}
+                {/* Header: Name, Circular Progress Level, Rank */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CircularProgress
+                      value={Math.min(100, Math.max(8, item.levelInfo.level))}
+                      size={44}
+                      strokeWidth={3.8}
+                      progressColor="var(--accent)"
+                    >
+                      <span className="text-xs font-bold text-text-primary">
+                        {item.levelInfo.level}
                       </span>
+                    </CircularProgress>
+                    <div>
+                      <h3 className="text-base font-bold text-text-primary capitalize leading-tight">
+                        {item.exercise}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-2xs font-mono font-semibold text-accent">
+                          LEVEL {item.levelInfo.level}
+                        </span>
+                        <span className="text-text-muted text-2xs">•</span>
+                        <span className="text-2xs font-mono text-text-secondary">
+                          {item.levelInfo.ratio}x BW
+                        </span>
+                      </div>
                     </div>
                   </div>
                   <RankBadge rank={item.levelInfo.rank} size="md" />

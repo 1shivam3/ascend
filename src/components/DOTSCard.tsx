@@ -65,7 +65,7 @@ export default function DOTSCard({ onNavigate }: DOTSCardProps) {
           </div>
 
           {/* Big 3 Individual Lifts Breakdown */}
-          <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-bg-secondary/60 border border-border/60 text-center font-mono text-xs">
+          <div className="grid grid-cols-3 gap-2 py-3 px-3 rounded-2xl bg-bg-secondary/60 border border-border/60 text-center font-mono text-xs">
             <div>
               <span className="text-2xs text-text-muted uppercase block">Squat</span>
               <span className="font-bold text-text-primary text-sm sm:text-base">{stats.squatMax} kg</span>
@@ -88,7 +88,7 @@ export default function DOTSCard({ onNavigate }: DOTSCardProps) {
       ) : (
         /* Incomplete Big 3 Lifts State */
         <div className="space-y-3 py-1">
-          <div className="p-3 rounded-xl bg-bg-secondary border border-border/60 space-y-2">
+          <div className="p-3.5 rounded-2xl bg-bg-secondary border border-border/60 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-text-primary flex items-center gap-1.5">
                 <Dumbbell className="w-3.5 h-3.5 text-accent" />
@@ -110,7 +110,7 @@ export default function DOTSCard({ onNavigate }: DOTSCardProps) {
                 return (
                   <div
                     key={lift}
-                    className={`flex-1 py-1 px-2 rounded-lg text-2xs font-mono text-center border ${
+                    className={`flex-1 py-1.5 px-2 rounded-xl text-2xs font-mono text-center border ${
                       isLogged
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 font-semibold'
                         : 'bg-bg-card text-text-muted border-border'
@@ -127,7 +127,7 @@ export default function DOTSCard({ onNavigate }: DOTSCardProps) {
             <button
               type="button"
               onClick={() => onNavigate('prs')}
-              className="w-full py-2 px-3 rounded-lg bg-bg-elevated border border-border hover:border-accent/50 text-text-primary font-medium text-xs flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-2.5 px-4 rounded-full bg-bg-elevated border border-border hover:border-accent/50 text-text-primary font-medium text-xs flex items-center justify-center gap-1.5 transition-colors active:scale-[0.98]"
             >
               <span>Set Missing Lift PRs</span>
               <ChevronRight className="w-3.5 h-3.5 text-accent" />

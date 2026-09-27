@@ -203,7 +203,7 @@ export default function WorkoutHeatmap({ onNavigate }: WorkoutHeatmapProps) {
           <button
             type="button"
             onClick={() => handleQuickHitGym(todayStr)}
-            className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold text-sm transition-all duration-200 shadow-sm active:scale-[0.98] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-emerald-500/20"
+            className="w-full flex items-center justify-center gap-2.5 py-3 px-4 rounded-full font-semibold text-sm transition-all duration-200 shadow-sm active:scale-[0.98] bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white shadow-emerald-500/20"
           >
             <Dumbbell className="w-4 h-4 stroke-[2.2]" />
             <span>I Hit Gym Today</span>
@@ -284,7 +284,7 @@ export default function WorkoutHeatmap({ onNavigate }: WorkoutHeatmapProps) {
                 key={dateStr}
                 type="button"
                 onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                className={`aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-mono transition-all duration-150 relative select-none ${
+                className={`aspect-square rounded-xl flex flex-col items-center justify-center text-xs font-mono transition-all duration-150 relative select-none ${
                   hasWorkout
                     ? 'bg-emerald-500 text-white font-bold shadow-sm shadow-emerald-500/30 hover:bg-emerald-400'
                     : isFuture

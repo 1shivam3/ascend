@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* Light Theme — Minimal, Clean Studio Aesthetic */
-  --bg-primary: 248 250 252;
-  --bg-secondary: 241 245 249;
-  --bg-tertiary: 226 232 240;
+  /* Light Theme — Soft Neumorphic Studio Aesthetic */
+  --bg-primary: 243 244 246;
+  --bg-secondary: 235 238 243;
+  --bg-tertiary: 226 230 238;
   --bg-card: 255 255 255;
   --bg-elevated: 255 255 255;
   --text-primary: 15 23 42;
   --text-secondary: 71 85 105;
   --text-muted: 148 163 184;
   --border: 226 232 240;
-  --border-subtle: 241 245 249;
+  --border-subtle: 238 242 246;
   --border-hover: 203 213 225;
   --accent: 217 119 6;
   --accent-dim: 180 83 9;
@@ -21,18 +21,18 @@
 }
 
 .dark {
-  /* Dark Theme — Deep Pitch & Warm Gold */
-  --bg-primary: 10 10 10;
-  --bg-secondary: 18 18 18;
-  --bg-tertiary: 30 30 30;
-  --bg-card: 21 21 21;
-  --bg-elevated: 26 26 26;
+  /* Dark Theme — Deep Pitch Obsidian & Rich Slate (Matching Reference UI) */
+  --bg-primary: 8 8 10;
+  --bg-secondary: 15 15 19;
+  --bg-tertiary: 22 22 28;
+  --bg-card: 20 20 26;
+  --bg-elevated: 27 27 35;
   --text-primary: 248 250 252;
   --text-secondary: 148 163 184;
   --text-muted: 100 116 139;
-  --border: 38 38 38;
-  --border-subtle: 28 28 28;
-  --border-hover: 58 58 58;
+  --border: 34 34 44;
+  --border-subtle: 24 24 32;
+  --border-hover: 50 50 64;
   --accent: 229 192 123;
   --accent-dim: 184 151 63;
   --accent-glow: rgba(229, 192, 123, 0.15);
@@ -73,22 +73,27 @@
 
 @layer components {
   .card {
-    @apply bg-bg-card border border-border rounded-xl p-4 shadow-sm transition-all duration-150;
+    @apply bg-bg-card border border-border/80 rounded-[24px] p-4 sm:p-5 shadow-sm transition-all duration-150;
   }
 
   .card-elevated {
-    @apply bg-bg-elevated border border-border rounded-xl p-4 shadow-md;
+    @apply bg-bg-elevated border border-border/80 rounded-[24px] p-4 sm:p-5 shadow-md;
+  }
+
+  .btn-circle {
+    @apply w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150;
+    @apply bg-bg-card border border-border/80 text-text-secondary hover:text-text-primary hover:border-accent/50 active:scale-95 shadow-sm;
   }
 
   .btn-primary {
-    @apply bg-accent text-bg-primary font-semibold px-4 py-2.5 rounded-lg text-sm;
+    @apply bg-accent text-bg-primary font-semibold px-4 py-2.5 rounded-full text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
     @apply hover:brightness-105;
     min-height: 44px;
   }
 
   .btn-secondary {
-    @apply bg-bg-elevated text-text-primary font-medium px-4 py-2.5 rounded-lg text-sm;
+    @apply bg-bg-elevated text-text-primary font-medium px-4 py-2.5 rounded-full text-sm;
     @apply border border-border;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
     @apply hover:bg-bg-secondary;
@@ -96,13 +101,13 @@
   }
 
   .btn-ghost {
-    @apply text-text-secondary font-medium px-3 py-2 rounded-lg text-sm;
+    @apply text-text-secondary font-medium px-3 py-2 rounded-full text-sm;
     @apply active:bg-bg-secondary transition-all duration-150;
     min-height: 40px;
   }
 
   .btn-danger {
-    @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-lg text-sm;
+    @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-full text-sm;
     @apply border border-danger/20;
     @apply active:scale-[0.98] transition-all duration-150;
   }
@@ -119,28 +124,29 @@
     @apply h-full rounded-full bg-accent transition-all duration-500 ease-out;
   }
 
-  .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-bg-primary/90 backdrop-blur-md;
-    @apply border-t border-border;
-    @apply flex items-center justify-around;
-    @apply px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)];
-    @apply z-40 max-w-lg mx-auto;
+  /* Floating Pill Bottom Navigation (Matching Reference Images 1, 2, 4) */
+  .floating-pill-nav {
+    @apply fixed left-4 right-4 max-w-sm mx-auto z-40;
+    @apply bg-bg-card/90 backdrop-blur-xl;
+    @apply border border-border/90;
+    @apply rounded-full shadow-2xl;
+    @apply flex items-center justify-around px-2 py-1.5;
+    bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
   }
 
-  .bottom-nav-item {
-    @apply flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl;
-    @apply text-text-muted text-[11px] font-medium;
-    @apply transition-colors duration-150;
-    min-width: 56px;
+  .pill-nav-item {
+    @apply relative flex flex-col items-center justify-center py-2 px-3 rounded-full text-xs font-medium transition-all duration-200 select-none;
+    @apply text-text-muted hover:text-text-primary;
+    min-width: 54px;
     min-height: 44px;
   }
 
-  .bottom-nav-item.active {
-    @apply text-accent font-semibold;
+  .pill-nav-item.active {
+    @apply text-accent font-bold;
   }
 
   .page {
-    @apply min-h-screen px-4 pt-3 pb-28 max-w-lg mx-auto;
+    @apply min-h-[100dvh] px-3.5 sm:px-4 pt-3 pb-32 max-w-md mx-auto;
   }
 
   .modal-overlay {
@@ -150,10 +156,10 @@
   }
 
   .modal-content {
-    @apply bg-bg-card rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
+    @apply bg-bg-card rounded-t-[28px] sm:rounded-[28px] w-full max-w-md max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
     @apply border border-border shadow-2xl;
     @apply animate-slide-up;
-    @apply pb-[max(env(safe-area-inset-bottom),1rem)];
+    @apply pb-[max(env(safe-area-inset-bottom),1.25rem)];
   }
 }
 
