@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { getExerciseList } from '@/lib/strength-standards';
 import { Plus, X, ChevronDown, ChevronUp, Calendar, Trash2 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet } from '@/lib/store';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function WorkoutPage() {
   const profile = useStore((state) => state.profile);
@@ -99,13 +100,17 @@ export default function WorkoutPage() {
           <h1 className="text-2xl font-bold text-text-primary">Workouts</h1>
           <p className="text-xs text-text-muted mt-0.5">Log your sessions & track consistency</p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => {
-          if (exercises.length === 0) handleAddExercise();
-          setIsModalOpen(true);
-        }}>
-          <Plus className="w-4 h-4" />
-          Log Workout
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button className="btn-primary flex items-center gap-1.5" onClick={() => {
+            if (exercises.length === 0) handleAddExercise();
+            setIsModalOpen(true);
+          }}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Log Workout</span>
+            <span className="sm:hidden">Log</span>
+          </button>
+        </div>
       </header>
 
       <section>

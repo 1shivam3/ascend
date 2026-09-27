@@ -1,33 +1,50 @@
+'use client';
+
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { getLiftLevel, getOverallLevel, getExerciseList, calculateOneRepMax } from '@/lib/strength-standards';
-import { Plus, Trash2, X, Activity } from 'lucide-react';
+import {
+  getLiftLevel,
+  getOverallLevel,
+  getExerciseList,
+  calculateOneRepMax,
+  getNextMilestone
+} from '@/lib/strength-standards';
+import { Plus, Trash2, X, Target, Edit3, ChevronDown, ChevronUp } from 'lucide-react';
+import RankBadge from '@/components/ui/RankBadge';
+import ProgressChart from '@/components/ProgressChart';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function PRsPage() {
-  const { profile, prs, addPR, deletePR } = useStore();
-  const [showForm, setShowForm] = useState(false);
+  const { profile, prs, workouts, prTargets, addPR, deletePR, setPRTarget } = useStore();
+  const userUnit = profile?.unit || 'kg';
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [targetModalExercise, setTargetModalExercise] = useState<string | null>(null);
+  const [targetWeightInput, setTargetWeightInput] = useState('');
+  const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
+
+  // Form State
   const [exercise, setExercise] = useState('');
   const [customExercise, setCustomExercise] = useState('');
   const [weight, setWeight] = useState('');
-  const [unit, setUnit] = useState<'kg' | 'lbs'>(profile?.unit || 'kg');
-  const [reps, setReps] = useState('');
+  const [unit, setUnit] = useState<'kg' | 'lbs'>(userUnit);
+  const [reps, setReps] = useState('1');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
 
   const availableExercises = getExerciseList();
 
-  const handleSave = () => {
-    if (!weight || !reps || !date) return;
-    const finalExercise = exercise === 'Custom' ? customExercise : exercise;
-    if (!finalExercise) return;
+  const handleSavePR = () => {
+    const finalExercise = exercise === 'Custom' ? customExercise.trim() : exercise;
+    if (!finalExercise || !weight || !reps || !date) return;
 
     const weightNum = parseFloat(weight);
     const repsNum = parseInt(reps, 10);
-    
+    if (isNaN(weightNum) || isNaN(repsNum) || weightNum <= 0 || repsNum <= 0) return;
+
     let weightKg = 0;
     let weightLbs = 0;
-    
+
     if (unit === 'lbs') {
       weightLbs = weightNum;
       weightKg = weightNum * 0.453592;
@@ -35,284 +52,516 @@ export default function PRsPage() {
       weightKg = weightNum;
       weightLbs = weightNum * 2.20462;
     }
-    
-    const oneRepMax = calculateOneRepMax(weightKg, repsNum);
-    
+
+    const oneRepMaxKg = calculateOneRepMax(weightKg, repsNum);
+
     addPR({
       id: crypto.randomUUID(),
       exercise: finalExercise,
-      weightKg,
-      weightLbs,
+      weightKg: Math.round(weightKg * 10) / 10,
+      weightLbs: Math.round(weightLbs * 10) / 10,
       reps: repsNum,
-      oneRepMax,
+      oneRepMax: Math.round(oneRepMaxKg * 10) / 10,
       date,
-      notes
+      notes: notes.trim() || undefined
     });
-    
-    setShowForm(false);
+
+    setShowAddModal(false);
     setExercise('');
     setCustomExercise('');
     setWeight('');
-    setReps('');
+    setReps('1');
     setNotes('');
     setDate(new Date().toISOString().split('T')[0]);
   };
 
-  const groupedPRs = useMemo(() => {
-    const groups: Record<string, { prs: any[], best1RMKg: number, level: any }> = {};
-    
-    prs.forEach(pr => {
-      if (!groups[pr.exercise]) {
-        groups[pr.exercise] = { prs: [], best1RMKg: 0, level: null };
+  const handleSaveTarget = () => {
+    if (!targetModalExercise || !targetWeightInput) return;
+    const targetVal = parseFloat(targetWeightInput);
+    if (!isNaN(targetVal) && targetVal > 0) {
+      // Store target in kg internally for consistent comparisons
+      const targetKg = userUnit === 'lbs' ? targetVal * 0.453592 : targetVal;
+      setPRTarget(targetModalExercise, Math.round(targetKg * 10) / 10);
+    }
+    setTargetModalExercise(null);
+    setTargetWeightInput('');
+  };
+
+  // Group PRs by exercise and compute rich statistics
+  const exerciseStats = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        exercise: string;
+        prs: typeof prs;
+        bestPR: (typeof prs)[0];
+        best1RMKg: number;
+        bestSet: { weight: number; reps: number; unit: string };
+        levelInfo: ReturnType<typeof getLiftLevel>;
+        sessionsCount: number;
+        nextMilestone: number;
+        milestoneProgress: number;
       }
-      groups[pr.exercise].prs.push(pr);
+    >();
+
+    prs.forEach((pr) => {
+      const ex = pr.exercise;
+      if (!groups.has(ex)) {
+        groups.set(ex, {
+          exercise: ex,
+          prs: [],
+          bestPR: pr,
+          best1RMKg: 0,
+          bestSet: { weight: 0, reps: 0, unit: userUnit },
+          levelInfo: null as any,
+          sessionsCount: 0,
+          nextMilestone: 0,
+          milestoneProgress: 0
+        });
+      }
+
+      const g = groups.get(ex)!;
+      g.prs.push(pr);
+
       const pr1RMKg = calculateOneRepMax(pr.weightKg, pr.reps);
-      if (pr1RMKg > groups[pr.exercise].best1RMKg) {
-        groups[pr.exercise].best1RMKg = pr1RMKg;
+      if (pr1RMKg > g.best1RMKg) {
+        g.best1RMKg = pr1RMKg;
+        g.bestPR = pr;
+        const dispW = userUnit === 'lbs' ? pr.weightLbs : pr.weightKg;
+        g.bestSet = { weight: dispW, reps: pr.reps, unit: userUnit };
       }
     });
 
-    Object.keys(groups).forEach(ex => {
-      groups[ex].prs.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      if (profile && profile.bodyweightKg) {
-        groups[ex].level = getLiftLevel(ex, groups[ex].best1RMKg, profile.bodyweightKg, profile.gender || 'male');
+    // Compute sessions from workouts
+    groups.forEach((g, ex) => {
+      g.prs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      // Sessions count from logged workouts
+      g.sessionsCount = workouts.filter((w) =>
+        w.exercises.some((e) => e.name.toLowerCase() === ex.toLowerCase())
+      ).length;
+
+      // Calculate calibrated lift level
+      g.levelInfo = getLiftLevel(
+        ex,
+        g.best1RMKg,
+        profile?.bodyweightKg || 75,
+        profile?.gender || 'male'
+      );
+
+      // Next milestone calculation
+      const best1RMUserUnit = userUnit === 'lbs' ? g.best1RMKg * 2.20462 : g.best1RMKg;
+      const customTargetKg = prTargets?.[ex];
+      const customTargetUserUnit = customTargetKg
+        ? userUnit === 'lbs'
+          ? customTargetKg * 2.20462
+          : customTargetKg
+        : undefined;
+
+      const milestone = getNextMilestone(best1RMUserUnit, customTargetUserUnit);
+      g.nextMilestone = Math.round(milestone * 10) / 10;
+
+      // Progress towards milestone
+      if (g.nextMilestone > 0) {
+        g.milestoneProgress = Math.min(100, Math.max(0, Math.round((best1RMUserUnit / g.nextMilestone) * 100)));
       }
     });
 
-    return Object.entries(groups)
-      .map(([name, data]) => ({ name, ...data }))
-      .sort((a, b) => {
-        const levelA = a.level?.level || 0;
-        const levelB = b.level?.level || 0;
-        return levelB - levelA;
-      });
-  }, [prs, profile]);
+    return Array.from(groups.values()).sort(
+      (a, b) => (b.levelInfo?.level || 0) - (a.levelInfo?.level || 0)
+    );
+  }, [prs, workouts, profile, prTargets, userUnit]);
 
+  // Overall strength level calculation
   const overallLevel = useMemo(() => {
-    const levels = groupedPRs.map(g => g.level).filter(Boolean);
+    const levels = exerciseStats.map((e) => e.levelInfo).filter(Boolean);
     if (levels.length > 0) {
-      try {
-        return getOverallLevel(levels);
-      } catch (e) {
-        const avg = levels.reduce((sum, l) => sum + (l?.level || 0), 0) / levels.length;
-        return {
-          level: Math.round(avg),
-          title: 'Overall',
-          category: 'Mixed'
-        };
-      }
+      return getOverallLevel(levels);
     }
     return null;
-  }, [groupedPRs]);
-
-  const userUnit = profile?.unit || 'kg';
+  }, [exerciseStats]);
 
   return (
-    <div className="page animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+    <div className="page animate-fade-in space-y-6">
+      {/* Top Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-text-primary">Personal Records</h1>
-          {overallLevel && (
-            <div className="flex items-center gap-2 mt-2">
-              <Activity className="w-5 h-5 text-accent" />
-              <span className="text-accent font-medium">Level {overallLevel.level}: {overallLevel.title}</span>
-            </div>
-          )}
+          <h1 className="text-2xl font-bold text-text-primary">Personal Records</h1>
+          <p className="text-xs text-text-muted mt-0.5">Ranked by real bodyweight standards</p>
         </div>
-        <button className="btn-primary flex items-center gap-2" onClick={() => setShowForm(true)}>
-          <Plus className="w-5 h-5" />
-          <span className="hidden sm:inline">Add PR</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button
+            className="btn-primary flex items-center gap-1.5"
+            onClick={() => setShowAddModal(true)}
+          >
+            <Plus size={16} />
+            <span>Add PR</span>
+          </button>
+        </div>
       </div>
 
+      {/* Overall Level Summary Card */}
       {overallLevel && (
-        <div className="card mb-8">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm text-text-secondary">Overall Strength Level</span>
-            <span className="text-sm font-bold text-text-primary">{overallLevel.level}/100</span>
+        <div className="card space-y-3 bg-gradient-to-br from-bg-card to-bg-secondary border border-border">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="section-title">OVERALL STRENGTH</span>
+              <div className="flex items-baseline gap-2.5 mt-1">
+                <span className="text-3xl font-extrabold text-accent font-mono">
+                  LV.{overallLevel.level}
+                </span>
+                <span className="text-base font-bold text-text-primary tracking-wide font-mono">
+                  {overallLevel.title}
+                </span>
+              </div>
+            </div>
+            <RankBadge rank={overallLevel.level <= 15 ? 'FOUNDATION' : overallLevel.level <= 30 ? 'TRAINED' : overallLevel.level <= 45 ? 'SKILLED' : overallLevel.level <= 65 ? 'ADVANCED' : overallLevel.level <= 80 ? 'ELITE' : overallLevel.level <= 95 ? 'MASTER' : 'GRANDMASTER'} size="sm" />
           </div>
+
           <div className="level-bar">
-            <div className="level-bar-fill" style={{ width: `${overallLevel.level}%` }} />
+            <div
+              className="level-bar-fill"
+              style={{ width: `${Math.min(100, Math.max(2, overallLevel.level))}%` }}
+            />
+          </div>
+
+          <div className="flex justify-between text-2xs text-text-muted font-mono">
+            <span>{exerciseStats.length} Lifts Ranked</span>
+            <span>Strength Ratio: {overallLevel.averageRatio}x BW</span>
           </div>
         </div>
       )}
 
-      {groupedPRs.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-text-secondary">No personal records yet. Start tracking your lifts.</p>
+      {/* Progress Chart */}
+      <ProgressChart />
+
+      {/* Lift Cards List */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="section-title">YOUR LIFTS & MILESTONES</h2>
+          <span className="text-2xs text-text-muted font-mono">{exerciseStats.length} Tracked</span>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {groupedPRs.map((group) => (
-            <div key={group.name} className="card">
-              <div className="mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-xl font-bold text-text-primary">{group.name}</h2>
-                  {group.level && (
-                    <span className="text-sm font-medium text-accent">
-                      {group.level.title}
-                    </span>
-                  )}
-                </div>
-                {group.level && (
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs text-text-secondary">{group.level.category}</span>
-                      <span className="text-xs text-text-secondary">Level {group.level.level}/100</span>
-                    </div>
-                    <div className="level-bar">
-                      <div className="level-bar-fill" style={{ width: `${group.level.level}%` }} />
+
+        {exerciseStats.length === 0 ? (
+          <div className="card text-center py-12">
+            <Target className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
+            <p className="text-text-secondary text-sm">No personal records logged yet.</p>
+            <p className="text-xs text-text-muted mt-1">
+              Tap &quot;Add PR&quot; above to calibrate your first lift and discover your rank.
+            </p>
+          </div>
+        ) : (
+          exerciseStats.map((item) => {
+            const isExpanded = expandedExercise === item.exercise;
+            const display1RM =
+              userUnit === 'lbs'
+                ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
+                : Math.round(item.best1RMKg * 10) / 10;
+
+            return (
+              <div
+                key={item.exercise}
+                className="card space-y-4 transition-all duration-150 hover:border-border-hover"
+              >
+                {/* Header: Name, Level, Rank */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-text-primary capitalize">
+                      {item.exercise}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs font-mono font-semibold text-accent">
+                        LEVEL {item.levelInfo.level}
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
+                  <RankBadge rank={item.levelInfo.rank} size="md" />
+                </div>
 
-              <div className="space-y-3">
-                {group.prs.map((pr) => {
-                  const displayWeight = userUnit === 'lbs' ? pr.weightLbs : pr.weightKg;
-                  const display1RM = calculateOneRepMax(displayWeight, pr.reps);
-                  
-                  return (
-                    <div key={pr.id} className="flex items-center justify-between p-3 rounded-lg bg-bg-elevated/50 border border-border">
-                      <div>
-                        <div className="font-bold text-text-primary">
-                          {Math.round(displayWeight * 10) / 10} {userUnit} × {pr.reps} reps
-                        </div>
-                        <div className="text-xs text-text-secondary flex gap-2 mt-1 font-mono">
-                          <span>Est. 1RM: {Math.round(display1RM * 10) / 10} {userUnit}</span>
-                          <span>•</span>
-                          <span>{new Date(pr.date).toLocaleDateString()}</span>
-                        </div>
-                        {pr.notes && (
-                          <div className="text-xs text-text-muted mt-1 italic">
-                            &quot;{pr.notes}&quot;
-                          </div>
-                        )}
-                      </div>
-                      <button 
-                        className="p-1.5 text-text-muted hover:text-danger hover:bg-danger/10 rounded transition-colors"
-                        onClick={() => deletePR(pr.id)}
-                        title="Delete PR"
+                {/* Metrics Grid as requested */}
+                <div className="grid grid-cols-4 gap-2 py-3 px-3 rounded-lg bg-bg-secondary/70 border border-border/60 text-center font-mono">
+                  <div>
+                    <span className="text-2xs text-text-muted block uppercase">e1RM</span>
+                    <span className="text-sm font-bold text-accent">
+                      {display1RM} {userUnit}
+                    </span>
+                  </div>
+                  <div className="border-l border-border/60">
+                    <span className="text-2xs text-text-muted block uppercase">Best Set</span>
+                    <span className="text-xs font-semibold text-text-primary">
+                      {item.bestSet.weight} × {item.bestSet.reps}
+                    </span>
+                  </div>
+                  <div className="border-l border-border/60">
+                    <span className="text-2xs text-text-muted block uppercase">PRs</span>
+                    <span className="text-sm font-semibold text-text-secondary">
+                      {item.prs.length}
+                    </span>
+                  </div>
+                  <div className="border-l border-border/60">
+                    <span className="text-2xs text-text-muted block uppercase">Sessions</span>
+                    <span className="text-sm font-semibold text-text-secondary">
+                      {item.sessionsCount}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Next Milestone Bar */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between items-center text-xs font-mono">
+                    <span className="text-text-muted flex items-center gap-1">
+                      <Target className="w-3.5 h-3.5 text-accent" /> Next Milestone
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-text-primary">
+                        {item.nextMilestone} {userUnit}
+                      </span>
+                      <button
+                        onClick={() => {
+                          setTargetModalExercise(item.exercise);
+                          setTargetWeightInput(item.nextMilestone.toString());
+                        }}
+                        className="text-text-muted hover:text-accent p-0.5 rounded transition-colors"
+                        title="Edit Target PR"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                     </div>
-                  );
-                })}
+                  </div>
+
+                  <div className="level-bar">
+                    <div
+                      className="level-bar-fill"
+                      style={{ width: `${item.milestoneProgress}%` }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between text-2xs text-text-muted font-mono">
+                    <span>
+                      {Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10)} {userUnit} to reach milestone
+                    </span>
+                    <span>{item.milestoneProgress}%</span>
+                  </div>
+                </div>
+
+                {/* Expand / View History Toggle */}
+                <div className="border-t border-border pt-2">
+                  <button
+                    onClick={() =>
+                      setExpandedExercise(isExpanded ? null : item.exercise)
+                    }
+                    className="w-full flex items-center justify-between text-xs text-text-secondary hover:text-text-primary font-mono py-1"
+                  >
+                    <span>PR History ({item.prs.length})</span>
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="mt-3 space-y-2 animate-fade-in">
+                      {item.prs.map((p) => {
+                        const w = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
+                        const single1RM = calculateOneRepMax(w, p.reps);
+                        return (
+                          <div
+                            key={p.id}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
+                          >
+                            <div>
+                              <span className="font-bold text-text-primary">
+                                {w} {userUnit} × {p.reps} reps
+                              </span>
+                              <div className="text-2xs text-text-muted flex gap-2 mt-0.5">
+                                <span>e1RM: {Math.round(single1RM * 10) / 10} {userUnit}</span>
+                                <span>•</span>
+                                <span>{new Date(p.date).toLocaleDateString()}</span>
+                              </div>
+                              {p.notes && (
+                                <p className="text-2xs text-text-secondary italic mt-0.5">
+                                  &quot;{p.notes}&quot;
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => deletePR(p.id)}
+                              className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
+                              title="Delete record"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Target Milestone Modal */}
+      {targetModalExercise && (
+        <div className="modal-overlay" onClick={() => setTargetModalExercise(null)}>
+          <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="font-bold text-text-primary text-base">
+                Set Target Milestone
+              </h3>
+              <button onClick={() => setTargetModalExercise(null)} className="text-text-muted p-1">
+                <X size={18} />
+              </button>
             </div>
-          ))}
+
+            <p className="text-xs text-text-secondary">
+              Set your next target 1RM for <span className="text-accent font-semibold">{targetModalExercise}</span>.
+            </p>
+
+            <div className="flex gap-2">
+              <input
+                type="number"
+                step="0.5"
+                value={targetWeightInput}
+                onChange={(e) => setTargetWeightInput(e.target.value)}
+                placeholder="Target Weight"
+                className="w-full text-base"
+                autoFocus
+              />
+              <span className="flex items-center px-4 rounded-lg bg-bg-secondary border border-border font-mono text-sm text-text-muted">
+                {userUnit}
+              </span>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setTargetModalExercise(null)}
+                className="btn-ghost flex-1 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveTarget}
+                className="btn-primary flex-1 text-xs"
+              >
+                Save Target
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {showForm && (
-        <div className="modal-overlay" onClick={() => setShowForm(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-text-primary">Add Personal Record</h2>
-              <button onClick={() => setShowForm(false)} className="text-text-muted hover:text-text-primary">
-                <X className="w-6 h-6" />
+      {/* Add PR Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-border flex justify-between items-center">
+              <h2 className="text-base font-bold text-text-primary">Record Personal Best</h2>
+              <button onClick={() => setShowAddModal(false)} className="text-text-muted p-1">
+                <X size={18} />
               </button>
             </div>
-            
-            <div className="space-y-4">
+
+            <div className="p-4 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Exercise</label>
-                <select 
-                  className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2.5 text-text-primary text-sm focus:outline-none focus:border-accent"
+                <label className="section-title mb-1.5 block">EXERCISE</label>
+                <select
                   value={exercise}
                   onChange={(e) => setExercise(e.target.value)}
+                  className="w-full"
                 >
-                  <option value="">Select exercise...</option>
-                  {availableExercises.map(ex => (
-                    <option key={ex} value={ex}>{ex}</option>
+                  <option value="">Select an exercise...</option>
+                  {availableExercises.map((ex) => (
+                    <option key={ex} value={ex}>
+                      {ex}
+                    </option>
                   ))}
-                  <option value="Custom">Other (Custom)...</option>
+                  <option value="Custom">Custom Exercise...</option>
                 </select>
               </div>
 
               {exercise === 'Custom' && (
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Custom Exercise Name</label>
+                  <label className="section-title mb-1.5 block">CUSTOM EXERCISE NAME</label>
                   <input
                     type="text"
-                    className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent"
                     value={customExercise}
                     onChange={(e) => setCustomExercise(e.target.value)}
-                    placeholder="e.g., Bulgarian Split Squat"
+                    placeholder="e.g. Front Squat"
+                    className="w-full"
                   />
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Weight</label>
+                  <label className="section-title mb-1.5 block">WEIGHT</label>
                   <div className="flex">
                     <input
                       type="number"
                       step="0.5"
-                      className="w-full bg-bg-elevated border border-border rounded-l-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
                       placeholder="0"
+                      className="w-full rounded-r-none"
                     />
                     <select
-                      className="bg-bg-card border border-l-0 border-border rounded-r-lg px-3 py-2 text-text-primary text-xs focus:outline-none"
                       value={unit}
                       onChange={(e) => setUnit(e.target.value as 'kg' | 'lbs')}
+                      className="rounded-l-none border-l-0 bg-bg-secondary px-2 font-mono text-xs"
                     >
                       <option value="kg">kg</option>
                       <option value="lbs">lbs</option>
                     </select>
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Reps</label>
+                  <label className="section-title mb-1.5 block">REPS</label>
                   <input
                     type="number"
                     min="1"
-                    className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent"
                     value={reps}
                     onChange={(e) => setReps(e.target.value)}
                     placeholder="1"
+                    className="w-full"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Date</label>
+                <label className="section-title mb-1.5 block">DATE</label>
                 <input
                   type="date"
-                  className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
+                  className="w-full"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1.5">Notes (Optional)</label>
+                <label className="section-title mb-1.5 block">NOTES (OPTIONAL)</label>
                 <textarea
-                  className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-accent resize-none h-20"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="How did the lift feel?"
+                  placeholder="RPE, bar speed, cue, beltless..."
+                  className="w-full h-18 resize-none text-sm"
                 />
               </div>
 
-              <div className="pt-4 flex gap-3">
-                <button 
-                  className="btn-ghost flex-1"
-                  onClick={() => setShowForm(false)}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="btn-ghost flex-1 text-xs"
                 >
                   Cancel
                 </button>
-                <button 
-                  className="btn-primary flex-1"
-                  onClick={handleSave}
-                  disabled={!weight || !reps || !date || (!exercise && !customExercise)}
+                <button
+                  onClick={handleSavePR}
+                  disabled={!weight || !reps || (!exercise && !customExercise.trim())}
+                  className="btn-primary flex-1 disabled:opacity-40 text-xs"
                 >
-                  Save PR
+                  Save Record
                 </button>
               </div>
             </div>

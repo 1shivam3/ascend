@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { estimateMacros, calculateMealMacros } from '@/lib/macros';
 import { Plus, X, ChevronDown, ChevronUp, Trash2, Utensils } from 'lucide-react';
 import { MealEntry, FoodItem } from '@/lib/types';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function MealsPage() {
   const meals = useStore((state) => state.meals);
@@ -99,13 +100,17 @@ export default function MealsPage() {
           <h1 className="text-2xl font-bold text-text-primary">Meals & Macros</h1>
           <p className="text-xs text-text-muted mt-0.5">Track nutrition & fuel your strength</p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => {
-          if (foods.length === 0) handleAddFood();
-          setIsModalOpen(true);
-        }}>
-          <Plus className="w-4 h-4" />
-          Log Meal
-        </button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <button className="btn-primary flex items-center gap-1.5" onClick={() => {
+            if (foods.length === 0) handleAddFood();
+            setIsModalOpen(true);
+          }}>
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Log Meal</span>
+            <span className="sm:hidden">Log</span>
+          </button>
+        </div>
       </header>
 
       {/* Today's Summary */}

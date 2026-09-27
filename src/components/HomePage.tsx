@@ -1,11 +1,16 @@
+'use client';
+
 import React, { useMemo } from 'react';
 import { Trophy, Dumbbell, UtensilsCrossed, ChevronRight } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getDailyQuote } from '@/lib/quotes';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
+import ThemeToggle from '@/components/ui/ThemeToggle';
+import RankBadge from '@/components/ui/RankBadge';
+import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 
 interface HomePageProps {
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
@@ -14,7 +19,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   });
 
@@ -31,7 +36,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       }
     }
 
-    const lifts = Array.from(prsByExercise.values()).map(pr => {
+    const lifts = Array.from(prsByExercise.values()).map((pr) => {
       const levelInfo = getLiftLevel(
         pr.exercise,
         pr.oneRepMax,
@@ -40,15 +45,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       );
       return {
         ...pr,
-        levelInfo
+        levelInfo,
       };
     });
 
     lifts.sort((a, b) => (b.levelInfo?.level || 0) - (a.levelInfo?.level || 0));
-    
-    // Pass the calculated lift levels to getOverallLevel
+
     const top = lifts.slice(0, 5);
-    const overall = getOverallLevel(lifts.map(l => l.levelInfo));
+    const overall = getOverallLevel(lifts.map((l) => l.levelInfo));
 
     return { topLifts: top, overallLevel: overall };
   }, [prs, profile]);
@@ -61,94 +65,164 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   return (
-    <div className="page animate-fade-in space-y-6 pb-20">
+    <div className="page animate-fade-in space-y-5">
       {/* Header */}
-      <header className="flex flex-col gap-1">
-        <h1 className="text-lg font-semibold text-text-primary">
-          Hey, {profile?.name || 'Athlete'}
-        </h1>
-        <p className="text-sm text-text-muted">{today}</p>
+      <header className="flex justify-between items-center pt-1">
+        <div>
+          <h1 className="text-xl font-bold text-text-primary tracking-tight">
+            Hey, {profile?.name || 'Athlete'}
+          </h1>
+          <p className="text-xs text-text-muted font-mono">{today}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Quote of the Day */}
-      <section className="card border-l-2 border-accent p-4">
-        <p className="italic text-text-secondary mb-2">&quot;{quote.text}&quot;</p>
-        <p className="text-sm text-text-muted text-right">— {quote.author}</p>
+      <section className="card border-l-2 border-accent p-4 bg-gradient-to-r from-bg-card to-bg-secondary/40">
+        <p className="italic text-text-secondary text-sm leading-relaxed mb-2 font-serif">
+          &quot;{quote.text}&quot;
+        </p>
+        <p className="text-xs text-text-muted text-right font-mono tracking-wide">
+          — {quote.author}
+        </p>
       </section>
 
       {/* Overall Level */}
       <section>
         {prs && prs.length > 0 && overallLevel ? (
-          <div className="card p-4 space-y-3">
-            <div className="flex justify-between items-end mb-2">
-              <h2 className="section-title mb-0">OVERALL LEVEL</h2>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-accent">{overallLevel.level}</span>
-                <span className="text-sm font-medium text-text-secondary">{overallLevel.title}</span>
+          <div className="card space-y-3 bg-gradient-to-br from-bg-card via-bg-card to-bg-secondary border border-border">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="section-title">OVERALL STRENGTH</span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <span className="text-3xl font-extrabold text-accent font-mono">
+                    LV.{overallLevel.level}
+                  </span>
+                  <span className="text-base font-bold text-text-primary font-mono tracking-wide">
+                    {overallLevel.title}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <RankBadge
+                  rank={
+                    overallLevel.level <= 15
+                      ? 'FOUNDATION'
+                      : overallLevel.level <= 30
+                      ? 'TRAINED'
+                      : overallLevel.level <= 45
+                      ? 'SKILLED'
+                      : overallLevel.level <= 65
+                      ? 'ADVANCED'
+                      : overallLevel.level <= 80
+                      ? 'ELITE'
+                      : overallLevel.level <= 95
+                      ? 'MASTER'
+                      : 'GRANDMASTER'
+                  }
+                  size="sm"
+                />
               </div>
             </div>
-            
+
             <div className="level-bar">
-              <div 
-                className="level-bar-fill" 
-                style={{ width: `${Math.min(100, Math.max(0, overallLevel.level || 0))}%` }} 
+              <div
+                className="level-bar-fill"
+                style={{ width: `${Math.min(100, Math.max(2, overallLevel.level || 0))}%` }}
               />
+            </div>
+
+            <div className="flex justify-between text-2xs text-text-muted font-mono">
+              <span>{topLifts.length} Core Lifts Evaluated</span>
+              <span>Ratio: {overallLevel.averageRatio}x BW</span>
             </div>
           </div>
         ) : (
-          <div className="card p-4 border border-border/50 text-center">
-            <p className="text-sm text-text-muted">Set your first PR to see your level</p>
+          <div className="card p-5 border border-border/70 text-center space-y-2">
+            <p className="text-sm font-medium text-text-secondary">
+              No lifts recorded yet
+            </p>
+            <p className="text-xs text-text-muted">
+              Add your first PR to unlock your calibrated strength level and title.
+            </p>
+            <button
+              onClick={() => onNavigate('prs')}
+              className="btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
+            >
+              <Trophy size={14} />
+              Set First PR
+            </button>
           </div>
         )}
       </section>
 
-      {/* Quick Actions */}
-      <section className="grid grid-cols-3 gap-3">
-        <button 
+      {/* Quick Action CTA Cards */}
+      <section className="grid grid-cols-3 gap-2.5">
+        <button
           onClick={() => onNavigate('prs')}
-          className="card p-3 flex flex-col items-center gap-2 border border-accent/20 hover:border-accent/40 transition-colors bg-surface/50"
+          className="card p-3 flex flex-col items-center justify-center gap-1.5 border border-accent/30 hover:border-accent/60 bg-accent/5 hover:bg-accent/10 transition-all text-center min-h-[76px]"
         >
           <Trophy className="w-5 h-5 text-accent" />
-          <span className="text-xs font-medium text-text-primary text-center">Set New PR</span>
+          <span className="text-xs font-semibold text-text-primary">New PR</span>
         </button>
-        <button 
+        <button
           onClick={() => onNavigate('workout')}
-          className="card p-3 flex flex-col items-center gap-2 hover:bg-surface-highlight transition-colors"
+          className="card p-3 flex flex-col items-center justify-center gap-1.5 hover:bg-bg-elevated transition-all text-center min-h-[76px]"
         >
           <Dumbbell className="w-5 h-5 text-text-secondary" />
-          <span className="text-xs font-medium text-text-secondary text-center">Log Workout</span>
+          <span className="text-xs font-medium text-text-secondary">Log Lift</span>
         </button>
-        <button 
+        <button
           onClick={() => onNavigate('meals')}
-          className="card p-3 flex flex-col items-center gap-2 hover:bg-surface-highlight transition-colors"
+          className="card p-3 flex flex-col items-center justify-center gap-1.5 hover:bg-bg-elevated transition-all text-center min-h-[76px]"
         >
           <UtensilsCrossed className="w-5 h-5 text-text-secondary" />
-          <span className="text-xs font-medium text-text-secondary text-center">Add Meal</span>
+          <span className="text-xs font-medium text-text-secondary">Add Meal</span>
         </button>
       </section>
 
-      {/* Top Lifts */}
+      {/* LeetCode-style Gym Calendar Heatmap */}
+      <WorkoutHeatmap />
+
+      {/* Top Lifts Showcase */}
       {topLifts.length > 0 && (
         <section className="space-y-3">
-          <h2 className="section-title px-1">YOUR LIFTS</h2>
-          <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="section-title">TOP LIFTS</h2>
+            <button
+              onClick={() => onNavigate('prs')}
+              className="text-2xs font-mono text-accent hover:underline flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <ChevronRight size={12} />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
             {topLifts.map((lift, idx) => (
-              <div 
+              <div
                 key={`${lift.exercise}-${idx}`}
                 onClick={() => onNavigate('prs')}
-                className="card p-4 flex items-center justify-between cursor-pointer hover:border-border-hover transition-colors"
+                className="card p-3.5 flex items-center justify-between cursor-pointer hover:border-border-hover transition-colors"
               >
                 <div className="flex flex-col gap-1">
-                  <span className="font-medium text-text-primary capitalize">{lift.exercise.replace(/-/g, ' ')}</span>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-accent font-semibold px-1.5 py-0.5 rounded bg-accent/10">
-                      Lv. {lift.levelInfo?.level || 0}
+                  <span className="font-semibold text-sm text-text-primary capitalize">
+                    {lift.exercise}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xs font-mono font-bold text-accent">
+                      LV.{lift.levelInfo?.level || 0}
                     </span>
-                    <span className="text-text-muted">{lift.levelInfo?.title || 'Beginner'}</span>
+                    <RankBadge rank={lift.levelInfo?.rank || 'FOUNDATION'} size="sm" />
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-text-primary">{displayWeight(lift.oneRepMax)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-text-primary text-sm">
+                    {displayWeight(lift.oneRepMax)}
+                  </span>
                   <ChevronRight className="w-4 h-4 text-text-muted" />
                 </div>
               </div>

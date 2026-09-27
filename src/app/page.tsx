@@ -20,7 +20,20 @@ type TabId = (typeof tabs)[number]['id'];
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const { profile, _hasHydrated } = useStore();
+  const { profile, theme, _hasHydrated } = useStore();
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const activeTheme = theme || 'dark';
+      if (activeTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+    }
+  }, [theme, _hasHydrated]);
 
   if (!_hasHydrated) {
     return (

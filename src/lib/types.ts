@@ -1,5 +1,27 @@
 export type Gender = 'male' | 'female';
 export type Unit = 'kg' | 'lbs';
+export type Theme = 'dark' | 'light';
+
+export type OverallTitle =
+  | 'INITIATE'
+  | 'FORGED'
+  | 'ADEPT'
+  | 'VANGUARD'
+  | 'ELITE'
+  | 'ASCENDANT'
+  | 'APEX'
+  | 'TRANSCENDENT'
+  | 'TITAN'
+  | 'IMMORTAL';
+
+export type ExerciseRank =
+  | 'FOUNDATION'
+  | 'TRAINED'
+  | 'SKILLED'
+  | 'ADVANCED'
+  | 'ELITE'
+  | 'MASTER'
+  | 'GRANDMASTER';
 
 export interface UserProfile {
   id: string;
@@ -35,7 +57,7 @@ export interface WorkoutExercise {
 
 export interface WorkoutEntry {
   id: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   exercises: WorkoutExercise[];
 }
 
@@ -51,7 +73,7 @@ export interface FoodItem {
 
 export interface MealEntry {
   id: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   name: string;
   foods: FoodItem[];
 }
@@ -68,11 +90,12 @@ export interface LiftLevel {
   level: number;
   title: string;
   ratio: number;
-  category: string;
+  category: ExerciseRank;
+  rank: ExerciseRank;
 }
 
 export interface OverallLevel {
   level: number;
-  title: string;
+  title: OverallTitle;
   averageRatio: number;
 }

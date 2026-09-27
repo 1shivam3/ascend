@@ -2,6 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Light Theme — Minimal, Clean Studio Aesthetic */
+  --bg-primary: 248 250 252;
+  --bg-secondary: 241 245 249;
+  --bg-tertiary: 226 232 240;
+  --bg-card: 255 255 255;
+  --bg-elevated: 255 255 255;
+  --text-primary: 15 23 42;
+  --text-secondary: 71 85 105;
+  --text-muted: 148 163 184;
+  --border: 226 232 240;
+  --border-subtle: 241 245 249;
+  --border-hover: 203 213 225;
+  --accent: 217 119 6;
+  --accent-dim: 180 83 9;
+  --accent-glow: rgba(217, 119, 6, 0.12);
+}
+
+.dark {
+  /* Dark Theme — Deep Pitch & Warm Gold */
+  --bg-primary: 10 10 10;
+  --bg-secondary: 18 18 18;
+  --bg-tertiary: 30 30 30;
+  --bg-card: 21 21 21;
+  --bg-elevated: 26 26 26;
+  --text-primary: 248 250 252;
+  --text-secondary: 148 163 184;
+  --text-muted: 100 116 139;
+  --border: 38 38 38;
+  --border-subtle: 28 28 28;
+  --border-hover: 58 58 58;
+  --accent: 229 192 123;
+  --accent-dim: 184 151 63;
+  --accent-glow: rgba(229, 192, 123, 0.15);
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -11,20 +47,23 @@
   html {
     @apply antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    touch-action: manipulation;
   }
 
   body {
     @apply bg-bg-primary text-text-primary font-sans;
-    overscroll-behavior: none;
+    overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   input, textarea, select {
-    @apply bg-bg-elevated text-text-primary border border-border rounded-lg px-3 py-2.5 text-sm;
+    @apply bg-bg-elevated text-text-primary border border-border rounded-lg px-3 py-2.5 text-base sm:text-sm;
     @apply outline-none transition-colors duration-150;
     @apply placeholder:text-text-muted;
-    @apply focus:border-accent/50 focus:ring-1 focus:ring-accent/20;
+    @apply focus:border-accent/60 focus:ring-1 focus:ring-accent/20;
   }
 
   select {
@@ -34,43 +73,46 @@
 
 @layer components {
   .card {
-    @apply bg-bg-card border border-border rounded-xl p-4;
+    @apply bg-bg-card border border-border rounded-xl p-4 shadow-sm transition-all duration-150;
   }
 
   .card-elevated {
-    @apply bg-bg-elevated border border-border rounded-xl p-4;
+    @apply bg-bg-elevated border border-border rounded-xl p-4 shadow-md;
   }
 
   .btn-primary {
     @apply bg-accent text-bg-primary font-semibold px-4 py-2.5 rounded-lg text-sm;
-    @apply active:scale-[0.98] transition-all duration-150;
-    @apply hover:brightness-110;
+    @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
+    @apply hover:brightness-105;
+    min-height: 44px;
   }
 
   .btn-secondary {
     @apply bg-bg-elevated text-text-primary font-medium px-4 py-2.5 rounded-lg text-sm;
     @apply border border-border;
-    @apply active:scale-[0.98] transition-all duration-150;
-    @apply hover:bg-bg-card;
+    @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
+    @apply hover:bg-bg-secondary;
+    min-height: 44px;
   }
 
   .btn-ghost {
     @apply text-text-secondary font-medium px-3 py-2 rounded-lg text-sm;
-    @apply active:bg-bg-elevated transition-all duration-150;
+    @apply active:bg-bg-secondary transition-all duration-150;
+    min-height: 40px;
   }
 
   .btn-danger {
-    @apply bg-danger/10 text-danger font-medium px-4 py-2.5 rounded-lg text-sm;
+    @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-lg text-sm;
     @apply border border-danger/20;
     @apply active:scale-[0.98] transition-all duration-150;
   }
 
   .section-title {
-    @apply text-2xs font-semibold tracking-widest uppercase text-text-muted;
+    @apply text-2xs font-bold tracking-widest uppercase text-text-muted font-mono;
   }
 
   .level-bar {
-    @apply h-1.5 rounded-full bg-bg-elevated overflow-hidden;
+    @apply h-2 rounded-full bg-bg-secondary border border-border/50 overflow-hidden;
   }
 
   .level-bar-fill {
@@ -78,52 +120,54 @@
   }
 
   .bottom-nav {
-    @apply fixed bottom-0 left-0 right-0 bg-bg-primary/95 backdrop-blur-md;
+    @apply fixed bottom-0 left-0 right-0 bg-bg-primary/90 backdrop-blur-md;
     @apply border-t border-border;
     @apply flex items-center justify-around;
-    @apply px-2 pb-[env(safe-area-inset-bottom)] pt-2;
-    @apply z-50;
+    @apply px-3 pt-2 pb-[max(env(safe-area-inset-bottom),0.75rem)];
+    @apply z-40 max-w-lg mx-auto;
   }
 
   .bottom-nav-item {
-    @apply flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg;
-    @apply text-text-muted text-[10px] font-medium;
+    @apply flex flex-col items-center justify-center gap-1 px-3 py-1.5 rounded-xl;
+    @apply text-text-muted text-[11px] font-medium;
     @apply transition-colors duration-150;
+    min-width: 56px;
+    min-height: 44px;
   }
 
   .bottom-nav-item.active {
-    @apply text-accent;
+    @apply text-accent font-semibold;
   }
 
   .page {
-    @apply min-h-screen pb-24 px-4 pt-[env(safe-area-inset-top)] pt-4;
-    @apply max-w-lg mx-auto;
+    @apply min-h-screen px-4 pt-3 pb-28 max-w-lg mx-auto;
   }
 
   .modal-overlay {
-    @apply fixed inset-0 bg-black/70 backdrop-blur-sm z-50;
-    @apply flex items-end sm:items-center justify-center;
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
+    @apply flex items-end sm:items-center justify-center p-0 sm:p-4;
     @apply animate-fade-in;
   }
 
   .modal-content {
-    @apply bg-bg-secondary rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[88vh] overflow-y-auto;
+    @apply bg-bg-card rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
     @apply border border-border shadow-2xl;
     @apply animate-slide-up;
-    @apply pb-[env(safe-area-inset-bottom)];
+    @apply pb-[max(env(safe-area-inset-bottom),1rem)];
   }
 }
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #262626;
-  border-radius: 2px;
+  background: rgb(var(--border-hover));
+  border-radius: 4px;
 }
 
 /* Number input hide arrows */
