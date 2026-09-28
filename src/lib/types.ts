@@ -131,3 +131,17 @@ export interface PlannedWorkout {
   exercises: PlannedExercise[];
   createdAt: string;
 }
+
+export interface FavoriteFood {
+  id: string;
+  name: string;
+  defaultQuantity?: number;
+  unit: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  barcode?: string;
+  notes?: string;
+}
+

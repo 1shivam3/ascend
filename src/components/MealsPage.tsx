@@ -4,11 +4,29 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useStore } from '@/lib/store';
 import { estimateMacros, calculateMealMacros, getFoodSuggestions } from '@/lib/macros';
 import {
-  Plus, X, ChevronDown, ChevronUp, Trash2, Utensils, ArrowLeft,
-  Target, Sparkles, Edit3, Search, ChevronRight,
+  Plus,
+  X,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  Utensils,
+  ArrowLeft,
+  Target,
+  Sparkles,
+  Edit3,
+  Search,
+  ChevronRight,
+  Barcode as BarcodeIcon,
+  Star,
+  Copy,
+  CalendarCheck,
+  CheckCircle2,
+  Clock,
+  Flame,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import { useToast } from '@/components/ui/Toast';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -50,18 +68,23 @@ interface MealsPageProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
-  const profile      = useStore((state) => state.profile);
-  const meals        = useStore((state) => state.meals);
-  const macroGoals   = useStore((state) => state.macroGoals);
-  const addMeal      = useStore((state) => state.addMeal);
-  const deleteMeal   = useStore((state) => state.deleteMeal);
-  const setMacroGoals = useStore((state) => state.setMacroGoals);
-  const toast        = useToast();
+  const profile            = useStore((state) => state.profile);
+  const meals              = useStore((state) => state.meals);
+  const macroGoals         = useStore((state) => state.macroGoals);
+  const favoriteFoods      = useStore((state) => state.favoriteFoods || []);
+  const addMeal            = useStore((state) => state.addMeal);
+  const deleteMeal         = useStore((state) => state.deleteMeal);
+  const setMacroGoals      = useStore((state) => state.setMacroGoals);
+  const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
+  const toggleFavoriteFood = useStore((state) => state.toggleFavoriteFood);
+  const deleteFavoriteFood = useStore((state) => state.deleteFavoriteFood);
+  const toast              = useToast();
 
   // ── Modal visibility ──────────────────────────────────────────────────────
-  const [isModalOpen,      setIsModalOpen]      = useState(false);
-  const [isGoalsModalOpen, setIsGoalsModalOpen] = useState(false);
-  const [expandedMeals,    setExpandedMeals]    = useState<Set<string>>(new Set());
+  const [isModalOpen,        setIsModalOpen]        = useState(false);
+  const [isGoalsModalOpen,   setIsGoalsModalOpen]   = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [expandedMeals,      setExpandedMeals]      = useState<Set<string>>(new Set());
 
   // ── Goals form ────────────────────────────────────────────────────────────
   const [goalCalories, setGoalCalories] = useState('');
@@ -74,12 +97,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [foods,    setFoods]    = useState<FoodItem[]>([]);
 
   // ── Autocomplete state ────────────────────────────────────────────────────
-  // One suggestions list per food row, keyed by index
-  const [foodSuggestions,      setFoodSuggestions]      = useState<Record<number, string[]>>({});
-  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState<Record<number, number>>({});
-  const [showSuggestions,       setShowSuggestions]       = useState<Record<number, boolean>>({});
+  const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, string[]>>({});
+  const [activeSuggestionIndex,   setActiveSuggestionIndex]   = useState<Record<number, number>>({});
+  const [showSuggestions,         setShowSuggestions]         = useState<Record<number, boolean>>({});
 
-  // Ref map for suggestion containers (click-outside detection)
   const suggestionRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // ── Click-outside: close all dropdowns ────────────────────────────────────
@@ -105,7 +126,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const toggleExpand = (id: string) => {
-    setExpandedMeals(prev => {
+    setExpandedMeals((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -113,102 +134,176 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAddFood = () => {
-    setFoods(prev => [...prev, EMPTY_FOOD()]);
+    setFoods((prev) => [...prev, EMPTY_FOOD()]);
   };
 
   const handleRemoveFood = (index: number) => {
-    setFoods(prev => prev.filter((_, i) => i !== index));
-    setFoodSuggestions(prev  => { const n = { ...prev };  delete n[index]; return n; });
-    setShowSuggestions(prev  => { const n = { ...prev };  delete n[index]; return n; });
-    setActiveSuggestionIndex(prev => { const n = { ...prev }; delete n[index]; return n; });
+    setFoods((prev) => prev.filter((_, i) => i !== index));
+    setFoodSuggestions((prev) => { const n = { ...prev }; delete n[index]; return n; });
+    setShowSuggestions((prev) => { const n = { ...prev }; delete n[index]; return n; });
+    setActiveSuggestionIndex((prev) => { const n = { ...prev }; delete n[index]; return n; });
   };
 
   /**
    * Central handler for all food field changes.
-   * - When `name` changes: fetch suggestions; auto-estimate macros only if quantity is set.
-   * - When `quantity` or `unit` changes: re-estimate immediately.
-   * - For macro fields: just update the value (manual override).
    */
   const handleFoodChange = useCallback((index: number, field: keyof FoodItem, value: any) => {
-    setFoods(prev => {
+    setFoods((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], [field]: value };
 
       if (field === 'name') {
         const name = (value as string).trim();
-        // Show autocomplete
         if (name.length >= 1) {
           const suggestions = getFoodSuggestions(name);
-          setFoodSuggestions(s => ({ ...s, [index]: suggestions }));
-          setShowSuggestions(s => ({ ...s, [index]: suggestions.length > 0 }));
+          setFoodSuggestions((s) => ({ ...s, [index]: suggestions }));
+          setShowSuggestions((s) => ({ ...s, [index]: suggestions.length > 0 }));
         } else {
-          setFoodSuggestions(s => ({ ...s, [index]: [] }));
-          setShowSuggestions(s => ({ ...s, [index]: false }));
+          setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+          setShowSuggestions((s) => ({ ...s, [index]: false }));
         }
 
-        // Auto-estimate only if quantity already has a value
         if (name.length > 1 && next[index].quantity !== undefined && (next[index].quantity as number) > 0) {
           const est = estimateMacros(name, next[index].quantity, next[index].unit);
-          next[index] = { ...next[index], calories: est.calories, proteinG: est.proteinG, carbsG: est.carbsG, fatG: est.fatG };
+          next[index] = {
+            ...next[index],
+            calories: est.calories,
+            proteinG: est.proteinG,
+            carbsG:   est.carbsG,
+            fatG:     est.fatG,
+          };
         }
-      } else if (field === 'quantity') {
-        const qty = value === '' || value === null ? undefined : Number(value);
-        next[index] = { ...next[index], quantity: qty };
-        const name = next[index].name.trim();
-        if (name.length > 1 && qty !== undefined && qty > 0) {
-          const est = estimateMacros(name, qty, next[index].unit);
-          next[index] = { ...next[index], calories: est.calories, proteinG: est.proteinG, carbsG: est.carbsG, fatG: est.fatG };
+      }
+
+      if (field === 'quantity') {
+        const qty = Number(value);
+        if (next[index].name.trim().length > 1) {
+          const est = estimateMacros(next[index].name, qty > 0 ? qty : undefined, next[index].unit);
+          next[index] = {
+            ...next[index],
+            calories: est.calories,
+            proteinG: est.proteinG,
+            carbsG:   est.carbsG,
+            fatG:     est.fatG,
+          };
         }
-      } else if (field === 'unit') {
-        const name = next[index].name.trim();
-        const qty  = next[index].quantity;
-        if (name.length > 1 && qty !== undefined && qty > 0) {
-          const est = estimateMacros(name, qty, value as string);
-          next[index] = { ...next[index], calories: est.calories, proteinG: est.proteinG, carbsG: est.carbsG, fatG: est.fatG };
+      }
+
+      if (field === 'unit') {
+        const unit = value as string;
+        if (next[index].name.trim().length > 1 && next[index].quantity !== undefined && (next[index].quantity as number) > 0) {
+          const est = estimateMacros(next[index].name, next[index].quantity, unit);
+          next[index] = {
+            ...next[index],
+            calories: est.calories,
+            proteinG: est.proteinG,
+            carbsG:   est.carbsG,
+            fatG:     est.fatG,
+          };
         }
       }
 
       return next;
     });
   }, []);
+
+  const handleSelectSuggestion = (index: number, suggestion: string) => {
+    const currentQty  = foods[index]?.quantity;
+    const currentUnit = foods[index]?.unit || 'g';
+    const est = estimateMacros(suggestion, currentQty, currentUnit);
+
+    setFoods((prev) => {
+      const next = [...prev];
+      next[index] = {
+        ...next[index],
+        name:     suggestion,
+        calories: est.calories,
+        proteinG: est.proteinG,
+        carbsG:   est.carbsG,
+        fatG:     est.fatG,
+      };
+      return next;
+    });
+
+    setShowSuggestions((s) => ({ ...s, [index]: false }));
+    setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+  };
 
   /**
-   * Select a suggestion from the autocomplete dropdown.
+   * Handle food scanned via barcode
    */
-  const handleSelectSuggestion = useCallback((foodIndex: number, suggestion: string) => {
-    setFoods(prev => {
-      const next = [...prev];
-      next[foodIndex] = { ...next[foodIndex], name: suggestion };
-      // Re-estimate if quantity set
-      const qty = next[foodIndex].quantity;
-      if (qty !== undefined && qty > 0) {
-        const est = estimateMacros(suggestion, qty, next[foodIndex].unit);
-        next[foodIndex] = { ...next[foodIndex], calories: est.calories, proteinG: est.proteinG, carbsG: est.carbsG, fatG: est.fatG };
-      }
-      return next;
-    });
-    setShowSuggestions(s => ({ ...s, [foodIndex]: false }));
-    setFoodSuggestions(s => ({ ...s, [foodIndex]: [] }));
-  }, []);
+  const handleAddScannedFood = (scannedItem: FoodItem) => {
+    if (isModalOpen) {
+      // Append to currently editing meal
+      setFoods((prev) => [...prev, scannedItem]);
+    } else {
+      // Open modal with this food
+      setMealName('Scanned Meal');
+      setFoods([scannedItem]);
+      setIsModalOpen(true);
+    }
+    toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
+  };
 
-  // ── Save meal ─────────────────────────────────────────────────────────────
+  /**
+   * 1-Tap Add Favorite Food into current meal
+   */
+  const handleAddFavoriteToMeal = (fav: FavoriteFood) => {
+    const item: FoodItem = {
+      name: fav.name,
+      quantity: fav.defaultQuantity,
+      unit: fav.unit || 'g',
+      calories: fav.calories,
+      proteinG: fav.proteinG,
+      carbsG: fav.carbsG,
+      fatG: fav.fatG,
+    };
+
+    if (isModalOpen) {
+      setFoods((prev) => [...prev, item]);
+      toast.success(`Added ${fav.name} to meal!`, 'Favorite Added');
+    } else {
+      setMealName('Quick Meal');
+      setFoods([item]);
+      setIsModalOpen(true);
+      toast.info(`Started meal with ${fav.name}. Tap Save when done!`, 'Meal Created');
+    }
+  };
+
+  /**
+   * Toggle favorite food status
+   */
+  const handleToggleFavorite = (food: FoodItem) => {
+    if (!food.name.trim()) return;
+    const added = toggleFavoriteFood(food);
+    if (added) {
+      toast.success(`Pinned ${food.name} to Frequent Favorites!`, 'Favorite Saved');
+    } else {
+      toast.info(`Unpinned ${food.name} from Favorites.`, 'Favorite Removed');
+    }
+  };
+
+  const isItemFavorited = (name: string): boolean => {
+    const n = name.toLowerCase().trim();
+    return favoriteFoods.some((f) => f.name.toLowerCase().trim() === n);
+  };
 
   const handleSaveMeal = () => {
-    const validFoods = foods.filter(f => f.name.trim());
+    const validFoods = foods.filter((f) => f.name.trim());
     if (!mealName.trim()) {
       toast.error('Please enter a meal name (e.g. Breakfast, Post-Workout).', 'Missing Name');
       return;
     }
     if (validFoods.length === 0) {
-      toast.error('Please add at least one food item.', 'No Food Items');
+      toast.error('Please add at least one food item with a name.', 'No Food Items');
       return;
     }
 
     const today = new Date().toISOString().split('T')[0];
     const newMeal: MealEntry = {
-      id:    crypto.randomUUID(),
-      date:  today,
-      name:  mealName.trim(),
+      id: crypto.randomUUID(),
+      date: today,
+      name: mealName.trim(),
       foods: validFoods,
     };
 
@@ -217,23 +312,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     addMeal(newMeal);
     toast.success(
       `Added ${mealName.trim()} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
-      'Meal Logged',
+      'Meal Logged'
     );
     setIsModalOpen(false);
     setMealName('');
     setFoods([]);
-    setFoodSuggestions({});
-    setShowSuggestions({});
   };
-
-  // ── Goals modal ───────────────────────────────────────────────────────────
 
   const handleOpenGoalsModal = () => {
     if (macroGoals) {
-      setGoalCalories(macroGoals.calories  ? String(macroGoals.calories)  : '');
-      setGoalProtein(macroGoals.proteinG   ? String(macroGoals.proteinG)  : '');
-      setGoalCarbs(macroGoals.carbsG       ? String(macroGoals.carbsG)    : '');
-      setGoalFat(macroGoals.fatG           ? String(macroGoals.fatG)      : '');
+      setGoalCalories(macroGoals.calories ? String(macroGoals.calories) : '');
+      setGoalProtein(macroGoals.proteinG ? String(macroGoals.proteinG) : '');
+      setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
+      setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
     } else {
       const bw   = profile?.bodyweightKg || 75;
       const cal  = Math.round(bw * 32);
@@ -293,15 +384,39 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const todayDate   = new Date().toISOString().split('T')[0];
-  const todayMeals  = meals.filter(m => m.date === todayDate);
-  const todayMacros = calculateMealMacros(todayMeals.flatMap(m => m.foods));
+  const todayMeals  = meals.filter((m) => m.date === todayDate);
+  const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
+
+  // Yesterday's meals for Quick Copy feature
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayDate = yesterday.toISOString().split('T')[0];
+  const yesterdayMeals = meals.filter((m) => m.date === yesterdayDate);
+  const yesterdayMacros = calculateMealMacros(yesterdayMeals.flatMap((m) => m.foods));
+
+  const handleCopyYesterday = () => {
+    if (yesterdayMeals.length === 0) return;
+    const copiedCount = copyMealsFromDate(yesterdayDate, todayDate);
+    toast.success(
+      `🎉 Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from yesterday (~${Math.round(yesterdayMacros.calories)} kcal)!`,
+      'Yesterday Meals Copied'
+    );
+  };
+
+  const handleCopySpecificDay = (sourceDate: string) => {
+    const copiedCount = copyMealsFromDate(sourceDate, todayDate);
+    toast.success(
+      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from ${sourceDate} to Today!`,
+      'Meals Copied'
+    );
+  };
 
   const groupedMeals = useMemo(() => {
     const groups: Record<string, MealEntry[]> = {};
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 14);
 
-    meals.forEach(meal => {
+    meals.forEach((meal) => {
       const mealDate = new Date(meal.date);
       if (mealDate >= weekAgo) {
         if (!groups[meal.date]) groups[meal.date] = [];
@@ -318,9 +433,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="page animate-fade-in">
+    <div className="page animate-fade-in space-y-5">
       {/* ── Header ── */}
-      <header className="flex justify-between items-center mb-6">
+      <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2.5">
           {onNavigate && (
             <button
@@ -337,7 +452,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <p className="text-2xs text-text-muted font-mono">Track nutrition &amp; fuel your strength</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Barcode Scanner Button */}
+          <button
+            type="button"
+            onClick={() => setIsBarcodeModalOpen(true)}
+            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1"
+            title="Scan Food Barcode (Open Food Facts)"
+          >
+            <BarcodeIcon className="w-4 h-4 text-accent" />
+            <span className="hidden sm:inline text-xs font-mono font-semibold">Scan</span>
+          </button>
           <ThemeToggle />
           <button
             className="btn-primary flex items-center gap-1.5"
@@ -354,7 +479,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       </header>
 
       {/* ── Today's Summary & Goals ── */}
-      <section className="mb-6 space-y-3">
+      <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="section-title mb-0">TODAY&apos;S TOTALS &amp; GOALS</h2>
           <button
@@ -463,6 +588,73 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         )}
       </section>
 
+      {/* ── Feature 3: Copy Yesterday's Meals Banner (High Consistency) ── */}
+      {yesterdayMeals.length > 0 && todayMeals.length === 0 && (
+        <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-sm animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
+              <Copy className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-primary font-mono block">
+                REPEAT YESTERDAY&apos;S DIET
+              </span>
+              <span className="text-[11px] text-text-muted font-mono">
+                {yesterdayMeals.length} meals • ~{Math.round(yesterdayMacros.calories)} kcal • ~{Math.round(yesterdayMacros.proteinG)}g protein
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleCopyYesterday}
+            className="btn-primary py-1.5 px-3 text-2xs font-mono font-bold flex items-center gap-1.5 active:scale-95 transition-transform"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            <span>Copy All</span>
+          </button>
+        </section>
+      )}
+
+      {/* ── Feature 2: Frequent & Pinned Foods Carousel (1-Tap Logging) ── */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Star className="w-3.5 h-3.5 text-accent fill-accent" />
+            <h2 className="section-title mb-0">FREQUENT &amp; PINNED FOODS</h2>
+          </div>
+          <span className="text-2xs text-text-muted font-mono">{favoriteFoods.length} Pinned</span>
+        </div>
+
+        <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none font-mono">
+          {favoriteFoods.map((fav) => (
+            <button
+              key={fav.id}
+              type="button"
+              onClick={() => handleAddFavoriteToMeal(fav)}
+              className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-95"
+              title={`Tap to log ${fav.name} in 1 tap`}
+            >
+              <div className="flex items-center gap-1 text-xs font-bold text-text-primary group-hover:text-accent">
+                <Star className="w-3 h-3 text-accent fill-accent" />
+                <span>{fav.name}</span>
+              </div>
+              <div className="flex items-center gap-2 text-2xs text-text-muted mt-1">
+                <span>{fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit}</span>
+                <span>•</span>
+                <span className="text-accent font-semibold">~{fav.calories} kcal</span>
+                <span>•</span>
+                <span className="text-info font-semibold">~{fav.proteinG}g P</span>
+              </div>
+            </button>
+          ))}
+          {favoriteFoods.length === 0 && (
+            <div className="p-3 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-xs text-text-muted font-mono w-full text-center">
+              Star (⭐) any food in your meals to pin it here for 1-tap quick logging!
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ── Meal History ── */}
       <section>
         <div className="flex justify-between items-center mb-3">
@@ -474,90 +666,121 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <div className="card text-center py-12 space-y-2">
             <Utensils className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
             <p className="text-text-secondary text-sm font-semibold">No meals logged yet.</p>
-            <p className="text-xs text-text-muted">Tap &quot;Log Meal&quot; to start tracking your nutrition.</p>
+            <p className="text-xs text-text-muted">Tap &quot;Log Meal&quot; or scan a barcode to start tracking nutrition.</p>
             <div className="mt-4 text-left max-w-xs mx-auto bg-bg-secondary/60 rounded-lg p-3 border border-border/60">
-              <p className="text-2xs font-mono text-accent font-semibold mb-1.5 uppercase tracking-wider">Tips</p>
+              <p className="text-2xs font-mono text-accent font-semibold mb-1.5 uppercase tracking-wider">Features</p>
               <ul className="space-y-1 text-[11px] text-text-muted font-mono">
-                <li>• Type a food name to get smart suggestions</li>
-                <li>• Enter a quantity — macros estimate automatically</li>
-                <li>• Override macros manually if needed</li>
-                <li>• Use quick templates: Breakfast, Lunch, etc.</li>
+                <li>• Barcode scanner via Open Food Facts</li>
+                <li>• 1-tap Repeat Yesterday&apos;s Diet</li>
+                <li>• Pin favorite foods for instant logging</li>
+                <li>• Instant smart food autocomplete</li>
               </ul>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-5">
-            {groupedMeals.map(([date, dayMeals]) => (
-              <div key={date}>
-                <h3 className="text-xs font-semibold text-text-muted mb-2 uppercase tracking-wider font-mono">
-                  {date === todayDate
-                    ? 'Today'
-                    : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                </h3>
-                <div className="flex flex-col gap-2.5">
-                  {dayMeals.map(meal => {
-                    const isExpanded = expandedMeals.has(meal.id);
-                    const macros = calculateMealMacros(meal.foods);
-                    return (
-                      <div key={meal.id} className="card">
-                        <div
-                          className="flex justify-between items-center cursor-pointer"
-                          onClick={() => toggleExpand(meal.id)}
-                        >
-                          <div className="flex-1">
-                            <div className="flex justify-between items-center mb-1">
-                              <h4 className="font-semibold text-text-primary text-sm">{meal.name}</h4>
-                              <span className="font-bold text-accent text-sm font-mono">
-                                ~{Math.round(macros.calories)} kcal
-                              </span>
-                            </div>
-                            <div className="flex gap-3 text-xs text-text-secondary font-mono">
-                              <span className="text-info">~{Math.round(macros.proteinG)}g P</span>
-                              <span>•</span>
-                              <span className="text-warning">~{Math.round(macros.carbsG)}g C</span>
-                              <span>•</span>
-                              <span className="text-danger">~{Math.round(macros.fatG)}g F</span>
-                            </div>
-                          </div>
-                          <div className="ml-3 flex items-center text-text-muted">
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="mt-3.5 flex flex-col gap-2 border-t border-border pt-3">
-                            {meal.foods.map((food, i) => (
-                              <div key={i} className="flex justify-between items-center text-xs py-1 px-2 rounded bg-bg-elevated/50">
-                                <div className="text-text-primary">
-                                  <span className="font-medium">{food.name}</span>{' '}
-                                  <span className="text-text-muted">({food.quantity} {food.unit})</span>
-                                </div>
-                                <div className="text-text-secondary font-mono">
-                                  <span className="text-accent">~{Math.round(food.calories)} kcal</span>
-                                  <span className="text-text-muted ml-2">P:~{Math.round(food.proteinG)}g</span>
-                                </div>
+            {groupedMeals.map(([date, dayMeals]) => {
+              const isToday = date === todayDate;
+              return (
+                <div key={date}>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider font-mono">
+                      {isToday
+                        ? 'Today'
+                        : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </h3>
+                    {!isToday && (
+                      <button
+                        type="button"
+                        onClick={() => handleCopySpecificDay(date)}
+                        className="text-2xs font-mono text-accent hover:underline flex items-center gap-1 font-semibold"
+                        title="Copy all meals from this day to Today"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>Copy to Today</span>
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-2.5">
+                    {dayMeals.map((meal) => {
+                      const isExpanded = expandedMeals.has(meal.id);
+                      const macros = calculateMealMacros(meal.foods);
+                      return (
+                        <div key={meal.id} className="card">
+                          <div
+                            className="flex justify-between items-center cursor-pointer"
+                            onClick={() => toggleExpand(meal.id)}
+                          >
+                            <div className="flex-1">
+                              <div className="flex justify-between items-center mb-1">
+                                <h4 className="font-semibold text-text-primary text-sm">{meal.name}</h4>
+                                <span className="font-bold text-accent text-sm font-mono">
+                                  ~{Math.round(macros.calories)} kcal
+                                </span>
                               </div>
-                            ))}
-                            <div className="mt-1 flex justify-end">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteMeal(meal.id);
-                                  toast.info(`Deleted ${meal.name} entry.`, 'Meal Removed');
-                                }}
-                                className="text-danger hover:text-danger/80 text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Delete Meal
-                              </button>
+                              <div className="flex gap-3 text-xs text-text-secondary font-mono">
+                                <span className="text-info">~{Math.round(macros.proteinG)}g P</span>
+                                <span>•</span>
+                                <span className="text-warning">~{Math.round(macros.carbsG)}g C</span>
+                                <span>•</span>
+                                <span className="text-danger">~{Math.round(macros.fatG)}g F</span>
+                              </div>
+                            </div>
+                            <div className="ml-3 flex items-center text-text-muted">
+                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+
+                          {isExpanded && (
+                            <div className="mt-3.5 flex flex-col gap-2 border-t border-border pt-3">
+                              {meal.foods.map((food, i) => (
+                                <div key={i} className="flex justify-between items-center text-xs py-1 px-2 rounded bg-bg-elevated/50">
+                                  <div className="text-text-primary flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleFavorite(food);
+                                      }}
+                                      className="text-text-muted hover:text-accent p-0.5"
+                                      title={isItemFavorited(food.name) ? 'Unpin favorite' : 'Pin to favorites'}
+                                    >
+                                      <Star
+                                        className={`w-3.5 h-3.5 ${
+                                          isItemFavorited(food.name) ? 'text-accent fill-accent' : 'text-text-muted'
+                                        }`}
+                                      />
+                                    </button>
+                                    <span className="font-medium">{food.name}</span>{' '}
+                                    <span className="text-text-muted">({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})</span>
+                                  </div>
+                                  <div className="text-text-secondary font-mono">
+                                    <span className="text-accent">~{Math.round(food.calories)} kcal</span>
+                                    <span className="text-text-muted ml-2">P:~{Math.round(food.proteinG)}g</span>
+                                  </div>
+                                </div>
+                              ))}
+                              <div className="mt-1 flex justify-end">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    deleteMeal(meal.id);
+                                    toast.info(`Deleted ${meal.name} entry.`, 'Meal Removed');
+                                  }}
+                                  className="text-danger hover:text-danger/80 text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete Meal
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -565,14 +788,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       {/* ══════════════════ LOG MEAL MODAL ══════════════════ */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-base font-bold text-text-primary">Log Meal</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsBarcodeModalOpen(true)}
+                  className="px-2 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent flex items-center gap-1"
+                  title="Scan Food Barcode"
+                >
+                  <BarcodeIcon className="w-3.5 h-3.5" />
+                  <span>Scan</span>
+                </button>
+                <button onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-4">
@@ -583,7 +817,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
                 {/* Quick-log template buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {MEAL_TEMPLATES.map(template => (
+                  {MEAL_TEMPLATES.map((template) => (
                     <button
                       key={template}
                       type="button"
@@ -608,205 +842,254 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 />
               </div>
 
-              {/* ── Foods section ── */}
+              {/* ── Quick Add Favorites Inside Modal ── */}
+              {favoriteFoods.length > 0 && (
+                <div>
+                  <label className="text-2xs font-mono text-text-muted uppercase block mb-1">
+                    Quick-Add Favorites (1-Tap)
+                  </label>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono">
+                    {favoriteFoods.map((fav) => (
+                      <button
+                        key={fav.id}
+                        type="button"
+                        onClick={() => handleAddFavoriteToMeal(fav)}
+                        className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-bg-elevated border border-border text-2xs text-text-secondary hover:text-accent hover:border-accent/60 flex items-center gap-1 transition-colors"
+                      >
+                        <Star className="w-3 h-3 text-accent fill-accent" />
+                        <span>{fav.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Foods Section ── */}
               <div>
                 <div className="flex justify-between items-center mb-2.5">
                   <label className="section-title">Foods</label>
-                  <button
-                    onClick={handleAddFood}
-                    className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Food
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsBarcodeModalOpen(true)}
+                      className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110 font-mono"
+                    >
+                      <BarcodeIcon className="w-3.5 h-3.5" /> Scan Barcode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddFood}
+                      className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Food
+                    </button>
+                  </div>
                 </div>
 
-                {/* Empty state inside the foods area */}
-                {foods.length === 0 && (
-                  <div className="text-center py-6 rounded-xl border border-dashed border-border/70 bg-bg-secondary/40">
-                    <Utensils className="w-6 h-6 text-text-muted mx-auto mb-1.5 opacity-50" />
-                    <p className="text-xs text-text-muted font-mono">Tap &quot;Add Food&quot; to log your first item.</p>
-                    <p className="text-[11px] text-text-muted mt-0.5 font-mono opacity-70">Enter a quantity to see estimated macros.</p>
+                {foods.length === 0 ? (
+                  <div className="border border-dashed border-border/80 rounded-xl p-5 text-center bg-bg-elevated/20">
+                    <Utensils className="w-6 h-6 text-text-muted mx-auto mb-1.5 opacity-40" />
+                    <p className="text-xs text-text-secondary font-medium">No foods added to this meal yet.</p>
+                    <p className="text-[11px] text-text-muted font-mono mt-0.5">
+                      Tap &quot;Add Food&quot;, select from Favorites above, or scan a barcode.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleAddFood}
+                      className="mt-3 btn-ghost text-xs py-1 px-3 mx-auto flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Food Item
+                    </button>
                   </div>
-                )}
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    {foods.map((food, i) => {
+                      const isQtySet = food.quantity !== undefined && (food.quantity as number) > 0;
+                      const hasName  = food.name.trim().length >= 2;
+                      const suggestions = foodSuggestions[i] || [];
+                      const isDropdownOpen = showSuggestions[i] && suggestions.length > 0;
+                      const favorited = isItemFavorited(food.name);
 
-                <div className="flex flex-col gap-3">
-                  {foods.map((food, i) => {
-                    const hasName     = food.name.trim().length >= 2;
-                    const hasQuantity = food.quantity !== undefined && (food.quantity as number) > 0;
-                    const showMacros  = hasName && hasQuantity;
-
-                    return (
-                      <div
-                        key={i}
-                        className="border border-border rounded-xl p-3 bg-bg-elevated/40 relative"
-                      >
-                        {/* Food row header */}
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-2xs font-mono text-accent font-semibold">FOOD {i + 1}</span>
-                          <button
-                            onClick={() => handleRemoveFood(i)}
-                            className="text-text-muted hover:text-danger p-0.5 transition-colors"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Food name input + autocomplete */}
+                      return (
                         <div
-                          className="relative mb-2"
-                          ref={el => { suggestionRefs.current[i] = el; }}
+                          key={i}
+                          className="border border-border rounded-xl p-3 bg-bg-elevated/40 relative space-y-2"
                         >
-                          <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted pointer-events-none" />
-                            <input
-                              type="text"
-                              placeholder="Food name (e.g. Chicken breast, Eggs, Rice)"
-                              value={food.name}
-                              onChange={(e) => handleFoodChange(i, 'name', e.target.value)}
-                              onFocus={() => {
-                                if (food.name.length >= 1) {
-                                  const suggestions = getFoodSuggestions(food.name);
-                                  if (suggestions.length > 0) {
-                                    setFoodSuggestions(s => ({ ...s, [i]: suggestions }));
-                                    setShowSuggestions(s => ({ ...s, [i]: true }));
-                                  }
-                                }
-                              }}
-                              className="w-full bg-bg-elevated border border-border rounded-lg pl-8 pr-2.5 py-2 text-text-primary text-sm focus:border-accent outline-none"
-                            />
+                          {/* Row header: label + favorite star + delete */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xs font-mono text-accent font-semibold">
+                              FOOD {i + 1}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {hasName && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFavorite(food)}
+                                  className="text-text-muted hover:text-accent p-0.5"
+                                  title={favorited ? 'Unpin favorite' : 'Pin to favorites'}
+                                >
+                                  <Star
+                                    className={`w-3.5 h-3.5 ${
+                                      favorited ? 'text-accent fill-accent' : 'text-text-muted'
+                                    }`}
+                                  />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFood(i)}
+                                className="text-text-muted hover:text-danger p-0.5 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
 
-                          {/* Autocomplete dropdown */}
-                          {showSuggestions[i] && foodSuggestions[i] && foodSuggestions[i].length > 0 && (
-                            <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-bg-card border border-border rounded-lg shadow-lg overflow-hidden">
-                              {foodSuggestions[i].map((suggestion, si) => (
-                                <button
-                                  key={suggestion}
-                                  type="button"
-                                  onMouseDown={(e) => {
-                                    e.preventDefault(); // prevent blur before click
-                                    handleSelectSuggestion(i, suggestion);
-                                  }}
-                                  className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 transition-colors ${
-                                    activeSuggestionIndex[i] === si
-                                      ? 'bg-accent/15 text-accent'
-                                      : 'text-text-primary hover:bg-bg-elevated'
-                                  }`}
-                                >
-                                  <span>{suggestion}</span>
-                                  <ChevronRight className="w-3 h-3 text-text-muted flex-shrink-0" />
-                                </button>
+                          {/* Food Name input with live autocomplete */}
+                          <div
+                            className="relative"
+                            ref={(el) => { suggestionRefs.current[i] = el; }}
+                          >
+                            <input
+                              type="text"
+                              placeholder="Food name (e.g. Chicken breast, Eggs, Rice, Whey)"
+                              value={food.name}
+                              onChange={(e) => handleFoodChange(i, 'name', e.target.value)}
+                              className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
+                            />
+
+                            {/* Dropdown suggestions list */}
+                            {isDropdownOpen && (
+                              <div className="absolute left-0 right-0 top-full mt-1 bg-bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                                {suggestions.map((sugg) => (
+                                  <button
+                                    key={sugg}
+                                    type="button"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault();
+                                      handleSelectSuggestion(i, sugg);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent flex items-center justify-between border-b border-border/40 last:border-b-0 font-medium"
+                                  >
+                                    <span>{sugg}</span>
+                                    <ChevronRight className="w-3 h-3 text-text-muted" />
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Quantity & Unit Row */}
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              placeholder="Qty (enter amount)"
+                              value={food.quantity ?? ''}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                handleFoodChange(i, 'quantity', v === '' ? undefined : Number(v));
+                              }}
+                              className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent placeholder:text-text-muted"
+                            />
+
+                            <select
+                              value={food.unit || 'g'}
+                              onChange={(e) => handleFoodChange(i, 'unit', e.target.value)}
+                              className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent min-w-[90px]"
+                            >
+                              {UNIT_OPTIONS.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </option>
                               ))}
+                            </select>
+                          </div>
+
+                          {/* Macro breakdown indicators / manual override */}
+                          {hasName && (
+                            <div className="bg-bg-primary/70 p-2 rounded-lg border border-border/80 space-y-1.5">
+                              {/* Quantity guidance banner if quantity is missing */}
+                              {!isQtySet ? (
+                                <p className="text-[11px] text-text-muted font-mono italic">
+                                  Enter quantity above to calculate macros automatically.
+                                </p>
+                              ) : (
+                                <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
+                                  <span className="flex items-center gap-1 text-accent font-semibold">
+                                    <Sparkles className="w-3 h-3" />
+                                    ~{Math.round(food.calories)} kcal
+                                  </span>
+                                  <span>
+                                    P:~{food.proteinG}g • C:~{food.carbsG}g • F:~{food.fatG}g
+                                  </span>
+                                </div>
+                              )}
+
+                              {/* Editable macro input fields */}
+                              <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                                <div>
+                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                    {isQtySet ? '~CAL' : 'CAL'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    value={food.calories || ''}
+                                    placeholder="0"
+                                    onChange={(e) => handleFoodChange(i, 'calories', Number(e.target.value))}
+                                    className="w-full bg-transparent text-accent text-xs font-mono font-semibold p-0 border-none outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                    {isQtySet ? '~PRO' : 'PRO'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={food.proteinG || ''}
+                                    placeholder="0"
+                                    onChange={(e) => handleFoodChange(i, 'proteinG', Number(e.target.value))}
+                                    className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                    {isQtySet ? '~CARB' : 'CARB'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={food.carbsG || ''}
+                                    placeholder="0"
+                                    onChange={(e) => handleFoodChange(i, 'carbsG', Number(e.target.value))}
+                                    className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
+                                  />
+                                </div>
+                                <div>
+                                  <span className="text-2xs text-text-muted block mb-0.5 font-mono">
+                                    {isQtySet ? '~FAT' : 'FAT'}
+                                  </span>
+                                  <input
+                                    type="number"
+                                    step="0.1"
+                                    value={food.fatG || ''}
+                                    placeholder="0"
+                                    onChange={(e) => handleFoodChange(i, 'fatG', Number(e.target.value))}
+                                    className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
+                                  />
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
-
-                        {/* Quantity + Unit row */}
-                        <div className="flex gap-2 mb-2.5">
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            min={0}
-                            value={food.quantity ?? ''}
-                            onChange={(e) => {
-                              const raw = e.target.value;
-                              handleFoodChange(i, 'quantity', raw === '' ? undefined : raw);
-                            }}
-                            className="flex-1 min-w-0 bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
-                          />
-                          <select
-                            value={food.unit}
-                            onChange={(e) => handleFoodChange(i, 'unit', e.target.value)}
-                            className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
-                          >
-                            {UNIT_OPTIONS.map(opt => (
-                              <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        {/* ── Macro display area ── */}
-                        {!hasName ? null : !hasQuantity ? (
-                          /* Prompt: quantity missing */
-                          <p className="text-[11px] text-text-muted font-mono italic mb-2">
-                            Enter quantity to see macros
-                          </p>
-                        ) : null}
-
-                        {/* Editable macro input fields (always shown once food name ≥2 chars) */}
-                        {hasName && (
-                          <div className="grid grid-cols-4 gap-1.5 bg-bg-primary/70 p-2 rounded-lg border border-border">
-                            <div>
-                              <span className="text-2xs text-text-muted block mb-0.5 font-mono">
-                                {showMacros ? '~CAL' : 'CAL'}
-                              </span>
-                              <input
-                                type="number"
-                                value={showMacros ? food.calories : (food.calories || 0)}
-                                onChange={(e) => handleFoodChange(i, 'calories', Number(e.target.value))}
-                                className="w-full bg-transparent text-accent text-xs font-mono font-semibold p-0 border-none outline-none"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-2xs text-text-muted block mb-0.5 font-mono">
-                                {showMacros ? '~PRO' : 'PRO'}
-                              </span>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={showMacros ? food.proteinG : (food.proteinG || 0)}
-                                onChange={(e) => handleFoodChange(i, 'proteinG', Number(e.target.value))}
-                                className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-2xs text-text-muted block mb-0.5 font-mono">
-                                {showMacros ? '~CARB' : 'CARB'}
-                              </span>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={showMacros ? food.carbsG : (food.carbsG || 0)}
-                                onChange={(e) => handleFoodChange(i, 'carbsG', Number(e.target.value))}
-                                className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
-                              />
-                            </div>
-                            <div>
-                              <span className="text-2xs text-text-muted block mb-0.5 font-mono">
-                                {showMacros ? '~FAT' : 'FAT'}
-                              </span>
-                              <input
-                                type="number"
-                                step="0.1"
-                                value={showMacros ? food.fatG : (food.fatG || 0)}
-                                onChange={(e) => handleFoodChange(i, 'fatG', Number(e.target.value))}
-                                className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Inline macro summary badge (when estimated) */}
-                        {showMacros && (
-                          <p className="text-[11px] text-text-muted font-mono mt-1.5">
-                            <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
-                            {' · '}
-                            <span className="text-info">~{food.proteinG}g P</span>
-                            {' · '}
-                            <span className="text-warning">~{food.carbsG}g C</span>
-                            {' · '}
-                            <span className="text-danger">~{food.fatG}g F</span>
-                            <span className="text-text-muted/60 ml-1">(est.)</span>
-                          </p>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Footer: meal totals + save/cancel */}
+            {/* Footer with Meal Totals + Actions */}
             <div className="p-4 border-t border-border bg-bg-card">
               <div className="flex justify-between text-xs mb-1.5 font-mono">
                 <span className="text-text-muted">MEAL TOTAL</span>
@@ -821,14 +1104,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
                   className="btn-ghost flex-1 text-xs"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSaveMeal}
-                  disabled={!mealName.trim() || foods.length === 0 || !foods.some(f => f.name.trim())}
+                  disabled={!mealName.trim() || foods.length === 0 || !foods.some((f) => f.name.trim())}
                   className="btn-primary flex-1 disabled:opacity-40 text-xs"
                 >
                   Save Meal
@@ -852,7 +1137,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <Target className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-text-primary leading-tight">Daily Macro Targets</h3>
+                  <h3 className="font-bold text-base text-text-primary leading-tight">
+                    Daily Macro Targets
+                  </h3>
                   <p className="text-2xs text-text-muted font-mono">Caloric &amp; protein pacing</p>
                 </div>
               </div>
@@ -964,6 +1251,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
       )}
+
+      {/* ══════════════════ BARCODE SCANNER MODAL ══════════════════ */}
+      <BarcodeScannerModal
+        isOpen={isBarcodeModalOpen}
+        onClose={() => setIsBarcodeModalOpen(false)}
+        onAddFood={handleAddScannedFood}
+      />
     </div>
   );
 }

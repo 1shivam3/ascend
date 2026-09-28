@@ -62,14 +62,18 @@
 - **Monthly Activity Heatmap**: green-tinted calendar showing every day you logged a gym session; tap *"I hit the gym today"* to log a quick check-in without a full workout.
 - Full expandable workout history (most recent 20 sessions).
 
-### 🥗 Meals, Live Autocomplete & Daily Macro Targets
-- **Instant Food Autocomplete**: as you type, matching foods from the 130+ item database appear with 1-tap autofill.
-- **Blank Quantity by Default**: no irritating default numbers (no forced 100g); enter exact quantities only when you know them.
-- **Expanded Serving Units**: support for `g`, `ml`, `oz`, `piece`, `pieces`, `scoop`, `tbsp`, `tsp`, `cup`, `bowl`, `serving`, `slice`, and `handful`.
+### 🥗 Nutrition: Barcode Scanner, Favorites & Macro Targets
+- **Live Barcode Scanner**: Scan packaged food barcodes using your device camera powered by `@zxing/browser` and the worldwide **Open Food Facts API** database with live nutritional retrieval and serving size calculation.
+- **Manual Barcode Lookup**: Enter or paste any barcode manually with instant fallback.
+- **Frequent & Pinned Foods (1-Tap Logging)**: Pin staple daily foods (eggs, chicken breast, oats, protein scoop, rice) with custom portions for instant 1-tap logging.
+- **Repeat Yesterday's Diet (Copy Meals)**: 1-tap "Copy Yesterday's Meals" banner and historical day cloning to duplicate meals across days for consistent diets with zero repetitive logging.
+- **Instant Food Autocomplete**: As you type, matching foods from the 130+ item database appear with 1-tap autofill.
+- **Blank Quantity by Default**: No irritating default numbers (no forced 100g); enter exact quantities only when you know them.
+- **Expanded Serving Units**: Support for `g`, `ml`, `oz`, `piece`, `pieces`, `scoop`, `tbsp`, `tsp`, `cup`, `bowl`, `serving`, `slice`, and `handful`.
 - **Quick-Log Templates**: 1-tap buttons for "Breakfast", "Lunch", "Dinner", "Pre-Workout", and "Post-Workout".
-- **Daily Macro Targets**: set per-day goals for Calories, Protein, Carbs, and Fat. Visual progress bars show how close you are. Auto-calculate button suggests targets based on your bodyweight (2 g/kg protein, ~32 kcal/kg total calories).
+- **Daily Macro Targets**: Set per-day goals for Calories, Protein, Carbs, and Fat with visual progress bars. Auto-calculate button suggests targets based on bodyweight.
 - Today's running totals (Kcal, Protein, Carbs, Fat) always visible at the top of the page.
-- Last 7 days of meal history with per-day grouping.
+- Last 14 days of meal history with per-day grouping and expandable food details.
 
 ### 📱 Navigation & Mobile Back-Button
 - **Native-Like Back Navigation**: tapping the hardware/browser back button returns to the Home dashboard rather than abruptly quitting the application.

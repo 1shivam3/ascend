@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry, MacroGoals, PlannedWorkout } from './types';
+import {
+  UserProfile,
+  PersonalRecord,
+  WorkoutEntry,
+  MealEntry,
+  Theme,
+  BodyMetricEntry,
+  MacroGoals,
+  PlannedWorkout,
+  FavoriteFood,
+  FoodItem
+} from './types';
 
 export * from './types';
 
@@ -14,6 +25,7 @@ interface AppState {
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
+  favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
   
@@ -35,6 +47,7 @@ interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+  copyMealsFromDate: (sourceDate: string, targetDate?: string) => number;
 
   setMacroGoals: (goals: MacroGoals | null) => void;
 
@@ -46,11 +59,24 @@ interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
 
+  addFavoriteFood: (food: Omit<FavoriteFood, 'id'>) => void;
+  deleteFavoriteFood: (id: string) => void;
+  toggleFavoriteFood: (food: FoodItem) => boolean;
+
   clearAllData: () => void;
   
   importAllData: (data: any) => boolean;
 }
 
+
+const DEFAULT_FAVORITE_FOODS: FavoriteFood[] = [
+  { id: 'fav_eggs', name: 'Eggs', defaultQuantity: 2, unit: 'piece', calories: 155, proteinG: 13, carbsG: 1.1, fatG: 11 },
+  { id: 'fav_chicken', name: 'Chicken Breast', defaultQuantity: 150, unit: 'g', calories: 248, proteinG: 46.5, carbsG: 0, fatG: 5.4 },
+  { id: 'fav_oats', name: 'Oats', defaultQuantity: 50, unit: 'g', calories: 195, proteinG: 8.5, carbsG: 33, fatG: 3.5 },
+  { id: 'fav_whey', name: 'Whey Protein', defaultQuantity: 1, unit: 'scoop', calories: 120, proteinG: 24, carbsG: 2.2, fatG: 1 },
+  { id: 'fav_banana', name: 'Banana', defaultQuantity: 1, unit: 'piece', calories: 105, proteinG: 1.3, carbsG: 27, fatG: 0.4 },
+  { id: 'fav_rice', name: 'White Rice', defaultQuantity: 150, unit: 'g', calories: 195, proteinG: 4.1, carbsG: 42, fatG: 0.5 },
+];
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -64,6 +90,7 @@ export const useAppStore = create<AppState>()(
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
+      favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
       
@@ -120,6 +147,26 @@ export const useAppStore = create<AppState>()(
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
 
+      copyMealsFromDate: (sourceDate, targetDate) => {
+        const tgt = targetDate || new Date().toISOString().split('T')[0];
+        let copiedCount = 0;
+        set((state) => {
+          const sourceMeals = state.meals.filter(m => m.date === sourceDate);
+          if (sourceMeals.length === 0) return state;
+
+          const clonedMeals = sourceMeals.map(m => ({
+            ...m,
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m_${Date.now()}_${Math.random()}`,
+            date: tgt,
+            foods: m.foods.map(f => ({ ...f }))
+          }));
+
+          copiedCount = clonedMeals.length;
+          return { meals: [...state.meals, ...clonedMeals] };
+        });
+        return copiedCount;
+      },
+
       setMacroGoals: (goals) => set({ macroGoals: goals }),
 
       addBodyMetric: (entry) => set((state) => ({ bodyMetrics: [entry, ...state.bodyMetrics] })),
@@ -151,6 +198,47 @@ export const useAppStore = create<AppState>()(
         plannedWorkouts: state.plannedWorkouts.filter(p => p.id !== id)
       })),
 
+      addFavoriteFood: (food) => set((state) => ({
+        favoriteFoods: [
+          {
+            ...food,
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fav_${Date.now()}`
+          },
+          ...state.favoriteFoods.filter(f => f.name.toLowerCase() !== food.name.toLowerCase())
+        ]
+      })),
+
+      deleteFavoriteFood: (id) => set((state) => ({
+        favoriteFoods: state.favoriteFoods.filter(f => f.id !== id && f.name.toLowerCase() !== id.toLowerCase())
+      })),
+
+      toggleFavoriteFood: (food) => {
+        let isAdded = false;
+        set((state) => {
+          const existing = state.favoriteFoods.find(
+            f => f.name.toLowerCase() === food.name.toLowerCase()
+          );
+          if (existing) {
+            isAdded = false;
+            return { favoriteFoods: state.favoriteFoods.filter(f => f.id !== existing.id) };
+          } else {
+            isAdded = true;
+            const newFav: FavoriteFood = {
+              id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `fav_${Date.now()}`,
+              name: food.name,
+              defaultQuantity: food.quantity,
+              unit: food.unit || 'g',
+              calories: food.calories || 0,
+              proteinG: food.proteinG || 0,
+              carbsG: food.carbsG || 0,
+              fatG: food.fatG || 0,
+            };
+            return { favoriteFoods: [newFav, ...state.favoriteFoods] };
+          }
+        });
+        return isAdded;
+      },
+
       clearAllData: () => {
         set({
           profile: null,
@@ -161,6 +249,7 @@ export const useAppStore = create<AppState>()(
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
+          favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
         });
         if (typeof window !== 'undefined') {
@@ -187,6 +276,7 @@ export const useAppStore = create<AppState>()(
                 ? data.hasCompletedOnboarding
                 : state.hasCompletedOnboarding,
             plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
+            favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
           }));
           return true;
         } catch {
@@ -223,6 +313,7 @@ export const useAppStore = create<AppState>()(
         prTargets: state.prTargets,
         macroGoals: state.macroGoals,
         plannedWorkouts: state.plannedWorkouts,
+        favoriteFoods: state.favoriteFoods,
         hasCompletedOnboarding: state.hasCompletedOnboarding
       })
     }
