@@ -35,6 +35,28 @@ export default function AppPage() {
     }
   }, [theme, _hasHydrated]);
 
+  // Android/Browser back button: navigate to Home instead of exiting
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handlePopState = () => {
+      if (activeTab !== 'home') {
+        setActiveTab('home');
+        // Re-push state so subsequent back presses also work
+        window.history.pushState({ tab: 'home' }, '');
+      }
+      // If already on home, do nothing — let the OS handle exit naturally
+    };
+
+    // Push an initial state entry so we have something to pop to
+    window.history.pushState({ tab: activeTab }, '');
+    window.addEventListener('popstate', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
   if (!_hasHydrated) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
@@ -58,7 +80,7 @@ export default function AppPage() {
         {activeTab === 'meals' && <MealsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
       </main>
 
-      {/* Floating Pill Bottom Navigation (Matching Reference Images 1, 2, 4) */}
+      {/* Floating Pill Bottom Navigation */}
       <nav className="floating-pill-nav" aria-label="Bottom Navigation">
         {tabs.map((tab) => {
           const Icon = tab.icon;

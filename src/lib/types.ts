@@ -115,3 +115,19 @@ export interface MacroGoals {
   carbsG?: number;
   fatG?: number;
 }
+
+export interface PlannedExercise {
+  name: string;
+  targetSets: number;
+  targetReps: number;
+  targetWeight?: number;
+  targetUnit?: Unit;
+  notes?: string;
+}
+
+export interface PlannedWorkout {
+  id: string;
+  name: string;
+  exercises: PlannedExercise[];
+  createdAt: string;
+}

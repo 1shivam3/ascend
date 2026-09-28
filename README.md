@@ -22,7 +22,11 @@
 ## Features
 
 ### 🏆 Personal Records & Strength Levels (1–100)
-- Log PRs for 11 major lifts: Bench Press, Squat, Deadlift, Overhead Press, Barbell Row, Pull-ups, Dumbbell Curl, Leg Press, Romanian Deadlift, Incline Bench, Lat Pulldown — plus any custom exercise.
+- Log PRs for 30+ major lifts across Barbell Compounds, Dumbbells, Bodyweight, and Cable & Machines — plus custom exercises.
+- **Categorized Exercise Selector**: beautiful modal dropdown with live search and color-coded category pills (BB, DB, BW, CM).
+- **Bodyweight Exercise Support**: Pull-ups, Dips, and Push-ups support pure bodyweight tracking (optional added weight; defaults to your bodyweight baseline with 0 extra weight).
+- **Dumbbell Exercise Library**: calibrated per-hand standards for Dumbbell Press, Dumbbell Row, Incline DB Press, DB Shoulder Press, DB Lateral Raise, DB Fly, Hammer Curl, Goblet Squat, Arnold Press, Preacher Curl, and more.
+- **Interactive Level Progression Modal**: tap any level ring or badge to see the exact 1RM needed in `kg`/`lbs` to reach the next level, remaining levels until the next rank tier, and a full 7-tier journey overview.
 - Calculates your **exact 1-Rep Max** using the validated **Epley formula**: `weight × (1 + reps/30)`.
 - Ranks every lift on a **Level 1–100 scale** using real bodyweight-ratio strength standards with gender-adjusted multipliers and smooth interpolation between breakpoints.
 - **10 progression titles** across the scale:
@@ -49,19 +53,26 @@
 - **Working Set / Milestone toggle**: pre-load your best PR set weight or your milestone goal with one tap.
 - Available anywhere in the app (PRs page header, Workout page header, PR card).
 
-### 📅 Workout Logger & Auto-PR Detection
+### 📅 Workout Logger, Pre-Planning & Auto-PR Detection
+- **Pre-Plan Workouts**: create named workout routines (e.g. "Push Day", "Leg Day") with planned exercises, target sets, reps, and target weights before going to the gym.
+- **1-Tap Start from Plan**: hit "Start Workout" on any plan to pre-load all exercises and sets directly into the logger so you can execute and log with zero friction.
 - Log any workout session: multiple exercises, sets, reps, and weights in `kg` or `lbs`.
 - **Auto-PR Detection**: on saving a session, ASCEND computes the Epley 1RM for every set and compares it against your existing bests — new PRs are recorded automatically and a toast announces how many were detected.
 - **Rest Interval Timer**: built-in countdown timer with presets (1 min, 1.5 min, 2 min, 3 min) and ±15 s fine-tune buttons. Fires an audio beep + haptic vibration when time is up. Shows an animated progress bar.
 - **Monthly Activity Heatmap**: green-tinted calendar showing every day you logged a gym session; tap *"I hit the gym today"* to log a quick check-in without a full workout.
 - Full expandable workout history (most recent 20 sessions).
 
-### 🥗 Meals & Daily Macro Targets
-- Log meals by name and add individual food items; quantities can be entered in `g`, `ml`, `piece`, `scoop`, `slice`, `tbsp`, or `oz`.
-- ~80-food database with per-100 g macros; type a food name and macros are estimated in real-time.
+### 🥗 Meals, Live Autocomplete & Daily Macro Targets
+- **Instant Food Autocomplete**: as you type, matching foods from the 130+ item database appear with 1-tap autofill.
+- **Blank Quantity by Default**: no irritating default numbers (no forced 100g); enter exact quantities only when you know them.
+- **Expanded Serving Units**: support for `g`, `ml`, `oz`, `piece`, `pieces`, `scoop`, `tbsp`, `tsp`, `cup`, `bowl`, `serving`, `slice`, and `handful`.
+- **Quick-Log Templates**: 1-tap buttons for "Breakfast", "Lunch", "Dinner", "Pre-Workout", and "Post-Workout".
 - **Daily Macro Targets**: set per-day goals for Calories, Protein, Carbs, and Fat. Visual progress bars show how close you are. Auto-calculate button suggests targets based on your bodyweight (2 g/kg protein, ~32 kcal/kg total calories).
 - Today's running totals (Kcal, Protein, Carbs, Fat) always visible at the top of the page.
 - Last 7 days of meal history with per-day grouping.
+
+### 📱 Navigation & Mobile Back-Button
+- **Native-Like Back Navigation**: tapping the hardware/browser back button returns to the Home dashboard rather than abruptly quitting the application.
 
 ### 📊 Body Metrics Tracking
 - Log bodyweight and height at any time; history is stored and charted.

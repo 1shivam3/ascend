@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry, MacroGoals } from './types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, Theme, BodyMetricEntry, MacroGoals, PlannedWorkout } from './types';
 
 export * from './types';
 
@@ -13,6 +13,7 @@ interface AppState {
   theme: Theme;
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
+  plannedWorkouts: PlannedWorkout[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
   
@@ -40,10 +41,16 @@ interface AppState {
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
   updateBodyMetrics: (weightKg: number, heightCm?: number) => void;
+
+  addPlannedWorkout: (plan: PlannedWorkout) => void;
+  updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
+  deletePlannedWorkout: (id: string) => void;
+
   clearAllData: () => void;
   
   importAllData: (data: any) => boolean;
 }
+
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -56,6 +63,7 @@ export const useAppStore = create<AppState>()(
       theme: 'dark',
       prTargets: {},
       macroGoals: null,
+      plannedWorkouts: [],
       hasCompletedOnboarding: false,
       _hasHydrated: false,
       
@@ -135,6 +143,14 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
+      addPlannedWorkout: (plan) => set((state) => ({ plannedWorkouts: [...state.plannedWorkouts, plan] })),
+      updatePlannedWorkout: (id, plan) => set((state) => ({
+        plannedWorkouts: state.plannedWorkouts.map(p => p.id === id ? plan : p)
+      })),
+      deletePlannedWorkout: (id) => set((state) => ({
+        plannedWorkouts: state.plannedWorkouts.filter(p => p.id !== id)
+      })),
+
       clearAllData: () => {
         set({
           profile: null,
@@ -144,6 +160,7 @@ export const useAppStore = create<AppState>()(
           bodyMetrics: [],
           prTargets: {},
           macroGoals: null,
+          plannedWorkouts: [],
           hasCompletedOnboarding: false,
         });
         if (typeof window !== 'undefined') {
@@ -169,6 +186,7 @@ export const useAppStore = create<AppState>()(
               data.hasCompletedOnboarding !== undefined
                 ? data.hasCompletedOnboarding
                 : state.hasCompletedOnboarding,
+            plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
           }));
           return true;
         } catch {
@@ -204,6 +222,7 @@ export const useAppStore = create<AppState>()(
         theme: state.theme,
         prTargets: state.prTargets,
         macroGoals: state.macroGoals,
+        plannedWorkouts: state.plannedWorkouts,
         hasCompletedOnboarding: state.hasCompletedOnboarding
       })
     }

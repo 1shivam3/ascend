@@ -29,6 +29,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const prTargets = useStore((state) => state.prTargets);
   const macroGoals = useStore((state) => state.macroGoals);
+  const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const theme = useStore((state) => state.theme);
   const importAllData = useStore((state) => state.importAllData);
   const clearAllData = useStore((state) => state.clearAllData);
@@ -53,6 +54,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
       bodyMetrics,
       prTargets,
       macroGoals,
+      plannedWorkouts,
       theme,
       hasCompletedOnboarding: true,
     };
