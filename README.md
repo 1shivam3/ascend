@@ -1,66 +1,194 @@
-# ASCEND — Strength & Progression Web App
+# ASCEND — Strength & Progression Tracker
 
-ASCEND is a minimalist, mobile-first strength tracking web application built with **Next.js 14 (App Router)**, **Tailwind CSS**, and **TypeScript**.
+<p align="center">
+  <img src="public/icon.svg" alt="ASCEND Logo" width="72" height="72" />
+</p>
+
+<p align="center">
+  A minimalist, mobile-first strength tracking PWA built with Next.js 14, Tailwind CSS, and TypeScript.<br/>
+  <strong>100% local-first — no backend, no accounts, no data sent anywhere.</strong>
+</p>
+
+<p align="center">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" />
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" />
+  <img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" />
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-green" />
+</p>
 
 ---
 
-## Key Features
+## Features
 
-1. **Personal Records & Real Strength Standards (Levels 1 to 100)**:
-   - Calculate your **exact 1RM** using the validated Epley formula ($1\text{RM} = \text{weight} \times (1 + \frac{\text{reps}}{30})$).
-   - Ranks your lifts from **Level 1 to 100** based on real bodyweight-to-lift strength ratios (with gender multipliers).
-   - Awards cool progression titles for each tier:
-     - *First Steps* (1–10)
-     - *Iron Initiate* (11–20)
-     - *Steel Apprentice* (21–30)
-     - *Forge Bound* (31–40)
-     - *Iron Forged* (41–50)
-     - *Steel Tempered* (51–60)
-     - *Iron Will* (61–70)
-     - *Titan Rising* (71–80)
-     - *Apex Predator* (81–90)
-     - *Mythic* (91–100)
-   - Categorizes ranks into *Untrained*, *Beginner*, *Novice*, *Intermediate*, *Advanced*, *Elite*, and *World Class*.
-   - Computes an **Overall Strength Level** and composite title across all your lifts.
+### 🏆 Personal Records & Strength Levels (1–100)
+- Log PRs for 11 major lifts: Bench Press, Squat, Deadlift, Overhead Press, Barbell Row, Pull-ups, Dumbbell Curl, Leg Press, Romanian Deadlift, Incline Bench, Lat Pulldown — plus any custom exercise.
+- Calculates your **exact 1-Rep Max** using the validated **Epley formula**: `weight × (1 + reps/30)`.
+- Ranks every lift on a **Level 1–100 scale** using real bodyweight-ratio strength standards with gender-adjusted multipliers and smooth interpolation between breakpoints.
+- **10 progression titles** across the scale:
+  | Range | Title |
+  |---|---|
+  | 1–10 | First Steps |
+  | 11–20 | Iron Initiate |
+  | 21–30 | Steel Apprentice |
+  | 31–40 | Forge Bound |
+  | 41–50 | Iron Forged |
+  | 51–60 | Steel Tempered |
+  | 61–70 | Iron Will |
+  | 71–80 | Titan Rising |
+  | 81–90 | Apex Predator |
+  | 91–100 | Mythic |
+- **Rank categories**: Untrained → Beginner → Novice → Intermediate → Advanced → Elite → World Class.
+- **DOTS Powerlifting Score** computed for Squat, Bench, and Deadlift to give a bodyweight-equalized total.
+- **Overall Strength Level**: weighted average across all your logged lifts.
+- **Milestone targets**: set a target weight per exercise; the plate calculator pre-loads both your best working set and the milestone in one tap.
 
-2. **Daily Hard-Hitting Quote**:
-   - A curated roster of 60 real motivational quotes from legendary athletes, philosophers, and coaches (Rollins, Socrates, Schwarzenegger, Goggins, Bruce Lee, Ali).
-   - Automatically synchronizes to the day of the year for a fresh daily boost.
+### 🏋️ Barbell Plate Calculator
+- Enter any target weight and your available plate denominations — instantly see the exact plates to load on each side.
+- **Warm-up Ramp Generator**: auto-calculates a 5-set ramp (empty bar × 10, 50% × 5, 70% × 3, 85% × 1–2, 100% work set); tap any row to instantly preview that weight's plate breakdown.
+- **Working Set / Milestone toggle**: pre-load your best PR set weight or your milestone goal with one tap.
+- Available anywhere in the app (PRs page header, Workout page header, PR card).
 
-3. **Workout Logger**:
-   - Fast, streamlined workout recorder.
-   - Add exercises, track sets, weights, and reps in your preferred unit (`kg` or `lbs`).
-   - Detailed expandable session history with total sets and exercise counts.
+### 📅 Workout Logger & Auto-PR Detection
+- Log any workout session: multiple exercises, sets, reps, and weights in `kg` or `lbs`.
+- **Auto-PR Detection**: on saving a session, ASCEND computes the Epley 1RM for every set and compares it against your existing bests — new PRs are recorded automatically and a toast announces how many were detected.
+- **Rest Interval Timer**: built-in countdown timer with presets (1 min, 1.5 min, 2 min, 3 min) and ±15 s fine-tune buttons. Fires an audio beep + haptic vibration when time is up. Shows an animated progress bar.
+- **Monthly Activity Heatmap**: green-tinted calendar showing every day you logged a gym session; tap *"I hit the gym today"* to log a quick check-in without a full workout.
+- Full expandable workout history (most recent 20 sessions).
 
-4. **Meal & Macro Estimator**:
-   - Type in foods (e.g. *chicken breast, eggs, rice, oats, whey protein, avocado*), and it automatically estimates calories, protein, carbs, and fat based on quantity and serving units (`g`, `ml`, `piece`, `scoop`, `slice`, `tbsp`, `oz`).
-   - All macros remain fully editable so you can customize them based on exact food labels.
-   - Real-time daily macro totals (Kcal, Protein, Carbs, Fat) displayed at the top.
+### 🥗 Meals & Daily Macro Targets
+- Log meals by name and add individual food items; quantities can be entered in `g`, `ml`, `piece`, `scoop`, `slice`, `tbsp`, or `oz`.
+- ~80-food database with per-100 g macros; type a food name and macros are estimated in real-time.
+- **Daily Macro Targets**: set per-day goals for Calories, Protein, Carbs, and Fat. Visual progress bars show how close you are. Auto-calculate button suggests targets based on your bodyweight (2 g/kg protein, ~32 kcal/kg total calories).
+- Today's running totals (Kcal, Protein, Carbs, Fat) always visible at the top of the page.
+- Last 7 days of meal history with per-day grouping.
 
-5. **Pure Zero Dummy Data**:
-   - Clean slate: starts with zero placeholder PRs, fake workouts, or mock stats.
-   - Clean onboarding asks for your name, gender, and bodyweight once so all strength math is 100% accurate from your first PR.
-   - Persisted locally in browser `localStorage` with instant hydration.
+### 📊 Body Metrics Tracking
+- Log bodyweight and height at any time; history is stored and charted.
+- **BW Ratio** displayed on your profile — strength-to-bodyweight comparison across all your tracked lifts.
+- Unit-aware: switch between `kg`/`lbs` at any point; all stored values are converted automatically.
 
-6. **Fast, Mobile-First PWA UI**:
-   - Dark theme with warm gold accents (`#e5c07b`) on deep charcoal surfaces (`#0a0a0a`).
-   - Mobile bottom navigation bar with safe-area support.
-   - Installable on mobile home screens as a PWA (Progressive Web App).
+### 💡 Daily Motivational Quote
+- 60+ real, curated hard-hitting quotes from legendary athletes, coaches, and philosophers (Henry Rollins, Socrates, Arnold Schwarzenegger, David Goggins, Bruce Lee, Muhammad Ali, and more).
+- Synchronized to the day-of-year — same quote all day, fresh one tomorrow.
+
+### 🔒 Local-First Data Vault (Backup & Restore)
+- Every piece of data lives in your browser's `localStorage` under the `ascend_` namespace.
+- **Data Vault modal**: export all your data as a structured JSON file with one tap.
+- **Restore**: drag-and-drop or select your JSON backup to fully restore your account.
+- **Emergency Snapshot**: on first launch after reinstalling the PWA, ASCEND detects any `ascend_emergency_snapshot` key left in storage and offers to auto-restore it.
+- On data clear, prompted to download a backup before deletion.
+
+### 📱 PWA — Installable & Offline-Capable
+- Full Progressive Web App with a Web App Manifest and service worker.
+- Install prompt banner appears automatically on supported browsers.
+- Runs completely offline after first load — no internet connection required.
+- Safe-area support for notched devices; optimized for iOS Safari, Android Chrome, and desktop browsers.
+
+### ⚖️ Legal & Compliance
+- [Privacy Policy](/privacy) — details local-only data storage, no tracking, no cookies.
+- [Terms of Service](/terms) — usage terms and conditions.
+- [Medical & Safety Disclaimer](/disclaimer) — fitness information is for educational purposes only.
+- Custom [404 Not Found](/404) page.
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | [Next.js 14](https://nextjs.org/) (App Router) |
+| Language | TypeScript 5 |
+| Styling | Tailwind CSS 3 with custom design tokens |
+| State | [Zustand](https://zustand-demo.pmnd.rs/) with `persist` middleware |
+| Icons | [Lucide React](https://lucide.dev/) |
+| Charts | Custom SVG + CSS animations |
+| Storage | Browser `localStorage` only |
+| PWA | Web App Manifest + Next.js metadata |
+
+---
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx           # Root layout (meta, PWA manifest link)
+│   ├── page.tsx             # SPA shell — tab router
+│   ├── globals.css          # Design tokens + utility classes
+│   ├── not-found.tsx        # Custom 404 page
+│   ├── disclaimer/page.tsx  # Medical & Safety Disclaimer
+│   ├── privacy/page.tsx     # Privacy Policy
+│   └── terms/page.tsx       # Terms of Service
+├── components/
+│   ├── HomePage.tsx          # Dashboard — quote, level, quick actions, heatmap
+│   ├── PRsPage.tsx           # Personal Records — levels, DOTS, plate calc
+│   ├── WorkoutPage.tsx       # Workout logger — sets, rest timer, auto-PR
+│   ├── MealsPage.tsx         # Nutrition — food log, macro progress bars
+│   ├── Onboarding.tsx        # First-launch onboarding flow
+│   ├── PlateCalculatorModal.tsx  # Plate calc + warm-up ramp
+│   ├── WorkoutHeatmap.tsx    # Monthly gym activity heatmap
+│   ├── BodyMetricsModal.tsx  # Bodyweight & height history
+│   ├── DataVaultModal.tsx    # Backup / restore JSON
+│   ├── DOTSCard.tsx          # DOTS score display
+│   ├── ProgressChart.tsx     # Lift progress over time
+│   ├── InstallAppBanner.tsx  # PWA install prompt
+│   ├── LegalHubModal.tsx     # Links to legal pages
+│   ├── PrivacyPolicyModal.tsx # In-app privacy policy
+│   ├── SettingsModal.tsx     # App settings
+│   └── ui/
+│       ├── CircularProgress.tsx  # SVG circular progress ring
+│       ├── RankBadge.tsx         # Rank tier badge
+│       ├── ThemeToggle.tsx       # Dark / light theme switch
+│       └── Toast.tsx             # Toast notification system
+└── lib/
+    ├── types.ts              # All shared TypeScript interfaces
+    ├── store.ts              # Zustand global store (state + actions)
+    ├── strength-standards.ts # Level calculation, Epley, breakpoints
+    ├── dots.ts               # DOTS powerlifting score calculation
+    ├── macros.ts             # Food database + macro estimator
+    ├── plate-calculator.ts   # Plate breakdown algorithm
+    ├── quotes.ts             # 60+ daily motivational quotes
+    └── storage.ts            # localStorage helpers
+```
 
 ---
 
 ## Getting Started
 
 ```bash
-# Install dependencies
+# 1. Clone the repo
+git clone https://github.com/1shivam3/ascend.git
+cd ascend
+
+# 2. Install dependencies
 npm install
 
-# Run development server
+# 3. Run the development server
 npm run dev
+```
 
-# Build production bundle
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+```bash
+# Build for production
 npm run build
 
 # Start production server
 npm start
+
+# Run linter
+npm run lint
 ```
+
+---
+
+## Privacy
+
+ASCEND stores **all data exclusively in your browser's `localStorage`**. No data is ever sent to any server. There are no analytics, no tracking cookies, and no third-party SDKs. You own your data — export it any time from the Data Vault.
+
+---
+
+## License
+
+MIT © 2024 Shivam Kumar
