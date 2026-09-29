@@ -478,128 +478,105 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </header>
 
-      {/* ── Today's Summary & Goals ── */}
-      <section className="space-y-3">
+      {/* ── Today's Nutrition & Goals (Item 16: Emphasize Calories & Protein) ── */}
+      <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="section-title mb-0">TODAY&apos;S TOTALS &amp; GOALS</h2>
+          <div>
+            <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
+            <p className="text-2xs text-text-muted mt-0.5">Strength &amp; macro targets</p>
+          </div>
           <button
             type="button"
             onClick={handleOpenGoalsModal}
-            className="text-2xs font-mono text-accent hover:underline flex items-center gap-1 font-semibold"
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
           >
             <Target className="w-3.5 h-3.5" />
             <span>{macroGoals ? 'Edit Targets' : 'Set Targets'}</span>
           </button>
         </div>
 
-        {/* 4-Stat Grid */}
-        <div className="card grid grid-cols-4 gap-2 text-center py-4 bg-bg-card border border-border">
-          <div className="flex flex-col">
-            <span className="text-2xl font-bold text-accent font-mono">{Math.round(todayMacros.calories)}</span>
-            <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">CALORIES</span>
+        {/* Primary Emphasis: Calories & Protein (Item 16) */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* Calories Box */}
+          <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+              CALORIES
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-black text-accent font-sans">
+                {Math.round(todayMacros.calories)}
+              </span>
+              {macroGoals && (
+                <span className="text-xs text-text-muted font-medium">/ {macroGoals.calories} kcal</span>
+              )}
+            </div>
             {macroGoals && (
-              <span className="text-[10px] font-mono text-text-muted mt-0.5">/ {macroGoals.calories}</span>
-            )}
-          </div>
-          <div className="flex flex-col border-l border-border">
-            <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.proteinG)}g</span>
-            <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">PROTEIN</span>
-            {macroGoals && (
-              <span className="text-[10px] font-mono text-text-muted mt-0.5">/ {macroGoals.proteinG}g</span>
-            )}
-          </div>
-          <div className="flex flex-col border-l border-border">
-            <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.carbsG)}g</span>
-            <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">CARBS</span>
-            {macroGoals && macroGoals.carbsG ? (
-              <span className="text-[10px] font-mono text-text-muted mt-0.5">/ {macroGoals.carbsG}g</span>
-            ) : null}
-          </div>
-          <div className="flex flex-col border-l border-border">
-            <span className="text-lg font-bold text-text-primary font-mono">{Math.round(todayMacros.fatG)}g</span>
-            <span className="text-2xs uppercase text-text-muted font-semibold tracking-wider mt-0.5">FAT</span>
-            {macroGoals && macroGoals.fatG ? (
-              <span className="text-[10px] font-mono text-text-muted mt-0.5">/ {macroGoals.fatG}g</span>
-            ) : null}
-          </div>
-        </div>
-
-        {/* Progress bars or set-targets prompt */}
-        {macroGoals ? (
-          <div className="card p-3.5 space-y-2.5 bg-bg-secondary/60 border border-border/80 text-xs font-mono">
-            {/* Calories bar */}
-            <div>
-              <div className="flex justify-between items-center text-2xs mb-1">
-                <span className="text-text-secondary flex items-center gap-1 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-accent inline-block" />
-                  Calories Progress
-                </span>
-                <span className="font-bold text-text-primary">
-                  {Math.round(todayMacros.calories)} / {macroGoals.calories} kcal
-                  ({Math.min(100, Math.round((todayMacros.calories / macroGoals.calories) * 100))}%)
-                </span>
-              </div>
-              <div className="level-bar">
+              <div className="level-bar h-1.5 mt-1">
                 <div
                   className="level-bar-fill bg-accent"
                   style={{ width: `${Math.min(100, Math.round((todayMacros.calories / macroGoals.calories) * 100))}%` }}
                 />
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Protein bar */}
-            <div>
-              <div className="flex justify-between items-center text-2xs mb-1">
-                <span className="text-text-secondary flex items-center gap-1 font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-                  Protein Target
-                </span>
-                <span className="font-bold text-text-primary">
-                  {Math.round(todayMacros.proteinG)} / {macroGoals.proteinG} g
-                  ({Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%)
-                </span>
-              </div>
-              <div className="level-bar">
+          {/* Protein Box (High strength emphasis) */}
+          <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
+            <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider block flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              PROTEIN (KEY)
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-2xl font-black text-emerald-600 font-sans">
+                {Math.round(todayMacros.proteinG)}g
+              </span>
+              {macroGoals && (
+                <span className="text-xs text-text-muted font-medium">/ {macroGoals.proteinG}g</span>
+              )}
+            </div>
+            {macroGoals && (
+              <div className="level-bar h-1.5 mt-1">
                 <div
-                  className="level-bar-fill bg-emerald-400"
+                  className="level-bar-fill bg-emerald-500"
                   style={{ width: `${Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%` }}
                 />
               </div>
-            </div>
+            )}
           </div>
-        ) : (
-          <div
-            onClick={handleOpenGoalsModal}
-            className="p-3 rounded-xl bg-bg-secondary border border-dashed border-border/80 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
-                <Target className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-primary">Set Daily Macro Targets</p>
-                <p className="text-[11px] text-text-muted font-mono">Calibrate daily calories &amp; protein for cutting or bulking</p>
-              </div>
-            </div>
-            <button type="button" className="text-xs font-mono font-semibold text-accent underline ml-2 flex-shrink-0">
-              Configure
-            </button>
+        </div>
+
+        {/* Secondary Info: Carbs & Fat */}
+        <div className="flex items-center justify-around py-2 px-3 rounded-xl bg-bg-secondary/40 border border-border/50 text-xs text-text-secondary">
+          <div className="flex items-center gap-1.5">
+            <span className="text-text-muted font-medium">Carbs:</span>
+            <strong className="text-text-primary">{Math.round(todayMacros.carbsG)}g</strong>
+            {macroGoals?.carbsG && (
+              <span className="text-2xs text-text-muted">/ {macroGoals.carbsG}g</span>
+            )}
           </div>
-        )}
+          <span className="text-border">•</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-text-muted font-medium">Fat:</span>
+            <strong className="text-text-primary">{Math.round(todayMacros.fatG)}g</strong>
+            {macroGoals?.fatG && (
+              <span className="text-2xs text-text-muted">/ {macroGoals.fatG}g</span>
+            )}
+          </div>
+        </div>
       </section>
 
-      {/* ── Feature 3: Copy Yesterday's Meals Banner (High Consistency) ── */}
+      {/* ── Feature: Copy Yesterday's Meals (High Consistency) ── */}
       {yesterdayMeals.length > 0 && todayMeals.length === 0 && (
-        <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-sm animate-fade-in">
+        <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-xs animate-fade-in">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
               <Copy className="w-4 h-4" />
             </div>
             <div>
-              <span className="text-xs font-bold text-text-primary font-mono block">
+              <span className="text-xs font-bold text-text-primary block font-sans">
                 REPEAT YESTERDAY&apos;S DIET
               </span>
-              <span className="text-[11px] text-text-muted font-mono">
+              <span className="text-[11px] text-text-muted font-sans">
                 {yesterdayMeals.length} meals • ~{Math.round(yesterdayMacros.calories)} kcal • ~{Math.round(yesterdayMacros.proteinG)}g protein
               </span>
             </div>
@@ -607,7 +584,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <button
             type="button"
             onClick={handleCopyYesterday}
-            className="btn-primary py-1.5 px-3 text-2xs font-mono font-bold flex items-center gap-1.5 active:scale-95 transition-transform"
+            className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"
           >
             <Copy className="w-3.5 h-3.5" />
             <span>Copy All</span>
@@ -615,67 +592,79 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </section>
       )}
 
-      {/* ── Feature 2: Frequent & Pinned Foods Carousel (1-Tap Logging) ── */}
+      {/* ── Feature: Frequent & Pinned Foods (Item 17: Clean 2-column grid) ── */}
       <section className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1.5">
             <Star className="w-3.5 h-3.5 text-accent fill-accent" />
-            <h2 className="section-title mb-0">FREQUENT &amp; PINNED FOODS</h2>
+            <h2 className="section-title text-[11px] mb-0 font-sans">FREQUENT &amp; PINNED FOODS</h2>
           </div>
-          <span className="text-2xs text-text-muted font-mono">{favoriteFoods.length} Pinned</span>
+          <span className="text-2xs text-text-muted font-sans">{favoriteFoods.length} Pinned</span>
         </div>
 
-        <div className="flex gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-none font-mono">
+        {/* Clean 2-column grid to prevent awkwardly clipped cards (Item 17) */}
+        <div className="grid grid-cols-2 gap-2">
           {favoriteFoods.map((fav) => (
             <button
               key={fav.id}
               type="button"
               onClick={() => handleAddFavoriteToMeal(fav)}
-              className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-95"
+              className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.98] shadow-xs"
               title={`Tap to log ${fav.name} in 1 tap`}
             >
-              <div className="flex items-center gap-1 text-xs font-bold text-text-primary group-hover:text-accent">
-                <Star className="w-3 h-3 text-accent fill-accent" />
-                <span>{fav.name}</span>
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-xs text-text-primary group-hover:text-accent truncate">
+                  {fav.name}
+                </span>
+                <Star className="w-3 h-3 text-accent fill-accent shrink-0 ml-1" />
               </div>
-              <div className="flex items-center gap-2 text-2xs text-text-muted mt-1">
+              <div className="flex items-center gap-1.5 text-2xs text-text-muted mt-1">
                 <span>{fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit}</span>
                 <span>•</span>
                 <span className="text-accent font-semibold">~{fav.calories} kcal</span>
                 <span>•</span>
-                <span className="text-info font-semibold">~{fav.proteinG}g P</span>
+                <span className="text-emerald-600 font-semibold">~{fav.proteinG}g P</span>
               </div>
             </button>
           ))}
           {favoriteFoods.length === 0 && (
-            <div className="p-3 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-xs text-text-muted font-mono w-full text-center">
-              Star (⭐) any food in your meals to pin it here for 1-tap quick logging!
+            <div className="col-span-2 p-3 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-xs text-text-muted text-center">
+              Star (⭐) foods in your meals to pin them here for 1-tap quick logging.
             </div>
           )}
         </div>
       </section>
 
-      {/* ── Meal History ── */}
-      <section>
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="section-title">MEAL HISTORY</h2>
+      {/* ── Meal History (Item 18: Clean action empty state) ── */}
+      <section className="space-y-2.5">
+        <div className="flex justify-between items-center px-0.5">
+          <h2 className="section-title text-[11px] mb-0 font-sans">MEAL HISTORY</h2>
           <span className="text-xs text-text-muted">{meals.length} logged</span>
         </div>
 
         {groupedMeals.length === 0 ? (
-          <div className="card text-center py-12 space-y-2">
-            <Utensils className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
-            <p className="text-text-secondary text-sm font-semibold">No meals logged yet.</p>
-            <p className="text-xs text-text-muted">Tap &quot;Log Meal&quot; or scan a barcode to start tracking nutrition.</p>
-            <div className="mt-4 text-left max-w-xs mx-auto bg-bg-secondary/60 rounded-lg p-3 border border-border/60">
-              <p className="text-2xs font-mono text-accent font-semibold mb-1.5 uppercase tracking-wider">Features</p>
-              <ul className="space-y-1 text-[11px] text-text-muted font-mono">
-                <li>• Barcode scanner via Open Food Facts</li>
-                <li>• 1-tap Repeat Yesterday&apos;s Diet</li>
-                <li>• Pin favorite foods for instant logging</li>
-                <li>• Instant smart food autocomplete</li>
-              </ul>
+          /* Item 18: Clean empty state without bloated feature list */
+          <div className="card text-center py-8 px-4 space-y-2.5">
+            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent mx-auto">
+              <Utensils className="w-5 h-5" />
             </div>
+            <div>
+              <p className="text-sm font-bold text-text-primary">No meals logged</p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Log your first meal to start tracking calories and protein.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (foods.length === 0) handleAddFood();
+                setIsModalOpen(true);
+              }}
+              className="btn-primary mx-auto text-xs py-2 px-4 flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>LOG MEAL</span>
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-5">

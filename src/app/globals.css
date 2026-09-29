@@ -3,39 +3,39 @@
 @tailwind utilities;
 
 :root {
-  /* Light Theme — Soft Neumorphic Studio Aesthetic */
-  --bg-primary: 243 244 246;
-  --bg-secondary: 235 238 243;
-  --bg-tertiary: 226 230 238;
-  --bg-card: 255 255 255;
-  --bg-elevated: 255 255 255;
-  --text-primary: 15 23 42;
-  --text-secondary: 71 85 105;
-  --text-muted: 148 163 184;
-  --border: 226 232 240;
-  --border-subtle: 238 242 246;
-  --border-hover: 203 213 225;
-  --accent: 217 119 6;
-  --accent-dim: 180 83 9;
-  --accent-glow: rgba(217, 119, 6, 0.12);
+  /* Clean Light Theme — Crisp Off-White, Deep Navy & Energetic Orange */
+  --bg-primary: 248 250 252;      /* slate-50 #f8fafc */
+  --bg-secondary: 241 245 249;    /* slate-100 #f1f5f9 */
+  --bg-tertiary: 226 232 240;     /* slate-200 #e2e8f0 */
+  --bg-card: 255 255 255;         /* white */
+  --bg-elevated: 255 255 255;     /* white */
+  --text-primary: 15 23 42;       /* slate-900 #0f172a - deep navy */
+  --text-secondary: 71 85 105;    /* slate-600 #475569 */
+  --text-muted: 100 116 139;      /* slate-500 #64748b */
+  --border: 226 232 240;          /* slate-200 #e2e8f0 */
+  --border-subtle: 241 245 249;   /* slate-100 */
+  --border-hover: 203 213 225;    /* slate-300 */
+  --accent: 234 88 12;            /* orange-600 #ea580c — primary brand action */
+  --accent-dim: 194 65 12;        /* orange-700 #c2410c */
+  --accent-glow: rgba(234, 88, 12, 0.16);
 }
 
 .dark {
-  /* Dark Theme — Deep Pitch Obsidian & Rich Slate (Matching Reference UI) */
-  --bg-primary: 8 8 10;
-  --bg-secondary: 15 15 19;
-  --bg-tertiary: 22 22 28;
-  --bg-card: 20 20 26;
-  --bg-elevated: 27 27 35;
-  --text-primary: 248 250 252;
-  --text-secondary: 148 163 184;
-  --text-muted: 100 116 139;
-  --border: 34 34 44;
-  --border-subtle: 24 24 32;
-  --border-hover: 50 50 64;
-  --accent: 229 192 123;
-  --accent-dim: 184 151 63;
-  --accent-glow: rgba(229, 192, 123, 0.15);
+  /* Dark Theme */
+  --bg-primary: 15 23 42;         /* deep slate navy #0f172a */
+  --bg-secondary: 30 41 59;       /* slate-800 #1e293b */
+  --bg-tertiary: 51 65 85;        /* slate-700 */
+  --bg-card: 23 32 51;            /* #172033 */
+  --bg-elevated: 30 41 59;
+  --text-primary: 248 250 252;    /* slate-50 */
+  --text-secondary: 148 163 184;  /* slate-400 */
+  --text-muted: 100 116 139;      /* slate-500 */
+  --border: 44 58 82;
+  --border-subtle: 30 41 59;
+  --border-hover: 60 76 104;
+  --accent: 249 115 22;           /* orange-500 #f97316 */
+  --accent-dim: 234 88 12;
+  --accent-glow: rgba(249, 115, 22, 0.2);
 }
 
 @layer base {
@@ -60,10 +60,10 @@
   }
 
   input, textarea, select {
-    @apply bg-bg-elevated text-text-primary border border-border rounded-lg px-3 py-2.5 text-base sm:text-sm;
+    @apply bg-bg-elevated text-text-primary border border-border rounded-xl px-3 py-2.5 text-base sm:text-sm;
     @apply outline-none transition-colors duration-150;
     @apply placeholder:text-text-muted;
-    @apply focus:border-accent/60 focus:ring-1 focus:ring-accent/20;
+    @apply focus:border-accent focus:ring-2 focus:ring-accent/20;
   }
 
   select {
@@ -72,48 +72,53 @@
 }
 
 @layer components {
+  /* Restrained rounded corners (16-18px) to reduce card-heavy bubble feel */
   .card {
-    @apply bg-bg-card border border-border/80 rounded-[24px] p-4 sm:p-5 shadow-sm transition-all duration-150;
+    @apply bg-bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-sm transition-all duration-150;
   }
 
   .card-elevated {
-    @apply bg-bg-elevated border border-border/80 rounded-[24px] p-4 sm:p-5 shadow-md;
+    @apply bg-bg-elevated border border-border/80 rounded-2xl p-4 sm:p-5 shadow-sm;
   }
 
   .btn-circle {
-    @apply w-10 h-10 rounded-full flex items-center justify-center transition-all duration-150;
-    @apply bg-bg-card border border-border/80 text-text-secondary hover:text-text-primary hover:border-accent/50 active:scale-95 shadow-sm;
+    @apply w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-150;
+    @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
+  /* Solid vibrant orange primary CTA, white text, strong presence */
   .btn-primary {
-    @apply bg-accent text-bg-primary font-semibold px-4 py-2.5 rounded-full text-sm;
-    @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
-    @apply hover:brightness-105;
+    @apply bg-accent text-white font-semibold px-4 py-2.5 rounded-xl text-sm;
+    @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/25;
+    @apply hover:brightness-105 flex items-center justify-center gap-2;
     min-height: 44px;
   }
 
+  /* Secondary: White background, subtle border, hover state */
   .btn-secondary {
-    @apply bg-bg-elevated text-text-primary font-medium px-4 py-2.5 rounded-full text-sm;
-    @apply border border-border;
+    @apply bg-bg-card text-text-primary font-medium px-4 py-2.5 rounded-xl text-sm;
+    @apply border border-border hover:border-accent/40;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
-    @apply hover:bg-bg-secondary;
+    @apply hover:bg-bg-secondary flex items-center justify-center gap-2;
     min-height: 44px;
   }
 
   .btn-ghost {
-    @apply text-text-secondary font-medium px-3 py-2 rounded-full text-sm;
-    @apply active:bg-bg-secondary transition-all duration-150;
+    @apply text-text-secondary font-medium px-3 py-2 rounded-xl text-sm;
+    @apply hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary transition-all duration-150 flex items-center justify-center gap-1.5;
     min-height: 40px;
   }
 
   .btn-danger {
-    @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-full text-sm;
+    @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-xl text-sm;
     @apply border border-danger/20;
     @apply active:scale-[0.98] transition-all duration-150;
+    min-height: 40px;
   }
 
+  /* Cleaner typography hierarchy: sans-serif for section titles, no excessive monospace */
   .section-title {
-    @apply text-2xs font-bold tracking-widest uppercase text-text-muted font-mono;
+    @apply text-xs font-bold tracking-wider uppercase text-text-muted font-sans;
   }
 
   .level-bar {
@@ -124,29 +129,30 @@
     @apply h-full rounded-full bg-accent transition-all duration-500 ease-out;
   }
 
-  /* Floating Pill Bottom Navigation (Matching Reference Images 1, 2, 4) */
+  /* Floating Pill Bottom Navigation */
   .floating-pill-nav {
     @apply fixed left-4 right-4 max-w-sm mx-auto z-40;
-    @apply bg-bg-card/90 backdrop-blur-xl;
+    @apply bg-bg-card/95 backdrop-blur-xl;
     @apply border border-border/90;
-    @apply rounded-full shadow-2xl;
+    @apply rounded-2xl shadow-xl;
     @apply flex items-center justify-around px-2 py-1.5;
     bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
   }
 
   .pill-nav-item {
-    @apply relative flex flex-col items-center justify-center py-2 px-3 rounded-full text-xs font-medium transition-all duration-200 select-none;
+    @apply relative flex flex-col items-center justify-center py-1.5 px-3 rounded-xl text-xs font-medium transition-all duration-200 select-none;
     @apply text-text-muted hover:text-text-primary;
     min-width: 54px;
     min-height: 44px;
   }
 
   .pill-nav-item.active {
-    @apply text-accent font-bold;
+    @apply text-accent font-bold bg-accent/10;
   }
 
+  /* Desktop centered container (480-540px), mobile full width with 16-20px padding */
   .page {
-    @apply min-h-[100dvh] px-3.5 sm:px-4 pt-3 pb-32 max-w-md mx-auto;
+    @apply min-h-[100dvh] px-4 sm:px-5 pt-3 pb-32 max-w-[520px] mx-auto;
   }
 
   .modal-overlay {
@@ -156,7 +162,7 @@
   }
 
   .modal-content {
-    @apply bg-bg-card rounded-t-[28px] sm:rounded-[28px] w-full max-w-md max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
+    @apply bg-bg-card rounded-t-2xl sm:rounded-2xl w-full max-w-[520px] max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
     @apply border border-border shadow-2xl;
     @apply animate-slide-up;
     @apply pb-[max(env(safe-area-inset-bottom),1.25rem)];

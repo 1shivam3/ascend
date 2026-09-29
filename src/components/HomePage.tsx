@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Trophy,
   Dumbbell,
@@ -10,67 +10,57 @@ import {
   Scale,
   HardDrive,
   X,
-  RefreshCw,
+  Play,
+  Flame,
+  Plus,
+  CheckCircle2,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { getDailyQuote } from '@/lib/quotes';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import RankBadge from '@/components/ui/RankBadge';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
-import DOTSCard from '@/components/DOTSCard';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
-import CircularProgress from '@/components/ui/CircularProgress';
-import { getBigThreeStats } from '@/lib/dots';
+import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
-  const { profile, prs } = useStore();
+  const { profile, prs, workouts, plannedWorkouts } = useStore();
 
-  // Refresh quote every 4 hours automatically + allow manual next-quote tap
-  const INTERVAL_HOURS = 4;
-  const [quoteOffset, setQuoteOffset] = useState(0);
-  const quote = getDailyQuote(profile?.gender ?? null, INTERVAL_HOURS, quoteOffset);
+  const todayDate = useMemo(() => new Date(), []);
+  const todayStr = useMemo(() => {
+    const y = todayDate.getFullYear();
+    const m = String(todayDate.getMonth() + 1).padStart(2, '0');
+    const d = String(todayDate.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }, [todayDate]);
 
-  // Auto-refresh quote when the hour-slot ticks over
-  useEffect(() => {
-    const msPerSlot = INTERVAL_HOURS * 60 * 60 * 1000;
-    const now = Date.now();
-    const msToNextSlot = msPerSlot - (now % msPerSlot);
-    const timer = setTimeout(() => setQuoteOffset(0), msToNextSlot + 100);
-    return () => clearTimeout(timer);
-  }, [quoteOffset]);
+  const formattedDate = useMemo(() => {
+    return todayDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+    });
+  }, [todayDate]);
 
-  // Minutes left until next auto-refresh
-  const [minutesLeft, setMinutesLeft] = useState<number>(0);
-  useEffect(() => {
-    const computeMinutes = () => {
-      const msPerSlot = INTERVAL_HOURS * 60 * 60 * 1000;
-      const remaining = msPerSlot - (Date.now() % msPerSlot);
-      return Math.ceil(remaining / 60000);
-    };
-    setMinutesLeft(computeMinutes());
-    const id = setInterval(() => setMinutesLeft(computeMinutes()), 60000);
-    return () => clearInterval(id);
-  }, []);
+  // Today's workout state
+  const todayWorkouts = useMemo(() => {
+    return workouts.filter((w) => w.date && w.date.startsWith(todayStr));
+  }, [workouts, todayStr]);
 
-  const handleNextQuote = () => {
-    setQuoteOffset((prev) => prev + 1);
-  };
+  const hasTrainedToday = todayWorkouts.length > 0;
+  const activePlan = plannedWorkouts?.[0] || null;
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
-
+  // Lifts and Overall Level Calculation
   const { topLifts, overallLevel } = useMemo(() => {
     if (!profile?.bodyweightKg || !profile?.gender || !prs?.length) {
       return { topLifts: [], overallLevel: null };
@@ -99,14 +89,47 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
     lifts.sort((a, b) => (b.levelInfo?.level || 0) - (a.levelInfo?.level || 0));
 
-    const top = lifts.slice(0, 5);
+    const top = lifts.slice(0, 3);
     const overall = getOverallLevel(lifts.map((l) => l.levelInfo));
 
     return { topLifts: top, overallLevel: overall };
   }, [prs, profile]);
 
+  // Powerlifting Big 3 Stats
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
 
+  // DOTS Score calculation
+  const dotsScore = useMemo(() => {
+    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0) return 0;
+    return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
+  }, [profile, bigThreeStats.totalKg]);
+
+  const dotsClassification = useMemo(() => getDOTSClassification(dotsScore), [dotsScore]);
+
+  // XP / Level progression calculation (Item 6)
+  const levelProgress = useMemo(() => {
+    if (!overallLevel) {
+      return { currentXP: 0, maxXP: 1000, nextLevelXP: 1000, pct: 0, currentRank: 'FOUNDATION' };
+    }
+    const lvl = overallLevel.level;
+    // Each level tier represents 100 XP
+    const currentTierXP = (lvl % 10) * 100 + 45;
+    const maxTierXP = 1000;
+    const pct = Math.min(100, Math.max(8, lvl));
+    const nextLevelXP = 1000 - currentTierXP;
+
+    let rank = 'FOUNDATION';
+    if (lvl > 95) rank = 'GRANDMASTER';
+    else if (lvl > 80) rank = 'MASTER';
+    else if (lvl > 65) rank = 'ELITE';
+    else if (lvl > 45) rank = 'ADVANCED';
+    else if (lvl > 30) rank = 'SKILLED';
+    else if (lvl > 15) rank = 'TRAINED';
+
+    return { currentXP: currentTierXP, maxXP: maxTierXP, nextLevelXP, pct, currentRank: rank };
+  }, [overallLevel]);
+
+  // Display weight helper
   const displayWeight = (weightKg: number) => {
     if (profile?.unit === 'lbs') {
       return `${Math.round(weightKg * 2.20462)} lbs`;
@@ -114,19 +137,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(weightKg)} kg`;
   };
 
+  // Modals state
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isDataVaultModalOpen, setIsDataVaultModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [showDOTSModal, setShowDOTSModal] = useState(false);
   const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
 
   return (
     <div className="page animate-fade-in space-y-4">
-      {/* PWA Install Banner (Top Popup menu for mobile/desktop browsers) */}
+      {/* PWA Install Banner */}
       <InstallAppBanner />
 
-      {/* Header with Clickable Logo */}
-      <header className="flex justify-between items-center pt-1">
+      {/* ── 1. IDENTITY HEADER ──────────────────────────────────────────────── */}
+      <header className="flex justify-between items-center pt-1 pb-1">
         <button
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
@@ -134,16 +159,35 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           title="ASCEND - Click to scroll to top"
         >
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent group-hover:bg-accent/25 transition-colors">
-              <Dumbbell className="w-4 h-4 group-hover:rotate-12 transition-transform duration-300" />
+            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center text-white shadow-xs shadow-accent/25">
+              <Dumbbell className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <h1 className="text-2xl font-black text-text-primary tracking-tight group-hover:text-accent transition-colors font-mono">
-              ASCEND
-            </h1>
+            <div>
+              <h1 className="text-xl font-black text-text-primary tracking-tight leading-none">
+                ASCEND
+              </h1>
+              <p className="text-xs text-text-secondary font-medium mt-0.5">{formattedDate}</p>
+            </div>
           </div>
-          <p className="text-xs text-text-muted font-mono mt-0.5">{today}</p>
         </button>
+
         <div className="flex items-center gap-2">
+          {/* Quick Bodyweight Chip */}
+          <button
+            type="button"
+            onClick={() => setIsBodyMetricsModalOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-bg-card border border-border text-xs font-semibold text-text-primary hover:border-accent/40 transition-colors shadow-xs"
+            title="Update Bodyweight"
+          >
+            <Scale className="w-3.5 h-3.5 text-accent" />
+            <span>
+              {profile?.unit === 'lbs'
+                ? `${Math.round((profile?.bodyweightKg || 75) * 2.20462)} lbs`
+                : `${Math.round(profile?.bodyweightKg || 75)} kg`}
+            </span>
+          </button>
+
+          {/* Plate Calculator Quick Action */}
           <button
             type="button"
             onClick={() => setIsPlateModalOpen(true)}
@@ -152,228 +196,258 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           >
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
+
           <ThemeToggle />
         </div>
       </header>
 
-      {/* 2-Column Hero Grid */}
-      <section className="grid grid-cols-2 gap-3">
-        {/* Left Card: Overall Strength Level with Circular Progress Ring */}
-        <div
-          onClick={() => onNavigate('prs')}
-          className="card p-4 flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-all select-none"
-        >
-          <div className="flex items-center justify-between">
-            <CircularProgress
-              value={overallLevel?.level || 0}
-              size={52}
-              strokeWidth={4.5}
-              progressColor="var(--accent)"
-            >
-              <span className="text-xs font-bold text-text-primary">
-                {overallLevel ? overallLevel.level : 0}
+      {/* ── 5. COMPACT MOTIVATION (Item 5: Compact, not full screen-width card) ── */}
+      <div className="px-1 flex items-center justify-between text-xs text-text-secondary font-sans border-l-2 border-accent pl-2.5 py-0.5">
+        <p className="font-medium text-text-primary">Build the next version of yourself.</p>
+        <span className="text-text-muted text-[11px] hidden sm:inline">• Consistency &gt; intensity</span>
+      </div>
+
+      {/* ── 2. LEVEL & RANK SYSTEM (Item 6: Visually stronger progression) ───── */}
+      <section
+        onClick={() => onNavigate('prs')}
+        className="card p-4 bg-bg-card border border-border hover:border-accent/50 cursor-pointer transition-all duration-150 active:scale-[0.99] select-none"
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <span className="section-title text-[11px] block">STRENGTH RANK</span>
+            <div className="flex items-baseline gap-2 mt-0.5">
+              <h2 className="text-2xl font-black text-text-primary tracking-tight font-sans">
+                {overallLevel ? overallLevel.title : 'VANGUARD'}
+              </h2>
+              <span className="text-sm font-bold text-accent">
+                LEVEL {overallLevel ? overallLevel.level : 1}
               </span>
-            </CircularProgress>
-            <RankBadge
-              rank={
-                !overallLevel
-                  ? 'FOUNDATION'
-                  : overallLevel.level <= 15
-                  ? 'FOUNDATION'
-                  : overallLevel.level <= 30
-                  ? 'TRAINED'
-                  : overallLevel.level <= 45
-                  ? 'SKILLED'
-                  : overallLevel.level <= 65
-                  ? 'ADVANCED'
-                  : overallLevel.level <= 80
-                  ? 'ELITE'
-                  : overallLevel.level <= 95
-                  ? 'MASTER'
-                  : 'GRANDMASTER'
-              }
-              size="sm"
+            </div>
+          </div>
+          <RankBadge
+            rank={levelProgress.currentRank as any}
+            size="sm"
+          />
+        </div>
+
+        {/* Strong progression visual bar */}
+        <div className="mt-3 space-y-1.5">
+          <div className="level-bar h-2.5 bg-bg-secondary rounded-full overflow-hidden">
+            <div
+              className="level-bar-fill h-full bg-accent rounded-full transition-all duration-700"
+              style={{ width: `${levelProgress.pct}%` }}
             />
           </div>
-
-          <div className="mt-3">
-            <h3 className="font-bold text-sm text-text-primary font-mono tracking-tight leading-tight">
-              {overallLevel ? overallLevel.title : 'INITIATE'}
-            </h3>
-            <p className="text-2xs text-text-muted font-mono mt-0.5">Overall Strength</p>
-          </div>
-        </div>
-
-        {/* Right Card: Body Weight & Ratio (Tap to update & view history) */}
-        <div
-          onClick={() => setIsBodyMetricsModalOpen(true)}
-          className="card p-4 flex flex-col justify-between select-none cursor-pointer hover:border-accent/40 active:scale-[0.99] transition-all group"
-          title="Tap to update bodyweight & height"
-        >
-          <div className="flex items-center justify-between">
-            <span className="section-title mb-0 flex items-center gap-1 group-hover:text-accent transition-colors">
-              <Scale className="w-3 h-3 text-accent" />
-              BODY WEIGHT
+          <div className="flex justify-between items-center text-xs text-text-muted">
+            <span className="font-semibold text-text-secondary">
+              {overallLevel ? `${overallLevel.averageRatio}× BW Ratio` : 'Calibrating lifts'}
             </span>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] font-mono text-accent underline opacity-80 group-hover:opacity-100">
-                Edit
-              </span>
-              <span className="text-xs text-accent font-mono font-semibold">
-                {profile?.gender === 'female' ? '♀' : '♂'}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-2">
-            <div className="flex items-baseline gap-1">
-              <span className="text-3xl font-extrabold text-text-primary font-mono tracking-tight">
-                {profile?.unit === 'lbs'
-                  ? Math.round((profile?.bodyweightKg || 75) * 2.20462)
-                  : Math.round(profile?.bodyweightKg || 75)}
-              </span>
-              <span className="text-xs font-mono text-text-muted">
-                {profile?.unit || 'kg'}
-              </span>
-              {profile?.heightCm && (
-                <span className="text-2xs font-mono text-text-muted ml-1">
-                  • {Math.round(profile.heightCm)}cm
-                </span>
-              )}
-            </div>
-
-            {/* Clear Strength-to-Bodyweight Ratio with Info Icon */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowBwRatioInfo(true);
-              }}
-              className="mt-1 flex items-center gap-1 text-2xs text-text-muted hover:text-accent font-mono transition-colors"
-              title="Click to learn what Strength-to-Bodyweight Ratio means"
-            >
-              <span>
-                {overallLevel ? `${overallLevel.averageRatio}x BW Strength` : 'Calibrated'}
-              </span>
-              <Info className="w-3 h-3 text-text-muted hover:text-accent flex-shrink-0" />
-            </div>
+            <span className="text-accent font-medium">
+              {overallLevel ? `${100 - (overallLevel.level % 100)} to next tier` : 'Log a PR to rank'}
+            </span>
           </div>
         </div>
       </section>
 
-      {/* Personalized Motivation Quote */}
-      <section className="card p-3.5 border-l-4 border-l-accent bg-bg-secondary/40 shadow-xs">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-xs text-text-primary italic leading-relaxed font-sans flex-1">
-            &ldquo;{quote.text}&rdquo;
+      {/* ── 3. TODAY'S MAIN ACTION (Item 4 & Item 9: Solid orange START WORKOUT) ─ */}
+      <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <span className="section-title text-[11px] mb-0">TODAY&apos;S TRAINING</span>
+          </div>
+          {hasTrainedToday && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Trained Today
+            </span>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-lg font-bold text-text-primary leading-tight">
+            {hasTrainedToday
+              ? 'Session Complete!'
+              : activePlan
+              ? activePlan.name
+              : 'Ready to Train'}
+          </h3>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {hasTrainedToday
+              ? `${todayWorkouts.length} workout logged for today. Rest & recover.`
+              : activePlan
+              ? `${activePlan.exercises.length} exercises planned • Tap to start`
+              : 'Start a blank workout or choose a training plan.'}
           </p>
+        </div>
+
+        {/* Prominent Primary Solid Orange Button (Item 3 & Item 9) */}
+        <button
+          type="button"
+          onClick={() => onNavigate('workout')}
+          className="btn-primary w-full py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+        >
+          <Play className="w-4 h-4 fill-white stroke-white" />
+          <span>{hasTrainedToday ? 'LOG ANOTHER WORKOUT' : 'START WORKOUT'}</span>
+        </button>
+
+        {/* Secondary Quick Action Links (Item 9: Clean, lower prominence than Start Workout) */}
+        <div className="grid grid-cols-2 gap-2 pt-0.5">
           <button
-            onClick={handleNextQuote}
-            className="flex-shrink-0 p-1 rounded text-text-muted hover:text-accent transition-colors mt-0.5"
-            title="Next quote"
+            type="button"
+            onClick={() => onNavigate('meals')}
+            className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
           >
-            <RefreshCw className="w-3 h-3" />
+            <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />
+            <span>Log Meal</span>
           </button>
-        </div>
-        <div className="flex items-center justify-between mt-1.5">
-          <span className="text-2xs text-text-muted/60 font-mono">
-            {profile?.gender === 'female' ? '♀ ' : profile?.gender === 'male' ? '♂ ' : ''}
-            next in {minutesLeft}m
-          </span>
-          <p className="text-2xs text-text-muted font-mono font-semibold">
-            — {quote.author}
-          </p>
-        </div>
-      </section>
-
-      {/* Empty State Onboarding Guidance when 0 PRs logged */}
-      {(!prs || prs.length === 0) && (
-        <section className="card p-4 border border-accent/40 bg-gradient-to-r from-accent/15 via-accent/5 to-transparent space-y-3 animate-fade-in shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-xl bg-accent/20 flex items-center justify-center text-accent flex-shrink-0 mt-0.5">
-              <Trophy className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-text-primary leading-tight">
-                Calibrate Your Strength Level
-              </h3>
-              <p className="text-xs text-text-secondary mt-1 leading-relaxed">
-                Log your first Bench, Squat, or Deadlift to calculate your calibrated rank, official DOTS score, and milestone targets.
-              </p>
-            </div>
-          </div>
           <button
             type="button"
             onClick={() => onNavigate('prs')}
-            className="btn-primary w-full py-2.5 text-xs font-bold font-mono tracking-wider uppercase flex items-center justify-center gap-2"
+            className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
           >
-            <span>Log Your First PR</span>
-            <ChevronRight className="w-4 h-4" />
+            <Trophy className="w-3.5 h-3.5 text-accent" />
+            <span>Record PR</span>
           </button>
-        </section>
-      )}
-
-      {/* Split Stat Banner */}
-      <section className="card p-4 flex items-center justify-between">
-        <div>
-          <span className="text-xs font-semibold text-text-primary block">
-            Big 3 Powerlifting Total
-          </span>
-          <span className="text-2xs text-text-muted font-mono">Best Squat + Bench + Deadlift</span>
-        </div>
-        <div className="text-right font-mono border-l border-border/80 pl-4">
-          <span className="text-2xl font-black text-text-primary block">
-            {bigThreeStats.totalKg > 0 ? bigThreeStats.totalKg : '—'}{' '}
-            <span className="text-xs font-normal text-text-muted">kg</span>
-          </span>
         </div>
       </section>
 
-      {/* Official Powerlifting DOTS Score */}
-      <DOTSCard onNavigate={onNavigate} />
-
-      {/* Quick Action CTA Cards */}
+      {/* ── 4. KEY STATS SUMMARY (Item 4: 361 kg Big 3 | 1.47× BW | 7 PRs) ───── */}
       <section className="grid grid-cols-3 gap-2.5">
-        <button
+        <div
           onClick={() => onNavigate('prs')}
-          className="card p-3 flex flex-col items-center justify-center gap-1.5 border border-accent/30 hover:border-accent/60 bg-accent/5 hover:bg-accent/10 transition-all text-center min-h-[76px]"
+          className="card p-3 text-center cursor-pointer hover:border-accent/40 transition-colors"
         >
-          <Trophy className="w-5 h-5 text-accent" />
-          <span className="text-xs font-semibold text-text-primary">New PR</span>
-        </button>
-        <button
-          onClick={() => onNavigate('workout')}
-          className="card p-3 flex flex-col items-center justify-center gap-1.5 hover:bg-bg-elevated transition-all text-center min-h-[76px]"
+          <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+            BIG 3 TOTAL
+          </span>
+          <span className="text-xl font-black text-text-primary mt-1 block">
+            {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg}` : '—'}
+            <span className="text-xs font-normal text-text-muted ml-0.5">kg</span>
+          </span>
+        </div>
+
+        <div
+          onClick={() => setShowBwRatioInfo(true)}
+          className="card p-3 text-center cursor-pointer hover:border-accent/40 transition-colors"
         >
-          <Dumbbell className="w-5 h-5 text-text-secondary" />
-          <span className="text-xs font-medium text-text-secondary">Log Lift</span>
-        </button>
-        <button
-          onClick={() => onNavigate('meals')}
-          className="card p-3 flex flex-col items-center justify-center gap-1.5 hover:bg-bg-elevated transition-all text-center min-h-[76px]"
+          <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+            BW RATIO
+          </span>
+          <span className="text-xl font-black text-text-primary mt-1 block">
+            {overallLevel ? `${overallLevel.averageRatio}×` : '—'}
+          </span>
+        </div>
+
+        <div
+          onClick={() => onNavigate('prs')}
+          className="card p-3 text-center cursor-pointer hover:border-accent/40 transition-colors"
         >
-          <UtensilsCrossed className="w-5 h-5 text-text-secondary" />
-          <span className="text-xs font-medium text-text-secondary">Add Meal</span>
-        </button>
+          <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+            TOTAL PRS
+          </span>
+          <span className="text-xl font-black text-accent mt-1 block">
+            {prs?.length || 0}
+          </span>
+        </div>
       </section>
 
-      {/* Monthly Gym Activity Calendar */}
-      <WorkoutHeatmap onNavigate={onNavigate} />
-
-      {/* Top Lifts Showcase */}
-      {topLifts.length > 0 && (
-        <section className="space-y-3">
+      {/* ── 7. BIG 3 TOTAL BREAKDOWN (Item 7: Clean, strong numbers) ─────────── */}
+      {bigThreeStats.totalKg > 0 && (
+        <section className="card p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="section-title">TOP LIFTS</h2>
+            <div>
+              <span className="section-title text-[11px]">POWERLIFTING TOTAL</span>
+              <div className="flex items-baseline gap-2 mt-0.5">
+                <span className="text-2xl font-black text-text-primary font-sans">
+                  {displayWeight(bigThreeStats.totalKg)}
+                </span>
+                <span className="text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                  Personal Best
+                </span>
+              </div>
+            </div>
             <button
+              type="button"
               onClick={() => onNavigate('prs')}
-              className="text-2xs font-mono text-accent hover:underline flex items-center gap-0.5"
+              className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5"
             >
               <span>View All</span>
-              <ChevronRight size={12} />
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="space-y-2.5">
+          {/* Squat • Bench • Deadlift 3-column pill */}
+          <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
+            <div>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
+              <span className="font-bold text-text-primary text-sm">
+                {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+              </span>
+            </div>
+            <div className="border-l border-border">
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
+              <span className="font-bold text-text-primary text-sm">
+                {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
+              </span>
+            </div>
+            <div className="border-l border-border">
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
+              <span className="font-bold text-text-primary text-sm">
+                {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── 8. IMPROVED DOTS PRESENTATION (Item 8: Clean card with View details →) ─ */}
+      <section className="card p-4 flex items-center justify-between bg-bg-card border border-border">
+        <div>
+          <span className="section-title text-[11px] block">DOTS SCORE</span>
+          <div className="flex items-baseline gap-2 mt-0.5">
+            <span className="text-2xl font-black text-accent font-sans">
+              {dotsScore > 0 ? dotsScore : '—'}
+            </span>
+            <span className="text-xs font-bold text-text-primary">
+              {dotsScore > 0 ? dotsClassification.tier : 'Calibration required'}
+            </span>
+          </div>
+          <p className="text-xs text-text-muted mt-0.5">
+            {dotsScore > 0
+              ? `${dotsClassification.description}`
+              : 'Log Squat, Bench & Deadlift to calculate'}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowDOTSModal(true)}
+          className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 shrink-0 p-1.5 rounded-lg hover:bg-accent/10 transition-colors"
+        >
+          <span>View details</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </section>
+
+      {/* ── 6. MONTHLY GYM ACTIVITY (Item 10: SEPTEMBER ACTIVITY, X days trained, streak) ── */}
+      <WorkoutHeatmap onNavigate={onNavigate} />
+
+      {/* ── TOP LIFTS SHOWCASE ──────────────────────────────────────────────── */}
+      {topLifts.length > 0 && (
+        <section className="space-y-2.5">
+          <div className="flex items-center justify-between px-0.5">
+            <h2 className="section-title text-[11px]">TOP LIFTS</h2>
+            <button
+              type="button"
+              onClick={() => onNavigate('prs')}
+              className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5"
+            >
+              <span>View All</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-2">
             {topLifts.map((lift, idx) => (
               <div
                 key={`${lift.exercise}-${idx}`}
@@ -381,30 +455,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 className="card p-3.5 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <CircularProgress
-                    value={Math.min(100, Math.max(8, lift.levelInfo?.level || 0))}
-                    size={42}
-                    strokeWidth={3.5}
-                    progressColor="var(--accent)"
-                  >
-                    <span className="text-[11px] font-bold text-text-primary">
-                      {idx + 1}
-                    </span>
-                  </CircularProgress>
+                  <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center font-bold text-xs text-text-primary">
+                    {idx + 1}
+                  </div>
                   <div>
                     <span className="font-semibold text-sm text-text-primary capitalize block leading-tight">
                       {lift.exercise}
                     </span>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-2xs font-mono font-bold text-accent">
-                        LV.{lift.levelInfo?.level || 0}
-                      </span>
-                      <RankBadge rank={lift.levelInfo?.rank || 'FOUNDATION'} size="sm" />
-                    </div>
+                    <span className="text-xs text-text-muted font-medium mt-0.5 block">
+                      LV {lift.levelInfo?.level || 0} • {lift.levelInfo?.rank || 'FOUNDATION'}
+                    </span>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-2">
-                  <span className="font-mono font-bold text-text-primary text-base">
+                  <span className="font-bold text-text-primary text-base">
                     {displayWeight(lift.oneRepMax)}
                   </span>
                   <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -415,58 +480,128 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </section>
       )}
 
-      {/* Footer Utility: Local Data Backup & Vault */}
-      <div className="pt-2 pb-6 flex items-center justify-between text-2xs text-text-muted font-mono border-t border-border/40">
+      {/* ── FOOTER UTILITY ──────────────────────────────────────────────────── */}
+      <div className="pt-2 pb-8 flex items-center justify-between text-xs text-text-muted font-sans border-t border-border/60">
         <button
           type="button"
           onClick={() => setIsPrivacyModalOpen(true)}
-          className="text-text-muted hover:text-text-primary underline transition-colors"
+          className="hover:text-text-primary underline transition-colors"
         >
-          Legal, Safety &amp; Terms
+          Legal &amp; Privacy
         </button>
         <button
           type="button"
           onClick={() => setIsDataVaultModalOpen(true)}
-          className="text-accent hover:underline flex items-center gap-1 font-semibold"
+          className="text-accent hover:underline flex items-center gap-1.5 font-semibold"
         >
           <HardDrive className="w-3.5 h-3.5" />
           <span>Data Backup &amp; Reset</span>
         </button>
       </div>
 
-      {/* Barbell Plate Loading Calculator Modal */}
+      {/* ── DOTS DETAILS MODAL ──────────────────────────────────────────────── */}
+      {showDOTSModal && (
+        <div className="modal-overlay" onClick={() => setShowDOTSModal(false)}>
+          <div
+            className="modal-content p-5 space-y-4 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2 text-accent">
+                <Trophy className="w-5 h-5" />
+                <h3 className="font-bold text-base text-text-primary">
+                  DOTS Score Breakdown
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDOTSModal(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
+              <div className="p-3 rounded-xl bg-bg-secondary text-center space-y-1">
+                <span className="text-2xs uppercase text-text-muted font-bold">Official Score</span>
+                <p className="text-3xl font-black text-accent">{dotsScore || '—'}</p>
+                <p className="text-xs font-bold text-text-primary">{dotsClassification.tier}</p>
+                <p className="text-2xs text-text-muted">{dotsClassification.description}</p>
+              </div>
+
+              <div className="space-y-1.5 pt-1">
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-text-muted">Bodyweight</span>
+                  <span className="font-semibold text-text-primary">{profile?.bodyweightKg || 75} kg</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-text-muted">Big 3 Total</span>
+                  <span className="font-semibold text-text-primary">{bigThreeStats.totalKg} kg</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-text-muted">Squat 1RM</span>
+                  <span className="font-semibold text-text-primary">{bigThreeStats.squatMax} kg</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-text-muted">Bench 1RM</span>
+                  <span className="font-semibold text-text-primary">{bigThreeStats.benchMax} kg</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-text-muted">Deadlift 1RM</span>
+                  <span className="font-semibold text-text-primary">{bigThreeStats.deadliftMax} kg</span>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-text-muted pt-1">
+                DOTS is the official powerlifting formula that compares strength across different bodyweights and genders.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowDOTSModal(false)}
+              className="btn-primary w-full py-2.5 text-xs font-bold"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Plate Calculator Modal */}
       <PlateCalculatorModal
         isOpen={isPlateModalOpen}
         onClose={() => setIsPlateModalOpen(false)}
         initialUnit={profile?.unit || 'kg'}
       />
 
-      {/* Bodyweight & Height Tracking Modal */}
+      {/* Body Metrics Modal */}
       <BodyMetricsModal
         isOpen={isBodyMetricsModalOpen}
         onClose={() => setIsBodyMetricsModalOpen(false)}
       />
 
-      {/* Local Vault Backup & Safeguarded Reset Modal */}
+      {/* Data Vault Modal */}
       <DataVaultModal
         isOpen={isDataVaultModalOpen}
         onClose={() => setIsDataVaultModalOpen(false)}
       />
 
-      {/* Legal & Compliance Hub Modal */}
+      {/* Legal Hub Modal */}
       <LegalHubModal
         isOpen={isPrivacyModalOpen}
         onClose={() => setIsPrivacyModalOpen(false)}
       />
 
-      {/* BW Ratio Info Modal / Tooltip */}
+      {/* BW Ratio Info Modal */}
       {showBwRatioInfo && (
         <div className="modal-overlay" onClick={() => setShowBwRatioInfo(false)}>
           <div
             className="modal-content p-5 space-y-4 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+            <div className="flex items-center justify-between border-b border-border pb-3">
               <div className="flex items-center gap-2 text-accent">
                 <Info className="w-5 h-5" />
                 <h3 className="font-bold text-base text-text-primary">
@@ -482,29 +617,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </button>
             </div>
 
-            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-mono">
+            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
               <p>
-                <strong className="text-text-primary">BW Ratio (Bodyweight Ratio)</strong> is your{' '}
-                <strong className="text-accent">pound-for-pound strength multiplier</strong>.
+                <strong className="text-text-primary">BW Ratio (Bodyweight Ratio)</strong> measures your pound-for-pound strength relative to your bodyweight.
               </p>
-              <p>
-                It is calculated by dividing your 1-Rep Max by your body weight across your tracked lifts.
-              </p>
-              <div className="p-2.5 rounded-lg bg-bg-secondary border border-border/70 space-y-1 text-2xs">
-                <p>• <strong>0.75× – 1.0×:</strong> Foundation / Trained lifter</p>
-                <p>• <strong>1.0× – 1.5×:</strong> Skilled / Intermediate lifter</p>
+              <div className="p-3 rounded-xl bg-bg-secondary space-y-1.5 text-xs">
+                <p>• <strong>0.75× – 1.0×:</strong> Foundation lifter</p>
+                <p>• <strong>1.0× – 1.5×:</strong> Skilled / Intermediate</p>
                 <p>• <strong>1.5× – 2.0×:</strong> Advanced lifter</p>
-                <p>• <strong>2.0× – 2.5×+:</strong> Elite / Master power lifter</p>
+                <p>• <strong>2.0×+:</strong> Elite power lifter</p>
               </div>
-              <p className="text-2xs text-text-muted">
-                As your lifts go up or your body composition leans down, this multiplier increases!
-              </p>
             </div>
 
             <button
               type="button"
               onClick={() => setShowBwRatioInfo(false)}
-              className="btn-primary w-full py-2 text-xs font-bold"
+              className="btn-primary w-full py-2.5 text-xs font-bold"
             >
               Got It
             </button>

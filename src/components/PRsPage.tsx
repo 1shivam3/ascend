@@ -727,15 +727,15 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       {/* Overall Level Summary Card */}
       {overallLevel && (
-        <div className="card space-y-3 bg-gradient-to-br from-bg-card to-bg-secondary border border-border">
+        <div className="card space-y-3 bg-bg-card border border-border">
           <div className="flex justify-between items-start">
             <div>
-              <span className="section-title">OVERALL STRENGTH</span>
+              <span className="section-title text-[11px]">OVERALL STRENGTH</span>
               <div className="flex items-baseline gap-2.5 mt-1">
-                <span className="text-3xl font-extrabold text-accent font-mono">
-                  LV.{overallLevel.level}
+                <span className="text-3xl font-black text-accent font-sans">
+                  LV {overallLevel.level}
                 </span>
-                <span className="text-base font-bold text-text-primary tracking-wide font-mono">
+                <span className="text-base font-bold text-text-primary tracking-tight font-sans">
                   {overallLevel.title}
                 </span>
               </div>
@@ -767,9 +767,9 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             />
           </div>
 
-          <div className="flex justify-between text-2xs text-text-muted font-mono">
-            <span>{exerciseStats.length} Lifts Ranked</span>
-            <span>Strength Ratio: {overallLevel.averageRatio}x BW</span>
+          <div className="flex justify-between text-xs text-text-muted">
+            <span className="font-medium text-text-secondary">{exerciseStats.length} Lifts Ranked</span>
+            <span>Strength Ratio: <strong className="text-text-primary">{overallLevel.averageRatio}× BW</strong></span>
           </div>
         </div>
       )}
@@ -804,67 +804,85 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             return (
               <div
                 key={item.exercise}
-                className="card space-y-4 transition-all duration-150 hover:border-border-hover"
+                className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border"
               >
-                {/* Header: Name, Clickable Circular Progress Level, Rank */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {/* Clickable level circle → opens level modal */}
-                    <button
-                      type="button"
-                      onClick={() => setLevelModalExercise(item.exercise)}
-                      title={`View level progression for ${item.exercise}`}
-                      className="shrink-0 hover:scale-105 transition-transform active:scale-95 rounded-full focus:outline-none focus:ring-2 focus:ring-accent/50"
-                    >
-                      <CircularProgress
-                        value={Math.min(100, Math.max(8, item.levelInfo.level))}
-                        size={44}
-                        strokeWidth={3.8}
-                        progressColor="var(--accent)"
+                {/* 1. Exercise Name & Prominent 1RM Value (Item 11) */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
+                      {item.exercise}
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setLevelModalExercise(item.exercise)}
+                        className="text-xs font-bold text-accent hover:underline flex items-center gap-1 font-sans"
+                        title="View level progression"
                       >
-                        <span className="text-xs font-bold text-text-primary">
-                          {item.levelInfo.level}
+                        <span>LV {item.levelInfo.level}</span>
+                        <span>•</span>
+                        <span>{item.levelInfo.rank}</span>
+                      </button>
+                      <span className="text-text-muted text-2xs">•</span>
+                      <span className="text-2xs text-text-muted font-medium">
+                        {item.levelInfo.ratio}× BW
+                      </span>
+                      {isBWExercise && (
+                        <span className="text-2xs px-1 rounded bg-warning/15 text-warning font-semibold">
+                          BW
                         </span>
-                      </CircularProgress>
-                    </button>
-                    <div>
-                      <h3 className="text-base font-bold text-text-primary capitalize leading-tight">
-                        {item.exercise}
-                      </h3>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <button
-                          type="button"
-                          onClick={() => setLevelModalExercise(item.exercise)}
-                          className="text-2xs font-mono font-semibold text-accent hover:underline"
-                          title="View level progression"
-                        >
-                          LEVEL {item.levelInfo.level}
-                        </button>
-                        <span className="text-text-muted text-2xs">•</span>
-                        <span className="text-2xs font-mono text-text-secondary">
-                          {item.levelInfo.ratio}x BW
-                        </span>
-                        {isBWExercise && (
-                          <>
-                            <span className="text-text-muted text-2xs">•</span>
-                            <span className="text-2xs font-mono text-warning">BW</span>
-                          </>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
-                  <RankBadge rank={item.levelInfo.rank} size="md" />
-                </div>
 
-                {/* Metrics Grid */}
-                <div className="grid grid-cols-4 gap-2 py-3 px-3 rounded-lg bg-bg-secondary/70 border border-border/60 text-center font-mono">
-                  <div>
-                    <span className="text-2xs text-text-muted block uppercase">e1RM</span>
-                    <span className="text-sm font-bold text-accent">
-                      {display1RM} {userUnit}
+                  <div className="text-right">
+                    <span className="text-2xl font-black text-text-primary font-sans leading-none block">
+                      {display1RM}{' '}
+                      <span className="text-xs font-normal text-text-muted">{userUnit}</span>
+                    </span>
+                    <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
+                      Estimated 1RM
                     </span>
                   </div>
-                  <div
+                </div>
+
+                {/* 2. Next Milestone Progress Bar (Item 11) */}
+                <div className="space-y-1 pt-0.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-text-muted flex items-center gap-1 font-medium">
+                      <Target className="w-3.5 h-3.5 text-accent" />
+                      <span>Next milestone: <strong>{item.nextMilestone} {userUnit}</strong></span>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTargetModalExercise(item.exercise);
+                          setTargetWeightInput(item.nextMilestone.toString());
+                        }}
+                        className="text-2xs text-text-muted hover:text-accent underline"
+                        title="Set target"
+                      >
+                        Edit Target
+                      </button>
+                      <span className="font-bold text-text-primary text-xs font-mono">
+                        {item.milestoneProgress}%
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="level-bar h-2">
+                    <div
+                      className="level-bar-fill"
+                      style={{ width: `${item.milestoneProgress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 3. Best Set & Plate Calculator Link (Item 11) */}
+                <div className="flex items-center justify-between pt-1 text-xs text-text-secondary border-t border-border/50">
+                  <button
+                    type="button"
                     onClick={() => {
                       if (item.bestSet.weight > 0 || isBWExercise) {
                         setPlateModalWeight(
@@ -882,93 +900,33 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         });
                       }
                     }}
-                    className="border-l border-border/60 cursor-pointer hover:bg-bg-elevated/50 transition-colors rounded p-0.5 group"
-                    title="Tap to calculate plates for Best Working Set"
+                    className="flex items-center gap-1.5 hover:text-accent font-medium group text-left"
+                    title="Tap to calculate barbell plates"
                   >
-                    <span className="text-2xs text-text-muted block uppercase flex items-center justify-center gap-0.5 group-hover:text-accent">
-                      Best Set <Dumbbell className="w-2.5 h-2.5 text-accent/70" />
-                    </span>
-                    <span className="text-xs font-semibold text-text-primary group-hover:text-accent">
-                      {item.bestSet.isBodyweight
-                        ? `BW × ${item.bestSet.reps}`
-                        : `${item.bestSet.weight} × ${item.bestSet.reps}`}
-                    </span>
-                  </div>
-                  <div className="border-l border-border/60">
-                    <span className="text-2xs text-text-muted block uppercase">PRs</span>
-                    <span className="text-sm font-semibold text-text-secondary">
-                      {item.prs.length}
-                    </span>
-                  </div>
-                  <div className="border-l border-border/60">
-                    <span className="text-2xs text-text-muted block uppercase">Sessions</span>
-                    <span className="text-sm font-semibold text-text-secondary">
-                      {item.sessionsCount}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Next Milestone Bar */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex justify-between items-center text-xs font-mono">
-                    <span className="text-text-muted flex items-center gap-1">
-                      <Target className="w-3.5 h-3.5 text-accent" /> Next Milestone
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-text-primary">
-                        {item.nextMilestone} {userUnit}
-                      </span>
-                      <button
-                        onClick={() => {
-                          setTargetModalExercise(item.exercise);
-                          setTargetWeightInput(item.nextMilestone.toString());
-                        }}
-                        className="text-text-muted hover:text-accent p-0.5 rounded transition-colors"
-                        title="Edit Target PR"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setPlateModalWeight(item.nextMilestone || display1RM);
-                          setPlateModalMeta({
-                            exerciseName: item.exercise,
-                            bestSetWeight: item.bestSet.weight,
-                            milestoneWeight: item.nextMilestone || display1RM,
-                          });
-                        }}
-                        className="text-text-muted hover:text-accent p-0.5 rounded transition-colors flex items-center gap-0.5 text-2xs"
-                        title="Calculate Barbell Plates (Best Set or Milestone)"
-                      >
-                        <Dumbbell className="w-3.5 h-3.5 text-accent" />
-                        <span className="hidden sm:inline">Plates</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="level-bar">
-                    <div
-                      className="level-bar-fill"
-                      style={{ width: `${item.milestoneProgress}%` }}
-                    />
-                  </div>
-
-                  <div className="flex justify-between text-2xs text-text-muted font-mono">
+                    <Dumbbell className="w-3.5 h-3.5 text-accent" />
                     <span>
-                      {Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10)}{' '}
-                      {userUnit} to reach milestone
+                      Best set:{' '}
+                      <strong className="text-text-primary group-hover:text-accent">
+                        {item.bestSet.isBodyweight
+                          ? `BW × ${item.bestSet.reps}`
+                          : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
+                      </strong>
                     </span>
-                    <span>{item.milestoneProgress}%</span>
-                  </div>
+                  </button>
+
+                  <span className="text-2xs text-text-muted">
+                    {item.prs.length} PRs • {item.sessionsCount} sessions
+                  </span>
                 </div>
 
-                {/* Expand / View History Toggle */}
-                <div className="border-t border-border pt-2">
+                {/* 4. Expand / View PR History Drawer (Item 11) */}
+                <div className="border-t border-border/60 pt-1">
                   <button
+                    type="button"
                     onClick={() =>
                       setExpandedExercise(isExpanded ? null : item.exercise)
                     }
-                    className="w-full flex items-center justify-between text-xs text-text-secondary hover:text-text-primary font-mono py-1"
+                    className="w-full flex items-center justify-between text-xs text-text-muted hover:text-text-primary py-1 font-medium transition-colors"
                   >
                     <span>PR History ({item.prs.length})</span>
                     {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}

@@ -86,7 +86,7 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       meals: [],
       bodyMetrics: [],
-      theme: 'dark',
+      theme: 'light',
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
@@ -292,7 +292,7 @@ export const useAppStore = create<AppState>()(
           state.setHasHydrated(true);
           // Apply active theme to DOM immediately upon hydration
           if (typeof document !== 'undefined') {
-            const currentTheme = state.theme || 'dark';
+            const currentTheme = state.theme || 'light';
             if (currentTheme === 'dark') {
               document.documentElement.classList.add('dark');
               document.documentElement.classList.remove('light');

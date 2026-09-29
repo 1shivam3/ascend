@@ -24,7 +24,7 @@ export default function AppPage() {
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      const activeTheme = theme || 'dark';
+      const activeTheme = theme || 'light';
       if (activeTheme === 'dark') {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');
@@ -72,7 +72,7 @@ export default function AppPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/30">
+    <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       <main className="w-full">
         {activeTab === 'home' && <HomePage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
         {activeTab === 'prs' && <PRsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
@@ -80,7 +80,7 @@ export default function AppPage() {
         {activeTab === 'meals' && <MealsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
       </main>
 
-      {/* Floating Pill Bottom Navigation */}
+      {/* Floating Bottom Navigation (Item 22: Orange active tab, slate unselected, safe area) */}
       <nav className="floating-pill-nav" aria-label="Bottom Navigation">
         {tabs.map((tab) => {
           const Icon = tab.icon;
@@ -90,22 +90,22 @@ export default function AppPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`pill-nav-item ${
+              className={`pill-nav-item transition-all ${
                 isActive
-                  ? 'active text-accent bg-bg-elevated/90 dark:bg-white/10 shadow-sm'
-                  : 'text-text-muted hover:text-text-primary'
+                  ? 'active text-accent bg-accent/10 font-bold'
+                  : 'text-text-muted hover:text-text-primary font-medium'
               }`}
             >
               <Icon
-                size={19}
-                strokeWidth={isActive ? 2.3 : 1.7}
+                size={20}
+                strokeWidth={isActive ? 2.3 : 1.8}
                 className={isActive ? 'text-accent' : 'text-text-muted'}
               />
-              <span className="text-[10px] mt-0.5 tracking-tight font-medium">
+              <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
                 {tab.label}
               </span>
               {isActive && (
-                <span className="w-1 h-1 rounded-full bg-accent mt-0.5 shadow-xs" />
+                <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />
               )}
             </button>
           );

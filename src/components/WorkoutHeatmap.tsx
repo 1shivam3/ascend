@@ -154,20 +154,49 @@ export default function WorkoutHeatmap({ onNavigate }: WorkoutHeatmapProps) {
 
   return (
     <div className="card space-y-4">
-      {/* Header with Title and Streak Counters */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <CalendarIcon className="w-4 h-4 text-accent" />
-          <h2 className="section-title mb-0">MONTHLY GYM ACTIVITY</h2>
+      {/* Header with Title and Useful Activity Summary (Item 10) */}
+      <div className="flex items-start justify-between">
+        <div>
+          <span className="section-title text-[11px] block">{monthName} Activity</span>
+          <div className="mt-1">
+            <span className="text-2xl font-black text-text-primary block font-sans">
+              {monthWorkoutsCount} {monthWorkoutsCount === 1 ? 'day' : 'days'} trained
+            </span>
+            <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1.5 font-medium">
+              <Flame className="w-3.5 h-3.5 text-accent fill-accent" />
+              <span>Current streak: <strong>{currentStreak} {currentStreak === 1 ? 'day' : 'days'}</strong></span>
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <div className="flex items-center gap-1 text-emerald-500 font-semibold">
-            <Flame className="w-3.5 h-3.5 fill-emerald-500" />
-            <span>{currentStreak}d streak</span>
-          </div>
-          <span className="text-text-muted">•</span>
-          <span className="text-text-secondary">{monthWorkoutsCount} this month</span>
+        {/* Quick Month Navigation */}
+        <div className="flex items-center gap-1 pt-1">
+          {(currentDate.getMonth() !== today.getMonth() || currentDate.getFullYear() !== today.getFullYear()) && (
+            <button
+              type="button"
+              onClick={resetToToday}
+              className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 mr-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Today</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={prevMonth}
+            className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors active:scale-95"
+            aria-label="Previous Month"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={nextMonth}
+            className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors active:scale-95"
+            aria-label="Next Month"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -211,43 +240,8 @@ export default function WorkoutHeatmap({ onNavigate }: WorkoutHeatmapProps) {
         )}
       </div>
 
-      {/* Month Navigation Row */}
-      <div className="flex items-center justify-between pt-1 border-t border-border/40">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-sm text-text-primary font-mono tracking-wide">
-            {monthName} {yearNum}
-          </span>
-          {(currentDate.getMonth() !== today.getMonth() || currentDate.getFullYear() !== today.getFullYear()) && (
-            <button
-              type="button"
-              onClick={resetToToday}
-              className="text-2xs font-mono text-accent hover:underline flex items-center gap-0.5 ml-1"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-              <span>Today</span>
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={prevMonth}
-            className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors active:scale-95"
-            aria-label="Previous Month"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button
-            type="button"
-            onClick={nextMonth}
-            className="p-1.5 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors active:scale-95"
-            aria-label="Next Month"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      {/* Divider */}
+      <div className="border-t border-border/60 pt-1" />
 
       {/* Monthly Calendar Grid */}
       <div className="space-y-1.5">

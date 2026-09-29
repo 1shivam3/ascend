@@ -353,6 +353,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(90);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
+  const [isTimerFinished, setIsTimerFinished] = useState<boolean>(false);
 
   // ── Workout Logger Form State ──────────────────────────────────────────────
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -492,8 +493,9 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         setRestSecondsLeft((prev) => {
           if (prev <= 1) {
             playBeep();
-            toast.info('⏰ Rest time is up! Ready for your next set.', 'Rest Period Complete');
+            toast.info('⏰ Rest time is up! Ready for your next set.', 'SET READY');
             setIsRestRunning(false);
+            setIsTimerFinished(true);
             return 0;
           }
           return prev - 1;
@@ -507,17 +509,32 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
     setRestTotalSeconds(seconds);
     setRestSecondsLeft(seconds);
     setIsRestRunning(true);
+    setIsTimerFinished(false);
   };
 
-  const togglePauseTimer = () => setIsRestRunning(r => !r);
+  const togglePauseTimer = () => {
+    if (restSecondsLeft === 0) {
+      startTimer(restTotalSeconds || 90);
+    } else {
+      setIsRestRunning(r => !r);
+    }
+  };
 
   const resetTimer = () => {
     setIsRestRunning(false);
+    setIsTimerFinished(false);
     setRestSecondsLeft(restTotalSeconds);
+  };
+
+  const skipTimer = () => {
+    setIsRestRunning(false);
+    setRestSecondsLeft(0);
+    setIsTimerFinished(false);
   };
 
   const adjustTimer = (deltaSeconds: number) => {
     setRestSecondsLeft(prev => Math.max(0, prev + deltaSeconds));
+    setIsTimerFinished(false);
   };
 
   const formatTimer = (secs: number) => {
@@ -695,138 +712,180 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         </div>
       </header>
 
-      {/* ── Rest Interval Timer ──────────────────────────────────────────── */}
-      <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-secondary to-bg-card border border-border/80">
+      {/* ── 1. TODAY'S WORKOUT HERO (Item 13: Strong "let's train" moment) ── */}
+      <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
-              <Timer className="w-4 h-4" />
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <h2 className="section-title text-[11px] mb-0">TODAY&apos;S WORKOUT</h2>
+          </div>
+          {plannedWorkouts.length > 0 && (
+            <span className="text-2xs text-text-muted font-medium">
+              {plannedWorkouts.length} {plannedWorkouts.length === 1 ? 'plan' : 'plans'} ready
+            </span>
+          )}
+        </div>
+
+        <div>
+          <h3 className="text-lg font-bold text-text-primary leading-tight">
+            {plannedWorkouts.length > 0
+              ? plannedWorkouts[0].name
+              : 'No workout planned'}
+          </h3>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {plannedWorkouts.length > 0
+              ? `${plannedWorkouts[0].exercises.length} exercises configured • Ready to train`
+              : 'Start a workout from scratch or create a plan'}
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              if (plannedWorkouts.length > 0) {
+                handleStartPlan(plannedWorkouts[0]);
+              } else {
+                openBlankLogger();
+              }
+            }}
+            className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+          >
+            <Play className="w-4 h-4 fill-white stroke-white" />
+            <span>START WORKOUT</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={openCreatePlan}
+            className="btn-secondary py-3 text-xs font-semibold px-4"
+          >
+            <Plus className="w-4 h-4 text-accent" />
+            <span>Create Workout Plan</span>
+          </button>
+        </div>
+      </section>
+
+      {/* ── 2. INTERACTIVE REST TIMER (Item 14: Big countdown, +30s, Skip, SET READY) ── */}
+      <section className="card p-4 bg-bg-card border border-border space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Timer className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-[11px] mb-0">REST TIMER</h2>
+          </div>
+          {isTimerFinished && (
+            <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-bounce">
+              SET READY!
+            </span>
+          )}
+        </div>
+
+        {/* Big Countdown display (Item 14) */}
+        <div className="flex items-center justify-between py-1">
+          <div>
+            <div className="text-3xl sm:text-4xl font-black text-text-primary tracking-tight font-mono">
+              {isTimerFinished ? (
+                <span className="text-emerald-500">READY</span>
+              ) : (
+                formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+              )}
             </div>
-            <div>
-              <span className="text-xs font-bold text-text-primary font-mono block">REST INTERVAL TIMER</span>
-              <span className="text-[10px] text-text-muted font-mono">
-                {isRestRunning ? 'Rest in progress...' : 'Pace your sets & recovery'}
-              </span>
-            </div>
+            <p className="text-xs text-text-muted mt-0.5">
+              {isRestRunning
+                ? 'Rest in progress...'
+                : isTimerFinished
+                ? 'Ready for your next set!'
+                : 'Select rest interval or tap play'}
+            </p>
           </div>
 
-          <div className="flex items-center gap-1.5 font-mono">
-            {restSecondsLeft > 0 ? (
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-accent">{formatTimer(restSecondsLeft)}</span>
-                <button
-                  type="button"
-                  onClick={togglePauseTimer}
-                  className="p-1 rounded bg-bg-elevated hover:bg-bg-secondary text-text-primary transition-colors"
-                  title={isRestRunning ? 'Pause' : 'Resume'}
-                >
-                  {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={resetTimer}
-                  className="p-1 rounded bg-bg-elevated hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
-                  title="Reset timer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
-              <span className="text-2xs text-text-muted">Tap interval:</span>
-            )}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={togglePauseTimer}
+              className="p-2.5 rounded-xl bg-accent text-white hover:brightness-105 active:scale-95 transition-all shadow-xs shadow-accent/25"
+              title={isRestRunning ? 'Pause' : 'Start'}
+            >
+              {isRestRunning ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustTimer(30)}
+              className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-semibold hover:border-accent/40 active:scale-95 transition-all"
+              title="+30 Seconds"
+            >
+              +30s
+            </button>
+            <button
+              type="button"
+              onClick={skipTimer}
+              className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-medium active:scale-95 transition-all"
+              title="Skip Rest"
+            >
+              Skip
+            </button>
           </div>
         </div>
 
         {/* Preset chips */}
-        <div className="flex items-center gap-1.5 pt-2.5 overflow-x-auto scrollbar-none font-mono">
+        <div className="grid grid-cols-4 gap-2 pt-1 font-sans">
           {[60, 90, 120, 180].map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => startTimer(s)}
-              className={`flex-1 py-1 px-2 rounded-lg text-2xs font-semibold border transition-colors ${
+              className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
                 restTotalSeconds === s && restSecondsLeft > 0
-                  ? 'bg-accent/20 border-accent text-accent'
-                  : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
+                  ? 'bg-accent text-white border-accent shadow-xs'
+                  : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
               }`}
             >
               {s >= 60 ? `${s / 60}m` : `${s}s`}
             </button>
           ))}
-          {restSecondsLeft > 0 && (
-            <div className="flex gap-1 ml-1">
-              <button
-                type="button"
-                onClick={() => adjustTimer(-15)}
-                className="py-1 px-1.5 rounded-lg text-2xs bg-bg-secondary border border-border text-text-muted hover:text-text-primary"
-                title="-15 seconds"
-              >
-                -15s
-              </button>
-              <button
-                type="button"
-                onClick={() => adjustTimer(15)}
-                className="py-1 px-1.5 rounded-lg text-2xs bg-bg-secondary border border-border text-accent hover:border-accent"
-                title="+15 seconds"
-              >
-                +15s
-              </button>
-            </div>
-          )}
         </div>
-
-        {/* Live progress bar */}
-        {restSecondsLeft > 0 && restTotalSeconds > 0 && (
-          <div className="mt-2.5">
-            <div className="level-bar">
-              <div
-                className="level-bar-fill bg-accent"
-                style={{
-                  width: `${Math.min(100, Math.max(0, (restSecondsLeft / restTotalSeconds) * 100))}%`,
-                  transition: 'width 1s linear',
-                }}
-              />
-            </div>
-          </div>
-        )}
       </section>
 
-      {/* ── Workout Plans Section ────────────────────────────────────────── */}
-      <section>
-        {/* Section header — always visible */}
-        <div className="flex items-center justify-between mb-3">
+      {/* ── 3. WORKOUT PLANS SECTION ────────────────────────────────────────── */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-accent/15 flex items-center justify-center">
-              <BookOpen className="w-3.5 h-3.5 text-accent" />
-            </div>
-            <h2 className="section-title">WORKOUT PLANS</h2>
+            <BookOpen className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-[11px] mb-0">WORKOUT PLANS</h2>
             {plannedWorkouts.length > 0 && (
-              <span className="text-2xs bg-accent/15 text-accent font-mono font-bold px-1.5 py-0.5 rounded-md">
+              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md">
                 {plannedWorkouts.length}
               </span>
             )}
           </div>
           <button
             onClick={openCreatePlan}
-            className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110 transition-all"
+            className="text-accent text-xs font-semibold flex items-center gap-1 hover:underline"
             title="Create new workout plan"
           >
-            <Plus className="w-3.5 h-3.5" /> New Plan
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Plan</span>
           </button>
         </div>
 
         {plannedWorkouts.length === 0 ? (
-          /* Empty state */
-          <div className="card border-dashed border-border/60 py-8 flex flex-col items-center gap-2 text-center">
-            <div className="w-10 h-10 rounded-xl bg-bg-elevated flex items-center justify-center mb-1">
-              <BookOpen className="w-5 h-5 text-text-muted" />
+          /* Item 15: Compact empty state instead of giant empty rectangle */
+          <div className="card p-3.5 flex items-center justify-between border-dashed border-border">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-text-primary">No plans yet</p>
+                <p className="text-2xs text-text-muted">Save your routine for 1-tap logging</p>
+              </div>
             </div>
-            <p className="text-sm text-text-secondary font-medium">No workout plans yet</p>
-            <p className="text-xs text-text-muted max-w-[220px]">
-              Create a reusable plan to quickly start a pre-built session.
-            </p>
-            <button onClick={openCreatePlan} className="btn-primary mt-2 flex items-center gap-1.5 text-sm px-4 py-2">
-              <Plus className="w-3.5 h-3.5" /> Create First Plan
+            <button
+              onClick={openCreatePlan}
+              className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Plan</span>
             </button>
           </div>
         ) : (
@@ -845,24 +904,39 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         )}
       </section>
 
-      {/* ── Workout History Section ──────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-md bg-accent/15 flex items-center justify-center">
-            <Sparkles className="w-3.5 h-3.5 text-accent" />
+      {/* ── 4. RECENT WORKOUTS HISTORY (Item 27: Action-oriented empty state) ─ */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-[11px] mb-0">RECENT WORKOUTS</h2>
           </div>
-          <h2 className="section-title">WORKOUT HISTORY</h2>
           {sortedWorkouts.length > 0 && (
-            <span className="text-2xs bg-accent/15 text-accent font-mono font-bold px-1.5 py-0.5 rounded-md">
-              {sortedWorkouts.length}
+            <span className="text-2xs text-text-muted font-medium">
+              {sortedWorkouts.length} logged
             </span>
           )}
         </div>
 
         {sortedWorkouts.length === 0 ? (
-          <div className="card text-center py-12">
-            <p className="text-text-secondary">No workouts logged yet.</p>
-            <p className="text-xs text-text-muted mt-1">Tap &quot;Log Workout&quot; to record what you trained today.</p>
+          <div className="card text-center py-8 px-4 space-y-2.5">
+            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent mx-auto">
+              <Dumbbell className="w-5 h-5" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-text-primary">Your journey starts here.</p>
+              <p className="text-xs text-text-secondary mt-0.5">
+                Log your first workout to begin tracking consistency and volume.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openBlankLogger}
+              className="btn-primary mx-auto text-xs py-2 px-4 flex items-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>START WORKOUT</span>
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-4">
