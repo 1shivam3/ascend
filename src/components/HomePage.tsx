@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   Trophy,
   Dumbbell,
@@ -9,7 +9,8 @@ import {
   Info,
   Scale,
   HardDrive,
-  X
+  X,
+  RefreshCw,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getDailyQuote } from '@/lib/quotes';
@@ -32,7 +33,37 @@ interface HomePageProps {
 
 export default function HomePage({ onNavigate }: HomePageProps) {
   const { profile, prs } = useStore();
-  const quote = getDailyQuote();
+
+  // Refresh quote every 4 hours automatically + allow manual next-quote tap
+  const INTERVAL_HOURS = 4;
+  const [quoteOffset, setQuoteOffset] = useState(0);
+  const quote = getDailyQuote(profile?.gender ?? null, INTERVAL_HOURS, quoteOffset);
+
+  // Auto-refresh quote when the hour-slot ticks over
+  useEffect(() => {
+    const msPerSlot = INTERVAL_HOURS * 60 * 60 * 1000;
+    const now = Date.now();
+    const msToNextSlot = msPerSlot - (now % msPerSlot);
+    const timer = setTimeout(() => setQuoteOffset(0), msToNextSlot + 100);
+    return () => clearTimeout(timer);
+  }, [quoteOffset]);
+
+  // Minutes left until next auto-refresh
+  const [minutesLeft, setMinutesLeft] = useState<number>(0);
+  useEffect(() => {
+    const computeMinutes = () => {
+      const msPerSlot = INTERVAL_HOURS * 60 * 60 * 1000;
+      const remaining = msPerSlot - (Date.now() % msPerSlot);
+      return Math.ceil(remaining / 60000);
+    };
+    setMinutesLeft(computeMinutes());
+    const id = setInterval(() => setMinutesLeft(computeMinutes()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const handleNextQuote = () => {
+    setQuoteOffset((prev) => prev + 1);
+  };
 
   const today = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -229,14 +260,29 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </section>
 
-      {/* Prominent Daily Motivation Quote */}
+      {/* Personalized Motivation Quote */}
       <section className="card p-3.5 border-l-4 border-l-accent bg-bg-secondary/40 shadow-xs">
-        <p className="text-xs text-text-primary italic leading-relaxed font-sans">
-          &ldquo;{quote.text}&rdquo;
-        </p>
-        <p className="text-2xs text-text-muted font-mono text-right mt-1.5 font-semibold">
-          — {quote.author}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs text-text-primary italic leading-relaxed font-sans flex-1">
+            &ldquo;{quote.text}&rdquo;
+          </p>
+          <button
+            onClick={handleNextQuote}
+            className="flex-shrink-0 p-1 rounded text-text-muted hover:text-accent transition-colors mt-0.5"
+            title="Next quote"
+          >
+            <RefreshCw className="w-3 h-3" />
+          </button>
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="text-2xs text-text-muted/60 font-mono">
+            {profile?.gender === 'female' ? '♀ ' : profile?.gender === 'male' ? '♂ ' : ''}
+            next in {minutesLeft}m
+          </span>
+          <p className="text-2xs text-text-muted font-mono font-semibold">
+            — {quote.author}
+          </p>
+        </div>
       </section>
 
       {/* Empty State Onboarding Guidance when 0 PRs logged */}
