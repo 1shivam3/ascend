@@ -21,6 +21,48 @@
 
 ## Features
 
+### ⚡ Daily Essentials & Habit Operating System (New)
+- **Daily Essentials Checklist**: Unified home dashboard status tracking your 5 core daily objectives:
+  - `🏋️ Workout / 🛌 Active Recovery` (automatically recognizes planned rest days without penalty)
+  - `💧 Hydration Target`
+  - `🥤 Creatine Intake`
+  - `🍗 Protein Target`
+  - `⚖ Morning Bodyweight`
+  - Real-time completion progress: `3/5 DAILY OBJECTIVES COMPLETE`
+- **Dynamic Training Day vs. Rest Day Modes**:
+  - Training day ethos: `TRAIN • HYDRATE • FUEL • RECOVER` (adds +500 ml hydration bonus)
+  - Rest day ethos: `RECOVER • HYDRATE • FUEL • MOBILITY` (automatically completes recovery objective)
+  - 1-tap toggle between training and rest days anytime without penalizing habit streaks.
+- **Next Best Action**: High-impact, zero-clutter single dynamic banner on Home guiding your immediate next priority:
+  - `💧 Drink 500 ml water (1.8 / 2.7 L)`
+  - `🥤 Creatine not logged today`
+  - `🏋️ Complete today's workout`
+  - `⚖ Log morning bodyweight`
+  - `🍗 You're 42g short of protein`
+- **1-Tap Quick Log Bar**: Home screen action strip for instant 1-tap logging of `+250ml`, `+500ml`, `✓ Creatine`, `+25g Protein`, and `⚖ Weight` with tactile toast feedback.
+- **Context-Aware Prompts**: Intelligent in-app alerts (e.g. Post-Workout Rehydration reminder with 1-tap `[+500 ML]` button, and afternoon hydration checks).
+- **Daily Activity Timeline**: Chronological event feed tracking every completed workout, creatine dose, water batch, meal, and bodyweight log throughout the day.
+- **Weekly Consistency Breakdown**: Honest 7-day multi-habit score across all 4 pillars (Gym, Water, Creatine, Protein) with overall adherence percentage.
+- **Monthly Ascension Report & Share Card**: Comprehensive monthly progression report detailing total sessions, PRs set, volume tonnage lifted, hydration %, creatine days, and top lift increases, with 1-click clipboard export.
+
+### 💧 Hydration Target & 1-Tap Logging
+- **Personalized Hydration Target**: Calibrated fluid requirements based on bodyweight (~35 ml/kg), training day bonus (+500 ml), and hot climate adjustment (+300 ml), with optional manual custom target override.
+- **1-Tap Quick Logging**: `+250ml`, `+500ml`, `+750ml`, and `+1000ml` buttons on Home, in Nutrition, and in the dedicated Hydration modal.
+- Detailed daily water intake history and batch timestamps.
+
+### 🥤 Creatine Daily Tracker & Supply Management
+- **Custom Dose & Reminder**: User-configured target (e.g. 5g daily) and preferred reminder time.
+- **Non-Punishing Consistency**: 30-day rolling consistency (`23 / 30 days`), cellular saturation estimate (`Full`, `Maintaining`, `Building`), and streak preservation.
+- **Creatine Container Supply Tracker**: Monitors container capacity (e.g. 500g) and remaining grams, auto-decrements on daily intake, calculates estimated days remaining, alerts on low supply (`< 10 days remaining`), and offers 1-tap container refills.
+
+### 📅 Multi-Habit Monthly Heatmap Matrix
+- **Calendar & Matrix Views**: Toggle between a monthly calendar grid and multi-habit rows:
+  - `WATER ■ ■ ■ □ ■ ■ ■`
+  - `CREATINE ■ ■ ■ ■ ■ □ ■`
+  - `GYM ■ □ ■ ■ ■ □ ■`
+  - `PROTEIN ■ ■ □ ■ ■ ■ ■`
+- **Interactive Day Inspector**: Tap any day to open a rich drawer showing workout exercises and sets, water volume, creatine status, protein intake, and timeline events.
+
 ### 🏆 Personal Records & Strength Levels (1–100)
 - Log PRs for 30+ major lifts across Barbell Compounds, Dumbbells, Bodyweight, and Cable & Machines — plus custom exercises.
 - **Categorized Exercise Selector**: beautiful modal dropdown with live search and color-coded category pills (BB, DB, BW, CM).

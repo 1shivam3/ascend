@@ -145,3 +145,45 @@ export interface FavoriteFood {
   notes?: string;
 }
 
+export type DayType = 'training' | 'rest';
+
+export interface HydrationConfig {
+  baseMl?: number;
+  dailyTargetMl: number;
+  activityBonusMl: number;
+  climateAdjustmentMl?: number;
+  isCustomTarget?: boolean;
+}
+
+export interface WaterLogBatch {
+  id: string;
+  amountMl: number;
+  timestamp: string; // ISO string
+}
+
+export interface CreatineLog {
+  taken: boolean;
+  amountG: number;
+  timestamp?: string; // ISO string
+}
+
+export interface CreatineConfig {
+  dailyTargetG: number;
+  reminderTime?: string;
+  enabled: boolean;
+}
+
+export interface CreatineSupply {
+  containerG: number;
+  currentAmountG: number;
+  lastUpdated: string; // YYYY-MM-DD
+}
+
+export interface DailyTimelineEvent {
+  id: string;
+  time: string; // "HH:MM"
+  type: 'workout' | 'creatine' | 'water' | 'meal' | 'weight';
+  title: string;
+  detail?: string;
+  completed: boolean;
+}

@@ -10,7 +10,14 @@ import {
   MacroGoals,
   PlannedWorkout,
   FavoriteFood,
-  FoodItem
+  FoodItem,
+  DayType,
+  HydrationConfig,
+  WaterLogBatch,
+  CreatineLog,
+  CreatineConfig,
+  CreatineSupply,
+  DailyTimelineEvent
 } from './types';
 
 export * from './types';
@@ -28,6 +35,15 @@ interface AppState {
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
+
+  // Habit Operating System (Tier 1 & 2)
+  waterLogs: Record<string, number>;
+  waterBatches: Record<string, WaterLogBatch[]>;
+  hydrationConfig: HydrationConfig;
+  creatineLogs: Record<string, CreatineLog>;
+  creatineConfig: CreatineConfig;
+  creatineSupply: CreatineSupply;
+  dayTypeOverrides: Record<string, DayType>;
   
   setHasHydrated: (state: boolean) => void;
   setProfile: (profile: UserProfile) => void;
@@ -63,10 +79,48 @@ interface AppState {
   deleteFavoriteFood: (id: string) => void;
   toggleFavoriteFood: (food: FoodItem) => boolean;
 
+  // Habit Actions
+  logWater: (amountMl: number, date?: string) => void;
+  resetWater: (date?: string) => void;
+  setHydrationConfig: (config: Partial<HydrationConfig>) => void;
+  toggleCreatine: (date?: string, amountG?: number) => void;
+  setCreatineConfig: (config: Partial<CreatineConfig>) => void;
+  updateCreatineSupply: (supply: Partial<CreatineSupply>) => void;
+  refillCreatineSupply: (containerG?: number) => void;
+  setDayType: (date: string, type: DayType) => void;
+  logQuickProtein: (proteinG: number, date?: string) => void;
+
   clearAllData: () => void;
   
   importAllData: (data: any) => boolean;
 }
+
+function getLocalTodayStr(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const DEFAULT_HYDRATION_CONFIG: HydrationConfig = {
+  dailyTargetMl: 2700,
+  activityBonusMl: 500,
+  climateAdjustmentMl: 0,
+  isCustomTarget: false,
+};
+
+const DEFAULT_CREATINE_CONFIG: CreatineConfig = {
+  dailyTargetG: 5,
+  reminderTime: '08:00',
+  enabled: true,
+};
+
+const DEFAULT_CREATINE_SUPPLY: CreatineSupply = {
+  containerG: 500,
+  currentAmountG: 450,
+  lastUpdated: new Date().toISOString().split('T')[0],
+};
 
 
 const DEFAULT_FAVORITE_FOODS: FavoriteFood[] = [
@@ -93,6 +147,15 @@ export const useAppStore = create<AppState>()(
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
+
+      // Habit State
+      waterLogs: {},
+      waterBatches: {},
+      hydrationConfig: DEFAULT_HYDRATION_CONFIG,
+      creatineLogs: {},
+      creatineConfig: DEFAULT_CREATINE_CONFIG,
+      creatineSupply: DEFAULT_CREATINE_SUPPLY,
+      dayTypeOverrides: {},
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -239,6 +302,125 @@ export const useAppStore = create<AppState>()(
         return isAdded;
       },
 
+      logWater: (amountMl, date) => set((state) => {
+        const d = date || getLocalTodayStr();
+        const current = state.waterLogs[d] || 0;
+        const nextAmount = Math.max(0, current + amountMl);
+        const batch: WaterLogBatch = {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `water_${Date.now()}`,
+          amountMl,
+          timestamp: new Date().toISOString(),
+        };
+        return {
+          waterLogs: { ...state.waterLogs, [d]: nextAmount },
+          waterBatches: {
+            ...state.waterBatches,
+            [d]: [...(state.waterBatches[d] || []), batch],
+          },
+        };
+      }),
+
+      resetWater: (date) => set((state) => {
+        const d = date || getLocalTodayStr();
+        return {
+          waterLogs: { ...state.waterLogs, [d]: 0 },
+          waterBatches: { ...state.waterBatches, [d]: [] },
+        };
+      }),
+
+      setHydrationConfig: (config) => set((state) => ({
+        hydrationConfig: { ...state.hydrationConfig, ...config },
+      })),
+
+      toggleCreatine: (date, amountG) => set((state) => {
+        const d = date || getLocalTodayStr();
+        const existing = state.creatineLogs[d];
+        const dose = amountG || state.creatineConfig?.dailyTargetG || 5;
+        const wasTaken = !!existing?.taken;
+        const nowTaken = !wasTaken;
+
+        // Auto-decrement/increment container supply
+        const currentSupply = state.creatineSupply?.currentAmountG ?? 500;
+        const supplyDiff = nowTaken ? -dose : dose;
+        const newSupplyAmount = Math.max(0, currentSupply + supplyDiff);
+
+        return {
+          creatineLogs: {
+            ...state.creatineLogs,
+            [d]: {
+              taken: nowTaken,
+              amountG: dose,
+              timestamp: nowTaken ? new Date().toISOString() : undefined,
+            },
+          },
+          creatineSupply: {
+            containerG: state.creatineSupply?.containerG ?? 500,
+            currentAmountG: newSupplyAmount,
+            lastUpdated: d,
+          },
+        };
+      }),
+
+      setCreatineConfig: (config) => set((state) => ({
+        creatineConfig: { ...state.creatineConfig, ...config },
+      })),
+
+      updateCreatineSupply: (supply) => set((state) => ({
+        creatineSupply: {
+          containerG: state.creatineSupply?.containerG ?? 500,
+          currentAmountG: state.creatineSupply?.currentAmountG ?? 500,
+          lastUpdated: getLocalTodayStr(),
+          ...supply,
+        },
+      })),
+
+      refillCreatineSupply: (containerG) => set((state) => {
+        const size = containerG || state.creatineSupply?.containerG || 500;
+        return {
+          creatineSupply: {
+            containerG: size,
+            currentAmountG: size,
+            lastUpdated: getLocalTodayStr(),
+          },
+        };
+      }),
+
+      setDayType: (date, type) => set((state) => ({
+        dayTypeOverrides: { ...state.dayTypeOverrides, [date]: type },
+      })),
+
+      logQuickProtein: (proteinG, date) => set((state) => {
+        const d = date || getLocalTodayStr();
+        const existingIndex = state.meals.findIndex((m) => m.date === d && m.name === 'Quick Protein');
+        const newFood: FoodItem = {
+          name: `Protein Boost (${proteinG}g)`,
+          quantity: proteinG,
+          unit: 'g',
+          calories: Math.round(proteinG * 4),
+          proteinG,
+          carbsG: 0,
+          fatG: 0,
+        };
+
+        if (existingIndex >= 0) {
+          const updatedMeals = [...state.meals];
+          const existingMeal = updatedMeals[existingIndex];
+          updatedMeals[existingIndex] = {
+            ...existingMeal,
+            foods: [...existingMeal.foods, newFood],
+          };
+          return { meals: updatedMeals };
+        } else {
+          const newMeal: MealEntry = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+            date: d,
+            name: 'Quick Protein',
+            foods: [newFood],
+          };
+          return { meals: [newMeal, ...state.meals] };
+        }
+      }),
+
       clearAllData: () => {
         set({
           profile: null,
@@ -251,6 +433,13 @@ export const useAppStore = create<AppState>()(
           plannedWorkouts: [],
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
+          waterLogs: {},
+          waterBatches: {},
+          hydrationConfig: DEFAULT_HYDRATION_CONFIG,
+          creatineLogs: {},
+          creatineConfig: DEFAULT_CREATINE_CONFIG,
+          creatineSupply: DEFAULT_CREATINE_SUPPLY,
+          dayTypeOverrides: {},
         });
         if (typeof window !== 'undefined') {
           try {
@@ -277,6 +466,13 @@ export const useAppStore = create<AppState>()(
                 : state.hasCompletedOnboarding,
             plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
             favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
+            waterLogs: data.waterLogs && typeof data.waterLogs === 'object' ? data.waterLogs : state.waterLogs,
+            waterBatches: data.waterBatches && typeof data.waterBatches === 'object' ? data.waterBatches : state.waterBatches,
+            hydrationConfig: data.hydrationConfig || state.hydrationConfig,
+            creatineLogs: data.creatineLogs && typeof data.creatineLogs === 'object' ? data.creatineLogs : state.creatineLogs,
+            creatineConfig: data.creatineConfig || state.creatineConfig,
+            creatineSupply: data.creatineSupply || state.creatineSupply,
+            dayTypeOverrides: data.dayTypeOverrides && typeof data.dayTypeOverrides === 'object' ? data.dayTypeOverrides : state.dayTypeOverrides,
           }));
           return true;
         } catch {
@@ -314,7 +510,14 @@ export const useAppStore = create<AppState>()(
         macroGoals: state.macroGoals,
         plannedWorkouts: state.plannedWorkouts,
         favoriteFoods: state.favoriteFoods,
-        hasCompletedOnboarding: state.hasCompletedOnboarding
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
+        waterLogs: state.waterLogs,
+        waterBatches: state.waterBatches,
+        hydrationConfig: state.hydrationConfig,
+        creatineLogs: state.creatineLogs,
+        creatineConfig: state.creatineConfig,
+        creatineSupply: state.creatineSupply,
+        dayTypeOverrides: state.dayTypeOverrides,
       })
     }
   )

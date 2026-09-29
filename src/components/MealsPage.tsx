@@ -23,10 +23,14 @@ import {
   CheckCircle2,
   Clock,
   Flame,
+  Droplet,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
+import HydrationModal from '@/components/HydrationModal';
+import CreatineModal from '@/components/CreatineModal';
+import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -80,11 +84,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFavoriteFood = useStore((state) => state.deleteFavoriteFood);
   const toast              = useToast();
 
+  // Habit store state
+  const waterLogs          = useStore((state) => state.waterLogs || {});
+  const creatineLogs       = useStore((state) => state.creatineLogs || {});
+  const logWater           = useStore((state) => state.logWater);
+  const toggleCreatine     = useStore((state) => state.toggleCreatine);
+  const hydrationConfig    = useStore((state) => state.hydrationConfig);
+  const creatineConfig     = useStore((state) => state.creatineConfig);
+
   // ── Modal visibility ──────────────────────────────────────────────────────
-  const [isModalOpen,        setIsModalOpen]        = useState(false);
-  const [isGoalsModalOpen,   setIsGoalsModalOpen]   = useState(false);
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
-  const [expandedMeals,      setExpandedMeals]      = useState<Set<string>>(new Set());
+  const [isModalOpen,          setIsModalOpen]          = useState(false);
+  const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
+  const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
+  const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
+  const [isCreatineModalOpen,  setIsCreatineModalOpen]  = useState(false);
+  const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
 
   // ── Goals form ────────────────────────────────────────────────────────────
   const [goalCalories, setGoalCalories] = useState('');
@@ -387,6 +401,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const todayMeals  = meals.filter((m) => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
 
+  const waterToday = waterLogs[todayDate] || 0;
+  const waterTargetMl = calculateHydrationTarget({
+    bodyweightKg: profile?.bodyweightKg || 75,
+    customTargetMl: hydrationConfig?.dailyTargetMl,
+    isCustomTarget: hydrationConfig?.isCustomTarget,
+  });
+  const waterRemaining = Math.max(0, waterTargetMl - waterToday);
+  const creatineToday = creatineLogs[todayDate];
+  const creatineTaken = !!creatineToday?.taken;
+
   // Yesterday's meals for Quick Copy feature
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
@@ -561,6 +585,110 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {macroGoals?.fatG && (
               <span className="text-2xs text-text-muted">/ {macroGoals.fatG}g</span>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Daily Hydration & Supplements Habit Strip (Unified System) ── */}
+      <section className="card p-3.5 bg-bg-card border border-border space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="section-title text-[10px] mb-0 font-sans">DAILY HYDRATION &amp; SUPPLEMENTS</span>
+          <button
+            type="button"
+            onClick={() => setIsHydrationModalOpen(true)}
+            className="text-[11px] font-semibold text-accent hover:underline"
+          >
+            Adjust Target
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Water widget */}
+          <div
+            onClick={() => setIsHydrationModalOpen(true)}
+            className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-sky-500/40 cursor-pointer transition-all space-y-1.5"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-sky-600 uppercase flex items-center gap-1">
+                <Droplet className="w-3.5 h-3.5 fill-sky-500/20 stroke-sky-500" />
+                WATER
+              </span>
+              <span className="text-[10px] text-text-muted font-medium">
+                {waterRemaining === 0 ? '✓ Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-text-primary font-sans">
+                {(waterToday / 1000).toFixed(1)}
+              </span>
+              <span className="text-xs text-text-muted font-medium">
+                / {(waterTargetMl / 1000).toFixed(1)} L
+              </span>
+            </div>
+            <div className="flex gap-1 pt-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  logWater(250, todayDate);
+                  toast.success('+250 ml logged!', 'Hydration');
+                }}
+                className="flex-1 py-1 rounded-lg bg-bg-card border border-border text-[10px] font-bold text-text-primary hover:border-sky-500 active:scale-95 transition-colors"
+              >
+                +250ml
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  logWater(500, todayDate);
+                  toast.success('+500 ml logged!', 'Hydration');
+                }}
+                className="flex-1 py-1 rounded-lg bg-bg-card border border-border text-[10px] font-bold text-text-primary hover:border-sky-500 active:scale-95 transition-colors"
+              >
+                +500ml
+              </button>
+            </div>
+          </div>
+
+          {/* Creatine widget */}
+          <div
+            onClick={() => setIsCreatineModalOpen(true)}
+            className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-amber-500/40 cursor-pointer transition-all space-y-1.5"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 fill-amber-500/20 stroke-amber-500" />
+                CREATINE
+              </span>
+              <span className="text-[10px] text-text-muted font-medium">
+                {creatineTaken ? '✓ Taken' : 'Pending'}
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-600' : 'text-text-primary'}`}>
+                {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleCreatine(todayDate);
+                if (!creatineTaken) {
+                  toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
+                } else {
+                  toast.info('Creatine marked as not taken', 'Creatine');
+                }
+              }}
+              className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 ${
+                creatineTaken
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
+                  : 'bg-bg-card border-border text-text-primary hover:border-amber-500'
+              }`}
+            >
+              {creatineTaken ? '✓ Taken Today' : '+ Log Creatine'}
+            </button>
           </div>
         </div>
       </section>
@@ -1246,6 +1374,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         isOpen={isBarcodeModalOpen}
         onClose={() => setIsBarcodeModalOpen(false)}
         onAddFood={handleAddScannedFood}
+      />
+
+      {/* Hydration Target Modal */}
+      <HydrationModal
+        isOpen={isHydrationModalOpen}
+        onClose={() => setIsHydrationModalOpen(false)}
+      />
+
+      {/* Creatine Tracker Modal */}
+      <CreatineModal
+        isOpen={isCreatineModalOpen}
+        onClose={() => setIsCreatineModalOpen(false)}
       />
     </div>
   );

@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   TrendingUp,
   Sparkles,
+  Droplet,
+  Award,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
@@ -28,6 +30,16 @@ import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
+import DailyEssentialsCard from '@/components/DailyEssentialsCard';
+import QuickLogBar from '@/components/QuickLogBar';
+import NextBestActionBanner from '@/components/NextBestActionBanner';
+import HydrationModal from '@/components/HydrationModal';
+import CreatineModal from '@/components/CreatineModal';
+import WeeklyConsistencyCard from '@/components/WeeklyConsistencyCard';
+import DailyTimelineCard from '@/components/DailyTimelineCard';
+import MonthlyAscensionReportModal from '@/components/MonthlyAscensionReportModal';
+import { calculateHydrationTarget, formatWaterLiters } from '@/lib/habits';
+import { useToast } from '@/components/ui/Toast';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -137,6 +149,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(weightKg)} kg`;
   };
 
+  // Habit store state
+  const toast = useToast();
+  const waterLogs = useStore((state) => state.waterLogs || {});
+  const logWater = useStore((state) => state.logWater);
+  const hydrationConfig = useStore((state) => state.hydrationConfig);
+
+  const waterToday = waterLogs[todayStr] || 0;
+  const waterTargetMl = calculateHydrationTarget({
+    bodyweightKg: profile?.bodyweightKg || 75,
+    customTargetMl: hydrationConfig?.dailyTargetMl,
+    isCustomTarget: hydrationConfig?.isCustomTarget,
+  });
+
+  // Context-aware reminders (Item 6):
+  const showPostWorkoutHydrationPrompt = hasTrainedToday && waterToday < waterTargetMl;
+  const currentHour = new Date().getHours();
+  const showAfternoonHydrationCheck = !hasTrainedToday && currentHour >= 14 && waterToday < 1200;
+
   // Modals state
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
@@ -144,6 +174,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showDOTSModal, setShowDOTSModal] = useState(false);
   const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
+  const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
+  const [isCreatineModalOpen, setIsCreatineModalOpen] = useState(false);
+  const [isAscensionReportModalOpen, setIsAscensionReportModalOpen] = useState(false);
 
   return (
     <div className="page animate-fade-in space-y-4">
@@ -206,6 +239,88 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <p className="font-medium text-text-primary">Build the next version of yourself.</p>
         <span className="text-text-muted text-[11px] hidden sm:inline">• Consistency &gt; intensity</span>
       </div>
+
+      {/* ── CONTEXT-AWARE REMINDERS (Item 6) ── */}
+      {showPostWorkoutHydrationPrompt && (
+        <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-between text-xs animate-fade-in shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-sky-500/20 flex items-center justify-center text-sky-500 shrink-0">
+              <Droplet className="w-4 h-4 fill-sky-500/30" />
+            </div>
+            <div>
+              <span className="font-bold text-text-primary block leading-tight">
+                POST-WORKOUT REHYDRATION
+              </span>
+              <span className="text-[11px] text-text-secondary mt-0.5 block">
+                Workout complete ✓ Water logged: {formatWaterLiters(waterToday)} / {formatWaterLiters(waterTargetMl)}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logWater(500, todayStr);
+              toast.success('+500 ml logged!', 'Hydration Updated');
+            }}
+            className="btn-secondary py-1 px-2.5 text-xs font-bold text-sky-600 border-sky-500/40 hover:bg-sky-500/10 shrink-0"
+          >
+            +500 ML
+          </button>
+        </div>
+      )}
+
+      {showAfternoonHydrationCheck && (
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs animate-fade-in shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-500 shrink-0">
+              <Droplet className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold text-text-primary block leading-tight">
+                HYDRATION CHECK
+              </span>
+              <span className="text-[11px] text-text-secondary mt-0.5 block">
+                You are behind target: {formatWaterLiters(waterToday)} / {formatWaterLiters(waterTargetMl)}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              logWater(500, todayStr);
+              toast.success('+500 ml logged!', 'Hydration Updated');
+            }}
+            className="btn-secondary py-1 px-2.5 text-xs font-bold text-amber-600 border-amber-500/40 hover:bg-amber-500/10 shrink-0"
+          >
+            +500 ML
+          </button>
+        </div>
+      )}
+
+      {/* ── NEXT BEST ACTION (Item 11 & 19: High-impact single direction) ── */}
+      <NextBestActionBanner
+        onNavigateWorkout={() => onNavigate('workout')}
+        onNavigateMeals={() => onNavigate('meals')}
+        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
+        onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
+        onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
+      />
+
+      {/* ── DAILY ESSENTIALS CHECKLIST (Item 1, 4 & 5: Unified habit OS) ── */}
+      <DailyEssentialsCard
+        onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
+        onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
+        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
+        onNavigateMeals={() => onNavigate('meals')}
+        onNavigateWorkout={() => onNavigate('workout')}
+      />
+
+      {/* ── QUICK LOG BAR (Item 8: 1-Tap strip) ── */}
+      <QuickLogBar
+        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
+        onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
+        onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
+      />
 
       {/* ── 2. LEVEL & RANK SYSTEM (Item 6: Visually stronger progression) ───── */}
       <section
@@ -310,6 +425,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </section>
+
+      {/* ── WEEKLY CONSISTENCY (Item 12: 4 Pillars 7-Day Adherence) ── */}
+      <WeeklyConsistencyCard />
 
       {/* ── 4. KEY STATS SUMMARY (Item 4: 361 kg Big 3 | 1.47× BW | 7 PRs) ───── */}
       <section className="grid grid-cols-3 gap-2.5">
@@ -429,8 +547,28 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </button>
       </section>
 
-      {/* ── 6. MONTHLY GYM ACTIVITY (Item 10: SEPTEMBER ACTIVITY, X days trained, streak) ── */}
-      <WorkoutHeatmap onNavigate={onNavigate} />
+      {/* ── 6. MONTHLY HABIT ACTIVITY & ASCENSION REPORT (Item 10 & 14) ── */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <span className="section-title text-[11px] mb-0">MONTHLY PROGRESSION</span>
+          <button
+            type="button"
+            onClick={() => setIsAscensionReportModalOpen(true)}
+            className="text-xs font-bold text-accent hover:underline flex items-center gap-1 py-0.5"
+          >
+            <Award className="w-3.5 h-3.5" />
+            <span>Ascension Report</span>
+          </button>
+        </div>
+        <WorkoutHeatmap
+          onNavigate={onNavigate}
+          onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
+          onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
+        />
+      </div>
+
+      {/* ── DAILY TIMELINE (Item 8: Chronological feed) ── */}
+      <DailyTimelineCard />
 
       {/* ── TOP LIFTS SHOWCASE ──────────────────────────────────────────────── */}
       {topLifts.length > 0 && (
@@ -639,6 +777,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       )}
+
+      {/* Hydration Target Modal */}
+      <HydrationModal
+        isOpen={isHydrationModalOpen}
+        onClose={() => setIsHydrationModalOpen(false)}
+      />
+
+      {/* Creatine Tracker & Supply Modal */}
+      <CreatineModal
+        isOpen={isCreatineModalOpen}
+        onClose={() => setIsCreatineModalOpen(false)}
+      />
+
+      {/* Monthly Ascension Progression Report Modal */}
+      <MonthlyAscensionReportModal
+        isOpen={isAscensionReportModalOpen}
+        onClose={() => setIsAscensionReportModalOpen(false)}
+      />
     </div>
   );
 }
