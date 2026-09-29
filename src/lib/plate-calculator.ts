@@ -42,21 +42,25 @@ export function calculatePlates(
   barWeight: number = 20,
   unit: 'kg' | 'lbs' = 'kg'
 ): PlateCalculationResult {
-  const platesConfig = unit === 'kg' ? METRIC_PLATES : IMPERIAL_PLATES;
+  let effectiveBar = typeof barWeight === 'number' ? barWeight : (typeof unit === 'number' ? unit : 20);
+  let effectiveUnit: 'kg' | 'lbs' = typeof unit === 'string' && (unit === 'kg' || unit === 'lbs') ? unit : (typeof barWeight === 'string' && (barWeight === 'kg' || barWeight === 'lbs') ? barWeight : 'kg');
+  if (isNaN(effectiveBar) || effectiveBar <= 0) effectiveBar = 20;
 
-  if (targetWeight <= barWeight) {
+  const platesConfig = effectiveUnit === 'kg' ? METRIC_PLATES : IMPERIAL_PLATES;
+
+  if (targetWeight <= effectiveBar) {
     return {
       targetWeight,
-      barWeight,
+      barWeight: effectiveBar,
       weightPerSide: 0,
-      totalLoadedWeight: barWeight,
+      totalLoadedWeight: effectiveBar,
       plates: [],
       remainder: 0,
-      unit,
+      unit: effectiveUnit,
     };
   }
 
-  let sideWeightRemaining = (targetWeight - barWeight) / 2;
+  let sideWeightRemaining = (targetWeight - effectiveBar) / 2;
   const resultPlates: PlateInfo[] = [];
 
   for (const plate of platesConfig) {
@@ -76,16 +80,40 @@ export function calculatePlates(
   }
 
   const loadedPerSide = resultPlates.reduce((acc, p) => acc + p.weight * p.count, 0);
-  const totalLoaded = Number((barWeight + loadedPerSide * 2).toFixed(2));
+  const totalLoaded = Number((effectiveBar + loadedPerSide * 2).toFixed(2));
   const remainder = Number((targetWeight - totalLoaded).toFixed(2));
 
   return {
     targetWeight,
-    barWeight,
+    barWeight: effectiveBar,
     weightPerSide: loadedPerSide,
     totalLoadedWeight: totalLoaded,
     plates: resultPlates,
     remainder,
-    unit,
+    unit: effectiveUnit,
   };
+}
+
+export interface WarmupSet {
+  label: string;
+  weight: number;
+  reps: string;
+  pct: string;
+}
+
+export function generateWarmupRamp(
+  targetWeight: number,
+  unit: 'kg' | 'lbs' = 'kg',
+  barWeight: number = 20
+): WarmupSet[] {
+  if (targetWeight <= barWeight) return [];
+  const step = unit === 'kg' ? 2.5 : 5;
+  const roundToStep = (wt: number) => Math.max(barWeight, Math.round(wt / step) * step);
+  return [
+    { label: 'Set 1 (Empty Bar)', weight: barWeight, reps: '10 reps', pct: 'Warmup' },
+    { label: 'Set 2 (50%)', weight: roundToStep(targetWeight * 0.5), reps: '5 reps', pct: '50%' },
+    { label: 'Set 3 (70%)', weight: roundToStep(targetWeight * 0.7), reps: '3 reps', pct: '70%' },
+    { label: 'Set 4 (85%)', weight: roundToStep(targetWeight * 0.85), reps: '1-2 reps', pct: '85%' },
+    { label: 'Work Set (100%)', weight: targetWeight, reps: 'Work reps', pct: '100%' },
+  ];
 }
