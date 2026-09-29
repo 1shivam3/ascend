@@ -1,4 +1,4 @@
-import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle } from './types';
+import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 
 export function calculateOneRepMax(weight: number, reps: number): number {
   if (reps <= 1) return weight;
@@ -21,15 +21,17 @@ const MALE_STANDARDS: Record<string, { [key: number]: number }> = {
   'Close Grip Bench':       { 1: 0.35, 20: 0.65, 35: 0.95, 50: 1.20, 70: 1.50, 85: 1.75, 100: 2.05 },
   'Sumo Deadlift':          { 1: 0.70, 20: 1.20, 35: 1.65, 50: 2.25, 70: 2.80, 85: 3.30, 100: 3.80 },
 
-  // ── Cable & Machine ────────────────────────────────────────────────
+  // ── Cable ──────────────────────────────────────────────────────────
   'Lat Pulldown':           { 1: 0.35, 20: 0.65, 35: 0.90, 50: 1.15, 70: 1.40, 85: 1.65, 100: 1.95 },
-  'Leg Press':              { 1: 1.20, 20: 2.20, 35: 3.20, 50: 4.20, 70: 5.50, 85: 6.80, 100: 8.00 },
   'Cable Row':              { 1: 0.35, 20: 0.65, 35: 0.90, 50: 1.15, 70: 1.40, 85: 1.65, 100: 1.90 },
   'Chest Fly':              { 1: 0.15, 20: 0.28, 35: 0.42, 50: 0.55, 70: 0.70, 85: 0.85, 100: 1.00 },
-  'Leg Curl':               { 1: 0.30, 20: 0.55, 35: 0.75, 50: 1.00, 70: 1.25, 85: 1.45, 100: 1.70 },
-  'Leg Extension':          { 1: 0.40, 20: 0.70, 35: 1.00, 50: 1.30, 70: 1.55, 85: 1.80, 100: 2.10 },
   'Face Pull':              { 1: 0.20, 20: 0.35, 35: 0.50, 50: 0.65, 70: 0.80, 85: 0.95, 100: 1.10 },
   'Tricep Pushdown':        { 1: 0.20, 20: 0.38, 35: 0.55, 50: 0.70, 70: 0.90, 85: 1.05, 100: 1.25 },
+
+  // ── Machine ────────────────────────────────────────────────────────
+  'Leg Press':              { 1: 1.20, 20: 2.20, 35: 3.20, 50: 4.20, 70: 5.50, 85: 6.80, 100: 8.00 },
+  'Leg Curl':               { 1: 0.30, 20: 0.55, 35: 0.75, 50: 1.00, 70: 1.25, 85: 1.45, 100: 1.70 },
+  'Leg Extension':          { 1: 0.40, 20: 0.70, 35: 1.00, 50: 1.30, 70: 1.55, 85: 1.80, 100: 2.10 },
 
   // ── Bodyweight ─────────────────────────────────────────────────────
   // ratio = added_weight / bodyweight (0 = bodyweight only is base)
@@ -56,6 +58,35 @@ const MALE_STANDARDS: Record<string, { [key: number]: number }> = {
 
 const LEVELS = [1, 20, 35, 50, 70, 85, 100];
 
+// Main foundational compound lifts that define athletic & powerlifting strength
+export const MAIN_COMPOUND_LIFTS = new Set([
+  'Bench Press',
+  'Squat',
+  'Deadlift',
+  'Overhead Press',
+  'Barbell Row',
+  'Pull-ups',
+  'Dips',
+  'Romanian Deadlift',
+  'Incline Bench',
+  'Front Squat',
+  'Sumo Deadlift',
+]);
+
+export function isMainCompoundLift(exercise: string): boolean {
+  if (MAIN_COMPOUND_LIFTS.has(exercise)) return true;
+  const name = exercise.toLowerCase();
+  return (
+    (name.includes('bench') && !name.includes('dumbbell') && !name.includes('close grip')) ||
+    (name.includes('squat') && !name.includes('goblet') && !name.includes('split')) ||
+    name.includes('deadlift') ||
+    name.includes('overhead press') ||
+    name.includes('barbell row') ||
+    name.includes('pull-up') ||
+    name.includes('chin-up')
+  );
+}
+
 // Exercises where the tracked "weight" is ADDED weight beyond bodyweight (or 0 for pure bodyweight)
 const BODYWEIGHT_EXERCISES = new Set([
   'Pull-ups', 'Dips', 'Push-ups',
@@ -69,6 +100,14 @@ const DUMBBELL_EXERCISES = new Set([
   'Arnold Press', 'Preacher Curl',
 ]);
 
+const CABLE_EXERCISES = new Set([
+  'Lat Pulldown', 'Cable Row', 'Chest Fly', 'Face Pull', 'Tricep Pushdown',
+]);
+
+const MACHINE_EXERCISES = new Set([
+  'Leg Press', 'Leg Curl', 'Leg Extension',
+]);
+
 export function isBodyweightExercise(exercise: string): boolean {
   return BODYWEIGHT_EXERCISES.has(exercise);
 }
@@ -77,11 +116,41 @@ export function isDumbbellExercise(exercise: string): boolean {
   return DUMBBELL_EXERCISES.has(exercise);
 }
 
+export function isCableExercise(exercise: string): boolean {
+  return CABLE_EXERCISES.has(exercise);
+}
+
+export function isMachineExercise(exercise: string): boolean {
+  return MACHINE_EXERCISES.has(exercise);
+}
+
+export function getExerciseEquipment(exerciseName: string): EquipmentType {
+  if (BODYWEIGHT_EXERCISES.has(exerciseName)) return 'bodyweight';
+  if (DUMBBELL_EXERCISES.has(exerciseName)) return 'dumbbell';
+  if (CABLE_EXERCISES.has(exerciseName)) return 'cable';
+  if (MACHINE_EXERCISES.has(exerciseName)) return 'machine';
+
+  const name = exerciseName.toLowerCase();
+  if (name.includes('pull-up') || name.includes('dip') || name.includes('push-up') || name.includes('chin-up') || name.includes('bodyweight')) {
+    return 'bodyweight';
+  }
+  if (name.includes('dumbbell') || name.includes('db ') || name.includes('goblet') || name.includes('arnold')) {
+    return 'dumbbell';
+  }
+  if (name.includes('cable') || name.includes('pulldown') || name.includes('pushdown') || name.includes('face pull')) {
+    return 'cable';
+  }
+  if (name.includes('machine') || name.includes('press machine') || name.includes('smith') || name.includes('hack') || name.includes('leg press') || name.includes('leg curl') || name.includes('leg extension')) {
+    return 'machine';
+  }
+  return 'barbell';
+}
+
 export function getExerciseList(): string[] {
   return Object.keys(MALE_STANDARDS);
 }
 
-/** Group exercises by category for pretty dropdown */
+/** Group exercises by category for pretty dropdown with 5 clean equipment categories */
 export function getExercisesByCategory(): { category: string; exercises: string[] }[] {
   return [
     {
@@ -97,8 +166,12 @@ export function getExercisesByCategory(): { category: string; exercises: string[
       exercises: ['Pull-ups', 'Dips', 'Push-ups'],
     },
     {
-      category: 'Cable & Machine',
-      exercises: ['Lat Pulldown', 'Leg Press', 'Cable Row', 'Chest Fly', 'Leg Curl', 'Leg Extension', 'Face Pull', 'Tricep Pushdown'],
+      category: 'Cable',
+      exercises: ['Lat Pulldown', 'Cable Row', 'Chest Fly', 'Face Pull', 'Tricep Pushdown'],
+    },
+    {
+      category: 'Machine',
+      exercises: ['Leg Press', 'Leg Curl', 'Leg Extension'],
     },
   ];
 }
@@ -188,6 +261,7 @@ export function getLiftLevel(
 
   level = Math.max(1, level);
   const rank = getExerciseRank(level);
+  const equipment = getExerciseEquipment(exercise);
 
   return {
     exercise,
@@ -195,22 +269,32 @@ export function getLiftLevel(
     title: rank,
     ratio: Number(ratio.toFixed(2)),
     category: rank,
-    rank
+    rank,
+    equipment,
   };
 }
 
 export function getOverallLevel(liftLevels: LiftLevel[]): OverallLevel {
   if (!liftLevels || liftLevels.length === 0) {
-    return { level: 1, title: 'INITIATE', averageRatio: 0 };
+    return { level: 1, title: 'INITIATE', averageRatio: 0, isMainLiftsOnly: false, mainLiftsCount: 0 };
   }
 
-  const avgLevel = Math.round(liftLevels.reduce((sum, l) => sum + l.level, 0) / liftLevels.length);
-  const avgRatio = liftLevels.reduce((sum, l) => sum + l.ratio, 0) / liftLevels.length;
+  // Count main compound lifts first to reflect true athletic & strength capacity
+  const mainLifts = liftLevels.filter((l) => isMainCompoundLift(l.exercise));
+  const targetLifts = mainLifts.length > 0 ? mainLifts : liftLevels;
+
+  const avgLevel = Math.round(
+    targetLifts.reduce((sum, l) => sum + l.level, 0) / targetLifts.length
+  );
+  const avgRatio =
+    targetLifts.reduce((sum, l) => sum + l.ratio, 0) / targetLifts.length;
 
   return {
     level: avgLevel,
     title: getOverallTitle(avgLevel),
-    averageRatio: Number(avgRatio.toFixed(2))
+    averageRatio: Number(avgRatio.toFixed(2)),
+    isMainLiftsOnly: mainLifts.length > 0,
+    mainLiftsCount: mainLifts.length,
   };
 }
 

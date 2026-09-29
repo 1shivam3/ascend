@@ -25,6 +25,10 @@ import {
   Flame,
   Droplet,
   Camera,
+  Edit2,
+  Settings2,
+  Sliders,
+  AlertTriangle,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -82,8 +86,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteMeal         = useStore((state) => state.deleteMeal);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
-  const toggleFavoriteFood = useStore((state) => state.toggleFavoriteFood);
-  const deleteFavoriteFood = useStore((state) => state.deleteFavoriteFood);
+  const toggleFavoriteFood    = useStore((state) => state.toggleFavoriteFood);
+  const updateFavoriteFood    = useStore((state) => state.updateFavoriteFood);
+  const deleteFavoriteFood    = useStore((state) => state.deleteFavoriteFood);
+  const clearAllFavoriteFoods = useStore((state) => state.clearAllFavoriteFoods);
   const toast              = useToast();
 
   // Habit store state
@@ -101,7 +107,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen,  setIsCreatineModalOpen]  = useState(false);
+  const [isManagePinnedOpen,   setIsManagePinnedOpen]   = useState(false);
+  const [isEditPinnedOpen,     setIsEditPinnedOpen]     = useState(false);
+  const [editingPinnedFood,    setEditingPinnedFood]    = useState<FavoriteFood | null>(null);
+  const [isNewPinned,          setIsNewPinned]          = useState(false);
+  const [confirmClearAll,      setConfirmClearAll]      = useState(false);
   const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
+
+  // ── Pinned food edit / add form ───────────────────────────────────────────
+  const [pinnedName,     setPinnedName]     = useState('');
+  const [pinnedQuantity, setPinnedQuantity] = useState('');
+  const [pinnedUnit,     setPinnedUnit]     = useState('g');
+  const [pinnedCalories, setPinnedCalories] = useState('');
+  const [pinnedProtein,  setPinnedProtein]  = useState('');
+  const [pinnedCarbs,    setPinnedCarbs]    = useState('');
+  const [pinnedFat,      setPinnedFat]      = useState('');
 
   // ── Goals form ────────────────────────────────────────────────────────────
   const [goalCalories, setGoalCalories] = useState('');
@@ -305,6 +325,148 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     return favoriteFoods.some((f) => f.name.toLowerCase().trim() === n);
   };
 
+  // ── Pinned Food Management Handlers ───────────────────────────────────────
+
+  const openEditPinned = (fav: FavoriteFood) => {
+    setEditingPinnedFood(fav);
+    setIsNewPinned(false);
+    setPinnedName(fav.name);
+    setPinnedQuantity(fav.defaultQuantity ? String(fav.defaultQuantity) : '');
+    setPinnedUnit(fav.unit || 'g');
+    setPinnedCalories(String(fav.calories || 0));
+    setPinnedProtein(String(fav.proteinG || 0));
+    setPinnedCarbs(fav.carbsG !== undefined ? String(fav.carbsG) : '');
+    setPinnedFat(fav.fatG !== undefined ? String(fav.fatG) : '');
+    setIsEditPinnedOpen(true);
+  };
+
+  const openAddPinned = () => {
+    setEditingPinnedFood(null);
+    setIsNewPinned(true);
+    setPinnedName('');
+    setPinnedQuantity('100');
+    setPinnedUnit('g');
+    setPinnedCalories('');
+    setPinnedProtein('');
+    setPinnedCarbs('');
+    setPinnedFat('');
+    setIsEditPinnedOpen(true);
+  };
+
+  const handleAutoEstimatePinned = () => {
+    if (!pinnedName.trim()) {
+      toast.error('Please enter a food name first.', 'Missing Name');
+      return;
+    }
+    const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
+    const est = estimateMacros(pinnedName.trim(), qty, pinnedUnit);
+    setPinnedCalories(String(est.calories));
+    setPinnedProtein(String(est.proteinG));
+    setPinnedCarbs(String(est.carbsG));
+    setPinnedFat(String(est.fatG));
+    toast.info(`Calculated: ~${est.calories} kcal, ~${est.proteinG}g protein.`, 'Macros Calculated');
+  };
+
+  const handleSavePinnedFood = () => {
+    const name = pinnedName.trim();
+    if (!name) {
+      toast.error('Please enter a food name.', 'Missing Name');
+      return;
+    }
+    const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
+    const cal = parseFloat(pinnedCalories) || 0;
+    const prot = parseFloat(pinnedProtein) || 0;
+    const carb = parseFloat(pinnedCarbs) || 0;
+    const fat = parseFloat(pinnedFat) || 0;
+
+    if (editingPinnedFood && !isNewPinned) {
+      updateFavoriteFood(editingPinnedFood.id, {
+        name,
+        defaultQuantity: qty,
+        unit: pinnedUnit,
+        calories: cal,
+        proteinG: prot,
+        carbsG: carb,
+        fatG: fat,
+      });
+      toast.success(`Updated "${name}" in pinned foods!`, 'Food Updated');
+    } else {
+      toggleFavoriteFood({
+        name,
+        quantity: qty,
+        unit: pinnedUnit,
+        calories: cal,
+        proteinG: prot,
+        carbsG: carb,
+        fatG: fat,
+      });
+      toast.success(`Pinned "${name}" to favorites!`, 'Food Pinned');
+    }
+    setIsEditPinnedOpen(false);
+  };
+
+  const handleDeletePinned = (id: string, name: string) => {
+    deleteFavoriteFood(id);
+    toast.info(`Removed "${name}" from pinned foods.`, 'Food Unpinned');
+  };
+
+  const handleClearAllPinned = () => {
+    clearAllFavoriteFoods();
+    setConfirmClearAll(false);
+    setIsManagePinnedOpen(false);
+    toast.info('All pinned foods have been removed.', 'Pinned Foods Cleared');
+  };
+
+  const handleAddFoodFromHistory = (food: FoodItem) => {
+    if (isModalOpen) {
+      setFoods((prev) => [...prev, food]);
+      toast.success(`Added ${food.name} to current meal!`);
+    } else {
+      setMealName('Quick Meal');
+      setFoods([food]);
+      setIsModalOpen(true);
+      toast.info(`Started meal with ${food.name}. Tap Save when done!`);
+    }
+  };
+
+  const handlePinAllFrequent = () => {
+    if (frequentFoodsFromHistory.length === 0) return;
+    let count = 0;
+    frequentFoodsFromHistory.forEach(({ food }) => {
+      toggleFavoriteFood(food);
+      count++;
+    });
+    toast.success(`Pinned ${count} frequent foods to your favorites!`, 'Foods Pinned');
+  };
+
+  const handleLogFrequentMeal = (meal: MealEntry) => {
+    const today = new Date().toISOString().split('T')[0];
+    const newMeal: MealEntry = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+      date: today,
+      name: meal.name,
+      foods: meal.foods.map((f) => ({ ...f })),
+    };
+    addMeal(newMeal);
+    const mMacros = calculateMealMacros(meal.foods);
+    toast.success(`Logged ${meal.name} (~${Math.round(mMacros.calories)} kcal)!`, 'Meal Added');
+  };
+
+  const handlePinMealFoods = (meal: MealEntry) => {
+    let count = 0;
+    meal.foods.forEach((f) => {
+      if (!isItemFavorited(f.name)) {
+        toggleFavoriteFood(f);
+        count++;
+      }
+    });
+    if (count > 0) {
+      toast.success(`Pinned ${count} food${count > 1 ? 's' : ''} from ${meal.name}!`, 'Foods Pinned');
+    } else {
+      toast.info('All foods in this meal are already pinned.');
+    }
+  };
+
   const handleSaveMeal = () => {
     const validFoods = foods.filter((f) => f.name.trim());
     if (!mealName.trim()) {
@@ -453,6 +615,50 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     return Object.entries(groups)
       .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
+  }, [meals]);
+
+  // ── Auto-detect Frequently Eaten Foods & Meals from History ───────────────
+  const frequentFoodsFromHistory = useMemo(() => {
+    const counts: Record<string, { count: number; latest: FoodItem }> = {};
+    meals.forEach((m) => {
+      m.foods.forEach((f) => {
+        const key = f.name.toLowerCase().trim();
+        if (!key) return;
+        if (!counts[key]) {
+          counts[key] = { count: 0, latest: f };
+        }
+        counts[key].count += 1;
+        counts[key].latest = f;
+      });
+    });
+
+    const pinnedNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase().trim()));
+
+    // Surfaced items eaten >= 2 times not already pinned
+    return Object.entries(counts)
+      .filter(([key, data]) => data.count >= 2 && !pinnedNames.has(key))
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 6)
+      .map(([_, data]) => ({
+        food: data.latest,
+        count: data.count,
+      }));
+  }, [meals, favoriteFoods]);
+
+  const frequentMealsFromHistory = useMemo(() => {
+    const counts: Record<string, { count: number; meal: MealEntry }> = {};
+    meals.forEach((m) => {
+      const name = m.name.toLowerCase().trim();
+      if (!name || name === 'quick meal' || name === 'scanned meal') return;
+      if (!counts[name]) {
+        counts[name] = { count: 0, meal: m };
+      }
+      counts[name].count += 1;
+    });
+    return Object.values(counts)
+      .filter((d) => d.count >= 2)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
   }, [meals]);
 
   const currentMealMacros = calculateMealMacros(foods);
@@ -757,47 +963,212 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </section>
       )}
 
-      {/* ── Feature: Frequent & Pinned Foods (Item 17: Clean 2-column grid) ── */}
-      <section className="space-y-2">
+      {/* ── Feature: Frequent & Pinned Foods (Editable & Manageable) ── */}
+      <section className="space-y-3">
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1.5">
             <Star className="w-3.5 h-3.5 text-accent fill-accent" />
             <h2 className="section-title text-[11px] mb-0 font-sans">FREQUENT &amp; PINNED FOODS</h2>
+            {favoriteFoods.length > 0 && (
+              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
+                {favoriteFoods.length}
+              </span>
+            )}
           </div>
-          <span className="text-2xs text-text-muted font-sans">{favoriteFoods.length} Pinned</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openAddPinned}
+              className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
+              title="Add a custom pinned food"
+            >
+              <Plus className="w-3 h-3" />
+              <span>Add</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManagePinnedOpen(true)}
+              className="text-2xs font-semibold text-text-secondary hover:text-text-primary flex items-center gap-1 px-2 py-0.5 rounded-md bg-bg-card border border-border hover:border-accent/40 transition-colors"
+              title="Manage and edit pinned foods"
+            >
+              <Settings2 className="w-3 h-3 text-accent" />
+              <span>Manage</span>
+            </button>
+          </div>
         </div>
 
-        {/* Clean 2-column grid to prevent awkwardly clipped cards (Item 17) */}
+        {/* Clean 2-column grid */}
         <div className="grid grid-cols-2 gap-2">
           {favoriteFoods.map((fav) => (
-            <button
+            <div
               key={fav.id}
-              type="button"
               onClick={() => handleAddFavoriteToMeal(fav)}
-              className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.98] shadow-xs"
+              className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.99] shadow-xs cursor-pointer relative"
               title={`Tap to log ${fav.name} in 1 tap`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-1">
                 <span className="font-bold text-xs text-text-primary group-hover:text-accent truncate">
                   {fav.name}
                 </span>
-                <Star className="w-3 h-3 text-accent fill-accent shrink-0 ml-1" />
+                <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    onClick={() => openEditPinned(fav)}
+                    className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
+                    title={`Edit ${fav.name}`}
+                  >
+                    <Edit2 className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePinned(fav.id, fav.name)}
+                    className="p-1 text-text-muted hover:text-danger rounded hover:bg-danger/10 transition-colors"
+                    title={`Unpin ${fav.name}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-2xs text-text-muted mt-1">
+              <div className="flex items-center gap-1 text-2xs text-text-muted mt-1">
                 <span>{fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit}</span>
                 <span>•</span>
                 <span className="text-accent font-semibold">~{fav.calories} kcal</span>
                 <span>•</span>
                 <span className="text-emerald-600 font-semibold">~{fav.proteinG}g P</span>
               </div>
-            </button>
+            </div>
           ))}
           {favoriteFoods.length === 0 && (
-            <div className="col-span-2 p-3 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-xs text-text-muted text-center">
-              Star (⭐) foods in your meals to pin them here for 1-tap quick logging.
+            <div className="col-span-2 p-3.5 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center space-y-1.5">
+              <p className="text-xs text-text-secondary font-medium">No pinned foods yet.</p>
+              <p className="text-2xs text-text-muted">
+                Star (⭐) foods in your meals or tap &quot;Add&quot; above to pin your daily staples for 1-tap quick logging.
+              </p>
+              <button
+                type="button"
+                onClick={openAddPinned}
+                className="btn-secondary py-1 px-3 text-xs mx-auto flex items-center gap-1 mt-1"
+              >
+                <Plus className="w-3 h-3 text-accent" />
+                <span>Add Pinned Food</span>
+              </button>
             </div>
           )}
         </div>
+
+        {/* ── Frequently Logged Foods (Auto-Detected from Meal History) ── */}
+        {frequentFoodsFromHistory.length > 0 && (
+          <div className="pt-1.5 space-y-2">
+            <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-accent" />
+                <h3 className="section-title text-[10px] mb-0 font-sans uppercase">
+                  FREQUENTLY LOGGED FOODS
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={handlePinAllFrequent}
+                className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
+                title="Pin all frequent foods to your favorites"
+              >
+                <Star className="w-3 h-3 fill-accent" />
+                <span>Pin All ({frequentFoodsFromHistory.length})</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {frequentFoodsFromHistory.map(({ food, count }) => (
+                <div
+                  key={food.name}
+                  className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/80 flex items-center justify-between gap-2 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs text-text-primary truncate">{food.name}</span>
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent shrink-0">
+                        {count}×
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1 text-2xs text-text-muted mt-0.5">
+                      <span>{food.quantity ? `${food.quantity} ${food.unit || 'g'}` : food.unit || 'portion'}</span>
+                      <span>•</span>
+                      <span className="text-accent font-semibold">~{food.calories} kcal</span>
+                      <span>•</span>
+                      <span className="text-emerald-600 font-semibold">~{food.proteinG}g P</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAddFoodFromHistory(food)}
+                      className="px-2 py-1 rounded-lg bg-bg-card border border-border hover:border-accent text-2xs font-semibold text-text-primary flex items-center gap-1 active:scale-95 transition-all"
+                      title="Log this food into current meal"
+                    >
+                      <Plus className="w-3 h-3 text-accent" />
+                      <span>Log</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleFavorite(food)}
+                      className="p-1.5 rounded-lg bg-bg-card border border-border hover:border-accent text-accent hover:bg-accent/10 active:scale-95 transition-all"
+                      title="Pin to Frequent Foods"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-accent/20" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Frequently Logged Full Meals (Auto-Detected) ── */}
+        {frequentMealsFromHistory.length > 0 && (
+          <div className="pt-1.5 space-y-1.5">
+            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono px-0.5 block">
+              FREQUENT FULL MEALS
+            </span>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+              {frequentMealsFromHistory.map(({ meal, count }) => {
+                const mMacros = calculateMealMacros(meal.foods);
+                return (
+                  <div
+                    key={meal.id}
+                    className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
+                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted shrink-0">
+                        {count}×
+                      </span>
+                    </div>
+                    <div className="text-2xs text-text-muted">
+                      {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-600 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleLogFrequentMeal(meal)}
+                        className="btn-primary flex-1 py-1 text-2xs font-semibold"
+                      >
+                        + Log Meal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePinMealFoods(meal)}
+                        className="p-1 rounded-lg border border-border text-accent hover:border-accent hover:bg-accent/10 transition-colors"
+                        title="Pin all foods from this meal"
+                      >
+                        <Star className="w-3 h-3 fill-accent/20" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </section>
 
       {/* ── Meal History (Item 18: Clean action empty state) ── */}
@@ -1449,6 +1820,294 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         isOpen={isCreatineModalOpen}
         onClose={() => setIsCreatineModalOpen(false)}
       />
+
+      {/* ══════════════════ MANAGE PINNED FOODS MODAL ══════════════════ */}
+      {isManagePinnedOpen && (
+        <div className="modal-overlay" onClick={() => setIsManagePinnedOpen(false)}>
+          <div
+            className="modal-content max-w-md p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-accent fill-accent" />
+                <h2 className="text-base font-bold text-text-primary">Manage Pinned Foods</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManagePinnedOpen(false)}
+                className="text-text-muted hover:text-text-primary p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-2xs text-text-muted">
+              Edit portion sizes, adjust calories/macros, or remove pinned items. Pinned foods appear on your nutrition dashboard for 1-tap logging.
+            </p>
+
+            {/* List of Pinned Foods */}
+            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+              {favoriteFoods.map((fav) => (
+                <div
+                  key={fav.id}
+                  className="p-3 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-2 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-xs text-text-primary truncate">{fav.name}</p>
+                    <p className="text-2xs text-text-muted mt-0.5">
+                      {fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit} •{' '}
+                      <span className="text-accent font-semibold">~{fav.calories} kcal</span> •{' '}
+                      <span className="text-emerald-600 font-semibold">~{fav.proteinG}g P</span>
+                      {fav.carbsG ? ` • ~${fav.carbsG}g C` : ''}
+                      {fav.fatG ? ` • ~${fav.fatG}g F` : ''}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openEditPinned(fav)}
+                      className="p-1.5 rounded-lg bg-bg-secondary text-text-secondary hover:text-accent hover:border-accent/40 border border-border transition-colors"
+                      title="Edit food details"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePinned(fav.id, fav.name)}
+                      className="p-1.5 rounded-lg bg-bg-secondary text-text-muted hover:text-danger hover:border-danger/40 border border-border transition-colors"
+                      title="Remove food"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {favoriteFoods.length === 0 && (
+                <div className="p-4 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center text-xs text-text-muted">
+                  No pinned foods. Tap &quot;Add Custom Food&quot; below to create your first pinned food!
+                </div>
+              )}
+            </div>
+
+            {/* Clear All Confirmation Block */}
+            {confirmClearAll ? (
+              <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-danger">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>Remove all {favoriteFoods.length} pinned foods?</span>
+                </div>
+                <p className="text-2xs text-text-muted">
+                  This will remove all items from your pinned foods list. This action cannot be undone.
+                </p>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmClearAll(false)}
+                    className="btn-secondary flex-1 py-1.5 text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearAllPinned}
+                    className="btn-danger flex-1 py-1.5 text-xs font-bold"
+                  >
+                    Yes, Clear All
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Bottom Actions */}
+            <div className="pt-2 flex items-center justify-between gap-2 border-t border-border">
+              {favoriteFoods.length > 0 && !confirmClearAll && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmClearAll(true)}
+                  className="text-xs font-semibold text-danger hover:underline flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Remove All</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openAddPinned}
+                className="btn-primary ml-auto py-2 px-3 text-xs font-bold flex items-center gap-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Custom Food</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════ EDIT / ADD PINNED FOOD MODAL ══════════════════ */}
+      {isEditPinnedOpen && (
+        <div className="modal-overlay" onClick={() => setIsEditPinnedOpen(false)}>
+          <div
+            className="modal-content max-w-md p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex justify-between items-center pb-2 border-b border-border">
+              <div>
+                <h2 className="text-base font-bold text-text-primary">
+                  {isNewPinned ? 'Add Pinned Food' : `Edit "${editingPinnedFood?.name}"`}
+                </h2>
+                <p className="text-2xs text-text-muted mt-0.5">
+                  Set default portion &amp; nutritional values
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditPinnedOpen(false)}
+                className="text-text-muted hover:text-text-primary p-1"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3">
+              {/* Name */}
+              <div>
+                <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                  Food Name
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Chicken Breast, Whole Eggs, Oats"
+                  value={pinnedName}
+                  onChange={(e) => setPinnedName(e.target.value)}
+                  className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary text-sm focus:border-accent outline-none font-medium"
+                />
+              </div>
+
+              {/* Default Quantity & Unit */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Default Quantity
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 150"
+                    value={pinnedQuantity}
+                    onChange={(e) => setPinnedQuantity(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Unit
+                  </label>
+                  <select
+                    value={pinnedUnit}
+                    onChange={(e) => setPinnedUnit(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
+                  >
+                    {UNIT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Auto Calculate Button */}
+              <button
+                type="button"
+                onClick={handleAutoEstimatePinned}
+                className="w-full py-1.5 px-3 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 text-xs font-semibold text-accent flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>⚡ Auto-Calculate Macros from Name</span>
+              </button>
+
+              {/* Macros Breakdown */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Calories (kcal)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 250"
+                    value={pinnedCalories}
+                    onChange={(e) => setPinnedCalories(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-accent font-bold text-sm focus:border-accent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-2xs font-bold text-emerald-600 uppercase block mb-1">
+                    Protein (g)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 30"
+                    value={pinnedProtein}
+                    onChange={(e) => setPinnedProtein(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-emerald-600 font-bold text-sm focus:border-accent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Carbs (g)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 15"
+                    value={pinnedCarbs}
+                    onChange={(e) => setPinnedCarbs(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
+                    Fat (g)
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 5"
+                    value={pinnedFat}
+                    onChange={(e) => setPinnedFat(e.target.value)}
+                    className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary text-sm focus:border-accent outline-none"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-2 flex gap-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setIsEditPinnedOpen(false)}
+                className="btn-secondary py-2 px-4 text-xs font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePinnedFood}
+                className="btn-primary flex-1 py-2 text-xs font-bold uppercase tracking-wider"
+              >
+                {isNewPinned ? 'Pin Food' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

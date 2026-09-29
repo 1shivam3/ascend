@@ -21,7 +21,8 @@ import {
   Edit2,
   CheckCircle2,
   ArrowRightLeft,
-  Bot
+  Bot,
+  Zap,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -29,6 +30,7 @@ import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
 import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
+import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import { AISubstitutionResult } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
@@ -378,6 +380,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
+  const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
 
   const handleApplyReplacement = (replacement: AISubstitutionResult) => {
     if (substitutionExerciseIndex !== null) {
@@ -714,6 +717,36 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
     setIsPlanModalOpen(true);
   };
 
+  // ─── Suggested Workout Handlers ───────────────────────────────────────────
+
+  const handleStartSuggestedWorkout = (workoutName: string, suggestedExercises: PlannedExercise[]) => {
+    setSessionStartTime(Date.now());
+    const preFilled: WorkoutExercise[] = suggestedExercises.map(pe => ({
+      name: pe.name,
+      sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
+        weight: pe.targetWeight ?? 0,
+        reps: pe.targetReps,
+        unit: pe.targetUnit ?? userUnit,
+      })),
+    }));
+    setExercises(preFilled);
+    setDate(new Date().toISOString().split('T')[0]);
+    setStartedFromPlan(workoutName);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveSuggestedPlan = (planData: Omit<PlannedWorkout, 'id' | 'createdAt'>) => {
+    const newPlan: PlannedWorkout = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `plan_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      name: planData.name,
+      exercises: planData.exercises,
+    };
+    addPlannedWorkout(newPlan);
+  };
+
   // ─── Sorted workout history ───────────────────────────────────────────────
 
   const sortedWorkouts = useMemo(
@@ -807,11 +840,21 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
 
           <button
             type="button"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+            title="Generate customized workout plan by body part & intensity"
+          >
+            <Zap className="w-4 h-4 text-accent" />
+            <span>⚡ Suggest Workout</span>
+          </button>
+
+          <button
+            type="button"
             onClick={openCreatePlan}
-            className="btn-secondary py-3 text-xs font-semibold px-4"
+            className="btn-secondary py-3 text-xs font-semibold px-3"
           >
             <Plus className="w-4 h-4 text-accent" />
-            <span>Create Workout Plan</span>
+            <span>Create Plan</span>
           </button>
         </div>
       </section>
@@ -903,18 +946,54 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             <BookOpen className="w-4 h-4 text-accent" />
             <h2 className="section-title text-[11px] mb-0">WORKOUT PLANS</h2>
             {plannedWorkouts.length > 0 && (
-              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md">
+              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
                 {plannedWorkouts.length}
               </span>
             )}
           </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="text-accent text-xs font-semibold flex items-center gap-1 hover:underline"
+              title="Generate a suggested workout routine"
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>⚡ Suggest Plan</span>
+            </button>
+            <span className="text-border">•</span>
+            <button
+              onClick={openCreatePlan}
+              className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
+              title="Create new workout plan"
+            >
+              <Plus className="w-3.5 h-3.5 text-accent" />
+              <span>New Plan</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Suggested Workout Generator Banner Card ── */}
+        <div className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
+              <Zap className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-primary block font-sans">
+                SUGGESTED WORKOUT GENERATOR
+              </span>
+              <span className="text-2xs text-text-muted font-sans">
+                Choose body part &amp; intensity (Low / Med / High) to generate a fully editable routine
+              </span>
+            </div>
+          </div>
           <button
-            onClick={openCreatePlan}
-            className="text-accent text-xs font-semibold flex items-center gap-1 hover:underline"
-            title="Create new workout plan"
+            type="button"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Plan</span>
+            <Zap className="w-3.5 h-3.5" />
+            <span>Generate Plan</span>
           </button>
         </div>
 
@@ -926,17 +1005,26 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 <BookOpen className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-text-primary">No plans yet</p>
-                <p className="text-2xs text-text-muted">Save your routine for 1-tap logging</p>
+                <p className="text-xs font-semibold text-text-primary">No saved plans yet</p>
+                <p className="text-2xs text-text-muted">Save your routines for 1-tap logging or generate one</p>
               </div>
             </div>
-            <button
-              onClick={openCreatePlan}
-              className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Plan</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsSuggestedModalOpen(true)}
+                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Suggest</span>
+              </button>
+              <button
+                onClick={openCreatePlan}
+                className="btn-secondary py-1 px-2.5 text-xs font-semibold flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5 text-accent" />
+                <span>Create</span>
+              </button>
+            </div>
           </div>
         ) : (
           /* Plan cards grid */
@@ -1275,6 +1363,15 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           completedWorkout={postWorkoutSummary}
         />
       )}
+
+      {/* Suggested Workout Plan Generator Modal */}
+      <SuggestedWorkoutModal
+        isOpen={isSuggestedModalOpen}
+        onClose={() => setIsSuggestedModalOpen(false)}
+        userUnit={userUnit}
+        onStartWorkout={handleStartSuggestedWorkout}
+        onSavePlan={handleSaveSuggestedPlan}
+      />
     </div>
   );
 }

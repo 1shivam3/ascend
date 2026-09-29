@@ -94,6 +94,8 @@ export interface MacroTotals {
   fatG: number;
 }
 
+export type EquipmentType = 'barbell' | 'dumbbell' | 'cable' | 'bodyweight' | 'machine' | 'other';
+
 export interface LiftLevel {
   exercise: string;
   level: number;
@@ -101,12 +103,15 @@ export interface LiftLevel {
   ratio: number;
   category: ExerciseRank;
   rank: ExerciseRank;
+  equipment?: EquipmentType;
 }
 
 export interface OverallLevel {
   level: number;
   title: OverallTitle;
   averageRatio: number;
+  isMainLiftsOnly?: boolean;
+  mainLiftsCount?: number;
 }
 
 export interface MacroGoals {

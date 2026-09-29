@@ -88,7 +88,9 @@ export interface AppState {
   deletePlannedWorkout: (id: string) => void;
 
   addFavoriteFood: (food: Omit<FavoriteFood, 'id'>) => void;
+  updateFavoriteFood: (id: string, updated: Partial<FavoriteFood>) => void;
   deleteFavoriteFood: (id: string) => void;
+  clearAllFavoriteFoods: () => void;
   toggleFavoriteFood: (food: FoodItem) => boolean;
 
   // Habit Actions
@@ -299,9 +301,15 @@ export const useAppStore = create<AppState>()(
         ]
       })),
 
+      updateFavoriteFood: (id, updated) => set((state) => ({
+        favoriteFoods: state.favoriteFoods.map((f) => (f.id === id ? { ...f, ...updated } : f)),
+      })),
+
       deleteFavoriteFood: (id) => set((state) => ({
         favoriteFoods: state.favoriteFoods.filter(f => f.id !== id && f.name.toLowerCase() !== id.toLowerCase())
       })),
+
+      clearAllFavoriteFoods: () => set({ favoriteFoods: [] }),
 
       toggleFavoriteFood: (food) => {
         let isAdded = false;

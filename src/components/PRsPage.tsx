@@ -12,6 +12,8 @@ import {
   getNextLevelInfo,
   isBodyweightExercise,
   isDumbbellExercise,
+  isMainCompoundLift,
+  getExerciseEquipment,
 } from '@/lib/strength-standards';
 import {
   Plus,
@@ -28,6 +30,7 @@ import {
   BarChart2,
   Layers,
   Activity,
+  Filter,
 } from 'lucide-react';
 import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
@@ -35,7 +38,7 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
-import { ExerciseRank } from '@/lib/types';
+import { ExerciseRank, EquipmentType } from '@/lib/types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,10 +71,12 @@ const RANK_COLORS: Record<ExerciseRank, string> = {
 // ─── Category pill config ──────────────────────────────────────────────────────
 
 const CATEGORY_PILL: Record<string, { label: string; color: string }> = {
-  'Barbell Compounds': { label: 'BB',    color: 'bg-accent/20 text-accent' },
-  'Dumbbell':          { label: 'DB',    color: 'bg-info/20 text-info' },
-  'Bodyweight':        { label: 'BW',    color: 'bg-warning/20 text-warning' },
-  'Cable & Machine':   { label: 'CM',    color: 'bg-text-muted/20 text-text-secondary' },
+  'Barbell Compounds': { label: 'BB',      color: 'bg-accent/20 text-accent' },
+  'Dumbbell':          { label: 'DB',      color: 'bg-info/20 text-info' },
+  'Bodyweight':        { label: 'BW',      color: 'bg-warning/20 text-warning' },
+  'Cable':             { label: 'Cable',   color: 'bg-sky-500/20 text-sky-400' },
+  'Machine':           { label: 'Machine', color: 'bg-emerald-500/20 text-emerald-400' },
+  'Cable & Machine':   { label: 'CM',      color: 'bg-text-muted/20 text-text-secondary' },
 };
 
 // ─── Custom Exercise Dropdown ─────────────────────────────────────────────────
@@ -399,6 +404,230 @@ function LevelProgressionModal({
   );
 }
 
+// ─── LiftCard Sub-Component ──────────────────────────────────────────────────
+
+interface LiftCardProps {
+  item: {
+    exercise: string;
+    prs: any[];
+    bestPR: any;
+    best1RMKg: number;
+    bestSet: { weight: number; reps: number; unit: string; isBodyweight: boolean };
+    levelInfo: any;
+    sessionsCount: number;
+    nextMilestone: number;
+    milestoneProgress: number;
+  };
+  userUnit: 'kg' | 'lbs';
+  bodyweightKg: number;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onOpenLevelModal: () => void;
+  onOpenPlateModal: () => void;
+  onOpenTargetModal: () => void;
+  onDeletePR: (id: string, date: string, exercise: string) => void;
+}
+
+function LiftCard({
+  item,
+  userUnit,
+  bodyweightKg,
+  isExpanded,
+  onToggleExpand,
+  onOpenLevelModal,
+  onOpenPlateModal,
+  onOpenTargetModal,
+  onDeletePR,
+}: LiftCardProps) {
+  const display1RM =
+    userUnit === 'lbs'
+      ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
+      : Math.round(item.best1RMKg * 10) / 10;
+  const isBWExercise = isBodyweightExercise(item.exercise);
+  const equip = getExerciseEquipment(item.exercise);
+  const isMain = isMainCompoundLift(item.exercise);
+
+  const equipConfig: Record<EquipmentType, { label: string; icon: string; style: string }> = {
+    barbell: { label: 'Barbell', icon: '🏋️', style: 'bg-slate-500/10 text-slate-300 border-slate-500/30' },
+    dumbbell: { label: 'Dumbbell', icon: '🪙', style: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+    cable: { label: 'Cable', icon: '🔗', style: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
+    bodyweight: { label: 'Bodyweight', icon: '🤸', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+    machine: { label: 'Machine', icon: '⚙️', style: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
+    other: { label: 'Exercise', icon: '⚡', style: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30' },
+  };
+
+  const badge = equipConfig[equip] || equipConfig.barbell;
+
+  return (
+    <div className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border">
+      {/* 1. Exercise Header, Equipment Badge & Prominent 1RM Value */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
+            <span
+              className={`text-3xs font-semibold px-2 py-0.5 rounded border flex items-center gap-1 font-mono ${badge.style}`}
+            >
+              <span>{badge.icon}</span>
+              <span>{badge.label}</span>
+            </span>
+            {isMain && (
+              <span className="text-3xs font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase font-mono">
+                Core Lift
+              </span>
+            )}
+          </div>
+          <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
+            {item.exercise}
+          </h3>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              type="button"
+              onClick={onOpenLevelModal}
+              className="text-xs font-bold text-accent hover:underline flex items-center gap-1 font-sans"
+              title="View level progression"
+            >
+              <span>LV {item.levelInfo.level}</span>
+              <span>•</span>
+              <span>{item.levelInfo.rank}</span>
+            </button>
+            <span className="text-text-muted text-2xs">•</span>
+            <span className="text-2xs text-text-muted font-medium font-mono">
+              {item.levelInfo.ratio}× BW
+            </span>
+            {isBWExercise && (
+              <span className="text-2xs px-1 rounded bg-warning/15 text-warning font-semibold">
+                BW
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="text-right shrink-0">
+          <span className="text-2xl font-black text-text-primary font-sans leading-none block">
+            {display1RM}{' '}
+            <span className="text-xs font-normal text-text-muted">{userUnit}</span>
+          </span>
+          <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
+            Estimated 1RM
+          </span>
+        </div>
+      </div>
+
+      {/* 2. Next Milestone Progress Bar */}
+      <div className="space-y-1 pt-0.5">
+        <div className="flex justify-between items-center text-xs">
+          <span className="text-text-muted flex items-center gap-1 font-medium">
+            <Target className="w-3.5 h-3.5 text-accent" />
+            <span>
+              Next milestone: <strong>{item.nextMilestone} {userUnit}</strong>
+            </span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onOpenTargetModal}
+              className="text-2xs text-text-muted hover:text-accent underline"
+              title="Set target"
+            >
+              Edit Target
+            </button>
+            <span className="font-bold text-text-primary text-xs font-mono">
+              {item.milestoneProgress}%
+            </span>
+          </div>
+        </div>
+
+        <div className="level-bar h-2">
+          <div
+            className="level-bar-fill"
+            style={{ width: `${item.milestoneProgress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* 3. Best Set & Plate Calculator Link */}
+      <div className="flex items-center justify-between pt-1 text-xs text-text-secondary border-t border-border/50">
+        <button
+          type="button"
+          onClick={onOpenPlateModal}
+          className="flex items-center gap-1.5 hover:text-accent font-medium group text-left"
+          title="Tap to calculate barbell plates"
+        >
+          <Dumbbell className="w-3.5 h-3.5 text-accent" />
+          <span>
+            Best set:{' '}
+            <strong className="text-text-primary group-hover:text-accent">
+              {item.bestSet.isBodyweight
+                ? `BW × ${item.bestSet.reps}`
+                : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
+            </strong>
+          </span>
+        </button>
+
+        <span className="text-2xs text-text-muted">
+          {item.prs.length} PRs • {item.sessionsCount} sessions
+        </span>
+      </div>
+
+      {/* 4. Expand / View PR History Drawer */}
+      <div className="border-t border-border/60 pt-1">
+        <button
+          type="button"
+          onClick={onToggleExpand}
+          className="w-full flex items-center justify-between text-xs text-text-muted hover:text-text-primary py-1 font-medium transition-colors"
+        >
+          <span>PR History ({item.prs.length})</span>
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+
+        {isExpanded && (
+          <div className="mt-3 space-y-2 animate-fade-in">
+            {item.prs.map((p) => {
+              const w = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
+              const isBWRecord = isBodyweightExercise(p.exercise) && p.weightKg === 0;
+              const single1RM = calculateOneRepMax(
+                isBWRecord ? bodyweightKg : w,
+                p.reps
+              );
+              return (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
+                >
+                  <div>
+                    <span className="font-bold text-text-primary">
+                      {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
+                    </span>
+                    <div className="text-2xs text-text-muted flex gap-2 mt-0.5">
+                      <span>
+                        e1RM: {Math.round(single1RM * 10) / 10} {userUnit}
+                      </span>
+                      <span>•</span>
+                      <span>{new Date(p.date).toLocaleDateString()}</span>
+                    </div>
+                    {p.notes && (
+                      <p className="text-2xs text-text-secondary italic mt-0.5">
+                        &quot;{p.notes}&quot;
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onDeletePR(p.id, p.date, p.exercise)}
+                    className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
+                    title="Delete record"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
@@ -422,6 +651,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   // ── New: level modal state ──
   const [levelModalExercise, setLevelModalExercise] = useState<string | null>(null);
+
+  // ── Equipment filter and show-more state ──
+  const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<'all' | EquipmentType>('all');
+  const [showAllOtherLifts, setShowAllOtherLifts] = useState(false);
 
   // ── Form state ──
   const [exercise, setExercise] = useState('');
@@ -678,6 +911,39 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     return exerciseStats.find((s) => s.exercise === levelModalExercise) || null;
   }, [levelModalExercise, exerciseStats]);
 
+  // ─── Partition lifts & Equipment Filters ──────────────────────────────────────
+
+  const mainCompoundLifts = useMemo(() => {
+    return exerciseStats.filter((e) => isMainCompoundLift(e.exercise));
+  }, [exerciseStats]);
+
+  const otherLifts = useMemo(() => {
+    return exerciseStats.filter((e) => !isMainCompoundLift(e.exercise));
+  }, [exerciseStats]);
+
+  const filteredStats = useMemo(() => {
+    if (selectedEquipmentFilter === 'all') return exerciseStats;
+    return exerciseStats.filter(
+      (e) => getExerciseEquipment(e.exercise) === selectedEquipmentFilter
+    );
+  }, [exerciseStats, selectedEquipmentFilter]);
+
+  const equipmentCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: exerciseStats.length,
+      barbell: 0,
+      dumbbell: 0,
+      cable: 0,
+      bodyweight: 0,
+      machine: 0,
+    };
+    exerciseStats.forEach((e) => {
+      const eq = getExerciseEquipment(e.exercise);
+      if (counts[eq] !== undefined) counts[eq]++;
+    });
+    return counts;
+  }, [exerciseStats]);
+
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -730,7 +996,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="card space-y-3 bg-bg-card border border-border">
           <div className="flex justify-between items-start">
             <div>
-              <span className="section-title text-[11px]">OVERALL STRENGTH</span>
+              <div className="flex items-center gap-1.5">
+                <span className="section-title text-[11px] mb-0">OVERALL STRENGTH</span>
+                {overallLevel.isMainLiftsOnly && (
+                  <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
+                    Main Lifts
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2.5 mt-1">
                 <span className="text-3xl font-black text-accent font-sans">
                   LV {overallLevel.level}
@@ -768,8 +1041,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           </div>
 
           <div className="flex justify-between text-xs text-text-muted">
-            <span className="font-medium text-text-secondary">{exerciseStats.length} Lifts Ranked</span>
-            <span>Strength Ratio: <strong className="text-text-primary">{overallLevel.averageRatio}× BW</strong></span>
+            <span className="font-medium text-text-secondary">
+              {overallLevel.isMainLiftsOnly
+                ? `${overallLevel.mainLiftsCount} Main Compound Lifts Ranked`
+                : `${exerciseStats.length} Lifts Ranked`}
+            </span>
+            <span>
+              Strength Ratio: <strong className="text-text-primary">{overallLevel.averageRatio}× BW</strong>
+            </span>
           </div>
         </div>
       )}
@@ -779,9 +1058,41 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       {/* Lift Cards List */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title">YOUR LIFTS &amp; MILESTONES</h2>
-          <span className="text-2xs text-text-muted font-mono">{exerciseStats.length} Tracked</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div>
+            <h2 className="section-title mb-0">YOUR LIFTS &amp; MILESTONES</h2>
+            <p className="text-2xs text-text-muted mt-0.5 font-sans">
+              {mainCompoundLifts.length} Core Compound Lifts • {otherLifts.length} Accessory Exercises
+            </p>
+          </div>
+
+          {/* Equipment Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {[
+              { id: 'all', label: 'All Lifts', count: exerciseStats.length },
+              { id: 'barbell', label: '🏋️ Barbell', count: equipmentCounts.barbell },
+              { id: 'dumbbell', label: '🪙 Dumbbell', count: equipmentCounts.dumbbell },
+              { id: 'cable', label: '🔗 Cable', count: equipmentCounts.cable },
+              { id: 'bodyweight', label: '🤸 Bodyweight', count: equipmentCounts.bodyweight },
+              { id: 'machine', label: '⚙️ Machine', count: equipmentCounts.machine },
+            ]
+              .filter((chip) => chip.id === 'all' || chip.count > 0)
+              .map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setSelectedEquipmentFilter(chip.id as any)}
+                  className={`px-2.5 py-1 rounded-lg text-2xs font-bold border transition-colors whitespace-nowrap flex items-center gap-1 ${
+                    selectedEquipmentFilter === chip.id
+                      ? 'bg-accent/15 border-accent text-accent'
+                      : 'bg-bg-card border-border text-text-secondary hover:border-accent/40'
+                  }`}
+                >
+                  <span>{chip.label}</span>
+                  <span className="text-3xs opacity-75 font-mono">({chip.count})</span>
+                </button>
+              ))}
+          </div>
         </div>
 
         {exerciseStats.length === 0 ? (
@@ -792,199 +1103,244 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               Tap &quot;Add PR&quot; above to calibrate your first lift and discover your rank.
             </p>
           </div>
-        ) : (
-          exerciseStats.map((item) => {
-            const isExpanded = expandedExercise === item.exercise;
-            const display1RM =
-              userUnit === 'lbs'
-                ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
-                : Math.round(item.best1RMKg * 10) / 10;
-            const isBWExercise = isBodyweightExercise(item.exercise);
-
-            return (
-              <div
+        ) : filteredStats.length === 0 ? (
+          <div className="card text-center py-12 space-y-2">
+            <Filter className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
+            <p className="text-text-secondary text-sm">No records found for this equipment filter.</p>
+            <button
+              type="button"
+              onClick={() => setSelectedEquipmentFilter('all')}
+              className="btn-secondary text-xs py-1.5 px-3 mx-auto"
+            >
+              Clear Filter
+            </button>
+          </div>
+        ) : selectedEquipmentFilter !== 'all' ? (
+          // Specific equipment filter view: render all matching lifts
+          <div className="space-y-3">
+            {filteredStats.map((item) => (
+              <LiftCard
                 key={item.exercise}
-                className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border"
-              >
-                {/* 1. Exercise Name & Prominent 1RM Value (Item 11) */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
-                      {item.exercise}
-                    </h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setLevelModalExercise(item.exercise)}
-                        className="text-xs font-bold text-accent hover:underline flex items-center gap-1 font-sans"
-                        title="View level progression"
-                      >
-                        <span>LV {item.levelInfo.level}</span>
-                        <span>•</span>
-                        <span>{item.levelInfo.rank}</span>
-                      </button>
-                      <span className="text-text-muted text-2xs">•</span>
-                      <span className="text-2xs text-text-muted font-medium">
-                        {item.levelInfo.ratio}× BW
-                      </span>
-                      {isBWExercise && (
-                        <span className="text-2xs px-1 rounded bg-warning/15 text-warning font-semibold">
-                          BW
-                        </span>
-                      )}
-                    </div>
+                item={item}
+                userUnit={userUnit}
+                bodyweightKg={bodyweightKg}
+                isExpanded={expandedExercise === item.exercise}
+                onToggleExpand={() =>
+                  setExpandedExercise(expandedExercise === item.exercise ? null : item.exercise)
+                }
+                onOpenLevelModal={() => setLevelModalExercise(item.exercise)}
+                onOpenPlateModal={() => {
+                  const isBW = isBodyweightExercise(item.exercise);
+                  setPlateModalWeight(
+                    isBW && item.bestSet.weight === 0
+                      ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                      : item.bestSet.weight
+                  );
+                  setPlateModalMeta({
+                    exerciseName: item.exercise,
+                    bestSetWeight:
+                      isBW && item.bestSet.weight === 0
+                        ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                        : item.bestSet.weight,
+                    milestoneWeight: item.nextMilestone,
+                  });
+                }}
+                onOpenTargetModal={() => {
+                  setTargetModalExercise(item.exercise);
+                  setTargetWeightInput(item.nextMilestone.toString());
+                }}
+                onDeletePR={(id, date, ex) => {
+                  deletePR(id);
+                  toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          // "All" view: Main compound lifts first, then collapsible "Show More" for other lifts
+          <div className="space-y-5">
+            {/* 1. Main Compound Lifts Section */}
+            {mainCompoundLifts.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between px-0.5">
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="w-4 h-4 text-accent" />
+                    <h3 className="section-title text-[11px] mb-0">MAIN COMPOUND LIFTS</h3>
                   </div>
-
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-text-primary font-sans leading-none block">
-                      {display1RM}{' '}
-                      <span className="text-xs font-normal text-text-muted">{userUnit}</span>
-                    </span>
-                    <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
-                      Estimated 1RM
-                    </span>
-                  </div>
+                  <span className="text-2xs font-bold px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-mono">
+                    {mainCompoundLifts.length} Core Lifts
+                  </span>
                 </div>
 
-                {/* 2. Next Milestone Progress Bar (Item 11) */}
-                <div className="space-y-1 pt-0.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-text-muted flex items-center gap-1 font-medium">
-                      <Target className="w-3.5 h-3.5 text-accent" />
-                      <span>Next milestone: <strong>{item.nextMilestone} {userUnit}</strong></span>
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTargetModalExercise(item.exercise);
-                          setTargetWeightInput(item.nextMilestone.toString());
-                        }}
-                        className="text-2xs text-text-muted hover:text-accent underline"
-                        title="Set target"
-                      >
-                        Edit Target
-                      </button>
-                      <span className="font-bold text-text-primary text-xs font-mono">
-                        {item.milestoneProgress}%
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="level-bar h-2">
-                    <div
-                      className="level-bar-fill"
-                      style={{ width: `${item.milestoneProgress}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Best Set & Plate Calculator Link (Item 11) */}
-                <div className="flex items-center justify-between pt-1 text-xs text-text-secondary border-t border-border/50">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (item.bestSet.weight > 0 || isBWExercise) {
+                <div className="space-y-3">
+                  {mainCompoundLifts.map((item) => (
+                    <LiftCard
+                      key={item.exercise}
+                      item={item}
+                      userUnit={userUnit}
+                      bodyweightKg={bodyweightKg}
+                      isExpanded={expandedExercise === item.exercise}
+                      onToggleExpand={() =>
+                        setExpandedExercise(expandedExercise === item.exercise ? null : item.exercise)
+                      }
+                      onOpenLevelModal={() => setLevelModalExercise(item.exercise)}
+                      onOpenPlateModal={() => {
+                        const isBW = isBodyweightExercise(item.exercise);
                         setPlateModalWeight(
-                          isBWExercise && item.bestSet.weight === 0
+                          isBW && item.bestSet.weight === 0
                             ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
                             : item.bestSet.weight
                         );
                         setPlateModalMeta({
                           exerciseName: item.exercise,
                           bestSetWeight:
-                            isBWExercise && item.bestSet.weight === 0
+                            isBW && item.bestSet.weight === 0
                               ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
                               : item.bestSet.weight,
-                          milestoneWeight: item.nextMilestone || display1RM,
+                          milestoneWeight: item.nextMilestone,
                         });
-                      }
-                    }}
-                    className="flex items-center gap-1.5 hover:text-accent font-medium group text-left"
-                    title="Tap to calculate barbell plates"
-                  >
-                    <Dumbbell className="w-3.5 h-3.5 text-accent" />
-                    <span>
-                      Best set:{' '}
-                      <strong className="text-text-primary group-hover:text-accent">
-                        {item.bestSet.isBodyweight
-                          ? `BW × ${item.bestSet.reps}`
-                          : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
-                      </strong>
-                    </span>
-                  </button>
-
-                  <span className="text-2xs text-text-muted">
-                    {item.prs.length} PRs • {item.sessionsCount} sessions
-                  </span>
-                </div>
-
-                {/* 4. Expand / View PR History Drawer (Item 11) */}
-                <div className="border-t border-border/60 pt-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setExpandedExercise(isExpanded ? null : item.exercise)
-                    }
-                    className="w-full flex items-center justify-between text-xs text-text-muted hover:text-text-primary py-1 font-medium transition-colors"
-                  >
-                    <span>PR History ({item.prs.length})</span>
-                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-
-                  {isExpanded && (
-                    <div className="mt-3 space-y-2 animate-fade-in">
-                      {item.prs.map((p) => {
-                        const w = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
-                        const isBWRecord = isBodyweightExercise(p.exercise) && p.weightKg === 0;
-                        const single1RM = calculateOneRepMax(
-                          isBWRecord ? bodyweightKg : w,
-                          p.reps
-                        );
-                        return (
-                          <div
-                            key={p.id}
-                            className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
-                          >
-                            <div>
-                              <span className="font-bold text-text-primary">
-                                {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
-                              </span>
-                              <div className="text-2xs text-text-muted flex gap-2 mt-0.5">
-                                <span>
-                                  e1RM: {Math.round(single1RM * 10) / 10} {userUnit}
-                                </span>
-                                <span>•</span>
-                                <span>{new Date(p.date).toLocaleDateString()}</span>
-                              </div>
-                              {p.notes && (
-                                <p className="text-2xs text-text-secondary italic mt-0.5">
-                                  &quot;{p.notes}&quot;
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => {
-                                deletePR(p.id);
-                                toast.info(
-                                  `Deleted ${p.exercise} record from ${p.date}.`,
-                                  'PR Removed'
-                                );
-                              }}
-                              className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
-                              title="Delete record"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                      }}
+                      onOpenTargetModal={() => {
+                        setTargetModalExercise(item.exercise);
+                        setTargetWeightInput(item.nextMilestone.toString());
+                      }}
+                      onDeletePR={(id, date, ex) => {
+                        deletePR(id);
+                        toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
-            );
-          })
+            )}
+
+            {/* 2. Other Exercises Section with "Show More" Accordion */}
+            {otherLifts.length > 0 && (
+              <div className="space-y-3 pt-1">
+                {mainCompoundLifts.length > 0 ? (
+                  // If main compound lifts exist, wrap others in a collapsible accordion
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllOtherLifts((prev) => !prev)}
+                      className="w-full p-3.5 rounded-xl bg-bg-card border border-border hover:border-accent/40 flex items-center justify-between transition-colors group text-left shadow-xs"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted group-hover:text-accent transition-colors">
+                          <Layers className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-text-primary group-hover:text-accent block">
+                            Other Exercises &amp; Accessories ({otherLifts.length})
+                          </span>
+                          <span className="text-2xs text-text-muted">
+                            Dumbbell, cable, machine &amp; accessory PRs
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
+                        <span>{showAllOtherLifts ? 'Show Less' : `Show More (${otherLifts.length})`}</span>
+                        <ChevronDown
+                          className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                            showAllOtherLifts ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
+                    </button>
+
+                    {showAllOtherLifts && (
+                      <div className="space-y-3 animate-fade-in">
+                        {otherLifts.map((item) => (
+                          <LiftCard
+                            key={item.exercise}
+                            item={item}
+                            userUnit={userUnit}
+                            bodyweightKg={bodyweightKg}
+                            isExpanded={expandedExercise === item.exercise}
+                            onToggleExpand={() =>
+                              setExpandedExercise(
+                                expandedExercise === item.exercise ? null : item.exercise
+                              )
+                            }
+                            onOpenLevelModal={() => setLevelModalExercise(item.exercise)}
+                            onOpenPlateModal={() => {
+                              const isBW = isBodyweightExercise(item.exercise);
+                              setPlateModalWeight(
+                                isBW && item.bestSet.weight === 0
+                                  ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                  : item.bestSet.weight
+                              );
+                              setPlateModalMeta({
+                                exerciseName: item.exercise,
+                                bestSetWeight:
+                                  isBW && item.bestSet.weight === 0
+                                    ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                    : item.bestSet.weight,
+                                milestoneWeight: item.nextMilestone,
+                              });
+                            }}
+                            onOpenTargetModal={() => {
+                              setTargetModalExercise(item.exercise);
+                              setTargetWeightInput(item.nextMilestone.toString());
+                            }}
+                            onDeletePR={(id, date, ex) => {
+                              deletePR(id);
+                              toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // If no main compound lifts have been logged yet, show other lifts directly
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between px-0.5">
+                      <h3 className="section-title text-[11px] mb-0">LOGGED EXERCISES</h3>
+                      <span className="text-2xs text-text-muted">{otherLifts.length} Logged</span>
+                    </div>
+                    {otherLifts.map((item) => (
+                      <LiftCard
+                        key={item.exercise}
+                        item={item}
+                        userUnit={userUnit}
+                        bodyweightKg={bodyweightKg}
+                        isExpanded={expandedExercise === item.exercise}
+                        onToggleExpand={() =>
+                          setExpandedExercise(expandedExercise === item.exercise ? null : item.exercise)
+                        }
+                        onOpenLevelModal={() => setLevelModalExercise(item.exercise)}
+                        onOpenPlateModal={() => {
+                          const isBW = isBodyweightExercise(item.exercise);
+                          setPlateModalWeight(
+                            isBW && item.bestSet.weight === 0
+                              ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                              : item.bestSet.weight
+                          );
+                          setPlateModalMeta({
+                            exerciseName: item.exercise,
+                            bestSetWeight:
+                              isBW && item.bestSet.weight === 0
+                                ? (userUnit === 'lbs' ? bodyweightKg * 2.20462 : bodyweightKg)
+                                : item.bestSet.weight,
+                            milestoneWeight: item.nextMilestone,
+                          });
+                        }}
+                        onOpenTargetModal={() => {
+                          setTargetModalExercise(item.exercise);
+                          setTargetWeightInput(item.nextMilestone.toString());
+                        }}
+                        onDeletePR={(id, date, ex) => {
+                          deletePR(id);
+                          toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
