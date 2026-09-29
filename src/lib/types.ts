@@ -269,3 +269,32 @@ export interface AIWeeklyReview {
   createdAt: string;
 }
 
+// ── Photo AI Meal Scanner Types ──────────────────────────────────────────────
+
+export interface ScannedFoodItem {
+  name: string;
+  quantity: string;
+  estimatedGrams: number;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  confidence: 'high' | 'medium' | 'low';
+  preparation?: string;
+  notes?: string;
+}
+
+export interface MealAnalysisResult {
+  mealName: string;
+  items: ScannedFoodItem[];
+  totalCalories: number;
+  totalProtein: number;
+  totalCarbs: number;
+  totalFat: number;
+  hiddenIngredients?: string[];
+  confidence: 'high' | 'medium' | 'low';
+  coachingNote?: string;
+  timestamp?: string;
+  imageUrl?: string;
+}
+

@@ -24,10 +24,12 @@ import {
   Clock,
   Flame,
   Droplet,
+  Camera,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
+import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
@@ -94,6 +96,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
+  const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
   const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
@@ -477,6 +480,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
+          {/* Scan Meal (AI Vision) Button */}
+          <button
+            type="button"
+            onClick={() => setIsScanModalOpen(true)}
+            className="p-2 sm:px-3 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 transition-colors flex items-center gap-1.5 font-bold text-xs"
+            title="Scan Meal with AI Vision"
+          >
+            <Camera className="w-4 h-4" />
+            <span className="hidden sm:inline">Scan Meal</span>
+          </button>
+
           {/* Barcode Scanner Button */}
           <button
             type="button"
@@ -485,7 +499,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             title="Scan Food Barcode (Open Food Facts)"
           >
             <BarcodeIcon className="w-4 h-4 text-accent" />
-            <span className="hidden sm:inline text-xs font-mono font-semibold">Scan</span>
+            <span className="hidden sm:inline text-xs font-mono font-semibold">Barcode</span>
           </button>
           <ThemeToggle />
           <button
@@ -496,7 +510,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             }}
           >
             <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Log Meal</span>
+            <span className="hidden sm:inline">Log Food</span>
             <span className="sm:hidden">Log</span>
           </button>
         </div>
@@ -586,6 +600,29 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <span className="text-2xs text-text-muted">/ {macroGoals.fatG}g</span>
             )}
           </div>
+        </div>
+
+        {/* Primary Action Row: Scan Meal & Log Food (Item 1 & 14) */}
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsScanModalOpen(true)}
+            className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Scan Meal</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (foods.length === 0) handleAddFood();
+              setIsModalOpen(true);
+            }}
+            className="btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>Log Food</span>
+          </button>
         </div>
       </section>
 
@@ -877,7 +914,26 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   </div>
                                 </div>
                               ))}
-                              <div className="mt-1 flex justify-end">
+                              <div className="mt-1 flex justify-between items-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const today = new Date().toISOString().split('T')[0];
+                                    const repeatedMeal: MealEntry = {
+                                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                                      date: today,
+                                      name: meal.name,
+                                      foods: meal.foods.map((f) => ({ ...f })),
+                                    };
+                                    addMeal(repeatedMeal);
+                                    toast.success(`Repeated "${meal.name}" for Today!`, 'Meal Logged');
+                                  }}
+                                  className="text-accent hover:underline text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-accent/10 transition-colors font-medium"
+                                >
+                                  <Copy className="w-3.5 h-3.5" /> Repeat Meal
+                                </button>
+
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1368,6 +1424,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
       )}
+
+      {/* ══════════════════ PHOTO AI SCAN MEAL MODAL ══════════════════ */}
+      <ScanMealModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+      />
 
       {/* ══════════════════ BARCODE SCANNER MODAL ══════════════════ */}
       <BarcodeScannerModal
