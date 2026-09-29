@@ -62,6 +62,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editGrams, setEditGrams] = useState<number>(100);
 
+  // Error state
+  const [scanError, setScanError] = useState<string | null>(null);
+
   // "Tell AI" refinement state
   const [refinementInput, setRefinementInput] = useState('');
   const [isRefining, setIsRefining] = useState(false);
@@ -84,6 +87,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setEditingItemIndex(null);
     setRefinementInput('');
     setShowAddItem(false);
+    setScanError(null);
   };
 
   const handleClose = () => {
@@ -93,6 +97,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   const handleFileSelected = (file: File) => {
     setSelectedFile(file);
+    setScanError(null);
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
   };
@@ -109,6 +114,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       return;
     }
 
+    setScanError(null);
     setStep('analyzing');
     try {
       const result = await analyzeMealPhoto({
@@ -123,7 +129,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setStep('review');
     } catch (err: any) {
       console.error('Meal scan failed:', err);
-      toast.error(err.message || 'Failed to analyze meal photo.', 'Analysis Failed');
+      const errorMsg =
+        err?.message || 'Failed to analyze meal photo with Gemini. Please try again.';
+      setScanError(errorMsg);
+      toast.error(errorMsg, 'Analysis Notice');
       setStep('select');
     }
   };
@@ -345,6 +354,16 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         {/* ── STEP 1: SELECT / CAPTURE PHOTO ───────────────────────────────── */}
         {step === 'select' && (
           <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            {scanError && (
+              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-600 dark:text-red-400 flex items-start gap-2.5 animate-fade-in">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                <div className="space-y-1">
+                  <span className="font-bold block">Scan Notice</span>
+                  <p className="text-2xs text-text-muted leading-relaxed">{scanError}</p>
+                </div>
+              </div>
+            )}
+
             {/* Upload Area / Camera Card */}
             {!previewUrl ? (
               <div className="border-2 border-dashed border-border hover:border-accent/60 rounded-2xl p-6 text-center transition-colors bg-bg-secondary/20 space-y-4">
@@ -480,269 +499,427 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         )}
 
         {/* ── STEP 3: REVIEW / "LOOKS RIGHT?" STEP ──────────────────────────── */}
-        {step === 'review' && analysis && (
-          <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-            {/* Disclaimer pill */}
-            <div className="py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-2xs text-amber-600 dark:text-amber-400">
-              <span className="font-semibold">
-                AI Meal Estimate — Review portions before saving.
-              </span>
-              <span className="text-3xs uppercase font-mono font-bold bg-amber-500/20 px-1.5 py-0.5 rounded">
-                {analysis.confidence} Confidence
-              </span>
-            </div>
+        {step === 'review' && analysis && (() => {
+          const isEmptyDetection = analysis.items.length === 0;
+          const hasCreatine = analysis.items.some((item) =>
+            item.name.toLowerCase().includes('creatine')
+          );
+          const todayStr = new Date().toISOString().split('T')[0];
+          const isCreatineLoggedToday = !!store.creatineLogs?.[todayStr]?.taken;
 
-            {/* Editable Meal Name */}
-            <div>
-              <label className="text-2xs font-bold uppercase tracking-wider text-text-muted block mb-1">
-                Meal Name
-              </label>
-              <input
-                type="text"
-                value={mealName}
-                onChange={(e) => setMealName(e.target.value)}
-                className="w-full py-1.5 px-3 rounded-xl bg-bg-secondary border border-border text-sm font-bold text-text-primary focus:border-accent outline-none"
-              />
-            </div>
+          return (
+            <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {isEmptyDetection ? (
+                /* Empty / Non-food detection state */
+                <div className="space-y-4">
+                  <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-center space-y-3">
+                    <div className="w-12 h-12 mx-auto rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-500">
+                      <AlertCircle className="w-6 h-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-black text-sm sm:text-base text-text-primary">
+                        {analysis.mealName && !analysis.mealName.toLowerCase().includes('scanned')
+                          ? analysis.mealName
+                          : 'No Food or Supplement Detected'}
+                      </h3>
+                      <p className="text-xs text-text-muted max-w-sm mx-auto leading-relaxed">
+                        {analysis.coachingNote ||
+                          "Gemini couldn't find any identifiable food, drink, or workout supplement in this image."}
+                      </p>
+                    </div>
 
-            {/* Macro Summary Strip */}
-            <div className="grid grid-cols-4 gap-2 py-3 px-3.5 rounded-xl bg-bg-secondary/70 border border-border text-center">
-              <div>
-                <span className="text-3xs uppercase font-bold text-text-muted block">Calories</span>
-                <span className="font-black text-accent text-base sm:text-lg">
-                  ~{analysis.totalCalories}
-                </span>
-                <span className="text-3xs text-text-muted block">kcal</span>
-              </div>
-              <div className="border-l border-border/80">
-                <span className="text-3xs uppercase font-bold text-emerald-600 block">Protein</span>
-                <span className="font-black text-emerald-600 text-base sm:text-lg">
-                  ~{analysis.totalProtein}g
-                </span>
-                <span className="text-3xs text-text-muted block">key</span>
-              </div>
-              <div className="border-l border-border/80">
-                <span className="text-3xs uppercase font-bold text-text-muted block">Carbs</span>
-                <span className="font-bold text-text-primary text-base sm:text-lg">
-                  ~{analysis.totalCarbs}g
-                </span>
-                <span className="text-3xs text-text-muted block">energy</span>
-              </div>
-              <div className="border-l border-border/80">
-                <span className="text-3xs uppercase font-bold text-text-muted block">Fat</span>
-                <span className="font-bold text-text-primary text-base sm:text-lg">
-                  ~{analysis.totalFat}g
-                </span>
-                <span className="text-3xs text-text-muted block">essential</span>
-              </div>
-            </div>
-
-            {/* Food items breakdown list */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
-                  Detected Food Items ({analysis.items.length})
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setShowAddItem(true)}
-                  className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Item</span>
-                </button>
-              </div>
-
-              {/* Add item form modal inline */}
-              {showAddItem && (
-                <div className="p-3 rounded-xl border border-accent/30 bg-accent/5 space-y-2.5 animate-fade-in">
-                  <span className="text-xs font-bold text-text-primary block">
-                    Add Food Item
-                  </span>
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="Food name (e.g. Curd, Salad)"
-                      value={newItemName}
-                      onChange={(e) => setNewItemName(e.target.value)}
-                      className="py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
-                    />
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="number"
-                        placeholder="Grams"
-                        value={newItemGrams || ''}
-                        onChange={(e) => setNewItemGrams(Number(e.target.value))}
-                        className="w-20 py-1.5 px-2 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
-                      />
-                      <span className="text-xs text-text-muted">g</span>
-                      <button
-                        type="button"
-                        onClick={handleAddNewItem}
-                        disabled={!newItemName.trim()}
-                        className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
-                      >
-                        Add
-                      </button>
+                    <div className="text-2xs text-text-secondary bg-bg-secondary/60 p-3 rounded-xl border border-border text-left space-y-1.5">
+                      <span className="font-bold block text-text-primary">💡 Tips for accurate detection:</span>
+                      <ul className="list-disc list-inside space-y-1 text-text-muted">
+                        <li>For supplements: ensure the brand and tub label (e.g. Creatine, Whey) are clearly visible and well-lit.</li>
+                        <li>For home-cooked meals: frame the entire plate from a top-down angle.</li>
+                        <li>You can also type a note in &quot;Describe or Note&quot; before scanning to guide the AI.</li>
+                      </ul>
                     </div>
                   </div>
-                </div>
-              )}
 
-              <div className="space-y-2">
-                {analysis.items.map((item, idx) => {
-                  const isEditing = editingItemIndex === idx;
-                  const confidenceBadge =
-                    item.confidence === 'high'
-                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                      : item.confidence === 'medium'
-                      ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                      : 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+                  {/* Manual entry fallback */}
+                  {showAddItem ? (
+                    <div className="p-3.5 rounded-xl border border-accent/30 bg-accent/5 space-y-2.5 animate-fade-in">
+                      <span className="text-xs font-bold text-text-primary block">
+                        Add Item Manually
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. Creatine, Chicken, Rice"
+                          value={newItemName}
+                          onChange={(e) => setNewItemName(e.target.value)}
+                          className="py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            placeholder="Grams"
+                            value={newItemGrams || ''}
+                            onChange={(e) => setNewItemGrams(Number(e.target.value))}
+                            className="w-20 py-1.5 px-2 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
+                          />
+                          <span className="text-xs text-text-muted">g</span>
+                          <button
+                            type="button"
+                            onClick={handleAddNewItem}
+                            disabled={!newItemName.trim()}
+                            className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowAddItem(true)}
+                        className="btn-secondary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Enter Item Manually</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStep('select')}
+                        className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+                      >
+                        <Camera className="w-4 h-4" />
+                        <span>Retake Photo</span>
+                      </button>
+                    </div>
+                  )}
 
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-xl border border-border bg-bg-card hover:border-border/80 transition-colors space-y-1.5"
+                  {/* Empty Detection Actions */}
+                  <div className="flex gap-2 pt-2 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={handleClose}
+                      className="btn-secondary py-2.5 text-xs font-semibold flex-1"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-bold text-xs sm:text-sm text-text-primary">
-                              {item.name}
-                            </span>
-                            <span
-                              className={`text-3xs font-semibold px-1.5 py-0.5 rounded border capitalize ${confidenceBadge}`}
-                            >
-                              {item.confidence}
-                            </span>
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep('select')}
+                      className="btn-primary py-2.5 text-xs font-bold flex-1 flex items-center justify-center gap-1.5"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>Scan Another Photo</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Successful Detection Review State */
+                <>
+                  {/* Disclaimer pill */}
+                  <div className="py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-2xs text-amber-600 dark:text-amber-400">
+                    <span className="font-semibold">
+                      AI Meal Estimate — Review portions before saving.
+                    </span>
+                    <span className="text-3xs uppercase font-mono font-bold bg-amber-500/20 px-1.5 py-0.5 rounded">
+                      {analysis.confidence} Confidence
+                    </span>
+                  </div>
+
+                  {/* Creatine Habit Quick-Action Card if detected */}
+                  {hasCreatine && (
+                    <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 space-y-2 animate-fade-in">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                            <Zap className="w-3.5 h-3.5" />
                           </div>
-                          <span className="text-2xs text-text-secondary mt-0.5 block">
-                            {item.quantity} (~{item.estimatedGrams}g)
-                            {item.preparation ? ` • ${item.preparation}` : ''}
+                          <span className="font-bold text-xs text-text-primary">
+                            Creatine Monohydrate Detected
                           </span>
                         </div>
+                        {isCreatineLoggedToday ? (
+                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Logged Today
+                          </span>
+                        ) : (
+                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
+                            Daily Habit
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-2xs text-text-muted leading-relaxed">
+                        Creatine provides 0 kcal &amp; 0g protein, but resynthesizes muscular ATP for maximum power output and recovery.
+                      </p>
+                      {!isCreatineLoggedToday && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            store.toggleCreatine(todayStr, 5);
+                            toast.success("Marked today's 5g Creatine taken!", 'Creatine Habit');
+                          }}
+                          className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors shadow-sm"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Mark Daily Creatine Taken (5g)</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
 
-                        {/* Macros & Action Buttons */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="text-right">
-                            <span className="font-bold text-xs text-accent block">
-                              ~{item.calories} kcal
-                            </span>
-                            <span className="text-3xs text-text-muted block">
-                              P: {item.proteinG}g • C: {item.carbsG}g • F: {item.fatG}g
-                            </span>
-                          </div>
+                  {/* Editable Meal Name */}
+                  <div>
+                    <label className="text-2xs font-bold uppercase tracking-wider text-text-muted block mb-1">
+                      Meal Name
+                    </label>
+                    <input
+                      type="text"
+                      value={mealName}
+                      onChange={(e) => setMealName(e.target.value)}
+                      className="w-full py-1.5 px-3 rounded-xl bg-bg-secondary border border-border text-sm font-bold text-text-primary focus:border-accent outline-none"
+                    />
+                  </div>
 
-                          <div className="flex items-center gap-0.5 border-l border-border pl-1.5">
+                  {/* Macro Summary Strip */}
+                  <div className="grid grid-cols-4 gap-2 py-3 px-3.5 rounded-xl bg-bg-secondary/70 border border-border text-center">
+                    <div>
+                      <span className="text-3xs uppercase font-bold text-text-muted block">Calories</span>
+                      <span className="font-black text-accent text-base sm:text-lg">
+                        ~{analysis.totalCalories}
+                      </span>
+                      <span className="text-3xs text-text-muted block">kcal</span>
+                    </div>
+                    <div className="border-l border-border/80">
+                      <span className="text-3xs uppercase font-bold text-emerald-600 block">Protein</span>
+                      <span className="font-black text-emerald-600 text-base sm:text-lg">
+                        ~{analysis.totalProtein}g
+                      </span>
+                      <span className="text-3xs text-text-muted block">key</span>
+                    </div>
+                    <div className="border-l border-border/80">
+                      <span className="text-3xs uppercase font-bold text-text-muted block">Carbs</span>
+                      <span className="font-bold text-text-primary text-base sm:text-lg">
+                        ~{analysis.totalCarbs}g
+                      </span>
+                      <span className="text-3xs text-text-muted block">energy</span>
+                    </div>
+                    <div className="border-l border-border/80">
+                      <span className="text-3xs uppercase font-bold text-text-muted block">Fat</span>
+                      <span className="font-bold text-text-primary text-base sm:text-lg">
+                        ~{analysis.totalFat}g
+                      </span>
+                      <span className="text-3xs text-text-muted block">essential</span>
+                    </div>
+                  </div>
+
+                  {/* Food items breakdown list */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
+                        Detected Food Items ({analysis.items.length})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddItem(true)}
+                        className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Add Item</span>
+                      </button>
+                    </div>
+
+                    {/* Add item form modal inline */}
+                    {showAddItem && (
+                      <div className="p-3 rounded-xl border border-accent/30 bg-accent/5 space-y-2.5 animate-fade-in">
+                        <span className="text-xs font-bold text-text-primary block">
+                          Add Food Item
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Food name (e.g. Curd, Salad)"
+                            value={newItemName}
+                            onChange={(e) => setNewItemName(e.target.value)}
+                            className="py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
+                          />
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              placeholder="Grams"
+                              value={newItemGrams || ''}
+                              onChange={(e) => setNewItemGrams(Number(e.target.value))}
+                              className="w-20 py-1.5 px-2 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
+                            />
+                            <span className="text-xs text-text-muted">g</span>
                             <button
                               type="button"
-                              onClick={() => {
-                                setEditingItemIndex(isEditing ? null : idx);
-                                setEditGrams(item.estimatedGrams);
-                              }}
-                              className="p-1 rounded-md text-text-muted hover:text-accent hover:bg-bg-secondary transition-colors"
-                              title="Edit Portion"
+                              onClick={handleAddNewItem}
+                              disabled={!newItemName.trim()}
+                              className="btn-primary py-1.5 px-2.5 text-xs font-bold disabled:opacity-40"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(idx)}
-                              className="p-1 rounded-md text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                              title="Remove Food"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              Add
                             </button>
                           </div>
                         </div>
                       </div>
+                    )}
 
-                      {/* Inline portion editor */}
-                      {isEditing && (
-                        <div className="flex items-center gap-2 pt-1 border-t border-border/60">
-                          <span className="text-2xs text-text-muted font-medium">Adjust weight:</span>
-                          <input
-                            type="number"
-                            value={editGrams}
-                            onChange={(e) => setEditGrams(Number(e.target.value))}
-                            className="w-20 py-1 px-2 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary outline-none focus:border-accent"
-                          />
-                          <span className="text-xs text-text-muted">grams</span>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateItemGrams(idx)}
-                            className="btn-primary py-1 px-2.5 text-2xs font-bold"
+                    <div className="space-y-2">
+                      {analysis.items.map((item, idx) => {
+                        const isEditing = editingItemIndex === idx;
+                        const confidenceBadge =
+                          item.confidence === 'high'
+                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                            : item.confidence === 'medium'
+                            ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                            : 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+
+                        return (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-xl border border-border bg-bg-card hover:border-border/80 transition-colors space-y-1.5"
                           >
-                            Save
-                          </button>
-                        </div>
-                      )}
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-xs sm:text-sm text-text-primary">
+                                    {item.name}
+                                  </span>
+                                  <span
+                                    className={`text-3xs font-semibold px-1.5 py-0.5 rounded border capitalize ${confidenceBadge}`}
+                                  >
+                                    {item.confidence}
+                                  </span>
+                                </div>
+                                <span className="text-2xs text-text-secondary mt-0.5 block">
+                                  {item.quantity} (~{item.estimatedGrams}g)
+                                  {item.preparation ? ` • ${item.preparation}` : ''}
+                                </span>
+                              </div>
+
+                              {/* Macros & Action Buttons */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="text-right">
+                                  <span className="font-bold text-xs text-accent block">
+                                    ~{item.calories} kcal
+                                  </span>
+                                  <span className="text-3xs text-text-muted block">
+                                    P: {item.proteinG}g • C: {item.carbsG}g • F: {item.fatG}g
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-0.5 border-l border-border pl-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingItemIndex(isEditing ? null : idx);
+                                      setEditGrams(item.estimatedGrams);
+                                    }}
+                                    className="p-1 rounded-md text-text-muted hover:text-accent hover:bg-bg-secondary transition-colors"
+                                    title="Edit Portion"
+                                  >
+                                    <Edit2 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem(idx)}
+                                    className="p-1 rounded-md text-text-muted hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                                    title="Remove Food"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Inline portion editor */}
+                            {isEditing && (
+                              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
+                                <span className="text-2xs text-text-muted font-medium">Adjust weight:</span>
+                                <input
+                                  type="number"
+                                  value={editGrams}
+                                  onChange={(e) => setEditGrams(Number(e.target.value))}
+                                  className="w-20 py-1 px-2 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary outline-none focus:border-accent"
+                                />
+                                <span className="text-xs text-text-muted">grams</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemGrams(idx)}
+                                  className="btn-primary py-1 px-2.5 text-2xs font-bold"
+                                >
+                                  Save
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  </div>
 
-            {/* "Tell AI" / Improve Estimate */}
-            <div className="p-3 rounded-xl bg-bg-secondary/40 border border-border space-y-2">
-              <span className="text-2xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1">
-                <MessageSquare className="w-3 h-3 text-accent" />
-                Tell AI / Improve Estimate
-              </span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={refinementInput}
-                  onChange={(e) => setRefinementInput(e.target.value)}
-                  placeholder="e.g. Rice was about 250g, or Paneer had low oil..."
-                  className="flex-1 py-1.5 px-3 rounded-xl bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none placeholder:text-text-muted"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleRefineWithAI();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleRefineWithAI}
-                  disabled={!refinementInput.trim() || isRefining}
-                  className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
-                >
-                  <Send className={`w-3 h-3 ${isRefining ? 'animate-spin' : ''}`} />
-                  <span>Refine</span>
-                </button>
-              </div>
-            </div>
+                  {/* "Tell AI" / Improve Estimate */}
+                  <div className="p-3 rounded-xl bg-bg-secondary/40 border border-border space-y-2">
+                    <span className="text-2xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1">
+                      <MessageSquare className="w-3 h-3 text-accent" />
+                      Tell AI / Improve Estimate
+                    </span>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={refinementInput}
+                        onChange={(e) => setRefinementInput(e.target.value)}
+                        placeholder="e.g. Rice was about 250g, or Paneer had low oil..."
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none placeholder:text-text-muted"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleRefineWithAI();
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleRefineWithAI}
+                        disabled={!refinementInput.trim() || isRefining}
+                        className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1 disabled:opacity-40"
+                      >
+                        <Send className={`w-3 h-3 ${isRefining ? 'animate-spin' : ''}`} />
+                        <span>Refine</span>
+                      </button>
+                    </div>
+                  </div>
 
-            {/* Coaching Observation */}
-            {analysis.coachingNote && (
-              <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-xs text-text-secondary leading-relaxed flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
-                <span>{analysis.coachingNote}</span>
-              </div>
-            )}
+                  {/* Coaching Observation */}
+                  {analysis.coachingNote && (
+                    <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-xs text-text-secondary leading-relaxed flex items-start gap-2">
+                      <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      <span>{analysis.coachingNote}</span>
+                    </div>
+                  )}
 
-            {/* Bottom Actions */}
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-border">
-              <button
-                type="button"
-                onClick={() => setStep('select')}
-                className="btn-secondary py-2.5 text-xs font-semibold order-2 sm:order-1"
-              >
-                Scan Another Photo
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveToNutrition}
-                className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Add to Today&apos;s Nutrition</span>
-              </button>
+                  {/* Bottom Actions */}
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setStep('select')}
+                      className="btn-secondary py-2.5 text-xs font-semibold order-2 sm:order-1"
+                    >
+                      Scan Another Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveToNutrition}
+                      className="btn-primary py-3 text-sm font-bold flex-1 flex items-center justify-center gap-2 shadow-md shadow-accent/25 order-1 sm:order-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Add to Today&apos;s Nutrition</span>
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );

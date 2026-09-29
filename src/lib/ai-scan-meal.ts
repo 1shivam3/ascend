@@ -10,16 +10,16 @@ export interface ScanMealOptions {
 
 /**
  * Resizes and compresses image on the client to avoid uploading huge 10MB+ camera files.
- * Downsamples to max 1200px width/height and ~80% JPEG quality (~200KB).
+ * Downsamples to max 1024px width/height and 75% JPEG quality (~80-150KB).
  */
 export async function compressImageFile(
   file: File | Blob,
-  maxWidth = 1200,
-  maxHeight = 1200,
-  quality = 0.85
+  maxWidth = 1024,
+  maxHeight = 1024,
+  quality = 0.75
 ): Promise<{ base64: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
-    // If running server-side (fallback)
+    // If running server-side or non-DOM environment
     if (typeof window === 'undefined' || typeof document === 'undefined') {
       const reader = new FileReader();
       reader.onload = () => {
@@ -33,101 +33,115 @@ export async function compressImageFile(
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
 
-        if (width > height) {
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
-          }
-        } else {
-          if (height > maxHeight) {
-            width = Math.round((width * maxHeight) / height);
-            height = maxHeight;
-          }
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let width = img.naturalWidth || img.width;
+      let height = img.naturalHeight || img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
         }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
 
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        // Fallback if canvas context cannot be initialized
+        const reader = new FileReader();
+        reader.onload = () =>
           resolve({
-            base64: e.target?.result as string,
+            base64: reader.result as string,
             mimeType: file.type || 'image/jpeg',
           });
-          return;
-        }
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
 
-        ctx.drawImage(img, 0, 0, width, height);
-        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve({
+        base64: compressedDataUrl,
+        mimeType: 'image/jpeg',
+      });
+    };
+
+    img.onerror = (err) => {
+      URL.revokeObjectURL(objectUrl);
+      // Fallback to raw FileReader
+      const reader = new FileReader();
+      reader.onload = () =>
         resolve({
-          base64: compressedDataUrl,
-          mimeType: 'image/jpeg',
-        });
-      };
-      img.onerror = () => {
-        resolve({
-          base64: e.target?.result as string,
+          base64: reader.result as string,
           mimeType: file.type || 'image/jpeg',
         });
-      };
-      img.src = e.target?.result as string;
+      reader.onerror = () => reject(err);
+      reader.readAsDataURL(file);
     };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+
+    img.src = objectUrl;
   });
 }
 
 /**
  * Sends compressed meal photo to Gemini AI for identification and macro breakdown.
+ * Does NOT swallow errors or fake foods if the image or request fails.
  */
 export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAnalysisResult> {
   const isOnline = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
   if (!isOnline) {
-    return generateOfflineMealEstimate(options.userNotes, options.hiddenIngredients);
+    if (options.userNotes && options.userNotes.trim().length > 0) {
+      return generateOfflineMealEstimate(options.userNotes, options.hiddenIngredients);
+    }
+    throw new Error(
+      'You are currently offline. Connect to the internet to analyze photos with Gemini AI, or enter food manually.'
+    );
   }
 
   const { base64, mimeType } = await compressImageFile(options.file);
 
-  try {
-    const response = await fetch('/api/ai/scan-meal', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.customApiKey ? { 'x-gemini-api-key': options.customApiKey } : {}),
-      },
-      body: JSON.stringify({
-        imageBase64: base64,
-        mimeType,
-        userNotes: options.userNotes || '',
-        hiddenIngredients: options.hiddenIngredients || [],
-        customApiKey: options.customApiKey,
-      }),
-    });
+  const response = await fetch('/api/ai/scan-meal', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.customApiKey ? { 'x-gemini-api-key': options.customApiKey } : {}),
+    },
+    body: JSON.stringify({
+      imageBase64: base64,
+      mimeType,
+      userNotes: options.userNotes || '',
+      hiddenIngredients: options.hiddenIngredients || [],
+      customApiKey: options.customApiKey,
+    }),
+  });
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || `API error ${response.status}`);
-    }
-
-    const data: MealAnalysisResult = await response.json();
-    return {
-      ...data,
-      imageUrl: base64,
-    };
-  } catch (err: any) {
-    console.warn('Online meal scan failed, using fallback heuristic:', err);
-    // If the API call fails (quota or offline), provide graceful local estimate
-    return generateOfflineMealEstimate(options.userNotes, options.hiddenIngredients, base64);
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(
+      errData.message ||
+        `Food scan failed (${response.status}). Please check your internet connection or Gemini API key.`
+    );
   }
+
+  const data: MealAnalysisResult = await response.json();
+  return {
+    ...data,
+    imageUrl: base64,
+  };
 }
 
 /**
@@ -142,10 +156,17 @@ export function recalculateMealResult(
     const dbEst = estimateMacros(item.name, item.estimatedGrams || 100, 'g');
     return {
       ...item,
-      calories: item.calories > 0 && item.estimatedGrams === dbEst.quantity ? item.calories : dbEst.calories,
-      proteinG: item.proteinG > 0 && item.estimatedGrams === dbEst.quantity ? item.proteinG : dbEst.proteinG,
-      carbsG: item.carbsG > 0 && item.estimatedGrams === dbEst.quantity ? item.carbsG : dbEst.carbsG,
-      fatG: item.fatG > 0 && item.estimatedGrams === dbEst.quantity ? item.fatG : dbEst.fatG,
+      calories:
+        typeof item.calories === 'number' && !isNaN(item.calories)
+          ? item.calories
+          : dbEst.calories,
+      proteinG:
+        typeof item.proteinG === 'number' && !isNaN(item.proteinG)
+          ? item.proteinG
+          : dbEst.proteinG,
+      carbsG:
+        typeof item.carbsG === 'number' && !isNaN(item.carbsG) ? item.carbsG : dbEst.carbsG,
+      fatG: typeof item.fatG === 'number' && !isNaN(item.fatG) ? item.fatG : dbEst.fatG,
     };
   });
 
@@ -172,6 +193,7 @@ export function recalculateMealResult(
 
 /**
  * Offline heuristic fallback: generates a structured meal estimate using user hints or common plate heuristics.
+ * Only outputs items explicitly referenced by user notes; NEVER invents fake food.
  */
 export function generateOfflineMealEstimate(
   userNotes?: string,
@@ -181,13 +203,42 @@ export function generateOfflineMealEstimate(
   const notesLower = (userNotes || '').toLowerCase();
   const items: ScannedFoodItem[] = [];
 
-  // Parse common items if mentioned in user notes
+  // 1. Fitness Supplements in user notes
+  if (notesLower.includes('creatine')) {
+    items.push({
+      name: 'Creatine Monohydrate',
+      quantity: '1 scoop (5g)',
+      estimatedGrams: 5,
+      calories: 0,
+      proteinG: 0,
+      carbsG: 0,
+      fatG: 0,
+      confidence: 'high',
+      preparation: 'Micronized powder',
+    });
+  }
+
+  if (notesLower.includes('whey') || notesLower.includes('protein powder')) {
+    items.push({
+      name: 'Whey Protein Powder',
+      quantity: '1 scoop (30g)',
+      estimatedGrams: 30,
+      calories: 120,
+      proteinG: 24,
+      carbsG: 2.2,
+      fatG: 1.5,
+      confidence: 'high',
+      preparation: 'Mixed with water',
+    });
+  }
+
+  // 2. Common meals in user notes
   if (notesLower.includes('roti') || notesLower.includes('chapati')) {
     const qtyMatch = notesLower.match(/(\d+)\s*(roti|chapati)/);
     const count = qtyMatch ? parseInt(qtyMatch[1], 10) : 2;
     const est = estimateMacros('roti', count, 'piece');
     items.push({
-      name: 'Roti',
+      name: 'Roti / Chapati',
       quantity: `${count} pieces`,
       estimatedGrams: count * 40,
       calories: est.calories,
@@ -273,48 +324,12 @@ export function generateOfflineMealEstimate(
     });
   }
 
-  // Default balanced meal if no notes matched
-  if (items.length === 0) {
-    const rotiEst = estimateMacros('roti', 2, 'piece');
-    const dalEst = estimateMacros('dal', 180, 'g');
-    const riceEst = estimateMacros('rice', 150, 'g');
-
-    items.push(
-      {
-        name: 'Roti / Chapati',
-        quantity: '2 pieces',
-        estimatedGrams: 80,
-        calories: rotiEst.calories,
-        proteinG: rotiEst.proteinG,
-        carbsG: rotiEst.carbsG,
-        fatG: rotiEst.fatG,
-        confidence: 'medium',
-      },
-      {
-        name: 'Dal (Lentils)',
-        quantity: '1 bowl (180g)',
-        estimatedGrams: 180,
-        calories: dalEst.calories,
-        proteinG: dalEst.proteinG,
-        carbsG: dalEst.carbsG,
-        fatG: dalEst.fatG,
-        confidence: 'medium',
-      },
-      {
-        name: 'Cooked Rice',
-        quantity: '1 cup (150g)',
-        estimatedGrams: 150,
-        calories: riceEst.calories,
-        proteinG: riceEst.proteinG,
-        carbsG: riceEst.carbsG,
-        fatG: riceEst.fatG,
-        confidence: 'medium',
-      }
-    );
-  }
-
   // Hidden ingredients (Ghee/Oil)
-  if (hiddenIngredients?.some((h) => h.toLowerCase().includes('oil') || h.toLowerCase().includes('ghee'))) {
+  if (
+    hiddenIngredients?.some(
+      (h) => h.toLowerCase().includes('oil') || h.toLowerCase().includes('ghee')
+    )
+  ) {
     const gheeEst = estimateMacros('ghee', 10, 'g');
     items.push({
       name: 'Added Ghee / Cooking Oil',
@@ -329,13 +344,31 @@ export function generateOfflineMealEstimate(
     });
   }
 
+  // If no notes matched, do NOT fabricate fake food. Return an empty result with a helpful note.
+  if (items.length === 0) {
+    return {
+      mealName: userNotes ? `Meal (${userNotes.slice(0, 30)})` : 'No Food or Supplement Detected',
+      items: [],
+      totalCalories: 0,
+      totalProtein: 0,
+      totalCarbs: 0,
+      totalFat: 0,
+      hiddenIngredients: hiddenIngredients || [],
+      confidence: 'low',
+      coachingNote:
+        'No matching foods found in offline database. Add items manually or connect to internet for Gemini photo scanning.',
+      timestamp: new Date().toISOString(),
+      imageUrl,
+    };
+  }
+
   const totalCalories = Math.round(items.reduce((acc, it) => acc + it.calories, 0));
   const totalProtein = Number(items.reduce((acc, it) => acc + it.proteinG, 0).toFixed(1));
   const totalCarbs = Number(items.reduce((acc, it) => acc + it.carbsG, 0).toFixed(1));
   const totalFat = Number(items.reduce((acc, it) => acc + it.fatG, 0).toFixed(1));
 
   return {
-    mealName: userNotes ? `Meal (${userNotes.slice(0, 20)}...)` : 'Balanced Nutrition Plate',
+    mealName: userNotes ? `Meal (${userNotes.slice(0, 25)})` : 'Custom Food Entry',
     items,
     totalCalories,
     totalProtein,
@@ -343,7 +376,8 @@ export function generateOfflineMealEstimate(
     totalFat,
     hiddenIngredients: hiddenIngredients || [],
     confidence: 'medium',
-    coachingNote: 'Estimated nutrition from local database. Review and adjust portions before saving.',
+    coachingNote:
+      'Estimated nutrition from offline database matching your notes. Review and adjust portions before saving.',
     timestamp: new Date().toISOString(),
     imageUrl,
   };

@@ -177,9 +177,18 @@ const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
   // ── Drinks & Supplements ─────────────────────────────────────────
   'protein shake': { calories: 130, proteinG: 25, carbsG: 5, fatG: 2 },
   'mass gainer': { calories: 400, proteinG: 30, carbsG: 70, fatG: 5 },
+  'creatine': { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  'creatine monohydrate': { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  'bcaa': { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  'pre-workout': { calories: 5, proteinG: 0, carbsG: 1, fatG: 0 },
+  'preworkout': { calories: 5, proteinG: 0, carbsG: 1, fatG: 0 },
+  'protein bar': { calories: 360, proteinG: 33, carbsG: 35, fatG: 11 },
   'orange juice': { calories: 45, proteinG: 0.7, carbsG: 10.4, fatG: 0.2 },
   'coconut water': { calories: 19, proteinG: 0.7, carbsG: 3.7, fatG: 0.2 },
   'coffee': { calories: 2, proteinG: 0.3, carbsG: 0, fatG: 0 },
+  'black coffee': { calories: 2, proteinG: 0.3, carbsG: 0, fatG: 0 },
+  'green tea': { calories: 1, proteinG: 0.1, carbsG: 0, fatG: 0 },
+  'water': { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
 };
 
 const EMPTY_MACROS = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
@@ -215,6 +224,14 @@ const PIECE_WEIGHTS: Record<string, number> = {
   'milk tea': 150,
   lassi: 250,
   chaas: 250,
+  creatine: 5,
+  'creatine monohydrate': 5,
+  'protein powder': 30,
+  'whey protein': 30,
+  'protein bar': 60,
+  'pre-workout': 10,
+  preworkout: 10,
+  bcaa: 7,
 };
 
 function findBestMatch(normalizedName: string): string {

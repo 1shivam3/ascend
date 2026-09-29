@@ -54,55 +54,69 @@ export async function POST(req: Request) {
       },
     };
 
-    const prompt = `You are ASCEND's precision AI Sports Nutritionist and Computer Vision Food Analyst.
-Analyze the attached meal photo with high clinical and athletic precision.
+    const prompt = `You are ASCEND's precision AI Sports Nutritionist, Supplement Analyst, and Computer Vision Food Classifier.
+Analyze the attached photograph with high clinical and athletic precision.
 
-CRITICAL INSTRUCTIONS:
-1. Deconstruct the meal into individual visible food components (e.g. separate Roti, Cooked Rice, Dal, Paneer, Salad, etc.). Do not return a single vague aggregate number.
-2. INDIAN & REGIONAL CUISINE SPECIALTY: Accurately distinguish Indian staples:
-   - Breads: Roti/Chapati (typically 35-40g each), Paratha (plain ~75g, stuffed ~110-120g), Naan (~90g).
-   - Lentils & Legumes: Dal Tadka (yellow dal ~120-130 kcal/bowl), Dal Makhani (~170 kcal/bowl with cream/butter), Rajma (~130 kcal/100g), Chole (~150 kcal/100g).
-   - Curries & Sabjis: Paneer Butter Masala, Palak Paneer, Paneer Bhurji, Aloo Gobi, Bhindi Masala, Mixed Sabji.
-   - Rice & Grains: Steamed Rice, Jeera Rice, Pulao, Biryani, Khichdi, Poha, Upma.
-   - South Indian: Idli, Dosa, Masala Dosa, Medu Vada, Sambar.
-   - Dairy/Sides: Dahi/Curd, Raita, Chaas, Lassi, Boondi.
-   - Global Fitness Foods: Chicken breast, eggs/omelet, oats, salmon, sweet potato, protein shake, etc.
-3. USER OBSERVATIONS / NOTES: "${userNotes || 'None'}"
-   If the user specified portion context (e.g. "3 rotis, 1 bowl dal, hostel dinner"), prioritize the user's explicit quantities and count.
-4. HIDDEN INGREDIENTS REPORTED: ${hiddenIngredients.length > 0 ? hiddenIngredients.join(', ') : 'None'}
-   If 'Extra Oil / Ghee' is indicated, include an item for Ghee/Oil (typically 10-15g, 90-135 kcal, 100% fat) or incorporate it into the rich curries.
-   If 'Sugar / Sweet' is indicated, factor into beverages or sweet items.
-5. ESTIMATION LABELS:
-   All numbers must be rounded estimates (~650 kcal, ~23g protein, ~120g carbs, ~10g fat). Do not invent artificial decimal precision for calories.
-6. CONFIDENCE RATING:
-   Assign 'high', 'medium', or 'low' confidence to each detected food item based on visual clarity and visibility.
-7. ONE BRIEF ACTIONABLE COACHING NOTE:
-   Provide exactly ONE concise sentence summarizing protein adequacy or macro balance relative to strength/muscle maintenance (e.g. "Solid high-protein meal with good complex carbs. Perfect fuel for recovery.").
+CATEGORY INSTRUCTIONS:
+1. FITNESS SUPPLEMENTS (VERY IMPORTANT):
+   - If the photo shows a fitness supplement container, tub, box, bag, or shaker (e.g., Creatine, Whey Protein, Casein, Pre-Workout, BCAA, Mass Gainer, Multivitamin, Fish Oil, Protein Bar, Electrolytes):
+     - Carefully read visible branding and labels (e.g., "Optimum Nutrition Creatine", "MuscleBlaze Whey", "Wellcore Creatine", "Creatine Monohydrate").
+     - For CREATINE MONOHYDRATE:
+       * Name: "[Brand] Creatine Monohydrate" (or "Creatine Monohydrate")
+       * Portion: "1 scoop (3-5g)"
+       * Estimated grams: 5
+       * Calories: 0 kcal, Protein: 0g, Carbs: 0g, Fat: 0g (Creatine is an amino acid derivative with zero caloric macronutrient content)
+       * Coaching note: "Creatine monohydrate detected. 0 calories, essential for muscular ATP resynthesis and strength output."
+     - For WHEY PROTEIN / POWDER:
+       * Portion: "1 scoop (30g)"
+       * Calories: ~120-130 kcal, Protein: ~24-25g, Carbs: ~2-3g, Fat: ~1.5-2g
+     - For PROTEIN BAR:
+       * Portion: "1 bar (~60g)"
+       * Calories: ~200-240 kcal, Protein: ~20g, Carbs: ~22g, Fat: ~7g
+
+2. REAL MEALS & COOKED FOOD:
+   - Deconstruct visible plates into individual food items (e.g. separate Roti, Rice, Dal, Paneer, Salad, Chicken).
+   - Accurately estimate gram weights based on standard portion sizes.
+   - Distinguish Indian specialties: Roti/Chapati (35-40g each), Paratha, Naan, Dal Tadka vs Makhani, Rajma, Chole, Paneer curries, Biryani, Poha, Idli, Dosa, Curd, etc.
+   - Distinguish Global fitness foods: Chicken breast, eggs, salmon, oats, sweet potato, Greek yogurt, etc.
+
+3. NON-FOOD OR UNRELATED IMAGES:
+   - If the photo is clearly NOT food, drink, or nutritional supplements (e.g., gym weights, dumbbells, barbell, shoes, floor, wall, face, clothing, electronics):
+     - mealName: "No Food or Supplement Detected"
+     - items: [] (empty array)
+     - totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0
+     - coachingNote: "No food or fitness supplement was recognized in this photo. Please take a clear picture of a meal, snack, or supplement container."
+
+4. USER OBSERVATIONS / NOTES: "${userNotes || 'None'}"
+   If the user specified context (e.g. "3 rotis, 1 bowl dal", "taking my creatine scoop"), prioritize the user's explicit quantities.
+
+5. HIDDEN INGREDIENTS: ${hiddenIngredients.length > 0 ? hiddenIngredients.join(', ') : 'None'}
+   If 'Extra Oil / Ghee' is indicated, include an item for Ghee/Oil (10-15g, 90-135 kcal, 100% fat).
 
 OUTPUT FORMAT:
 Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or conversational text:
 {
-  "mealName": "Descriptive meal name e.g. Indian Lunch (Roti, Dal & Rice)",
+  "mealName": "Descriptive meal name e.g. Creatine Monohydrate Supplement OR Indian Lunch (Roti, Dal & Rice)",
   "items": [
     {
-      "name": "Food name (e.g. Roti, Cooked Basmati Rice, Dal Tadka)",
-      "quantity": "Human readable portion e.g. 2 pieces, 1 cup, 1 bowl, 150g",
-      "estimatedGrams": 80,
-      "calories": 220,
-      "proteinG": 7,
-      "carbsG": 40,
-      "fatG": 5,
+      "name": "Food or supplement name e.g. Creatine Monohydrate",
+      "quantity": "Human readable portion e.g. 1 scoop (5g) or 2 pieces",
+      "estimatedGrams": 5,
+      "calories": 0,
+      "proteinG": 0,
+      "carbsG": 0,
+      "fatG": 0,
       "confidence": "high",
-      "preparation": "Dry roasted without oil"
+      "preparation": "Micronized powder"
     }
   ],
-  "totalCalories": 650,
-  "totalProtein": 23,
-  "totalCarbs": 120,
-  "totalFat": 10.5,
-  "hiddenIngredients": ["Extra Ghee"],
+  "totalCalories": 0,
+  "totalProtein": 0,
+  "totalCarbs": 0,
+  "totalFat": 0,
+  "hiddenIngredients": [],
   "confidence": "high",
-  "coachingNote": "Good protein meal with balanced carbs for muscle recovery."
+  "coachingNote": "One concise sentence on nutritional relevance or strength purpose."
 }`;
 
     const candidateModels = [
