@@ -18,8 +18,12 @@ import {
   CreatineConfig,
   CreatineSupply,
   DailyTimelineEvent,
-  AICoachInsight
+  AICoachInsight,
+  AITrainingProfile,
+  AIPlannedWorkout,
+  AIWeeklyReview
 } from './types';
+import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 
 export * from './types';
 
@@ -36,6 +40,11 @@ export interface AppState {
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
+
+  // AI Training Profile & Plans
+  trainingProfile: AITrainingProfile;
+  todaysAIWorkoutPlan?: AIPlannedWorkout;
+  latestWeeklyReview?: AIWeeklyReview;
 
   // Habit Operating System (Tier 1 & 2)
   waterLogs: Record<string, number>;
@@ -96,6 +105,9 @@ export interface AppState {
   // AI Coach Actions
   setCustomGeminiKey: (key: string) => void;
   cacheAIInsight: (date: string, insight: AICoachInsight) => void;
+  setTrainingProfile: (profile: Partial<AITrainingProfile>) => void;
+  setTodaysAIWorkoutPlan: (plan: AIPlannedWorkout | undefined) => void;
+  saveWeeklyReview: (review: AIWeeklyReview) => void;
 
   clearAllData: () => void;
   
@@ -165,6 +177,11 @@ export const useAppStore = create<AppState>()(
       dayTypeOverrides: {},
       customGeminiKey: undefined,
       aiInsightsCache: {},
+
+      // AI State
+      trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
+      todaysAIWorkoutPlan: undefined,
+      latestWeeklyReview: undefined,
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -262,7 +279,9 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
-      addPlannedWorkout: (plan) => set((state) => ({ plannedWorkouts: [...state.plannedWorkouts, plan] })),
+      addPlannedWorkout: (plan) => set((state) => ({
+        plannedWorkouts: [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())]
+      })),
       updatePlannedWorkout: (id, plan) => set((state) => ({
         plannedWorkouts: state.plannedWorkouts.map(p => p.id === id ? plan : p)
       })),
@@ -440,6 +459,15 @@ export const useAppStore = create<AppState>()(
           },
         })),
 
+      setTrainingProfile: (profileUpdates) =>
+        set((state) => ({
+          trainingProfile: { ...state.trainingProfile, ...profileUpdates },
+        })),
+
+      setTodaysAIWorkoutPlan: (plan) => set({ todaysAIWorkoutPlan: plan }),
+
+      saveWeeklyReview: (review) => set({ latestWeeklyReview: review }),
+
       clearAllData: () => {
         set({
           profile: null,
@@ -461,6 +489,9 @@ export const useAppStore = create<AppState>()(
           dayTypeOverrides: {},
           customGeminiKey: undefined,
           aiInsightsCache: {},
+          trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
+          todaysAIWorkoutPlan: undefined,
+          latestWeeklyReview: undefined,
         });
         if (typeof window !== 'undefined') {
           try {
@@ -496,6 +527,9 @@ export const useAppStore = create<AppState>()(
             dayTypeOverrides: data.dayTypeOverrides && typeof data.dayTypeOverrides === 'object' ? data.dayTypeOverrides : state.dayTypeOverrides,
             customGeminiKey: data.customGeminiKey !== undefined ? data.customGeminiKey : state.customGeminiKey,
             aiInsightsCache: data.aiInsightsCache && typeof data.aiInsightsCache === 'object' ? data.aiInsightsCache : state.aiInsightsCache,
+            trainingProfile: data.trainingProfile || state.trainingProfile,
+            todaysAIWorkoutPlan: data.todaysAIWorkoutPlan || state.todaysAIWorkoutPlan,
+            latestWeeklyReview: data.latestWeeklyReview || state.latestWeeklyReview,
           }));
           return true;
         } catch {
@@ -543,6 +577,9 @@ export const useAppStore = create<AppState>()(
         dayTypeOverrides: state.dayTypeOverrides,
         customGeminiKey: state.customGeminiKey,
         aiInsightsCache: state.aiInsightsCache,
+        trainingProfile: state.trainingProfile,
+        todaysAIWorkoutPlan: state.todaysAIWorkoutPlan,
+        latestWeeklyReview: state.latestWeeklyReview,
       })
     }
   )

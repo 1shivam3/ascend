@@ -1,6 +1,17 @@
 import { AppState } from './store';
-import { AICoachInsight, WorkoutEntry, PersonalRecord } from './types';
+import {
+  AICoachInsight,
+  WorkoutEntry,
+  PersonalRecord,
+  AIPlannedWorkout,
+  AIPlannedExercise,
+  AISubstitutionResult,
+  AIWorkoutCommandResult,
+  AIPostWorkoutTake,
+  AIWeeklyReview
+} from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
+import { buildCompactUserContext } from './ai-context';
 
 /**
  * Calculates total tonnage (volume in kg) for a workout session.
@@ -20,7 +31,6 @@ export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75
       }
 
       if (isBw) {
-        // Effective load = bodyweight (or proportion) + added weight
         weightKg = (bodyweightKg * 0.9) + weightKg;
       }
 
@@ -92,7 +102,6 @@ export function getConsecutiveWorkoutDays(
     if (hasTrained) {
       streak++;
     } else {
-      // If we haven't trained today yet, don't break the streak if yesterday had a workout
       if (i === 0) continue;
       break;
     }
@@ -119,10 +128,10 @@ export function getDaysSinceLastWorkout(
   return Math.max(0, days);
 }
 
-/**
- * Deterministic, offline heuristic strength & fatigue engine.
- * Runs instantly 100% on-device with zero network required.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. DETERMINISTIC OFFLINE HEURISTIC ENGINES (100% On-Device Math)
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function generateOfflineHeuristic(
   state: Pick<
     AppState,
@@ -145,7 +154,6 @@ export function generateOfflineHeuristic(
   const consecutiveDays = getConsecutiveWorkoutDays(state.workouts, targetDate);
   const daysSince = getDaysSinceLastWorkout(state.workouts, targetDate);
 
-  // Daily Essentials status
   const waterMl = state.waterLogs[todayStr] || 0;
   const waterTarget = calculateHydrationTarget({
     bodyweightKg: bw,
@@ -167,13 +175,11 @@ export function generateOfflineHeuristic(
   );
   const proteinTarget = state.macroGoals?.proteinG || Math.round(bw * 1.8);
 
-  // 1. Volume Trend
   let volumeTrend = '';
   if (volume.lastWeekKg === 0 && volume.thisWeekKg === 0) {
     volumeTrend = 'Baseline training cycle. Log workout sets to establish weekly tonnage metrics.';
   } else if (volume.lastWeekKg === 0) {
-    const formattedThis = volume.thisWeekKg.toLocaleString();
-    volumeTrend = `Initial cycle established: ${formattedThis} kg total tonnage logged this week.`;
+    volumeTrend = `Initial cycle established: ${volume.thisWeekKg.toLocaleString()} kg total tonnage logged this week.`;
   } else if (volume.diffPercent >= 10) {
     volumeTrend = `Volume increased by +${volume.diffPercent}% (${volume.thisWeekKg.toLocaleString()} kg vs ${volume.lastWeekKg.toLocaleString()} kg prior). Progressive overload active.`;
   } else if (volume.diffPercent <= -10) {
@@ -182,7 +188,6 @@ export function generateOfflineHeuristic(
     volumeTrend = `Training volume is stable (${volume.thisWeekKg.toLocaleString()} kg, ${volume.diffPercent >= 0 ? '+' : ''}${volume.diffPercent}% vs prior week). Excellent consistency maintaining work capacity.`;
   }
 
-  // 2. Recovery Status
   let recoveryStatus = '';
   if (consecutiveDays >= 4) {
     recoveryStatus = `High systemic fatigue accumulated over ${consecutiveDays} consecutive training days. CNS and connective tissues require prioritized recovery.`;
@@ -196,10 +201,7 @@ export function generateOfflineHeuristic(
     recoveryStatus = 'Normal neuromuscular baseline. Hydration and nutritional replenishment dictate session quality.';
   }
 
-  // 3. Tactical Advice
   const advicePoints: string[] = [];
-
-  // Workout timing & intensity advice
   if (consecutiveDays >= 3) {
     advicePoints.push('Cap today’s session intensity at RPE 8 to preserve joint integrity and avoid accumulated overtraining.');
   } else if (daysSince >= 2) {
@@ -208,7 +210,6 @@ export function generateOfflineHeuristic(
     advicePoints.push('Ensure 2–3 ramp-up warm-up sets before your top working set to prime the neuromuscular groove.');
   }
 
-  // Nutrition / Hydration tactical advice
   if (waterMl < waterTarget * 0.6) {
     const needed = Math.round(waterTarget - waterMl);
     advicePoints.push(`Hydration is trailing target by ${(needed / 1000).toFixed(1)} L. Consume 500 ml before exercise to maintain blood volume and prevent premature pump loss.`);
@@ -225,7 +226,6 @@ export function generateOfflineHeuristic(
 
   const tacticalAdvice = advicePoints.slice(0, 2).join(' ');
 
-  // 4. Fatigue Warning
   let fatigueWarning: string | undefined = undefined;
   if (consecutiveDays >= 4) {
     fatigueWarning = `⚠️ Consecutive training warning: ${consecutiveDays} continuous workout days detected without a scheduled rest day. Watch for joint soreness and technical breakdown.`;
@@ -245,86 +245,345 @@ export function generateOfflineHeuristic(
 }
 
 /**
- * Hybrid AI Coach Dispatcher:
- * 1. Checks cache for today.
- * 2. Checks browser connectivity (`navigator.onLine`). If offline, runs deterministic heuristics immediately.
- * 3. If online, calls `/api/ai/coach` with 7s timeout. If timeout or error, falls back to deterministic heuristics.
+ * Deterministic offline workout plan generator.
+ * Analyzes last workout to select next logical split and exercises based on PRs and history.
  */
-export async function fetchOrGenerateAICoachInsight(
-  state: AppState,
-  options?: { forceRefresh?: boolean }
-): Promise<AICoachInsight> {
+export function generateDeterministicDailyPlan(state: AppState): AIPlannedWorkout {
   const todayStr = toLocalDateString(new Date());
+  const bw = state.profile?.bodyweightKg || 75;
+  const recentWorkouts = state.workouts || [];
+  const lastWorkout = recentWorkouts[0];
 
-  // 1. Check local cache
-  if (!options?.forceRefresh && state.aiInsightsCache && state.aiInsightsCache[todayStr]) {
-    return state.aiInsightsCache[todayStr];
+  let workoutName = 'Upper Body Strength';
+  let focus = 'Chest, Shoulders & Upper Back Overload';
+  let exercises: AIPlannedExercise[] = [];
+
+  // Determine split continuity
+  const lastWorkoutName = lastWorkout?.exercises?.[0]?.name?.toLowerCase() || '';
+  const isLastUpper = /bench|press|row|pull|curl|dip/i.test(lastWorkoutName);
+
+  if (isLastUpper) {
+    workoutName = 'Lower Body Power & Hypertrophy';
+    focus = 'Quad & Posterior Chain Progression';
+    const squatPR = state.prs.find((p) => /squat/i.test(p.exercise))?.weightKg || Math.round(bw * 1.2);
+    const rdlPR = state.prs.find((p) => /deadlift|rdl/i.test(p.exercise))?.weightKg || Math.round(bw * 1.1);
+
+    exercises = [
+      {
+        exercise: 'Barbell Back Squat',
+        sets: 4,
+        reps: '6-8',
+        targetWeightKg: Math.round(squatPR * 0.82),
+        restSeconds: 150,
+        reason: 'Primary knee extension overload. Aim for 8 reps before adding load.',
+      },
+      {
+        exercise: 'Romanian Deadlift',
+        sets: 3,
+        reps: '8-10',
+        targetWeightKg: Math.round(rdlPR * 0.75),
+        restSeconds: 120,
+        reason: 'Hamstring & posterior chain eccentric hypertrophy with full stretch.',
+      },
+      {
+        exercise: 'Leg Press',
+        sets: 3,
+        reps: '10-12',
+        targetWeightKg: Math.round(bw * 1.8),
+        restSeconds: 90,
+        reason: 'Safe machine volume without axial spinal loading.',
+      },
+      {
+        exercise: 'Standing Calf Raise',
+        sets: 3,
+        reps: '12-15',
+        targetWeightKg: Math.round(bw * 0.8),
+        restSeconds: 60,
+        reason: 'Direct gastrocnemius stimulus with 2s pause at bottom stretch.',
+      },
+    ];
+  } else {
+    workoutName = 'Upper Body Strength & Hypertrophy';
+    focus = 'Chest & Lat Progressive Overload';
+    const benchPR = state.prs.find((p) => /bench/i.test(p.exercise))?.weightKg || Math.round(bw * 0.9);
+    const rowPR = state.prs.find((p) => /row/i.test(p.exercise))?.weightKg || Math.round(bw * 0.8);
+
+    exercises = [
+      {
+        exercise: 'Barbell Bench Press',
+        sets: 4,
+        reps: '6-8',
+        targetWeightKg: Math.round(benchPR * 0.82),
+        restSeconds: 120,
+        reason: 'Primary horizontal press. Hit 8 reps across all sets before advancing weight.',
+      },
+      {
+        exercise: 'Barbell Row',
+        sets: 3,
+        reps: '8-10',
+        targetWeightKg: Math.round(rowPR * 0.8),
+        restSeconds: 90,
+        reason: 'Horizontal back density balancing anterior shoulder volume.',
+      },
+      {
+        exercise: 'Incline Dumbbell Press',
+        sets: 3,
+        reps: '8-10',
+        targetWeightKg: Math.round(benchPR * 0.35),
+        restSeconds: 90,
+        reason: 'Upper clavicular pec emphasis with deep convergence at lockout.',
+      },
+      {
+        exercise: 'Lat Pulldown',
+        sets: 3,
+        reps: '10-12',
+        targetWeightKg: Math.round(bw * 0.7),
+        restSeconds: 75,
+        reason: 'Vertical pulling hypertrophy targeting lower lats with strict tempo.',
+      },
+      {
+        exercise: 'Dumbbell Lateral Raise',
+        sets: 3,
+        reps: '12-15',
+        targetWeightKg: Math.round(bw * 0.12),
+        restSeconds: 60,
+        reason: 'Lateral deltoid cap isolated hypertrophy.',
+      },
+    ];
   }
 
-  // 2. Offline check
-  const isBrowserOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
-  if (isBrowserOffline) {
-    const heuristic = generateOfflineHeuristic(state);
-    state.cacheAIInsight(todayStr, heuristic);
-    return heuristic;
+  return {
+    id: `plan_${todayStr}`,
+    date: todayStr,
+    workoutName,
+    estimatedDurationMin: exercises.length * 10 + 10,
+    focus,
+    whyThisWorkout: `Structured based on your recent training rotation. Balanced volume targeting hypertrophy without exceeding connective tissue capacity.`,
+    exercises,
+    source: 'offline_deterministic',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Deterministic exercise substitution engine.
+ * Fast 1-tap replacements matching movement patterns and user equipment constraints.
+ */
+export function generateDeterministicSubstitution(
+  exerciseToReplace: string,
+  reasonOption: string
+): AISubstitutionResult {
+  const name = exerciseToReplace.toLowerCase();
+
+  if (name.includes('squat')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'Hack Squat',
+      reason: 'Replicates identical quad-dominant knee extension with zero lower-back spinal compression.',
+      movementPattern: 'Quad-dominant compound squat',
+      targetWeightKg: 80,
+      targetReps: '8-10',
+      targetSets: 3,
+    };
   }
 
-  // 3. Online AI Generation with 7-second timeout
-  try {
-    const bw = state.profile?.bodyweightKg || 75;
-    const volumeMetrics = getVolumeComparison(state.workouts, bw);
-    const consecutiveWorkoutDays = getConsecutiveWorkoutDays(state.workouts);
-    const daysSinceLastWorkout = getDaysSinceLastWorkout(state.workouts);
+  if (name.includes('bench')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'Dumbbell Bench Press',
+      reason: 'Matches horizontal pressing pattern while allowing natural wrist rotation and greater range of motion at bottom stretch.',
+      movementPattern: 'Horizontal chest press',
+      targetWeightKg: 28,
+      targetReps: '8-10',
+      targetSets: 3,
+    };
+  }
 
-    const waterMlToday = state.waterLogs[todayStr] || 0;
-    const waterTargetMl = calculateHydrationTarget({
-      bodyweightKg: bw,
-      isTrainingDay: state.workouts.some((w) => w.date && w.date.startsWith(todayStr)),
-      customTargetMl: state.hydrationConfig?.dailyTargetMl,
-      isCustomTarget: state.hydrationConfig?.isCustomTarget,
+  if (name.includes('deadlift') || name.includes('rdl')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'Dumbbell Romanian Deadlift',
+      reason: 'Maintains hip-hinge hamstring stretch with independent bilateral dumbbell tracking.',
+      movementPattern: 'Hip-hinge posterior chain',
+      targetWeightKg: 26,
+      targetReps: '10-12',
+      targetSets: 3,
+    };
+  }
+
+  if (name.includes('row')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'One-Arm Dumbbell Row',
+      reason: 'Full lat stretch and contraction with unilateral core bracing on flat bench.',
+      movementPattern: 'Horizontal pull',
+      targetWeightKg: 26,
+      targetReps: '10-12',
+      targetSets: 3,
+    };
+  }
+
+  if (name.includes('overhead') || name.includes('ohp') || name.includes('military')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'Seated Dumbbell Shoulder Press',
+      reason: 'Vertical anterior deltoid press with back support to eliminate lumbar hyperextension.',
+      movementPattern: 'Vertical shoulder press',
+      targetWeightKg: 20,
+      targetReps: '8-10',
+      targetSets: 3,
+    };
+  }
+
+  if (name.includes('pull') || name.includes('chin')) {
+    return {
+      originalExercise: exerciseToReplace,
+      replacementExercise: 'Lat Pulldown',
+      reason: 'Identical vertical pulling mechanics with micro-adjustable resistance for strict failure control.',
+      movementPattern: 'Vertical lat pull',
+      targetWeightKg: 55,
+      targetReps: '10-12',
+      targetSets: 3,
+    };
+  }
+
+  // Fallback generic replacement
+  return {
+    originalExercise: exerciseToReplace,
+    replacementExercise: `Dumbbell ${exerciseToReplace}`,
+    reason: 'Readily available dumbbell variant matching primary movement mechanics.',
+    movementPattern: 'Free weight bilateral movement',
+    targetReps: '8-12',
+    targetSets: 3,
+  };
+}
+
+/**
+ * Deterministic command interpreter for live in-workout commands.
+ */
+export function generateDeterministicCommand(
+  instruction: string,
+  activeWorkout: any
+): AIWorkoutCommandResult {
+  const text = instruction.toLowerCase();
+
+  if (text.includes('30') || text.includes('time') || text.includes('short') || text.includes('hurry')) {
+    const exercises = (activeWorkout?.exercises || []).slice(0, 3).map((e: any) => ({
+      exercise: e.name,
+      sets: Math.min(e.sets?.length || 2, 2),
+      reps: '8-10',
+      targetWeightKg: e.sets?.[0]?.weight || 50,
+      restSeconds: 75,
+      reason: 'Streamlined working sets to compress session under 30 minutes.',
+    }));
+
+    return {
+      actionType: 'SHORTEN_TIME',
+      summary: '30-Minute Express Adaptation',
+      coachAdvice: 'Capped workout at top 3 movements with 2 working sets each and 75s rest periods to preserve density.',
+      modifiedExercises: exercises,
+    };
+  }
+
+  if (text.includes('crowd') || text.includes('busy') || text.includes('machine') || text.includes('occupied')) {
+    const exercises = (activeWorkout?.exercises || []).map((e: any) => {
+      const sub = generateDeterministicSubstitution(e.name, 'Equipment busy');
+      return {
+        exercise: sub.replacementExercise,
+        sets: e.sets?.length || 3,
+        reps: sub.targetReps || '8-10',
+        targetWeightKg: sub.targetWeightKg || e.sets?.[0]?.weight || 24,
+        restSeconds: 90,
+        reason: sub.reason,
+      };
     });
 
-    const creatineStats = getCreatineStats(
-      state.creatineLogs,
-      new Date(),
-      state.creatineConfig?.dailyTargetG || 5
-    );
-
-    const todayMeals = state.meals.filter((m) => m.date && m.date.startsWith(todayStr));
-    const proteinGToday = todayMeals.reduce(
-      (acc, m) => acc + m.foods.reduce((sum, f) => sum + (f.proteinG || 0), 0),
-      0
-    );
-    const proteinTargetG = state.macroGoals?.proteinG || Math.round(bw * 1.8);
-
-    const payload = {
-      customApiKey: state.customGeminiKey,
-      profile: {
-        name: state.profile?.name,
-        gender: state.profile?.gender,
-        bodyweightKg: state.profile?.bodyweightKg,
-        unit: state.profile?.unit,
-      },
-      metrics: {
-        volumeThisWeekKg: volumeMetrics.thisWeekKg,
-        volumeLastWeekKg: volumeMetrics.lastWeekKg,
-        volumeDiffPercent: volumeMetrics.diffPercent,
-        consecutiveWorkoutDays,
-        daysSinceLastWorkout,
-        waterMlToday,
-        waterTargetMl,
-        creatineTakenToday: creatineStats.takenToday,
-        creatineStreakDays: creatineStats.currentStreak,
-        proteinGToday,
-        proteinTargetG,
-      },
-      recentWorkouts: (state.workouts || []).slice(0, 7),
-      topPRs: (state.prs || []).slice(0, 5).map((p: PersonalRecord) => ({
-        exercise: p.exercise,
-        oneRepMax: p.oneRepMax,
-      })),
+    return {
+      actionType: 'SWAP_EQUIPMENT',
+      summary: 'Crowded Gym Dumbbell Adaptations',
+      coachAdvice: 'Converted required barbell/cable stations to open dumbbell variations to avoid waiting for equipment.',
+      modifiedExercises: exercises,
     };
+  }
 
+  if (text.includes('tired') || text.includes('low energy') || text.includes('fatigue') || text.includes('exhausted')) {
+    return {
+      actionType: 'DELOAD_INTENSITY',
+      summary: 'Technical Recovery Deload Active',
+      coachAdvice: 'Reduce current target weights by 10%. Stay 2-3 reps in reserve (RPE 7-8) to protect joints while keeping movement patterns sharp.',
+    };
+  }
+
+  // Weight progression query
+  return {
+    actionType: 'WEIGHT_ADVICE',
+    summary: 'Progressive Overload Rule',
+    coachAdvice: 'If you completed your previous session with all target reps at RPE ≤ 8 with strict form, increase load by 2.5 kg. Otherwise, lock in the same weight and aim for 1 more rep on your final set.',
+  };
+}
+
+/**
+ * Deterministic post-workout take.
+ */
+export function generateDeterministicPostWorkoutTake(
+  completedWorkout: any
+): AIPostWorkoutTake {
+  const exercises = completedWorkout?.exercises || [];
+  const primary = exercises[0]?.name || 'Primary lift';
+
+  return {
+    headline: `Session Complete • ${primary} locked in`,
+    volumeVsLastWeek: 'Volume stimulus successfully delivered to target muscle groups.',
+    keyAchievements: [
+      `Completed ${exercises.length} movements with consistent execution.`,
+      `Session duration: ${completedWorkout?.durationMinutes || 45} minutes.`,
+    ],
+    nextSessionTarget: `Repeat ${primary} next session and aim for +1 rep on your final working set before increasing load.`,
+    source: 'offline_heuristic',
+  };
+}
+
+/**
+ * Deterministic weekly review.
+ */
+export function generateDeterministicWeeklyReview(state: AppState): AIWeeklyReview {
+  const todayStr = toLocalDateString(new Date());
+  const trainingProfile = state.trainingProfile;
+  const recentWorkouts = state.workouts || [];
+  const count = recentWorkouts.filter((w) => {
+    const diff = Math.floor((new Date().getTime() - new Date(w.date).getTime()) / (1000 * 60 * 60 * 24));
+    return diff <= 7;
+  }).length;
+
+  return {
+    id: `review_${todayStr}`,
+    date: todayStr,
+    weekSummary: `Completed ${count} of ${trainingProfile?.daysPerWeek || 4} target training sessions over the past 7 days.`,
+    workoutsCompleted: count,
+    plannedDaysPerWeek: trainingProfile?.daysPerWeek || 4,
+    strengthHighlight: 'Primary compound movements maintained load progression with disciplined set execution.',
+    habitInsight: 'Consistent hydration on active workout days supported intra-muscular pump and session recovery.',
+    focusNextWeek: 'Focus on advancing top sets by one rep across your primary barbell movements before micro-loading.',
+    source: 'offline_heuristic',
+    createdAt: new Date().toISOString(),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. HYBRID DISPATCHERS (Progressive Gemini Cloud AI + 7s Abort + Offline Fallback)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function executeAIRequest<T>(
+  state: AppState,
+  payload: any,
+  offlineFallback: () => T
+): Promise<T> {
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (isOffline) {
+    return offlineFallback();
+  }
+
+  try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 7000);
 
@@ -335,40 +594,182 @@ export async function fetchOrGenerateAICoachInsight(
       headers['x-gemini-api-key'] = state.customGeminiKey;
     }
 
-    const response = await fetch('/api/ai/coach', {
+    const res = await fetch('/api/ai/coach', {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        ...payload,
+        customApiKey: state.customGeminiKey,
+        userContext: buildCompactUserContext(state),
+      }),
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.insight) {
-        const fullInsight: AICoachInsight = {
-          date: todayStr,
-          source: 'gemini',
-          volumeTrend: data.insight.volumeTrend,
-          recoveryStatus: data.insight.recoveryStatus,
-          tacticalAdvice: data.insight.tacticalAdvice,
-          fatigueWarning: data.insight.fatigueWarning || undefined,
-          timestamp: new Date().toISOString(),
-        };
-        state.cacheAIInsight(todayStr, fullInsight);
-        return fullInsight;
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.data) {
+        return data.data as T;
       }
     }
 
-    // Server error or non-200: fallback to offline heuristic
-    const fallback = generateOfflineHeuristic(state);
-    state.cacheAIInsight(todayStr, fallback);
-    return fallback;
+    return offlineFallback();
   } catch {
-    // Timeout or network disconnect: fallback seamlessly to offline heuristic
-    const fallback = generateOfflineHeuristic(state);
-    state.cacheAIInsight(todayStr, fallback);
-    return fallback;
+    return offlineFallback();
   }
+}
+
+/**
+ * 1. AI Workout Planner: Today's Training
+ */
+export async function fetchOrGenerateDailyPlan(
+  state: AppState,
+  options?: { forceRefresh?: boolean }
+): Promise<AIPlannedWorkout> {
+  const todayStr = toLocalDateString(new Date());
+
+  if (!options?.forceRefresh && state.todaysAIWorkoutPlan && state.todaysAIWorkoutPlan.date === todayStr) {
+    return state.todaysAIWorkoutPlan;
+  }
+
+  const result = await executeAIRequest<AIPlannedWorkout>(
+    state,
+    { task: 'GENERATE_DAILY_PLAN' },
+    () => generateDeterministicDailyPlan(state)
+  );
+
+  const finalPlan: AIPlannedWorkout = {
+    ...result,
+    id: `plan_${todayStr}`,
+    date: todayStr,
+    source: result.source || 'gemini',
+    createdAt: new Date().toISOString(),
+  };
+
+  state.setTodaysAIWorkoutPlan(finalPlan);
+  return finalPlan;
+}
+
+/**
+ * 2. 1-Tap Exercise Substitution
+ */
+export async function fetchExerciseSubstitution(
+  state: AppState,
+  exerciseToReplace: string,
+  reasonOption: string
+): Promise<AISubstitutionResult> {
+  return executeAIRequest<AISubstitutionResult>(
+    state,
+    {
+      task: 'SUBSTITUTE_EXERCISE',
+      substitution: { exerciseToReplace, reasonOption },
+    },
+    () => generateDeterministicSubstitution(exerciseToReplace, reasonOption)
+  );
+}
+
+/**
+ * 3. In-Workout Command ("30 mins", "Crowded gym", "Should I increase weight?")
+ */
+export async function fetchWorkoutCommand(
+  state: AppState,
+  instruction: string,
+  activeWorkout: any
+): Promise<AIWorkoutCommandResult> {
+  return executeAIRequest<AIWorkoutCommandResult>(
+    state,
+    {
+      task: 'WORKOUT_COMMAND',
+      command: { instruction, activeWorkout },
+    },
+    () => generateDeterministicCommand(instruction, activeWorkout)
+  );
+}
+
+/**
+ * 4. Immediate Post-Workout Coach's Take
+ */
+export async function fetchPostWorkoutTake(
+  state: AppState,
+  completedWorkout: any
+): Promise<AIPostWorkoutTake> {
+  return executeAIRequest<AIPostWorkoutTake>(
+    state,
+    {
+      task: 'POST_WORKOUT_TAKE',
+      completedWorkout,
+    },
+    () => generateDeterministicPostWorkoutTake(completedWorkout)
+  );
+}
+
+/**
+ * 5. Weekly AI Review
+ */
+export async function fetchWeeklyReview(
+  state: AppState,
+  options?: { forceRefresh?: boolean }
+): Promise<AIWeeklyReview> {
+  const todayStr = toLocalDateString(new Date());
+
+  if (!options?.forceRefresh && state.latestWeeklyReview && state.latestWeeklyReview.date === todayStr) {
+    return state.latestWeeklyReview;
+  }
+
+  const result = await executeAIRequest<AIWeeklyReview>(
+    state,
+    {
+      task: 'WEEKLY_REVIEW',
+      weeklyStats: {
+        workoutsCompleted: state.workouts.length,
+        plannedDays: state.trainingProfile?.daysPerWeek || 4,
+      },
+    },
+    () => generateDeterministicWeeklyReview(state)
+  );
+
+  const finalReview: AIWeeklyReview = {
+    ...result,
+    id: `review_${todayStr}`,
+    date: todayStr,
+    source: result.source || 'gemini',
+    createdAt: new Date().toISOString(),
+  };
+
+  state.saveWeeklyReview(finalReview);
+  return finalReview;
+}
+
+/**
+ * 6. Tactical AI Coach Insight (Home Screen Overview)
+ */
+export async function fetchOrGenerateAICoachInsight(
+  state: AppState,
+  options?: { forceRefresh?: boolean }
+): Promise<AICoachInsight> {
+  const todayStr = toLocalDateString(new Date());
+
+  if (!options?.forceRefresh && state.aiInsightsCache && state.aiInsightsCache[todayStr]) {
+    return state.aiInsightsCache[todayStr];
+  }
+
+  const result = await executeAIRequest<AICoachInsight>(
+    state,
+    { task: 'COACH_INSIGHT' },
+    () => generateOfflineHeuristic(state)
+  );
+
+  const fullInsight: AICoachInsight = {
+    date: todayStr,
+    source: result.source || 'gemini',
+    volumeTrend: result.volumeTrend,
+    recoveryStatus: result.recoveryStatus,
+    tacticalAdvice: result.tacticalAdvice,
+    fatigueWarning: result.fatigueWarning || undefined,
+    timestamp: new Date().toISOString(),
+  };
+
+  state.cacheAIInsight(todayStr, fullInsight);
+  return fullInsight;
 }

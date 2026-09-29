@@ -39,15 +39,18 @@ import CreatineModal from '@/components/CreatineModal';
 import WeeklyConsistencyCard from '@/components/WeeklyConsistencyCard';
 import DailyTimelineCard from '@/components/DailyTimelineCard';
 import MonthlyAscensionReportModal from '@/components/MonthlyAscensionReportModal';
+import AIWorkoutPlannerCard from '@/components/AIWorkoutPlannerCard';
+import WeeklyReviewModal from '@/components/WeeklyReviewModal';
 import { calculateHydrationTarget, formatWaterLiters } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
+import { AIPlannedWorkout, PlannedWorkout } from '@/lib/types';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
-  const { profile, prs, workouts, plannedWorkouts } = useStore();
+  const { profile, prs, workouts, plannedWorkouts, addPlannedWorkout } = useStore();
 
   const todayDate = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => {
@@ -178,6 +181,34 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen, setIsCreatineModalOpen] = useState(false);
   const [isAscensionReportModalOpen, setIsAscensionReportModalOpen] = useState(false);
+  const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
+
+  const handleStartAIPlan = (aiPlan: AIPlannedWorkout) => {
+    const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
+    const plannedWorkout: PlannedWorkout = {
+      id: newPlanId,
+      name: aiPlan.workoutName,
+      createdAt: new Date().toISOString(),
+      exercises: aiPlan.exercises.map((ex) => {
+        let weight: number | undefined = undefined;
+        if (ex.targetWeightKg && ex.targetWeightKg > 0) {
+          weight = profile?.unit === 'lbs' ? Math.round(ex.targetWeightKg * 2.20462) : ex.targetWeightKg;
+        }
+        return {
+          name: ex.exercise,
+          targetSets: ex.sets || 3,
+          targetReps: parseInt(ex.reps, 10) || 8,
+          targetWeight: weight,
+          targetUnit: profile?.unit || 'kg',
+          notes: ex.reason,
+        };
+      }),
+    };
+
+    addPlannedWorkout(plannedWorkout);
+    toast.success(`Loaded "${aiPlan.workoutName}" into Workout Plans`, 'AI Plan Ready');
+    onNavigate('workout');
+  };
 
   return (
     <div className="page animate-fade-in space-y-4">
@@ -368,70 +399,96 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </section>
 
-      {/* ── 3. TODAY'S MAIN ACTION (Item 4 & Item 9: Solid orange START WORKOUT) ─ */}
-      <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="section-title text-[11px] mb-0">TODAY&apos;S TRAINING</span>
-          </div>
-          {hasTrainedToday && (
+      {/* ── 3. TODAY'S MAIN ACTION (AI Adaptive Plan or Session Complete) ─ */}
+      {hasTrainedToday ? (
+        <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="section-title text-[11px] mb-0">TODAY&apos;S TRAINING</span>
+            </div>
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
               <CheckCircle2 className="w-3.5 h-3.5" /> Trained Today
             </span>
-          )}
-        </div>
+          </div>
 
-        <div>
-          <h3 className="text-lg font-bold text-text-primary leading-tight">
-            {hasTrainedToday
-              ? 'Session Complete!'
-              : activePlan
-              ? activePlan.name
-              : 'Ready to Train'}
-          </h3>
-          <p className="text-xs text-text-secondary mt-0.5">
-            {hasTrainedToday
-              ? `${todayWorkouts.length} workout logged for today. Rest & recover.`
-              : activePlan
-              ? `${activePlan.exercises.length} exercises planned • Tap to start`
-              : 'Start a blank workout or choose a training plan.'}
-          </p>
-        </div>
+          <div>
+            <h3 className="text-lg font-bold text-text-primary leading-tight">
+              Session Complete!
+            </h3>
+            <p className="text-xs text-text-secondary mt-0.5">
+              {todayWorkouts.length} workout{todayWorkouts.length !== 1 ? 's' : ''} logged for today. Rest, recover, and hit your hydration target.
+            </p>
+          </div>
 
-        {/* Prominent Primary Solid Orange Button (Item 3 & Item 9) */}
-        <button
-          type="button"
-          onClick={() => onNavigate('workout')}
-          className="btn-primary w-full py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
-        >
-          <Play className="w-4 h-4 fill-white stroke-white" />
-          <span>{hasTrainedToday ? 'LOG ANOTHER WORKOUT' : 'START WORKOUT'}</span>
-        </button>
-
-        {/* Secondary Quick Action Links (Item 9: Clean, lower prominence than Start Workout) */}
-        <div className="grid grid-cols-2 gap-2 pt-0.5">
+          {/* Action buttons */}
           <button
             type="button"
-            onClick={() => onNavigate('meals')}
-            className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+            onClick={() => onNavigate('workout')}
+            className="btn-primary w-full py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
           >
-            <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />
-            <span>Log Meal</span>
+            <Play className="w-4 h-4 fill-white stroke-white" />
+            <span>LOG ANOTHER WORKOUT</span>
           </button>
+
+          <div className="grid grid-cols-2 gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => onNavigate('meals')}
+              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+            >
+              <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />
+              <span>Log Meal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('prs')}
+              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+            >
+              <Trophy className="w-3.5 h-3.5 text-accent" />
+              <span>Record PR</span>
+            </button>
+          </div>
+        </section>
+      ) : (
+        <div className="space-y-3">
+          <AIWorkoutPlannerCard onStartWorkout={handleStartAIPlan} />
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => onNavigate('meals')}
+              className="btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+            >
+              <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />
+              <span>Log Meal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('prs')}
+              className="btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
+            >
+              <Trophy className="w-3.5 h-3.5 text-accent" />
+              <span>Record PR</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── WEEKLY CONSISTENCY & PERFORMANCE REVIEW ── */}
+      <div className="space-y-2">
+        <WeeklyConsistencyCard />
+        <div className="flex justify-end px-1">
           <button
             type="button"
-            onClick={() => onNavigate('prs')}
-            className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+            onClick={() => setIsWeeklyReviewModalOpen(true)}
+            className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-accent/10 transition-colors"
           >
-            <Trophy className="w-3.5 h-3.5 text-accent" />
-            <span>Record PR</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI Weekly Performance Review &rarr;</span>
           </button>
         </div>
-      </section>
-
-      {/* ── WEEKLY CONSISTENCY (Item 12: 4 Pillars 7-Day Adherence) ── */}
-      <WeeklyConsistencyCard />
+      </div>
 
       {/* ── 4. KEY STATS SUMMARY (Item 4: 361 kg Big 3 | 1.47× BW | 7 PRs) ───── */}
       <section className="grid grid-cols-3 gap-2.5">
@@ -798,6 +855,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <MonthlyAscensionReportModal
         isOpen={isAscensionReportModalOpen}
         onClose={() => setIsAscensionReportModalOpen(false)}
+      />
+
+      {/* Weekly Review Modal */}
+      <WeeklyReviewModal
+        isOpen={isWeeklyReviewModalOpen}
+        onClose={() => setIsWeeklyReviewModalOpen(false)}
       />
     </div>
   );

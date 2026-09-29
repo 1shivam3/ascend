@@ -20,10 +20,16 @@ import {
   BookOpen,
   Edit2,
   CheckCircle2,
+  ArrowRightLeft,
+  Bot
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
+import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
+import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
+import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
+import { AISubstitutionResult } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
 interface WorkoutPageProps {
@@ -359,9 +365,44 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
 
+  // ── AI In-Workout & Post-Workout State ─────────────────────────────────────
+  const [substitutionExerciseIndex, setSubstitutionExerciseIndex] = useState<number | null>(null);
+  const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState(false);
+  const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
+    name: string;
+    durationMinutes: number;
+    exercises: WorkoutExercise[];
+  } | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
+
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
+
+  const handleApplyReplacement = (replacement: AISubstitutionResult) => {
+    if (substitutionExerciseIndex !== null) {
+      setExercises(prev => prev.map((ex, i) => {
+        if (i === substitutionExerciseIndex) {
+          return {
+            name: replacement.replacementExercise,
+            sets: Array.from({ length: replacement.targetSets || ex.sets.length || 3 }).map(() => ({
+              weight: replacement.targetWeightKg || ex.sets[0]?.weight || 0,
+              reps: parseInt(replacement.targetReps || '8') || 8,
+              unit: userUnit,
+            })),
+          };
+        }
+        return ex;
+      }));
+      toast.success(`Replaced with ${replacement.replacementExercise}`, 'Exercise Substituted');
+      setSubstitutionExerciseIndex(null);
+    }
+  };
+
+  const handleApplyModifiedWorkout = (modifiedExercises: WorkoutExercise[]) => {
+    setExercises(modifiedExercises);
+    toast.success('Workout updated according to Coach directive.', 'Workout Adapted');
+  };
 
   // ─── Workout logger helpers ────────────────────────────────────────────────
 
@@ -432,6 +473,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
 
   const openBlankLogger = () => {
     setStartedFromPlan(null);
+    setSessionStartTime(Date.now());
     if (exercises.length === 0) handleAddExercise();
     setIsModalOpen(true);
   };
@@ -439,6 +481,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   // ─── Start plan → pre-fill logger ────────────────────────────────────────
 
   const handleStartPlan = (plan: PlannedWorkout) => {
+    setSessionStartTime(Date.now());
     const preFilledExercises: WorkoutExercise[] = plan.exercises.map(pe => ({
       name: pe.name,
       sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
@@ -617,6 +660,13 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         'Workout Saved'
       );
     }
+
+    const durationMin = Math.max(15, Math.round((Date.now() - sessionStartTime) / 60000));
+    setPostWorkoutSummary({
+      name: startedFromPlan || 'Workout Session',
+      durationMinutes: durationMin,
+      exercises: validExercises,
+    });
 
     setIsModalOpen(false);
     setStartedFromPlan(null);
@@ -1027,9 +1077,20 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                   <p className="text-2xs text-text-muted font-mono mt-0.5">Record your session</p>
                 )}
               </div>
-              <button onClick={closeLogger} className="text-text-secondary hover:text-text-primary p-1">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCoachDrawerOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/30 text-accent text-xs font-bold hover:bg-accent/25 transition-all shadow-xs"
+                  title="Ask In-Workout AI Coach"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Ask Coach</span>
+                </button>
+                <button onClick={closeLogger} className="text-text-secondary hover:text-text-primary p-1">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Body */}
@@ -1065,12 +1126,25 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                     <div key={i} className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 relative">
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-mono text-accent font-semibold">EXERCISE {i + 1}</span>
-                        <button
-                          onClick={() => handleRemoveExercise(i)}
-                          className="text-text-muted hover:text-danger p-1"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {exercise.name.trim() && (
+                            <button
+                              type="button"
+                              onClick={() => setSubstitutionExerciseIndex(i)}
+                              className="flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                              title="Replace with alternative exercise"
+                            >
+                              <ArrowRightLeft className="w-3 h-3" />
+                              <span>Replace</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleRemoveExercise(i)}
+                            className="text-text-muted hover:text-danger p-1"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <input
@@ -1171,6 +1245,36 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         initialUnit={userUnit}
         initialWeight={userUnit === 'kg' ? 100 : 225}
       />
+
+      {/* AI Exercise Substitution Modal */}
+      {substitutionExerciseIndex !== null && (
+        <ExerciseSubstitutionModal
+          isOpen={substitutionExerciseIndex !== null}
+          onClose={() => setSubstitutionExerciseIndex(null)}
+          exerciseName={exercises[substitutionExerciseIndex]?.name || ''}
+          onApplyReplacement={handleApplyReplacement}
+        />
+      )}
+
+      {/* In-Workout Ask Coach Drawer */}
+      <WorkoutCoachDrawer
+        isOpen={isCoachDrawerOpen}
+        onClose={() => setIsCoachDrawerOpen(false)}
+        activeWorkout={{
+          name: startedFromPlan || 'Current Workout',
+          exercises,
+        }}
+        onApplyModifiedWorkout={handleApplyModifiedWorkout}
+      />
+
+      {/* Post-Workout Coach's Take Modal */}
+      {postWorkoutSummary && (
+        <PostWorkoutTakeModal
+          isOpen={!!postWorkoutSummary}
+          onClose={() => setPostWorkoutSummary(null)}
+          completedWorkout={postWorkoutSummary}
+        />
+      )}
     </div>
   );
 }

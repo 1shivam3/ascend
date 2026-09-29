@@ -197,3 +197,75 @@ export interface AICoachInsight {
   fatigueWarning?: string;
   timestamp: string;
 }
+
+export interface AITrainingProfile {
+  goal: 'muscle_gain' | 'strength' | 'fat_loss' | 'general_fitness';
+  experience: 'beginner' | 'intermediate' | 'advanced';
+  daysPerWeek: number;
+  preferredDurationMin: number;
+  equipment: 'full_gym' | 'home_dumbbells' | 'bodyweight_only' | 'barbell_only';
+  preferredSplit: 'push_pull_legs' | 'upper_lower' | 'full_body' | 'bro_split';
+  dislikedExercises: string[];
+  injuriesOrLimitations: string[];
+  coachingStyle: 'concise' | 'balanced' | 'detailed';
+}
+
+export interface AIPlannedExercise {
+  exercise: string;
+  sets: number;
+  reps: string;
+  targetWeightKg: number;
+  restSeconds: number;
+  reason: string;
+}
+
+export interface AIPlannedWorkout {
+  id: string;
+  date: string; // YYYY-MM-DD
+  workoutName: string;
+  estimatedDurationMin: number;
+  focus: string;
+  whyThisWorkout: string;
+  exercises: AIPlannedExercise[];
+  source: 'gemini' | 'offline_deterministic';
+  createdAt: string;
+}
+
+export interface AISubstitutionResult {
+  originalExercise: string;
+  replacementExercise: string;
+  reason: string;
+  movementPattern: string;
+  targetWeightKg?: number;
+  targetReps?: string;
+  targetSets?: number;
+}
+
+export interface AIWorkoutCommandResult {
+  actionType: 'SHORTEN_TIME' | 'SWAP_EQUIPMENT' | 'DELOAD_INTENSITY' | 'WEIGHT_ADVICE' | 'CUSTOM';
+  summary: string;
+  coachAdvice: string;
+  modifiedExercises?: AIPlannedExercise[];
+}
+
+export interface AIPostWorkoutTake {
+  headline: string;
+  volumeVsLastWeek: string;
+  keyAchievements: string[];
+  nextSessionTarget: string;
+  source: 'gemini' | 'offline_heuristic';
+}
+
+export interface AIWeeklyReview {
+  id: string;
+  date: string; // YYYY-MM-DD
+  weekSummary: string;
+  workoutsCompleted: number;
+  plannedDaysPerWeek: number;
+  strengthHighlight: string;
+  habitInsight: string;
+  focusNextWeek: string;
+  source: 'gemini' | 'offline_heuristic';
+  createdAt: string;
+}
+
