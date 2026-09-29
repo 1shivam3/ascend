@@ -17,12 +17,13 @@ import {
   CreatineLog,
   CreatineConfig,
   CreatineSupply,
-  DailyTimelineEvent
+  DailyTimelineEvent,
+  AICoachInsight
 } from './types';
 
 export * from './types';
 
-interface AppState {
+export interface AppState {
   profile: UserProfile | null;
   prs: PersonalRecord[];
   workouts: WorkoutEntry[];
@@ -44,6 +45,8 @@ interface AppState {
   creatineConfig: CreatineConfig;
   creatineSupply: CreatineSupply;
   dayTypeOverrides: Record<string, DayType>;
+  customGeminiKey?: string;
+  aiInsightsCache: Record<string, AICoachInsight>;
   
   setHasHydrated: (state: boolean) => void;
   setProfile: (profile: UserProfile) => void;
@@ -89,6 +92,10 @@ interface AppState {
   refillCreatineSupply: (containerG?: number) => void;
   setDayType: (date: string, type: DayType) => void;
   logQuickProtein: (proteinG: number, date?: string) => void;
+
+  // AI Coach Actions
+  setCustomGeminiKey: (key: string) => void;
+  cacheAIInsight: (date: string, insight: AICoachInsight) => void;
 
   clearAllData: () => void;
   
@@ -156,6 +163,8 @@ export const useAppStore = create<AppState>()(
       creatineConfig: DEFAULT_CREATINE_CONFIG,
       creatineSupply: DEFAULT_CREATINE_SUPPLY,
       dayTypeOverrides: {},
+      customGeminiKey: undefined,
+      aiInsightsCache: {},
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -421,6 +430,16 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
+      setCustomGeminiKey: (key: string) => set({ customGeminiKey: key.trim() ? key.trim() : undefined }),
+
+      cacheAIInsight: (date: string, insight: AICoachInsight) =>
+        set((state) => ({
+          aiInsightsCache: {
+            ...state.aiInsightsCache,
+            [date]: insight,
+          },
+        })),
+
       clearAllData: () => {
         set({
           profile: null,
@@ -440,6 +459,8 @@ export const useAppStore = create<AppState>()(
           creatineConfig: DEFAULT_CREATINE_CONFIG,
           creatineSupply: DEFAULT_CREATINE_SUPPLY,
           dayTypeOverrides: {},
+          customGeminiKey: undefined,
+          aiInsightsCache: {},
         });
         if (typeof window !== 'undefined') {
           try {
@@ -473,6 +494,8 @@ export const useAppStore = create<AppState>()(
             creatineConfig: data.creatineConfig || state.creatineConfig,
             creatineSupply: data.creatineSupply || state.creatineSupply,
             dayTypeOverrides: data.dayTypeOverrides && typeof data.dayTypeOverrides === 'object' ? data.dayTypeOverrides : state.dayTypeOverrides,
+            customGeminiKey: data.customGeminiKey !== undefined ? data.customGeminiKey : state.customGeminiKey,
+            aiInsightsCache: data.aiInsightsCache && typeof data.aiInsightsCache === 'object' ? data.aiInsightsCache : state.aiInsightsCache,
           }));
           return true;
         } catch {
@@ -518,6 +541,8 @@ export const useAppStore = create<AppState>()(
         creatineConfig: state.creatineConfig,
         creatineSupply: state.creatineSupply,
         dayTypeOverrides: state.dayTypeOverrides,
+        customGeminiKey: state.customGeminiKey,
+        aiInsightsCache: state.aiInsightsCache,
       })
     }
   )

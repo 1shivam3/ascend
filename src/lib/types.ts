@@ -187,3 +187,13 @@ export interface DailyTimelineEvent {
   detail?: string;
   completed: boolean;
 }
+
+export interface AICoachInsight {
+  date: string; // YYYY-MM-DD
+  source: 'gemini' | 'offline_heuristic';
+  volumeTrend: string;
+  recoveryStatus: string;
+  tacticalAdvice: string;
+  fatigueWarning?: string;
+  timestamp: string;
+}

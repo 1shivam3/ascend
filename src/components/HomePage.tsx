@@ -33,6 +33,7 @@ import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/do
 import DailyEssentialsCard from '@/components/DailyEssentialsCard';
 import QuickLogBar from '@/components/QuickLogBar';
 import NextBestActionBanner from '@/components/NextBestActionBanner';
+import AICoachCard from '@/components/AICoachCard';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import WeeklyConsistencyCard from '@/components/WeeklyConsistencyCard';
@@ -321,6 +322,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
+
+      {/* ── ASCEND AI COACH (Offline-First Progressive Hybrid Engine) ── */}
+      <AICoachCard onOpenSettings={() => setIsDataVaultModalOpen(true)} />
 
       {/* ── 2. LEVEL & RANK SYSTEM (Item 6: Visually stronger progression) ───── */}
       <section
