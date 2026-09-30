@@ -568,6 +568,66 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
+  const dynamicCloseoutSuggestions = useMemo(() => {
+    const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 6);
+
+    if (candidates.length === 0) {
+      return [
+        {
+          tag: '⚡ FASTEST (1 MIN PREP)',
+          tagCls: 'bg-accent/10 text-accent',
+          name: 'Whey Protein Shake',
+          description: '1 scoop whey protein + 250ml milk or water',
+          calories: 200,
+          proteinG: 30,
+          carbsG: 14,
+          foods: [
+            { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+            { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+          ],
+        },
+        {
+          tag: '🍽️ HIGH PROTEIN STAPLE',
+          tagCls: 'bg-[#22C55E]/10 text-[#22C55E]',
+          name: 'Soya Chunks Bowl',
+          description: '50g boiled soya chunks with spices',
+          calories: 172,
+          proteinG: 26,
+          carbsG: 16,
+          foods: [
+            { name: 'Soya Chunks', quantity: 50, unit: 'g', calories: 172, proteinG: 26, carbsG: 16, fatG: 0.3 },
+          ],
+        },
+      ];
+    }
+
+    const sorted = [...candidates].sort((a, b) => (b.proteinG || 0) - (a.proteinG || 0)).slice(0, 2);
+
+    return sorted.map((cand, idx) => {
+      const isFirst = idx === 0;
+      return {
+        tag: isFirst ? '⚡ PINNED HIGH PROTEIN' : '🍽️ WHOLE FOOD STAPLE',
+        tagCls: isFirst ? 'bg-accent/10 text-accent' : 'bg-[#22C55E]/10 text-[#22C55E]',
+        name: cand.name,
+        description: `${cand.defaultQuantity || 100}${cand.unit || 'g'} ${cand.name}`,
+        calories: Math.round(cand.calories),
+        proteinG: Math.round(cand.proteinG),
+        carbsG: Math.round(cand.carbsG),
+        foods: [
+          {
+            name: cand.name,
+            quantity: cand.defaultQuantity || 100,
+            unit: cand.unit || 'g',
+            calories: cand.calories,
+            proteinG: cand.proteinG,
+            carbsG: cand.carbsG,
+            fatG: cand.fatG,
+          },
+        ],
+      };
+    });
+  }, [favoriteFoods]);
+
   const waterToday = waterLogs[todayDate] || 0;
   const waterTargetMl = calculateHydrationTarget({
     bodyweightKg: profile?.bodyweightKg || 75,
@@ -735,11 +795,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </button>
         </div>
 
-        {/* Primary Emphasis: Calories & Protein (Item 16) */}
+        {/* All 4 Macro Progress Boxes */}
         <div className="grid grid-cols-2 gap-3">
           {/* Calories Box */}
           <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
               CALORIES
             </span>
             <div className="flex items-baseline gap-1">
@@ -760,14 +821,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             )}
           </div>
 
-          {/* Protein Box (High strength emphasis) */}
+          {/* Protein Box (Key strength metric) */}
           <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider block flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="text-[10px] uppercase font-bold text-[#22C55E] tracking-wider block flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
               PROTEIN (KEY)
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-emerald-600 font-sans">
+              <span className="text-2xl font-black text-[#22C55E] font-sans">
                 {Math.round(todayMacros.proteinG)}g
               </span>
               {macroGoals && (
@@ -777,29 +838,58 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {macroGoals && (
               <div className="level-bar h-1.5 mt-1">
                 <div
-                  className="level-bar-fill bg-emerald-500"
+                  className="level-bar-fill bg-[#22C55E]"
                   style={{ width: `${Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%` }}
                 />
               </div>
             )}
           </div>
-        </div>
 
-        {/* Secondary Info: Carbs & Fat */}
-        <div className="flex items-center justify-around py-2 px-3 rounded-xl bg-bg-secondary/40 border border-border/50 text-xs text-text-secondary">
-          <div className="flex items-center gap-1.5">
-            <span className="text-text-muted font-medium">Carbs:</span>
-            <strong className="text-text-primary">{Math.round(todayMacros.carbsG)}g</strong>
+          {/* Carbs Box */}
+          <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-[#38BDF8] tracking-wider block flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
+              CARBS
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-text-primary font-sans">
+                {Math.round(todayMacros.carbsG)}g
+              </span>
+              {macroGoals?.carbsG && (
+                <span className="text-xs text-text-muted font-medium">/ {macroGoals.carbsG}g</span>
+              )}
+            </div>
             {macroGoals?.carbsG && (
-              <span className="text-2xs text-text-muted">/ {macroGoals.carbsG}g</span>
+              <div className="level-bar h-1 mt-1">
+                <div
+                  className="level-bar-fill bg-[#38BDF8]"
+                  style={{ width: `${Math.min(100, Math.round((todayMacros.carbsG / macroGoals.carbsG) * 100))}%` }}
+                />
+              </div>
             )}
           </div>
-          <span className="text-border">•</span>
-          <div className="flex items-center gap-1.5">
-            <span className="text-text-muted font-medium">Fat:</span>
-            <strong className="text-text-primary">{Math.round(todayMacros.fatG)}g</strong>
+
+          {/* Fat Box */}
+          <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
+            <span className="text-[10px] uppercase font-bold text-[#F5B301] tracking-wider block flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5B301]" />
+              FAT
+            </span>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black text-text-primary font-sans">
+                {Math.round(todayMacros.fatG)}g
+              </span>
+              {macroGoals?.fatG && (
+                <span className="text-xs text-text-muted font-medium">/ {macroGoals.fatG}g</span>
+              )}
+            </div>
             {macroGoals?.fatG && (
-              <span className="text-2xs text-text-muted">/ {macroGoals.fatG}g</span>
+              <div className="level-bar h-1 mt-1">
+                <div
+                  className="level-bar-fill bg-[#F5B301]"
+                  style={{ width: `${Math.min(100, Math.round((todayMacros.fatG / macroGoals.fatG) * 100))}%` }}
+                />
+              </div>
             )}
           </div>
         </div>
@@ -866,75 +956,43 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           <div className="space-y-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {/* Option 1: Fastest Option */}
-              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-3xs font-mono uppercase font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
-                      ⚡ FASTEST OPTION (1 MIN PREP)
-                    </span>
-                    <span className="text-xs font-bold text-emerald-600 font-mono">+30g P</span>
-                  </div>
-                  <h4 className="text-xs font-bold text-text-primary">Whey Protein Shake</h4>
-                  <p className="text-3xs text-text-muted mt-0.5">1 scoop whey protein + 250ml milk or water</p>
-                  <p className="text-3xs text-text-secondary mt-1 font-mono">~200 kcal • 30g protein • 14g carbs</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newMeal: MealEntry = {
-                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                      date: todayDate,
-                      name: 'Whey Protein Shake',
-                      foods: [
-                        { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
-                        { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
-                      ],
-                    };
-                    addMeal(newMeal);
-                    toast.success('Logged Whey Protein Shake (+30g protein)!', 'Protein Logged');
-                  }}
-                  className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+              {dynamicCloseoutSuggestions.map((sug, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
                 >
-                  <Plus className="w-3 h-3" />
-                  <span>Log 1-Tap</span>
-                </button>
-              </div>
-
-              {/* Option 2: More Filling Option */}
-              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-3xs font-mono uppercase font-bold text-emerald-500 px-1.5 py-0.5 rounded bg-emerald-500/10">
-                      🍽️ MORE FILLING OPTION (HIGH SATIETY)
-                    </span>
-                    <span className="text-xs font-bold text-emerald-600 font-mono">+38g P</span>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
+                        {sug.tag}
+                      </span>
+                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
+                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
+                    <p className="text-3xs text-text-secondary mt-1 font-mono">
+                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
+                    </p>
                   </div>
-                  <h4 className="text-xs font-bold text-text-primary">Greek Yogurt + Whey Bowl</h4>
-                  <p className="text-3xs text-text-muted mt-0.5">150g greek yogurt / thick curd + 1 scoop protein</p>
-                  <p className="text-3xs text-text-secondary mt-1 font-mono">~240 kcal • 38g protein • 8g carbs</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newMeal: MealEntry = {
+                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                        date: todayDate,
+                        name: sug.name,
+                        foods: sug.foods,
+                      };
+                      addMeal(newMeal);
+                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
+                    }}
+                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Log 1-Tap</span>
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newMeal: MealEntry = {
-                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                      date: todayDate,
-                      name: 'Greek Yogurt + Whey',
-                      foods: [
-                        { name: 'Greek Yogurt', quantity: 150, unit: 'g', calories: 120, proteinG: 14, carbsG: 6, fatG: 2 },
-                        { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
-                      ],
-                    };
-                    addMeal(newMeal);
-                    toast.success('Logged Greek Yogurt + Whey (+38g protein)!', 'Protein Logged');
-                  }}
-                  className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
-                >
-                  <Plus className="w-3 h-3" />
-                  <span>Log 1-Tap</span>
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         </section>

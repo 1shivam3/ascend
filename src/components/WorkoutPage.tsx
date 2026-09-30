@@ -74,6 +74,55 @@ const emptyPlanExercise = (unit: 'kg' | 'lbs'): PlannedExercise => ({
   notes: '',
 });
 
+export const BUILTIN_SPLIT_TEMPLATES: PlannedWorkout[] = [
+  {
+    id: 'builtin_upper_a',
+    name: 'Upper A',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: 70, targetUnit: 'kg' },
+      { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: 60, targetUnit: 'kg' },
+      { name: 'Overhead Press', targetSets: 3, targetReps: 10, targetWeight: 40, targetUnit: 'kg' },
+      { name: 'Lat Pulldown', targetSets: 3, targetReps: 12, targetWeight: 55, targetUnit: 'kg' },
+      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 12, targetWeight: 14, targetUnit: 'kg' },
+    ],
+  },
+  {
+    id: 'builtin_lower_a',
+    name: 'Lower A',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: 100, targetUnit: 'kg' },
+      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 10, targetWeight: 80, targetUnit: 'kg' },
+      { name: 'Leg Press', targetSets: 3, targetReps: 12, targetWeight: 160, targetUnit: 'kg' },
+      { name: 'Calf Raise', targetSets: 4, targetReps: 15, targetWeight: 50, targetUnit: 'kg' },
+    ],
+  },
+  {
+    id: 'builtin_upper_b',
+    name: 'Upper B',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: 60, targetUnit: 'kg' },
+      { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: 'kg' },
+      { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: 22, targetUnit: 'kg' },
+      { name: 'Lateral Raise', targetSets: 4, targetReps: 15, targetWeight: 10, targetUnit: 'kg' },
+      { name: 'Tricep Extension', targetSets: 3, targetReps: 12, targetWeight: 25, targetUnit: 'kg' },
+    ],
+  },
+  {
+    id: 'builtin_lower_b',
+    name: 'Lower B',
+    createdAt: '2026-01-01',
+    exercises: [
+      { name: 'Deadlift', targetSets: 4, targetReps: 5, targetWeight: 120, targetUnit: 'kg' },
+      { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: 70, targetUnit: 'kg' },
+      { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetWeight: 16, targetUnit: 'kg' },
+      { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: 45, targetUnit: 'kg' },
+    ],
+  },
+];
+
 function PlanModal({ isOpen, onClose, initial, availableExercises, userUnit, onSave }: PlanModalProps) {
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit)]);
@@ -1045,59 +1094,70 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+        {/* Consolidated Primary & Secondary CTA */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
           {plannedWorkouts.length > 0 ? (
             <button
               type="button"
               onClick={() => handleStartPlan(plannedWorkouts[0])}
-              className="btn-primary py-3 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              <Play className="w-3.5 h-3.5 fill-white stroke-white" />
+              <Play className="w-4 h-4 fill-white stroke-white" />
               <span className="truncate">Start: {plannedWorkouts[0].name}</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={openBlankLogger}
-              className="btn-primary py-3 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
-              <Play className="w-3.5 h-3.5 fill-white stroke-white" />
+              <Play className="w-4 h-4 fill-white stroke-white" />
               <span>START WORKOUT</span>
-            </button>
-          )}
-
-          {workouts.length > 0 ? (
-            <button
-              type="button"
-              onClick={handleRepeatLastWorkout}
-              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-              title={`Repeat last session from ${workouts[0]?.date}`}
-            >
-              <FastForward className="w-3.5 h-3.5 text-accent" />
-              <span>Repeat Last ({workouts[0]?.exercises.length} ex)</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>⚡ Suggest Plan</span>
             </button>
           )}
 
           <button
             type="button"
-            onClick={openBlankLogger}
-            className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="btn-secondary py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
           >
-            <Plus className="w-3.5 h-3.5 text-accent" />
-            <span>Start Empty</span>
+            <Sparkles className="w-4 h-4 text-accent" />
+            <span>Suggest Plan / Templates</span>
           </button>
         </div>
 
-        {/* Quick Exercise Library & Suggestion Bar */}
+        {/* Quick Split Templates Bar */}
+        <div className="pt-2 border-t border-border/50 space-y-1.5">
+          <div className="flex items-center justify-between text-2xs text-text-muted">
+            <span className="font-mono uppercase font-bold tracking-wider text-accent">Quick Split Templates:</span>
+            {workouts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleRepeatLastWorkout}
+                className="text-text-secondary hover:text-accent font-medium flex items-center gap-1 transition-colors"
+              >
+                <FastForward className="w-3 h-3 text-accent" />
+                <span>Repeat last session</span>
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+            {BUILTIN_SPLIT_TEMPLATES.map((tmpl) => (
+              <button
+                key={tmpl.id}
+                type="button"
+                onClick={() => handleStartPlan(tmpl)}
+                className="py-1.5 px-2.5 rounded-lg bg-bg-secondary/70 border border-border/70 text-2xs font-semibold text-text-primary hover:border-accent/50 hover:bg-accent/10 transition-colors text-left flex items-center justify-between"
+                title={`Start ${tmpl.name} (${tmpl.exercises.length} movements)`}
+              >
+                <span className="truncate">{tmpl.name}</span>
+                <Play className="w-2.5 h-2.5 text-accent shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Quick Exercise Library Link */}
         <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
           <button
             type="button"
@@ -1107,17 +1167,6 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             <BookOpen className="w-3.5 h-3.5 text-accent" />
             <span>Browse Exercise Library (History &amp; PRs) &rarr;</span>
           </button>
-
-          {workouts.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="text-accent hover:underline flex items-center gap-1 font-semibold"
-            >
-              <Zap className="w-3 h-3" />
-              <span>Suggest Workout</span>
-            </button>
-          )}
         </div>
       </section>
 
@@ -1137,8 +1186,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          {[60, 90, 120].map((s) => (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[60, 90, 120, 180, 300].map((s) => (
             <button
               key={s}
               type="button"
@@ -1175,80 +1224,34 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="text-accent text-xs font-semibold flex items-center gap-1 hover:underline"
-              title="Generate a suggested workout routine"
-            >
-              <Zap className="w-3.5 h-3.5" />
-              <span>⚡ Suggest Plan</span>
-            </button>
-            <span className="text-border">•</span>
-            <button
-              onClick={openCreatePlan}
-              className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
-              title="Create new workout plan"
-            >
-              <Plus className="w-3.5 h-3.5 text-accent" />
-              <span>New Plan</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── Suggested Workout Generator Banner Card ── */}
-        <div className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
-              <Zap className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-text-primary block font-sans">
-                SUGGESTED WORKOUT GENERATOR
-              </span>
-              <span className="text-2xs text-text-muted font-sans">
-                Choose body part &amp; intensity (Low / Med / High) to generate a fully editable routine
-              </span>
-            </div>
-          </div>
           <button
-            type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
-            className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 shrink-0 active:scale-95 transition-transform"
+            onClick={openCreatePlan}
+            className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
+            title="Create new workout plan"
           >
-            <Zap className="w-3.5 h-3.5" />
-            <span>Generate Plan</span>
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>New Plan</span>
           </button>
         </div>
 
         {plannedWorkouts.length === 0 ? (
-          /* Item 15: Compact empty state instead of giant empty rectangle */
           <div className="card p-3.5 flex items-center justify-between border-dashed border-border">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
                 <BookOpen className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-semibold text-text-primary">No saved plans yet</p>
-                <p className="text-2xs text-text-muted">Save your routines for 1-tap logging or generate one</p>
+                <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
+                <p className="text-2xs text-text-muted">Build your personalized routine or load a split template above</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsSuggestedModalOpen(true)}
-                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
-              >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Suggest</span>
-              </button>
-              <button
-                onClick={openCreatePlan}
-                className="btn-secondary py-1 px-2.5 text-xs font-semibold flex items-center gap-1"
-              >
-                <Plus className="w-3.5 h-3.5 text-accent" />
-                <span>Create</span>
-              </button>
-            </div>
+            <button
+              onClick={openCreatePlan}
+              className="btn-secondary py-1 px-3 text-xs font-semibold flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5 text-accent" />
+              <span>Create Plan</span>
+            </button>
           </div>
         ) : (
           /* Plan cards grid */
@@ -1497,8 +1500,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 </div>
 
                 {/* Preset intervals */}
-                <div className="grid grid-cols-4 gap-1.5 pt-0.5">
-                  {[60, 90, 120, 180].map((s) => (
+                <div className="grid grid-cols-5 gap-1.5 pt-0.5">
+                  {[60, 90, 120, 180, 300].map((s) => (
                     <button
                       key={s}
                       type="button"
@@ -1704,57 +1707,113 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                         )}
 
                         <div className="flex flex-col gap-2">
-                          {exercise.sets.map((set, j) => (
-                            <div key={j} className="flex gap-2 items-center">
-                              <span className="text-text-muted text-xs w-7 font-mono">S{j + 1}</span>
-
-                              {/* 1-Tap Autofill from Last Session */}
-                              {lastPerf?.sets && lastPerf.sets[j] && (
+                          {exercise.sets.map((set, j) => {
+                            const e1rm = set.weight > 0 && set.reps > 0 ? Math.round(set.weight * (1 + set.reps / 30)) : 0;
+                            return (
+                              <div key={j} className="flex gap-2 items-center">
+                                {/* Completion Checkbox */}
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const prevS = lastPerf.sets[j];
-                                    handleSetChange(i, j, 'weight', prevS.weight);
-                                    handleSetChange(i, j, 'reps', prevS.reps);
+                                    const nextCompleted = !set.completed;
+                                    handleSetChange(i, j, 'completed', nextCompleted);
+                                    if (nextCompleted) {
+                                      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                                        navigator.vibrate(10);
+                                      }
+                                      startTimer(restTotalSeconds || 90);
+                                      toast.info(`Set ${j + 1} logged! Rest timer started (${restTotalSeconds || 90}s).`, 'Set Complete');
+                                    }
                                   }}
-                                  className="px-1.5 py-1 rounded text-3xs font-mono bg-bg-card hover:bg-accent/20 border border-border/80 text-text-muted hover:text-accent transition-colors shrink-0"
-                                  title="Autofill previous weight and reps"
+                                  className={`w-6 h-6 rounded-md flex items-center justify-center border transition-all shrink-0 ${
+                                    set.completed
+                                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                                      : 'bg-bg-elevated border-border text-transparent hover:border-emerald-500/50'
+                                  }`}
+                                  title="Mark set complete (starts rest timer)"
                                 >
-                                  Prev: {lastPerf.sets[j].weight}×{lastPerf.sets[j].reps}
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
                                 </button>
-                              )}
 
-                              <input
-                                type="number"
-                                placeholder="Weight"
-                                value={set.weight || ''}
-                                onChange={e => handleSetChange(i, j, 'weight', Number(e.target.value))}
-                                className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
-                              />
-                              <select
-                                value={set.unit}
-                                onChange={e => handleSetChange(i, j, 'unit', e.target.value)}
-                                className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
-                              >
-                                <option value="kg">kg</option>
-                                <option value="lbs">lbs</option>
-                              </select>
-                              <span className="text-text-muted text-xs">×</span>
-                              <input
-                                type="number"
-                                placeholder="Reps"
-                                value={set.reps || ''}
-                                onChange={e => handleSetChange(i, j, 'reps', Number(e.target.value))}
-                                className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
-                              />
-                              <button
-                                onClick={() => handleRemoveSet(i, j)}
-                                className="text-text-muted hover:text-danger p-1"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          ))}
+                                <span className="text-text-muted text-xs w-6 font-mono shrink-0">S{j + 1}</span>
+
+                                {/* 1-Tap Autofill from Last Session */}
+                                {lastPerf?.sets && lastPerf.sets[j] ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const prevS = lastPerf.sets[j];
+                                      handleSetChange(i, j, 'weight', prevS.weight);
+                                      handleSetChange(i, j, 'reps', prevS.reps);
+                                    }}
+                                    className="px-1.5 py-1 rounded text-3xs font-mono bg-bg-card hover:bg-accent/20 border border-border/80 text-text-muted hover:text-accent transition-colors shrink-0"
+                                    title="Autofill previous weight and reps"
+                                  >
+                                    Last: {lastPerf.sets[j].weight}×{lastPerf.sets[j].reps}
+                                  </button>
+                                ) : (
+                                  <span className="text-3xs text-text-muted/40 font-mono w-14 text-center shrink-0">—</span>
+                                )}
+
+                                <input
+                                  type="number"
+                                  placeholder="Weight"
+                                  value={set.weight || ''}
+                                  onChange={e => handleSetChange(i, j, 'weight', Number(e.target.value))}
+                                  className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
+                                />
+                                <select
+                                  value={set.unit}
+                                  onChange={e => handleSetChange(i, j, 'unit', e.target.value)}
+                                  className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
+                                >
+                                  <option value="kg">kg</option>
+                                  <option value="lbs">lbs</option>
+                                </select>
+                                <span className="text-text-muted text-xs">×</span>
+                                <input
+                                  type="number"
+                                  placeholder="Reps"
+                                  value={set.reps || ''}
+                                  onChange={e => handleSetChange(i, j, 'reps', Number(e.target.value))}
+                                  className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
+                                />
+
+                                {/* RPE Selector */}
+                                <select
+                                  value={set.rpe || ''}
+                                  onChange={e => handleSetChange(i, j, 'rpe', e.target.value ? Number(e.target.value) : undefined)}
+                                  className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent w-16 shrink-0"
+                                  title="RPE (Rate of Perceived Exertion)"
+                                >
+                                  <option value="">RPE</option>
+                                  <option value="6">@ 6</option>
+                                  <option value="6.5">@ 6.5</option>
+                                  <option value="7">@ 7</option>
+                                  <option value="7.5">@ 7.5</option>
+                                  <option value="8">@ 8</option>
+                                  <option value="8.5">@ 8.5</option>
+                                  <option value="9">@ 9</option>
+                                  <option value="9.5">@ 9.5</option>
+                                  <option value="10">@ 10</option>
+                                </select>
+
+                                {/* e1RM calculation */}
+                                {e1rm > 0 && (
+                                  <span className="text-3xs font-mono text-accent hidden sm:inline whitespace-nowrap shrink-0" title="Estimated 1RM (Epley formula)">
+                                    e1RM: {e1rm}{set.unit || userUnit}
+                                  </span>
+                                )}
+
+                                <button
+                                  onClick={() => handleRemoveSet(i, j)}
+                                  className="text-text-muted hover:text-danger p-1 shrink-0"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
 
                         <button

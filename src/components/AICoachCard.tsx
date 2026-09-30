@@ -11,49 +11,26 @@ import {
   RefreshCw,
   TrendingUp,
   Activity,
-  Zap,
   AlertTriangle,
-  Key,
-  ShieldCheck,
-  Wifi,
-  WifiOff,
-  CheckCircle2,
-  X
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface AICoachCardProps {
   onOpenSettings?: () => void;
+  onNavigateWorkout?: () => void;
 }
 
-export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
+export default function AICoachCard({ onOpenSettings, onNavigateWorkout }: AICoachCardProps) {
   const store = useStore();
+  const workouts = store.workouts || [];
   const todayStr = toLocalDateString(new Date());
 
   const cachedInsight = store.aiInsightsCache ? store.aiInsightsCache[todayStr] : undefined;
 
   const [insight, setInsight] = useState<AICoachInsight | undefined>(cachedInsight);
   const [loading, setLoading] = useState<boolean>(false);
-  const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
-  const [apiKeyInput, setApiKeyInput] = useState<string>(store.customGeminiKey || '');
-  const [keySavedAlert, setKeySavedAlert] = useState<boolean>(false);
-
-  // Monitor online status
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsOnline(navigator.onLine);
-      const handleOnline = () => setIsOnline(true);
-      const handleOffline = () => setIsOnline(false);
-
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-
-      return () => {
-        window.removeEventListener('online', handleOnline);
-        window.removeEventListener('offline', handleOffline);
-      };
-    }
-  }, []);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
 
   // Sync with store cache
   useEffect(() => {
@@ -62,15 +39,16 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
     }
   }, [store.aiInsightsCache, todayStr]);
 
-  // Initial load if not cached
+  // Initial load only if user has logged at least 1 workout
   useEffect(() => {
-    if (!insight && store._hasHydrated) {
+    if (!insight && store._hasHydrated && workouts.length >= 1) {
       handleGenerate(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store._hasHydrated]);
+  }, [store._hasHydrated, workouts.length]);
 
   const handleGenerate = async (forceRefresh = true) => {
+    if (workouts.length < 1) return;
     setLoading(true);
     try {
       const result = await fetchOrGenerateAICoachInsight(store, { forceRefresh });
@@ -82,265 +60,112 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
     }
   };
 
-  const handleSaveCustomKey = () => {
-    store.setCustomGeminiKey(apiKeyInput);
-    setKeySavedAlert(true);
-    setTimeout(() => {
-      setKeySavedAlert(false);
-      setShowKeyModal(false);
-    }, 1200);
-  };
-
-  const handleClearCustomKey = () => {
-    store.setCustomGeminiKey('');
-    setApiKeyInput('');
-    setKeySavedAlert(true);
-    setTimeout(() => {
-      setKeySavedAlert(false);
-      setShowKeyModal(false);
-    }, 1000);
-  };
-
-  return (
-    <>
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl p-5 shadow-sm transition-all relative overflow-hidden">
-        {/* Subtle decorative background gradient */}
-        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-bl from-accent/10 via-transparent to-transparent pointer-events-none rounded-tr-2xl" />
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 mb-4 relative z-10">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
-              <Bot className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base text-text-primary">
-                  ASCEND COACH
-                </h3>
-                {isOnline && insight?.source === 'gemini' ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Online
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-bg-secondary text-text-muted border border-border">
-                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted" />
-                    Offline mode
-                  </span>
-                )}
-              </div>
-              <p className="text-2xs text-text-muted">
-                {isOnline && insight?.source === 'gemini' ? 'AI Coach · Online' : 'ASCEND Coach · Local'}
-              </p>
-            </div>
+  // State 1: Brand-new account with 0 workouts logged
+  if (workouts.length === 0) {
+    return (
+      <div className="card p-4 bg-bg-card border border-border shadow-xs space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
+            <Bot className="w-4 h-4" />
           </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => {
-                setApiKeyInput(store.customGeminiKey || '');
-                setShowKeyModal(true);
-              }}
-              title="Configure Personal Gemini API Key"
-              className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-            >
-              <Key className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => handleGenerate(true)}
-              disabled={loading}
-              title="Refresh Coach Insight"
-              className="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-bg-secondary transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-accent' : ''}`} />
-            </button>
+          <div>
+            <h3 className="font-bold text-xs text-text-primary uppercase tracking-wider font-mono">
+              ASCEND COACH
+            </h3>
+            <span className="text-2xs text-text-muted">Awaiting first session</span>
           </div>
         </div>
+        <p className="text-xs text-text-secondary leading-relaxed">
+          Log 1 workout to unlock coaching. Once recorded, ASCEND analyzes your volume trends, recovery cadence, and progressive overload targets.
+        </p>
+      </div>
+    );
+  }
 
-        {/* Content Body */}
-        {loading && !insight ? (
-          <div className="space-y-3 py-3 animate-pulse">
-            <div className="h-4 bg-bg-secondary rounded w-3/4" />
-            <div className="h-4 bg-bg-secondary rounded w-5/6" />
-            <div className="h-4 bg-bg-secondary rounded w-2/3" />
+  // State 2: Active user with workout history
+  return (
+    <div className="card p-4 bg-bg-card border border-border shadow-xs space-y-2.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
+            <Sparkles className="w-3.5 h-3.5" />
           </div>
-        ) : insight ? (
-          <div className="space-y-3.5 relative z-10 text-sm">
-            {/* Volume Trend */}
-            <div className="flex items-start gap-2.5">
-              <div className="mt-0.5 text-accent shrink-0">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-2xs uppercase tracking-wider font-semibold text-text-muted block">
-                  Volume & Overload
-                </span>
-                <p className="text-text-secondary leading-snug">
-                  {insight.volumeTrend}
-                </p>
-              </div>
-            </div>
+          <h3 className="font-bold text-xs text-text-primary uppercase tracking-wider font-mono">
+            COACH INSIGHT
+          </h3>
+        </div>
 
-            {/* Recovery Assessment */}
-            <div className="flex items-start gap-2.5">
-              <div className="mt-0.5 text-blue-500 dark:text-blue-400 shrink-0">
-                <Activity className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-2xs uppercase tracking-wider font-semibold text-text-muted block">
-                  CNS & Muscular Recovery
-                </span>
-                <p className="text-text-secondary leading-snug">
-                  {insight.recoveryStatus}
-                </p>
-              </div>
-            </div>
-
-            {/* Today's Focus */}
-            <div className="flex items-start gap-2.5 bg-bg-secondary/60 dark:bg-bg-secondary/40 p-3 rounded-xl border border-border-light/60 dark:border-border-dark/60">
-              <div className="mt-0.5 text-accent shrink-0">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="text-2xs uppercase tracking-wider font-semibold text-accent block mb-0.5">
-                  Today&apos;s Focus
-                </span>
-                <p className="text-text-primary font-medium leading-snug">
-                  {insight.tacticalAdvice}
-                </p>
-              </div>
-            </div>
-
-            {/* Fatigue / Safety Warning (if active) */}
-            {insight.fatigueWarning && (
-              <div className="flex items-start gap-2 p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-xs">
-                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                <p className="leading-snug">{insight.fatigueWarning}</p>
-              </div>
-            )}
-
-            {/* Footer Status & Trigger */}
-            <div className="pt-2 flex items-center justify-between text-2xs text-text-muted border-t border-border-light/60 dark:border-border-dark/60">
-              <span className="flex items-center gap-1">
-                {isOnline ? (
-                  <Wifi className="w-3 h-3 text-emerald-500" />
-                ) : (
-                  <WifiOff className="w-3 h-3 text-text-muted" />
-                )}
-                {insight.source === 'gemini'
-                  ? 'Grounded via Google Gemini'
-                  : 'Personalized training insight'}
-              </span>
-
-              <button
-                onClick={() => handleGenerate(true)}
-                disabled={loading}
-                className="font-medium text-accent hover:underline flex items-center gap-1 disabled:opacity-50"
-              >
-                {loading ? 'Analyzing...' : 'Recalculate'}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="py-4 text-center">
-            <p className="text-xs text-text-muted mb-3">
-              No daily coaching analysis generated yet.
-            </p>
-            <button
-              onClick={() => handleGenerate(true)}
-              disabled={loading}
-              className="px-4 py-2 rounded-xl bg-accent text-white text-xs font-semibold hover:bg-accent-hover transition-colors"
-            >
-              {loading ? 'Analyzing...' : 'Generate Today&apos;s Coaching'}
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-2xs font-semibold text-accent hover:underline flex items-center gap-0.5"
+          >
+            <span>{isExpanded ? 'Collapse' : 'Expand'}</span>
+            {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleGenerate(true)}
+            disabled={loading}
+            className="p-1 rounded text-text-muted hover:text-accent disabled:opacity-50 transition-colors"
+            title="Recalculate Insight"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-accent' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      {/* Custom Gemini Key Modal */}
-      {showKeyModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl w-full max-w-md p-6 shadow-xl relative animate-scale-up">
-            <button
-              onClick={() => setShowKeyModal(false)}
-              className="absolute top-4 right-4 p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
-            >
-              <X className="w-5 h-5" />
-            </button>
+      {loading && !insight ? (
+        <div className="space-y-1.5 py-1 animate-pulse">
+          <div className="h-3.5 bg-bg-secondary rounded w-5/6" />
+          <div className="h-3.5 bg-bg-secondary rounded w-2/3" />
+        </div>
+      ) : insight ? (
+        <div className="space-y-2">
+          {/* Collapsed 2-line summary */}
+          <p className={`text-xs text-text-secondary leading-relaxed ${isExpanded ? '' : 'line-clamp-2'}`}>
+            {insight.tacticalAdvice || insight.recoveryStatus || insight.volumeTrend}
+          </p>
 
-            <div className="flex items-center gap-2.5 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
-                <Key className="w-4 h-4" />
-              </div>
-              <h3 className="text-base font-bold text-text-primary">
-                Gemini API Key Settings
-              </h3>
-            </div>
-
-            <p className="text-xs text-text-muted mb-4 leading-relaxed">
-              ASCEND operates seamlessly offline with local strength math. When online, it connects to Google Gemini for deep coaching. ASCEND includes a shared default key, but you can provide your personal API key to use your private quota.
-            </p>
-
-            <div className="space-y-3 mb-5">
-              <div>
-                <label className="text-2xs font-semibold uppercase tracking-wider text-text-muted block mb-1.5">
-                  Personal Gemini API Key
-                </label>
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="AIzaSy..."
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-border-light dark:border-border-dark bg-bg-secondary text-text-primary text-xs focus:outline-none focus:border-accent"
-                />
+          {/* Expanded detailed breakdown */}
+          {isExpanded && (
+            <div className="space-y-2.5 pt-2 border-t border-border/50 text-xs animate-fade-in">
+              <div className="space-y-0.5">
+                <span className="text-3xs uppercase font-bold text-text-muted font-mono block">
+                  VOLUME &amp; OVERLOAD
+                </span>
+                <p className="text-text-primary text-2xs leading-relaxed">{insight.volumeTrend}</p>
               </div>
 
-              {keySavedAlert && (
-                <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Key preferences saved successfully!
+              <div className="space-y-0.5">
+                <span className="text-3xs uppercase font-bold text-text-muted font-mono block">
+                  RECOVERY STATUS
+                </span>
+                <p className="text-text-primary text-2xs leading-relaxed">{insight.recoveryStatus}</p>
+              </div>
+
+              {insight.fatigueWarning && (
+                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-500 text-2xs flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                  <span>{insight.fatigueWarning}</span>
                 </div>
               )}
-
-              <p className="text-2xs text-text-muted">
-                Keys are stored locally in your browser&apos;s encrypted storage and sent directly to the Gemini API endpoint.
-              </p>
             </div>
-
-            <div className="flex items-center justify-between gap-3">
-              {store.customGeminiKey ? (
-                <button
-                  type="button"
-                  onClick={handleClearCustomKey}
-                  className="px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                >
-                  Clear Key
-                </button>
-              ) : (
-                <div />
-              )}
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowKeyModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-muted hover:text-text-primary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveCustomKey}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-accent text-white hover:bg-accent-hover transition-colors shadow-sm"
-                >
-                  Save Key
-                </button>
-              </div>
-            </div>
-          </div>
+          )}
+        </div>
+      ) : (
+        <div className="py-2 text-center">
+          <button
+            type="button"
+            onClick={() => handleGenerate(true)}
+            disabled={loading}
+            className="text-xs text-accent font-semibold hover:underline"
+          >
+            {loading ? 'Analyzing...' : 'Generate Today’s Coaching'}
+          </button>
         </div>
       )}
-    </>
+    </div>
   );
 }

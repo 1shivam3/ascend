@@ -155,13 +155,13 @@ export async function POST(req: Request) {
     let systemInstruction = '';
     let promptText = '';
 
-    // Guardrail base instruction
     const baseGuardrails = `You are ASCEND's fitness coaching intelligence engine.
 Rules:
 - Ground all recommendations in the user's actual logged workout and habit history.
 - Never invent imaginary workout data or fake past numbers.
 - Keep output extremely concise, actionable, and free of generic motivational filler.
-- Always output strictly valid JSON matching the requested schema.`;
+- Always output strictly valid JSON matching the requested schema.
+- Creatine guideline: 5g/day is the standard daily maintenance dose. True loading is ~20g/day for 5-7 days. Never recommend "creatine loading (5g/day)"; say "start 5g/day" or "daily maintenance (5g/day)".`;
 
     if (task === 'GENERATE_DAILY_PLAN') {
       systemInstruction = `${baseGuardrails}

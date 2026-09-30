@@ -595,7 +595,7 @@ async function executeAIRequest<T>(
       headers['x-gemini-api-key'] = state.customGeminiKey;
     }
 
-    const res = await fetch('/api/ai/coach', {
+    const res = await fetch('/api/coach', {
       method: 'POST',
       headers,
       body: JSON.stringify({

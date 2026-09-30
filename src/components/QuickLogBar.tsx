@@ -33,7 +33,14 @@ export default function QuickLogBar({
   const [waterAnim, setWaterAnim] = useState<number | null>(null);
   const [proteinAnim, setProteinAnim] = useState(false);
 
+  const triggerHaptic = () => {
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  };
+
   const handleQuickWater = (amountMl: number) => {
+    triggerHaptic();
     logWater(amountMl, todayStr);
     setWaterAnim(amountMl);
     setTimeout(() => setWaterAnim(null), 600);
@@ -46,6 +53,7 @@ export default function QuickLogBar({
   };
 
   const handleToggleCreatine = () => {
+    triggerHaptic();
     toggleCreatine(todayStr);
     if (!creatineTaken) {
       toast.success(
@@ -58,6 +66,7 @@ export default function QuickLogBar({
   };
 
   const handleQuickProtein = () => {
+    triggerHaptic();
     logQuickProtein(25, todayStr);
     setProteinAnim(true);
     setTimeout(() => setProteinAnim(false), 600);

@@ -33,6 +33,7 @@ import SettingsModal from '@/components/SettingsModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import DailyEssentialsCard from '@/components/DailyEssentialsCard';
+import ActivityRingsCard from '@/components/ActivityRingsCard';
 import QuickLogBar from '@/components/QuickLogBar';
 import NextBestActionBanner from '@/components/NextBestActionBanner';
 import AICoachCard from '@/components/AICoachCard';
@@ -333,14 +334,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── 2. NEXT BEST ACTION ────────────────────────────────────────────── */}
-      <NextBestActionBanner
-        onNavigateWorkout={() => onNavigate('workout')}
-        onNavigateMeals={() => onNavigate('meals')}
-        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
-        onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
-        onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
-      />
+
 
       {/* ── 3. TODAY'S WORKOUT HERO (High Prominence) ────────────────────────── */}
       {workouts.length === 0 ? (
@@ -483,38 +477,46 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </section>
       )}
 
-      {/* ── 4. TODAY'S ESSENTIALS & QUICK LOG ─────────────────────────────────── */}
-      <DailyEssentialsCard
+      {/* ── 4. THREE HABIT RINGS (Training, Protein, Water) ──────────────────── */}
+      <ActivityRingsCard
+        onNavigateWorkout={() => onNavigate('workout')}
+        onNavigateMeals={() => onNavigate('meals')}
         onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
-        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
-        onNavigateMeals={() => onNavigate('meals')}
-        onNavigateWorkout={() => onNavigate('workout')}
       />
 
+      {/* ── 5. QUICK 1-TAP LOG ROW (High Reachability) ────────────────────────── */}
       <QuickLogBar
         onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
         onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 5. TODAY'S PROGRESS (STRENGTH & HABITS SNAPSHOT) ──────────────── */}
+      {/* ── 6. COACH INSIGHT (Collapsed 2-Line Summary with Expand) ───────────── */}
+      <AICoachCard
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onNavigateWorkout={() => onNavigate('workout')}
+      />
+
+      {/* ── 7. TODAY'S PROGRESS (POWERLIFTING & COMPOUND LIFTS) ──────────────── */}
       <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5">
         <div className="flex items-center justify-between">
           <div>
             <span className="section-title text-[10px] block">TODAY&apos;S PROGRESS</span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <h3 className="text-xl font-black text-text-primary tracking-tight font-sans">
-                {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg} kg total` : 'Strength & Habits'}
+                {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg} kg total` : 'Strength Lifts'}
               </h3>
-              <span className="text-xs font-bold text-accent">
-                {overallLevel ? `${overallLevel.averageRatio}× bodyweight` : '1.0× BW'}
-              </span>
+              {dotsScore > 0 && (
+                <span className="text-xs font-bold text-accent font-mono">
+                  {Math.round(dotsScore)} DOTS ({dotsClassification.tier})
+                </span>
+              )}
             </div>
           </div>
           <button
             type="button"
-            onClick={() => onNavigate('prs')}
+            onClick={() => onNavigate('progress')}
             className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5"
           >
             <span>View Full Progress &rarr;</span>
@@ -522,46 +524,28 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
 
-        {/* Compound Lifts & Water Snapshot */}
+        {/* Compound Lifts (Big 3) Snapshot */}
         <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
           <div>
             <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block">
+            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
               {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
             </span>
           </div>
           <div className="border-l border-border">
             <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block">
+            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
               {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
             </span>
           </div>
           <div className="border-l border-border">
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Water</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block">
-              {formatWaterLiters(waterToday)} / {formatWaterLiters(waterTargetMl)}
+            <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
+            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+              {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
             </span>
           </div>
         </div>
-
-        {dotsScore > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-border/50 text-xs">
-            <span className="text-text-muted">
-              Powerlifting DOTS: <strong className="text-text-primary">{dotsScore}</strong> ({dotsClassification.tier})
-            </span>
-            <button
-              type="button"
-              onClick={() => onNavigate('prs')}
-              className="text-2xs text-accent hover:underline font-semibold"
-            >
-              Full analysis &rarr;
-            </button>
-          </div>
-        )}
       </section>
-
-      {/* ── 6. COACH INSIGHT ─────────────────────────────────────────────────── */}
-      <AICoachCard onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* ── CLEAN FOOTER ──────────────────────────────────────────────────── */}
       <div className="pt-2 pb-6 text-center text-3xs font-mono text-text-muted">

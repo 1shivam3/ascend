@@ -21,21 +21,21 @@
 }
 
 .dark {
-  /* Dark Theme */
-  --bg-primary: 15 23 42;         /* deep slate navy #0f172a */
-  --bg-secondary: 30 41 59;       /* slate-800 #1e293b */
-  --bg-tertiary: 51 65 85;        /* slate-700 */
-  --bg-card: 23 32 51;            /* #172033 */
-  --bg-elevated: 30 41 59;
-  --text-primary: 248 250 252;    /* slate-50 */
-  --text-secondary: 148 163 184;  /* slate-400 */
-  --text-muted: 100 116 139;      /* slate-500 */
-  --border: 44 58 82;
-  --border-subtle: 30 41 59;
-  --border-hover: 60 76 104;
-  --accent: 249 115 22;           /* orange-500 #f97316 */
+  /* Deep Premium Dark Gym Palette */
+  --bg-primary: 11 13 18;         /* #0B0D12 - deep dark background */
+  --bg-secondary: 20 24 33;       /* #141821 - card surface */
+  --bg-tertiary: 27 32 48;        /* #1B2030 - elevated surface */
+  --bg-card: 20 24 33;            /* #141821 */
+  --bg-elevated: 27 32 48;        /* #1B2030 */
+  --text-primary: 244 246 250;    /* #F4F6FA */
+  --text-secondary: 139 147 167;  /* #8B93A7 */
+  --text-muted: 100 116 139;
+  --border: 35 42 56;
+  --border-subtle: 25 30 42;
+  --border-hover: 50 60 80;
+  --accent: 255 106 26;           /* #FF6A1A vibrant orange */
   --accent-dim: 234 88 12;
-  --accent-glow: rgba(249, 115, 22, 0.2);
+  --accent-glow: rgba(255, 106, 26, 0.2);
 }
 
 @layer base {
@@ -150,9 +150,14 @@
     @apply text-accent font-bold bg-accent/10;
   }
 
-  /* Desktop centered container (480-540px), mobile full width with 16-20px padding */
+  /* Desktop centered container (480-540px), mobile full width with safe bottom nav spacing */
   .page {
-    @apply min-h-[100dvh] px-4 sm:px-5 pt-3 pb-32 max-w-[520px] mx-auto;
+    @apply min-h-[100dvh] px-4 sm:px-5 pt-3 max-w-[520px] mx-auto;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 1.25rem));
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
   .modal-overlay {

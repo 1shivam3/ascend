@@ -252,7 +252,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('gym')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'gym'
-              ? 'bg-emerald-600 text-white shadow-xs'
+              ? 'bg-[#FF6A1A] text-white shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -276,7 +276,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('creatine')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'creatine'
-              ? 'bg-amber-600 text-white shadow-xs'
+              ? 'bg-[#F5B301] text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -288,7 +288,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('protein')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'protein'
-              ? 'bg-orange-600 text-white shadow-xs'
+              ? 'bg-[#22C55E] text-white shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -370,10 +370,10 @@ export default function WorkoutHeatmap({
                   {/* Multi-habit indicators */}
                   {activeFilter === 'all' && !isFuture && (
                     <div className="flex items-center gap-0.5 justify-center w-full mt-auto">
-                      <span className={`w-1 h-1 rounded-full ${hasGym ? 'bg-emerald-500' : 'bg-border'}`} />
-                      <span className={`w-1 h-1 rounded-full ${hasWater ? 'bg-sky-500' : 'bg-border'}`} />
-                      <span className={`w-1 h-1 rounded-full ${hasCreatine ? 'bg-amber-500' : 'bg-border'}`} />
-                      <span className={`w-1 h-1 rounded-full ${hasProtein ? 'bg-orange-500' : 'bg-border'}`} />
+                      <span className={`w-1 h-1 rounded-full ${hasGym ? 'bg-[#FF6A1A]' : 'bg-border'}`} />
+                      <span className={`w-1 h-1 rounded-full ${hasWater ? 'bg-[#38BDF8]' : 'bg-border'}`} />
+                      <span className={`w-1 h-1 rounded-full ${hasCreatine ? 'bg-[#F5B301]' : 'bg-border'}`} />
+                      <span className={`w-1 h-1 rounded-full ${hasProtein ? 'bg-[#22C55E]' : 'bg-border'}`} />
                     </div>
                   )}
                 </button>
@@ -396,7 +396,7 @@ export default function WorkoutHeatmap({
 
             {/* Gym Row */}
             <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-text-muted">GYM</span>
+              <span className="w-14 text-[10px] uppercase font-bold text-[#FF6A1A]">GYM</span>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
                   const dayNum = i + 1;
@@ -407,7 +407,7 @@ export default function WorkoutHeatmap({
                       key={i}
                       onClick={() => setSelectedDate(dStr)}
                       className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-emerald-500' : 'bg-bg-secondary border border-border/40'
+                        done ? 'bg-[#FF6A1A]' : 'bg-bg-secondary border border-border/40'
                       }`}
                     />
                   );
@@ -417,7 +417,7 @@ export default function WorkoutHeatmap({
 
             {/* Water Row */}
             <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-sky-600">WATER</span>
+              <span className="w-14 text-[10px] uppercase font-bold text-[#38BDF8]">WATER</span>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
                   const dayNum = i + 1;
@@ -428,7 +428,7 @@ export default function WorkoutHeatmap({
                       key={i}
                       onClick={() => setSelectedDate(dStr)}
                       className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-sky-500' : 'bg-bg-secondary border border-border/40'
+                        done ? 'bg-[#38BDF8]' : 'bg-bg-secondary border border-border/40'
                       }`}
                     />
                   );
@@ -438,7 +438,7 @@ export default function WorkoutHeatmap({
 
             {/* Creatine Row */}
             <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-amber-600">CREAT</span>
+              <span className="w-14 text-[10px] uppercase font-bold text-[#F5B301]">CREAT</span>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
                   const dayNum = i + 1;
@@ -449,7 +449,7 @@ export default function WorkoutHeatmap({
                       key={i}
                       onClick={() => setSelectedDate(dStr)}
                       className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-amber-500' : 'bg-bg-secondary border border-border/40'
+                        done ? 'bg-[#F5B301]' : 'bg-bg-secondary border border-border/40'
                       }`}
                     />
                   );
@@ -459,7 +459,7 @@ export default function WorkoutHeatmap({
 
             {/* Protein Row */}
             <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-orange-600">PROT</span>
+              <span className="w-14 text-[10px] uppercase font-bold text-[#22C55E]">PROT</span>
               <div className="flex items-center gap-1">
                 {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
                   const dayNum = i + 1;
@@ -470,7 +470,7 @@ export default function WorkoutHeatmap({
                       key={i}
                       onClick={() => setSelectedDate(dStr)}
                       className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-orange-500' : 'bg-bg-secondary border border-border/40'
+                        done ? 'bg-[#22C55E]' : 'bg-bg-secondary border border-border/40'
                       }`}
                     />
                   );
@@ -517,15 +517,21 @@ export default function WorkoutHeatmap({
                 <Dumbbell className="w-3.5 h-3.5 text-emerald-500" />
                 <span className="font-semibold text-text-primary">Gym Session</span>
               </div>
-              <span
-                className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${
-                  selectedWorkouts.length > 0
-                    ? 'bg-emerald-500/10 text-emerald-600'
-                    : 'text-text-muted'
-                }`}
-              >
-                {selectedWorkouts.length > 0 ? `${selectedWorkouts.length} Logged` : 'Rest Day'}
-              </span>
+              {(() => {
+                const status = selectedWorkouts.length > 0
+                  ? { text: `${selectedWorkouts.length} Done`, cls: 'bg-emerald-500/10 text-emerald-500' }
+                  : selectedDate === todayStr
+                  ? { text: 'Planned', cls: 'bg-accent/15 text-accent font-bold' }
+                  : selectedDate > todayStr
+                  ? { text: 'Not planned', cls: 'text-text-muted' }
+                  : { text: 'Rest', cls: 'text-text-muted' };
+
+                return (
+                  <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${status.cls}`}>
+                    {status.text}
+                  </span>
+                );
+              })()}
             </div>
 
             {/* Water */}
