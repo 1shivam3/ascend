@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
+import { Home, Dumbbell, TrendingUp, UtensilsCrossed, Plus } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
 import HomePage from '@/components/HomePage';
 import ProgressPage from '@/components/ProgressPage';
 import WorkoutPage from '@/components/WorkoutPage';
 import MealsPage from '@/components/MealsPage';
+import QuickActionSheetModal from '@/components/QuickActionSheetModal';
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
@@ -21,7 +22,8 @@ type TabId = (typeof tabs)[number]['id'] | 'prs';
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [progressInitialTab, setProgressInitialTab] = useState<'overview' | 'strength' | 'prs' | 'bodyweight' | 'training'>('overview');
-  const { profile, theme, _hasHydrated } = useStore();
+  const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const { profile, theme, _hasHydrated, activeWorkoutDraft } = useStore();
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -126,42 +128,147 @@ export default function AppPage() {
         )}
       </main>
 
-      {/* Floating Bottom Navigation (Item 22: Orange active tab, slate unselected, safe area) */}
-      <nav className="floating-pill-nav" aria-label="Bottom Navigation">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id || (tab.id === 'progress' && activeTab === 'prs');
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => {
-                if (tab.id === 'progress') {
+      {/* Floating 5-Slot Bottom Navigation with Centered Elevated [+] Button */}
+      {!activeWorkoutDraft && (
+        <nav
+          className="floating-pill-nav"
+          style={{
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            background: 'rgba(20, 24, 33, 0.88)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+          aria-label="Bottom Navigation"
+        >
+          {/* Slot 1: Home */}
+          {(() => {
+            const tab = tabs[0];
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`pill-nav-item transition-all ${
+                  isActive
+                    ? 'active text-accent bg-accent/10 font-bold'
+                    : 'text-text-muted hover:text-text-primary font-medium'
+                }`}
+              >
+                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
+                  {tab.label}
+                </span>
+                {isActive && <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />}
+              </button>
+            );
+          })()}
+
+          {/* Slot 2: Workout */}
+          {(() => {
+            const tab = tabs[1];
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`pill-nav-item transition-all ${
+                  isActive
+                    ? 'active text-accent bg-accent/10 font-bold'
+                    : 'text-text-muted hover:text-text-primary font-medium'
+                }`}
+              >
+                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
+                  {tab.label}
+                </span>
+                {isActive && <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />}
+              </button>
+            );
+          })()}
+
+          {/* Slot 3: Prominent Centered Elevated [+] Action Button */}
+          <button
+            type="button"
+            onClick={() => setIsQuickActionOpen(true)}
+            className="w-11 h-11 -mt-3 rounded-full bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/35 hover:scale-105 active:scale-90 transition-all border-2 border-[#141821] shrink-0"
+            title="Quick Action"
+            aria-label="Quick Action"
+          >
+            <Plus size={22} strokeWidth={2.8} />
+          </button>
+
+          {/* Slot 4: Progress */}
+          {(() => {
+            const tab = tabs[2];
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id || activeTab === 'prs';
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
                   setProgressInitialTab('overview');
-                }
-                setActiveTab(tab.id);
-              }}
-              className={`pill-nav-item transition-all ${
-                isActive
-                  ? 'active text-accent bg-accent/10 font-bold'
-                  : 'text-text-muted hover:text-text-primary font-medium'
-              }`}
-            >
-              <Icon
-                size={20}
-                strokeWidth={isActive ? 2.3 : 1.8}
-                className={isActive ? 'text-accent' : 'text-text-muted'}
-              />
-              <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
-                {tab.label}
-              </span>
-              {isActive && (
-                <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />
-              )}
-            </button>
-          );
-        })}
-      </nav>
+                  setActiveTab(tab.id);
+                }}
+                className={`pill-nav-item transition-all ${
+                  isActive
+                    ? 'active text-accent bg-accent/10 font-bold'
+                    : 'text-text-muted hover:text-text-primary font-medium'
+                }`}
+              >
+                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
+                  {tab.label}
+                </span>
+                {isActive && <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />}
+              </button>
+            );
+          })()}
+
+          {/* Slot 5: Nutrition */}
+          {(() => {
+            const tab = tabs[3];
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`pill-nav-item transition-all ${
+                  isActive
+                    ? 'active text-accent bg-accent/10 font-bold'
+                    : 'text-text-muted hover:text-text-primary font-medium'
+                }`}
+              >
+                <Icon size={19} strokeWidth={isActive ? 2.3 : 1.8} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                <span className={`text-[10px] mt-0.5 tracking-tight ${isActive ? 'text-accent font-bold' : 'text-text-muted'}`}>
+                  {tab.label}
+                </span>
+                {isActive && <span className="w-1 h-1 rounded-full bg-accent mt-0.5" />}
+              </button>
+            );
+          })()}
+        </nav>
+      )}
+
+      {/* Quick Action Sheet Modal */}
+      <QuickActionSheetModal
+        isOpen={isQuickActionOpen}
+        onClose={() => setIsQuickActionOpen(false)}
+        onNavigate={(tab) => {
+          if (tab === 'prs') {
+            setProgressInitialTab('prs');
+            setActiveTab('progress');
+          } else {
+            setActiveTab(tab as TabId);
+          }
+        }}
+      />
     </div>
   );
 }

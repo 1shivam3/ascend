@@ -99,7 +99,39 @@ export function getProgressionRecommendation(
   const lastReps = lastSets[0]?.reps || 8;
   const lastSetsCount = lastSets.length;
 
-  // Check Plateau: estimated 1RM has not improved within 1.5% across 4 or more sessions
+  // 1. Two consecutive misses in a row -> Suggest a 10% deload
+  if (sessions.length >= 2) {
+    const s0 = sessions[0];
+    const s1 = sessions[1];
+    const s0TotalReps = s0.sets.reduce((sum, s) => sum + s.reps, 0);
+    const s1TotalReps = s1.sets.reduce((sum, s) => sum + s.reps, 0);
+    const s0AvgRpe = s0.sets.filter(s => s.rpe).length > 0
+      ? s0.sets.reduce((sum, s) => sum + (s.rpe || 8), 0) / s0.sets.length
+      : 8;
+    const s1AvgRpe = s1.sets.filter(s => s.rpe).length > 0
+      ? s1.sets.reduce((sum, s) => sum + (s.rpe || 8), 0) / s1.sets.length
+      : 8;
+
+    // Miss criteria: reps dropped or high strain failure (RPE >= 9.5 and rep drop) across both sessions
+    const s0Missed = s0.sets.some(s => (s.rpe && s.rpe >= 10 && s.reps < 6) || s.reps < 5);
+    const s1Missed = s1.sets.some(s => (s.rpe && s.rpe >= 10 && s.reps < 6) || s.reps < 5) || s0TotalReps < s1TotalReps;
+
+    if (s0Missed && s1Missed) {
+      const deloadWeight = Math.max(20, Math.round((lastWeight * 0.90) / 2.5) * 2.5);
+      return {
+        targetWeight: deloadWeight,
+        targetReps: Math.min(10, lastReps + 2),
+        targetSetsCount: lastSetsCount,
+        targetSummary: `${deloadWeight}${userUnit} × ${Math.min(10, lastReps + 2)} reps (-10% deload)`,
+        rationale: `Two consecutive misses detected. 10% deload recommended (-${Math.round(lastWeight - deloadWeight)}${userUnit}) to dissipate systemic fatigue and reset adaptation.`,
+        isPlateau: true,
+        plateauSessionsCount: 2,
+        plateauSuggestion: `Deload to ${deloadWeight}${userUnit} for 1 session, then build back up smoothly.`,
+      };
+    }
+  }
+
+  // 2. Check 4+ session plateau stall
   if (sessions.length >= 4) {
     const e1rms = sessions.map((s) => s.bestE1RM);
     const maxE1RM = Math.max(...e1rms);
@@ -107,8 +139,7 @@ export function getProgressionRecommendation(
     const variation = maxE1RM > 0 ? (maxE1RM - minE1RM) / maxE1RM : 0;
 
     if (variation < 0.02) {
-      // Stalled across 4+ sessions
-      const deloadWeight = Math.round((lastWeight * 0.85) / 2.5) * 2.5;
+      const deloadWeight = Math.round((lastWeight * 0.90) / 2.5) * 2.5;
       return {
         targetWeight: deloadWeight,
         targetReps: Math.min(12, lastReps + 2),
@@ -117,32 +148,35 @@ export function getProgressionRecommendation(
         rationale: `Plateau detected: your strength has stalled at ~${Math.round(lastSession.bestE1RM)}${userUnit} across ${sessions.length} sessions.`,
         isPlateau: true,
         plateauSessionsCount: sessions.length,
-        plateauSuggestion: `Deload to ${deloadWeight}${userUnit} for higher reps (10-12), or switch movement variation for 2 weeks to trigger new hypertrophy.`,
+        plateauSuggestion: `Deload 10% to ${deloadWeight}${userUnit} for higher reps, or switch variation for 2 weeks to trigger new hypertrophy.`,
       };
     }
   }
 
-  // Double Progression Rule:
-  // If user completed high reps (>= 8-10) across all sets last time -> Increase weight by 2.5kg (or 5lbs)
+  // 3. Smart Progression Rule:
+  // If all reps were hit at RPE 8 or below (or hit target reps >= 8 cleanly) -> Suggest +2.5 kg (or +5 lbs)
+  const hasRPE = lastSets.some((s) => s.rpe !== undefined);
+  const allRpeAtOrBelow8 = hasRPE ? lastSets.every((s) => (s.rpe ?? 8) <= 8) : false;
   const allSetsCompletedTargetReps = lastSets.every((s) => s.reps >= 8 && s.weight >= lastWeight);
 
-  if (allSetsCompletedTargetReps && lastSets.length >= 3) {
+  if (allRpeAtOrBelow8 || (allSetsCompletedTargetReps && lastSets.length >= 2)) {
     const increment = userUnit === 'lbs' ? 5 : 2.5;
     const nextWeight = lastWeight + increment;
     return {
       targetWeight: nextWeight,
-      targetReps: Math.max(6, lastReps - 2),
+      targetReps: Math.max(6, lastReps - 1),
       targetSetsCount: lastSetsCount,
-      targetSummary: `${nextWeight}${userUnit} × ${Math.max(6, lastReps - 2)} reps`,
-      rationale: `You hit target reps across all sets last session! Increase load by +${increment}${userUnit} for progressive overload.`,
+      targetSummary: `${nextWeight}${userUnit} × ${Math.max(6, lastReps - 1)} reps (+${increment}${userUnit})`,
+      rationale: allRpeAtOrBelow8
+        ? `All reps hit at RPE ≤ 8 (solid reserve left in the tank). Overload recommendation: +${increment}${userUnit}!`
+        : `Target reps hit across all sets. Progressive overload recommendation: +${increment}${userUnit}!`,
       isPlateau: false,
     };
   }
 
-  // Otherwise: Aim to add +1 rep on at least one set
+  // 4. Default: Aim to add +1 rep on current weight
   const repList = lastSets.map((s) => s.reps);
   const nextTargetReps = [...repList];
-  // Increase rep on the first set that had fewer reps or the last set
   const minRepIndex = nextTargetReps.lastIndexOf(Math.min(...nextTargetReps));
   nextTargetReps[minRepIndex] = (nextTargetReps[minRepIndex] || 8) + 1;
 

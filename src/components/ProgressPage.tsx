@@ -26,6 +26,9 @@ import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/do
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
+import ProgressChart from '@/components/ProgressChart';
+import BodyweightChart from '@/components/BodyweightChart';
+import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface ProgressPageProps {
@@ -51,6 +54,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const latestWeeklyReview = useStore((state) => state.latestWeeklyReview);
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
 
   const userUnit = profile?.unit || 'kg';
 
@@ -253,11 +257,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <span className="section-title text-[10px] mb-0 font-sans">POWERLIFTING TOTAL</span>
                     <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; DOTS Standard</h3>
                   </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black text-accent font-sans">
-                      {bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}
-                    </span>
-                    <span className="text-3xs text-text-muted block">Squat + Bench + Deadlift</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsMeetModalOpen(true)}
+                      className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 text-accent hover:border-accent/40"
+                      title="Powerlifting Meet Attempt Planner"
+                    >
+                      <Trophy className="w-3 h-3" />
+                      <span>Meet Planner</span>
+                    </button>
+                    <div className="text-right">
+                      <span className="text-2xl font-black text-accent font-sans block">
+                        {bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}
+                      </span>
+                      <span className="text-3xs text-text-muted block">Squat + Bench + Deadlift</span>
+                    </div>
                   </div>
                 </div>
 
@@ -281,6 +296,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </span>
                 </div>
               </div>
+
+              {/* Interactive e1RM Strength Trend Line per Lift */}
+              <ProgressChart />
 
               {/* Big 4 Compound Lifts Snapshot (Short Labels: Bench, Squat, Deadlift, OHP) */}
               <section className="card p-4 space-y-3 bg-bg-card border border-border">
@@ -396,6 +414,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </div>
           </section>
 
+          {/* 7-Day Average & Daily Weight SVG Trend Chart */}
+          <BodyweightChart />
+
           {/* Historical Logs List */}
           <section className="card p-4 bg-bg-card border border-border space-y-3">
             <h4 className="section-title text-[11px] mb-0 font-sans">RECENT WEIGHT LOGS</h4>
@@ -462,6 +483,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
       {/* Bodyweight Modal */}
       <BodyMetricsModal isOpen={isWeightModalOpen} onClose={() => setIsWeightModalOpen(false)} />
+
+      {/* Powerlifting Meet Attempt Planner Modal */}
+      <MeetAttemptPlannerModal isOpen={isMeetModalOpen} onClose={() => setIsMeetModalOpen(false)} />
     </div>
   );
 }

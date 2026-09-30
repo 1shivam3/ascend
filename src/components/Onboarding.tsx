@@ -8,7 +8,6 @@ import { PersonalRecord, BodyMetricEntry } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
 export default function OnboardingScreen() {
-  const { setProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
   const toast = useToast();
   const [step, setStep] = useState(0);
   const [name, setName] = useState('');
@@ -45,6 +44,12 @@ export default function OnboardingScreen() {
   const [ohpWeight, setOhpWeight] = useState('');
   const [ohpReps, setOhpReps] = useState('1');
 
+  // Training profile preferences
+  const [goal, setGoal] = useState<'strength' | 'muscle_gain' | 'fat_loss' | 'general_fitness'>('strength');
+  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
+
+  const { setProfile, setTrainingProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
+
   const handleFinish = (skipLifts = false) => {
     const bw = parseFloat(bodyweight);
     if (!name.trim() || !bw || bw <= 0) return;
@@ -66,6 +71,11 @@ export default function OnboardingScreen() {
     };
 
     setProfile(profileData);
+    setTrainingProfile({
+      goal,
+      daysPerWeek,
+      preferredSplit: daysPerWeek >= 5 ? 'push_pull_legs' : daysPerWeek === 4 ? 'upper_lower' : 'full_body',
+    });
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -98,7 +108,7 @@ export default function OnboardingScreen() {
             reps: r,
             oneRepMax: Math.round(oneRepMaxKg * 10) / 10,
             date: today,
-            notes: 'Baseline calibration'
+            notes: 'Baseline calibration (entered)'
           });
         }
       };
@@ -359,14 +369,79 @@ export default function OnboardingScreen() {
               disabled={!bodyweight || parseFloat(bodyweight) <= 0}
               className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-40"
             >
+              Continue to Training Goal
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* Step 3: Goal & Training Days */}
+        {step === 3 && (
+          <div className="space-y-4 animate-fade-in card">
+            <div>
+              <label className="section-title block mb-1">PRIMARY GOAL</label>
+              <p className="text-text-muted text-xs mb-3">
+                Tailors your progressive overload guidelines and nutritional targets.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'strength', label: 'Strength', sub: 'Max 1RM & DOTS' },
+                  { id: 'muscle_gain', label: 'Hypertrophy', sub: 'Muscle growth' },
+                  { id: 'fat_loss', label: 'Fat Loss', sub: 'Cut body fat' },
+                  { id: 'general_fitness', label: 'Conditioning', sub: 'Health & stamina' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setGoal(item.id as any)}
+                    className={`p-3 rounded-lg text-left transition-all border ${
+                      goal === item.id
+                        ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                        : 'bg-bg-elevated border-border text-text-secondary hover:border-border-hover'
+                    }`}
+                  >
+                    <span className="block text-xs font-bold text-text-primary">{item.label}</span>
+                    <span className="block text-3xs text-text-muted mt-0.5">{item.sub}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="section-title block mb-1">TRAINING DAYS / WEEK</label>
+              <p className="text-text-muted text-xs mb-2">
+                How many days per week do you plan to lift?
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {[3, 4, 5, 6].map((days) => (
+                  <button
+                    key={days}
+                    type="button"
+                    onClick={() => setDaysPerWeek(days)}
+                    className={`py-2.5 rounded-lg text-xs font-mono font-bold transition-all border ${
+                      daysPerWeek === days
+                        ? 'bg-accent text-bg-primary border-accent'
+                        : 'bg-bg-elevated border-border text-text-secondary hover:border-border-hover'
+                    }`}
+                  >
+                    {days} Days
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setStep(4)}
+              className="btn-primary w-full flex items-center justify-center gap-2"
+            >
               Continue to Lift Calibration
               <ChevronRight size={16} />
             </button>
           </div>
         )}
 
-        {/* Step 3: Major Lifts Calibration */}
-        {step === 3 && (
+        {/* Step 4: Major Lifts Calibration */}
+        {step === 4 && (
           <div className="space-y-4 animate-fade-in card max-h-[75vh] overflow-y-auto">
             <div>
               <label className="section-title block mb-1">MAJOR LIFTS CALIBRATION</label>
@@ -487,7 +562,7 @@ export default function OnboardingScreen() {
 
         {/* Step indicators */}
         <div className="flex justify-center gap-1.5 mt-6">
-          {[0, 1, 2, 3].map((s) => (
+          {[0, 1, 2, 3, 4].map((s) => (
             <div
               key={s}
               className={`h-1.5 rounded-full transition-all duration-300 ${

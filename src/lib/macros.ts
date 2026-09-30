@@ -378,3 +378,62 @@ export function getFoodSuggestions(query: string): string[] {
     .slice(0, 6)
     .map(k => k.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
 }
+
+/**
+ * Natural language food parser for offline and fast local processing.
+ * Parses input strings like "2 roti, 1 bowl dal, 100g paneer" or "1 scoop whey, 400ml milk"
+ */
+export function parseNaturalMealOffline(input: string): FoodItem[] {
+  if (!input || !input.trim()) return [];
+
+  // Split by commas, plus signs, newlines, or " and "
+  const tokens = input
+    .split(/,|\n|\+|\band\b/i)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
+  const parsedItems: FoodItem[] = [];
+
+  for (const token of tokens) {
+    // Regex matching: (number) (optional unit) (food name)
+    // or (food name) (number) (optional unit)
+    const qtyUnitMatch = token.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?\s+(.+)$/);
+    const suffixQtyMatch = token.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?$/);
+
+    let quantity = 1;
+    let unit = 'g';
+    let foodName = token;
+
+    if (qtyUnitMatch) {
+      quantity = parseFloat(qtyUnitMatch[1]);
+      const potentialUnit = (qtyUnitMatch[2] || '').toLowerCase();
+      const rest = qtyUnitMatch[3].trim();
+
+      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful'];
+      if (knownUnits.includes(potentialUnit)) {
+        unit = potentialUnit.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g').replace(/pc$/, 'piece');
+        foodName = rest;
+      } else {
+        // unit might be missing, e.g. "2 roti" -> potentialUnit is "roti", rest is ""
+        // or potentialUnit was part of the food name
+        foodName = `${qtyUnitMatch[2] ? qtyUnitMatch[2] + ' ' : ''}${rest}`.trim();
+        unit = 'piece'; // Default for discrete foods like "2 eggs", "2 roti", "2 bananas"
+      }
+    } else if (suffixQtyMatch) {
+      foodName = suffixQtyMatch[1].trim();
+      quantity = parseFloat(suffixQtyMatch[2]);
+      const potentialUnit = (suffixQtyMatch[3] || '').toLowerCase();
+      unit = potentialUnit || 'g';
+    } else {
+      // Just a food name, e.g. "roti" or "paneer"
+      foodName = token;
+      quantity = 100;
+      unit = 'g';
+    }
+
+    const estimated = estimateMacros(foodName, quantity, unit);
+    parsedItems.push(estimated);
+  }
+
+  return parsedItems;
+}

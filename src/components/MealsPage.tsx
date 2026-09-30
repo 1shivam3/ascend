@@ -133,6 +133,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [mealName, setMealName] = useState('');
   const [foods,    setFoods]    = useState<FoodItem[]>([]);
 
+  // ── Natural language meal logging ──────────────────────────────────────────
+  const [naturalQuery, setNaturalQuery] = useState('');
+  const [isNaturalParsing, setIsNaturalParsing] = useState(false);
+
   // ── Autocomplete state ────────────────────────────────────────────────────
   const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, string[]>>({});
   const [activeSuggestionIndex,   setActiveSuggestionIndex]   = useState<Record<number, number>>({});
@@ -560,6 +564,46 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setIsGoalsModalOpen(false);
   };
 
+  const handleNaturalLogSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = naturalQuery.trim();
+    if (!q || isNaturalParsing) return;
+
+    setIsNaturalParsing(true);
+    try {
+      const res = await fetch('/api/ai/parse-meal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: q }),
+      });
+
+      const data = await res.json();
+      if (data && Array.isArray(data.foods) && data.foods.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const newMeal: MealEntry = {
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+          date: today,
+          name: data.mealName || 'Quick Meal',
+          foods: data.foods,
+        };
+
+        addMeal(newMeal);
+        setNaturalQuery('');
+        toast.success(
+          `Logged ${data.foods.length} items (~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P)!`,
+          'Meal Logged'
+        );
+      } else {
+        toast.error('Could not parse foods from text. Please try again.', 'Parse Failed');
+      }
+    } catch (err) {
+      console.error('Natural log error:', err);
+      toast.error('Could not log meal. Please check connection.', 'Error');
+    } finally {
+      setIsNaturalParsing(false);
+    }
+  };
+
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const todayDate   = new Date().toISOString().split('T')[0];
@@ -933,6 +977,49 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </button>
           </div>
         </div>
+      </section>
+
+      {/* ── NATURAL-LANGUAGE QUICK FOOD LOGGING (AI & IFCT Calibrated) ── */}
+      <section className="card p-4 bg-gradient-to-r from-accent/10 via-bg-card to-accent/5 border border-accent/30 space-y-2.5 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent" />
+            <h3 className="section-title text-[10px] mb-0 font-sans text-accent">
+              NATURAL FOOD LOGGING
+            </h3>
+          </div>
+          <span className="text-3xs font-mono text-text-muted">Gemini &amp; Indian IFCT Calibrated</span>
+        </div>
+
+        <form onSubmit={handleNaturalLogSubmit} className="space-y-2">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder='Type e.g. "2 roti, 1 bowl dal, 100g paneer"'
+              value={naturalQuery}
+              onChange={(e) => setNaturalQuery(e.target.value)}
+              disabled={isNaturalParsing}
+              className="w-full bg-[#1B2030] border border-border/80 rounded-xl py-2.5 pl-3 pr-24 text-xs font-sans text-text-primary outline-none focus:border-accent"
+            />
+            <button
+              type="submit"
+              disabled={!naturalQuery.trim() || isNaturalParsing}
+              className="absolute right-1.5 top-1.5 bottom-1.5 px-3 rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
+            >
+              {isNaturalParsing ? (
+                <span className="text-3xs animate-pulse">Parsing...</span>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Log</span>
+                </>
+              )}
+            </button>
+          </div>
+          <p className="text-3xs text-text-muted leading-tight">
+            Type your meal naturally. Indian foods (roti, dal, paneer, sattu, eggs, whey) are calibrated accurately without complex tapping.
+          </p>
+        </form>
       </section>
 
       {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
