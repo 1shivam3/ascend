@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Sparkles,
@@ -14,6 +14,11 @@ import {
   Shield,
   Layers,
   Check,
+  Search,
+  ChevronRight,
+  Sliders,
+  Settings,
+  Repeat
 } from 'lucide-react';
 import { getExerciseList, getExerciseEquipment } from '@/lib/strength-standards';
 import { PlannedExercise, PlannedWorkout } from '@/lib/store';
@@ -26,9 +31,9 @@ export type BodyPartOption =
   | 'legs'
   | 'shoulders'
   | 'arms'
+  | 'core'
   | 'push'
   | 'pull'
-  | 'core'
   | 'full_body';
 
 export type IntensityOption = 'low' | 'medium' | 'high';
@@ -42,15 +47,77 @@ interface SuggestedWorkoutModalProps {
 }
 
 const BODY_PARTS: { id: BodyPartOption; label: string; icon: string; description: string }[] = [
-  { id: 'chest',      label: 'Chest',       icon: '🎯', description: 'Upper & Lower Pecs' },
-  { id: 'back',       label: 'Back',        icon: '🦅', description: 'Lats, Rhomboids & Traps' },
-  { id: 'legs',       label: 'Legs',        icon: '🦵', description: 'Quads, Hamstrings & Calves' },
-  { id: 'shoulders',  label: 'Shoulders',   icon: '🛡️', description: 'Deltoids & Traps' },
+  { id: 'chest',      label: 'Chest',       icon: '🎯', description: 'Pectorals & Incline' },
+  { id: 'back',       label: 'Back',        icon: '🦅', description: 'Lats, Traps & Rhomboids' },
+  { id: 'shoulders',  label: 'Shoulders',   icon: '🛡️', description: 'Delts & Overhead' },
   { id: 'arms',       label: 'Arms',        icon: '💪', description: 'Biceps & Triceps' },
-  { id: 'push',       label: 'Push',        icon: '🔥', description: 'Chest, Shoulders & Triceps' },
-  { id: 'pull',       label: 'Pull',        icon: '⚡', description: 'Back, Biceps & Rear Delts' },
-  { id: 'core',       label: 'Core',        icon: '🧱', description: 'Abs & Core Stability' },
-  { id: 'full_body',  label: 'Full Body',   icon: '👑', description: 'Total Body Heavy Compounds' },
+  { id: 'legs',       label: 'Legs',        icon: '🦵', description: 'Quads, Hamstrings & Calves' },
+  { id: 'core',       label: 'Core / Abs',  icon: '🧱', description: 'Abs & Stability' },
+  { id: 'push',       label: 'Push Day',    icon: '🔥', description: 'Chest, Shoulders & Triceps' },
+  { id: 'pull',       label: 'Pull Day',    icon: '⚡', description: 'Back, Biceps & Rear Delts' },
+  { id: 'full_body',  label: 'Full Body',   icon: '👑', description: 'Compound Total Body' },
+];
+
+interface SplitPreset {
+  id: string;
+  name: string;
+  description: string;
+  days: { name: string; bodyParts: BodyPartOption[] }[];
+}
+
+const SPLIT_PRESETS: SplitPreset[] = [
+  {
+    id: 'ppl',
+    name: 'Push / Pull / Legs (PPL)',
+    description: 'Gold standard 3-day or 6-day split grouping biomechanical muscle actions.',
+    days: [
+      { name: 'Push (Chest, Shoulders, Triceps)', bodyParts: ['chest', 'shoulders', 'arms'] },
+      { name: 'Pull (Back, Biceps, Rear Delts)', bodyParts: ['back', 'arms'] },
+      { name: 'Legs (Quads, Hamstrings, Calves)', bodyParts: ['legs', 'core'] },
+    ],
+  },
+  {
+    id: 'upper_lower',
+    name: 'Upper / Lower',
+    description: 'High-frequency 4-day split alternating upper body and lower body.',
+    days: [
+      { name: 'Upper A (Heavy Bench & Row)', bodyParts: ['chest', 'back', 'shoulders', 'arms'] },
+      { name: 'Lower A (Heavy Squat)', bodyParts: ['legs', 'core'] },
+      { name: 'Upper B (Incline & OHP)', bodyParts: ['shoulders', 'chest', 'back', 'arms'] },
+      { name: 'Lower B (Heavy Deadlift)', bodyParts: ['legs', 'core'] },
+    ],
+  },
+  {
+    id: 'arnold',
+    name: 'Arnold Split',
+    description: 'Agonist/Antagonist pairing for massive pump and upper body development.',
+    days: [
+      { name: 'Chest & Back (Superset Focus)', bodyParts: ['chest', 'back'] },
+      { name: 'Shoulders & Arms', bodyParts: ['shoulders', 'arms'] },
+      { name: 'Legs & Abs', bodyParts: ['legs', 'core'] },
+    ],
+  },
+  {
+    id: 'bro_split',
+    name: 'Bro Split (1 Muscle / Day)',
+    description: 'Classic bodybuilding 5-day split targeting one muscle group per session.',
+    days: [
+      { name: 'Chest Day', bodyParts: ['chest'] },
+      { name: 'Back Day', bodyParts: ['back'] },
+      { name: 'Shoulders Day', bodyParts: ['shoulders'] },
+      { name: 'Arms Day', bodyParts: ['arms'] },
+      { name: 'Legs Day', bodyParts: ['legs'] },
+    ],
+  },
+  {
+    id: 'full_body',
+    name: 'Full Body Compound',
+    description: '3 days a week full body strength progression for maximum efficiency.',
+    days: [
+      { name: 'Full Body Session A', bodyParts: ['full_body'] },
+      { name: 'Full Body Session B', bodyParts: ['full_body'] },
+    ],
+  },
 ];
 
 const INTENSITIES: { id: IntensityOption; label: string; tag: string; description: string; badgeColor: string }[] = [
@@ -58,225 +125,137 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
     id: 'low',
     label: 'Low',
     tag: 'Deload / Form / Mobility',
-    description: '3 exercises • 2–3 sets • 10–12 reps • Lighter weights for form & recovery',
-    badgeColor: 'text-sky-600 bg-sky-500/10 border-sky-500/30',
+    description: '3 exercises • 2–3 sets • 10–12 reps • Focus on technique',
+    badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
   },
   {
     id: 'medium',
     label: 'Medium',
     tag: 'Hypertrophy & Growth',
-    description: '4–5 exercises • 3 sets • 8–10 reps • Balanced progressive overload',
-    badgeColor: 'text-amber-600 bg-amber-500/10 border-amber-500/30',
+    description: '4–5 exercises • 3 sets • 8–10 reps • Balanced overload',
+    badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   {
     id: 'high',
     label: 'High',
     tag: 'Maximum Strength & Density',
-    description: '5–6 exercises • 3–4 heavy sets • 5–8 reps • Heavy compounds + burnout',
+    description: '5–6 exercises • 3–4 heavy sets • 5–8 reps • Heavy compound focus',
     badgeColor: 'text-accent bg-accent/15 border-accent/40',
   },
 ];
 
-// ── Curated exercise routines per body part & intensity ───────────────────────
-const SUGGESTED_ROUTINES: Record<BodyPartOption, Record<IntensityOption, { name: string; targetSets: number; targetReps: number }[]>> = {
+// Exercise pool mapped per body part
+const BODY_PART_POOLS: Record<BodyPartOption, { compound: string[]; isolation: string[] }> = {
   chest: {
-    low: [
-      { name: 'Dumbbell Press', targetSets: 3, targetReps: 10 },
-      { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 12 },
-      { name: 'Push-ups', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Bench Press', targetSets: 3, targetReps: 8 },
-      { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10 },
-      { name: 'Chest Fly', targetSets: 3, targetReps: 12 },
-      { name: 'Dips', targetSets: 3, targetReps: 8 },
-    ],
-    high: [
-      { name: 'Bench Press', targetSets: 4, targetReps: 5 },
-      { name: 'Incline Bench', targetSets: 3, targetReps: 6 },
-      { name: 'Dips', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Fly', targetSets: 3, targetReps: 10 },
-      { name: 'Push-ups', targetSets: 3, targetReps: 15 },
-    ],
+    compound: ['Bench Press', 'Incline Bench', 'Dips', 'Incline Dumbbell Press', 'Dumbbell Press'],
+    isolation: ['Chest Fly', 'Dumbbell Fly', 'Cable Crossover', 'Push-ups'],
   },
   back: {
-    low: [
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10 },
-      { name: 'Cable Row', targetSets: 3, targetReps: 12 },
-      { name: 'Dumbbell Row', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Barbell Row', targetSets: 3, targetReps: 8 },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10 },
-      { name: 'Cable Row', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Row', targetSets: 3, targetReps: 10 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 12 },
-    ],
-    high: [
-      { name: 'Deadlift', targetSets: 4, targetReps: 5 },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 8 },
-      { name: 'Barbell Row', targetSets: 3, targetReps: 6 },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 8 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 12 },
-    ],
+    compound: ['Deadlift', 'Barbell Row', 'Pull-ups', 'Lat Pulldown', 'T-Bar Row'],
+    isolation: ['Cable Row', 'Dumbbell Row', 'Face Pull', 'Straight Arm Pulldown'],
   },
   legs: {
-    low: [
-      { name: 'Goblet Squat', targetSets: 3, targetReps: 10 },
-      { name: 'Leg Press', targetSets: 3, targetReps: 12 },
-      { name: 'Leg Curl', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Squat', targetSets: 3, targetReps: 8 },
-      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 10 },
-      { name: 'Leg Press', targetSets: 3, targetReps: 10 },
-      { name: 'Leg Curl', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Lunge', targetSets: 2, targetReps: 12 },
-    ],
-    high: [
-      { name: 'Squat', targetSets: 4, targetReps: 6 },
-      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8 },
-      { name: 'Front Squat', targetSets: 3, targetReps: 6 },
-      { name: 'Leg Press', targetSets: 3, targetReps: 10 },
-      { name: 'Leg Extension', targetSets: 3, targetReps: 12 },
-      { name: 'Leg Curl', targetSets: 3, targetReps: 10 },
-    ],
+    compound: ['Squat', 'Front Squat', 'Romanian Deadlift', 'Leg Press'],
+    isolation: ['Leg Extension', 'Hamstring Curl', 'Calf Raise', 'Bulgarian Split Squat', 'Dumbbell Lunge'],
   },
   shoulders: {
-    low: [
-      { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12 },
-      { name: 'Face Pull', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Overhead Press', targetSets: 3, targetReps: 8 },
-      { name: 'Arnold Press', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 12 },
-    ],
-    high: [
-      { name: 'Overhead Press', targetSets: 4, targetReps: 5 },
-      { name: 'Arnold Press', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Lateral Raise', targetSets: 4, targetReps: 10 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Press', targetSets: 3, targetReps: 8 },
-    ],
+    compound: ['Overhead Press', 'Arnold Press', 'Dumbbell Shoulder Press', 'Push Press'],
+    isolation: ['Dumbbell Lateral Raise', 'Cable Lateral Raise', 'Face Pull', 'Rear Delt Fly'],
   },
   arms: {
-    low: [
-      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10 },
-      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 10 },
-      { name: 'Hammer Curl', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Close Grip Bench', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10 },
-      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 10 },
-      { name: 'Hammer Curl', targetSets: 3, targetReps: 10 },
-      { name: 'Preacher Curl', targetSets: 2, targetReps: 12 },
-    ],
-    high: [
-      { name: 'Close Grip Bench', targetSets: 4, targetReps: 6 },
-      { name: 'Dips', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 8 },
-      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 8 },
-      { name: 'Hammer Curl', targetSets: 3, targetReps: 8 },
-      { name: 'Tricep Kickback', targetSets: 2, targetReps: 12 },
-    ],
-  },
-  push: {
-    low: [
-      { name: 'Dumbbell Press', targetSets: 3, targetReps: 10 },
-      { name: 'Incline Dumbbell Press', targetSets: 2, targetReps: 12 },
-      { name: 'Tricep Pushdown', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Bench Press', targetSets: 3, targetReps: 8 },
-      { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12 },
-      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 10 },
-      { name: 'Push-ups', targetSets: 2, targetReps: 15 },
-    ],
-    high: [
-      { name: 'Bench Press', targetSets: 4, targetReps: 5 },
-      { name: 'Incline Bench', targetSets: 3, targetReps: 6 },
-      { name: 'Overhead Press', targetSets: 3, targetReps: 6 },
-      { name: 'Dips', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Lateral Raise', targetSets: 4, targetReps: 10 },
-      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 10 },
-    ],
-  },
-  pull: {
-    low: [
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10 },
-      { name: 'Cable Row', targetSets: 2, targetReps: 12 },
-      { name: 'Dumbbell Curl', targetSets: 2, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Barbell Row', targetSets: 3, targetReps: 8 },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10 },
-      { name: 'Cable Row', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 12 },
-    ],
-    high: [
-      { name: 'Deadlift', targetSets: 4, targetReps: 5 },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 8 },
-      { name: 'Barbell Row', targetSets: 3, targetReps: 6 },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 8 },
-      { name: 'Face Pull', targetSets: 3, targetReps: 12 },
-      { name: 'Hammer Curl', targetSets: 3, targetReps: 8 },
-    ],
+    compound: ['Close Grip Bench', 'Dips', 'Chin-ups'],
+    isolation: ['Dumbbell Curl', 'Tricep Pushdown', 'Hammer Curl', 'Skull Crushers', 'Preacher Curl', 'Overhead Tricep Extension'],
   },
   core: {
-    low: [
-      { name: 'Push-ups', targetSets: 3, targetReps: 12 },
-      { name: 'Cable Row', targetSets: 3, targetReps: 12 },
-    ],
-    medium: [
-      { name: 'Push-ups', targetSets: 3, targetReps: 15 },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 6 },
-      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 10 },
-    ],
-    high: [
-      { name: 'Deadlift', targetSets: 4, targetReps: 6 },
-      { name: 'Front Squat', targetSets: 3, targetReps: 6 },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 8 },
-      { name: 'Push-ups', targetSets: 3, targetReps: 20 },
-    ],
+    compound: ['Front Squat', 'Deadlift'],
+    isolation: ['Hanging Leg Raise', 'Plank', 'Cable Crunch', 'Ab Wheel Rollout', 'Russian Twist'],
+  },
+  push: {
+    compound: ['Bench Press', 'Incline Bench', 'Overhead Press', 'Dips'],
+    isolation: ['Dumbbell Lateral Raise', 'Tricep Pushdown', 'Incline Dumbbell Press', 'Chest Fly'],
+  },
+  pull: {
+    compound: ['Deadlift', 'Pull-ups', 'Barbell Row', 'Lat Pulldown'],
+    isolation: ['Cable Row', 'Dumbbell Curl', 'Hammer Curl', 'Face Pull'],
   },
   full_body: {
-    low: [
-      { name: 'Goblet Squat', targetSets: 3, targetReps: 10 },
-      { name: 'Dumbbell Press', targetSets: 3, targetReps: 10 },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10 },
-    ],
-    medium: [
-      { name: 'Squat', targetSets: 3, targetReps: 8 },
-      { name: 'Bench Press', targetSets: 3, targetReps: 8 },
-      { name: 'Barbell Row', targetSets: 3, targetReps: 8 },
-      { name: 'Overhead Press', targetSets: 3, targetReps: 8 },
-      { name: 'Dumbbell Curl', targetSets: 2, targetReps: 10 },
-    ],
-    high: [
-      { name: 'Squat', targetSets: 4, targetReps: 5 },
-      { name: 'Bench Press', targetSets: 4, targetReps: 5 },
-      { name: 'Deadlift', targetSets: 3, targetReps: 5 },
-      { name: 'Overhead Press', targetSets: 3, targetReps: 6 },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 8 },
-      { name: 'Dips', targetSets: 3, targetReps: 8 },
-    ],
+    compound: ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row', 'Pull-ups'],
+    isolation: ['Dumbbell Lateral Raise', 'Dumbbell Curl', 'Tricep Pushdown', 'Calf Raise'],
   },
 };
 
-const EQUIPMENT_BADGE_STYLE: Record<EquipmentType, { label: string; icon: string; style: string }> = {
-  barbell:    { label: 'Barbell',    icon: '🏋️', style: 'bg-accent/15 text-accent border-accent/30' },
-  dumbbell:   { label: 'Dumbbell',   icon: '🪙', style: 'bg-info/15 text-info border-info/30' },
-  cable:      { label: 'Cable',      icon: '🔗', style: 'bg-sky-500/15 text-sky-400 border-sky-500/30' },
-  bodyweight: { label: 'Bodyweight', icon: '🤸', style: 'bg-warning/15 text-warning border-warning/30' },
-  machine:    { label: 'Machine',    icon: '⚙️', style: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' },
-  other:      { label: 'Other',      icon: '⚡', style: 'bg-text-muted/15 text-text-muted border-border' },
-};
+export function generateExercisesFromSelection(
+  bodyParts: BodyPartOption[],
+  intensity: IntensityOption = 'medium',
+  userUnit: 'kg' | 'lbs' = 'kg'
+): PlannedExercise[] {
+  const sets = intensity === 'low' ? 3 : intensity === 'medium' ? 3 : 4;
+  const reps = intensity === 'low' ? 12 : intensity === 'medium' ? 8 : 6;
+  const maxTotal = intensity === 'low' ? 4 : intensity === 'medium' ? 6 : 7;
+
+  const validParts = bodyParts.length > 0 ? bodyParts : (['full_body'] as BodyPartOption[]);
+
+  const chosenExercises: string[] = [];
+  const addedNames = new Set<string>();
+
+  // Determine how many exercises to pick per body part
+  const perGroup = Math.max(1, Math.floor(maxTotal / validParts.length));
+
+  // Pass 1: Add compound lifts evenly from each body part
+  validParts.forEach((bp) => {
+    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+    let addedForThisBp = 0;
+    const targetCompound = Math.min(2, Math.max(1, Math.floor(perGroup * 0.6)));
+
+    for (const c of pool.compound) {
+      if (!addedNames.has(c) && addedForThisBp < targetCompound && chosenExercises.length < maxTotal) {
+        chosenExercises.push(c);
+        addedNames.add(c);
+        addedForThisBp++;
+      }
+    }
+  });
+
+  // Pass 2: Add isolations / accessories evenly from each body part
+  validParts.forEach((bp) => {
+    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+    for (const iso of pool.isolation) {
+      if (!addedNames.has(iso) && chosenExercises.length < maxTotal) {
+        const countFromThisBp = chosenExercises.filter(
+          (ex) => pool.compound.includes(ex) || pool.isolation.includes(ex)
+        ).length;
+        if (countFromThisBp < perGroup + 1) {
+          chosenExercises.push(iso);
+          addedNames.add(iso);
+          break; // 1 isolation per group in pass 2
+        }
+      }
+    }
+  });
+
+  // Pass 3: If still room under maxTotal, fill from remaining
+  if (chosenExercises.length < maxTotal) {
+    for (const bp of validParts) {
+      const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+      const combined = [...pool.compound, ...pool.isolation];
+      for (const ex of combined) {
+        if (!addedNames.has(ex) && chosenExercises.length < maxTotal) {
+          chosenExercises.push(ex);
+          addedNames.add(ex);
+        }
+      }
+    }
+  }
+
+  return chosenExercises.map((name) => ({
+    name,
+    targetSets: sets,
+    targetReps: reps,
+    targetWeight: 0,
+    targetUnit: userUnit,
+    notes: '',
+  }));
+}
 
 export default function SuggestedWorkoutModal({
   isOpen,
@@ -285,33 +264,84 @@ export default function SuggestedWorkoutModal({
   onStartWorkout,
   onSavePlan,
 }: SuggestedWorkoutModalProps) {
-  const [selectedBodyPart, setSelectedBodyPart] = useState<BodyPartOption>('push');
-  const [selectedIntensity, setSelectedIntensity] = useState<IntensityOption>('medium');
-  const [planTitle, setPlanTitle] = useState('');
-  const [exercises, setExercises] = useState<PlannedExercise[]>([]);
   const toast = useToast();
 
-  const availableExercises = getExerciseList();
+  // Mode: 'bodyparts' | 'split'
+  const [activeTab, setActiveTab] = useState<'bodyparts' | 'split'>('bodyparts');
 
-  // Generate routine when body part or intensity changes
+  // Multi-select body parts
+  const [selectedBodyParts, setSelectedBodyParts] = useState<BodyPartOption[]>(['chest', 'arms']);
+  const [selectedIntensity, setSelectedIntensity] = useState<IntensityOption>('medium');
+
+  // Split selection state
+  const [selectedSplitId, setSelectedSplitId] = useState<string>('ppl');
+  const [selectedSplitDayIdx, setSelectedSplitDayIdx] = useState<number>(0);
+
+  // Custom Split state
+  const [isCreatingCustomSplit, setIsCreatingCustomSplit] = useState(false);
+  const [customSplitName, setCustomSplitName] = useState('My Custom Split');
+  const [customSplitDays, setCustomSplitDays] = useState<{ name: string; bodyParts: BodyPartOption[] }[]>([
+    { name: 'Day 1: Chest & Triceps', bodyParts: ['chest', 'arms'] },
+    { name: 'Day 2: Back & Biceps', bodyParts: ['back', 'arms'] },
+    { name: 'Day 3: Legs & Shoulders', bodyParts: ['legs', 'shoulders'] },
+  ]);
+
+  // Plan editor state
+  const [planTitle, setPlanTitle] = useState('');
+  const [exercises, setExercises] = useState<PlannedExercise[]>([]);
+
+  // Search & quick add exercise
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [showAddDrawer, setShowAddDrawer] = useState(false);
+
+  const allAvailableExercises = useMemo(() => getExerciseList(), []);
+
+  // Filtered exercises for add drawer
+  const filteredAvailableExercises = useMemo(() => {
+    let list = allAvailableExercises;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((e) => e.toLowerCase().includes(q));
+    }
+    return list.slice(0, 15);
+  }, [allAvailableExercises, searchQuery]);
+
+  // Toggle body part selection
+  const handleToggleBodyPart = (id: BodyPartOption) => {
+    setSelectedBodyParts((prev) => {
+      if (prev.includes(id)) {
+        if (prev.length === 1) return prev; // Keep at least one
+        return prev.filter((p) => p !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // Generate exercises based on chosen body parts and intensity
+  const generateExercises = (bodyParts: BodyPartOption[], intensity: IntensityOption): PlannedExercise[] => {
+    return generateExercisesFromSelection(bodyParts, intensity, userUnit);
+  };
+
+  // Re-generate routine on changes
   useEffect(() => {
     if (!isOpen) return;
 
-    const bodyPartMeta = BODY_PARTS.find((b) => b.id === selectedBodyPart);
-    const intensityMeta = INTENSITIES.find((i) => i.id === selectedIntensity);
-    const defaultTitle = `${bodyPartMeta?.label || 'Workout'} (${intensityMeta?.label} Intensity)`;
-    setPlanTitle(defaultTitle);
-
-    const template = SUGGESTED_ROUTINES[selectedBodyPart]?.[selectedIntensity] || [];
-    const generated: PlannedExercise[] = template.map((item) => ({
-      name: item.name,
-      targetSets: item.targetSets,
-      targetReps: item.targetReps,
-      targetUnit: userUnit,
-      notes: '',
-    }));
-    setExercises(generated);
-  }, [isOpen, selectedBodyPart, selectedIntensity, userUnit]);
+    if (activeTab === 'bodyparts') {
+      const names = selectedBodyParts.map((bp) => BODY_PARTS.find((b) => b.id === bp)?.label || bp).join(' + ');
+      setPlanTitle(`${names} (${INTENSITIES.find((i) => i.id === selectedIntensity)?.label})`);
+      setExercises(generateExercisesFromSelection(selectedBodyParts, selectedIntensity, userUnit));
+    } else {
+      // Split mode
+      const split = SPLIT_PRESETS.find((s) => s.id === selectedSplitId);
+      const day = split?.days[selectedSplitDayIdx] || split?.days[0];
+      if (day) {
+        setPlanTitle(day.name);
+        setExercises(generateExercisesFromSelection(day.bodyParts, selectedIntensity, userUnit));
+      }
+    }
+  }, [isOpen, activeTab, selectedBodyParts, selectedIntensity, selectedSplitId, selectedSplitDayIdx, userUnit]);
 
   if (!isOpen) return null;
 
@@ -329,17 +359,23 @@ export default function SuggestedWorkoutModal({
     setExercises((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleAddExercise = () => {
+  const handleQuickAddExercise = (exerciseName: string) => {
+    if (exercises.some((e) => e.name.toLowerCase() === exerciseName.toLowerCase())) {
+      toast.info(`${exerciseName} is already in the routine.`);
+      return;
+    }
     setExercises((prev) => [
       ...prev,
       {
-        name: '',
+        name: exerciseName,
         targetSets: 3,
         targetReps: 10,
         targetUnit: userUnit,
         notes: '',
       },
     ]);
+    setShowAddDrawer(false);
+    toast.success(`Added ${exerciseName} to routine!`);
   };
 
   const handleStartNow = () => {
@@ -348,9 +384,7 @@ export default function SuggestedWorkoutModal({
       toast.error('Please include at least one named exercise.');
       return;
     }
-    const title = planTitle.trim() || 'Suggested Workout';
-    onStartWorkout(title, valid);
-    toast.success(`Loaded "${title}" into logger. Let's lift!`, 'Workout Started');
+    onStartWorkout(planTitle || 'Suggested Workout', valid);
     onClose();
   };
 
@@ -360,252 +394,361 @@ export default function SuggestedWorkoutModal({
       toast.error('Please include at least one named exercise.');
       return;
     }
-    const title = planTitle.trim() || 'Suggested Workout';
     onSavePlan({
-      name: title,
+      name: planTitle || 'Suggested Routine',
       exercises: valid,
     });
-    toast.success(`Saved "${title}" to your Workout Plans!`, 'Plan Saved');
     onClose();
   };
+
+  const currentSplit = SPLIT_PRESETS.find((s) => s.id === selectedSplitId) || SPLIT_PRESETS[0];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
-        className="modal-content max-w-xl p-5 space-y-5"
+        className="modal-content max-w-xl w-full max-h-[90vh] overflow-hidden p-0 bg-bg-card border border-border flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex justify-between items-center pb-2.5 border-b border-border">
+        <div className="p-4 border-b border-border flex items-center justify-between bg-bg-elevated/70">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent">
-              <Zap className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center">
+              <Sparkles className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary">Suggested Workout Generator</h2>
-              <p className="text-2xs text-text-muted">
-                Pick target muscle &amp; intensity to generate a tailored routine
+              <h2 className="text-base font-bold text-text-primary leading-tight font-sans">
+                Workout Plan Generator
+              </h2>
+              <p className="text-2xs text-text-secondary">
+                Select multiple body parts or choose your training split
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-text-muted hover:text-text-primary p-1"
+            className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Step 1: Body Part Selector */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-mono flex items-center gap-1.5">
-              <span>1. Choose Target Muscle Group</span>
-            </label>
-            <span className="text-2xs text-accent font-semibold">
-              {BODY_PARTS.find((b) => b.id === selectedBodyPart)?.label} Selected
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-            {BODY_PARTS.map((bp) => {
-              const isSelected = selectedBodyPart === bp.id;
-              return (
-                <button
-                  key={bp.id}
-                  type="button"
-                  onClick={() => setSelectedBodyPart(bp.id)}
-                  className={`p-2 rounded-xl border text-center transition-all active:scale-95 ${
-                    isSelected
-                      ? 'bg-accent/15 border-accent text-accent shadow-xs'
-                      : 'bg-bg-card border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
-                  }`}
-                >
-                  <div className="text-base leading-none mb-1">{bp.icon}</div>
-                  <div className="text-xs font-bold truncate">{bp.label}</div>
-                </button>
-              );
-            })}
-          </div>
+        {/* Tab Switcher: Multi Body Parts vs Split */}
+        <div className="px-4 pt-3 flex gap-2 border-b border-border bg-bg-secondary/40 font-mono text-xs">
+          <button
+            type="button"
+            onClick={() => setActiveTab('bodyparts')}
+            className={`pb-2.5 px-3 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'bodyparts'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Multi-Body Parts</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('split')}
+            className={`pb-2.5 px-3 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
+              activeTab === 'split'
+                ? 'border-accent text-accent'
+                : 'border-transparent text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <Repeat className="w-3.5 h-3.5" />
+            <span>Choose Split Routine</span>
+          </button>
         </div>
 
-        {/* Step 2: Intensity Selector */}
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-text-secondary uppercase tracking-wider font-mono flex items-center gap-1.5">
-            <span>2. Select Workout Intensity</span>
-          </label>
+        {/* Modal Scrollable Body */}
+        <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* ── MODE 1: MULTI-BODY PART SELECTION ── */}
+          {activeTab === 'bodyparts' && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider">
+                  Target Body Parts (Select Multiple)
+                </span>
+                <span className="text-2xs text-accent font-bold font-mono">
+                  {selectedBodyParts.length} selected
+                </span>
+              </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            {INTENSITIES.map((lvl) => {
-              const isSelected = selectedIntensity === lvl.id;
-              return (
-                <button
-                  key={lvl.id}
-                  type="button"
-                  onClick={() => setSelectedIntensity(lvl.id)}
-                  className={`p-3 rounded-xl border text-left transition-all active:scale-[0.98] ${
-                    isSelected
-                      ? `${lvl.badgeColor} shadow-xs ring-1 ring-accent/30`
-                      : 'bg-bg-card border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-xs">{lvl.label}</span>
-                    {isSelected && <Check className="w-3.5 h-3.5" />}
-                  </div>
-                  <p className="text-[10px] opacity-80 leading-snug">{lvl.tag}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Step 3: Editable Suggested Plan */}
-        <div className="space-y-3 pt-1 border-t border-border">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 mr-2">
-              <label className="text-2xs font-bold text-text-muted uppercase tracking-wider font-mono block mb-1">
-                Workout Plan Title (Editable)
-              </label>
-              <input
-                type="text"
-                value={planTitle}
-                onChange={(e) => setPlanTitle(e.target.value)}
-                className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-sm font-bold text-text-primary focus:border-accent outline-none"
-              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                {BODY_PARTS.map((bp) => {
+                  const isSelected = selectedBodyParts.includes(bp.id);
+                  return (
+                    <button
+                      key={bp.id}
+                      type="button"
+                      onClick={() => handleToggleBodyPart(bp.id)}
+                      className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all select-none active:scale-95 ${
+                        isSelected
+                          ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                          : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent/40'
+                      }`}
+                    >
+                      <span className="text-base">{bp.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
+                          {bp.label}
+                        </span>
+                        <span className="text-[10px] text-text-muted truncate block">
+                          {bp.description}
+                        </span>
+                      </div>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={handleAddExercise}
-              className="mt-4 px-2.5 py-1.5 rounded-lg bg-bg-card border border-border hover:border-accent text-accent text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-95 transition-all"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Exercise</span>
-            </button>
+          )}
+
+          {/* ── MODE 2: SPLIT SELECTION ── */}
+          {activeTab === 'split' && (
+            <div className="space-y-3">
+              <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
+                Choose Split Template
+              </span>
+
+              {/* Split Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {SPLIT_PRESETS.map((s) => {
+                  const isSelected = selectedSplitId === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSplitId(s.id);
+                        setSelectedSplitDayIdx(0);
+                      }}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                          : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent/40'
+                      }`}
+                    >
+                      <span className={`text-xs font-bold block ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
+                        {s.name}
+                      </span>
+                      <span className="text-2xs text-text-muted line-clamp-1 mt-0.5">
+                        {s.description}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Day selection within chosen split */}
+              <div className="pt-1 space-y-1.5">
+                <span className="text-2xs font-mono font-bold text-text-secondary uppercase block">
+                  Select Day to Train:
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {currentSplit.days.map((day, idx) => {
+                    const isDaySelected = selectedSplitDayIdx === idx;
+                    return (
+                      <button
+                        key={day.name}
+                        type="button"
+                        onClick={() => setSelectedSplitDayIdx(idx)}
+                        className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
+                          isDaySelected
+                            ? 'bg-accent text-white border-accent shadow-xs'
+                            : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {day.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Intensity Selector */}
+          <div className="space-y-1.5 pt-1">
+            <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
+              Intensity & Target Volume
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {INTENSITIES.map((int) => {
+                const isSelected = selectedIntensity === int.id;
+                return (
+                  <button
+                    key={int.id}
+                    type="button"
+                    onClick={() => setSelectedIntensity(int.id)}
+                    className={`p-2 rounded-xl border text-center transition-all ${
+                      isSelected
+                        ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                        : 'bg-bg-secondary border-border text-text-secondary hover:border-accent/40'
+                    }`}
+                  >
+                    <span className="text-xs font-bold block">{int.label}</span>
+                    <span className="text-[9px] text-text-muted font-mono block mt-0.5 truncate">
+                      {int.tag}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Datalist for autocomplete */}
-          <datalist id="suggested-exercises-list">
-            {availableExercises.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
+          {/* Routine Preview & Exercise List */}
+          <div className="pt-2 space-y-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <input
+                  type="text"
+                  value={planTitle}
+                  onChange={(e) => setPlanTitle(e.target.value)}
+                  placeholder="Workout Plan Name"
+                  className="font-bold text-sm text-text-primary bg-transparent border-b border-border/80 focus:border-accent outline-none pb-0.5"
+                />
+                <span className="text-2xs text-text-muted block mt-0.5 font-mono">
+                  {exercises.length} exercises configured
+                </span>
+              </div>
 
-          {/* Exercise list */}
-          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-            {exercises.map((ex, idx) => {
-              const eqType = getExerciseEquipment(ex.name);
-              const badge = EQUIPMENT_BADGE_STYLE[eqType] || EQUIPMENT_BADGE_STYLE.other;
+              <button
+                type="button"
+                onClick={() => setShowAddDrawer(!showAddDrawer)}
+                className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent hover:bg-accent/10"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Exercise</span>
+              </button>
+            </div>
 
-              return (
+            {/* Quick Add Drawer */}
+            {showAddDrawer && (
+              <div className="p-3 rounded-xl bg-bg-secondary border border-accent/40 space-y-2 animate-fade-in">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-text-muted" />
+                  <input
+                    type="text"
+                    placeholder="Search exercise (e.g. Bench, Curl, Squat)..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-bg-card border border-border rounded-lg text-text-primary outline-none focus:border-accent font-sans"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="flex flex-wrap gap-1 max-h-36 overflow-y-auto pr-1">
+                  {filteredAvailableExercises.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => handleQuickAddExercise(name)}
+                      className="px-2 py-1 rounded-lg bg-bg-card border border-border hover:border-accent text-2xs font-medium text-text-primary flex items-center gap-1 active:scale-95 transition-all"
+                    >
+                      <Plus className="w-2.5 h-2.5 text-accent" />
+                      <span>{name}</span>
+                    </button>
+                  ))}
+                  {filteredAvailableExercises.length === 0 && (
+                    <p className="text-2xs text-text-muted py-2 w-full text-center">
+                      No matching exercises found.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Exercise Rows */}
+            <div className="space-y-1.5">
+              {exercises.map((ex, idx) => (
                 <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-bg-card border border-border space-y-2 relative group"
+                  key={`${ex.name}-${idx}`}
+                  className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                      <span className="text-2xs font-mono font-bold text-text-muted">
-                        #{idx + 1}
-                      </span>
-                      <input
-                        type="text"
-                        value={ex.name}
-                        onChange={(e) => handleUpdateExercise(idx, 'name', e.target.value)}
-                        placeholder="Exercise name"
-                        list="suggested-exercises-list"
-                        className="bg-transparent font-bold text-xs text-text-primary focus:bg-bg-elevated p-1 rounded border border-transparent focus:border-accent outline-none flex-1 truncate"
-                      />
-                    </div>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[10px] font-mono font-bold text-text-muted shrink-0">
+                      {idx + 1}
+                    </span>
+                    <span className="text-xs font-bold text-text-primary truncate">
+                      {ex.name}
+                    </span>
+                  </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 ${badge.style}`}
-                      >
-                        <span>{badge.icon}</span>
-                        <span>{badge.label}</span>
-                      </span>
+                  {/* Steppers for Sets & Reps */}
+                  <div className="flex items-center gap-2 shrink-0 font-mono text-xs">
+                    <div className="flex items-center gap-1 bg-bg-card px-2 py-1 rounded-lg border border-border">
+                      <span className="text-text-muted text-[10px]">Sets:</span>
                       <button
                         type="button"
-                        onClick={() => handleRemoveExercise(idx)}
-                        className="p-1 text-text-muted hover:text-danger rounded hover:bg-danger/10 transition-colors"
-                        title="Remove exercise"
+                        onClick={() => handleUpdateExercise(idx, 'targetSets', Math.max(1, ex.targetSets - 1))}
+                        className="px-1 text-text-muted hover:text-text-primary"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        -
+                      </button>
+                      <span className="font-bold text-text-primary">{ex.targetSets}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateExercise(idx, 'targetSets', ex.targetSets + 1)}
+                        className="px-1 text-text-muted hover:text-text-primary"
+                      >
+                        +
                       </button>
                     </div>
-                  </div>
 
-                  {/* Target Sets & Reps row */}
-                  <div className="flex items-center gap-3 pt-0.5 text-xs text-text-secondary">
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-2xs font-mono text-text-muted uppercase">Sets:</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={ex.targetSets}
-                        onChange={(e) =>
-                          handleUpdateExercise(idx, 'targetSets', parseInt(e.target.value) || 1)
-                        }
-                        className="w-12 bg-bg-elevated border border-border rounded p-1 text-center font-bold text-text-primary text-xs outline-none focus:border-accent"
-                      />
+                    <div className="flex items-center gap-1 bg-bg-card px-2 py-1 rounded-lg border border-border">
+                      <span className="text-text-muted text-[10px]">Reps:</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateExercise(idx, 'targetReps', Math.max(1, ex.targetReps - 1))}
+                        className="px-1 text-text-muted hover:text-text-primary"
+                      >
+                        -
+                      </button>
+                      <span className="font-bold text-text-primary">{ex.targetReps}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateExercise(idx, 'targetReps', ex.targetReps + 1)}
+                        className="px-1 text-text-muted hover:text-text-primary"
+                      >
+                        +
+                      </button>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <label className="text-2xs font-mono text-text-muted uppercase">Reps:</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={50}
-                        value={ex.targetReps}
-                        onChange={(e) =>
-                          handleUpdateExercise(idx, 'targetReps', parseInt(e.target.value) || 1)
-                        }
-                        className="w-12 bg-bg-elevated border border-border rounded p-1 text-center font-bold text-text-primary text-xs outline-none focus:border-accent"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      <label className="text-2xs font-mono text-text-muted uppercase">Weight:</label>
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        value={ex.targetWeight !== undefined ? ex.targetWeight : ''}
-                        onChange={(e) =>
-                          handleUpdateExercise(
-                            idx,
-                            'targetWeight',
-                            e.target.value ? parseFloat(e.target.value) : undefined
-                          )
-                        }
-                        className="w-14 bg-bg-elevated border border-border rounded p-1 text-center font-medium text-text-primary text-xs outline-none focus:border-accent"
-                      />
-                      <span className="text-2xs text-text-muted font-mono">{userUnit}</span>
-                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExercise(idx)}
+                      className="p-1 text-text-muted hover:text-danger transition-colors"
+                      title="Remove exercise"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="pt-2 flex flex-col sm:flex-row gap-2 border-t border-border">
+        {/* Footer Actions */}
+        <div className="p-3.5 border-t border-border bg-bg-elevated/70 flex gap-2">
           <button
             type="button"
             onClick={handleSaveToPlans}
-            className="btn-secondary py-2.5 px-4 text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+            className="btn-secondary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
           >
             <BookmarkPlus className="w-4 h-4 text-accent" />
-            <span>Save as Planned Workout</span>
+            <span>Save to Plans</span>
           </button>
           <button
             type="button"
             onClick={handleStartNow}
-            className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-accent/25 hover:brightness-105 active:scale-95 transition-all"
+            className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-accent/25"
           >
-            <Play className="w-4 h-4 fill-white stroke-white" />
-            <span>START WORKOUT NOW</span>
+            <Play className="w-4 h-4 fill-white" />
+            <span>Start Workout</span>
           </button>
         </div>
       </div>

@@ -32,7 +32,8 @@ export default function ActivityRingsCard({
   const bw = profile?.bodyweightKg || 75;
 
   // Training Status
-  const hasTrainedToday = workouts.some((w) => w.date && w.date.startsWith(todayStr));
+  const hasGymLogged = !!store.gymLogs?.[todayStr];
+  const hasTrainedToday = hasGymLogged || workouts.some((w) => w.date && w.date.startsWith(todayStr));
   const trainingPct = hasTrainedToday ? 100 : 0;
 
   // Protein Status

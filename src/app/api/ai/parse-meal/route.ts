@@ -97,7 +97,7 @@ RULES FOR PRECISION:
    - Sattu (50g): ~206 kcal, 13g protein, 32g carbs, 2.5g fat.
    - Boiled Chana (100g): ~164 kcal, 8.9g protein, 27.4g carbs, 2.6g fat.
    - White Rice (150g cooked): ~195 kcal, 4.1g protein, 42g carbs, 0.5g fat.
-   - 1 Egg (large): ~78 kcal, 6.5g protein, 0.6g carbs, 5.5g fat.
+   - Oats / Oatmeal (raw, per 100g): ~389 kcal, 16.9g protein, 66.3g carbs, 6.9g fat.
    - Whey Protein (1 scoop ~30g): ~120 kcal, 24g protein, 2.2g carbs, 1g fat.
 
 2. Always output valid JSON strictly adhering to this schema:

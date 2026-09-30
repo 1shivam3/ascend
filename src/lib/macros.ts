@@ -286,17 +286,56 @@ function findBestMatch(normalizedName: string): string {
 }
 
 export function estimateMacros(foodName: string, quantity?: number, unit: string = 'g'): FoodItem {
-  const normalizedName = foodName.toLowerCase().trim();
+  let normalizedName = foodName.toLowerCase().trim();
 
   if (!normalizedName) {
     return { name: foodName, calories: 0, proteinG: 0, carbsG: 0, fatG: 0, quantity, unit };
   }
 
-  const matchedKey = findBestMatch(normalizedName);
+  // Strip common conversational filler words: "about", "around", "approx", "of", "having", "some"
+  normalizedName = normalizedName
+    .replace(/\b(i ate|i had|ate|had|having|about|around|approx|approximately|some|of|a plate of|a bowl of|a cup of)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  let effectiveQty = quantity;
+  let effectiveUnit = unit || 'g';
+  let cleanFoodName = normalizedName;
+
+  // If quantity was not explicitly supplied or was left as 1, check if foodName itself contains quantity & unit
+  // e.g. "oats 100gm", "100g oats", "2 roti", "150g paneer"
+  if (effectiveQty === undefined || effectiveQty === null || effectiveQty === 1) {
+    const prefixMatch = cleanFoodName.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?\s+(.+)$/);
+    const suffixMatch = cleanFoodName.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?$/);
+
+    if (prefixMatch) {
+      const q = parseFloat(prefixMatch[1]);
+      const potentialU = (prefixMatch[2] || '').toLowerCase();
+      const rest = prefixMatch[3].trim();
+      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful'];
+      if (knownUnits.includes(potentialU)) {
+        effectiveQty = q;
+        effectiveUnit = potentialU.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g').replace(/pc$/, 'piece');
+        cleanFoodName = rest;
+      } else if (!potentialU) {
+        effectiveQty = q;
+        effectiveUnit = 'piece';
+        cleanFoodName = rest;
+      }
+    } else if (suffixMatch) {
+      const q = parseFloat(suffixMatch[2]);
+      const potentialU = (suffixMatch[3] || 'g').toLowerCase();
+      effectiveQty = q;
+      effectiveUnit = potentialU.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g');
+      cleanFoodName = suffixMatch[1].trim();
+    }
+  }
+
+  const matchedKey = findBestMatch(cleanFoodName);
   const baseMacros = matchedKey ? FOOD_DB[matchedKey] : EMPTY_MACROS;
 
-  // If no quantity provided, return raw per-100g data without scaling
-  if (quantity === undefined || quantity === null || quantity === 0) {
+  // If still no quantity provided, return raw per-100g data without scaling
+  if (effectiveQty === undefined || effectiveQty === null || effectiveQty === 0) {
     return {
       name: foodName,
       calories: Math.round(baseMacros.calories),
@@ -304,16 +343,16 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
       carbsG: Number(baseMacros.carbsG.toFixed(1)),
       fatG: Number(baseMacros.fatG.toFixed(1)),
       quantity: undefined,
-      unit,
+      unit: effectiveUnit,
     };
   }
 
-  const safeQty = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
-  const u = (unit || 'g').toLowerCase().trim();
+  const safeQty = Number.isFinite(effectiveQty) && effectiveQty > 0 ? effectiveQty : 1;
+  const u = (effectiveUnit || 'g').toLowerCase().trim();
 
   // Calculate equivalent in grams
   let grams = safeQty;
-  if (u === 'g' || u === 'ml') {
+  if (u === 'g' || u === 'ml' || u === 'gm' || u === 'gram' || u === 'grams') {
     grams = safeQty;
   } else if (u === 'kg' || u === 'l') {
     grams = safeQty * 1000;
@@ -321,23 +360,22 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     grams = safeQty * 28.3495;
   } else if (u === 'lb' || u === 'lbs') {
     grams = safeQty * 453.592;
-  } else if (u === 'scoop') {
+  } else if (u === 'scoop' || u === 'scoops') {
     grams = safeQty * 30; // 1 standard protein scoop ~30g
   } else if (u === 'tbsp') {
     grams = safeQty * 15;
   } else if (u === 'tsp') {
     grams = safeQty * 5;
-  } else if (u === 'slice') {
+  } else if (u === 'slice' || u === 'slices') {
     grams = safeQty * 35; // 1 slice ~35g
-  } else if (u === 'piece' || u === 'pcs' || u === 'pc') {
-    // Look up known piece weight, else fallback to 100g
-    const pieceWeight = PIECE_WEIGHTS[normalizedName] || PIECE_WEIGHTS[matchedKey] || 100;
+  } else if (u === 'piece' || u === 'pieces' || u === 'pcs' || u === 'pc') {
+    const pieceWeight = PIECE_WEIGHTS[cleanFoodName] || PIECE_WEIGHTS[matchedKey] || 100;
     grams = safeQty * pieceWeight;
-  } else if (u === 'cup') {
+  } else if (u === 'cup' || u === 'cups') {
     grams = safeQty * 240;
-  } else if (u === 'bowl') {
+  } else if (u === 'bowl' || u === 'bowls') {
     grams = safeQty * 200;
-  } else if (u === 'plate' || u === 'serving') {
+  } else if (u === 'plate' || u === 'plates' || u === 'serving') {
     grams = safeQty * 250;
   } else if (u === 'handful') {
     grams = safeQty * 30;
@@ -352,7 +390,7 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     carbsG: Number((baseMacros.carbsG * multiplier).toFixed(1)),
     fatG: Number((baseMacros.fatG * multiplier).toFixed(1)),
     quantity: safeQty,
-    unit,
+    unit: effectiveUnit,
   };
 }
 
@@ -381,7 +419,7 @@ export function getFoodSuggestions(query: string): string[] {
 
 /**
  * Natural language food parser for offline and fast local processing.
- * Parses input strings like "2 roti, 1 bowl dal, 100g paneer" or "1 scoop whey, 400ml milk"
+ * Parses input strings like "2 roti, 1 bowl dal, 100g paneer", "oats about 100gm", or "1 scoop whey, 400ml milk"
  */
 export function parseNaturalMealOffline(input: string): FoodItem[] {
   if (!input || !input.trim()) return [];
@@ -394,9 +432,15 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
 
   const parsedItems: FoodItem[] = [];
 
-  for (const token of tokens) {
-    // Regex matching: (number) (optional unit) (food name)
-    // or (food name) (number) (optional unit)
+  for (let rawToken of tokens) {
+    // Strip filler phrases like "i ate", "had", "about", "around", "of"
+    let token = rawToken
+      .replace(/\b(i ate|i had|ate|had|having|about|around|approx|approximately|some|of|a plate of|a bowl of|a cup of)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!token) continue;
+
     const qtyUnitMatch = token.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?\s+(.+)$/);
     const suffixQtyMatch = token.match(/^(.+?)\s+(\d+(?:\.\d+)?)\s*([a-zA-Z]+)?$/);
 
@@ -414,16 +458,14 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
         unit = potentialUnit.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g').replace(/pc$/, 'piece');
         foodName = rest;
       } else {
-        // unit might be missing, e.g. "2 roti" -> potentialUnit is "roti", rest is ""
-        // or potentialUnit was part of the food name
         foodName = `${qtyUnitMatch[2] ? qtyUnitMatch[2] + ' ' : ''}${rest}`.trim();
         unit = 'piece'; // Default for discrete foods like "2 eggs", "2 roti", "2 bananas"
       }
     } else if (suffixQtyMatch) {
       foodName = suffixQtyMatch[1].trim();
       quantity = parseFloat(suffixQtyMatch[2]);
-      const potentialUnit = (suffixQtyMatch[3] || '').toLowerCase();
-      unit = potentialUnit || 'g';
+      const potentialUnit = (suffixQtyMatch[3] || 'g').toLowerCase();
+      unit = potentialUnit.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g');
     } else {
       // Just a food name, e.g. "roti" or "paneer"
       foodName = token;
@@ -432,7 +474,11 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
     }
 
     const estimated = estimateMacros(foodName, quantity, unit);
-    parsedItems.push(estimated);
+    // Use the cleaned food name for display so user doesn't see "oats about"
+    parsedItems.push({
+      ...estimated,
+      name: estimated.name.charAt(0).toUpperCase() + estimated.name.slice(1),
+    });
   }
 
   return parsedItems;

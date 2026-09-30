@@ -113,6 +113,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isNewPinned,          setIsNewPinned]          = useState(false);
   const [confirmClearAll,      setConfirmClearAll]      = useState(false);
   const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
+  const [showAllStaples,       setShowAllStaples]       = useState(false);
 
   // ── Pinned food edit / add form ───────────────────────────────────────────
   const [pinnedName,     setPinnedName]     = useState('');
@@ -723,33 +724,97 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime());
   }, [meals]);
 
-  // ── Auto-detect Frequently Eaten Foods & Meals from History ───────────────
-  const frequentFoodsFromHistory = useMemo(() => {
-    const counts: Record<string, { count: number; latest: FoodItem }> = {};
+  // ── Unified, strictly deduplicated Staples & Frequent Foods ───────────────
+  const unifiedStaples = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Array<{
+      id: string;
+      name: string;
+      quantity?: number;
+      unit: string;
+      calories: number;
+      proteinG: number;
+      carbsG?: number;
+      fatG?: number;
+      isPinned: boolean;
+      count?: number;
+      rawFood: FoodItem;
+    }> = [];
+
+    const normKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // 1. Pinned favorites first
+    favoriteFoods.forEach((fav) => {
+      const k = normKey(fav.name);
+      if (!seen.has(k) && k.length > 0) {
+        seen.add(k);
+        result.push({
+          id: fav.id,
+          name: fav.name,
+          quantity: fav.defaultQuantity,
+          unit: fav.unit || 'g',
+          calories: fav.calories,
+          proteinG: fav.proteinG,
+          carbsG: fav.carbsG,
+          fatG: fav.fatG,
+          isPinned: true,
+          rawFood: {
+            name: fav.name,
+            quantity: fav.defaultQuantity,
+            unit: fav.unit || 'g',
+            calories: fav.calories,
+            proteinG: fav.proteinG,
+            carbsG: fav.carbsG,
+            fatG: fav.fatG,
+          },
+        });
+      }
+    });
+
+    // 2. Count foods from meal history
+    const historyCounts: Record<string, { count: number; latest: FoodItem }> = {};
     meals.forEach((m) => {
       m.foods.forEach((f) => {
-        const key = f.name.toLowerCase().trim();
-        if (!key) return;
-        if (!counts[key]) {
-          counts[key] = { count: 0, latest: f };
+        const k = normKey(f.name);
+        if (!k) return;
+        if (!historyCounts[k]) {
+          historyCounts[k] = { count: 0, latest: f };
         }
-        counts[key].count += 1;
-        counts[key].latest = f;
+        historyCounts[k].count += 1;
+        historyCounts[k].latest = f;
       });
     });
 
-    const pinnedNames = new Set(favoriteFoods.map((f) => f.name.toLowerCase().trim()));
-
-    // Surfaced items eaten >= 2 times not already pinned
-    return Object.entries(counts)
-      .filter(([key, data]) => data.count >= 2 && !pinnedNames.has(key))
+    // 3. Add foods eaten >= 2 times that aren't already pinned
+    Object.entries(historyCounts)
+      .filter(([k, d]) => d.count >= 2 && !seen.has(k))
       .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 6)
-      .map(([_, data]) => ({
-        food: data.latest,
-        count: data.count,
-      }));
-  }, [meals, favoriteFoods]);
+      .forEach(([k, d]) => {
+        seen.add(k);
+        result.push({
+          id: `freq_${k}`,
+          name: d.latest.name,
+          quantity: d.latest.quantity,
+          unit: d.latest.unit || 'g',
+          calories: d.latest.calories,
+          proteinG: d.latest.proteinG,
+          carbsG: d.latest.carbsG,
+          fatG: d.latest.fatG,
+          isPinned: false,
+          count: d.count,
+          rawFood: d.latest,
+        });
+      });
+
+    return result;
+  }, [favoriteFoods, meals]);
+
+  const frequentFoodsFromHistory = useMemo(() => {
+    return unifiedStaples.filter((s) => !s.isPinned && s.count && s.count >= 2).map((s) => ({
+      food: s.rawFood,
+      count: s.count || 2,
+    }));
+  }, [unifiedStaples]);
 
   const frequentMealsFromHistory = useMemo(() => {
     const counts: Record<string, { count: number; meal: MealEntry }> = {};
@@ -1216,15 +1281,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </section>
       )}
 
-      {/* ── Feature: Frequent & Pinned Foods (Editable & Manageable) ── */}
+      {/* ── Feature: Staples & Frequent Foods (Unified, Zero Duplication) ── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between px-0.5">
           <div className="flex items-center gap-1.5">
             <Star className="w-3.5 h-3.5 text-accent fill-accent" />
-            <h2 className="section-title text-[11px] mb-0 font-sans">FREQUENT &amp; PINNED FOODS</h2>
-            {favoriteFoods.length > 0 && (
+            <h2 className="section-title text-[11px] mb-0 font-sans">STAPLES &amp; FREQUENT FOODS</h2>
+            {unifiedStaples.length > 0 && (
               <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
-                {favoriteFoods.length}
+                {unifiedStaples.length}
               </span>
             )}
           </div>
@@ -1250,52 +1315,89 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
 
-        {/* Clean 2-column grid */}
-        <div className="grid grid-cols-2 gap-2">
-          {favoriteFoods.map((fav) => (
-            <div
-              key={fav.id}
-              onClick={() => handleAddFavoriteToMeal(fav)}
-              className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.99] shadow-xs cursor-pointer relative"
-              title={`Tap to log ${fav.name} in 1 tap`}
-            >
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-bold text-xs text-text-primary group-hover:text-accent truncate">
-                  {fav.name}
-                </span>
-                <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    onClick={() => openEditPinned(fav)}
-                    className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
-                    title={`Edit ${fav.name}`}
-                  >
-                    <Edit2 className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeletePinned(fav.id, fav.name)}
-                    className="p-1 text-text-muted hover:text-danger rounded hover:bg-danger/10 transition-colors"
-                    title={`Unpin ${fav.name}`}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+        {/* Clean responsive grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {(showAllStaples ? unifiedStaples : unifiedStaples.slice(0, 4)).map((staple) => {
+            const favMatch = staple.isPinned ? favoriteFoods.find((f) => f.id === staple.id) : undefined;
+            return (
+              <div
+                key={staple.id}
+                onClick={() => handleAddFoodFromHistory(staple.rawFood)}
+                className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.99] shadow-xs cursor-pointer relative flex flex-col justify-between"
+                title={`Tap to log ${staple.name} in 1 tap`}
+              >
+                <div className="flex items-start justify-between gap-1">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-xs text-text-primary group-hover:text-accent truncate">
+                        {staple.name}
+                      </span>
+                      {staple.count && staple.count >= 2 && !staple.isPinned && (
+                        <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-accent/15 text-accent shrink-0">
+                          {staple.count}×
+                        </span>
+                      )}
+                      {staple.isPinned && (
+                        <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 shrink-0">
+                          STAPLE
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {favMatch ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEditPinned(favMatch)}
+                          className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
+                          title={`Edit ${staple.name}`}
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePinned(favMatch.id, favMatch.name)}
+                          className="p-1 text-text-muted hover:text-danger rounded hover:bg-danger/10 transition-colors"
+                          title={`Unpin ${staple.name}`}
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleFavorite(staple.rawFood)}
+                        className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
+                        title="Pin this food to your staples"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40">
+                  <div className="flex items-center gap-1 text-2xs text-text-muted truncate">
+                    <span>{staple.quantity ? `${staple.quantity} ${staple.unit}` : staple.unit}</span>
+                    <span>•</span>
+                    <span className="text-accent font-semibold">~{Math.round(staple.calories)} kcal</span>
+                    <span>•</span>
+                    <span className="text-emerald-400 font-semibold">~{Math.round(staple.proteinG)}g P</span>
+                  </div>
+                  <span className="text-[10px] font-medium text-accent flex items-center gap-0.5 shrink-0 ml-1">
+                    <Plus className="w-2.5 h-2.5" /> Log
+                  </span>
                 </div>
               </div>
-              <div className="flex items-center gap-1 text-2xs text-text-muted mt-1">
-                <span>{fav.defaultQuantity ? `${fav.defaultQuantity} ${fav.unit}` : fav.unit}</span>
-                <span>•</span>
-                <span className="text-accent font-semibold">~{fav.calories} kcal</span>
-                <span>•</span>
-                <span className="text-emerald-600 font-semibold">~{fav.proteinG}g P</span>
-              </div>
-            </div>
-          ))}
-          {favoriteFoods.length === 0 && (
-            <div className="col-span-2 p-3.5 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center space-y-1.5">
-              <p className="text-xs text-text-secondary font-medium">No pinned foods yet.</p>
+            );
+          })}
+
+          {unifiedStaples.length === 0 && (
+            <div className="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center space-y-1.5">
+              <p className="text-xs text-text-secondary font-medium">No pinned staples or frequent foods yet.</p>
               <p className="text-2xs text-text-muted">
-                Star (⭐) foods in your meals or tap &quot;Add&quot; above to pin your daily staples for 1-tap quick logging.
+                Log meals or tap &quot;Add&quot; above to pin your daily staples (e.g. Roti, Dal, Paneer, Whey) for 1-tap quick logging.
               </p>
               <button
                 type="button"
@@ -1309,76 +1411,24 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           )}
         </div>
 
-        {/* ── Frequently Logged Foods (Auto-Detected from Meal History) ── */}
-        {frequentFoodsFromHistory.length > 0 && (
-          <div className="pt-1.5 space-y-2">
-            <div className="flex items-center justify-between px-0.5">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-accent" />
-                <h3 className="section-title text-[10px] mb-0 font-sans uppercase">
-                  FREQUENTLY LOGGED FOODS
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={handlePinAllFrequent}
-                className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
-                title="Pin all frequent foods to your favorites"
-              >
-                <Star className="w-3 h-3 fill-accent" />
-                <span>Pin All ({frequentFoodsFromHistory.length})</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {frequentFoodsFromHistory.map(({ food, count }) => (
-                <div
-                  key={food.name}
-                  className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/80 flex items-center justify-between gap-2 shadow-xs"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-xs text-text-primary truncate">{food.name}</span>
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent shrink-0">
-                        {count}×
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 text-2xs text-text-muted mt-0.5">
-                      <span>{food.quantity ? `${food.quantity} ${food.unit || 'g'}` : food.unit || 'portion'}</span>
-                      <span>•</span>
-                      <span className="text-accent font-semibold">~{food.calories} kcal</span>
-                      <span>•</span>
-                      <span className="text-emerald-600 font-semibold">~{food.proteinG}g P</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => handleAddFoodFromHistory(food)}
-                      className="px-2 py-1 rounded-lg bg-bg-card border border-border hover:border-accent text-2xs font-semibold text-text-primary flex items-center gap-1 active:scale-95 transition-all"
-                      title="Log this food into current meal"
-                    >
-                      <Plus className="w-3 h-3 text-accent" />
-                      <span>Log</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleFavorite(food)}
-                      className="p-1.5 rounded-lg bg-bg-card border border-border hover:border-accent text-accent hover:bg-accent/10 active:scale-95 transition-all"
-                      title="Pin to Frequent Foods"
-                    >
-                      <Star className="w-3.5 h-3.5 fill-accent/20" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* See all / Show less toggle */}
+        {unifiedStaples.length > 4 && (
+          <div className="flex justify-center pt-1">
+            <button
+              type="button"
+              onClick={() => setShowAllStaples((prev) => !prev)}
+              className="text-2xs font-semibold text-text-muted hover:text-accent flex items-center gap-1 px-3 py-1 rounded-full bg-bg-secondary/60 border border-border/80 transition-colors"
+            >
+              <span>{showAllStaples ? 'Show less' : `See all ${unifiedStaples.length} foods`}</span>
+              <ChevronDown className={`w-3 h-3 transition-transform ${showAllStaples ? 'rotate-180' : ''}`} />
+            </button>
           </div>
         )}
+      </section>
 
         {/* ── Recent Meals (1-Tap Repeat) ── */}
         {recentUniqueMeals.length > 0 && (
-          <div className="pt-1.5 space-y-1.5">
+          <section className="pt-1.5 space-y-1.5">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono block">
                 RECENT MEALS (1-TAP REPEAT)
@@ -1435,9 +1485,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 );
               })}
             </div>
-          </div>
+          </section>
         )}
-      </section>
 
       {/* ── Meal History (Item 18: Clean action empty state) ── */}
       <section className="space-y-2.5">

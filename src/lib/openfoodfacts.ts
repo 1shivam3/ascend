@@ -31,68 +31,31 @@ export async function fetchProductByBarcode(barcode: string): Promise<ScannedPro
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 7000);
 
-    const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${cleanBarcode}.json`, {
-      headers: {
-        'User-Agent': 'ASCEND-StrengthTracker - Web - Version 2.0 (github.com/1shivam3/ascend)',
-      },
+    // Call internal Next.js API route to bypass browser CORS and User-Agent restrictions
+    const res = await fetch(`/api/barcode?code=${cleanBarcode}`, {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data.status !== 1 || !data.product) return null;
-
-    const p = data.product;
-    const n = p.nutriments || {};
-
-    const name = (
-      p.product_name ||
-      p.product_name_en ||
-      (p.brands ? `${p.brands} Product` : `Product (${cleanBarcode})`)
-    ).trim();
-    const brand = p.brands ? p.brands.trim() : undefined;
-
-    const kcal100 = Math.round(
-      n['energy-kcal_100g'] ??
-      n['energy-kcal'] ??
-      (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0)
-    );
-    const prot100 = Number((n['proteins_100g'] ?? n['proteins'] ?? 0).toFixed(1));
-    const carbs100 = Number((n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0).toFixed(1));
-    const fat100 = Number((n['fat_100g'] ?? n['fat'] ?? 0).toFixed(1));
-
-    let perServing: ScannedProduct['perServing'] | undefined = undefined;
-    if (n['energy-kcal_serving'] !== undefined || n['proteins_serving'] !== undefined) {
-      perServing = {
-        calories: Math.round(
-          n['energy-kcal_serving'] ??
-          (n['energy_serving'] ? n['energy_serving'] / 4.184 : 0)
-        ),
-        proteinG: Number((n['proteins_serving'] ?? 0).toFixed(1)),
-        carbsG: Number((n['carbohydrates_serving'] ?? 0).toFixed(1)),
-        fatG: Number((n['fat_serving'] ?? 0).toFixed(1)),
-      };
+    if (res.ok) {
+      const data = await res.json();
+      if (data.found && data.per100g) {
+        return {
+          barcode: cleanBarcode,
+          name: data.name,
+          brand: data.brand,
+          servingSize: data.servingSize,
+          servingQuantity: data.servingQuantity,
+          per100g: data.per100g,
+          perServing: data.perServing,
+        };
+      }
     }
-
-    return {
-      barcode: cleanBarcode,
-      name,
-      brand,
-      servingSize: p.serving_size,
-      servingQuantity: p.serving_quantity,
-      per100g: {
-        calories: Math.max(0, kcal100),
-        proteinG: Math.max(0, prot100),
-        carbsG: Math.max(0, carbs100),
-        fatG: Math.max(0, fat100),
-      },
-      perServing,
-    };
+    return null;
   } catch (err) {
-    console.error('Error fetching from Open Food Facts:', err);
+    console.warn('Error fetching barcode from /api/barcode:', err);
     return null;
   }
 }

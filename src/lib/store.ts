@@ -74,6 +74,8 @@ export interface AppState {
   creatineConfig: CreatineConfig;
   creatineSupply: CreatineSupply;
   dayTypeOverrides: Record<string, DayType>;
+  gymLogs: Record<string, boolean>;
+  toggleGymToday: (date?: string) => boolean;
   customGeminiKey?: string;
   aiInsightsCache: Record<string, AICoachInsight>;
   
@@ -207,6 +209,7 @@ export const useAppStore = create<AppState>()(
       creatineConfig: DEFAULT_CREATINE_CONFIG,
       creatineSupply: DEFAULT_CREATINE_SUPPLY,
       dayTypeOverrides: {},
+      gymLogs: {},
       customGeminiKey: undefined,
       aiInsightsCache: {},
 
@@ -455,6 +458,22 @@ export const useAppStore = create<AppState>()(
         dayTypeOverrides: { ...state.dayTypeOverrides, [date]: type },
       })),
 
+      toggleGymToday: (date) => {
+        let isMarked = false;
+        set((state) => {
+          const d = date || getLocalTodayStr();
+          const current = !!state.gymLogs?.[d];
+          isMarked = !current;
+          return {
+            gymLogs: {
+              ...(state.gymLogs || {}),
+              [d]: isMarked,
+            },
+          };
+        });
+        return isMarked;
+      },
+
       logQuickProtein: (proteinG, date) => set((state) => {
         const d = date || getLocalTodayStr();
         const existingIndex = state.meals.findIndex((m) => m.date === d && m.name === 'Quick Protein');
@@ -574,6 +593,7 @@ export const useAppStore = create<AppState>()(
             creatineConfig: data.creatineConfig || state.creatineConfig,
             creatineSupply: data.creatineSupply || state.creatineSupply,
             dayTypeOverrides: data.dayTypeOverrides && typeof data.dayTypeOverrides === 'object' ? data.dayTypeOverrides : state.dayTypeOverrides,
+            gymLogs: data.gymLogs && typeof data.gymLogs === 'object' ? data.gymLogs : state.gymLogs,
             customGeminiKey: data.customGeminiKey !== undefined ? data.customGeminiKey : state.customGeminiKey,
             aiInsightsCache: data.aiInsightsCache && typeof data.aiInsightsCache === 'object' ? data.aiInsightsCache : state.aiInsightsCache,
             trainingProfile: data.trainingProfile || state.trainingProfile,
@@ -624,6 +644,7 @@ export const useAppStore = create<AppState>()(
         creatineConfig: state.creatineConfig,
         creatineSupply: state.creatineSupply,
         dayTypeOverrides: state.dayTypeOverrides,
+        gymLogs: state.gymLogs,
         customGeminiKey: state.customGeminiKey,
         aiInsightsCache: state.aiInsightsCache,
         trainingProfile: state.trainingProfile,

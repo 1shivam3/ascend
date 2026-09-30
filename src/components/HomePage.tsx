@@ -8,7 +8,6 @@ import {
   ChevronRight,
   Info,
   Scale,
-  HardDrive,
   X,
   Play,
   Flame,
@@ -20,60 +19,84 @@ import {
   Award,
   FastForward,
   Settings,
+  Calendar,
+  Check
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import ThemeToggle from '@/components/ui/ThemeToggle';
-import RankBadge from '@/components/ui/RankBadge';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
-import DataVaultModal from '@/components/DataVaultModal';
-import LegalHubModal from '@/components/LegalHubModal';
 import SettingsModal from '@/components/SettingsModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
-import DailyEssentialsCard from '@/components/DailyEssentialsCard';
 import ActivityRingsCard from '@/components/ActivityRingsCard';
 import QuickLogBar from '@/components/QuickLogBar';
-import NextBestActionBanner from '@/components/NextBestActionBanner';
 import AICoachCard from '@/components/AICoachCard';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
-import { calculateHydrationTarget, formatWaterLiters } from '@/lib/habits';
+import HomeActivityHeatmap from '@/components/HomeActivityHeatmap';
+import { calculateHydrationTarget, formatWaterLiters, toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
-import { AIPlannedWorkout, PlannedWorkout, PlannedExercise } from '@/lib/types';
+import { PlannedWorkout, PlannedExercise } from '@/lib/types';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
-  const { profile, prs, workouts, plannedWorkouts, addPlannedWorkout, activeWorkoutDraft, clearWorkoutDraft } = useStore();
+  const {
+    profile,
+    prs,
+    workouts,
+    plannedWorkouts,
+    addPlannedWorkout,
+    activeWorkoutDraft,
+    clearWorkoutDraft,
+    gymLogs,
+    toggleGymToday,
+  } = useStore();
 
-  const todayDate = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => {
-    const y = todayDate.getFullYear();
-    const m = String(todayDate.getMonth() + 1).padStart(2, '0');
-    const d = String(todayDate.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  }, [todayDate]);
+  const toast = useToast();
+  const today = useMemo(() => new Date(), []);
+  const todayStr = useMemo(() => toLocalDateString(today), [today]);
+
+  const greeting = useMemo(() => {
+    const h = today.getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }, [today]);
 
   const formattedDate = useMemo(() => {
-    return todayDate.toLocaleDateString('en-US', {
+    return today.toLocaleDateString('en-IN', {
       weekday: 'long',
-      month: 'short',
       day: 'numeric',
+      month: 'short',
     });
-  }, [todayDate]);
+  }, [today]);
 
   // Today's workout state
   const todayWorkouts = useMemo(() => {
     return workouts.filter((w) => w.date && w.date.startsWith(todayStr));
   }, [workouts, todayStr]);
 
-  const hasTrainedToday = todayWorkouts.length > 0;
+  const hasManualGym = !!gymLogs?.[todayStr];
+  const hasTrainedToday = hasManualGym || todayWorkouts.length > 0;
   const activePlan = plannedWorkouts?.[0] || null;
+
+  const handleToggleGym = () => {
+    const isNowDone = toggleGymToday(todayStr);
+    if (isNowDone) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([80, 40, 80]);
+      }
+      toast.success('Gym session recorded for today! Keep up the momentum.', 'Gym Logged');
+    } else {
+      toast.info('Gym session un-marked for today.', 'Gym Status Updated');
+    }
+  };
 
   // Lifts and Overall Level Calculation
   const { topLifts, overallLevel } = useMemo(() => {
@@ -103,46 +126,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     });
 
     lifts.sort((a, b) => (b.levelInfo?.level || 0) - (a.levelInfo?.level || 0));
-
-    const top = lifts.slice(0, 3);
-    const overall = getOverallLevel(lifts.map((l) => l.levelInfo));
-
-    return { topLifts: top, overallLevel: overall };
+    return { topLifts: lifts.slice(0, 3), overallLevel: getOverallLevel(lifts.map((l) => l.levelInfo)) };
   }, [prs, profile]);
 
-  // Powerlifting Big 3 Stats
+  // Powerlifting Big 3 Stats & DOTS
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
-
-  // DOTS Score calculation
   const dotsScore = useMemo(() => {
     if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0) return 0;
     return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
   }, [profile, bigThreeStats.totalKg]);
-
   const dotsClassification = useMemo(() => getDOTSClassification(dotsScore), [dotsScore]);
-
-  // XP / Level progression calculation (Item 6)
-  const levelProgress = useMemo(() => {
-    if (!overallLevel) {
-      return { currentXP: 0, maxXP: 1000, nextLevelXP: 1000, pct: 0, currentRank: 'FOUNDATION' };
-    }
-    const lvl = overallLevel.level;
-    // Each level tier represents 100 XP
-    const currentTierXP = (lvl % 10) * 100 + 45;
-    const maxTierXP = 1000;
-    const pct = Math.min(100, Math.max(8, lvl));
-    const nextLevelXP = 1000 - currentTierXP;
-
-    let rank = 'FOUNDATION';
-    if (lvl > 95) rank = 'GRANDMASTER';
-    else if (lvl > 80) rank = 'MASTER';
-    else if (lvl > 65) rank = 'ELITE';
-    else if (lvl > 45) rank = 'ADVANCED';
-    else if (lvl > 30) rank = 'SKILLED';
-    else if (lvl > 15) rank = 'TRAINED';
-
-    return { currentXP: currentTierXP, maxXP: maxTierXP, nextLevelXP, pct, currentRank: rank };
-  }, [overallLevel]);
 
   // Display weight helper
   const displayWeight = (weightKg: number) => {
@@ -152,35 +145,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(weightKg)} kg`;
   };
 
-  // Habit store state
-  const toast = useToast();
-  const waterLogs = useStore((state) => state.waterLogs || {});
-  const logWater = useStore((state) => state.logWater);
-  const hydrationConfig = useStore((state) => state.hydrationConfig);
-
-  const waterToday = waterLogs[todayStr] || 0;
-  const waterTargetMl = calculateHydrationTarget({
-    bodyweightKg: profile?.bodyweightKg || 75,
-    customTargetMl: hydrationConfig?.dailyTargetMl,
-    isCustomTarget: hydrationConfig?.isCustomTarget,
-  });
-
-  // Context-aware reminders (Item 6):
-  const showPostWorkoutHydrationPrompt = hasTrainedToday && waterToday < waterTargetMl;
-  const currentHour = new Date().getHours();
-  const showAfternoonHydrationCheck = !hasTrainedToday && currentHour >= 14 && waterToday < 1200;
-
   // Modals state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
-  const [isDataVaultModalOpen, setIsDataVaultModalOpen] = useState(false);
-  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
-  const [showDOTSModal, setShowDOTSModal] = useState(false);
-  const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen, setIsCreatineModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
+  const [showDOTSModal, setShowDOTSModal] = useState(false);
 
   const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
     const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
@@ -195,110 +167,66 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     onNavigate('workout');
   };
 
-  const handleStartAIPlan = (aiPlan: AIPlannedWorkout) => {
-    const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
-    const plannedWorkout: PlannedWorkout = {
-      id: newPlanId,
-      name: aiPlan.workoutName,
-      createdAt: new Date().toISOString(),
-      exercises: aiPlan.exercises.map((ex) => {
-        let weight: number | undefined = undefined;
-        if (ex.targetWeightKg && ex.targetWeightKg > 0) {
-          weight = profile?.unit === 'lbs' ? Math.round(ex.targetWeightKg * 2.20462) : ex.targetWeightKg;
-        }
-        return {
-          name: ex.exercise,
-          targetSets: ex.sets || 3,
-          targetReps: parseInt(ex.reps, 10) || 8,
-          targetWeight: weight,
-          targetUnit: profile?.unit || 'kg',
-          notes: ex.reason,
-        };
-      }),
-    };
-
-    addPlannedWorkout(plannedWorkout);
-    toast.success(`Loaded "${aiPlan.workoutName}" into Workout Plans`, 'AI Plan Ready');
-    onNavigate('workout');
-  };
-
   return (
-    <div className="page animate-fade-in space-y-4">
-      {/* PWA Install Banner */}
+    <div className="page animate-fade-in space-y-3.5 pb-24">
       <InstallAppBanner />
 
-      {/* ── 1. IDENTITY HEADER ──────────────────────────────────────────────── */}
+      {/* ── 1. IDENTITY TOP BAR (Inspired by Prototype) ───────────────────── */}
       <header className="flex justify-between items-center pt-1 pb-1">
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          className="text-left group transition-transform active:scale-95"
-          title="ASCEND - Click to scroll to top"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-accent flex items-center justify-center text-white shadow-xs shadow-accent/25">
-              <Dumbbell className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-text-primary tracking-tight leading-none">
-                ASCEND
-              </h1>
-              <p className="text-xs text-text-secondary font-medium mt-0.5">{formattedDate}</p>
-            </div>
-          </div>
-        </button>
+        <div>
+          <h1 className="text-2xl font-black text-text-primary tracking-wider font-sans leading-none">
+            ASCEND
+          </h1>
+          <p className="text-xs text-text-muted mt-1 font-medium">
+            {greeting} • {formattedDate}
+          </p>
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Quick Bodyweight Chip */}
           <button
             type="button"
             onClick={() => setIsBodyMetricsModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-bg-card border border-border text-xs font-semibold text-text-primary hover:border-accent/40 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-card border border-border text-xs font-semibold text-text-primary hover:border-accent/40 active:scale-95 transition-all shadow-xs"
             title="Update Bodyweight"
           >
             <Scale className="w-3.5 h-3.5 text-accent" />
             <span>
               {profile?.unit === 'lbs'
-                ? `${Math.round((profile?.bodyweightKg || 75) * 2.20462)} lbs`
-                : `${Math.round(profile?.bodyweightKg || 75)} kg`}
+                ? `${Math.round((profile?.bodyweightKg || 72) * 2.20462)} lbs`
+                : `${Math.round(profile?.bodyweightKg || 72)} kg`}
             </span>
           </button>
 
-          {/* Plate Calculator Quick Action */}
+          {/* Barbell Plate Calculator */}
           <button
             type="button"
             onClick={() => setIsPlateModalOpen(true)}
-            className="btn-circle"
-            title="Barbell Plate Calculator"
+            className="w-8 h-8 rounded-full bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent/40 active:scale-95 transition-all"
+            title="Plate Calculator"
           >
-            <Dumbbell className="w-4 h-4 text-accent" />
+            <Dumbbell className="w-4 h-4" />
           </button>
 
           <ThemeToggle />
 
-          {/* Settings & Vault Gear */}
+          {/* Settings */}
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
-            className="btn-circle"
-            title="Settings, AI Key & Data Vault"
+            className="w-8 h-8 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 transition-all"
+            title="Settings & Data Vault"
           >
-            <Settings className="w-4 h-4 text-text-secondary hover:text-text-primary transition-colors" />
+            <Settings className="w-4 h-4" />
           </button>
         </div>
       </header>
 
-      {/* ── 5. COMPACT MOTIVATION (Item 5: Compact, not full screen-width card) ── */}
-      <div className="px-1 flex items-center justify-between text-xs text-text-secondary font-sans border-l-2 border-accent pl-2.5 py-0.5">
-        <p className="font-medium text-text-primary">Build the next version of yourself.</p>
-        <span className="text-text-muted text-[11px] hidden sm:inline">• Consistency &gt; intensity</span>
-      </div>
-
-      {/* ── ACTIVE WORKOUT DRAFT RESUME BANNER ── */}
+      {/* ── ACTIVE WORKOUT DRAFT BANNER (If in progress) ── */}
       {activeWorkoutDraft && (
-        <div className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center shrink-0">
+        <div className="card p-3 bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0">
               <FastForward className="w-4 h-4" />
             </div>
             <div>
@@ -311,21 +239,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => {
                 clearWorkoutDraft();
                 toast.info('Workout draft discarded.', 'Draft Cleared');
               }}
-              className="text-xs text-text-muted hover:text-danger px-2 py-1 transition-colors"
+              className="text-xs text-text-muted hover:text-danger px-2 py-1"
             >
               Discard
             </button>
             <button
               type="button"
               onClick={() => onNavigate('workout')}
-              className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5"
+              className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1"
             >
               <Play className="w-3 h-3 fill-white" />
               <span>Resume</span>
@@ -334,150 +262,74 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-
-
-      {/* ── 3. TODAY'S WORKOUT HERO (High Prominence) ────────────────────────── */}
-      {workouts.length === 0 ? (
-        <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="section-title text-[10px] mb-0 font-sans">GET STARTED</span>
-            </div>
-            <span className="text-2xs font-mono text-accent">FIRST SESSION</span>
-          </div>
-
-          <div>
-            <h3 className="text-xl font-black text-text-primary leading-tight font-sans">
-              Start Your First Workout
-            </h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              Log a quick routine or choose exercises as you train. ASCEND calculates your progression and strength automatically.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => onNavigate('workout')}
-              className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>START WORKOUT</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="btn-secondary py-3 text-xs font-semibold px-4 flex items-center justify-center gap-1.5 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>⚡ Suggest Workout</span>
-            </button>
-          </div>
-        </section>
-      ) : hasTrainedToday ? (
-        <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="section-title text-[10px] mb-0 font-sans">TODAY&apos;S WORKOUT</span>
-            </div>
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Session Complete
+      {/* ── 2. TODAY'S SESSION HERO CARD (Gradient Accent Hero) ───────────── */}
+      <section className="card p-4 sm:p-5 bg-radial-at-tr from-accent/20 via-bg-card to-bg-card border border-accent/35 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${hasTrainedToday ? 'bg-emerald-500' : 'bg-accent animate-pulse'}`} />
+            <span className="text-2xs font-mono uppercase font-bold text-text-muted tracking-wider">
+              {hasTrainedToday ? 'TODAY COMPLETED' : "TODAY'S SESSION"}
             </span>
           </div>
+          <span className="text-2xs font-mono text-accent font-semibold">
+            {activePlan ? 'PLANNED ROUTINE' : 'MAIN STRENGTH'}
+          </span>
+        </div>
 
-          <div>
-            <h3 className="text-lg font-bold text-text-primary leading-tight">
-              Session Complete!
-            </h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              {todayWorkouts.length} workout{todayWorkouts.length !== 1 ? 's' : ''} logged today. Rest, recover, and hit your hydration target ({formatWaterLiters(waterTargetMl)}).
-            </p>
-          </div>
+        <div>
+          <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans">
+            {activePlan ? activePlan.name : workouts.length === 0 ? 'Upper A' : hasTrainedToday ? 'Gym Session Done' : 'Upper A'}
+          </h2>
+          <p className="text-xs text-text-secondary mt-0.5">
+            {activePlan
+              ? activePlan.exercises.map((e) => e.name).slice(0, 4).join(', ')
+              : 'Bench Press, Barbell Row, Overhead Press, Pull-ups'}
+          </p>
+        </div>
 
-          <div className="grid grid-cols-2 gap-2 pt-0.5">
-            <button
-              type="button"
-              onClick={() => onNavigate('workout')}
-              className="btn-primary py-2.5 text-xs font-bold shadow-xs hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              <span>Log Another Workout</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('meals')}
-              className="btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
-            >
-              <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />
-              <span>Log Meal</span>
-            </button>
-          </div>
-        </section>
-      ) : (
-        <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-              <span className="section-title text-[10px] mb-0 font-sans">TODAY&apos;S WORKOUT</span>
-            </div>
-            {activePlan && (
-              <span className="text-2xs text-text-muted font-medium">
-                Active Plan
-              </span>
-            )}
-          </div>
+        {/* Action Row: Start Workout + "I Hit Gym Today" 1-Tap Toggle */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          {/* Main CTA */}
+          <button
+            type="button"
+            onClick={() => onNavigate('workout')}
+            className="btn-primary sm:col-span-2 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+          >
+            <Play className="w-4 h-4 fill-white stroke-white" />
+            <span>{activeWorkoutDraft ? 'CONTINUE WORKOUT' : hasTrainedToday ? 'LOG ANOTHER WORKOUT' : 'START WORKOUT'}</span>
+          </button>
 
-          <div>
-            <h3 className="text-xl font-black text-text-primary leading-tight font-sans">
-              {activePlan ? activePlan.name : 'Ready to Train'}
-            </h3>
-            <p className="text-xs text-text-secondary mt-0.5">
-              {activePlan
-                ? `${activePlan.exercises.length} exercises configured • ~50 min`
-                : workouts.length > 0
-                ? `Last session: ${workouts[0]?.exercises.length} exercises on ${workouts[0]?.date}`
-                : '5 exercises • Compound Progression'}
-            </p>
-          </div>
+          {/* 1-Tap "I Hit Gym Today" Quick Toggle */}
+          <button
+            type="button"
+            onClick={handleToggleGym}
+            className={`py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all select-none active:scale-95 ${
+              hasTrainedToday
+                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-xs'
+                : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent hover:text-text-primary'
+            }`}
+            title="Mark gym session done for today"
+          >
+            <CheckCircle2 className={`w-4 h-4 ${hasTrainedToday ? 'text-emerald-400' : 'text-text-muted'}`} />
+            <span>{hasTrainedToday ? 'Gym Done ✓' : 'I Hit Gym Today'}</span>
+          </button>
+        </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => onNavigate('workout')}
-              className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>{activePlan ? 'START PLAN' : 'START WORKOUT'}</span>
-            </button>
+        {/* Suggest / Split Entry point */}
+        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
+          <span className="text-text-muted">Want to target multiple body parts or switch split?</span>
+          <button
+            type="button"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="font-bold text-accent hover:underline flex items-center gap-1"
+          >
+            <Sparkles className="w-3 h-3" />
+            <span>⚡ Generate Plan</span>
+          </button>
+        </div>
+      </section>
 
-            {workouts.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onNavigate('workout')}
-                className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-                title={`Repeat last session with 1 tap`}
-              >
-                <FastForward className="w-3.5 h-3.5 text-accent" />
-                <span>Repeat Last</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-              title="Generate customized workout plan by body part & intensity"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>⚡ Suggest</span>
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* ── 4. THREE HABIT RINGS (Training, Protein, Water) ──────────────────── */}
+      {/* ── 3. THREE HABIT RINGS (Training, Protein, Water) ────────────────── */}
       <ActivityRingsCard
         onNavigateWorkout={() => onNavigate('workout')}
         onNavigateMeals={() => onNavigate('meals')}
@@ -485,234 +337,103 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 5. QUICK 1-TAP LOG ROW (High Reachability) ────────────────────────── */}
+      {/* ── 4. QUICK 1-TAP LOG ROW (High Reachability) ─────────────────────── */}
       <QuickLogBar
         onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
         onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 6. COACH INSIGHT (Collapsed 2-Line Summary with Expand) ───────────── */}
+      {/* ── 5. ACTIVITY HEATMAP CALENDAR (Visual Monthly Heatmap) ──────────── */}
+      <HomeActivityHeatmap />
+
+      {/* ── 6. COACH INSIGHT (Compact 2-Line Summary with Expand) ──────────── */}
       <AICoachCard
         onOpenSettings={() => setIsSettingsOpen(true)}
         onNavigateWorkout={() => onNavigate('workout')}
       />
 
-      {/* ── 7. TODAY'S PROGRESS (POWERLIFTING & COMPOUND LIFTS) ──────────────── */}
-      <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="section-title text-[10px] block">TODAY&apos;S PROGRESS</span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <h3 className="text-xl font-black text-text-primary tracking-tight font-sans">
-                {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg} kg total` : 'Strength Lifts'}
-              </h3>
-              {dotsScore > 0 && (
-                <span className="text-xs font-bold text-accent font-mono">
-                  {Math.round(dotsScore)} DOTS ({dotsClassification.tier})
-                </span>
-              )}
+      {/* ── 7. ORGANIZED DISCLOSURE: POWERLIFTING & STRENGTH SNAPSHOT ──────── */}
+      <details className="card p-3.5 sm:p-4 bg-bg-card border border-border group transition-all">
+        <summary className="cursor-pointer list-none flex items-center justify-between select-none">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-4 h-4 text-accent" />
+            <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider font-mono">
+              Strength Snapshot &amp; DOTS Score
+            </h3>
+          </div>
+          <div className="flex items-center gap-1.5 text-accent text-xs font-bold">
+            {dotsScore > 0 ? (
+              <span>{Math.round(dotsScore)} DOTS • {bigThreeStats.totalKg} kg</span>
+            ) : (
+              <span>View Big 3</span>
+            )}
+            <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
+          </div>
+        </summary>
+
+        <div className="pt-3 space-y-3 border-t border-border mt-3 text-xs">
+          <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center font-sans">
+            <div>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
+              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+                {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
+              </span>
+            </div>
+            <div className="border-l border-border">
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
+              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+                {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+              </span>
+            </div>
+            <div className="border-l border-border">
+              <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
+              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+                {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
+              </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('progress')}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5"
-          >
-            <span>View Full Progress &rarr;</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
 
-        {/* Compound Lifts (Big 3) Snapshot */}
-        <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
-          <div>
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
-              {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
-            </span>
-          </div>
-          <div className="border-l border-border">
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
-              {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
-            </span>
-          </div>
-          <div className="border-l border-border">
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
-              {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* ── CLEAN FOOTER ──────────────────────────────────────────────────── */}
-      <div className="pt-2 pb-6 text-center text-3xs font-mono text-text-muted">
-        ASCEND • Focused Daily Execution
-      </div>
-
-      {/* ── DOTS DETAILS MODAL ──────────────────────────────────────────────── */}
-      {showDOTSModal && (
-        <div className="modal-overlay" onClick={() => setShowDOTSModal(false)}>
-          <div
-            className="modal-content p-5 space-y-4 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2 text-accent">
-                <Trophy className="w-5 h-5" />
-                <h3 className="font-bold text-base text-text-primary">
-                  DOTS Score Breakdown
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowDOTSModal(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
-              <div className="p-3 rounded-xl bg-bg-secondary text-center space-y-1">
-                <span className="text-2xs uppercase text-text-muted font-bold">Official Score</span>
-                <p className="text-3xl font-black text-accent">{dotsScore || '—'}</p>
-                <p className="text-xs font-bold text-text-primary">{dotsClassification.tier}</p>
-                <p className="text-2xs text-text-muted">{dotsClassification.description}</p>
-              </div>
-
-              <div className="space-y-1.5 pt-1">
-                <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-text-muted">Bodyweight</span>
-                  <span className="font-semibold text-text-primary">{profile?.bodyweightKg || 75} kg</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-text-muted">Big 3 Total</span>
-                  <span className="font-semibold text-text-primary">{bigThreeStats.totalKg} kg</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-text-muted">Squat 1RM</span>
-                  <span className="font-semibold text-text-primary">{bigThreeStats.squatMax} kg</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-border/60">
-                  <span className="text-text-muted">Bench 1RM</span>
-                  <span className="font-semibold text-text-primary">{bigThreeStats.benchMax} kg</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-text-muted">Deadlift 1RM</span>
-                  <span className="font-semibold text-text-primary">{bigThreeStats.deadliftMax} kg</span>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-text-muted pt-1">
-                DOTS is the official powerlifting formula that compares strength across different bodyweights and genders.
-              </p>
-            </div>
-
+          <div className="flex items-center justify-between text-2xs font-mono text-text-secondary pt-1">
+            <span>Official DOTS Classification: <strong>{dotsClassification.tier}</strong></span>
             <button
               type="button"
-              onClick={() => setShowDOTSModal(false)}
-              className="btn-primary w-full py-2.5 text-xs font-bold"
+              onClick={() => onNavigate('progress')}
+              className="text-accent font-bold hover:underline"
             >
-              Close
+              Full Progress Charts &rarr;
             </button>
           </div>
         </div>
-      )}
+      </details>
 
-      {/* Plate Calculator Modal */}
+      {/* ── MODALS ── */}
       <PlateCalculatorModal
         isOpen={isPlateModalOpen}
         onClose={() => setIsPlateModalOpen(false)}
         initialUnit={profile?.unit || 'kg'}
       />
 
-      {/* Body Metrics Modal */}
       <BodyMetricsModal
         isOpen={isBodyMetricsModalOpen}
         onClose={() => setIsBodyMetricsModalOpen(false)}
       />
 
-      {/* Data Vault Modal */}
-      <DataVaultModal
-        isOpen={isDataVaultModalOpen}
-        onClose={() => setIsDataVaultModalOpen(false)}
-      />
-
-      {/* Legal Hub Modal */}
-      <LegalHubModal
-        isOpen={isPrivacyModalOpen}
-        onClose={() => setIsPrivacyModalOpen(false)}
-      />
-
-      {/* BW Ratio Info Modal */}
-      {showBwRatioInfo && (
-        <div className="modal-overlay" onClick={() => setShowBwRatioInfo(false)}>
-          <div
-            className="modal-content p-5 space-y-4 max-w-sm w-full"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2 text-accent">
-                <Info className="w-5 h-5" />
-                <h3 className="font-bold text-base text-text-primary">
-                  What is BW Ratio?
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowBwRatioInfo(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
-              <p>
-                <strong className="text-text-primary">BW Ratio (Bodyweight Ratio)</strong> measures your pound-for-pound strength relative to your bodyweight.
-              </p>
-              <div className="p-3 rounded-xl bg-bg-secondary space-y-1.5 text-xs">
-                <p>• <strong>0.75× – 1.0×:</strong> Foundation lifter</p>
-                <p>• <strong>1.0× – 1.5×:</strong> Skilled / Intermediate</p>
-                <p>• <strong>1.5× – 2.0×:</strong> Advanced lifter</p>
-                <p>• <strong>2.0×+:</strong> Elite power lifter</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowBwRatioInfo(false)}
-              className="btn-primary w-full py-2.5 text-xs font-bold"
-            >
-              Got It
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Hydration Target Modal */}
       <HydrationModal
         isOpen={isHydrationModalOpen}
         onClose={() => setIsHydrationModalOpen(false)}
       />
 
-      {/* Creatine Tracker & Supply Modal */}
       <CreatineModal
         isOpen={isCreatineModalOpen}
         onClose={() => setIsCreatineModalOpen(false)}
       />
 
-      {/* Settings Modal */}
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
 
-
-      {/* Suggested Workout Modal */}
       <SuggestedWorkoutModal
         isOpen={isSuggestedModalOpen}
         onClose={() => setIsSuggestedModalOpen(false)}
