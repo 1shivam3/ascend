@@ -832,110 +832,63 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 openBlankLogger();
               }
             }}
-            className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+            className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
             <Play className="w-4 h-4 fill-white stroke-white" />
-            <span>START WORKOUT</span>
+            <span>{plannedWorkouts.length > 0 ? 'START WORKOUT' : 'START EMPTY WORKOUT'}</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsSuggestedModalOpen(true)}
-            className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+            className="btn-secondary py-3 text-xs font-semibold px-4 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
             title="Generate customized workout plan by body part & intensity"
           >
             <Zap className="w-4 h-4 text-accent" />
             <span>⚡ Suggest Workout</span>
           </button>
-
-          <button
-            type="button"
-            onClick={openCreatePlan}
-            className="btn-secondary py-3 text-xs font-semibold px-3"
-          >
-            <Plus className="w-4 h-4 text-accent" />
-            <span>Create Plan</span>
-          </button>
         </div>
       </section>
 
-      {/* ── 2. INTERACTIVE REST TIMER (Item 14: Big countdown, +30s, Skip, SET READY) ── */}
-      <section className="card p-4 bg-bg-card border border-border space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Timer className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">REST TIMER</h2>
-          </div>
-          {isTimerFinished && (
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-bounce">
-              SET READY!
-            </span>
-          )}
-        </div>
-
-        {/* Big Countdown display (Item 14) */}
-        <div className="flex items-center justify-between py-1">
-          <div>
-            <div className="text-3xl sm:text-4xl font-black text-text-primary tracking-tight font-mono">
+      {/* ── 2. CONTEXTUAL REST TIMER (Compact utility outside workout) ── */}
+      <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Timer className="w-4 h-4 text-accent shrink-0" />
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-bold text-text-primary font-mono">
               {isTimerFinished ? (
                 <span className="text-emerald-500">READY</span>
               ) : (
                 formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
               )}
-            </div>
-            <p className="text-xs text-text-muted mt-0.5">
-              {isRestRunning
-                ? 'Rest in progress...'
-                : isTimerFinished
-                ? 'Ready for your next set!'
-                : 'Select rest interval or tap play'}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={togglePauseTimer}
-              className="p-2.5 rounded-xl bg-accent text-white hover:brightness-105 active:scale-95 transition-all shadow-xs shadow-accent/25"
-              title={isRestRunning ? 'Pause' : 'Start'}
-            >
-              {isRestRunning ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => adjustTimer(30)}
-              className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-semibold hover:border-accent/40 active:scale-95 transition-all"
-              title="+30 Seconds"
-            >
-              +30s
-            </button>
-            <button
-              type="button"
-              onClick={skipTimer}
-              className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-medium active:scale-95 transition-all"
-              title="Skip Rest"
-            >
-              Skip
-            </button>
+            </span>
+            <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
           </div>
         </div>
 
-        {/* Preset chips */}
-        <div className="grid grid-cols-4 gap-2 pt-1 font-sans">
-          {[60, 90, 120, 180].map((s) => (
+        <div className="flex items-center gap-1.5">
+          {[60, 90, 120].map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => startTimer(s)}
-              className={`py-1.5 px-2 rounded-xl text-xs font-semibold border transition-all text-center ${
+              className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
                 restTotalSeconds === s && restSecondsLeft > 0
-                  ? 'bg-accent text-white border-accent shadow-xs'
-                  : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
+                  ? 'bg-accent text-white border-accent'
+                  : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
               }`}
             >
               {s >= 60 ? `${s / 60}m` : `${s}s`}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={togglePauseTimer}
+            className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
+            title={isRestRunning ? 'Pause' : 'Start'}
+          >
+            {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+          </button>
         </div>
       </section>
 
@@ -1183,6 +1136,80 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
 
             {/* Body */}
             <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-5">
+              {/* Prominent In-Workout Rest Timer */}
+              <div className="p-3.5 rounded-xl bg-bg-card border border-accent/25 space-y-2.5 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Timer className="w-4 h-4 text-accent" />
+                    <span className="text-2xs font-bold text-accent uppercase tracking-wider font-mono">
+                      Rest Interval
+                    </span>
+                  </div>
+                  {isTimerFinished && (
+                    <span className="text-2xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full animate-bounce">
+                      SET READY!
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-3xl sm:text-4xl font-black text-text-primary tracking-tight font-mono">
+                      {isTimerFinished ? (
+                        <span className="text-emerald-500">READY</span>
+                      ) : (
+                        formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={togglePauseTimer}
+                      className="p-2.5 rounded-xl bg-accent text-white hover:brightness-105 active:scale-95 transition-all shadow-xs shadow-accent/25"
+                      title={isRestRunning ? 'Pause' : 'Start'}
+                    >
+                      {isRestRunning ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => adjustTimer(30)}
+                      className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-semibold hover:border-accent/40 active:scale-95 transition-all"
+                      title="+30 Seconds"
+                    >
+                      +30s
+                    </button>
+                    <button
+                      type="button"
+                      onClick={skipTimer}
+                      className="px-2.5 py-2 rounded-xl bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-medium active:scale-95 transition-all"
+                      title="Skip Rest"
+                    >
+                      Skip
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preset intervals */}
+                <div className="grid grid-cols-4 gap-1.5 pt-0.5">
+                  {[60, 90, 120, 180].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => startTimer(s)}
+                      className={`py-1 rounded-lg text-2xs font-semibold border transition-all text-center ${
+                        restTotalSeconds === s && restSecondsLeft > 0
+                          ? 'bg-accent text-white border-accent shadow-xs'
+                          : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      {s >= 60 ? `${s / 60}m` : `${s}s`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               {/* Date picker */}
               <div>
                 <label className="section-title mb-2 block">Date</label>

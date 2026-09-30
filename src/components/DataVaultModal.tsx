@@ -373,7 +373,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               </div>
 
               <p className="text-2xs text-text-secondary leading-relaxed">
-                ASCEND works completely offline with deterministic heuristics. When online, provide your own Gemini API key to use your personal quota.
+                ASCEND works completely offline with built-in coach intelligence. When online, provide your own Gemini API key to use your personal quota.
               </p>
 
               <div className="flex gap-2">

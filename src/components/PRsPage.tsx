@@ -443,63 +443,24 @@ function LiftCard({
     userUnit === 'lbs'
       ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
       : Math.round(item.best1RMKg * 10) / 10;
-  const isBWExercise = isBodyweightExercise(item.exercise);
-  const equip = getExerciseEquipment(item.exercise);
   const isMain = isMainCompoundLift(item.exercise);
-
-  const equipConfig: Record<EquipmentType, { label: string; icon: string; style: string }> = {
-    barbell: { label: 'Barbell', icon: '🏋️', style: 'bg-slate-500/10 text-slate-300 border-slate-500/30' },
-    dumbbell: { label: 'Dumbbell', icon: '🪙', style: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
-    cable: { label: 'Cable', icon: '🔗', style: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/30' },
-    bodyweight: { label: 'Bodyweight', icon: '🤸', style: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
-    machine: { label: 'Machine', icon: '⚙️', style: 'bg-purple-500/10 text-purple-400 border-purple-500/30' },
-    other: { label: 'Exercise', icon: '⚡', style: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/30' },
-  };
-
-  const badge = equipConfig[equip] || equipConfig.barbell;
 
   return (
     <div className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border">
-      {/* 1. Exercise Header, Equipment Badge & Prominent 1RM Value */}
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
-            <span
-              className={`text-3xs font-semibold px-2 py-0.5 rounded border flex items-center gap-1 font-mono ${badge.style}`}
-            >
-              <span>{badge.icon}</span>
-              <span>{badge.label}</span>
-            </span>
-            {isMain && (
-              <span className="text-3xs font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase font-mono">
-                Core Lift
-              </span>
-            )}
-          </div>
+      {/* 1. Exercise Header & Prominent 1RM */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
             {item.exercise}
           </h3>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              type="button"
-              onClick={onOpenLevelModal}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1 font-sans"
-              title="View level progression"
-            >
-              <span>LV {item.levelInfo.level}</span>
-              <span>•</span>
-              <span>{item.levelInfo.rank}</span>
-            </button>
-            <span className="text-text-muted text-2xs">•</span>
-            <span className="text-2xs text-text-muted font-medium font-mono">
-              {item.levelInfo.ratio}× BW
-            </span>
-            {isBWExercise && (
-              <span className="text-2xs px-1 rounded bg-warning/15 text-warning font-semibold">
-                BW
-              </span>
-            )}
-          </div>
+          <p className="text-xs text-text-muted mt-1">
+            Best:{' '}
+            <strong className="text-text-primary font-medium">
+              {item.bestSet.isBodyweight
+                ? `BW × ${item.bestSet.reps}`
+                : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
+            </strong>
+          </p>
         </div>
 
         <div className="text-right shrink-0">
@@ -514,12 +475,12 @@ function LiftCard({
       </div>
 
       {/* 2. Next Milestone Progress Bar */}
-      <div className="space-y-1 pt-0.5">
+      <div className="space-y-1.5 pt-0.5">
         <div className="flex justify-between items-center text-xs">
           <span className="text-text-muted flex items-center gap-1 font-medium">
             <Target className="w-3.5 h-3.5 text-accent" />
             <span>
-              Next milestone: <strong>{item.nextMilestone} {userUnit}</strong>
+              Next milestone: <strong className="text-text-primary">{item.nextMilestone} {userUnit}</strong>
             </span>
           </span>
           <div className="flex items-center gap-1.5">
@@ -537,7 +498,7 @@ function LiftCard({
           </div>
         </div>
 
-        <div className="level-bar h-2">
+        <div className="level-bar h-1.5">
           <div
             className="level-bar-fill"
             style={{ width: `${item.milestoneProgress}%` }}
@@ -545,43 +506,58 @@ function LiftCard({
         </div>
       </div>
 
-      {/* 3. Best Set & Plate Calculator Link */}
-      <div className="flex items-center justify-between pt-1 text-xs text-text-secondary border-t border-border/50">
-        <button
-          type="button"
-          onClick={onOpenPlateModal}
-          className="flex items-center gap-1.5 hover:text-accent font-medium group text-left"
-          title="Tap to calculate barbell plates"
-        >
-          <Dumbbell className="w-3.5 h-3.5 text-accent" />
-          <span>
-            Best set:{' '}
-            <strong className="text-text-primary group-hover:text-accent">
-              {item.bestSet.isBodyweight
-                ? `BW × ${item.bestSet.reps}`
-                : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
-            </strong>
-          </span>
-        </button>
-
-        <span className="text-2xs text-text-muted">
-          {item.prs.length} PRs • {item.sessionsCount} sessions
-        </span>
-      </div>
-
-      {/* 4. Expand / View PR History Drawer */}
-      <div className="border-t border-border/60 pt-1">
+      {/* 3. Action Bar: View History Toggle & Plate Calculator */}
+      <div className="flex items-center justify-between pt-1 border-t border-border/50 text-xs">
         <button
           type="button"
           onClick={onToggleExpand}
-          className="w-full flex items-center justify-between text-xs text-text-muted hover:text-text-primary py-1 font-medium transition-colors"
+          className="text-text-muted hover:text-text-primary font-medium flex items-center gap-1.5 transition-colors py-0.5"
         >
-          <span>PR History ({item.prs.length})</span>
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          <span>{isExpanded ? 'Hide History' : 'View History'}</span>
+          <span className="text-2xs font-mono text-text-muted">
+            ({item.prs.length} {item.prs.length === 1 ? 'PR' : 'PRs'})
+          </span>
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
 
-        {isExpanded && (
-          <div className="mt-3 space-y-2 animate-fade-in">
+        <button
+          type="button"
+          onClick={onOpenPlateModal}
+          className="text-2xs text-text-muted hover:text-accent font-medium flex items-center gap-1 py-0.5"
+          title="Tap to calculate barbell plates"
+        >
+          <Dumbbell className="w-3 h-3 text-accent" />
+          <span>Plate Calc</span>
+        </button>
+      </div>
+
+      {/* 4. Expand / View PR History Drawer */}
+      {isExpanded && (
+        <div className="mt-2 pt-2 border-t border-border/50 space-y-2.5 animate-fade-in">
+          {/* Secondary stats row */}
+          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-xs">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onOpenLevelModal}
+                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                title="View tier progression"
+              >
+                <span>Level {item.levelInfo.level}</span>
+                <span>•</span>
+                <span>{item.levelInfo.rank}</span>
+              </button>
+              <span className="text-text-muted text-2xs">•</span>
+              <span className="text-2xs text-text-muted font-mono">{item.levelInfo.ratio}× BW</span>
+            </div>
+            {isMain && (
+              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
+                Core Lift
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-2">
             {item.prs.map((p) => {
               const w = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
               const isBWRecord = isBodyweightExercise(p.exercise) && p.weightKg === 0;
@@ -622,8 +598,8 @@ function LiftCard({
               );
             })}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -991,10 +967,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         </div>
       </div>
 
-      {/* Overall Level Summary Card */}
+      {/* Overall Strength Summary Card */}
       {overallLevel && (
         <div className="card space-y-3 bg-bg-card border border-border">
-          <div className="flex justify-between items-start">
+          <div className="flex justify-between items-baseline">
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="section-title text-[11px] mb-0">OVERALL STRENGTH</span>
@@ -1004,36 +980,23 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   </span>
                 )}
               </div>
-              <div className="flex items-baseline gap-2.5 mt-1">
+              <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl font-black text-accent font-sans">
-                  LV {overallLevel.level}
+                  {overallLevel.averageRatio}×
                 </span>
-                <span className="text-base font-bold text-text-primary tracking-tight font-sans">
-                  {overallLevel.title}
+                <span className="text-sm font-semibold text-text-primary">
+                  Bodyweight Ratio
                 </span>
               </div>
             </div>
-            <RankBadge
-              rank={
-                overallLevel.level <= 15
-                  ? 'FOUNDATION'
-                  : overallLevel.level <= 30
-                  ? 'TRAINED'
-                  : overallLevel.level <= 45
-                  ? 'SKILLED'
-                  : overallLevel.level <= 65
-                  ? 'ADVANCED'
-                  : overallLevel.level <= 80
-                  ? 'ELITE'
-                  : overallLevel.level <= 95
-                  ? 'MASTER'
-                  : 'GRANDMASTER'
-              }
-              size="sm"
-            />
+            <span className="text-xs text-text-muted font-medium">
+              {overallLevel.isMainLiftsOnly
+                ? `${overallLevel.mainLiftsCount} Core Lifts Ranked`
+                : `${exerciseStats.length} Lifts Ranked`}
+            </span>
           </div>
 
-          <div className="level-bar">
+          <div className="level-bar h-2">
             <div
               className="level-bar-fill"
               style={{ width: `${Math.min(100, Math.max(2, overallLevel.level))}%` }}
@@ -1042,12 +1005,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
           <div className="flex justify-between text-xs text-text-muted">
             <span className="font-medium text-text-secondary">
-              {overallLevel.isMainLiftsOnly
-                ? `${overallLevel.mainLiftsCount} Main Compound Lifts Ranked`
-                : `${exerciseStats.length} Lifts Ranked`}
+              Classification: <strong className="text-text-primary">{overallLevel.title}</strong>
             </span>
             <span>
-              Strength Ratio: <strong className="text-text-primary">{overallLevel.averageRatio}× BW</strong>
+              Relative Score: <strong className="text-text-primary">{overallLevel.level}/100</strong>
             </span>
           </div>
         </div>

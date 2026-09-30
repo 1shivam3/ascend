@@ -60,7 +60,6 @@ export default function NextBestActionBanner({
   const waterToday = waterLogs[todayStr] || 0;
   const waterTargetMl = calculateHydrationTarget({
     bodyweightKg: profile?.bodyweightKg || 75,
-    isTrainingDay: currentDayType === 'training',
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
@@ -89,6 +88,7 @@ export default function NextBestActionBanner({
     proteinTargetG,
     hasLoggedWeight,
     activePlanName: activePlan?.name,
+    mealsCount: todayMeals.length,
   });
 
   const handleActionClick = () => {
@@ -103,9 +103,10 @@ export default function NextBestActionBanner({
       onNavigateWorkout();
     } else if (nba.type === 'LOG_WEIGHT') {
       onOpenWeightModal();
+    } else if (nba.type === 'LOG_MEAL') {
+      onNavigateMeals();
     } else if (nba.type === 'LOG_PROTEIN') {
-      logQuickProtein(25, todayStr);
-      toast.success('+25g protein logged to today’s meals!', 'Protein Boost');
+      onNavigateMeals();
     } else {
       onOpenHydrationModal();
     }
@@ -127,7 +128,7 @@ export default function NextBestActionBanner({
   } else if (nba.type === 'LOG_WEIGHT') {
     Icon = Scale;
     iconBg = 'bg-purple-500/15 text-purple-500';
-  } else if (nba.type === 'LOG_PROTEIN') {
+  } else if (nba.type === 'LOG_MEAL' || nba.type === 'LOG_PROTEIN') {
     Icon = UtensilsCrossed;
     iconBg = 'bg-orange-500/15 text-orange-500';
   } else if (nba.type === 'ALL_COMPLETE') {

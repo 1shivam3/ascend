@@ -190,38 +190,39 @@ export function generateOfflineHeuristic(
 
   let recoveryStatus = '';
   if (consecutiveDays >= 4) {
-    recoveryStatus = `High systemic fatigue accumulated over ${consecutiveDays} consecutive training days. CNS and connective tissues require prioritized recovery.`;
+    recoveryStatus = `High fatigue from ${consecutiveDays} consecutive training days. Consider a rest day or lighter active recovery.`;
   } else if (consecutiveDays >= 2) {
-    recoveryStatus = `Moderate central fatigue after ${consecutiveDays} training days in a row. Muscle glycogen and neural drive remain balanced.`;
+    recoveryStatus = `Consistent training (${consecutiveDays} days in a row). Keep form crisp and listen to your body.`;
   } else if (daysSince === 1) {
-    recoveryStatus = 'CNS readiness primed. Prior rest day allowed full replenishment of neuromuscular power and cellular hydration.';
+    recoveryStatus = 'Prior rest day completed. Ready to hit today’s training session with good energy.';
+  } else if (daysSince > 14) {
+    recoveryStatus = "No recent workout logged. Today's session can start fresh.";
   } else if (daysSince >= 3) {
-    recoveryStatus = `Full physiological recovery detected (${daysSince} days since last session). Maximum motor unit recruitment available for heavy compound efforts.`;
+    recoveryStatus = `Well rested (${daysSince} days since last session). Good window to push your key compound lifts.`;
   } else {
-    recoveryStatus = 'Normal neuromuscular baseline. Hydration and nutritional replenishment dictate session quality.';
+    recoveryStatus = "Ready to train. Hydration and pre-workout nutrition will support today's session.";
   }
 
   const advicePoints: string[] = [];
   if (consecutiveDays >= 3) {
-    advicePoints.push('Cap today’s session intensity at RPE 8 to preserve joint integrity and avoid accumulated overtraining.');
+    advicePoints.push('Keep today’s intensity moderate to manage fatigue and protect joint health.');
   } else if (daysSince >= 2) {
-    advicePoints.push('Tackle your heaviest barbell compound lift first while neural drive and motor unit recruitment are at their peak.');
+    advicePoints.push('Tackle your heaviest compound lift first while energy and focus are at their peak.');
   } else {
-    advicePoints.push('Ensure 2–3 ramp-up warm-up sets before your top working set to prime the neuromuscular groove.');
+    advicePoints.push('Complete 2–3 warm-up sets before your working sets to prepare your muscles.');
   }
 
   if (waterMl < waterTarget * 0.6) {
-    const needed = Math.round(waterTarget - waterMl);
-    advicePoints.push(`Hydration is trailing target by ${(needed / 1000).toFixed(1)} L. Consume 500 ml before exercise to maintain blood volume and prevent premature pump loss.`);
+    advicePoints.push("You're below today's hydration target. Consider drinking some water before training.");
   }
 
   if (proteinG < proteinTarget * 0.7) {
     const proteinDeficit = Math.round(proteinTarget - proteinG);
-    advicePoints.push(`Prioritize protein intake (${proteinDeficit}g remaining) to drive muscle protein synthesis during nocturnal recovery.`);
+    advicePoints.push(`Prioritize protein intake (${proteinDeficit}g remaining) to support muscle recovery.`);
   }
 
   if (creatineStats.saturationLevel === 'Full' || creatineStats.saturationLevel === 'Maintaining') {
-    advicePoints.push('Intra-muscular phosphocreatine stores are saturated, supporting maximum ATP resynthesis on 1–5 rep sets.');
+    advicePoints.push('Creatine consistency is on track, supporting your strength and training capacity.');
   }
 
   const tacticalAdvice = advicePoints.slice(0, 2).join(' ');

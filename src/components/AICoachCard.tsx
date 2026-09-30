@@ -116,22 +116,22 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-base text-text-primary">
-                  ASCEND AI Coach
+                  ASCEND COACH
                 </h3>
-                {insight?.source === 'gemini' ? (
+                {isOnline && insight?.source === 'gemini' ? (
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-semibold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    Gemini AI
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Online
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                    <Zap className="w-2.5 h-2.5" />
-                    Offline Heuristics
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-bg-secondary text-text-muted border border-border">
+                    <span className="w-1.5 h-1.5 rounded-full bg-text-muted" />
+                    Offline mode
                   </span>
                 )}
               </div>
               <p className="text-2xs text-text-muted">
-                {isOnline ? 'Online • Progressive Cloud AI' : 'Offline Mode • Instant On-Device Math'}
+                {isOnline && insight?.source === 'gemini' ? 'AI Coach · Online' : 'ASCEND Coach · Local'}
               </p>
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
             <button
               onClick={() => handleGenerate(true)}
               disabled={loading}
-              title="Refresh Tactical Advice"
+              title="Refresh Coach Insight"
               className="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-bg-secondary transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-accent' : ''}`} />
@@ -197,14 +197,14 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
               </div>
             </div>
 
-            {/* Tactical Advice */}
+            {/* Today's Focus */}
             <div className="flex items-start gap-2.5 bg-bg-secondary/60 dark:bg-bg-secondary/40 p-3 rounded-xl border border-border-light/60 dark:border-border-dark/60">
               <div className="mt-0.5 text-accent shrink-0">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div>
                 <span className="text-2xs uppercase tracking-wider font-semibold text-accent block mb-0.5">
-                  Today&apos;s Tactical Directive
+                  Today&apos;s Focus
                 </span>
                 <p className="text-text-primary font-medium leading-snug">
                   {insight.tacticalAdvice}
@@ -226,11 +226,11 @@ export default function AICoachCard({ onOpenSettings }: AICoachCardProps) {
                 {isOnline ? (
                   <Wifi className="w-3 h-3 text-emerald-500" />
                 ) : (
-                  <WifiOff className="w-3 h-3 text-amber-500" />
+                  <WifiOff className="w-3 h-3 text-text-muted" />
                 )}
                 {insight.source === 'gemini'
                   ? 'Grounded via Google Gemini'
-                  : 'Computed via Local Heuristics'}
+                  : 'Personalized training insight'}
               </span>
 
               <button

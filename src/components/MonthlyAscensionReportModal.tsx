@@ -66,7 +66,7 @@ export default function MonthlyAscensionReportModal({
     try {
       await navigator.clipboard.writeText(report.shareableSummary);
       setCopied(true);
-      toast.success('Monthly Ascension Report copied to clipboard!', 'Copied');
+      toast.success('Monthly Progress Report copied to clipboard!', 'Copied');
       setTimeout(() => setCopied(false), 2500);
     } catch {
       toast.error('Unable to copy to clipboard', 'Error');
@@ -87,9 +87,9 @@ export default function MonthlyAscensionReportModal({
             </div>
             <div>
               <h2 className="text-lg font-black text-text-primary leading-tight font-sans">
-                {report.monthName.toUpperCase()} ASCENSION
+                {report.monthName.toUpperCase()} PROGRESS
               </h2>
-              <p className="text-xs text-text-muted">Monthly Progression &amp; Discipline</p>
+              <p className="text-xs text-text-muted">Monthly Progress &amp; Consistency</p>
             </div>
           </div>
           <button

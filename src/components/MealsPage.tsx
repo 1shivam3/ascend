@@ -685,28 +685,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <p className="text-2xs text-text-muted font-mono">Track nutrition &amp; fuel your strength</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {/* Scan Meal (AI Vision) Button */}
-          <button
-            type="button"
-            onClick={() => setIsScanModalOpen(true)}
-            className="p-2 sm:px-3 rounded-lg bg-accent/15 border border-accent/30 text-accent hover:bg-accent/25 transition-colors flex items-center gap-1.5 font-bold text-xs"
-            title="Scan Meal with AI Vision"
-          >
-            <Camera className="w-4 h-4" />
-            <span className="hidden sm:inline">Scan Meal</span>
-          </button>
-
-          {/* Barcode Scanner Button */}
-          <button
-            type="button"
-            onClick={() => setIsBarcodeModalOpen(true)}
-            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1"
-            title="Scan Food Barcode (Open Food Facts)"
-          >
-            <BarcodeIcon className="w-4 h-4 text-accent" />
-            <span className="hidden sm:inline text-xs font-mono font-semibold">Barcode</span>
-          </button>
+        <div className="flex items-center gap-2">
           <ThemeToggle />
           <button
             className="btn-primary flex items-center gap-1.5"
@@ -808,27 +787,44 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
 
-        {/* Primary Action Row: Scan Meal & Log Food (Item 1 & 14) */}
-        <div className="grid grid-cols-2 gap-2.5 pt-1">
+        {/* Primary Action: Dominant Scan Meal & Secondary Actions */}
+        <div className="space-y-2 pt-1">
           <button
             type="button"
             onClick={() => setIsScanModalOpen(true)}
-            className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+            className="w-full btn-primary py-3 px-4 rounded-xl flex flex-col items-center justify-center gap-0.5 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all text-center"
           >
-            <Camera className="w-4 h-4" />
-            <span>Scan Meal</span>
+            <div className="flex items-center gap-2 text-sm font-bold">
+              <Camera className="w-4 h-4" />
+              <span>SCAN MEAL</span>
+            </div>
+            <span className="text-2xs text-white/80 font-normal">
+              Estimate calories &amp; macros from a photo
+            </span>
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (foods.length === 0) handleAddFood();
-              setIsModalOpen(true);
-            }}
-            className="btn-secondary py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5 text-accent" />
-            <span>Log Food</span>
-          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                if (foods.length === 0) handleAddFood();
+                setIsModalOpen(true);
+              }}
+              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5 text-accent" />
+              <span>Log Food</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBarcodeModalOpen(true)}
+              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+              title="Scan Food Barcode (Open Food Facts)"
+            >
+              <BarcodeIcon className="w-3.5 h-3.5 text-accent" />
+              <span>Barcode</span>
+            </button>
+          </div>
         </div>
       </section>
 

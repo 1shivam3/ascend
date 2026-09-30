@@ -13,7 +13,8 @@ import {
   Trash2,
   Share2,
   RefreshCw,
-  HardDrive
+  HardDrive,
+  Key
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -28,9 +29,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const meals = useStore((state) => state.meals);
   const prTargets = useStore((state) => state.prTargets);
   const theme = useStore((state) => state.theme);
+  const customGeminiKey = useStore((state) => state.customGeminiKey);
+  const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const importAllData = useStore((state) => state.importAllData);
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
+  const [keySaved, setKeySaved] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -134,6 +139,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
+  const handleSaveGeminiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    setCustomGeminiKey(trimmed);
+    setKeySaved(true);
+    setMessage({
+      text: trimmed ? 'Custom Gemini API key saved!' : 'Switched to default server key.',
+      type: 'success',
+    });
+    setTimeout(() => setKeySaved(false), 2000);
+    setTimeout(() => setMessage(null), 4000);
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -228,6 +245,76 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               )}
             </div>
           )}
+        </div>
+
+        {/* Gemini AI Configuration Card */}
+        <div className="p-3.5 rounded-xl bg-bg-secondary border border-border/80 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-2xs font-mono font-bold uppercase text-text-muted flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-accent" />
+              GEMINI AI CONFIGURATION
+            </span>
+            {customGeminiKey ? (
+              <span className="px-2 py-0.5 rounded text-2xs font-mono bg-emerald-500/15 text-emerald-400 font-semibold border border-emerald-500/30">
+                CUSTOM KEY ACTIVE
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-2xs font-mono bg-accent/15 text-accent font-semibold border border-accent/30">
+                SERVER KEY (.env.local)
+              </span>
+            )}
+          </div>
+
+          <p className="text-2xs text-text-secondary leading-relaxed">
+            Power meal photo scanning, AI workout generation, and smart coaching. Custom keys are stored locally on your device.
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={apiKeyInput}
+              onChange={(e) => setApiKeyInput(e.target.value)}
+              placeholder={customGeminiKey ? '••••••••••••••••••••••••' : 'Enter Gemini API key (optional)'}
+              className="flex-1 py-1.5 px-3 rounded-lg bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none font-mono placeholder:text-text-muted"
+            />
+            <button
+              type="button"
+              onClick={handleSaveGeminiKey}
+              className="btn-primary py-1.5 px-3 text-xs font-semibold shrink-0"
+            >
+              {keySaved ? 'Saved!' : 'Save'}
+            </button>
+            {customGeminiKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  setApiKeyInput('');
+                  setCustomGeminiKey('');
+                  setMessage({
+                    text: 'Custom API key removed. Using server default.',
+                    type: 'success',
+                  });
+                  setTimeout(() => setMessage(null), 3000);
+                }}
+                className="btn-secondary py-1.5 px-2.5 text-xs font-semibold text-text-muted hover:text-red-400 shrink-0"
+                title="Reset to server default"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-3xs text-text-muted font-mono pt-0.5">
+            <span>Free keys at Google AI Studio</span>
+            <a
+              href="https://aistudio.google.com/apikey"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent underline hover:text-accent-hover font-semibold"
+            >
+              Get Free Key &rarr;
+            </a>
+          </div>
         </div>
 
         {/* 1-Tap Data Backup & Restore */}

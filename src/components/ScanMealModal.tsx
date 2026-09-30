@@ -3,7 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/types';
-import { analyzeMealPhoto, recalculateMealResult } from '@/lib/ai-scan-meal';
+import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { estimateMacros } from '@/lib/macros';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -25,6 +25,8 @@ import {
   ArrowRight,
   Send,
   Zap,
+  Key,
+  Check,
 } from 'lucide-react';
 
 interface ScanMealModalProps {
@@ -46,6 +48,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Gemini API Key config state
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState(store.customGeminiKey || '');
+  const [isKeySaved, setIsKeySaved] = useState(false);
 
   // Flow states: 'select' | 'analyzing' | 'review'
   const [step, setStep] = useState<'select' | 'analyzing' | 'review'>('select');
@@ -88,6 +95,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setRefinementInput('');
     setShowAddItem(false);
     setScanError(null);
+    setShowApiKeyInput(false);
   };
 
   const handleClose = () => {
@@ -106,6 +114,36 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setSelectedHiddenIngredients((prev) =>
       prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
     );
+  };
+
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    store.setCustomGeminiKey(trimmed);
+    if (trimmed) {
+      toast.success('Custom Gemini API key saved!', 'API Key Saved');
+      setIsKeySaved(true);
+      setTimeout(() => setIsKeySaved(false), 2000);
+      setScanError(null);
+    } else {
+      toast.info('Custom Gemini API key cleared. Using server default.', 'Key Cleared');
+      setScanError(null);
+    }
+  };
+
+  const handleOfflineEstimate = () => {
+    try {
+      const result = generateOfflineMealEstimate(
+        userNotes.trim() || 'Standard balanced meal',
+        selectedHiddenIngredients,
+        previewUrl || undefined
+      );
+      setAnalysis(result);
+      setMealName(result.mealName || 'Estimated Meal');
+      setStep('review');
+      toast.info('Estimated nutrition from offline food database.', 'Offline Estimate');
+    } catch (err: any) {
+      toast.error('Could not generate offline estimate.', 'Estimate Error');
+    }
   };
 
   const startAnalysis = async () => {
@@ -134,6 +172,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setScanError(errorMsg);
       toast.error(errorMsg, 'Analysis Notice');
       setStep('select');
+      if (
+        errorMsg.toLowerCase().includes('api key') ||
+        errorMsg.toLowerCase().includes('key configured') ||
+        errorMsg.toLowerCase().includes('no_api_key')
+      ) {
+        setShowApiKeyInput(true);
+      }
     }
   };
 
@@ -342,24 +387,137 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setShowApiKeyInput((prev) => !prev)}
+              className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1 text-2xs font-mono ${
+                store.customGeminiKey
+                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                  : 'border-border text-text-muted hover:text-text-primary hover:bg-bg-secondary'
+              }`}
+              title={store.customGeminiKey ? 'Custom Gemini API Key Active' : 'Configure Gemini API Key'}
+            >
+              <Key className="w-4 h-4 text-accent" />
+              {store.customGeminiKey && (
+                <span className="hidden sm:inline text-3xs font-bold text-emerald-400">KEY ACTIVE</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* ── STEP 1: SELECT / CAPTURE PHOTO ───────────────────────────────── */}
         {step === 'select' && (
           <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            {/* Inline Gemini API Key Setup Card */}
+            {(showApiKeyInput ||
+              (scanError &&
+                (scanError.toLowerCase().includes('api key') ||
+                  scanError.toLowerCase().includes('key configured') ||
+                  scanError.toLowerCase().includes('no_api_key')))) && (
+              <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2.5 animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
+                    <Key className="w-3.5 h-3.5" />
+                    <span>Gemini API Key Configuration</span>
+                  </div>
+                  {store.customGeminiKey ? (
+                    <span className="text-3xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                      ACTIVE KEY
+                    </span>
+                  ) : (
+                    <span className="text-3xs font-mono font-bold bg-bg-card text-text-muted border border-border px-1.5 py-0.5 rounded">
+                      DEFAULT (.env.local)
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-2xs text-text-muted leading-relaxed">
+                  Enter your Google Gemini API key to enable instant photo meal recognition. Your key is stored securely in your browser&apos;s local storage.
+                </p>
+
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="Paste Gemini API key (e.g. AIzaSy...)"
+                    className="flex-1 py-1.5 px-3 rounded-lg bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none font-mono placeholder:text-text-muted"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveApiKey}
+                    className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 flex items-center gap-1"
+                  >
+                    {isKeySaved ? <Check className="w-3.5 h-3.5 text-white" /> : null}
+                    <span>{isKeySaved ? 'Saved' : 'Save Key'}</span>
+                  </button>
+                  {store.customGeminiKey && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setApiKeyInput('');
+                        store.setCustomGeminiKey('');
+                        toast.info('Custom API key removed.', 'Cleared');
+                      }}
+                      className="btn-secondary py-1.5 px-2.5 text-xs font-bold shrink-0 text-text-muted hover:text-red-400"
+                      title="Clear key"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-3xs text-text-muted pt-0.5">
+                  <span>Free key available at Google AI Studio</span>
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent underline font-semibold hover:text-accent-hover"
+                  >
+                    Get Free Key &rarr;
+                  </a>
+                </div>
+              </div>
+            )}
+
             {scanError && (
-              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-600 dark:text-red-400 flex items-start gap-2.5 animate-fade-in">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
-                <div className="space-y-1">
-                  <span className="font-bold block">Scan Notice</span>
-                  <p className="text-2xs text-text-muted leading-relaxed">{scanError}</p>
+              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-600 dark:text-red-400 space-y-2 animate-fade-in">
+                <div className="flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                  <div className="space-y-1 flex-1">
+                    <span className="font-bold block">Scan Notice</span>
+                    <p className="text-2xs text-text-muted leading-relaxed">{scanError}</p>
+                  </div>
+                </div>
+
+                {/* Quick actions for error recovery */}
+                <div className="flex items-center gap-2 pt-1 border-t border-red-500/20">
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKeyInput(true)}
+                    className="text-2xs font-semibold text-accent underline flex items-center gap-1"
+                  >
+                    <Key className="w-3 h-3" />
+                    <span>Enter Gemini Key</span>
+                  </button>
+                  <span className="text-border">•</span>
+                  <button
+                    type="button"
+                    onClick={handleOfflineEstimate}
+                    className="text-2xs font-semibold text-text-secondary hover:text-text-primary underline flex items-center gap-1"
+                  >
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>Estimate with Offline DB</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -469,6 +627,18 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <Sparkles className="w-4 h-4" />
                   <span>Analyze Meal &amp; Calculate Macros</span>
                 </button>
+
+                <div className="flex items-center justify-center gap-2 pt-1 text-2xs text-text-muted">
+                  <span>Prefer fast offline calculation?</span>
+                  <button
+                    type="button"
+                    onClick={handleOfflineEstimate}
+                    className="text-accent underline font-semibold hover:text-accent-hover flex items-center gap-1"
+                  >
+                    <Zap className="w-3 h-3 text-amber-400" />
+                    <span>Estimate with Offline DB</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -615,14 +785,33 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
               ) : (
                 /* Successful Detection Review State */
                 <>
-                  {/* Disclaimer pill */}
-                  <div className="py-1.5 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-2xs text-amber-600 dark:text-amber-400">
-                    <span className="font-semibold">
-                      AI Meal Estimate — Review portions before saving.
-                    </span>
-                    <span className="text-3xs uppercase font-mono font-bold bg-amber-500/20 px-1.5 py-0.5 rounded">
-                      {analysis.confidence} Confidence
-                    </span>
+                  {/* MEAL ESTIMATE Summary Header */}
+                  <div className="card p-4 bg-bg-card border border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="section-title text-[11px] mb-0">MEAL ESTIMATE</span>
+                      <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
+                        Estimated
+                      </span>
+                    </div>
+
+                    <div className="flex items-baseline gap-2 pt-0.5">
+                      <span className="text-3xl font-black text-accent font-sans">
+                        ~{analysis.totalCalories}
+                      </span>
+                      <span className="text-sm font-semibold text-text-muted">kcal</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs font-semibold text-text-secondary pt-0.5">
+                      <span className="text-emerald-500 font-bold">{analysis.totalProtein}g Protein</span>
+                      <span>•</span>
+                      <span className="text-text-primary">{analysis.totalCarbs}g Carbs</span>
+                      <span>•</span>
+                      <span className="text-text-primary">{analysis.totalFat}g Fat</span>
+                    </div>
+
+                    <p className="text-2xs text-text-muted border-t border-border/60 pt-2 mt-1">
+                      Nutrition is estimated from the image. Review portions before saving.
+                    </p>
                   </div>
 
                   {/* Creatine Habit Quick-Action Card if detected */}
@@ -679,43 +868,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     />
                   </div>
 
-                  {/* Macro Summary Strip */}
-                  <div className="grid grid-cols-4 gap-2 py-3 px-3.5 rounded-xl bg-bg-secondary/70 border border-border text-center">
-                    <div>
-                      <span className="text-3xs uppercase font-bold text-text-muted block">Calories</span>
-                      <span className="font-black text-accent text-base sm:text-lg">
-                        ~{analysis.totalCalories}
-                      </span>
-                      <span className="text-3xs text-text-muted block">kcal</span>
-                    </div>
-                    <div className="border-l border-border/80">
-                      <span className="text-3xs uppercase font-bold text-emerald-600 block">Protein</span>
-                      <span className="font-black text-emerald-600 text-base sm:text-lg">
-                        ~{analysis.totalProtein}g
-                      </span>
-                      <span className="text-3xs text-text-muted block">key</span>
-                    </div>
-                    <div className="border-l border-border/80">
-                      <span className="text-3xs uppercase font-bold text-text-muted block">Carbs</span>
-                      <span className="font-bold text-text-primary text-base sm:text-lg">
-                        ~{analysis.totalCarbs}g
-                      </span>
-                      <span className="text-3xs text-text-muted block">energy</span>
-                    </div>
-                    <div className="border-l border-border/80">
-                      <span className="text-3xs uppercase font-bold text-text-muted block">Fat</span>
-                      <span className="font-bold text-text-primary text-base sm:text-lg">
-                        ~{analysis.totalFat}g
-                      </span>
-                      <span className="text-3xs text-text-muted block">essential</span>
-                    </div>
-                  </div>
-
                   {/* Food items breakdown list */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
-                        Detected Food Items ({analysis.items.length})
+                        DETECTED FOODS ({analysis.items.length})
                       </span>
                       <button
                         type="button"
@@ -766,12 +923,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <div className="space-y-2">
                       {analysis.items.map((item, idx) => {
                         const isEditing = editingItemIndex === idx;
-                        const confidenceBadge =
-                          item.confidence === 'high'
-                            ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                            : item.confidence === 'medium'
-                            ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                            : 'bg-slate-500/10 text-slate-500 border-slate-500/20';
 
                         return (
                           <div
@@ -783,11 +934,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-bold text-xs sm:text-sm text-text-primary">
                                     {item.name}
-                                  </span>
-                                  <span
-                                    className={`text-3xs font-semibold px-1.5 py-0.5 rounded border capitalize ${confidenceBadge}`}
-                                  >
-                                    {item.confidence}
                                   </span>
                                 </div>
                                 <span className="text-2xs text-text-secondary mt-0.5 block">

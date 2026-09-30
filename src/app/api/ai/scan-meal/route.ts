@@ -2,7 +2,45 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { MealAnalysisResult } from '@/lib/types';
 
+import fs from 'fs';
+import path from 'path';
+
 export const runtime = 'nodejs';
+
+function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
+  if (headerKey && headerKey.trim()) return headerKey.trim();
+  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
+
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
+    return process.env.GOOGLE_API_KEY.trim();
+  }
+
+  // Fallback: Read directly from local env files if process.env wasn't populated yet
+  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
+  for (const envFile of envFiles) {
+    try {
+      const filePath = path.resolve(process.cwd(), envFile);
+      if (fs.existsSync(filePath)) {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        const lines = fileContent.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
+            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
+            if (val) return val;
+          }
+        }
+      }
+    } catch {
+      // Ignore filesystem errors
+    }
+  }
+
+  return undefined;
+}
 
 interface ScanMealRequestBody {
   imageBase64: string;
@@ -26,17 +64,14 @@ export async function POST(req: Request) {
       );
     }
 
-    const apiKey =
-      (headerKey && headerKey.trim()) ||
-      (body.customApiKey && body.customApiKey.trim()) ||
-      process.env.GEMINI_API_KEY;
+    const apiKey = getResolvedApiKey(headerKey, body.customApiKey);
 
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'NO_API_KEY',
           message:
-            'No Gemini API key configured. Please add GEMINI_API_KEY in .env.local or enter your custom key in Settings.',
+            'No Gemini API key configured. Please enter your API key in the Scan Meal modal or add GEMINI_API_KEY in .env.local.',
         },
         { status: 400 }
       );
@@ -121,8 +156,10 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 
     const candidateModels = [
       'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
       'gemini-flash-latest',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash',
+      'gemini-1.5-flash',
     ];
 
     let lastError: any = null;

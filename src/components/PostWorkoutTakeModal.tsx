@@ -130,11 +130,11 @@ export default function PostWorkoutTakeModal({
               </span>
               {take.source === 'gemini' ? (
                 <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                  Gemini AI
+                  AI Coach
                 </span>
               ) : (
-                <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">
-                  Heuristic
+                <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
+                  Local Coach
                 </span>
               )}
             </div>

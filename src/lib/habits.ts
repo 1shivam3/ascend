@@ -28,10 +28,10 @@ export function toLocalDateString(d: Date = new Date()): string {
 // ── 1. Hydration Target Calculation ──────────────────────────────────────────
 export function calculateHydrationTarget(params: {
   bodyweightKg?: number;
-  isTrainingDay?: boolean;
-  climateHeat?: boolean;
   customTargetMl?: number;
   isCustomTarget?: boolean;
+  isTrainingDay?: boolean;
+  climateHeat?: boolean;
 }): number {
   if (params.isCustomTarget && params.customTargetMl && params.customTargetMl > 0) {
     return params.customTargetMl;
@@ -39,20 +39,11 @@ export function calculateHydrationTarget(params: {
 
   const bw = params.bodyweightKg && params.bodyweightKg > 0 ? params.bodyweightKg : 75;
   // Standard guideline: ~35 ml / kg bodyweight
+  // Fixed baseline so all screens (Home, Nutrition, Essentials, AI) show the exact same target
   let target = Math.round(bw * 35);
 
-  // Round to nearest 50ml for clean numbers
+  // Round to nearest 50ml for clean numbers (e.g. 72kg * 35 = 2520 -> 2500ml = 2.5L)
   target = Math.round(target / 50) * 50;
-
-  // Training day bonus (+500ml for perspiration)
-  if (params.isTrainingDay) {
-    target += 500;
-  }
-
-  // Hot weather / high humidity bonus (+300ml)
-  if (params.climateHeat) {
-    target += 300;
-  }
 
   return Math.max(1500, target);
 }
@@ -299,6 +290,7 @@ export type ActionType =
   | 'TAKE_CREATINE'
   | 'START_WORKOUT'
   | 'LOG_WEIGHT'
+  | 'LOG_MEAL'
   | 'LOG_PROTEIN'
   | 'ALL_COMPLETE';
 
@@ -323,6 +315,7 @@ export function getNextBestAction(params: {
   proteinTargetG: number;
   hasLoggedWeight: boolean;
   activePlanName?: string;
+  mealsCount?: number;
 }): NextBestActionInfo {
   const {
     nowHour = new Date().getHours(),
@@ -335,29 +328,50 @@ export function getNextBestAction(params: {
     proteinTargetG,
     hasLoggedWeight,
     activePlanName,
+    mealsCount = 0,
   } = params;
 
   // 1. Morning weight (early morning priority before eating)
-  if (!hasLoggedWeight && nowHour < 11) {
+  if (!hasLoggedWeight && nowHour < 12) {
     return {
       type: 'LOG_WEIGHT',
-      title: 'Log Morning Bodyweight',
-      description: 'Track weight under consistent morning conditions.',
-      buttonLabel: '⚖ LOG WEIGHT',
+      title: 'Log Morning Weight',
+      description: 'Track bodyweight under consistent morning conditions.',
+      buttonLabel: 'LOG WEIGHT',
     };
   }
 
-  // 2. Creatine if not yet taken
+  // 2. Training Session (if scheduled training day and not yet logged)
+  if (dayType === 'training' && !hasTrainedToday) {
+    return {
+      type: 'START_WORKOUT',
+      title: activePlanName ? `Today's Workout: ${activePlanName}` : "Start Today's Workout",
+      description: 'Hit the gym and push your compound progression.',
+      buttonLabel: 'START WORKOUT',
+    };
+  }
+
+  // 3. Post-workout nutrition / meal logging
+  if (hasTrainedToday && mealsCount === 0) {
+    return {
+      type: 'LOG_MEAL',
+      title: "Log Today's Meal",
+      description: 'Scan or log your meal to fuel recovery and muscle protein synthesis.',
+      buttonLabel: 'LOG MEAL',
+    };
+  }
+
+  // 4. Creatine consistency
   if (!creatineTaken) {
     return {
       type: 'TAKE_CREATINE',
-      title: 'Creatine not logged today',
+      title: 'Log Creatine',
       description: 'Daily consistency sustains muscle phosphocreatine stores.',
-      buttonLabel: '✓ LOG CREATINE',
+      buttonLabel: 'LOG CREATINE',
     };
   }
 
-  // 3. Hydration check (if water is behind target)
+  // 5. Hydration check (if water is behind target)
   const remainingMl = Math.max(0, waterTargetMl - waterMl);
   if (remainingMl > 250) {
     const quickDrink = remainingMl >= 500 ? 500 : 250;
@@ -370,33 +384,23 @@ export function getNextBestAction(params: {
     };
   }
 
-  // 4. Workout if training day and not yet done
-  if (dayType === 'training' && !hasTrainedToday) {
-    return {
-      type: 'START_WORKOUT',
-      title: activePlanName ? `Train: ${activePlanName}` : 'Complete Today’s Workout',
-      description: 'Hit the gym and push your strength progression.',
-      buttonLabel: 'START WORKOUT',
-    };
-  }
-
-  // 5. Protein shortfall
+  // 6. Protein shortfall
   const proteinShort = Math.round(proteinTargetG - proteinG);
-  if (proteinShort > 15) {
+  if (proteinShort > 20) {
     return {
       type: 'LOG_PROTEIN',
-      title: `You're ${proteinShort}g short of protein`,
-      description: `Fuel muscle repair and reach your daily ${Math.round(proteinTargetG)}g target.`,
-      buttonLabel: '+25G PROTEIN',
+      title: `Fuel up: ${proteinShort}g protein remaining`,
+      description: `Target ${Math.round(proteinTargetG)}g protein for optimal recovery.`,
+      buttonLabel: 'LOG FOOD',
       proteinShortG: proteinShort,
     };
   }
 
-  // 6. Everything completed!
+  // 7. Everything completed!
   return {
     type: 'ALL_COMPLETE',
-    title: 'All daily objectives complete!',
-    description: 'Outstanding discipline. Rest, hydrate, and prepare for tomorrow.',
+    title: "Review Today's Progress",
+    description: 'All core essentials complete for today. Rest up for tomorrow.',
     buttonLabel: 'VIEW PROGRESS',
   };
 }
@@ -493,6 +497,9 @@ export interface MonthlyAscensionReport {
   strongerLifts: { exercise: string; deltaKg: number }[];
   shareableSummary: string;
 }
+
+export type MonthlyProgressReport = MonthlyAscensionReport;
+export const getMonthlyProgressReport = getMonthlyAscensionReport;
 
 export function getMonthlyAscensionReport(params: {
   year: number;

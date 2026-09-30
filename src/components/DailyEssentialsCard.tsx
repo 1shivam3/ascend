@@ -54,16 +54,16 @@ export default function DailyEssentialsCard({
   // Day Type
   const currentDayType: DayType = getDayType(todayStr, workouts, dayTypeOverrides);
 
-  // Water target
+  // Water target (unified calculation)
   const waterTargetMl = calculateHydrationTarget({
     bodyweightKg: profile?.bodyweightKg || 75,
-    isTrainingDay: currentDayType === 'training',
     customTargetMl: hydrationConfig?.dailyTargetMl,
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
 
   const waterToday = waterLogs[todayStr] || 0;
   const creatineToday = creatineLogs[todayStr];
+  const creatineTaken = !!creatineToday?.taken;
 
   // Protein today
   const todayMeals = meals.filter((m) => m.date && m.date.startsWith(todayStr));
@@ -74,20 +74,7 @@ export default function DailyEssentialsCard({
 
   // Weight today
   const todayWeight = bodyMetrics.find((b) => b.date && b.date.startsWith(todayStr)) || null;
-
-  // Calculate daily summary
-  const summary = getDailyObjectives({
-    dateStr: todayStr,
-    dayType: currentDayType,
-    workouts,
-    waterMl: waterToday,
-    waterTargetMl,
-    creatineLog: creatineToday,
-    proteinG: proteinToday,
-    proteinTargetG,
-    weightEntry: todayWeight,
-    profileUnit: profile?.unit || 'kg',
-  });
+  const hasWorkout = workouts.some((w) => w.date && w.date.startsWith(todayStr));
 
   const toggleDayMode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -95,14 +82,21 @@ export default function DailyEssentialsCard({
     setDayType(todayStr, nextType);
   };
 
+  const displayWeight = (weightKg: number) => {
+    if (profile?.unit === 'lbs') {
+      return `${Math.round(weightKg * 2.20462)} lbs`;
+    }
+    return `${Math.round(weightKg)} kg`;
+  };
+
   return (
-    <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5 shadow-xs">
+    <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3 shadow-xs">
       {/* Top Header & Day Mode Toggle */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="section-title text-[11px] block">DAILY ESSENTIALS</span>
-          <h2 className="text-lg font-black text-text-primary tracking-tight font-sans mt-0.5">
-            {summary.statusMessage}
+          <span className="section-title text-[10px] block">TODAY&apos;S ESSENTIALS</span>
+          <h2 className="text-base font-bold text-text-primary tracking-tight font-sans mt-0.5">
+            Daily Habits &amp; Nutrition
           </h2>
         </div>
 
@@ -110,7 +104,7 @@ export default function DailyEssentialsCard({
         <button
           type="button"
           onClick={toggleDayMode}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all border shadow-xs ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all border shadow-xs ${
             currentDayType === 'training'
               ? 'bg-accent/10 border-accent/30 text-accent hover:bg-accent/15'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/15'
@@ -119,119 +113,101 @@ export default function DailyEssentialsCard({
         >
           {currentDayType === 'training' ? (
             <>
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Training Day</span>
+              <Zap className="w-3 h-3 fill-current" />
+              <span>Training</span>
             </>
           ) : (
             <>
-              <Moon className="w-3.5 h-3.5 fill-current" />
+              <Moon className="w-3 h-3 fill-current" />
               <span>Rest Day</span>
             </>
           )}
         </button>
       </div>
 
-      {/* Progress Bar */}
-      <div className="space-y-1">
-        <div className="h-2 w-full bg-bg-secondary rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all duration-500 ${
-              summary.allDone ? 'bg-emerald-500' : 'bg-accent'
-            }`}
-            style={{ width: `${summary.pct}%` }}
-          />
-        </div>
-        <div className="flex justify-between items-center text-[11px] text-text-muted">
-          <span>{summary.completedCount} of {summary.totalCount} completed</span>
-          <span className="font-bold text-accent">{summary.pct}%</span>
-        </div>
-      </div>
-
-      {/* Checklist Grid */}
-      <div className="space-y-1.5 pt-1">
-        {summary.objectives.map((obj) => {
-          let Icon = Circle;
-          let onClick = () => {};
-
-          if (obj.id === 'workout') {
-            Icon = Dumbbell;
-            onClick = onNavigateWorkout;
-          } else if (obj.id === 'recovery') {
-            Icon = Moon;
-            onClick = () => {};
-          } else if (obj.id === 'water') {
-            Icon = Droplet;
-            onClick = onOpenHydrationModal;
-          } else if (obj.id === 'creatine') {
-            Icon = Sparkles;
-            onClick = () => toggleCreatine(todayStr);
-          } else if (obj.id === 'protein') {
-            Icon = UtensilsCrossed;
-            onClick = onNavigateMeals;
-          } else if (obj.id === 'weight') {
-            Icon = Scale;
-            onClick = onOpenWeightModal;
-          }
-
-          return (
-            <div
-              key={obj.id}
-              onClick={onClick}
-              className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-                obj.done
-                  ? 'bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/35'
-                  : 'bg-bg-secondary/60 border-border/80 hover:border-accent/40'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <div
-                  className={`w-6 h-6 rounded-lg flex items-center justify-center ${
-                    obj.done
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-bg-card text-text-muted border border-border'
-                  }`}
-                >
-                  {obj.done ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                  ) : (
-                    <Icon className="w-3.5 h-3.5" />
-                  )}
-                </div>
-                <div>
-                  <span
-                    className={`text-xs font-semibold block leading-tight ${
-                      obj.done ? 'text-text-primary' : 'text-text-secondary'
-                    }`}
-                  >
-                    {obj.title}
-                  </span>
-                  <span className="text-[10px] text-text-muted font-medium">
-                    {obj.metricLabel}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                    obj.done
-                      ? 'text-emerald-600 bg-emerald-500/10'
-                      : 'text-text-muted bg-bg-card border border-border'
-                  }`}
-                >
-                  {obj.done ? 'DONE' : 'PENDING'}
-                </span>
-              </div>
+      {/* Essentials Rows */}
+      <div className="divide-y divide-border/60">
+        {/* 1. Training */}
+        <div
+          onClick={onNavigateWorkout}
+          className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasWorkout ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-text-muted'}`}>
+              <Dumbbell className="w-3.5 h-3.5" />
             </div>
-          );
-        })}
-      </div>
+            <span className="text-xs font-semibold text-text-primary">Training</span>
+          </div>
+          <span className={`text-xs font-semibold ${hasWorkout ? 'text-emerald-600' : 'text-text-muted'}`}>
+            {hasWorkout ? 'Complete ✓' : currentDayType === 'rest' ? 'Rest Planned' : 'Pending'}
+          </span>
+        </div>
 
-      {/* Dynamic Training vs Rest Day Mantra Banner */}
-      <div className="py-1.5 px-3 rounded-xl bg-bg-secondary text-center text-[10px] font-mono tracking-wider text-text-muted font-semibold">
-        {currentDayType === 'training'
-          ? 'TRAIN • HYDRATE • FUEL • RECOVER'
-          : 'RECOVER • HYDRATE • FUEL • MOBILITY'}
+        {/* 2. Water */}
+        <div
+          onClick={onOpenHydrationModal}
+          className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${waterToday >= waterTargetMl ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-sky-500'}`}>
+              <Droplet className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-xs font-semibold text-text-primary">Water</span>
+          </div>
+          <span className="text-xs font-mono font-medium text-text-secondary">
+            {(waterToday / 1000).toFixed(1)} / {(waterTargetMl / 1000).toFixed(1)} L
+            {waterToday >= waterTargetMl && <span className="text-emerald-600 ml-1">✓</span>}
+          </span>
+        </div>
+
+        {/* 3. Creatine */}
+        <div
+          onClick={() => toggleCreatine(todayStr)}
+          className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${creatineTaken ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-amber-500'}`}>
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-xs font-semibold text-text-primary">Creatine</span>
+          </div>
+          <span className={`text-xs font-semibold ${creatineTaken ? 'text-emerald-600' : 'text-text-muted'}`}>
+            {creatineTaken ? `${creatineToday?.amountG || 5}g Taken ✓` : 'Not logged'}
+          </span>
+        </div>
+
+        {/* 4. Protein */}
+        <div
+          onClick={onNavigateMeals}
+          className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${proteinToday >= proteinTargetG ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-orange-500'}`}>
+              <UtensilsCrossed className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-xs font-semibold text-text-primary">Protein</span>
+          </div>
+          <span className="text-xs font-mono font-medium text-text-secondary">
+            {Math.round(proteinToday)} / {proteinTargetG} g
+            {proteinToday >= proteinTargetG && <span className="text-emerald-600 ml-1">✓</span>}
+          </span>
+        </div>
+
+        {/* 5. Weight */}
+        <div
+          onClick={onOpenWeightModal}
+          className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${todayWeight ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-purple-500'}`}>
+              <Scale className="w-3.5 h-3.5" />
+            </div>
+            <span className="text-xs font-semibold text-text-primary">Weight</span>
+          </div>
+          <span className={`text-xs font-semibold ${todayWeight ? 'text-emerald-600 font-mono' : 'text-text-muted'}`}>
+            {todayWeight ? `${displayWeight(todayWeight.weightKg)} ✓` : 'Pending'}
+          </span>
+        </div>
       </div>
     </section>
   );

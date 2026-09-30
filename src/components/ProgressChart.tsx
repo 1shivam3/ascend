@@ -201,55 +201,51 @@ export default function ProgressChart() {
         })}
       </div>
 
-      {/* ── Stats Summary Bar ── */}
-      {chartData.length > 0 ? (
-        <div className="flex items-baseline justify-between pt-1">
-          <div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-2xl font-black text-text-primary font-sans">
-                {activePoint ? activePoint.oneRepMax : latestVal}
-              </span>
-              <span className="text-xs text-text-muted">{userUnit} 1RM</span>
+      {/* ── Strength Trend Content ── */}
+      {chartData.length >= 3 ? (
+        <>
+          {/* ── Stats Summary Bar ── */}
+          <div className="flex items-baseline justify-between pt-1">
+            <div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-text-primary font-sans">
+                  {activePoint ? activePoint.oneRepMax : latestVal}
+                </span>
+                <span className="text-xs text-text-muted">{userUnit} 1RM</span>
+              </div>
+              <p className="text-2xs text-text-muted mt-0.5">
+                {activePoint
+                  ? `${new Date(activePoint.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • ${activePoint.weight} ${userUnit} × ${activePoint.reps} reps`
+                  : `${chartData.length} records in this period`}
+              </p>
             </div>
-            <p className="text-2xs text-text-muted mt-0.5">
-              {activePoint
-                ? `${new Date(activePoint.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • ${activePoint.weight} ${userUnit} × ${activePoint.reps} reps`
-                : `${chartData.length} records in this period`}
-            </p>
+
+            <div className="text-right">
+              {delta !== 0 ? (
+                <span
+                  className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
+                    delta > 0
+                      ? 'bg-emerald-500/10 text-emerald-600'
+                      : 'bg-danger/10 text-danger'
+                  }`}
+                >
+                  {delta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                  {delta > 0 ? `+${delta}` : delta} {userUnit}
+                </span>
+              ) : (
+                <span className="text-xs text-text-muted font-medium">Consistent</span>
+              )}
+              <p className="text-2xs text-text-muted mt-0.5">Peak: {maxVal} {userUnit}</p>
+            </div>
           </div>
 
-          <div className="text-right">
-            {delta !== 0 ? (
-              <span
-                className={`inline-flex items-center gap-0.5 text-xs font-bold px-2 py-0.5 rounded-full ${
-                  delta > 0
-                    ? 'bg-emerald-500/10 text-emerald-600'
-                    : 'bg-danger/10 text-danger'
-                }`}
+          {/* ── Interactive SVG Sparkline Chart ── */}
+          <div className="relative pt-1">
+            <div className="w-full overflow-hidden">
+              <svg
+                viewBox={`0 0 ${width} ${height}`}
+                className="w-full h-32 overflow-visible"
               >
-                {delta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                {delta > 0 ? `+${delta}` : delta} {userUnit}
-              </span>
-            ) : (
-              <span className="text-xs text-text-muted font-medium">Consistent</span>
-            )}
-            <p className="text-2xs text-text-muted mt-0.5">Peak: {maxVal} {userUnit}</p>
-          </div>
-        </div>
-      ) : (
-        <div className="py-6 text-center text-xs text-text-muted">
-          No records logged for {selectedExercise} in this timeframe.
-        </div>
-      )}
-
-      {/* ── Interactive SVG Sparkline Chart ── */}
-      {chartData.length > 0 && (
-        <div className="relative pt-1">
-          <div className="w-full overflow-hidden">
-            <svg
-              viewBox={`0 0 ${width} ${height}`}
-              className="w-full h-32 overflow-visible"
-            >
               <defs>
                 <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.28" />
@@ -318,6 +314,20 @@ export default function ProgressChart() {
               })}
             </svg>
           </div>
+        </div>
+        </>
+      ) : (
+        <div className="py-6 px-4 text-center rounded-xl bg-bg-secondary/40 border border-border/50">
+          <p className="text-xs font-semibold text-text-primary">
+            {chartData.length === 0
+              ? `No records logged for ${selectedExercise} in this timeframe.`
+              : 'Not enough workout history yet.'}
+          </p>
+          <p className="text-2xs text-text-muted mt-1">
+            {chartData.length === 0
+              ? 'Log PRs or workouts to track your strength over time.'
+              : 'Complete a few sessions to see your trend.'}
+          </p>
         </div>
       )}
     </div>

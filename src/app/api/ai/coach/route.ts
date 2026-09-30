@@ -86,16 +86,50 @@ interface CoachRequestBody {
   };
 }
 
+import fs from 'fs';
+import path from 'path';
+
+function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
+  if (headerKey && headerKey.trim()) return headerKey.trim();
+  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
+
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
+    return process.env.GEMINI_API_KEY.trim();
+  }
+  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
+    return process.env.GOOGLE_API_KEY.trim();
+  }
+
+  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
+  for (const envFile of envFiles) {
+    try {
+      const filePath = path.resolve(process.cwd(), envFile);
+      if (fs.existsSync(filePath)) {
+        const fileContent = fs.readFileSync(filePath, 'utf8');
+        const lines = fileContent.split(/\r?\n/);
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
+            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
+            if (val) return val;
+          }
+        }
+      }
+    } catch {
+      // Ignore filesystem errors
+    }
+  }
+
+  return undefined;
+}
+
 export async function POST(req: Request) {
   try {
     const headerKey = req.headers.get('x-gemini-api-key');
     const body: CoachRequestBody = await req.json();
     const task = body.task || 'COACH_INSIGHT';
 
-    const apiKey =
-      (headerKey && headerKey.trim()) ||
-      (body.customApiKey && body.customApiKey.trim()) ||
-      process.env.GEMINI_API_KEY;
+    const apiKey = getResolvedApiKey(headerKey, body.customApiKey);
 
     if (!apiKey) {
       return NextResponse.json(
