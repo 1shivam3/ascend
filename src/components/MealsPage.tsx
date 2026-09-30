@@ -565,6 +565,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const todayDate   = new Date().toISOString().split('T')[0];
   const todayMeals  = meals.filter((m) => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
+  const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
+  const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
   const waterToday = waterLogs[todayDate] || 0;
   const waterTargetMl = calculateHydrationTarget({
@@ -827,6 +829,92 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
       </section>
+
+      {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
+      {proteinRemaining > 10 && (
+        <section className="card p-4 bg-gradient-to-br from-bg-card via-bg-card to-emerald-500/5 border border-emerald-500/30 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="section-title text-[10px] mb-0 text-emerald-500 font-sans">
+                WHAT SHOULD I EAT NEXT?
+              </h3>
+            </div>
+            <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              {Math.round(proteinRemaining)}g protein left
+            </span>
+          </div>
+
+          <p className="text-xs text-text-secondary">
+            Quick high-protein suggestions to hit your daily target:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {[
+              {
+                title: 'Whey Protein Shake',
+                desc: '1 scoop whey + 250ml milk',
+                protein: 30,
+                cals: 200,
+                foods: [
+                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                  { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+                ],
+              },
+              {
+                title: 'Greek Yogurt + Whey',
+                desc: '150g curd/yogurt + 1 scoop',
+                protein: 38,
+                cals: 240,
+                foods: [
+                  { name: 'Greek Yogurt', quantity: 150, unit: 'g', calories: 120, proteinG: 14, carbsG: 6, fatG: 2 },
+                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                ],
+              },
+              {
+                title: 'Paneer / Tofu Stir-Fry',
+                desc: '150g grilled paneer/tofu',
+                protein: 27,
+                cals: 320,
+                foods: [
+                  { name: 'Paneer', quantity: 150, unit: 'g', calories: 320, proteinG: 27, carbsG: 4, fatG: 22 },
+                ],
+              },
+            ].map((option, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-text-primary">{option.title}</span>
+                    <span className="text-2xs font-bold text-emerald-600 font-mono">+{option.protein}g</span>
+                  </div>
+                  <p className="text-3xs text-text-muted mt-0.5">{option.desc}</p>
+                  <p className="text-3xs text-text-secondary mt-1 font-mono">~{option.cals} kcal</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newMeal: MealEntry = {
+                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                      date: todayDate,
+                      name: option.title,
+                      foods: option.foods,
+                    };
+                    addMeal(newMeal);
+                    toast.success(`Logged ${option.title} (+${option.protein}g protein)!`, 'Protein Logged');
+                  }}
+                  className="btn-secondary py-1 text-2xs font-semibold w-full mt-2 flex items-center justify-center gap-1 hover:border-emerald-500 hover:text-emerald-500"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Log 1-Tap</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── Daily Hydration & Supplements Habit Strip (Unified System) ── */}
       <section className="card p-3.5 bg-bg-card border border-border space-y-2.5">

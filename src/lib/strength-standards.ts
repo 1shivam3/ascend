@@ -146,6 +146,8 @@ export function getExerciseEquipment(exerciseName: string): EquipmentType {
   return 'barbell';
 }
 
+export { getExerciseEquipment as getEquipmentType };
+
 export function getExerciseList(): string[] {
   return Object.keys(MALE_STANDARDS);
 }

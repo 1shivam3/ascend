@@ -4,6 +4,7 @@ import {
   UserProfile,
   PersonalRecord,
   WorkoutEntry,
+  WorkoutExercise,
   MealEntry,
   Theme,
   BodyMetricEntry,
@@ -27,6 +28,16 @@ import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 
 export * from './types';
 
+export interface ActiveWorkoutDraft {
+  id?: string;
+  name?: string;
+  date: string;
+  exercises: WorkoutExercise[];
+  startedFromPlan?: string | null;
+  sessionStartTime?: number;
+  savedAt: string;
+}
+
 export interface AppState {
   profile: UserProfile | null;
   prs: PersonalRecord[];
@@ -40,6 +51,15 @@ export interface AppState {
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
+
+  // Active workout persistence
+  activeWorkoutDraft: ActiveWorkoutDraft | null;
+  saveWorkoutDraft: (draft: ActiveWorkoutDraft) => void;
+  clearWorkoutDraft: () => void;
+
+  // Food Portion Memory
+  userPortionPreferences: Record<string, number>;
+  savePortionPreference: (foodName: string, grams: number) => void;
 
   // AI Training Profile & Plans
   trainingProfile: AITrainingProfile;
@@ -168,6 +188,12 @@ export const useAppStore = create<AppState>()(
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
+
+      // Active workout persistence
+      activeWorkoutDraft: null,
+
+      // Portion Preferences
+      userPortionPreferences: {},
 
       // Habit State
       waterLogs: {},
@@ -458,6 +484,17 @@ export const useAppStore = create<AppState>()(
       }),
 
       setCustomGeminiKey: (key: string) => set({ customGeminiKey: key.trim() ? key.trim() : undefined }),
+
+      saveWorkoutDraft: (draft) => set({ activeWorkoutDraft: draft }),
+      clearWorkoutDraft: () => set({ activeWorkoutDraft: null }),
+
+      savePortionPreference: (foodName, grams) =>
+        set((state) => ({
+          userPortionPreferences: {
+            ...state.userPortionPreferences,
+            [foodName.toLowerCase().trim()]: grams,
+          },
+        })),
 
       cacheAIInsight: (date: string, insight: AICoachInsight) =>
         set((state) => ({

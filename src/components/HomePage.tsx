@@ -18,6 +18,7 @@ import {
   Sparkles,
   Droplet,
   Award,
+  FastForward,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
@@ -51,7 +52,7 @@ interface HomePageProps {
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
-  const { profile, prs, workouts, plannedWorkouts, addPlannedWorkout } = useStore();
+  const { profile, prs, workouts, plannedWorkouts, addPlannedWorkout, activeWorkoutDraft, clearWorkoutDraft } = useStore();
 
   const todayDate = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => {
@@ -287,6 +288,46 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <p className="font-medium text-text-primary">Build the next version of yourself.</p>
         <span className="text-text-muted text-[11px] hidden sm:inline">• Consistency &gt; intensity</span>
       </div>
+
+      {/* ── ACTIVE WORKOUT DRAFT RESUME BANNER ── */}
+      {activeWorkoutDraft && (
+        <div className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center shrink-0">
+              <FastForward className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-primary block font-sans">
+                WORKOUT IN PROGRESS
+              </span>
+              <span className="text-2xs text-text-secondary">
+                {activeWorkoutDraft.startedFromPlan ? `${activeWorkoutDraft.startedFromPlan} • ` : ''}
+                {activeWorkoutDraft.exercises.filter((e) => e.name.trim()).length} exercises saved
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                clearWorkoutDraft();
+                toast.info('Workout draft discarded.', 'Draft Cleared');
+              }}
+              className="text-xs text-text-muted hover:text-danger px-2 py-1 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate('workout')}
+              className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5"
+            >
+              <Play className="w-3 h-3 fill-white" />
+              <span>Resume</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 2. NEXT BEST ACTION ────────────────────────────────────────────── */}
       <NextBestActionBanner

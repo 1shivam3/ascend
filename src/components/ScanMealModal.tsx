@@ -130,13 +130,43 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
   };
 
+  const applyLearnedPortionPreferences = (result: MealAnalysisResult): MealAnalysisResult => {
+    const preferences = store.userPortionPreferences || {};
+    if (Object.keys(preferences).length === 0) return result;
+
+    let hasChanges = false;
+    const adjustedItems = result.items.map((item) => {
+      const prefGrams = preferences[item.name.toLowerCase().trim()];
+      if (prefGrams && prefGrams > 0 && prefGrams !== item.estimatedGrams) {
+        hasChanges = true;
+        const est = estimateMacros(item.name, prefGrams, 'g');
+        return {
+          ...item,
+          estimatedGrams: prefGrams,
+          quantity: `${prefGrams}g`,
+          calories: est.calories,
+          proteinG: est.proteinG,
+          carbsG: est.carbsG,
+          fatG: est.fatG,
+        };
+      }
+      return item;
+    });
+
+    if (hasChanges) {
+      return recalculateMealResult(result, adjustedItems);
+    }
+    return result;
+  };
+
   const handleOfflineEstimate = () => {
     try {
-      const result = generateOfflineMealEstimate(
+      const rawResult = generateOfflineMealEstimate(
         userNotes.trim() || 'Standard balanced meal',
         selectedHiddenIngredients,
         previewUrl || undefined
       );
+      const result = applyLearnedPortionPreferences(rawResult);
       setAnalysis(result);
       setMealName(result.mealName || 'Estimated Meal');
       setStep('review');
@@ -155,13 +185,14 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setScanError(null);
     setStep('analyzing');
     try {
-      const result = await analyzeMealPhoto({
+      const rawResult = await analyzeMealPhoto({
         file: selectedFile,
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
         customApiKey: store.customGeminiKey,
       });
 
+      const result = applyLearnedPortionPreferences(rawResult);
       setAnalysis(result);
       setMealName(result.mealName || 'Scanned Meal');
       setStep('review');
@@ -191,6 +222,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     const newGrams = editGrams > 0 ? editGrams : 100;
     const est = estimateMacros(targetItem.name, newGrams, 'g');
 
+    // Save portion preference for future auto-calibration
+    store.savePortionPreference(targetItem.name, newGrams);
+
     itemsCopy[index] = {
       ...targetItem,
       estimatedGrams: newGrams,
@@ -204,7 +238,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     const updated = recalculateMealResult(analysis, itemsCopy);
     setAnalysis(updated);
     setEditingItemIndex(null);
-    toast.info(`Updated ${targetItem.name} to ${newGrams}g`, 'Portion Adjusted');
+    toast.info(`Updated & remembered portion for ${targetItem.name} (${newGrams}g)`, 'Portion Calibrated');
   };
 
   const handleDeleteItem = (index: number) => {

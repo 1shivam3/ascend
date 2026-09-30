@@ -23,8 +23,23 @@ import {
   ArrowRightLeft,
   Bot,
   Zap,
+  Mic,
+  MicOff,
+  Clock,
+  Flame,
+  FastForward,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
+import {
+  getLastExercisePerformance,
+  getProgressionRecommendation,
+  getQuickSubstitutes,
+  compressWorkout,
+  parseVoiceWorkout,
+  ExerciseSubstitute,
+} from '@/lib/workout-engine';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
@@ -345,6 +360,9 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
   const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
   const deletePlannedWorkout = useStore((state) => state.deletePlannedWorkout);
+  const activeWorkoutDraft = useStore((state) => state.activeWorkoutDraft);
+  const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
+  const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
   const toast = useToast();
 
   const userUnit = profile?.unit || 'kg';
@@ -367,6 +385,10 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
 
+  // ── Quick Substitution & Voice State ───────────────────────────────────────
+  const [quickSubstituteIndex, setQuickSubstituteIndex] = useState<number | null>(null);
+  const [isListening, setIsListening] = useState(false);
+
   // ── AI In-Workout & Post-Workout State ─────────────────────────────────────
   const [substitutionExerciseIndex, setSubstitutionExerciseIndex] = useState<number | null>(null);
   const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState(false);
@@ -381,6 +403,138 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
+
+  // ── Auto-save Draft to Local Storage ──────────────────────────────────────
+  useEffect(() => {
+    if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => s.weight > 0 || s.reps > 0))) {
+      saveWorkoutDraft({
+        date,
+        exercises,
+        startedFromPlan,
+        sessionStartTime,
+        savedAt: new Date().toISOString(),
+      });
+    }
+  }, [isModalOpen, exercises, date, startedFromPlan, sessionStartTime, saveWorkoutDraft]);
+
+  const handleResumeWorkout = () => {
+    if (!activeWorkoutDraft) return;
+    setDate(activeWorkoutDraft.date);
+    setExercises(activeWorkoutDraft.exercises);
+    setStartedFromPlan(activeWorkoutDraft.startedFromPlan || null);
+    setSessionStartTime(activeWorkoutDraft.sessionStartTime || Date.now());
+    setIsModalOpen(true);
+    toast.success('Resumed active workout session!', 'Workout Restored');
+  };
+
+  const handleDiscardDraft = () => {
+    clearWorkoutDraft();
+    toast.info('Workout draft discarded.', 'Draft Cleared');
+  };
+
+  const handleRepeatLastWorkout = () => {
+    if (workouts.length === 0) return;
+    const last = workouts[0];
+    setSessionStartTime(Date.now());
+    const clonedExercises: WorkoutExercise[] = last.exercises.map((ex) => ({
+      name: ex.name,
+      sets: ex.sets.map((s) => ({
+        weight: s.weight,
+        reps: s.reps,
+        unit: s.unit || userUnit,
+      })),
+    }));
+    setExercises(clonedExercises);
+    setDate(new Date().toISOString().split('T')[0]);
+    setStartedFromPlan(`Repeated (${last.date})`);
+    setIsModalOpen(true);
+    toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
+  };
+
+  const handleCompressWorkout = (mins: 30 | 45 | 60) => {
+    const compressed = compressWorkout(exercises, mins);
+    setExercises(compressed);
+    toast.info(
+      `Workout shortened to ~${mins} min (${compressed.length} primary movements preserved).`,
+      'Time Adapted'
+    );
+  };
+
+  const handleQuickSubstitute = (index: number, sub: ExerciseSubstitute) => {
+    const targetEx = exercises[index];
+    if (!targetEx) return;
+    setExercises((prev) =>
+      prev.map((ex, i) =>
+        i === index
+          ? {
+              ...ex,
+              name: sub.name,
+            }
+          : ex
+      )
+    );
+    setQuickSubstituteIndex(null);
+    toast.success(`Swapped to ${sub.name}`, 'Exercise Replaced');
+  };
+
+  const toggleVoiceLogging = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+      return;
+    }
+
+    if (isListening) {
+      setIsListening(false);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognitionClass();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast.info('Listening... Say e.g. "Bench 70 for 8 8 7"', 'Voice Logging');
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setIsListening(false);
+        const parsed = parseVoiceWorkout(transcript, availableExercises);
+        if (parsed) {
+          setExercises((prev) => [
+            ...prev.filter((e) => e.name.trim()),
+            {
+              name: parsed.exerciseName,
+              sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
+            },
+          ]);
+          toast.success(
+            `Logged "${parsed.exerciseName}" (${parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')})`,
+            'Voice Input Added'
+          );
+        } else {
+          toast.error(`Could not parse: "${transcript}"`, 'Voice Error');
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+    }
+  };
 
   const handleApplyReplacement = (replacement: AISubstitutionResult) => {
     if (substitutionExerciseIndex !== null) {
@@ -527,6 +681,12 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('ASCEND • REST COMPLETE', {
+          body: 'Rest time is up! Ready for your next set.',
+          icon: '/favicon.ico',
+        });
+      }
     } catch {}
   };
 
@@ -552,6 +712,11 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   }, [isRestRunning, restSecondsLeft, toast]);
 
   const startTimer = (seconds: number) => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        Notification.requestPermission();
+      } catch {}
+    }
     setRestTotalSeconds(seconds);
     setRestSecondsLeft(seconds);
     setIsRestRunning(true);
@@ -671,6 +836,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
       exercises: validExercises,
     });
 
+    clearWorkoutDraft();
     setIsModalOpen(false);
     setStartedFromPlan(null);
     setDate(new Date().toISOString().split('T')[0]);
@@ -795,6 +961,43 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         </div>
       </header>
 
+      {/* ── ACTIVE WORKOUT DRAFT RESUME BANNER ── */}
+      {activeWorkoutDraft && !isModalOpen && (
+        <div className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center shrink-0">
+              <FastForward className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-text-primary block font-sans">
+                IN-PROGRESS WORKOUT DETECTED
+              </span>
+              <span className="text-2xs text-text-secondary">
+                {activeWorkoutDraft.startedFromPlan ? `Plan: ${activeWorkoutDraft.startedFromPlan} • ` : ''}
+                {activeWorkoutDraft.exercises.filter((e) => e.name.trim()).length} exercises saved
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDiscardDraft}
+              className="text-xs text-text-muted hover:text-danger px-2 py-1 transition-colors"
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              onClick={handleResumeWorkout}
+              className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5"
+            >
+              <Play className="w-3 h-3 fill-white" />
+              <span>Resume</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── 1. TODAY'S WORKOUT HERO (Item 13: Strong "let's train" moment) ── */}
       <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
         <div className="flex items-center justify-between">
@@ -837,6 +1040,18 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             <Play className="w-4 h-4 fill-white stroke-white" />
             <span>{plannedWorkouts.length > 0 ? 'START WORKOUT' : 'START EMPTY WORKOUT'}</span>
           </button>
+
+          {workouts.length > 0 && (
+            <button
+              type="button"
+              onClick={handleRepeatLastWorkout}
+              className="btn-secondary py-3 text-xs font-semibold px-3.5 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+              title={`Repeat last session from ${workouts[0]?.date}`}
+            >
+              <FastForward className="w-4 h-4 text-accent" />
+              <span>Repeat Last ({workouts[0]?.exercises.length} ex)</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -1118,7 +1333,20 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                   <p className="text-2xs text-text-muted font-mono mt-0.5">Record your session</p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={toggleVoiceLogging}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all ${
+                    isListening
+                      ? 'bg-rose-500/20 text-rose-400 border-rose-500/50 animate-pulse'
+                      : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
+                  }`}
+                  title="Hands-free voice logging (e.g. 'Bench 70 for 8 8 7')"
+                >
+                  {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-accent" />}
+                  <span>{isListening ? 'Listening...' : 'Voice'}</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => setIsCoachDrawerOpen(true)}
@@ -1131,6 +1359,27 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 <button onClick={closeLogger} className="text-text-secondary hover:text-text-primary p-1">
                   <X className="w-5 h-5" />
                 </button>
+              </div>
+            </div>
+
+            {/* Time Compressor Quick Bar */}
+            <div className="px-4 py-2 bg-bg-secondary/40 border-b border-border/60 flex items-center justify-between text-2xs">
+              <span className="text-text-muted font-medium flex items-center gap-1">
+                <Clock className="w-3 h-3 text-accent" />
+                Compress session:
+              </span>
+              <div className="flex items-center gap-1.5">
+                {[30, 45, 60].map((mins) => (
+                  <button
+                    key={mins}
+                    type="button"
+                    onClick={() => handleCompressWorkout(mins as 30 | 45 | 60)}
+                    className="px-2 py-0.5 rounded bg-bg-elevated hover:bg-accent/20 border border-border text-text-secondary hover:text-accent font-mono transition-colors"
+                    title={`Compress routine to ${mins} minutes keeping core compound lifts`}
+                  >
+                    {mins}m
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1237,85 +1486,161 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 </div>
 
                 <div className="flex flex-col gap-4">
-                  {exercises.map((exercise, i) => (
-                    <div key={i} className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 relative">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-mono text-accent font-semibold">EXERCISE {i + 1}</span>
-                        <div className="flex items-center gap-1.5">
-                          {exercise.name.trim() && (
-                            <button
-                              type="button"
-                              onClick={() => setSubstitutionExerciseIndex(i)}
-                              className="flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
-                              title="Replace with alternative exercise"
-                            >
-                              <ArrowRightLeft className="w-3 h-3" />
-                              <span>Replace</span>
-                            </button>
-                          )}
-                          <button
-                            onClick={() => handleRemoveExercise(i)}
-                            className="text-text-muted hover:text-danger p-1"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
+                  {exercises.map((exercise, i) => {
+                    const lastPerf = getLastExercisePerformance(exercise.name, workouts);
+                    const progRec = getProgressionRecommendation(exercise.name, workouts, userUnit);
+                    const quickSubs = getQuickSubstitutes(exercise.name);
 
-                      <input
-                        type="text"
-                        placeholder="Exercise Name (e.g. Bench Press)"
-                        value={exercise.name}
-                        onChange={e => handleExerciseNameChange(i, e.target.value)}
-                        list="exercises-list"
-                        className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary mb-3 text-sm focus:border-accent outline-none"
-                      />
-
-                      <div className="flex flex-col gap-2">
-                        {exercise.sets.map((set, j) => (
-                          <div key={j} className="flex gap-2 items-center">
-                            <span className="text-text-muted text-xs w-10 font-mono">S{j + 1}</span>
-                            <input
-                              type="number"
-                              placeholder="Weight"
-                              value={set.weight || ''}
-                              onChange={e => handleSetChange(i, j, 'weight', Number(e.target.value))}
-                              className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
-                            />
-                            <select
-                              value={set.unit}
-                              onChange={e => handleSetChange(i, j, 'unit', e.target.value)}
-                              className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
-                            >
-                              <option value="kg">kg</option>
-                              <option value="lbs">lbs</option>
-                            </select>
-                            <span className="text-text-muted text-xs">×</span>
-                            <input
-                              type="number"
-                              placeholder="Reps"
-                              value={set.reps || ''}
-                              onChange={e => handleSetChange(i, j, 'reps', Number(e.target.value))}
-                              className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
-                            />
+                    return (
+                      <div key={i} className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 relative">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-mono text-accent font-semibold">EXERCISE {i + 1}</span>
+                          <div className="flex items-center gap-1.5">
+                            {exercise.name.trim() && (
+                              <div className="relative">
+                                <button
+                                  type="button"
+                                  onClick={() => setQuickSubstituteIndex(quickSubstituteIndex === i ? null : i)}
+                                  className="flex items-center gap-1 text-2xs font-semibold px-2 py-0.5 rounded-md bg-accent/10 text-accent hover:bg-accent/20 transition-colors"
+                                  title="Quick substitute options"
+                                >
+                                  <ArrowRightLeft className="w-3 h-3" />
+                                  <span>Replace</span>
+                                </button>
+                                {quickSubstituteIndex === i && (
+                                  <div className="absolute right-0 top-7 z-30 w-64 bg-bg-card border border-accent/40 rounded-xl shadow-xl p-2 space-y-1.5 animate-in fade-in zoom-in-95">
+                                    <div className="text-3xs uppercase font-bold text-accent px-1">Quick Direct Substitutes</div>
+                                    {quickSubs.map((sub, sIdx) => (
+                                      <button
+                                        key={sIdx}
+                                        type="button"
+                                        onClick={() => handleQuickSubstitute(i, sub)}
+                                        className="w-full text-left p-1.5 rounded-lg hover:bg-accent/15 flex flex-col transition-colors"
+                                      >
+                                        <span className="text-xs font-semibold text-text-primary">{sub.name}</span>
+                                        <span className="text-3xs text-text-muted">{sub.equipment} • {sub.reason}</span>
+                                      </button>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setQuickSubstituteIndex(null);
+                                        setSubstitutionExerciseIndex(i);
+                                      }}
+                                      className="w-full text-left p-1.5 rounded-lg hover:bg-bg-secondary text-2xs text-accent font-semibold pt-1 border-t border-border flex items-center justify-between"
+                                    >
+                                      <span>Ask AI for deeper options...</span>
+                                      <ArrowRightLeft className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <button
-                              onClick={() => handleRemoveSet(i, j)}
+                              onClick={() => handleRemoveExercise(i)}
                               className="text-text-muted hover:text-danger p-1"
                             >
                               <X className="w-4 h-4" />
                             </button>
                           </div>
-                        ))}
-                      </div>
+                        </div>
 
-                      <button
-                        onClick={() => handleAddSet(i)}
-                        className="btn-ghost text-xs mt-2.5 w-full flex items-center justify-center gap-1 py-1.5"
-                      >
-                        <Plus className="w-3.5 h-3.5" /> Add Set
-                      </button>
-                    </div>
-                  ))}
+                        <input
+                          type="text"
+                          placeholder="Exercise Name (e.g. Bench Press)"
+                          value={exercise.name}
+                          onChange={e => handleExerciseNameChange(i, e.target.value)}
+                          list="exercises-list"
+                          className="w-full bg-bg-elevated border border-border rounded-lg p-2 text-text-primary mb-2 text-sm focus:border-accent outline-none"
+                        />
+
+                        {/* Last Performance & Progression Coach Pill */}
+                        {exercise.name.trim() && (lastPerf || progRec) && (
+                          <div className="mb-3 p-2 rounded-lg bg-bg-secondary/60 border border-border/70 space-y-1 text-2xs">
+                            {lastPerf && (
+                              <div className="flex items-center justify-between text-text-secondary">
+                                <span className="font-semibold text-accent">Last time:</span>
+                                <span className="font-mono">{lastPerf.summary} <span className="text-text-muted">({lastPerf.date})</span></span>
+                              </div>
+                            )}
+                            {progRec && (
+                              <div className="flex items-baseline justify-between text-emerald-500 font-medium">
+                                <span className="text-3xs uppercase tracking-wider font-semibold">Target:</span>
+                                <span className="font-mono text-text-primary">{progRec.targetSummary}</span>
+                              </div>
+                            )}
+                            {progRec?.isPlateau && (
+                              <div className="flex items-center gap-1 text-amber-500 font-medium text-3xs pt-0.5">
+                                <AlertTriangle className="w-3 h-3 shrink-0" />
+                                <span>Plateau detected ({progRec.plateauSessionsCount} sessions flat). Deload or swap.</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col gap-2">
+                          {exercise.sets.map((set, j) => (
+                            <div key={j} className="flex gap-2 items-center">
+                              <span className="text-text-muted text-xs w-7 font-mono">S{j + 1}</span>
+
+                              {/* 1-Tap Autofill from Last Session */}
+                              {lastPerf?.sets && lastPerf.sets[j] && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const prevS = lastPerf.sets[j];
+                                    handleSetChange(i, j, 'weight', prevS.weight);
+                                    handleSetChange(i, j, 'reps', prevS.reps);
+                                  }}
+                                  className="px-1.5 py-1 rounded text-3xs font-mono bg-bg-card hover:bg-accent/20 border border-border/80 text-text-muted hover:text-accent transition-colors shrink-0"
+                                  title="Autofill previous weight and reps"
+                                >
+                                  Prev: {lastPerf.sets[j].weight}×{lastPerf.sets[j].reps}
+                                </button>
+                              )}
+
+                              <input
+                                type="number"
+                                placeholder="Weight"
+                                value={set.weight || ''}
+                                onChange={e => handleSetChange(i, j, 'weight', Number(e.target.value))}
+                                className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
+                              />
+                              <select
+                                value={set.unit}
+                                onChange={e => handleSetChange(i, j, 'unit', e.target.value)}
+                                className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent"
+                              >
+                                <option value="kg">kg</option>
+                                <option value="lbs">lbs</option>
+                              </select>
+                              <span className="text-text-muted text-xs">×</span>
+                              <input
+                                type="number"
+                                placeholder="Reps"
+                                value={set.reps || ''}
+                                onChange={e => handleSetChange(i, j, 'reps', Number(e.target.value))}
+                                className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
+                              />
+                              <button
+                                onClick={() => handleRemoveSet(i, j)}
+                                className="text-text-muted hover:text-danger p-1"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+
+                        <button
+                          onClick={() => handleAddSet(i)}
+                          className="btn-ghost text-xs mt-2.5 w-full flex items-center justify-center gap-1 py-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Add Set
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

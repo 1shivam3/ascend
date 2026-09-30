@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { parseWorkoutCSV } from '@/lib/workout-import';
 import {
   X,
   Download,
@@ -14,7 +15,8 @@ import {
   HardDrive,
   AlertTriangle,
   FolderOpen,
-  Key
+  Key,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface DataVaultModalProps {
@@ -37,12 +39,15 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const importAllData = useStore((state) => state.importAllData);
   const clearAllData = useStore((state) => state.clearAllData);
+  const addWorkout = useStore((state) => state.addWorkout);
+  const addPR = useStore((state) => state.addPR);
 
   const toast = useToast();
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false);
+  const csvFileInputRef = useRef<HTMLInputElement>(null);
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
   const [keySaved, setKeySaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,6 +166,47 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     };
     reader.onerror = () => {
       toast.error('Device file access was denied or interrupted.', 'Access Denied');
+    };
+    reader.readAsText(file);
+  };
+
+  // CSV Workout History Import (Strong, Hevy, FitNotes, Generic)
+  const handleCSVFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const result = parseWorkoutCSV(text);
+
+        result.workouts.forEach((w) => {
+          addWorkout(w);
+        });
+
+        result.newPRs.forEach((pr) => {
+          addPR(pr);
+        });
+
+        toast.success(
+          `Imported ${result.workoutsImported} workouts & calibrated ${result.newPRsCount} PRs!`,
+          'History Imported'
+        );
+        setMessage({
+          text: `Successfully imported ${result.workoutsImported} workouts (${result.totalSets} total sets) and calibrated ${result.newPRsCount} PR milestones from CSV!`,
+          type: 'success',
+        });
+      } catch (err: any) {
+        toast.error(err?.message || 'Could not parse CSV file.', 'CSV Import Failed');
+        setMessage({ text: err?.message || 'Invalid workout CSV.', type: 'error' });
+      } finally {
+        if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+        setTimeout(() => setMessage(null), 5000);
+      }
+    };
+    reader.onerror = () => {
+      toast.error('File reading was interrupted.', 'Import Error');
     };
     reader.readAsText(file);
   };
@@ -344,6 +390,39 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <p className="text-2xs text-text-muted text-center pt-1 font-mono">
                 {prs.length} PRs • {workouts.length} Workouts • {bodyMetrics.length} Body Weight logs
               </p>
+            </div>
+
+            {/* CSV Workout Importer (Strong / Hevy / FitNotes) */}
+            <div className="space-y-2 p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                  <span className="text-2xs font-mono uppercase font-bold text-text-primary">
+                    Import Workout History (CSV)
+                  </span>
+                </div>
+                <span className="text-3xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
+                  Strong / Hevy / FitNotes
+                </span>
+              </div>
+              <p className="text-2xs text-text-secondary leading-relaxed">
+                Seamlessly transfer your training history. Upload your export CSV file to import all past workouts and auto-calibrate your PRs.
+              </p>
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                className="btn-secondary w-full py-2 px-3 text-xs font-semibold flex items-center justify-center gap-2 hover:border-emerald-500/40 hover:text-emerald-400"
+              >
+                <Upload className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Upload Workout CSV</span>
+              </button>
+              <input
+                ref={csvFileInputRef}
+                type="file"
+                accept=".csv,text/csv,text/plain"
+                onChange={handleCSVFileChange}
+                className="hidden"
+              />
             </div>
 
             {/* Privacy Guarantee */}

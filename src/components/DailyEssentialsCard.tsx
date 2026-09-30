@@ -89,6 +89,38 @@ export default function DailyEssentialsCard({
     return `${Math.round(weightKg)} kg`;
   };
 
+  // 7-day moving average and weekly trend
+  const weightAnalytics = React.useMemo(() => {
+    if (!bodyMetrics || bodyMetrics.length === 0) return null;
+    const sorted = [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const recent7 = sorted.slice(0, 7);
+    if (recent7.length === 0) return null;
+    const avgKg = recent7.reduce((sum, b) => sum + b.weightKg, 0) / recent7.length;
+
+    let trendStr = '';
+    if (sorted.length >= 4) {
+      const older = sorted.slice(3, 10);
+      if (older.length > 0) {
+        const olderAvg = older.reduce((sum, b) => sum + b.weightKg, 0) / older.length;
+        const diffKg = avgKg - olderAvg;
+        const diffConverted = profile?.unit === 'lbs' ? diffKg * 2.20462 : diffKg;
+        const unit = profile?.unit || 'kg';
+        const sign = diffConverted > 0.05 ? '+' : diffConverted < -0.05 ? '' : '±';
+        if (Math.abs(diffConverted) >= 0.05) {
+          trendStr = `${sign}${diffConverted.toFixed(1)} ${unit}/wk`;
+        } else {
+          trendStr = 'Steady';
+        }
+      }
+    }
+
+    return {
+      avgKg,
+      trendStr,
+      count: recent7.length,
+    };
+  }, [bodyMetrics, profile?.unit]);
+
   return (
     <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3 shadow-xs">
       {/* Top Header & Day Mode Toggle */}
@@ -202,7 +234,14 @@ export default function DailyEssentialsCard({
             <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${todayWeight ? 'bg-emerald-500/15 text-emerald-600' : 'bg-bg-secondary text-purple-500'}`}>
               <Scale className="w-3.5 h-3.5" />
             </div>
-            <span className="text-xs font-semibold text-text-primary">Weight</span>
+            <div>
+              <span className="text-xs font-semibold text-text-primary block leading-none">Weight</span>
+              {weightAnalytics && (
+                <span className="text-3xs text-text-muted font-mono mt-0.5 block">
+                  7d Avg: {displayWeight(weightAnalytics.avgKg)} {weightAnalytics.trendStr ? `(${weightAnalytics.trendStr})` : ''}
+                </span>
+              )}
+            </div>
           </div>
           <span className={`text-xs font-semibold ${todayWeight ? 'text-emerald-600 font-mono' : 'text-text-muted'}`}>
             {todayWeight ? `${displayWeight(todayWeight.weightKg)} ✓` : 'Pending'}
