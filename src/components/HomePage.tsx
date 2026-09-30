@@ -19,16 +19,17 @@ import {
   Droplet,
   Award,
   FastForward,
+  Settings,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import RankBadge from '@/components/ui/RankBadge';
-import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
+import SettingsModal from '@/components/SettingsModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import DailyEssentialsCard from '@/components/DailyEssentialsCard';
@@ -37,18 +38,13 @@ import NextBestActionBanner from '@/components/NextBestActionBanner';
 import AICoachCard from '@/components/AICoachCard';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
-import WeeklyConsistencyCard from '@/components/WeeklyConsistencyCard';
-import DailyTimelineCard from '@/components/DailyTimelineCard';
-import MonthlyAscensionReportModal from '@/components/MonthlyAscensionReportModal';
-import AIWorkoutPlannerCard from '@/components/AIWorkoutPlannerCard';
-import WeeklyReviewModal from '@/components/WeeklyReviewModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import { calculateHydrationTarget, formatWaterLiters } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { AIPlannedWorkout, PlannedWorkout, PlannedExercise } from '@/lib/types';
 
 interface HomePageProps {
-  onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+  onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
@@ -174,6 +170,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const showAfternoonHydrationCheck = !hasTrainedToday && currentHour >= 14 && waterToday < 1200;
 
   // Modals state
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isDataVaultModalOpen, setIsDataVaultModalOpen] = useState(false);
@@ -182,10 +179,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [showBwRatioInfo, setShowBwRatioInfo] = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen, setIsCreatineModalOpen] = useState(false);
-  const [isAscensionReportModalOpen, setIsAscensionReportModalOpen] = useState(false);
-  const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
-  const [showHabitMatrix, setShowHabitMatrix] = useState(false);
 
   const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
     const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
@@ -280,6 +274,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
 
           <ThemeToggle />
+
+          {/* Settings & Vault Gear */}
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="btn-circle"
+            title="Settings, AI Key & Data Vault"
+          >
+            <Settings className="w-4 h-4 text-text-secondary hover:text-text-primary transition-colors" />
+          </button>
         </div>
       </header>
 
@@ -339,7 +343,45 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       />
 
       {/* ── 3. TODAY'S WORKOUT HERO (High Prominence) ────────────────────────── */}
-      {hasTrainedToday ? (
+      {workouts.length === 0 ? (
+        <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="section-title text-[10px] mb-0 font-sans">GET STARTED</span>
+            </div>
+            <span className="text-2xs font-mono text-accent">FIRST SESSION</span>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-black text-text-primary leading-tight font-sans">
+              Start Your First Workout
+            </h3>
+            <p className="text-xs text-text-secondary mt-0.5">
+              Log a quick routine or choose exercises as you train. ASCEND calculates your progression and strength automatically.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => onNavigate('workout')}
+              className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              <Play className="w-4 h-4 fill-white stroke-white" />
+              <span>START WORKOUT</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="btn-secondary py-3 text-xs font-semibold px-4 flex items-center justify-center gap-1.5 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span>⚡ Suggest Workout</span>
+            </button>
+          </div>
+        </section>
+      ) : hasTrainedToday ? (
         <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -356,7 +398,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               Session Complete!
             </h3>
             <p className="text-xs text-text-secondary mt-0.5">
-              {todayWorkouts.length} workout{todayWorkouts.length !== 1 ? 's' : ''} logged today. Rest, recover, and hit your hydration target.
+              {todayWorkouts.length} workout{todayWorkouts.length !== 1 ? 's' : ''} logged today. Rest, recover, and hit your hydration target ({formatWaterLiters(waterTargetMl)}).
             </p>
           </div>
 
@@ -395,12 +437,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
           <div>
             <h3 className="text-xl font-black text-text-primary leading-tight font-sans">
-              {activePlan ? activePlan.name : 'Upper Body'}
+              {activePlan ? activePlan.name : 'Ready to Train'}
             </h3>
             <p className="text-xs text-text-secondary mt-0.5">
               {activePlan
-                ? `${activePlan.exercises.length} exercises • ~55 min`
-                : '5 exercises • ~60 min • Compound Progression'}
+                ? `${activePlan.exercises.length} exercises configured • ~50 min`
+                : workouts.length > 0
+                ? `Last session: ${workouts[0]?.exercises.length} exercises on ${workouts[0]?.date}`
+                : '5 exercises • Compound Progression'}
             </p>
           </div>
 
@@ -411,16 +455,29 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>START WORKOUT</span>
+              <span>{activePlan ? 'START PLAN' : 'START WORKOUT'}</span>
             </button>
+
+            {workouts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onNavigate('workout')}
+                className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+                title={`Repeat last session with 1 tap`}
+              >
+                <FastForward className="w-3.5 h-3.5 text-accent" />
+                <span>Repeat Last</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setIsSuggestedModalOpen(true)}
-              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
               title="Generate customized workout plan by body part & intensity"
             >
               <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>Suggest Workout</span>
+              <span>⚡ Suggest</span>
             </button>
           </div>
         </section>
@@ -441,17 +498,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 5. COACH INSIGHT ─────────────────────────────────────────────────── */}
-      <AICoachCard onOpenSettings={() => setIsDataVaultModalOpen(true)} />
-
-      {/* ── 6. RECENT PROGRESS (STRENGTH SUMMARY - NO GAMIFICATION) ──────────── */}
+      {/* ── 5. TODAY'S PROGRESS (STRENGTH & HABITS SNAPSHOT) ──────────────── */}
       <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5">
         <div className="flex items-center justify-between">
           <div>
-            <span className="section-title text-[10px] block">STRENGTH SUMMARY</span>
+            <span className="section-title text-[10px] block">TODAY&apos;S PROGRESS</span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <h3 className="text-xl font-black text-text-primary tracking-tight font-sans">
-                {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg} kg total` : 'Strength Summary'}
+                {bigThreeStats.totalKg > 0 ? `${bigThreeStats.totalKg} kg total` : 'Strength & Habits'}
               </h3>
               <span className="text-xs font-bold text-accent">
                 {overallLevel ? `${overallLevel.averageRatio}× bodyweight` : '1.0× BW'}
@@ -463,29 +517,29 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             onClick={() => onNavigate('prs')}
             className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5"
           >
-            <span>View PRs</span>
+            <span>View Full Progress &rarr;</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Squat • Bench • Deadlift Summary */}
+        {/* Compound Lifts & Water Snapshot */}
         <div className="grid grid-cols-3 gap-2 py-2.5 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
           <div>
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
-            <span className="font-bold text-text-primary text-sm mt-0.5 block">
-              {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
-            </span>
-          </div>
-          <div className="border-l border-border">
             <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
             <span className="font-bold text-text-primary text-sm mt-0.5 block">
               {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
             </span>
           </div>
           <div className="border-l border-border">
-            <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
+            <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
             <span className="font-bold text-text-primary text-sm mt-0.5 block">
-              {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
+              {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+            </span>
+          </div>
+          <div className="border-l border-border">
+            <span className="text-[10px] text-text-muted uppercase font-bold block">Water</span>
+            <span className="font-bold text-text-primary text-sm mt-0.5 block">
+              {formatWaterLiters(waterToday)} / {formatWaterLiters(waterTargetMl)}
             </span>
           </div>
         </div>
@@ -497,73 +551,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </span>
             <button
               type="button"
-              onClick={() => setShowDOTSModal(true)}
+              onClick={() => onNavigate('prs')}
               className="text-2xs text-accent hover:underline font-semibold"
             >
-              Score details &rarr;
+              Full analysis &rarr;
             </button>
           </div>
         )}
       </section>
 
-      {/* ── 7. MONTHLY PROGRESS ──────────────────────────────────────────────── */}
-      <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="section-title text-[10px] block">MONTHLY PROGRESS</span>
-            <h3 className="text-base font-bold text-text-primary tracking-tight font-sans mt-0.5">
-              Consistency &amp; Volume
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsAscensionReportModalOpen(true)}
-            className="text-xs font-bold text-accent hover:underline flex items-center gap-1 py-1 px-2 rounded-lg hover:bg-accent/10 transition-colors"
-          >
-            <Award className="w-3.5 h-3.5" />
-            <span>View Report &rarr;</span>
-          </button>
-        </div>
+      {/* ── 6. COACH INSIGHT ─────────────────────────────────────────────────── */}
+      <AICoachCard onOpenSettings={() => setIsSettingsOpen(true)} />
 
-        <div className="flex items-center justify-between text-xs text-text-muted py-1">
-          <span>{workouts.filter(w => w.date && w.date.startsWith(todayStr.substring(0, 7))).length} workouts logged this month</span>
-          <button
-            type="button"
-            onClick={() => setShowHabitMatrix(!showHabitMatrix)}
-            className="text-accent hover:underline text-2xs font-semibold"
-          >
-            {showHabitMatrix ? 'Hide Habit Matrix' : 'View Habit Matrix ▾'}
-          </button>
-        </div>
-
-        {showHabitMatrix && (
-          <div className="pt-2 border-t border-border animate-fade-in">
-            <WorkoutHeatmap
-              onNavigate={onNavigate}
-              onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
-              onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
-            />
-          </div>
-        )}
-      </section>
-
-      {/* ── FOOTER UTILITY ──────────────────────────────────────────────────── */}
-      <div className="pt-2 pb-8 flex items-center justify-between text-xs text-text-muted font-sans border-t border-border/60">
-        <button
-          type="button"
-          onClick={() => setIsPrivacyModalOpen(true)}
-          className="hover:text-text-primary underline transition-colors"
-        >
-          Legal &amp; Privacy
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsDataVaultModalOpen(true)}
-          className="text-accent hover:underline flex items-center gap-1.5 font-semibold"
-        >
-          <HardDrive className="w-3.5 h-3.5" />
-          <span>Data Backup &amp; Reset</span>
-        </button>
+      {/* ── CLEAN FOOTER ──────────────────────────────────────────────────── */}
+      <div className="pt-2 pb-6 text-center text-3xs font-mono text-text-muted">
+        ASCEND • Focused Daily Execution
       </div>
 
       {/* ── DOTS DETAILS MODAL ──────────────────────────────────────────────── */}
@@ -719,17 +721,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onClose={() => setIsCreatineModalOpen(false)}
       />
 
-      {/* Monthly Ascension Progression Report Modal */}
-      <MonthlyAscensionReportModal
-        isOpen={isAscensionReportModalOpen}
-        onClose={() => setIsAscensionReportModalOpen(false)}
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
 
-      {/* Weekly Review Modal */}
-      <WeeklyReviewModal
-        isOpen={isWeeklyReviewModalOpen}
-        onClose={() => setIsWeeklyReviewModalOpen(false)}
-      />
 
       {/* Suggested Workout Modal */}
       <SuggestedWorkoutModal

@@ -1,25 +1,26 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Home, Dumbbell, Trophy, UtensilsCrossed } from 'lucide-react';
+import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
 import HomePage from '@/components/HomePage';
-import PRsPage from '@/components/PRsPage';
+import ProgressPage from '@/components/ProgressPage';
 import WorkoutPage from '@/components/WorkoutPage';
 import MealsPage from '@/components/MealsPage';
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
-  { id: 'prs', label: 'PRs', icon: Trophy },
   { id: 'workout', label: 'Workout', icon: Dumbbell },
+  { id: 'progress', label: 'Progress', icon: TrendingUp },
   { id: 'meals', label: 'Nutrition', icon: UtensilsCrossed },
 ] as const;
 
-type TabId = (typeof tabs)[number]['id'];
+type TabId = (typeof tabs)[number]['id'] | 'prs';
 
 export default function AppPage() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
+  const [progressInitialTab, setProgressInitialTab] = useState<'overview' | 'strength' | 'prs' | 'bodyweight' | 'training'>('overview');
   const { profile, theme, _hasHydrated } = useStore();
 
   useEffect(() => {
@@ -74,22 +75,72 @@ export default function AppPage() {
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       <main className="w-full">
-        {activeTab === 'home' && <HomePage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
-        {activeTab === 'prs' && <PRsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
-        {activeTab === 'workout' && <WorkoutPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
-        {activeTab === 'meals' && <MealsPage onNavigate={(tab) => setActiveTab(tab as TabId)} />}
+        {activeTab === 'home' && (
+          <HomePage
+            onNavigate={(tab) => {
+              if (tab === 'prs') {
+                setProgressInitialTab('prs');
+                setActiveTab('progress');
+              } else {
+                setActiveTab(tab as TabId);
+              }
+            }}
+          />
+        )}
+        {activeTab === 'workout' && (
+          <WorkoutPage
+            onNavigate={(tab) => {
+              if (tab === 'prs') {
+                setProgressInitialTab('prs');
+                setActiveTab('progress');
+              } else {
+                setActiveTab(tab as TabId);
+              }
+            }}
+          />
+        )}
+        {(activeTab === 'progress' || activeTab === 'prs') && (
+          <ProgressPage
+            initialTab={progressInitialTab}
+            onNavigate={(tab) => {
+              if (tab === 'prs') {
+                setProgressInitialTab('prs');
+                setActiveTab('progress');
+              } else {
+                setActiveTab(tab as TabId);
+              }
+            }}
+          />
+        )}
+        {activeTab === 'meals' && (
+          <MealsPage
+            onNavigate={(tab) => {
+              if (tab === 'prs') {
+                setProgressInitialTab('prs');
+                setActiveTab('progress');
+              } else {
+                setActiveTab(tab as TabId);
+              }
+            }}
+          />
+        )}
       </main>
 
       {/* Floating Bottom Navigation (Item 22: Orange active tab, slate unselected, safe area) */}
       <nav className="floating-pill-nav" aria-label="Bottom Navigation">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
+          const isActive = activeTab === tab.id || (tab.id === 'progress' && activeTab === 'prs');
           return (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === 'progress') {
+                  setProgressInitialTab('overview');
+                }
+                setActiveTab(tab.id);
+              }}
               className={`pill-nav-item transition-all ${
                 isActive
                   ? 'active text-accent bg-accent/10 font-bold'

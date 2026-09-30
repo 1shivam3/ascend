@@ -663,6 +663,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       .slice(0, 3);
   }, [meals]);
 
+  const recentUniqueMeals = useMemo(() => {
+    const seen = new Set<string>();
+    const list: MealEntry[] = [];
+    const sorted = [...meals].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    for (const m of sorted) {
+      const key = `${m.name.toLowerCase().trim()}_${m.foods.map(f => f.name).sort().join(',')}`;
+      if (!seen.has(key) && m.foods.length > 0) {
+        seen.add(key);
+        list.push(m);
+        if (list.length >= 6) break;
+      }
+    }
+    return list;
+  }, [meals]);
+
   const currentMealMacros = calculateMealMacros(foods);
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -849,49 +864,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             Quick high-protein suggestions to hit your daily target:
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {[
-              {
-                title: 'Whey Protein Shake',
-                desc: '1 scoop whey + 250ml milk',
-                protein: 30,
-                cals: 200,
-                foods: [
-                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
-                  { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
-                ],
-              },
-              {
-                title: 'Greek Yogurt + Whey',
-                desc: '150g curd/yogurt + 1 scoop',
-                protein: 38,
-                cals: 240,
-                foods: [
-                  { name: 'Greek Yogurt', quantity: 150, unit: 'g', calories: 120, proteinG: 14, carbsG: 6, fatG: 2 },
-                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
-                ],
-              },
-              {
-                title: 'Paneer / Tofu Stir-Fry',
-                desc: '150g grilled paneer/tofu',
-                protein: 27,
-                cals: 320,
-                foods: [
-                  { name: 'Paneer', quantity: 150, unit: 'g', calories: 320, proteinG: 27, carbsG: 4, fatG: 22 },
-                ],
-              },
-            ].map((option, idx) => (
-              <div
-                key={idx}
-                className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors"
-              >
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {/* Option 1: Fastest Option */}
+              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2">
                 <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-text-primary">{option.title}</span>
-                    <span className="text-2xs font-bold text-emerald-600 font-mono">+{option.protein}g</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-3xs font-mono uppercase font-bold text-accent px-1.5 py-0.5 rounded bg-accent/10">
+                      ⚡ FASTEST OPTION (1 MIN PREP)
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 font-mono">+30g P</span>
                   </div>
-                  <p className="text-3xs text-text-muted mt-0.5">{option.desc}</p>
-                  <p className="text-3xs text-text-secondary mt-1 font-mono">~{option.cals} kcal</p>
+                  <h4 className="text-xs font-bold text-text-primary">Whey Protein Shake</h4>
+                  <p className="text-3xs text-text-muted mt-0.5">1 scoop whey protein + 250ml milk or water</p>
+                  <p className="text-3xs text-text-secondary mt-1 font-mono">~200 kcal • 30g protein • 14g carbs</p>
                 </div>
                 <button
                   type="button"
@@ -899,19 +885,57 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     const newMeal: MealEntry = {
                       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
                       date: todayDate,
-                      name: option.title,
-                      foods: option.foods,
+                      name: 'Whey Protein Shake',
+                      foods: [
+                        { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                        { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+                      ],
                     };
                     addMeal(newMeal);
-                    toast.success(`Logged ${option.title} (+${option.protein}g protein)!`, 'Protein Logged');
+                    toast.success('Logged Whey Protein Shake (+30g protein)!', 'Protein Logged');
                   }}
-                  className="btn-secondary py-1 text-2xs font-semibold w-full mt-2 flex items-center justify-center gap-1 hover:border-emerald-500 hover:text-emerald-500"
+                  className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
                 >
                   <Plus className="w-3 h-3" />
                   <span>Log 1-Tap</span>
                 </button>
               </div>
-            ))}
+
+              {/* Option 2: More Filling Option */}
+              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-3xs font-mono uppercase font-bold text-emerald-500 px-1.5 py-0.5 rounded bg-emerald-500/10">
+                      🍽️ MORE FILLING OPTION (HIGH SATIETY)
+                    </span>
+                    <span className="text-xs font-bold text-emerald-600 font-mono">+38g P</span>
+                  </div>
+                  <h4 className="text-xs font-bold text-text-primary">Greek Yogurt + Whey Bowl</h4>
+                  <p className="text-3xs text-text-muted mt-0.5">150g greek yogurt / thick curd + 1 scoop protein</p>
+                  <p className="text-3xs text-text-secondary mt-1 font-mono">~240 kcal • 38g protein • 8g carbs</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newMeal: MealEntry = {
+                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                      date: todayDate,
+                      name: 'Greek Yogurt + Whey',
+                      foods: [
+                        { name: 'Greek Yogurt', quantity: 150, unit: 'g', calories: 120, proteinG: 14, carbsG: 6, fatG: 2 },
+                        { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                      ],
+                    };
+                    addMeal(newMeal);
+                    toast.success('Logged Greek Yogurt + Whey (+38g protein)!', 'Protein Logged');
+                  }}
+                  className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Log 1-Tap</span>
+                </button>
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -1207,36 +1231,51 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         )}
 
-        {/* ── Frequently Logged Full Meals (Auto-Detected) ── */}
-        {frequentMealsFromHistory.length > 0 && (
+        {/* ── Recent Meals (1-Tap Repeat) ── */}
+        {recentUniqueMeals.length > 0 && (
           <div className="pt-1.5 space-y-1.5">
-            <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono px-0.5 block">
-              FREQUENT FULL MEALS
-            </span>
+            <div className="flex items-center justify-between px-0.5">
+              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono block">
+                RECENT MEALS (1-TAP REPEAT)
+              </span>
+              <span className="text-2xs text-text-muted">
+                {recentUniqueMeals.length} recent
+              </span>
+            </div>
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {frequentMealsFromHistory.map(({ meal, count }) => {
+              {recentUniqueMeals.map((meal) => {
                 const mMacros = calculateMealMacros(meal.foods);
+                const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                });
                 return (
                   <div
                     key={meal.id}
-                    className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs"
+                    className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs flex flex-col justify-between"
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
-                      <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted shrink-0">
-                        {count}×
-                      </span>
+                    <div>
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
+                        <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted shrink-0">
+                          {mealDate}
+                        </span>
+                      </div>
+                      <div className="text-2xs text-text-muted truncate mt-0.5" title={meal.foods.map((f) => f.name).join(', ')}>
+                        {meal.foods.map((f) => f.name).join(', ')}
+                      </div>
+                      <div className="text-2xs text-text-muted mt-1">
+                        {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-600 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
+                      </div>
                     </div>
-                    <div className="text-2xs text-text-muted">
-                      {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-600 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-0.5">
+                    <div className="flex items-center gap-1.5 pt-1">
                       <button
                         type="button"
                         onClick={() => handleLogFrequentMeal(meal)}
-                        className="btn-primary flex-1 py-1 text-2xs font-semibold"
+                        className="btn-primary flex-1 py-1 text-2xs font-semibold flex items-center justify-center gap-1"
                       >
-                        + Log Meal
+                        <Plus className="w-3 h-3" />
+                        <span>Repeat Today</span>
                       </button>
                       <button
                         type="button"

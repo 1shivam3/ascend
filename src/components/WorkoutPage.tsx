@@ -43,6 +43,7 @@ import {
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
+import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
@@ -387,9 +388,12 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
 
   // ── Quick Substitution & Voice State ───────────────────────────────────────
   const [quickSubstituteIndex, setQuickSubstituteIndex] = useState<number | null>(null);
+  const [quickSubEquipmentFilter, setQuickSubEquipmentFilter] = useState<string>('all');
   const [isListening, setIsListening] = useState(false);
+  const [expandedRationaleIndex, setExpandedRationaleIndex] = useState<number | null>(null);
 
-  // ── AI In-Workout & Post-Workout State ─────────────────────────────────────
+  // ── Exercise Library & AI State ───────────────────────────────────────────
+  const [isExerciseLibraryOpen, setIsExerciseLibraryOpen] = useState(false);
   const [substitutionExerciseIndex, setSubstitutionExerciseIndex] = useState<number | null>(null);
   const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState(false);
   const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
@@ -570,8 +574,24 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
     setExpandedWorkouts(newExpanded);
   };
 
-  const handleAddExercise = () => {
-    setExercises(prev => [...prev, { name: '', sets: [{ reps: 8, weight: 0, unit: userUnit }] }]);
+  const handleAddExercise = (exerciseName = '') => {
+    setExercises(prev => [...prev, { name: exerciseName, sets: [{ reps: 8, weight: 0, unit: userUnit }] }]);
+  };
+
+  const handleSelectFromLibrary = (exerciseName: string) => {
+    if (!isModalOpen) {
+      setStartedFromPlan(null);
+      setSessionStartTime(Date.now());
+      setExercises([{ name: exerciseName, sets: [{ reps: 8, weight: 0, unit: userUnit }] }]);
+      setIsModalOpen(true);
+    } else {
+      handleAddExercise(exerciseName);
+    }
+    toast.success(`Added "${exerciseName}" to session`, 'Exercise Added');
+  };
+
+  const handleExerciseNotesChange = (index: number, notes: string) => {
+    setExercises(prev => prev.map((ex, i) => i === index ? { ...ex, notes } : ex));
   };
 
   const handleRemoveExercise = (index: number) => {
@@ -1025,43 +1045,79 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-2 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              if (plannedWorkouts.length > 0) {
-                handleStartPlan(plannedWorkouts[0]);
-              } else {
-                openBlankLogger();
-              }
-            }}
-            className="btn-primary flex-1 py-3 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-          >
-            <Play className="w-4 h-4 fill-white stroke-white" />
-            <span>{plannedWorkouts.length > 0 ? 'START WORKOUT' : 'START EMPTY WORKOUT'}</span>
-          </button>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+          {plannedWorkouts.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => handleStartPlan(plannedWorkouts[0])}
+              className="btn-primary py-3 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5 fill-white stroke-white" />
+              <span className="truncate">Start: {plannedWorkouts[0].name}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={openBlankLogger}
+              className="btn-primary py-3 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+            >
+              <Play className="w-3.5 h-3.5 fill-white stroke-white" />
+              <span>START WORKOUT</span>
+            </button>
+          )}
 
-          {workouts.length > 0 && (
+          {workouts.length > 0 ? (
             <button
               type="button"
               onClick={handleRepeatLastWorkout}
-              className="btn-secondary py-3 text-xs font-semibold px-3.5 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
               title={`Repeat last session from ${workouts[0]?.date}`}
             >
-              <FastForward className="w-4 h-4 text-accent" />
+              <FastForward className="w-3.5 h-3.5 text-accent" />
               <span>Repeat Last ({workouts[0]?.exercises.length} ex)</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span>⚡ Suggest Plan</span>
             </button>
           )}
 
           <button
             type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
-            className="btn-secondary py-3 text-xs font-semibold px-4 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-            title="Generate customized workout plan by body part & intensity"
+            onClick={openBlankLogger}
+            className="btn-secondary py-3 text-xs font-semibold px-3 flex items-center justify-center gap-1.5 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
           >
-            <Zap className="w-4 h-4 text-accent" />
-            <span>⚡ Suggest Workout</span>
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>Start Empty</span>
           </button>
+        </div>
+
+        {/* Quick Exercise Library & Suggestion Bar */}
+        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
+          <button
+            type="button"
+            onClick={() => setIsExerciseLibraryOpen(true)}
+            className="text-text-muted hover:text-accent flex items-center gap-1.5 py-1 transition-colors"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-accent" />
+            <span>Browse Exercise Library (History &amp; PRs) &rarr;</span>
+          </button>
+
+          {workouts.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="text-accent hover:underline flex items-center gap-1 font-semibold"
+            >
+              <Zap className="w-3 h-3" />
+              <span>Suggest Workout</span>
+            </button>
+          )}
         </div>
       </section>
 
@@ -1476,13 +1532,25 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
               {/* Exercises */}
               <div>
                 <div className="flex justify-between items-center mb-3">
-                  <label className="section-title">Exercises</label>
-                  <button
-                    onClick={handleAddExercise}
-                    className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Add Exercise
-                  </button>
+                  <label className="section-title mb-0">Exercises</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsExerciseLibraryOpen(true)}
+                      className="text-xs font-semibold text-text-secondary hover:text-accent flex items-center gap-1 px-2.5 py-1 rounded-lg bg-bg-elevated border border-border transition-colors"
+                      title="Browse full exercise database with muscle groups and personal PR history"
+                    >
+                      <BookOpen className="w-3.5 h-3.5 text-accent" />
+                      <span>Browse Library</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddExercise()}
+                      className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110 px-2.5 py-1 rounded-lg bg-accent/10 border border-accent/30 transition-colors"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add Exercise
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-4">
@@ -1508,19 +1576,60 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                                   <span>Replace</span>
                                 </button>
                                 {quickSubstituteIndex === i && (
-                                  <div className="absolute right-0 top-7 z-30 w-64 bg-bg-card border border-accent/40 rounded-xl shadow-xl p-2 space-y-1.5 animate-in fade-in zoom-in-95">
-                                    <div className="text-3xs uppercase font-bold text-accent px-1">Quick Direct Substitutes</div>
-                                    {quickSubs.map((sub, sIdx) => (
+                                  <div className="absolute right-0 top-7 z-30 w-72 bg-bg-card border border-accent/40 rounded-xl shadow-xl p-2.5 space-y-2 animate-in fade-in zoom-in-95">
+                                    <div className="flex items-center justify-between pb-1 border-b border-border">
+                                      <span className="text-3xs uppercase font-bold text-accent font-mono">
+                                        Quick Direct Substitutes
+                                      </span>
                                       <button
-                                        key={sIdx}
                                         type="button"
-                                        onClick={() => handleQuickSubstitute(i, sub)}
-                                        className="w-full text-left p-1.5 rounded-lg hover:bg-accent/15 flex flex-col transition-colors"
+                                        onClick={() => setQuickSubstituteIndex(null)}
+                                        className="text-text-muted hover:text-text-primary p-0.5"
                                       >
-                                        <span className="text-xs font-semibold text-text-primary">{sub.name}</span>
-                                        <span className="text-3xs text-text-muted">{sub.equipment} • {sub.reason}</span>
+                                        <X className="w-3 h-3" />
                                       </button>
-                                    ))}
+                                    </div>
+
+                                    {/* Equipment Filter Chips (Item 22) */}
+                                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                                      {['all', 'barbell', 'dumbbell', 'machine', 'cable', 'bodyweight'].map((eq) => (
+                                        <button
+                                          key={eq}
+                                          type="button"
+                                          onClick={() => setQuickSubEquipmentFilter(eq)}
+                                          className={`px-1.5 py-0.5 rounded text-3xs capitalize font-medium transition-colors ${
+                                            quickSubEquipmentFilter === eq
+                                              ? 'bg-accent text-white font-bold'
+                                              : 'bg-bg-secondary text-text-muted hover:text-text-primary'
+                                          }`}
+                                        >
+                                          {eq}
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    <div className="space-y-1 max-h-48 overflow-y-auto">
+                                      {quickSubs
+                                        .filter((sub) => quickSubEquipmentFilter === 'all' || sub.equipment.toLowerCase() === quickSubEquipmentFilter.toLowerCase())
+                                        .map((sub, sIdx) => (
+                                          <button
+                                            key={sIdx}
+                                            type="button"
+                                            onClick={() => handleQuickSubstitute(i, sub)}
+                                            className="w-full text-left p-1.5 rounded-lg hover:bg-accent/15 flex flex-col transition-colors"
+                                          >
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs font-semibold text-text-primary">{sub.name}</span>
+                                              <span className="text-3xs uppercase font-mono text-accent">{sub.equipment}</span>
+                                            </div>
+                                            <span className="text-3xs text-text-muted">{sub.reason}</span>
+                                          </button>
+                                        ))}
+                                      {quickSubs.filter((sub) => quickSubEquipmentFilter === 'all' || sub.equipment.toLowerCase() === quickSubEquipmentFilter.toLowerCase()).length === 0 && (
+                                        <p className="text-3xs text-text-muted text-center py-2">No {quickSubEquipmentFilter} substitutes found.</p>
+                                      )}
+                                    </div>
+
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1564,9 +1673,25 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                               </div>
                             )}
                             {progRec && (
-                              <div className="flex items-baseline justify-between text-emerald-500 font-medium">
-                                <span className="text-3xs uppercase tracking-wider font-semibold">Target:</span>
-                                <span className="font-mono text-text-primary">{progRec.targetSummary}</span>
+                              <div className="space-y-1">
+                                <div className="flex items-baseline justify-between text-emerald-500 font-medium">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-3xs uppercase tracking-wider font-semibold">Target:</span>
+                                    <span className="font-mono text-text-primary">{progRec.targetSummary}</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setExpandedRationaleIndex(expandedRationaleIndex === i ? null : i)}
+                                    className="text-3xs text-accent underline hover:text-accent-hover font-semibold"
+                                  >
+                                    {expandedRationaleIndex === i ? 'Hide' : 'Why?'}
+                                  </button>
+                                </div>
+                                {expandedRationaleIndex === i && (
+                                  <p className="text-3xs text-text-secondary italic pt-0.5 bg-bg-card/40 p-1.5 rounded border border-border/40">
+                                    {progRec.rationale}
+                                  </p>
+                                )}
                               </div>
                             )}
                             {progRec?.isPlateau && (
@@ -1638,6 +1763,17 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                         >
                           <Plus className="w-3.5 h-3.5" /> Add Set
                         </button>
+
+                        {/* Tiny Exercise Notes Field (Item 11) */}
+                        <div className="mt-2.5 pt-2 border-t border-border/50">
+                          <input
+                            type="text"
+                            placeholder="Exercise note (e.g. 2 RIR, pause at bottom, seat pos 4)..."
+                            value={exercise.notes || ''}
+                            onChange={(e) => handleExerciseNotesChange(i, e.target.value)}
+                            className="w-full bg-bg-secondary/40 border border-border/40 rounded-lg px-2.5 py-1 text-2xs text-text-secondary placeholder:text-text-muted/60 focus:border-accent outline-none font-sans"
+                          />
+                        </div>
                       </div>
                     );
                   })}
@@ -1723,6 +1859,16 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         userUnit={userUnit}
         onStartWorkout={handleStartSuggestedWorkout}
         onSavePlan={handleSaveSuggestedPlan}
+      />
+
+      {/* Exercise Library Modal (Item 21) */}
+      <ExerciseLibraryModal
+        isOpen={isExerciseLibraryOpen}
+        onClose={() => setIsExerciseLibraryOpen(false)}
+        onSelectExercise={handleSelectFromLibrary}
+        workouts={workouts}
+        prs={prs}
+        userUnit={userUnit}
       />
     </div>
   );

@@ -62,6 +62,7 @@ export interface WorkoutSet {
 export interface WorkoutExercise {
   name: string;
   sets: WorkoutSet[];
+  notes?: string;
 }
 
 export interface WorkoutEntry {
