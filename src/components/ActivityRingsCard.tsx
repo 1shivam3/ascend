@@ -62,15 +62,15 @@ export default function ActivityRingsCard({
   const circumference = 2 * Math.PI * radius;
 
   return (
-    <div className="card p-3.5 bg-bg-card border border-border shadow-xs">
-      <div className="flex items-center justify-between mb-2.5 px-0.5">
-        <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider font-mono">
-          TODAY&apos;S HABIT RINGS
+    <div className="card p-4 bg-bg-card border border-border shadow-xs">
+      <div className="flex items-center justify-between mb-3 px-1">
+        <span className="text-label font-bold text-text-muted">
+          Today&apos;s habit rings
         </span>
         <button
           type="button"
           onClick={onOpenCreatineModal}
-          className={`text-2xs font-mono font-bold px-2 py-0.5 rounded-full flex items-center gap-1 transition-all ${
+          className={`text-label font-semibold px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-all ${
             creatineTaken
               ? 'bg-amber-500/15 text-amber-500 border border-amber-500/30'
               : 'bg-bg-secondary text-text-muted border border-border/60 hover:border-amber-500/30'
@@ -82,12 +82,12 @@ export default function ActivityRingsCard({
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-3">
         {/* Ring 1: Training */}
         <button
           type="button"
           onClick={onNavigateWorkout}
-          className="flex flex-col items-center p-2 rounded-xl bg-bg-secondary/40 hover:bg-bg-secondary border border-border/60 hover:border-accent/40 transition-all text-center group active:scale-95"
+          className="flex flex-col items-center p-1 transition-all text-center group active:scale-95 hover:opacity-90"
         >
           <div className="relative w-14 h-14 flex items-center justify-center">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 60 60">
@@ -115,8 +115,8 @@ export default function ActivityRingsCard({
               <Dumbbell className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-[11px] font-bold text-text-primary mt-1.5 font-sans">Training</span>
-          <span className="text-3xs text-text-muted font-mono">
+          <span className="text-xs font-bold text-text-primary mt-1.5 font-sans">Training</span>
+          <span className="text-2xs text-text-muted font-medium">
             {hasTrainedToday ? 'Done ✓' : 'Planned'}
           </span>
         </button>
@@ -125,7 +125,7 @@ export default function ActivityRingsCard({
         <button
           type="button"
           onClick={onNavigateMeals}
-          className="flex flex-col items-center p-2 rounded-xl bg-bg-secondary/40 hover:bg-bg-secondary border border-border/60 hover:border-emerald-500/40 transition-all text-center group active:scale-95"
+          className="flex flex-col items-center p-1 transition-all text-center group active:scale-95 hover:opacity-90"
         >
           <div className="relative w-14 h-14 flex items-center justify-center">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 60 60">
@@ -153,8 +153,8 @@ export default function ActivityRingsCard({
               <UtensilsCrossed className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-[11px] font-bold text-text-primary mt-1.5 font-sans">Protein</span>
-          <span className="text-3xs text-text-muted font-mono tabular-nums">
+          <span className="text-xs font-bold text-text-primary mt-1.5 font-sans">Protein</span>
+          <span className="text-2xs text-text-muted font-medium tabular-nums">
             {proteinToday}/{proteinTarget}g
           </span>
         </button>
@@ -163,7 +163,7 @@ export default function ActivityRingsCard({
         <button
           type="button"
           onClick={onOpenHydrationModal}
-          className="flex flex-col items-center p-2 rounded-xl bg-bg-secondary/40 hover:bg-bg-secondary border border-border/60 hover:border-sky-500/40 transition-all text-center group active:scale-95"
+          className="flex flex-col items-center p-1 transition-all text-center group active:scale-95 hover:opacity-90"
         >
           <div className="relative w-14 h-14 flex items-center justify-center">
             <svg className="w-14 h-14 -rotate-90" viewBox="0 0 60 60">
@@ -179,7 +179,7 @@ export default function ActivityRingsCard({
                 cx="30"
                 cy="30"
                 r={radius}
-                className="stroke-sky-500 transition-all duration-700 ease-out"
+                className="stroke-sky-400 transition-all duration-700 ease-out"
                 strokeWidth="5"
                 strokeDasharray={circumference}
                 strokeDashoffset={circumference - (waterPct / 100) * circumference}
@@ -187,12 +187,12 @@ export default function ActivityRingsCard({
                 fill="none"
               />
             </svg>
-            <div className="absolute inset-0 flex items-center justify-center text-sky-500">
+            <div className="absolute inset-0 flex items-center justify-center text-sky-400">
               <Droplet className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-[11px] font-bold text-text-primary mt-1.5 font-sans">Water</span>
-          <span className="text-3xs text-text-muted font-mono tabular-nums">
+          <span className="text-xs font-bold text-text-primary mt-1.5 font-sans">Water</span>
+          <span className="text-2xs text-text-muted font-medium tabular-nums">
             {(waterToday / 1000).toFixed(1)}/{(waterTarget / 1000).toFixed(1)}L
           </span>
         </button>

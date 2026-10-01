@@ -404,7 +404,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         }}
       />
 
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl w-full max-w-lg shadow-2xl relative animate-scale-up my-auto overflow-hidden">
+      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-lg shadow-2xl relative animate-scale-in my-auto overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border">
           <div className="flex items-center gap-2.5">

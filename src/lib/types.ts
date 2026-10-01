@@ -59,6 +59,7 @@ export interface WorkoutSet {
   unit: Unit;
   completed?: boolean;
   rpe?: number;
+  isPR?: boolean;
 }
 
 export interface WorkoutExercise {
@@ -70,6 +71,8 @@ export interface WorkoutExercise {
 export interface WorkoutEntry {
   id: string;
   date: string; // YYYY-MM-DD
+  name?: string;
+  durationMinutes?: number;
   exercises: WorkoutExercise[];
 }
 

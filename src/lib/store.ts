@@ -220,7 +220,29 @@ export const useAppStore = create<AppState>()(
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
-      setProfile: (profile) => set({ profile, hasCompletedOnboarding: true }),
+      setProfile: (profile) => set((state) => {
+        let nextMetrics = state.bodyMetrics;
+        if ((!nextMetrics || nextMetrics.length === 0) && profile.bodyweightKg) {
+          const entry: BodyMetricEntry = {
+            id: 'initial_bw_' + (profile.id || 'user'),
+            date: profile.createdAt ? profile.createdAt.split('T')[0] : getLocalTodayStr(),
+            weightKg: profile.bodyweightKg,
+            heightCm: profile.heightCm,
+            notes: 'Baseline calibration',
+          };
+          nextMetrics = [entry];
+        }
+        let nextFavorites = state.favoriteFoods;
+        if (!nextFavorites || nextFavorites.length === 0) {
+          nextFavorites = DEFAULT_FAVORITE_FOODS;
+        }
+        return {
+          profile,
+          hasCompletedOnboarding: true,
+          bodyMetrics: nextMetrics,
+          favoriteFoods: nextFavorites,
+        };
+      }),
       
       setTheme: (theme) => {
         if (typeof document !== 'undefined') {
@@ -612,6 +634,24 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
+
+          // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
+          if (state.profile?.bodyweightKg && (!state.bodyMetrics || state.bodyMetrics.length === 0)) {
+            const entry: BodyMetricEntry = {
+              id: 'initial_bw_' + (state.profile.id || 'user'),
+              date: state.profile.createdAt ? state.profile.createdAt.split('T')[0] : getLocalTodayStr(),
+              weightKg: state.profile.bodyweightKg,
+              heightCm: state.profile.heightCm,
+              notes: 'Baseline calibration',
+            };
+            useAppStore.setState({ bodyMetrics: [entry] });
+          }
+
+          // Ensure staple foods are populated if empty
+          if (!state.favoriteFoods || state.favoriteFoods.length === 0) {
+            useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
+          }
+
           // Apply active theme to DOM immediately upon hydration
           if (typeof document !== 'undefined') {
             const currentTheme = state.theme || 'light';

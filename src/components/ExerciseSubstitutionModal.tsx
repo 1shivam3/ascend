@@ -65,9 +65,9 @@ export default function ExerciseSubstitutionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl w-full max-w-md p-5 shadow-2xl relative animate-scale-up space-y-4">
+      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-5 shadow-2xl relative animate-scale-in space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border-light dark:border-border-dark pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
               <ArrowRightLeft className="w-4 h-4" />
@@ -108,7 +108,7 @@ export default function ExerciseSubstitutionModal({
                   className={`w-full text-left p-3 rounded-xl border text-xs font-medium transition-all flex items-center justify-between ${
                     selectedReason === opt
                       ? 'border-accent bg-accent/10 text-accent font-semibold'
-                      : 'border-border-light dark:border-border-dark hover:bg-bg-secondary text-text-primary'
+                      : 'border-border hover:bg-bg-secondary text-text-primary'
                   }`}
                 >
                   <span>{opt}</span>
@@ -132,7 +132,7 @@ export default function ExerciseSubstitutionModal({
         {/* Result Card */}
         {result && !loading && (
           <div className="space-y-3.5 animate-fade-in">
-            <div className="p-4 rounded-xl bg-bg-secondary/70 border border-border-light dark:border-border-dark space-y-2.5">
+            <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2.5">
               <div className="flex items-center justify-between text-2xs text-text-muted">
                 <span className="uppercase tracking-wider font-semibold">Suggested Alternative</span>
                 <span className="font-medium text-accent">{result.movementPattern}</span>
@@ -155,7 +155,7 @@ export default function ExerciseSubstitutionModal({
                 )}
               </div>
 
-              <p className="text-xs text-text-secondary pt-1 leading-relaxed border-t border-border-light/60 dark:border-border-dark/60">
+              <p className="text-xs text-text-secondary pt-1 leading-relaxed border-t border-border">
                 {result.reason}
               </p>
             </div>
@@ -164,7 +164,7 @@ export default function ExerciseSubstitutionModal({
               <button
                 type="button"
                 onClick={() => setResult(null)}
-                className="flex-1 py-2.5 rounded-xl border border-border-light dark:border-border-dark text-xs font-semibold text-text-secondary hover:bg-bg-secondary transition-colors"
+                className="flex-1 py-2.5 rounded-xl border border-border text-xs font-semibold text-text-secondary hover:bg-bg-secondary transition-colors"
               >
                 Choose Other Reason
               </button>

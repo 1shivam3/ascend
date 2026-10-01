@@ -74,17 +74,17 @@ export default function QuickLogBar({
   };
 
   return (
-    <div className="card p-3 bg-bg-card border border-border space-y-2">
+    <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
       <div className="flex items-center justify-between px-1">
-        <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider">
-          QUICK 1-TAP LOG
+        <span className="text-label font-bold text-text-muted">
+          Quick log
         </span>
         <button
           type="button"
           onClick={onOpenHydrationModal}
-          className="text-[11px] font-semibold text-accent hover:underline"
+          className="text-label font-medium text-text-secondary hover:text-text-primary transition-colors"
         >
-          Hydration Target
+          Hydration target
         </button>
       </div>
 

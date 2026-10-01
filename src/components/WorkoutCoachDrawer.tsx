@@ -83,9 +83,9 @@ export default function WorkoutCoachDrawer({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-t-3xl sm:rounded-2xl w-full max-w-lg p-5 shadow-2xl relative animate-slide-up sm:animate-scale-up space-y-4 max-h-[85vh] overflow-y-auto">
+      <div className="bg-bg-card border border-border rounded-t-3xl sm:rounded-2xl w-full max-w-lg p-5 shadow-2xl relative animate-slide-up sm:animate-scale-in space-y-4 max-h-[85vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border-light dark:border-border-dark pb-3">
+        <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
               <Bot className="w-4 h-4" />
@@ -121,7 +121,7 @@ export default function WorkoutCoachDrawer({
                   type="button"
                   onClick={() => handleSendCommand(cmd.prompt)}
                   disabled={loading}
-                  className="flex items-center gap-2 p-2.5 rounded-xl border border-border-light dark:border-border-dark bg-bg-secondary hover:border-accent text-left transition-all text-xs font-semibold text-text-primary disabled:opacity-50"
+                  className="flex items-center gap-2 p-2.5 rounded-xl border border-border bg-bg-secondary hover:border-accent text-left transition-all text-xs font-semibold text-text-primary disabled:opacity-50"
                 >
                   <Icon className="w-3.5 h-3.5 text-accent shrink-0" />
                   <span className="truncate">{cmd.label}</span>
@@ -144,7 +144,7 @@ export default function WorkoutCoachDrawer({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Ask anything or request a tweak..."
-            className="flex-1 px-3.5 py-2.5 rounded-xl border border-border-light dark:border-border-dark bg-bg-secondary text-text-primary text-xs focus:outline-none focus:border-accent"
+            className="flex-1 px-3.5 py-2.5 rounded-xl border border-border bg-bg-secondary text-text-primary text-xs focus:outline-none focus:border-accent"
           />
           <button
             type="submit"
@@ -187,7 +187,7 @@ export default function WorkoutCoachDrawer({
                   {response.modifiedExercises.map((e, idx) => (
                     <div
                       key={idx}
-                      className="p-2 rounded-lg bg-white/70 dark:bg-[#161b22] text-xs flex justify-between items-center"
+                      className="p-2 rounded-lg bg-bg-secondary border border-border text-xs flex justify-between items-center"
                     >
                       <span className="font-semibold text-text-primary">{e.exercise}</span>
                       <span className="text-accent font-mono text-2xs font-bold">

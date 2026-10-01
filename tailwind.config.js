@@ -51,6 +51,10 @@ module.exports = {
       },
       fontSize: {
         '2xs': ['0.65rem', { lineHeight: '0.875rem' }],
+        label:   ['12px', '16px'],
+        body:    ['14px', '20px'],
+        title:   ['17px', '24px'],
+        display: ['32px', '36px'],
       },
       boxShadow: {
         xs: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',

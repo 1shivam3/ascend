@@ -101,8 +101,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Section 1: Profile & Preferences */}
           <div className="space-y-2">
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted px-1">
-              PROFILE &amp; UNITS
+            <span className="text-label font-bold text-text-muted px-1">
+              Profile &amp; units
             </span>
 
             <div className="card p-3 divide-y divide-border/60 bg-bg-card border border-border">
@@ -148,8 +148,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Section 2: Habit Targets */}
           <div className="space-y-2">
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted px-1">
-              HABIT TARGETS
+            <span className="text-label font-bold text-text-muted px-1">
+              Habit targets
             </span>
 
             <div className="card p-3 divide-y divide-border/60 bg-bg-card border border-border">
@@ -185,8 +185,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Section 3: AI Configuration */}
           <div className="space-y-2">
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted px-1">
-              AI INTELLIGENCE
+            <span className="text-label font-bold text-text-muted px-1">
+              AI intelligence
             </span>
 
             <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
@@ -226,13 +226,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   Save
                 </button>
               </div>
+
+              <p className="text-[11px] text-text-muted flex items-center gap-1.5 pt-0.5">
+                <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Your API key stays on this device in local storage and is never sent to our servers.</span>
+              </p>
             </div>
           </div>
 
           {/* Section 4: Data & Backups */}
           <div className="space-y-2">
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted px-1">
-              DATA VAULT &amp; BACKUP
+            <span className="text-label font-bold text-text-muted px-1">
+              Data vault &amp; backup
             </span>
 
             <div
@@ -252,8 +257,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Section 5: Legal & Privacy */}
           <div className="space-y-2">
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted px-1">
-              SAFETY &amp; PRIVACY
+            <span className="text-label font-bold text-text-muted px-1">
+              Safety &amp; privacy
             </span>
 
             <div

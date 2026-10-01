@@ -2,10 +2,15 @@
 
 import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { ChevronLeft, ChevronRight, Sparkles, CheckCircle2, Dumbbell, Droplet, Flame, Pill } from 'lucide-react';
+import { Dumbbell, Droplet, UtensilsCrossed, Sparkles, ChevronRight, Check } from 'lucide-react';
 import { calculateHydrationTarget, toLocalDateString } from '@/lib/habits';
 
 interface DayHabitStats {
+  dateStr: string;
+  dayName: string;
+  dayNum: number;
+  isToday: boolean;
+  isFuture: boolean;
   hasGym: boolean;
   waterMl: number;
   waterTargetMl: number;
@@ -14,24 +19,27 @@ interface DayHabitStats {
   proteinTargetG: number;
   hitProtein: boolean;
   hasCreatine: boolean;
+  totalCompleted: number;
 }
 
-export default function HomeActivityHeatmap() {
-  const store = useStore();
-  const [activeDate, setActiveDate] = useState<Date>(() => new Date());
+interface HomeActivityHeatmapProps {
+  onNavigateProgress?: () => void;
+}
+
+export default function HomeActivityHeatmap({ onNavigateProgress }: HomeActivityHeatmapProps) {
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
 
   const today = useMemo(() => new Date(), []);
   const todayKey = toLocalDateString(today);
 
-  const profile = store.profile;
-  const workouts = store.workouts;
-  const meals = store.meals;
-  const waterLogs = store.waterLogs;
-  const creatineLogs = store.creatineLogs;
-  const gymLogs = store.gymLogs;
-  const macroGoals = store.macroGoals;
-  const hydrationConfig = store.hydrationConfig;
+  const profile = useStore((s) => s.profile);
+  const workouts = useStore((s) => s.workouts);
+  const meals = useStore((s) => s.meals);
+  const waterLogs = useStore((s) => s.waterLogs);
+  const creatineLogs = useStore((s) => s.creatineLogs);
+  const gymLogs = useStore((s) => s.gymLogs);
+  const macroGoals = useStore((s) => s.macroGoals);
+  const hydrationConfig = useStore((s) => s.hydrationConfig);
 
   const bw = profile?.bodyweightKg || 75;
   const baseProteinTarget = macroGoals?.proteinG || Math.round(bw * 1.8);
@@ -41,52 +49,52 @@ export default function HomeActivityHeatmap() {
     isCustomTarget: hydrationConfig?.isCustomTarget,
   });
 
-  const year = activeDate.getFullYear();
-  const month = activeDate.getMonth();
+  // Calculate 7 days for current week (Mon -> Sun)
+  const weekDays = useMemo<DayHabitStats[]>(() => {
+    const now = new Date();
+    const currentDayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - currentDayOfWeek);
+    monday.setHours(0, 0, 0, 0);
 
-  // Days in month
-  const daysInMonth = useMemo(() => {
-    return new Date(year, month + 1, 0).getDate();
-  }, [year, month]);
+    const days: DayHabitStats[] = [];
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // First day offset (0 = Mon, 6 = Sun)
-  const firstDayOffset = useMemo(() => {
-    const day = new Date(year, month, 1).getDay();
-    return (day + 6) % 7;
-  }, [year, month]);
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dStr = toLocalDateString(d);
 
-  // Build habit stats dictionary for all days in month
-  const monthStats = useMemo(() => {
-    const stats: Record<string, DayHabitStats> = {};
-    const wList = workouts || [];
-    const mList = meals || [];
-    const waterMap = waterLogs || {};
-    const creatineMap = creatineLogs || {};
-    const gymMap = gymLogs || {};
+      const isToday = dStr === todayKey;
+      const isFuture = dStr > todayKey;
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-      // Gym
-      const hasWorkout = wList.some((w) => w.date && w.date.startsWith(dStr));
-      const hasManualGym = !!gymMap[dStr];
+      // Check gym
+      const hasWorkout = workouts.some((w) => w.date && w.date.startsWith(dStr));
+      const hasManualGym = !!gymLogs[dStr];
       const hasGym = hasWorkout || hasManualGym;
 
-      // Water
-      const waterMl = waterMap[dStr] || 0;
+      // Check water
+      const waterMl = waterLogs[dStr] || 0;
       const hitWater = waterMl >= baseWaterTarget && waterMl > 0;
 
-      // Protein
-      const dayMeals = mList.filter((m) => m.date && m.date.startsWith(dStr));
+      // Check protein
+      const dayMeals = meals.filter((m) => m.date && m.date.startsWith(dStr));
       const proteinG = Math.round(
         dayMeals.reduce((acc, m) => acc + m.foods.reduce((sum, f) => sum + (f.proteinG || 0), 0), 0)
       );
       const hitProtein = proteinG >= baseProteinTarget && proteinG > 0;
 
-      // Creatine
-      const hasCreatine = !!creatineMap[dStr]?.taken;
+      // Check creatine
+      const hasCreatine = !!creatineLogs[dStr]?.taken;
 
-      stats[dStr] = {
+      const totalCompleted = (hasGym ? 1 : 0) + (hitProtein ? 1 : 0) + (hitWater ? 1 : 0) + (hasCreatine ? 1 : 0);
+
+      days.push({
+        dateStr: dStr,
+        dayName: dayNames[i],
+        dayNum: d.getDate(),
+        isToday,
+        isFuture,
         hasGym,
         waterMl,
         waterTargetMl: baseWaterTarget,
@@ -95,125 +103,78 @@ export default function HomeActivityHeatmap() {
         proteinTargetG: baseProteinTarget,
         hitProtein,
         hasCreatine,
-      };
+        totalCompleted,
+      });
     }
 
-    return stats;
-  }, [year, month, daysInMonth, workouts, gymLogs, waterLogs, meals, creatineLogs, baseProteinTarget, baseWaterTarget]);
+    return days;
+  }, [todayKey, workouts, gymLogs, waterLogs, meals, creatineLogs, baseProteinTarget, baseWaterTarget]);
 
-  const handlePrevMonth = () => {
-    setActiveDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-    setSelectedDayKey(null);
-  };
-
-  const handleNextMonth = () => {
-    setActiveDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-    setSelectedDayKey(null);
-  };
-
-  const monthName = activeDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  // Selected day detail
-  const selectedStats = selectedDayKey ? monthStats[selectedDayKey] : null;
+  const selectedStats = selectedDayKey ? weekDays.find((d) => d.dateStr === selectedDayKey) : null;
 
   return (
     <div className="card p-3.5 sm:p-4 bg-bg-card border border-border shadow-xs space-y-3">
-      {/* Header with Month Navigation */}
-      <div className="flex items-center justify-between">
+      {/* Header */}
+      <div className="flex items-center justify-between px-0.5">
         <div>
-          <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider font-mono block">
-            ACTIVITY HEATMAP
+          <span className="text-label font-bold text-text-muted">
+            Weekly consistency
           </span>
-          <h3 className="text-sm sm:text-base font-bold text-text-primary leading-tight font-sans">
-            {monthName}
-          </h3>
+          <p className="text-2xs text-text-secondary mt-0.5">
+            {weekDays[0].dayName} {weekDays[0].dayNum} – {weekDays[6].dayName} {weekDays[6].dayNum}
+          </p>
         </div>
 
-        <div className="flex items-center gap-1">
+        {onNavigateProgress && (
           <button
             type="button"
-            onClick={handlePrevMonth}
-            className="p-1.5 rounded-lg border border-border bg-bg-secondary/60 text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-90 transition-all"
-            title="Previous Month"
+            onClick={onNavigateProgress}
+            className="text-label font-medium text-text-secondary hover:text-text-primary transition-colors flex items-center gap-0.5"
           >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveDate(new Date());
-              setSelectedDayKey(todayKey);
-            }}
-            className="px-2 py-1 rounded-lg border border-border bg-bg-secondary/60 text-2xs font-semibold text-text-primary hover:border-accent/40 active:scale-95 transition-all"
-          >
-            Today
-          </button>
-          <button
-            type="button"
-            onClick={handleNextMonth}
-            className="p-1.5 rounded-lg border border-border bg-bg-secondary/60 text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-90 transition-all"
-            title="Next Month"
-          >
+            <span>Full matrix</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
-        </div>
+        )}
       </div>
 
-      {/* Calendar Grid (M, T, W, T, F, S, S) */}
-      <div className="grid grid-cols-7 gap-1 sm:gap-1.5 text-center">
-        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, idx) => (
-          <span key={`${day}-${idx}`} className="text-[10px] font-mono font-bold text-text-muted">
-            {day}
-          </span>
-        ))}
-
-        {/* Empty padding cells for start of month */}
-        {Array.from({ length: firstDayOffset }).map((_, i) => (
-          <div key={`empty-${i}`} className="aspect-square" />
-        ))}
-
-        {/* Days of month */}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const dayNum = i + 1;
-          const dStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-          const stat = monthStats[dStr];
-          const isToday = dStr === todayKey;
-          const isSelected = dStr === selectedDayKey;
-
-          const dots = [
-            { active: stat?.hasGym, color: 'bg-accent shadow-xs shadow-accent/40' },
-            { active: stat?.hitWater, color: 'bg-[#4CC2FF] shadow-xs shadow-[#4CC2FF]/40' },
-            { active: stat?.hitProtein, color: 'bg-[#3DDC97] shadow-xs shadow-[#3DDC97]/40' },
-            { active: stat?.hasCreatine, color: 'bg-[#FFC23D] shadow-xs shadow-[#FFC23D]/40' },
-          ].filter((d) => d.active);
+      {/* 7-Day Strip */}
+      <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-center">
+        {weekDays.map((day) => {
+          const isSelected = selectedDayKey === day.dateStr;
 
           return (
             <button
-              key={dStr}
+              key={day.dateStr}
               type="button"
-              onClick={() => setSelectedDayKey(selectedDayKey === dStr ? null : dStr)}
-              className={`aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-all select-none relative ${
-                isToday
-                  ? 'border-2 border-accent bg-accent/10 shadow-xs'
+              onClick={() => setSelectedDayKey(isSelected ? null : day.dateStr)}
+              className={`py-2 px-1 rounded-xl border flex flex-col items-center justify-between transition-all select-none active:scale-95 ${
+                day.isToday
+                  ? 'border-accent/80 bg-accent/5 ring-1 ring-accent'
                   : isSelected
-                  ? 'border-2 border-text-primary bg-bg-secondary'
-                  : 'bg-bg-secondary/40 border border-border/60 hover:border-accent/40 hover:bg-bg-secondary'
+                  ? 'border-text-primary bg-bg-secondary shadow-sm'
+                  : day.isFuture
+                  ? 'border-border/40 bg-bg-secondary/30 opacity-60'
+                  : day.totalCompleted >= 3
+                  ? 'border-emerald-500/40 bg-emerald-500/10'
+                  : 'border-border/70 bg-bg-secondary/60 hover:border-border'
               }`}
             >
-              <span
-                className={`text-[11px] font-mono leading-none ${
-                  isToday ? 'font-bold text-accent' : isSelected ? 'font-bold text-text-primary' : 'text-text-secondary'
-                }`}
-              >
-                {dayNum}
+              <span className={`text-[10px] font-bold block ${day.isToday ? 'text-accent' : 'text-text-muted'}`}>
+                {day.dayName}
+              </span>
+              <span className="text-xs font-bold text-text-primary tabular-nums mt-0.5">
+                {day.dayNum}
               </span>
 
-              {/* Dots row */}
-              <div className="flex items-center justify-center gap-0.5 h-1.5">
-                {dots.length > 0 ? (
-                  dots.map((d, dIdx) => (
-                    <span key={dIdx} className={`w-1.5 h-1.5 rounded-full ${d.color}`} />
-                  ))
+              {/* Habit indicator dots */}
+              <div className="flex items-center gap-0.5 justify-center w-full mt-1.5 h-2">
+                {!day.isFuture ? (
+                  <>
+                    <span className={`w-1.5 h-1.5 rounded-full ${day.hasGym ? 'bg-accent' : 'bg-border/60'}`} title="Gym" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${day.hitProtein ? 'bg-[#22C55E]' : 'bg-border/60'}`} title="Protein" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${day.hitWater ? 'bg-[#38BDF8]' : 'bg-border/60'}`} title="Water" />
+                    <span className={`w-1.5 h-1.5 rounded-full ${day.hasCreatine ? 'bg-[#F5B301]' : 'bg-border/60'}`} title="Creatine" />
+                  </>
                 ) : (
                   <span className="w-1 h-1 rounded-full bg-border/40" />
                 )}
@@ -223,77 +184,66 @@ export default function HomeActivityHeatmap() {
         })}
       </div>
 
-      {/* Selected Day Popout Details */}
-      {selectedDayKey && selectedStats && (
-        <div className="p-3 rounded-xl bg-bg-secondary border border-accent/40 space-y-2 animate-fade-in">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-text-primary font-mono">
-              {new Date(selectedDayKey + 'T00:00:00').toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
+      {/* Selected Day Details Drawer */}
+      {selectedStats && (
+        <div className="p-3 rounded-xl bg-bg-secondary/80 border border-border animate-fade-in text-xs space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-text-primary">
+              {selectedStats.dayName}, {selectedStats.dayNum} {today.toLocaleString('en-US', { month: 'short' })}
+              {selectedStats.isToday && <span className="text-accent ml-1.5 text-2xs font-semibold">(Today)</span>}
             </span>
             <button
               type="button"
               onClick={() => setSelectedDayKey(null)}
-              className="text-text-muted hover:text-text-primary text-[11px]"
+              className="text-2xs text-text-muted hover:text-text-primary"
             >
               Close
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-2xs font-mono">
-            <div className={`p-2 rounded-lg border ${selectedStats.hasGym ? 'bg-accent/10 border-accent/40 text-accent font-bold' : 'bg-bg-card border-border text-text-muted'}`}>
-              <div className="flex items-center gap-1">
-                <Dumbbell className="w-3 h-3" />
-                <span>Gym: {selectedStats.hasGym ? 'Complete ✓' : 'Rest Day'}</span>
-              </div>
+          <div className="grid grid-cols-2 gap-2 text-2xs">
+            <div className="p-2 rounded-lg bg-bg-card border border-border/70 flex items-center justify-between">
+              <span className="text-text-muted flex items-center gap-1.5">
+                <Dumbbell className="w-3.5 h-3.5 text-accent" />
+                <span>Training</span>
+              </span>
+              <span className={`font-bold ${selectedStats.hasGym ? 'text-emerald-500' : 'text-text-muted'}`}>
+                {selectedStats.hasGym ? 'Done ✓' : 'Rest'}
+              </span>
             </div>
 
-            <div className={`p-2 rounded-lg border ${selectedStats.hitWater ? 'bg-[#4CC2FF]/10 border-[#4CC2FF]/40 text-[#4CC2FF] font-bold' : 'bg-bg-card border-border text-text-muted'}`}>
-              <div className="flex items-center gap-1">
-                <Droplet className="w-3 h-3" />
-                <span>Water: {selectedStats.waterMl} / {selectedStats.waterTargetMl}ml</span>
-              </div>
+            <div className="p-2 rounded-lg bg-bg-card border border-border/70 flex items-center justify-between">
+              <span className="text-text-muted flex items-center gap-1.5">
+                <UtensilsCrossed className="w-3.5 h-3.5 text-[#22C55E]" />
+                <span>Protein</span>
+              </span>
+              <span className="font-bold text-text-primary tabular-nums">
+                {selectedStats.proteinG}/{selectedStats.proteinTargetG}g
+              </span>
             </div>
 
-            <div className={`p-2 rounded-lg border ${selectedStats.hitProtein ? 'bg-[#3DDC97]/10 border-[#3DDC97]/40 text-[#3DDC97] font-bold' : 'bg-bg-card border-border text-text-muted'}`}>
-              <div className="flex items-center gap-1">
-                <Flame className="w-3 h-3" />
-                <span>Protein: {selectedStats.proteinG} / {selectedStats.proteinTargetG}g</span>
-              </div>
+            <div className="p-2 rounded-lg bg-bg-card border border-border/70 flex items-center justify-between">
+              <span className="text-text-muted flex items-center gap-1.5">
+                <Droplet className="w-3.5 h-3.5 text-[#38BDF8]" />
+                <span>Water</span>
+              </span>
+              <span className="font-bold text-text-primary tabular-nums">
+                {(selectedStats.waterMl / 1000).toFixed(1)}/{(selectedStats.waterTargetMl / 1000).toFixed(1)}L
+              </span>
             </div>
 
-            <div className={`p-2 rounded-lg border ${selectedStats.hasCreatine ? 'bg-[#FFC23D]/10 border-[#FFC23D]/40 text-[#FFC23D] font-bold' : 'bg-bg-card border-border text-text-muted'}`}>
-              <div className="flex items-center gap-1">
-                <Pill className="w-3 h-3" />
-                <span>Creatine: {selectedStats.hasCreatine ? 'Taken ✓' : 'Missed'}</span>
-              </div>
+            <div className="p-2 rounded-lg bg-bg-card border border-border/70 flex items-center justify-between">
+              <span className="text-text-muted flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#F5B301]" />
+                <span>Creatine</span>
+              </span>
+              <span className={`font-bold ${selectedStats.hasCreatine ? 'text-amber-500' : 'text-text-muted'}`}>
+                {selectedStats.hasCreatine ? 'Taken ✓' : 'Pending'}
+              </span>
             </div>
           </div>
         </div>
       )}
-
-      {/* Legend */}
-      <div className="flex items-center justify-between pt-1 border-t border-border/60 text-[10px] font-mono text-text-muted px-0.5">
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-accent" />
-          <span>Gym</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#4CC2FF]" />
-          <span>Water</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#3DDC97]" />
-          <span>Protein</span>
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-[#FFC23D]" />
-          <span>Creatine</span>
-        </span>
-      </div>
     </div>
   );
 }

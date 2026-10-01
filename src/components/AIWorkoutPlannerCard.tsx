@@ -57,7 +57,7 @@ export default function AIWorkoutPlannerCard({ onStartWorkout }: AIWorkoutPlanne
 
   if (loading && !plan) {
     return (
-      <div className="card p-5 bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark shadow-sm rounded-2xl animate-pulse space-y-3">
+      <div className="card p-5 bg-bg-card border border-border shadow-sm rounded-2xl animate-pulse space-y-3">
         <div className="h-4 bg-bg-secondary rounded w-1/3" />
         <div className="h-6 bg-bg-secondary rounded w-2/3" />
         <div className="h-10 bg-bg-secondary rounded w-full" />
@@ -68,7 +68,7 @@ export default function AIWorkoutPlannerCard({ onStartWorkout }: AIWorkoutPlanne
   if (!plan) return null;
 
   return (
-    <div className="card p-5 bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark shadow-sm rounded-2xl relative overflow-hidden transition-all">
+    <div className="card p-5 bg-bg-card border border-border shadow-sm rounded-2xl relative overflow-hidden transition-all">
       {/* Subtle background glow */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-accent/10 rounded-bl-full pointer-events-none" />
 
@@ -153,7 +153,7 @@ export default function AIWorkoutPlannerCard({ onStartWorkout }: AIWorkoutPlanne
             {plan.exercises.map((ex, idx) => (
               <div
                 key={idx}
-                className="p-3 rounded-xl border border-border-light dark:border-border-dark bg-white/60 dark:bg-[#1c2128] text-xs space-y-1"
+                className="p-3 rounded-xl border border-border bg-bg-secondary text-xs space-y-1"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-text-primary text-sm">

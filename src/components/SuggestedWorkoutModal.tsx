@@ -18,7 +18,11 @@ import {
   ChevronRight,
   Sliders,
   Settings,
-  Repeat
+  Repeat,
+  Target,
+  Box,
+  Crown,
+  Activity,
 } from 'lucide-react';
 import { getExerciseList, getExerciseEquipment } from '@/lib/strength-standards';
 import { PlannedExercise, PlannedWorkout } from '@/lib/store';
@@ -46,16 +50,16 @@ interface SuggestedWorkoutModalProps {
   onSavePlan: (plan: Omit<PlannedWorkout, 'id' | 'createdAt'>) => void;
 }
 
-const BODY_PARTS: { id: BodyPartOption; label: string; icon: string; description: string }[] = [
-  { id: 'chest',      label: 'Chest',       icon: '🎯', description: 'Pectorals & Incline' },
-  { id: 'back',       label: 'Back',        icon: '🦅', description: 'Lats, Traps & Rhomboids' },
-  { id: 'shoulders',  label: 'Shoulders',   icon: '🛡️', description: 'Delts & Overhead' },
-  { id: 'arms',       label: 'Arms',        icon: '💪', description: 'Biceps & Triceps' },
-  { id: 'legs',       label: 'Legs',        icon: '🦵', description: 'Quads, Hamstrings & Calves' },
-  { id: 'core',       label: 'Core / Abs',  icon: '🧱', description: 'Abs & Stability' },
-  { id: 'push',       label: 'Push Day',    icon: '🔥', description: 'Chest, Shoulders & Triceps' },
-  { id: 'pull',       label: 'Pull Day',    icon: '⚡', description: 'Back, Biceps & Rear Delts' },
-  { id: 'full_body',  label: 'Full Body',   icon: '👑', description: 'Compound Total Body' },
+const BODY_PARTS: { id: BodyPartOption; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
+  { id: 'chest',      label: 'Chest',       icon: Target,   description: 'Pectorals & Incline' },
+  { id: 'back',       label: 'Back',        icon: Layers,   description: 'Lats, Traps & Rhomboids' },
+  { id: 'shoulders',  label: 'Shoulders',   icon: Shield,   description: 'Delts & Overhead' },
+  { id: 'arms',       label: 'Arms',        icon: Dumbbell, description: 'Biceps & Triceps' },
+  { id: 'legs',       label: 'Legs',        icon: Activity, description: 'Quads, Hamstrings & Calves' },
+  { id: 'core',       label: 'Core / Abs',  icon: Box,      description: 'Abs & Stability' },
+  { id: 'push',       label: 'Push Day',    icon: Flame,    description: 'Chest, Shoulders & Triceps' },
+  { id: 'pull',       label: 'Pull Day',    icon: Zap,      description: 'Back, Biceps & Rear Delts' },
+  { id: 'full_body',  label: 'Full Body',   icon: Crown,    description: 'Compound Total Body' },
 ];
 
 interface SplitPreset {
@@ -139,7 +143,7 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
     id: 'high',
     label: 'High',
     tag: 'Maximum Strength & Density',
-    description: '5–6 exercises • 3–4 heavy sets • 5–8 reps • Heavy compound focus',
+    description: '4–5 exercises • 4–5 heavy sets • 3–5 reps • Maximum strength focus',
     badgeColor: 'text-accent bg-accent/15 border-accent/40',
   },
 ];
@@ -184,77 +188,87 @@ const BODY_PART_POOLS: Record<BodyPartOption, { compound: string[]; isolation: s
   },
 };
 
+const ALL_COMPOUND_NAMES = new Set<string>();
+Object.values(BODY_PART_POOLS).forEach((p) => p.compound.forEach((c) => ALL_COMPOUND_NAMES.add(c)));
+
 export function generateExercisesFromSelection(
   bodyParts: BodyPartOption[],
   intensity: IntensityOption = 'medium',
   userUnit: 'kg' | 'lbs' = 'kg'
 ): PlannedExercise[] {
-  const sets = intensity === 'low' ? 3 : intensity === 'medium' ? 3 : 4;
-  const reps = intensity === 'low' ? 12 : intensity === 'medium' ? 8 : 6;
-  const maxTotal = intensity === 'low' ? 4 : intensity === 'medium' ? 6 : 7;
+  const isHigh = intensity === 'high';
+  const isLow = intensity === 'low';
+
+  const defaultSets = isLow ? 3 : isHigh ? 5 : 3;
+  const defaultReps = isLow ? 12 : isHigh ? 4 : 8;
+  const maxTotal = isLow ? 4 : isHigh ? 6 : 6;
 
   const validParts = bodyParts.length > 0 ? bodyParts : (['full_body'] as BodyPartOption[]);
 
-  const chosenExercises: string[] = [];
+  const compoundExercises: string[] = [];
+  const isolationExercises: string[] = [];
   const addedNames = new Set<string>();
 
-  // Determine how many exercises to pick per body part
-  const perGroup = Math.max(1, Math.floor(maxTotal / validParts.length));
-
-  // Pass 1: Add compound lifts evenly from each body part
+  // Pass 1: Gather primary compound lifts from selected body parts FIRST
   validParts.forEach((bp) => {
     const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-    let addedForThisBp = 0;
-    const targetCompound = Math.min(2, Math.max(1, Math.floor(perGroup * 0.6)));
-
     for (const c of pool.compound) {
-      if (!addedNames.has(c) && addedForThisBp < targetCompound && chosenExercises.length < maxTotal) {
-        chosenExercises.push(c);
+      if (!addedNames.has(c) && compoundExercises.length + isolationExercises.length < maxTotal) {
+        compoundExercises.push(c);
         addedNames.add(c);
-        addedForThisBp++;
+        if (compoundExercises.length >= 4) break;
       }
     }
   });
 
-  // Pass 2: Add isolations / accessories evenly from each body part
+  // Pass 2: Gather accessories/isolations from selected body parts
   validParts.forEach((bp) => {
     const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
     for (const iso of pool.isolation) {
-      if (!addedNames.has(iso) && chosenExercises.length < maxTotal) {
-        const countFromThisBp = chosenExercises.filter(
-          (ex) => pool.compound.includes(ex) || pool.isolation.includes(ex)
-        ).length;
-        if (countFromThisBp < perGroup + 1) {
-          chosenExercises.push(iso);
-          addedNames.add(iso);
-          break; // 1 isolation per group in pass 2
-        }
+      if (!addedNames.has(iso) && compoundExercises.length + isolationExercises.length < maxTotal) {
+        isolationExercises.push(iso);
+        addedNames.add(iso);
       }
     }
   });
 
-  // Pass 3: If still room under maxTotal, fill from remaining
-  if (chosenExercises.length < maxTotal) {
+  // Pass 3: If still room under maxTotal, fill remaining compounds first, then isolations
+  if (compoundExercises.length + isolationExercises.length < maxTotal) {
     for (const bp of validParts) {
       const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-      const combined = [...pool.compound, ...pool.isolation];
-      for (const ex of combined) {
-        if (!addedNames.has(ex) && chosenExercises.length < maxTotal) {
-          chosenExercises.push(ex);
-          addedNames.add(ex);
+      for (const c of pool.compound) {
+        if (!addedNames.has(c) && compoundExercises.length + isolationExercises.length < maxTotal) {
+          compoundExercises.push(c);
+          addedNames.add(c);
+        }
+      }
+      for (const iso of pool.isolation) {
+        if (!addedNames.has(iso) && compoundExercises.length + isolationExercises.length < maxTotal) {
+          isolationExercises.push(iso);
+          addedNames.add(iso);
         }
       }
     }
   }
 
-  return chosenExercises.map((name) => ({
-    name,
-    targetSets: sets,
-    targetReps: reps,
-    targetWeight: 0,
-    targetUnit: userUnit,
-    notes: '',
-  }));
+  // Compounds are strictly ordered first
+  const finalExerciseList = [...compoundExercises, ...isolationExercises];
+
+  return finalExerciseList.map((name) => {
+    const isCompound = ALL_COMPOUND_NAMES.has(name);
+    // In High intensity: compounds get 5 sets x 4 reps, accessories get 4 sets x 6 reps
+    const targetSets = isHigh ? (isCompound ? 5 : 4) : defaultSets;
+    const targetReps = isHigh ? (isCompound ? 4 : 6) : defaultReps;
+
+    return {
+      name,
+      targetSets,
+      targetReps,
+      targetWeight: 0,
+      targetUnit: userUnit,
+      notes: '',
+    };
+  });
 }
 
 export default function SuggestedWorkoutModal({
@@ -467,8 +481,8 @@ export default function SuggestedWorkoutModal({
           {activeTab === 'bodyparts' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider">
-                  Target Body Parts (Select Multiple)
+                <span className="text-label font-bold text-text-muted">
+                  Target body parts (select multiple)
                 </span>
                 <span className="text-2xs text-accent font-bold font-mono">
                   {selectedBodyParts.length} selected
@@ -478,6 +492,7 @@ export default function SuggestedWorkoutModal({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 {BODY_PARTS.map((bp) => {
                   const isSelected = selectedBodyParts.includes(bp.id);
+                  const Icon = bp.icon;
                   return (
                     <button
                       key={bp.id}
@@ -489,7 +504,11 @@ export default function SuggestedWorkoutModal({
                           : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent/40'
                       }`}
                     >
-                      <span className="text-base">{bp.icon}</span>
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                        isSelected ? 'bg-accent/25 text-accent' : 'bg-bg-card border border-border/60 text-text-muted'
+                      }`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
                       <div className="min-w-0 flex-1">
                         <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
                           {bp.label}
@@ -733,22 +752,22 @@ export default function SuggestedWorkoutModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 border-t border-border bg-bg-elevated/70 flex gap-2">
+        <div className="p-3.5 border-t border-border bg-bg-card flex gap-2.5">
           <button
             type="button"
             onClick={handleSaveToPlans}
-            className="btn-secondary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-slate-800 dark:text-slate-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98]"
           >
             <BookmarkPlus className="w-4 h-4 text-accent" />
-            <span>Save to Plans</span>
+            <span className="text-slate-900 dark:text-white font-bold">Save to Plans</span>
           </button>
           <button
             type="button"
             onClick={handleStartNow}
-            className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-accent/25"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-accent hover:brightness-105 active:scale-[0.98] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-accent/25 transition-all"
           >
-            <Play className="w-4 h-4 fill-white" />
-            <span>Start Workout</span>
+            <Play className="w-4 h-4 fill-white text-white" />
+            <span className="text-white font-bold">Start Workout</span>
           </button>
         </div>
       </div>

@@ -355,8 +355,8 @@ export default function WorkoutHeatmap({
                       : totalHabitsDone >= 1
                       ? 'bg-bg-secondary text-text-primary border-border/70'
                       : isFuture
-                      ? 'bg-bg-secondary/40 text-text-muted/40 border-transparent'
-                      : 'bg-bg-secondary/60 text-text-muted border-border/40'
+                      ? 'bg-bg-secondary/30 text-text-muted/40 border-transparent'
+                      : 'bg-bg-secondary/70 text-slate-700 dark:text-slate-200 border-border/60 hover:border-border-hover'
                   } ${
                     isToday
                       ? 'ring-2 ring-accent ring-offset-1 ring-offset-bg-card font-black'
@@ -365,7 +365,9 @@ export default function WorkoutHeatmap({
                     isSelected ? 'scale-105 z-10 ring-2 ring-text-primary shadow-md' : ''
                   }`}
                 >
-                  <span className="text-[11px] leading-none">{dayNum}</span>
+                  <span className="text-[11px] leading-none font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
+                    {dayNum}
+                  </span>
 
                   {/* Multi-habit indicators */}
                   {activeFilter === 'all' && !isFuture && (

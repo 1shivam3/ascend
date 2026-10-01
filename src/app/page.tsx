@@ -132,12 +132,6 @@ export default function AppPage() {
       {!activeWorkoutDraft && (
         <nav
           className="floating-pill-nav"
-          style={{
-            backdropFilter: 'blur(16px)',
-            WebkitBackdropFilter: 'blur(16px)',
-            background: 'rgba(20, 24, 33, 0.88)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
           aria-label="Bottom Navigation"
         >
           {/* Slot 1: Home */}
@@ -194,7 +188,7 @@ export default function AppPage() {
           <button
             type="button"
             onClick={() => setIsQuickActionOpen(true)}
-            className="w-11 h-11 -mt-3 rounded-full bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/35 hover:scale-105 active:scale-90 transition-all border-2 border-[#141821] shrink-0"
+            className="w-11 h-11 -mt-3 rounded-full bg-accent text-white flex items-center justify-center shadow-lg shadow-accent/35 hover:scale-105 active:scale-90 transition-all border-2 border-bg-card shrink-0"
             title="Quick Action"
             aria-label="Quick Action"
           >

@@ -68,7 +68,7 @@ export default function PostWorkoutTakeModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up space-y-4">
+      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-scale-in space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -93,7 +93,7 @@ export default function PostWorkoutTakeModal({
         </div>
 
         {/* Quick Numbers Bar */}
-        <div className="grid grid-cols-3 gap-2 py-2 border-y border-border-light dark:border-border-dark text-center">
+        <div className="grid grid-cols-3 gap-2 py-2 border-y border-border text-center">
           <div>
             <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
             <span className="font-bold text-sm text-text-primary">
@@ -148,7 +148,7 @@ export default function PostWorkoutTakeModal({
             </p>
 
             {/* Next session target */}
-            <div className="p-3 rounded-lg bg-white/70 dark:bg-[#161b22] border border-border-light dark:border-border-dark space-y-1">
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border space-y-1">
               <div className="flex items-center gap-1 text-2xs font-bold text-text-muted uppercase tracking-wider">
                 <Target className="w-3.5 h-3.5 text-accent" />
                 <span>Next Session Target</span>

@@ -51,7 +51,7 @@ export default function WeeklyReviewModal({ isOpen, onClose }: WeeklyReviewModal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white dark:bg-[#161b22] border border-border-light dark:border-border-dark rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-scale-up space-y-4">
+      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-scale-in space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -95,7 +95,7 @@ export default function WeeklyReviewModal({ isOpen, onClose }: WeeklyReviewModal
         ) : review ? (
           <div className="space-y-3.5 text-xs">
             {/* Training Completion Badge */}
-            <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border-light dark:border-border-dark flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-bg-secondary border border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Dumbbell className="w-4 h-4 text-accent" />
                 <span className="font-bold text-text-primary">Training Consistency</span>
@@ -116,7 +116,7 @@ export default function WeeklyReviewModal({ isOpen, onClose }: WeeklyReviewModal
             </div>
 
             {/* Strength Progression */}
-            <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border-light dark:border-border-dark space-y-1">
+            <div className="p-3.5 rounded-xl bg-bg-secondary border border-border space-y-1">
               <div className="flex items-center gap-1.5 text-2xs font-bold text-text-muted uppercase tracking-wider">
                 <TrendingUp className="w-3.5 h-3.5 text-blue-500" />
                 <span>Strength Progression</span>
@@ -127,7 +127,7 @@ export default function WeeklyReviewModal({ isOpen, onClose }: WeeklyReviewModal
             </div>
 
             {/* Habit Connection (Water & Creatine) */}
-            <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border-light dark:border-border-dark space-y-1">
+            <div className="p-3.5 rounded-xl bg-bg-secondary border border-border space-y-1">
               <div className="flex items-center gap-1.5 text-2xs font-bold text-text-muted uppercase tracking-wider">
                 <Droplet className="w-3.5 h-3.5 text-sky-500" />
                 <span>Habit &amp; Recovery Connection</span>
@@ -138,7 +138,7 @@ export default function WeeklyReviewModal({ isOpen, onClose }: WeeklyReviewModal
             </div>
 
             {/* Next Week Target */}
-            <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border-light dark:border-border-dark space-y-1">
+            <div className="p-3.5 rounded-xl bg-bg-secondary border border-border space-y-1">
               <div className="flex items-center gap-1.5 text-2xs font-bold text-text-muted uppercase tracking-wider">
                 <Target className="w-3.5 h-3.5 text-accent" />
                 <span>Next Week Focus</span>

@@ -946,34 +946,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       {/* ── Header ── */}
       <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2.5">
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('home')}
-              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
-              title="Return to Home Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Meals &amp; Macros</h1>
-            <p className="text-2xs text-text-muted font-mono">Track nutrition &amp; fuel your strength</p>
+            <p className="text-label text-text-muted">Track nutrition &amp; fuel your strength</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <button
-            className="btn-primary flex items-center gap-1.5"
-            onClick={() => {
-              if (foods.length === 0) handleAddFood();
-              setIsModalOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Log Food</span>
-            <span className="sm:hidden">Log</span>
-          </button>
         </div>
       </header>
 
@@ -1093,88 +1072,63 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         </div>
 
-        {/* Primary Action: Dominant Scan Meal & Secondary Actions */}
-        <div className="space-y-2 pt-1">
-          <button
-            type="button"
-            onClick={() => setIsScanModalOpen(true)}
-            className="w-full btn-primary py-3 px-4 rounded-xl flex flex-col items-center justify-center gap-0.5 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all text-center"
-          >
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <Camera className="w-4 h-4" />
-              <span>SCAN MEAL</span>
+        {/* Consolidated 1-Input Food Logger Bar (Natural, Camera & Barcode) */}
+        <div className="pt-2 border-t border-border/60 space-y-2">
+          <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
+            <input
+              type="text"
+              placeholder='Log meal naturally (e.g. "2 roti, 1 bowl dal, 100g paneer")...'
+              value={naturalQuery}
+              onChange={(e) => setNaturalQuery(e.target.value)}
+              disabled={isNaturalParsing}
+              className="w-full bg-bg-secondary border border-border/80 rounded-xl py-2.5 pl-3.5 pr-28 text-body text-text-primary outline-none focus:border-accent transition-colors placeholder:text-text-muted"
+            />
+            <div className="absolute right-1.5 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsScanModalOpen(true)}
+                className="p-1.5 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-accent hover:border-accent transition-colors"
+                title="Scan meal with camera"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBarcodeModalOpen(true)}
+                className="p-1.5 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-accent hover:border-accent transition-colors"
+                title="Scan food barcode"
+              >
+                <BarcodeIcon className="w-4 h-4" />
+              </button>
+              <button
+                type="submit"
+                disabled={!naturalQuery.trim() || isNaturalParsing}
+                className="px-2.5 py-1.5 rounded-lg bg-accent text-white font-bold text-label flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
+              >
+                {isNaturalParsing ? (
+                  <span className="animate-pulse text-2xs">...</span>
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5" />
+                )}
+              </button>
             </div>
-            <span className="text-2xs text-white/80 font-normal">
-              Estimate calories &amp; macros from a photo
-            </span>
-          </button>
+          </form>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center justify-between text-label text-text-muted px-0.5">
+            <span>AI &amp; Indian IFCT calibrated</span>
             <button
               type="button"
               onClick={() => {
                 if (foods.length === 0) handleAddFood();
                 setIsModalOpen(true);
               }}
-              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
+              className="text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1"
             >
-              <Plus className="w-3.5 h-3.5 text-accent" />
-              <span>Log Food</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsBarcodeModalOpen(true)}
-              className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
-              title="Scan Food Barcode (Open Food Facts)"
-            >
-              <BarcodeIcon className="w-3.5 h-3.5 text-accent" />
-              <span>Barcode</span>
+              <Plus className="w-3 h-3 text-accent" />
+              <span>Manual item</span>
             </button>
           </div>
         </div>
-      </section>
-
-      {/* ── NATURAL-LANGUAGE QUICK FOOD LOGGING (AI & IFCT Calibrated) ── */}
-      <section className="card p-4 bg-gradient-to-r from-accent/10 via-bg-card to-accent/5 border border-accent/30 space-y-2.5 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <h3 className="section-title text-[10px] mb-0 font-sans text-accent">
-              NATURAL FOOD LOGGING
-            </h3>
-          </div>
-          <span className="text-3xs font-mono text-text-muted">Gemini &amp; Indian IFCT Calibrated</span>
-        </div>
-
-        <form onSubmit={handleNaturalLogSubmit} className="space-y-2">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder='Type e.g. "2 roti, 1 bowl dal, 100g paneer"'
-              value={naturalQuery}
-              onChange={(e) => setNaturalQuery(e.target.value)}
-              disabled={isNaturalParsing}
-              className="w-full bg-[#1B2030] border border-border/80 rounded-xl py-2.5 pl-3 pr-24 text-xs font-sans text-text-primary outline-none focus:border-accent"
-            />
-            <button
-              type="submit"
-              disabled={!naturalQuery.trim() || isNaturalParsing}
-              className="absolute right-1.5 top-1.5 bottom-1.5 px-3 rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
-            >
-              {isNaturalParsing ? (
-                <span className="text-3xs animate-pulse">Parsing...</span>
-              ) : (
-                <>
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Log</span>
-                </>
-              )}
-            </button>
-          </div>
-          <p className="text-3xs text-text-muted leading-tight">
-            Type your meal naturally. Indian foods (roti, dal, paneer, sattu, eggs, whey) are calibrated accurately without complex tapping.
-          </p>
-        </form>
       </section>
 
       {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
@@ -1218,10 +1172,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
                   }`}
                 >
-                  <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                  <span className={`text-label font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
                     {opt.label}
                   </span>
-                  <span className="text-3xs text-text-muted">{opt.sub}</span>
+                  <span className="text-label text-text-muted">{opt.sub}</span>
                 </button>
               );
             })}

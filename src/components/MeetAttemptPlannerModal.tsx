@@ -70,7 +70,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-[#141821] z-10">
+        <div className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-bg-card z-10">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-accent" />
             <div>
@@ -129,20 +129,20 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                   step="2.5"
                   value={squatMax}
                   onChange={(e) => setSquatMax(Math.max(20, Number(e.target.value)))}
-                  className="w-16 bg-[#1B2030] border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                  className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
                 />
                 <span className="font-mono text-text-muted">{userUnit}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.squat.opener} {userUnit}
                 </span>
               </div>
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.squat.second} {userUnit}
@@ -168,20 +168,20 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                   step="2.5"
                   value={benchMax}
                   onChange={(e) => setBenchMax(Math.max(20, Number(e.target.value)))}
-                  className="w-16 bg-[#1B2030] border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                  className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
                 />
                 <span className="font-mono text-text-muted">{userUnit}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.bench.opener} {userUnit}
                 </span>
               </div>
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.bench.second} {userUnit}
@@ -207,20 +207,20 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                   step="2.5"
                   value={deadliftMax}
                   onChange={(e) => setDeadliftMax(Math.max(20, Number(e.target.value)))}
-                  className="w-16 bg-[#1B2030] border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                  className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
                 />
                 <span className="font-mono text-text-muted">{userUnit}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.deadlift.opener} {userUnit}
                 </span>
               </div>
-              <div className="p-2 rounded-xl bg-[#1B2030] border border-border">
+              <div className="p-2 rounded-xl bg-bg-secondary border border-border">
                 <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.deadlift.second} {userUnit}

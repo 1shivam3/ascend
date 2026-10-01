@@ -40,6 +40,7 @@ import HomeActivityHeatmap from '@/components/HomeActivityHeatmap';
 import { calculateHydrationTarget, formatWaterLiters, toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise } from '@/lib/types';
+import { plural } from '@/lib/formatters';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
@@ -85,6 +86,50 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const hasManualGym = !!gymLogs?.[todayStr];
   const hasTrainedToday = hasManualGym || todayWorkouts.length > 0;
   const activePlan = plannedWorkouts?.[0] || null;
+
+  // Actual exercises, volume, and PR summary for today
+  const todaySummary = useMemo(() => {
+    if (todayWorkouts.length === 0) return null;
+    const workout = todayWorkouts[0];
+    let volumeKg = 0;
+    let totalSets = 0;
+    let prCount = 0;
+    let durationMin = workout.durationMinutes || 0;
+
+    for (const w of todayWorkouts) {
+      if (w.durationMinutes && !durationMin) durationMin = w.durationMinutes;
+      for (const ex of w.exercises) {
+        for (const s of ex.sets) {
+          if (s.reps && s.weight) {
+            const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+            volumeKg += wKg * s.reps;
+            totalSets += 1;
+          }
+          if (s.isPR) prCount++;
+        }
+      }
+    }
+
+    const exercisesList = workout.exercises
+      .map((e) => {
+        const validSets = e.sets.filter((s) => s.reps > 0);
+        if (validSets.length > 0) {
+          const bestSet = validSets.reduce((best, cur) => (cur.weight > best.weight ? cur : best), validSets[0]);
+          return `${e.name} ${bestSet.weight}${bestSet.unit || 'kg'} × ${bestSet.reps}`;
+        }
+        return e.name;
+      })
+      .join(', ');
+
+    return {
+      name: workout.name || 'Gym Session Done',
+      exercisesList: exercisesList || 'Exercises recorded',
+      volumeKg: Math.round(volumeKg),
+      totalSets,
+      prCount,
+      durationMin,
+    };
+  }, [todayWorkouts]);
 
   const handleToggleGym = () => {
     const isNowDone = toggleGymToday(todayStr);
@@ -267,25 +312,58 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className={`w-2 h-2 rounded-full ${hasTrainedToday ? 'bg-emerald-500' : 'bg-accent animate-pulse'}`} />
-            <span className="text-2xs font-mono uppercase font-bold text-text-muted tracking-wider">
-              {hasTrainedToday ? 'TODAY COMPLETED' : "TODAY'S SESSION"}
+            <span className="text-label font-medium text-text-muted">
+              {hasTrainedToday ? 'Today completed' : "Today's session"}
             </span>
           </div>
-          <span className="text-2xs font-mono text-accent font-semibold">
-            {activePlan ? 'PLANNED ROUTINE' : 'MAIN STRENGTH'}
+          <span className="text-label text-text-muted">
+            {hasTrainedToday && todaySummary ? `${todaySummary.totalSets} sets` : activePlan ? 'Planned routine' : 'Main strength'}
           </span>
         </div>
 
         <div>
-          <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans">
-            {activePlan ? activePlan.name : workouts.length === 0 ? 'Upper A' : hasTrainedToday ? 'Gym Session Done' : 'Upper A'}
+          <h2 className="text-title sm:text-display font-black text-text-primary tracking-tight font-sans">
+            {hasTrainedToday && todaySummary
+              ? todaySummary.name
+              : hasTrainedToday
+              ? 'Gym Session Done'
+              : activePlan
+              ? activePlan.name
+              : 'Upper A'}
           </h2>
-          <p className="text-xs text-text-secondary mt-0.5">
-            {activePlan
+          <p className="text-body text-text-secondary mt-0.5 line-clamp-2">
+            {hasTrainedToday && todaySummary
+              ? todaySummary.exercisesList
+              : activePlan
               ? activePlan.exercises.map((e) => e.name).slice(0, 4).join(', ')
               : 'Bench Press, Barbell Row, Overhead Press, Pull-ups'}
           </p>
         </div>
+
+        {/* If trained today with summary stats, show summary pills: volume, duration/sets, PRs */}
+        {hasTrainedToday && todaySummary && (
+          <div className="flex flex-wrap items-center gap-2 pt-1 text-label tabular-nums">
+            {todaySummary.volumeKg > 0 && (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
+                {todaySummary.volumeKg.toLocaleString()} kg volume
+              </span>
+            )}
+            {todaySummary.durationMin > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {todaySummary.durationMin} min
+              </span>
+            ) : todaySummary.totalSets > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {plural(todaySummary.totalSets, 'set')}
+              </span>
+            ) : null}
+            {todaySummary.prCount > 0 && (
+              <span className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/40 text-accent font-bold">
+                {plural(todaySummary.prCount, 'PR')}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Action Row: Start Workout + "I Hit Gym Today" 1-Tap Toggle */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
@@ -293,20 +371,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('workout')}
-            className="btn-primary sm:col-span-2 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all"
+            className={`sm:col-span-2 py-3 text-body font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all ${
+              hasTrainedToday
+                ? 'btn-secondary text-text-primary'
+                : 'btn-primary shadow-md shadow-accent/25 hover:brightness-105'
+            }`}
           >
-            <Play className="w-4 h-4 fill-white stroke-white" />
-            <span>{activeWorkoutDraft ? 'CONTINUE WORKOUT' : hasTrainedToday ? 'LOG ANOTHER WORKOUT' : 'START WORKOUT'}</span>
+            <Play className={`w-4 h-4 ${hasTrainedToday ? 'fill-text-primary stroke-text-primary' : 'fill-white stroke-white'}`} />
+            <span>{activeWorkoutDraft ? 'Continue Workout' : hasTrainedToday ? 'Log another workout' : 'Start Workout'}</span>
           </button>
 
           {/* 1-Tap "I Hit Gym Today" Quick Toggle */}
           <button
             type="button"
             onClick={handleToggleGym}
-            className={`py-3 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all select-none active:scale-95 ${
+            className={`py-3 px-3 rounded-xl border text-label font-bold flex items-center justify-center gap-1.5 transition-all select-none active:scale-95 ${
               hasTrainedToday
                 ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-xs'
-                : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent hover:text-text-primary'
+               : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent hover:text-text-primary'
             }`}
             title="Mark gym session done for today"
           >
@@ -316,15 +398,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
 
         {/* Suggest / Split Entry point */}
-        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
+        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-label">
           <span className="text-text-muted">Want to target multiple body parts or switch split?</span>
           <button
             type="button"
             onClick={() => setIsSuggestedModalOpen(true)}
             className="font-bold text-accent hover:underline flex items-center gap-1"
           >
-            <Sparkles className="w-3 h-3" />
-            <span>⚡ Generate Plan</span>
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Generate Plan</span>
           </button>
         </div>
       </section>
@@ -344,25 +426,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 5. ACTIVITY HEATMAP CALENDAR (Visual Monthly Heatmap) ──────────── */}
-      <HomeActivityHeatmap />
-
-      {/* ── 6. COACH INSIGHT (Compact 2-Line Summary with Expand) ──────────── */}
+      {/* ── 5. COACH INSIGHT (Compact 2-Line Summary with Expand) ──────────── */}
       <AICoachCard
         onOpenSettings={() => setIsSettingsOpen(true)}
         onNavigateWorkout={() => onNavigate('workout')}
       />
+
+      {/* ── 6. ACTIVITY 7-DAY STRIP ──────────── */}
+      <HomeActivityHeatmap onNavigateProgress={() => onNavigate('progress')} />
 
       {/* ── 7. ORGANIZED DISCLOSURE: POWERLIFTING & STRENGTH SNAPSHOT ──────── */}
       <details className="card p-3.5 sm:p-4 bg-bg-card border border-border group transition-all">
         <summary className="cursor-pointer list-none flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-accent" />
-            <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider font-mono">
+            <h3 className="text-label font-bold text-text-primary">
               Strength Snapshot &amp; DOTS Score
             </h3>
           </div>
-          <div className="flex items-center gap-1.5 text-accent text-xs font-bold">
+          <div className="flex items-center gap-1.5 text-text-muted text-label font-medium tabular-nums">
             {dotsScore > 0 ? (
               <span>{Math.round(dotsScore)} DOTS • {bigThreeStats.totalKg} kg</span>
             ) : (
@@ -372,34 +454,34 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </summary>
 
-        <div className="pt-3 space-y-3 border-t border-border mt-3 text-xs">
+        <div className="pt-3 space-y-3 border-t border-border mt-3 text-label">
           <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center font-sans">
             <div>
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Bench</span>
-              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+              <span className="text-label text-text-muted block">Bench</span>
+              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
                 {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
               </span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Squat</span>
-              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+              <span className="text-label text-text-muted block">Squat</span>
+              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
                 {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
               </span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Deadlift</span>
-              <span className="font-bold text-text-primary text-sm mt-0.5 block font-mono">
+              <span className="text-label text-text-muted block">Deadlift</span>
+              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
                 {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-2xs font-mono text-text-secondary pt-1">
-            <span>Official DOTS Classification: <strong>{dotsClassification.tier}</strong></span>
+          <div className="flex items-center justify-between text-label text-text-secondary pt-1">
+            <span>Official DOTS Classification: <strong className="text-text-primary">{dotsClassification.tier}</strong></span>
             <button
               type="button"
               onClick={() => onNavigate('progress')}
-              className="text-accent font-bold hover:underline"
+              className="text-text-muted hover:text-accent font-semibold hover:underline"
             >
               Full Progress Charts &rarr;
             </button>

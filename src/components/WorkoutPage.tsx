@@ -50,6 +50,7 @@ import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import { AISubstitutionResult } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import { plural } from '@/lib/formatters';
 
 interface WorkoutPageProps {
   onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -423,6 +424,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   /** When the logger is pre-filled from a plan, store its name here */
   const [startedFromPlan, setStartedFromPlan] = useState<string | null>(null);
 
@@ -1001,19 +1003,9 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <header className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2.5">
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('home')}
-              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
-              title="Return to Home Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Workouts</h1>
-            <p className="text-2xs text-text-muted font-mono">Log your sessions &amp; track consistency</p>
+            <p className="text-label text-text-muted">Log your sessions &amp; track consistency</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1026,11 +1018,6 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
           <ThemeToggle />
-          <button className="btn-primary flex items-center gap-1.5" onClick={openBlankLogger}>
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Log Workout</span>
-            <span className="sm:hidden">Log</span>
-          </button>
         </div>
       </header>
 
@@ -1047,7 +1034,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
               </span>
               <span className="text-2xs text-text-secondary">
                 {activeWorkoutDraft.startedFromPlan ? `Plan: ${activeWorkoutDraft.startedFromPlan} • ` : ''}
-                {activeWorkoutDraft.exercises.filter((e) => e.name.trim()).length} exercises saved
+                {plural(activeWorkoutDraft.exercises.filter((e) => e.name.trim()).length, 'exercise')} saved
               </span>
             </div>
           </div>
@@ -1079,8 +1066,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             <h2 className="section-title text-[11px] mb-0">TODAY&apos;S WORKOUT</h2>
           </div>
           {plannedWorkouts.length > 0 && (
-            <span className="text-2xs text-text-muted font-medium">
-              {plannedWorkouts.length} {plannedWorkouts.length === 1 ? 'plan' : 'plans'} ready
+            <span className="text-label text-text-muted font-medium">
+              {plural(plannedWorkouts.length, 'plan')} ready
             </span>
           )}
         </div>
@@ -1091,9 +1078,9 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
               ? plannedWorkouts[0].name
               : 'No workout planned'}
           </h3>
-          <p className="text-xs text-text-secondary mt-0.5">
+          <p className="text-body text-text-secondary mt-0.5">
             {plannedWorkouts.length > 0
-              ? `${plannedWorkouts[0].exercises.length} exercises configured • Ready to train`
+              ? `${plural(plannedWorkouts[0].exercises.length, 'exercise')} configured • Ready to train`
               : 'Start a workout from scratch or create a plan'}
           </p>
         </div>
@@ -1174,47 +1161,49 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         </div>
       </section>
 
-      {/* ── 2. CONTEXTUAL REST TIMER (Compact utility outside workout) ── */}
-      <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <Timer className="w-4 h-4 text-accent shrink-0" />
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-bold text-text-primary font-mono">
-              {isTimerFinished ? (
-                <span className="text-emerald-500">READY</span>
-              ) : (
-                formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-              )}
-            </span>
-            <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
+      {/* ── 2. CONTEXTUAL REST TIMER (Only visible during active rest) ── */}
+      {(isRestRunning || isTimerFinished || restSecondsLeft > 0) && (
+        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Timer className="w-4 h-4 text-accent shrink-0" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold text-text-primary font-mono">
+                {isTimerFinished ? (
+                  <span className="text-emerald-500">READY</span>
+                ) : (
+                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                )}
+              </span>
+              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {[60, 90, 120, 180, 300].map((s) => (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[60, 90, 120, 180, 300].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => startTimer(s)}
+                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
+                  restTotalSeconds === s && restSecondsLeft > 0
+                    ? 'bg-accent text-white border-accent'
+                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {s >= 60 ? `${s / 60}m` : `${s}s`}
+              </button>
+            ))}
             <button
-              key={s}
               type="button"
-              onClick={() => startTimer(s)}
-              className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
-                restTotalSeconds === s && restSecondsLeft > 0
-                  ? 'bg-accent text-white border-accent'
-                  : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
-              }`}
+              onClick={togglePauseTimer}
+              className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
+              title={isRestRunning ? 'Pause' : 'Start'}
             >
-              {s >= 60 ? `${s / 60}m` : `${s}s`}
+              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={togglePauseTimer}
-            className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
-            title={isRestRunning ? 'Pause' : 'Start'}
-          >
-            {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-          </button>
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* ── 3. WORKOUT PLANS SECTION ────────────────────────────────────────── */}
       <section className="space-y-2.5">
@@ -1328,8 +1317,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                           year: 'numeric',
                         })}
                       </h3>
-                      <p className="text-xs text-text-secondary mt-0.5">
-                        {workout.exercises.length} exercises • {totalSets} sets
+                      <p className="text-label text-text-secondary mt-0.5 tabular-nums">
+                        {plural(workout.exercises.length, 'exercise')} • {plural(totalSets, 'set')}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -1348,7 +1337,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                             {ex.sets.map((set, j) => (
                               <div key={j} className="bg-bg-primary px-2.5 py-1.5 rounded border border-border">
                                 Set {j + 1}:{' '}
-                                <span className="text-text-primary font-medium">
+                                <span className="text-text-primary font-medium tabular-nums">
                                   {set.weight} {set.unit}
                                 </span>{' '}
                                 × {set.reps} reps
@@ -1359,16 +1348,38 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                       ))}
 
                       <div className="flex justify-end pt-2">
-                        <button
-                          onClick={() => {
-                            deleteWorkout(workout.id);
-                            toast.info(`Deleted workout session from ${workout.date}.`, 'Workout Removed');
-                          }}
-                          className="text-danger hover:text-danger/80 text-xs flex items-center gap-1.5 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete Workout
-                        </button>
+                        {confirmDeleteId === workout.id ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-text-muted">Delete this workout?</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteWorkout(workout.id);
+                                setConfirmDeleteId(null);
+                                toast.info(`Deleted workout session from ${workout.date}.`, 'Workout Removed');
+                              }}
+                              className="px-2.5 py-1 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 transition-colors"
+                            >
+                              Yes, Delete
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="px-2.5 py-1 bg-bg-secondary text-text-muted rounded text-xs font-semibold hover:text-text-primary transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(workout.id)}
+                            className="text-danger hover:text-danger/80 text-xs flex items-center gap-1.5 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete Workout
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

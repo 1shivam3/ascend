@@ -30,6 +30,7 @@ import ProgressChart from '@/components/ProgressChart';
 import BodyweightChart from '@/components/BodyweightChart';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import ThemeToggle from '@/components/ui/ThemeToggle';
+import { plural } from '@/lib/formatters';
 
 interface ProgressPageProps {
   initialTab?: 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training' | 'body' | 'consistency';
@@ -80,7 +81,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     const recent7 = sorted.slice(0, 7);
     const avgKg = recent7.reduce((sum, b) => sum + b.weightKg, 0) / recent7.length;
 
-    let trendText = 'Stable';
+    let trendText = '—';
     let trendDelta = 0;
     if (sorted.length >= 3) {
       const older = sorted.slice(2, 9);
@@ -205,13 +206,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'strength' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-view toggle (Overview vs Personal Records) */}
-          <div className="flex rounded-lg bg-bg-secondary p-1 border border-border">
+          <div className="flex rounded-xl bg-bg-secondary/70 p-1 border border-border/60 max-w-sm">
             <button
               type="button"
               onClick={() => setStrengthSubView('overview')}
-              className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 strengthSubView === 'overview'
-                  ? 'bg-bg-card text-accent shadow-xs'
+                  ? 'bg-bg-card text-text-primary shadow-xs font-bold'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
@@ -220,9 +221,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <button
               type="button"
               onClick={() => setStrengthSubView('prs')}
-              className={`flex-1 py-1.5 rounded-md text-xs font-bold transition-all ${
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 strengthSubView === 'prs'
-                  ? 'bg-bg-card text-accent shadow-xs'
+                  ? 'bg-bg-card text-text-primary shadow-xs font-bold'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
@@ -236,8 +237,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <div className="card p-3.5 bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/30 space-y-1.5 shadow-xs">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-accent" />
-                  <span className="text-2xs uppercase tracking-wider font-bold text-accent font-mono">
-                    STRENGTH INTELLIGENCE
+                  <span className="text-label font-bold text-accent">
+                    Strength Intelligence
                   </span>
                 </div>
                 <p className="text-xs text-text-primary leading-relaxed font-sans">
@@ -261,14 +262,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <button
                       type="button"
                       onClick={() => setIsMeetModalOpen(true)}
-                      className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 text-accent hover:border-accent/40"
+                      className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 text-text-secondary hover:text-text-primary"
                       title="Powerlifting Meet Attempt Planner"
                     >
-                      <Trophy className="w-3 h-3" />
+                      <Trophy className="w-3 h-3 text-accent" />
                       <span>Meet Planner</span>
                     </button>
                     <div className="text-right">
-                      <span className="text-2xl font-black text-accent font-sans block">
+                      <span className="text-2xl font-black text-text-primary font-sans tabular-nums block">
                         {bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}
                       </span>
                       <span className="text-3xs text-text-muted block">Squat + Bench + Deadlift</span>
@@ -326,24 +327,26 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         ) : null}
                       </div>
 
-                      <div className="text-lg font-black text-text-primary font-mono">
+                      <div className="text-lg font-black text-text-primary font-sans tabular-nums">
                         {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
                       </div>
 
-                      <div className="text-3xs">
-                        {l.isBaseline ? (
-                          <span className="text-accent font-medium">Baseline 1RM (entered)</span>
-                        ) : profile?.bodyweightKg && l.best1RM > 0 ? (
-                          <span className="text-text-muted">
-                            {(l.best1RM / profile.bodyweightKg).toFixed(2)}× bodyweight
-                          </span>
+                      <div className="text-3xs text-text-muted">
+                        {profile?.bodyweightKg && l.best1RM > 0 ? (
+                          <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× bodyweight</span>
                         ) : (
-                          <span className="text-text-muted">Uncalibrated</span>
+                          <span>Uncalibrated</span>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {liftTrends.some((l) => l.isBaseline) && (
+                  <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
+                    * Values based on baseline 1RM entered during onboarding
+                  </p>
+                )}
               </section>
 
               {/* Action to switch to PR details */}
@@ -370,72 +373,92 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TAB 2: BODY (Bodyweight & Composition) ────────────────────────── */}
       {activeTab === 'body' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Current & 7-Day Average Card */}
-          <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="section-title text-[10px] mb-0 font-sans">BODY MASS ANALYTICS</span>
-                <h3 className="text-lg font-bold text-text-primary mt-0.5">Weight &amp; Composition</h3>
+          {bodyMetrics.length === 0 ? (
+            <div className="card p-8 bg-bg-card border border-border text-center space-y-4 shadow-sm">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 mx-auto flex items-center justify-center">
+                <Scale className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-text-primary font-sans">No Weight Logs Recorded</h3>
+                <p className="text-xs text-text-muted max-w-xs mx-auto">
+                  Log your daily or weekly morning weight to track your 7-day moving average and bodyweight trends.
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsWeightModalOpen(true)}
-                className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
+                className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 shadow-md shadow-accent/25"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 <span>Log Weight</span>
               </button>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border space-y-1">
-                <span className="text-3xs uppercase font-bold text-text-muted font-mono block">
-                  LATEST MEASUREMENT
-                </span>
-                <div className="text-2xl font-black text-text-primary font-mono mt-0.5">
-                  {bodyweightAnalytics?.current ? displayWeight(bodyweightAnalytics.current.weightKg) : '—'}
+          ) : (
+            <>
+              {/* Current & 7-Day Average Card */}
+              <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="section-title text-[10px] mb-0 font-sans">BODY MASS ANALYTICS</span>
+                    <h3 className="text-lg font-bold text-text-primary mt-0.5">Weight &amp; Composition</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsWeightModalOpen(true)}
+                    className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Log Weight</span>
+                  </button>
                 </div>
-                <span className="text-3xs text-text-muted">
-                  {bodyweightAnalytics?.current ? `Logged ${bodyweightAnalytics.current.date}` : 'No logs yet'}
-                </span>
-              </div>
 
-              <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border space-y-1">
-                <span className="text-3xs uppercase font-bold text-purple-400 font-mono block">
-                  7-DAY MOVING AVG
-                </span>
-                <div className="text-2xl font-black text-purple-400 font-mono mt-0.5">
-                  {bodyweightAnalytics ? displayWeight(bodyweightAnalytics.avgKg) : '—'}
-                </div>
-                <span className="text-3xs text-text-muted">
-                  Rate: {bodyweightAnalytics ? bodyweightAnalytics.trendText : 'Steady'}
-                </span>
-              </div>
-            </div>
-          </section>
-
-          {/* 7-Day Average & Daily Weight SVG Trend Chart */}
-          <BodyweightChart />
-
-          {/* Historical Logs List */}
-          <section className="card p-4 bg-bg-card border border-border space-y-3">
-            <h4 className="section-title text-[11px] mb-0 font-sans">RECENT WEIGHT LOGS</h4>
-            {bodyMetrics.length === 0 ? (
-              <p className="text-xs text-text-muted text-center py-4">No weight logs recorded yet.</p>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {[...bodyMetrics]
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 15)
-                  .map((log) => (
-                    <div key={log.id} className="py-2.5 flex items-center justify-between text-xs">
-                      <span className="font-mono text-text-secondary">{log.date}</span>
-                      <span className="font-mono font-bold text-text-primary">{displayWeight(log.weightKg)}</span>
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border space-y-1">
+                    <span className="text-label text-text-muted font-bold block">
+                      Latest measurement
+                    </span>
+                    <div className="text-2xl font-black text-text-primary font-sans tabular-nums mt-0.5">
+                      {bodyweightAnalytics?.current ? displayWeight(bodyweightAnalytics.current.weightKg) : '—'}
                     </div>
-                  ))}
-              </div>
-            )}
-          </section>
+                    <span className="text-3xs text-text-muted">
+                      {bodyweightAnalytics?.current ? `Logged ${bodyweightAnalytics.current.date}` : 'No logs yet'}
+                    </span>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border space-y-1">
+                    <span className="text-label text-purple-400 font-bold block">
+                      7-day moving avg
+                    </span>
+                    <div className="text-2xl font-black text-purple-400 font-sans tabular-nums mt-0.5">
+                      {bodyweightAnalytics && bodyMetrics.length >= 3 ? displayWeight(bodyweightAnalytics.avgKg) : '—'}
+                    </div>
+                    <span className="text-3xs text-text-muted">
+                      Rate: {bodyweightAnalytics && bodyMetrics.length >= 3 ? bodyweightAnalytics.trendText : '—'}
+                    </span>
+                  </div>
+                </div>
+              </section>
+
+              {/* 7-Day Average & Daily Weight SVG Trend Chart */}
+              <BodyweightChart />
+
+              {/* Historical Logs List */}
+              <section className="card p-4 bg-bg-card border border-border space-y-3">
+                <h4 className="section-title text-[11px] mb-0 font-sans">RECENT WEIGHT LOGS</h4>
+                <div className="divide-y divide-border/60">
+                  {[...bodyMetrics]
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                    .slice(0, 15)
+                    .map((log) => (
+                      <div key={log.id} className="py-2.5 flex items-center justify-between text-xs">
+                        <span className="text-text-secondary">{log.date}</span>
+                        <span className="font-bold text-text-primary tabular-nums">{displayWeight(log.weightKg)}</span>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            </>
+          )}
         </div>
       )}
 
@@ -448,8 +471,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <h3 className="text-base font-bold text-text-primary">Habit &amp; Workout Matrix</h3>
                 <p className="text-2xs text-text-muted">Multi-habit accountability across gym, water, protein, creatine</p>
               </div>
-              <span className="text-xs font-bold font-mono text-accent">
-                {trainingAnalytics.workoutsThisWeek} sessions this week
+              <span className="text-xs font-bold text-text-secondary tabular-nums">
+                {plural(trainingAnalytics.workoutsThisWeek, 'session')} this week
               </span>
             </div>
             <WorkoutHeatmap />
@@ -466,12 +489,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <div key={w.id} className="py-2.5 flex items-center justify-between text-xs">
                     <div>
                       <span className="font-semibold text-text-primary block">
-                        {w.exercises.length} Exercises ({w.exercises.map((e) => e.name).slice(0, 2).join(', ')}...)
+                        {plural(w.exercises.length, 'exercise')} ({w.exercises.map((e) => e.name).slice(0, 2).join(', ')}...)
                       </span>
                       <span className="text-3xs text-text-muted font-mono">{w.date}</span>
                     </div>
-                    <span className="text-2xs font-mono font-medium text-text-secondary">
-                      {w.exercises.reduce((acc, ex) => acc + ex.sets.length, 0)} sets
+                    <span className="text-2xs font-medium text-text-secondary tabular-nums">
+                      {plural(w.exercises.reduce((acc, ex) => acc + ex.sets.length, 0), 'set')}
                     </span>
                   </div>
                 ))}
