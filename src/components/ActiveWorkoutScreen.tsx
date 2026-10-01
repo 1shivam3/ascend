@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord } from '@/lib/types';
-import { isMainCompoundLift, calculateOneRepMax, getEquipmentType } from '@/lib/strength-standards';
+import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList } from '@/lib/strength-standards';
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
@@ -50,12 +50,17 @@ export default function ActiveWorkoutScreen({
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
 
+  const availableExercises = useMemo(() => getExerciseList(), []);
+
   // Session state
   const [exercises, setExercises] = useState<WorkoutExercise[]>(() => {
     if (initialExercises && initialExercises.length > 0) {
-      return initialExercises.map((e) => ({
+      return initialExercises.map((e, idx) => ({
         ...e,
-        sets: e.sets.map((s) => ({
+        name: e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`),
+        sets: (e.sets && e.sets.length > 0 ? e.sets : [
+          { weight: userUnit === 'kg' ? 60 : 135, reps: 8, unit: userUnit, completed: false, rpe: 8 },
+        ]).map((s) => ({
           ...s,
           unit: s.unit || userUnit,
           completed: s.completed || false,
@@ -409,17 +414,20 @@ export default function ActiveWorkoutScreen({
         totalSetsCount++;
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
-        if (s.completed && sWeight > 0 && sReps > 0) {
+        const isDone = s.completed || (sReps > 0 && sWeight > 0);
+        if (isDone && sReps > 0) {
           completedSetsCount++;
           const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
           totalVolumeKg += wKg * sReps;
+        } else if (s.completed) {
+          completedSetsCount++;
         }
       }
     }
 
     return {
       totalVolumeKg: Math.round(totalVolumeKg),
-      completedSetsCount,
+      completedSetsCount: Math.max(completedSetsCount, exercises.some(e => e.sets.some(s => s.reps > 0)) ? 1 : 0),
       totalSetsCount,
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
     };
@@ -429,22 +437,31 @@ export default function ActiveWorkoutScreen({
   const handleConfirmFinish = () => {
     const today = new Date().toISOString().split('T')[0];
     const validExercises = exercises
-      .filter((e) => e.name.trim().length > 0)
-      .map((e) => ({
-        name: e.name.trim(),
-        sets: e.sets
-          .filter((s) => (parseInt(String(s.reps), 10) || 0) > 0)
-          .map((s) => ({
-            ...s,
-            weight: parseFloat(String(s.weight)) || 0,
-            reps: parseInt(String(s.reps), 10) || 0,
-          })),
-        notes: e.notes,
-      }))
+      .map((e, idx) => {
+        const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`);
+        const validSets = e.sets
+          .map((s) => {
+            const w = parseFloat(String(s.weight)) || 0;
+            const r = parseInt(String(s.reps), 10) || (w > 0 ? 1 : 8);
+            return {
+              ...s,
+              completed: true,
+              weight: w,
+              reps: r,
+            };
+          })
+          .filter((s) => s.reps > 0);
+
+        return {
+          name: cleanName,
+          sets: validSets,
+          notes: e.notes,
+        };
+      })
       .filter((e) => e.sets.length > 0);
 
     if (validExercises.length === 0) {
-      toast.error('No exercises with reps recorded.', 'Cannot Finish');
+      toast.error('Please record at least 1 set with reps before finishing.', 'Cannot Finish');
       return;
     }
 
@@ -459,7 +476,7 @@ export default function ActiveWorkoutScreen({
       for (const s of ex.sets) {
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
-        if (s.completed && sWeight > 0 && sReps > 0) {
+        if (sWeight > 0 && sReps > 0) {
           const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
           const e1rm = calculateOneRepMax(wKg, sReps);
           if (e1rm > topSet.e1RMKg) {
@@ -490,6 +507,7 @@ export default function ActiveWorkoutScreen({
       exercises: validExercises,
     };
 
+    setIsFinishModalOpen(false);
     onFinish(workoutEntry, newPRsCount);
   };
 
@@ -596,7 +614,7 @@ export default function ActiveWorkoutScreen({
         {/* Exercise Header Card */}
         <section className="bg-[#141821] border border-border/80 rounded-2xl p-4 space-y-2.5 shadow-sm">
           <div className="flex items-start justify-between gap-2">
-            <div>
+            <div className="flex-1 min-w-0 mr-2">
               <div className="flex items-center gap-2">
                 <span className="text-3xs uppercase font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
                   {getEquipmentType(currentExercise.name)}
@@ -607,9 +625,22 @@ export default function ActiveWorkoutScreen({
                   </span>
                 )}
               </div>
-              <h2 className="text-xl font-extrabold text-text-primary mt-1 tracking-tight">
-                {currentExercise.name}
-              </h2>
+              <div className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  list="active-exercises-list"
+                  value={currentExercise.name}
+                  placeholder="Exercise Name (e.g. Bench Press)"
+                  onChange={(e) => {
+                    const newName = e.target.value;
+                    setExercises((prev) =>
+                      prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: newName } : ex))
+                    );
+                  }}
+                  className="text-lg sm:text-xl font-extrabold text-text-primary bg-transparent border-b border-border/40 hover:border-border focus:border-accent outline-none py-0.5 w-full tracking-tight transition-all placeholder:text-text-muted/40"
+                  title="Tap to edit or pick an exercise"
+                />
+              </div>
             </div>
 
             {/* Quick Actions (Warm-up & Plates) */}
@@ -1078,6 +1109,7 @@ export default function ActiveWorkoutScreen({
             <div className="p-4 space-y-3">
               <input
                 type="text"
+                list="active-exercises-list"
                 placeholder="Exercise name (e.g. Incline Bench)"
                 value={newExerciseName}
                 onChange={(e) => setNewExerciseName(e.target.value)}
@@ -1224,6 +1256,12 @@ export default function ActiveWorkoutScreen({
           </div>
         </div>
       )}
+      {/* Datalist for autocomplete */}
+      <datalist id="active-exercises-list">
+        {availableExercises.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
     </div>
   );
 }

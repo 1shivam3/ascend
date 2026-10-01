@@ -625,7 +625,8 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   };
 
   const handleAddExercise = (exerciseName = '') => {
-    setExercises(prev => [...prev, { name: exerciseName, sets: [{ reps: 8, weight: 0, unit: userUnit }] }]);
+    const finalName = exerciseName.trim() || (exercises.length === 0 ? 'Bench Press' : `Exercise ${exercises.length + 1}`);
+    setExercises(prev => [...prev, { name: finalName, sets: [{ reps: 8, weight: userUnit === 'kg' ? 60 : 135, unit: userUnit }] }]);
   };
 
   const handleSelectFromLibrary = (exerciseName: string) => {
@@ -701,7 +702,9 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const openBlankLogger = () => {
     setStartedFromPlan(null);
     setSessionStartTime(Date.now());
-    if (exercises.length === 0) handleAddExercise();
+    if (exercises.length === 0 || exercises.every(e => !e.name.trim())) {
+      setExercises([{ name: 'Bench Press', sets: [{ reps: 8, weight: userUnit === 'kg' ? 60 : 135, unit: userUnit }] }]);
+    }
     setIsModalOpen(true);
   };
 
