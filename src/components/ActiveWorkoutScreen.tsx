@@ -182,7 +182,22 @@ export default function ActiveWorkoutScreen({
     return getProgressionRecommendation(currentExercise.name, workouts, userUnit);
   }, [currentExercise?.name, workouts, userUnit]);
 
-  // Stepper handlers
+  // Weight & Reps handlers (direct typing + steppers)
+  const handleSetWeightChange = (setIdx: number, val: string | number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            return { ...s, weight: val as any };
+          }),
+        };
+      })
+    );
+  };
+
   const handleWeightStep = (setIdx: number, step: number) => {
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -191,8 +206,24 @@ export default function ActiveWorkoutScreen({
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
-            const newW = Math.max(0, Math.round(((s.weight || 0) + step) * 10) / 10);
+            const currentW = parseFloat(String(s.weight)) || 0;
+            const newW = Math.max(0, Math.round((currentW + step) * 10) / 10);
             return { ...s, weight: newW };
+          }),
+        };
+      })
+    );
+  };
+
+  const handleSetRepsChange = (setIdx: number, val: string | number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            return { ...s, reps: val as any };
           }),
         };
       })
@@ -207,7 +238,8 @@ export default function ActiveWorkoutScreen({
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
-            const newR = Math.max(1, (s.reps || 8) + step);
+            const currentR = parseInt(String(s.reps), 10) || 0;
+            const newR = Math.max(1, currentR + step);
             return { ...s, reps: newR };
           }),
         };
@@ -259,8 +291,8 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const lastSet = ex.sets[ex.sets.length - 1];
-        const newWeight = lastSet ? lastSet.weight : 60;
-        const newReps = lastSet ? lastSet.reps : 8;
+        const newWeight = lastSet ? (parseFloat(String(lastSet.weight)) || 0) : 60;
+        const newReps = lastSet ? (parseInt(String(lastSet.reps), 10) || 0) : 8;
         return {
           ...ex,
           sets: [
@@ -286,8 +318,8 @@ export default function ActiveWorkoutScreen({
 
   // Warm-up sets generator
   const handleGenerateWarmupSets = () => {
-    const firstWorkingSet = currentExercise.sets.find((s) => s.weight > 0) || currentExercise.sets[0];
-    const workingWeight = firstWorkingSet ? firstWorkingSet.weight : 80;
+    const firstWorkingSet = currentExercise.sets.find((s) => (parseFloat(String(s.weight)) || 0) > 0) || currentExercise.sets[0];
+    const workingWeight = firstWorkingSet ? (parseFloat(String(firstWorkingSet.weight)) || 0) : 80;
     const barWeight = 20;
 
     // Standard warm-up ramp:
@@ -375,10 +407,12 @@ export default function ActiveWorkoutScreen({
     for (const ex of exercises) {
       for (const s of ex.sets) {
         totalSetsCount++;
-        if (s.completed && s.weight > 0 && s.reps > 0) {
+        const sWeight = parseFloat(String(s.weight)) || 0;
+        const sReps = parseInt(String(s.reps), 10) || 0;
+        if (s.completed && sWeight > 0 && sReps > 0) {
           completedSetsCount++;
-          const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-          totalVolumeKg += wKg * s.reps;
+          const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+          totalVolumeKg += wKg * sReps;
         }
       }
     }
@@ -398,7 +432,13 @@ export default function ActiveWorkoutScreen({
       .filter((e) => e.name.trim().length > 0)
       .map((e) => ({
         name: e.name.trim(),
-        sets: e.sets.filter((s) => s.reps > 0),
+        sets: e.sets
+          .filter((s) => (parseInt(String(s.reps), 10) || 0) > 0)
+          .map((s) => ({
+            ...s,
+            weight: parseFloat(String(s.weight)) || 0,
+            reps: parseInt(String(s.reps), 10) || 0,
+          })),
         notes: e.notes,
       }))
       .filter((e) => e.sets.length > 0);
@@ -417,11 +457,13 @@ export default function ActiveWorkoutScreen({
 
       let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
       for (const s of ex.sets) {
-        if (s.completed && s.weight > 0 && s.reps > 0) {
-          const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-          const e1rm = calculateOneRepMax(wKg, s.reps);
+        const sWeight = parseFloat(String(s.weight)) || 0;
+        const sReps = parseInt(String(s.reps), 10) || 0;
+        if (s.completed && sWeight > 0 && sReps > 0) {
+          const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+          const e1rm = calculateOneRepMax(wKg, sReps);
           if (e1rm > topSet.e1RMKg) {
-            topSet = { weightKg: Math.round(wKg * 10) / 10, reps: s.reps, e1RMKg: Math.round(e1rm * 10) / 10 };
+            topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
           }
         }
       }
@@ -585,7 +627,7 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={() => {
-                  const firstW = currentExercise.sets[0]?.weight || 60;
+                  const firstW = parseFloat(String(currentExercise.sets[0]?.weight)) || 60;
                   openPlateCalculatorForWeight(firstW);
                 }}
                 className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border hover:border-accent/40 text-2xs font-semibold text-text-secondary hover:text-accent transition-all flex items-center gap-1"
@@ -626,12 +668,13 @@ export default function ActiveWorkoutScreen({
 
         {/* ── Set Rows Table (weight | reps | RPE | ✓) ─────────────────── */}
         <section className="space-y-2.5">
-          <div className="flex items-center justify-between px-2 text-3xs font-mono text-text-muted uppercase tracking-wider">
-            <span>Set</span>
-            <div className="flex items-center gap-14 mr-10">
-              <span>Weight ({userUnit})</span>
-              <span>Reps</span>
-              <span>RPE</span>
+          <div className="flex items-center justify-between px-3 text-3xs font-mono text-text-muted uppercase tracking-wider">
+            <span className="w-10 sm:w-12 shrink-0">Set</span>
+            <div className="flex-1 flex items-center justify-between pl-1 sm:pl-2 pr-1">
+              <span className="text-center w-28 sm:w-32">Weight ({userUnit})</span>
+              <span className="text-center w-24 sm:w-28">Reps</span>
+              <span className="text-center w-12 sm:w-14">RPE</span>
+              <span className="w-9 sm:w-10 text-center">Done</span>
             </div>
           </div>
 
@@ -642,16 +685,26 @@ export default function ActiveWorkoutScreen({
               return (
                 <div
                   key={sIdx}
-                  className={`p-3 rounded-2xl border transition-all ${
+                  className={`p-2.5 sm:p-3 rounded-2xl border transition-all ${
                     set.completed
                       ? 'bg-emerald-950/20 border-emerald-500/40'
                       : 'bg-[#141821] border-border/80'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-1.5 sm:gap-2">
                     {/* Set Number & Previous session in grey */}
-                    <div className="w-12 shrink-0">
-                      <span className="text-xs font-mono font-bold text-accent block">S{sIdx + 1}</span>
+                    <div className="w-10 sm:w-12 shrink-0">
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs font-mono font-bold text-accent">S{sIdx + 1}</span>
+                        <button
+                          type="button"
+                          onClick={() => openPlateCalculatorForWeight(parseFloat(String(set.weight)) || 60)}
+                          className="text-text-muted/60 hover:text-accent transition-colors p-0.5"
+                          title="Barbell plates for this set"
+                        >
+                          <Dumbbell className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
                       {prevSet ? (
                         <span
                           className="text-[10px] text-text-muted/80 font-mono block truncate"
@@ -664,49 +717,78 @@ export default function ActiveWorkoutScreen({
                       )}
                     </div>
 
-                    {/* Weight Steppers */}
-                    <div className="flex items-center gap-1 bg-[#1B2030] p-1 rounded-xl border border-border/60">
+                    {/* Weight Steppers & Direct Input */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 bg-[#1B2030] p-1 rounded-xl border border-border/60">
                       <button
                         type="button"
                         onClick={() => handleWeightStep(sIdx, -2.5)}
-                        className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0"
                         title="-2.5 kg"
                       >
                         -2.5
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openPlateCalculatorForWeight(set.weight)}
-                        className="px-2 font-mono font-bold text-sm text-text-primary hover:text-accent transition-colors"
-                        title="View Barbell Plates"
-                      >
-                        {set.weight}
-                      </button>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={set.weight ?? ''}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            handleSetWeightChange(sIdx, val);
+                          }
+                        }}
+                        onBlur={() => {
+                          const parsed = parseFloat(String(set.weight));
+                          handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
+                        }}
+                        className="w-12 sm:w-14 text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-[#141821] hover:bg-[#181d28] focus:bg-[#0E1118] border border-transparent focus:border-accent rounded-lg py-1 px-0.5 outline-none transition-all"
+                        title="Type weight directly or use -2.5 / +2.5"
+                      />
                       <button
                         type="button"
                         onClick={() => handleWeightStep(sIdx, 2.5)}
-                        className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0"
                         title="+2.5 kg"
                       >
                         +2.5
                       </button>
                     </div>
 
-                    {/* Reps Steppers */}
-                    <div className="flex items-center gap-1 bg-[#1B2030] p-1 rounded-xl border border-border/60">
+                    {/* Reps Steppers & Direct Input */}
+                    <div className="flex items-center gap-0.5 sm:gap-1 bg-[#1B2030] p-1 rounded-xl border border-border/60">
                       <button
                         type="button"
                         onClick={() => handleRepsStep(sIdx, -1)}
-                        className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0"
                         title="-1 Rep"
                       >
                         -1
                       </button>
-                      <span className="px-2 font-mono font-bold text-sm text-text-primary">{set.reps}</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={set.reps ?? ''}
+                        placeholder="1"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*$/.test(val)) {
+                            handleSetRepsChange(sIdx, val);
+                          }
+                        }}
+                        onBlur={() => {
+                          const parsed = parseInt(String(set.reps), 10);
+                          handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
+                        }}
+                        className="w-9 sm:w-11 text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-[#141821] hover:bg-[#181d28] focus:bg-[#0E1118] border border-transparent focus:border-accent rounded-lg py-1 px-0.5 outline-none transition-all"
+                        title="Type reps directly or use -1 / +1"
+                      />
                       <button
                         type="button"
                         onClick={() => handleRepsStep(sIdx, 1)}
-                        className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0"
                         title="+1 Rep"
                       >
                         +1
@@ -718,7 +800,7 @@ export default function ActiveWorkoutScreen({
                       <select
                         value={set.rpe || 8}
                         onChange={(e) => handleRPESelect(sIdx, Number(e.target.value))}
-                        className="bg-[#1B2030] border border-border/60 text-accent font-mono font-bold text-2xs p-2 rounded-xl outline-none focus:border-accent"
+                        className="bg-[#1B2030] border border-border/60 text-accent font-mono font-bold text-2xs p-1.5 sm:p-2 rounded-xl outline-none focus:border-accent"
                         title="RPE (Rate of Perceived Exertion)"
                       >
                         <option value="6">@6</option>
@@ -737,7 +819,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleToggleSetComplete(sIdx)}
-                      className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 shrink-0 ${
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 shrink-0 ${
                         set.completed
                           ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
                           : 'bg-[#1B2030] border border-border/80 text-text-muted hover:border-emerald-500/50 hover:text-emerald-400'
@@ -897,12 +979,46 @@ export default function ActiveWorkoutScreen({
             </div>
 
             <div className="p-4 space-y-4">
-              <div className="text-center p-3 rounded-xl bg-[#1B2030] border border-border">
+              <div className="text-center p-3 rounded-xl bg-[#1B2030] border border-border space-y-2">
                 <span className="text-3xs uppercase font-mono text-text-muted block">TARGET BARBELL WEIGHT</span>
-                <span className="text-3xl font-black font-mono text-accent mt-0.5 block">
-                  {plateTargetWeight} {userUnit}
-                </span>
-                <span className="text-2xs font-mono text-text-secondary mt-1 block">
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPlateTargetWeight((w) => Math.max(20, Math.round((w - 2.5) * 10) / 10))}
+                    className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                    title="-2.5 kg"
+                  >
+                    -2.5
+                  </button>
+                  <div className="flex items-center justify-center">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={plateTargetWeight || ''}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                          setPlateTargetWeight(val === '' ? 0 : parseFloat(val));
+                        }
+                      }}
+                      onBlur={() => {
+                        setPlateTargetWeight((w) => Math.max(20, Math.round((w || 20) * 10) / 10));
+                      }}
+                      className="w-24 text-center text-2xl font-black font-mono text-accent bg-[#141821] border border-border focus:border-accent rounded-lg py-1 outline-none"
+                    />
+                    <span className="text-xs font-mono text-text-muted ml-1.5">{userUnit}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPlateTargetWeight((w) => Math.round((w + 2.5) * 10) / 10)}
+                    className="w-8 h-8 rounded-lg bg-[#141821] hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all"
+                    title="+2.5 kg"
+                  >
+                    +2.5
+                  </button>
+                </div>
+                <span className="text-2xs font-mono text-text-secondary block">
                   {plateResult.barWeight}kg Bar +{' '}
                   <strong className="text-text-primary">{plateResult.weightPerSide}kg per side</strong>
                 </span>
