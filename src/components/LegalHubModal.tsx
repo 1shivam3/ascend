@@ -124,7 +124,10 @@ export default function LegalHubModal({
 
             <div className="space-y-2.5 leading-relaxed text-2xs">
               <p>
-                <strong>Data Collection:</strong> We collect only what you type (athlete name, bodyweight, height, PRs, workouts). We do not record telemetry or advertise.
+                <strong>Data Collection:</strong> We collect only what you type (athlete name, bodyweight, height, PRs, workouts, nutrition). We do not record telemetry or advertise.
+              </p>
+              <p>
+                <strong>AI &amp; External APIs:</strong> AI Coach and meal recognition use Google Gemini on-demand. Personal identifiers are never attached. If you provide a custom API key, it stays strictly in local device storage.
               </p>
               <p>
                 <strong>GDPR &amp; CCPA Rights:</strong> You can export a complete `.json` copy of your data anytime from the Data Vault, or purge all local records with 1 tap.
@@ -209,6 +212,9 @@ export default function LegalHubModal({
               </ul>
               <p className="text-amber-300 font-semibold pt-1">
                 If you answered YES to any question, obtain medical clearance prior to testing 1RM lifts.
+              </p>
+              <p className="text-text-muted text-3xs pt-1">
+                Hydration guidelines and creatine trackers are for informational reference only. Individuals with renal conditions or hypertension should consult a physician.
               </p>
             </div>
 

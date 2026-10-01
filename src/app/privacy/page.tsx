@@ -1,10 +1,22 @@
 import Link from 'next/link';
-import { Dumbbell, ArrowLeft, ShieldCheck, Lock, HardDrive, AlertTriangle, FileText } from 'lucide-react';
+import {
+  Dumbbell,
+  ArrowLeft,
+  ShieldCheck,
+  Lock,
+  HardDrive,
+  AlertTriangle,
+  FileText,
+  Sparkles,
+  Camera,
+  Barcode,
+  Key
+} from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy & Terms | ASCEND',
-  description: 'ASCEND Powerlifting WebApp Privacy Policy and Legal Terms. 100% offline, on-device local storage with complete user data ownership.',
+  title: 'Privacy Policy | ASCEND',
+  description: 'ASCEND Powerlifting WebApp Privacy Policy. 100% offline, on-device local storage, transparent AI disclosures, and complete user data ownership.',
 };
 
 export default function PrivacyPage() {
@@ -37,11 +49,11 @@ export default function PrivacyPage() {
         <div className="flex items-center gap-2 text-emerald-400">
           <ShieldCheck className="w-6 h-6" />
           <h1 className="text-xl sm:text-2xl font-black font-mono tracking-tight">
-            PRIVACY POLICY &amp; TERMS
+            PRIVACY POLICY
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Last Updated: September 2026 • Effective Worldwide
+          Last Updated: October 2026 • Version 2.2 • Effective Worldwide
         </p>
       </div>
 
@@ -49,10 +61,10 @@ export default function PrivacyPage() {
       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono space-y-1.5">
         <div className="flex items-center gap-2 font-bold text-sm">
           <Lock className="w-4 h-4" />
-          <span>100% On-Device Local Data Guarantee</span>
+          <span>100% Local-First Data Architecture Guarantee</span>
         </div>
         <p className="text-2xs opacity-90 leading-relaxed">
-          ASCEND is designed privacy-first. We do NOT harvest, monetize, or transmit your bodyweight, lifts, or workouts to external cloud servers. Your data stays in your browser.
+          ASCEND is engineered with privacy as a foundational principle. We do NOT harvest, monetize, sell, or sync your personal workouts, lift numbers, bodyweight metrics, or habits to any external database or cloud storage. Your data belongs exclusively to you and resides solely on your device.
         </p>
       </div>
 
@@ -62,69 +74,103 @@ export default function PrivacyPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-accent" />
-            1. Data Stored and Collection Methods
+            1. Information Stored Locally on Your Device
           </h2>
           <p className="text-2xs">
-            We store only the information you explicitly provide: athlete alias, biological sex, bodyweight measurements, height records, personal records (PRs), workout logs, and daily meal nutrition.
+            All primary application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key) inside your device browser:
           </p>
-          <p className="text-2xs">
-            This information is held in client-side HTML5 Local Storage (`localStorage`). If you clear your browser history or cache without an exported backup file, this data will be purged.
+          <ul className="list-disc list-inside text-2xs space-y-1 pl-2">
+            <li><strong>Athlete Profile:</strong> Name/alias, biological sex, baseline bodyweight, height, and unit preferences (kg/lbs).</li>
+            <li><strong>Strength &amp; Workouts:</strong> Personal records (PRs), workout sessions, individual sets, reps, active workout drafts, and custom workout plans.</li>
+            <li><strong>Daily Habits &amp; Nutrition:</strong> Water intake batches, creatine daily logs and container supply, meal entries, daily macro goals, and pinned food staples.</li>
+            <li><strong>UI Preferences:</strong> Theme selection (OLED Dark or Premium Light).</li>
+          </ul>
+          <p className="text-2xs text-amber-300/80 pt-1">
+            <strong>Important Notice:</strong> Because this information is stored locally on your device, clearing your browser history, site data, or cache without an exported backup file will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
           </p>
         </section>
 
-        {/* Section 2 */}
+        {/* Section 2: AI & Cloud Services */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-400" />
-            2. Medical &amp; Fitness Activity Disclaimer
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent" />
+            2. Generative AI Features &amp; Data Handling (Google Gemini)
           </h2>
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-1.5">
+          <p className="text-2xs">
+            ASCEND includes optional generative AI capabilities powered by Google Gemini (such as the AI Training Coach, AI Photo Meal Scanner, and Natural Language Meal Logging):
+          </p>
+          <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
+            <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature (e.g. asking the AI Coach a question, scanning a meal photo, or requesting natural language meal parsing).</li>
+            <li><strong>No Personal Identifiers:</strong> We never transmit your personal contact details, email addresses, or full workout histories to AI providers. Only the specific prompt, recent athletic context necessary to answer, or food image is sent for processing.</li>
+            <li><strong>Custom Gemini API Key Security:</strong> If you supply a custom Google Gemini API Key in Settings, that key is stored strictly on your local device in <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>. It is never transmitted to, collected by, or stored on any ASCEND backend servers.</li>
+          </ul>
+        </section>
+
+        {/* Section 3: Third-Party Lookups & Hardware Permissions */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <Barcode className="w-4 h-4 text-accent" />
+            3. Barcode Scanning &amp; Device Permissions
+          </h2>
+          <div className="space-y-2 text-2xs">
             <p>
-              <strong>IMPORTANT HEALTH ADVISORY:</strong> Heavy resistance training, barbell squats, bench pressing, and deadlifting carry substantial risks of musculoskeletal injury or cardiovascular strain.
+              <strong>Open Food Facts API:</strong> When using the barcode lookup feature, the app queries the public, open-source Open Food Facts database using the numeric barcode to retrieve nutritional information. These requests are anonymous and contain no user identity or telemetry.
             </p>
             <p>
-              ASCEND is solely a digital logbook and mathematical strength calculator. It is NOT medical advice, physical therapy, or tailored coaching. Always obtain medical clearance from a certified physician before starting heavy training.
+              <strong>Camera Permission:</strong> Camera access is requested strictly when you activate the live barcode scanner or capture a meal photo. Camera video streams are analyzed locally in real-time or processed directly for meal recognition; video feeds are never recorded, tracked, or stored.
+            </p>
+            <p>
+              <strong>Haptics &amp; Audio:</strong> Vibration and audio alert capabilities are utilized strictly for the rest interval timer and action confirmations.
             </p>
           </div>
         </section>
 
-        {/* Section 3 */}
+        {/* Section 4: Data Ownership & Rights */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <FileText className="w-4 h-4 text-accent" />
-            3. GDPR &amp; CCPA Compliance
+            4. User Rights, GDPR &amp; CCPA Compliance
           </h2>
           <p className="text-2xs">
-            Under global privacy frameworks (including the European Union General Data Protection Regulation and California Consumer Privacy Act), you retain uncompromised rights:
+            Under global privacy standards, including the EU General Data Protection Regulation (GDPR) and California Consumer Privacy Act (CCPA):
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
-            <li><strong>Right to Portability:</strong> Export your complete data vault in standard JSON format anytime.</li>
-            <li><strong>Right to Deletion:</strong> Wipe all stored information with one click via Data Vault Reset.</li>
-            <li><strong>No Tracking:</strong> Zero cross-site tracking, zero telemetry, zero analytics scripts.</li>
+            <li><strong>Right to Portability:</strong> You can download a complete, unencrypted copy of your full athletic history in standard JSON format at any time using the <em>Data Vault</em>.</li>
+            <li><strong>Right to Erasure:</strong> You can immediately and irreversibly delete all local storage records using the <em>Wipe All Data</em> action in the Data Vault.</li>
+            <li><strong>Zero Tracking / Zero Cookies:</strong> ASCEND uses zero third-party advertising cookies, zero behavioral tracking pixels, and zero telemetry analytics frameworks.</li>
           </ul>
         </section>
 
-        {/* Section 4 */}
+        {/* Section 5: Medical Notice */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-text-primary">
-            4. Scientific Formulations &amp; Intellectual Property
+          <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400" />
+            5. Health, Fitness &amp; Safety Notice
           </h2>
-          <p className="text-2xs">
-            - One-Rep Maximums are calculated using the standard Epley Equation: 1RM = weight × (1 + reps/30).
-          </p>
-          <p className="text-2xs">
-            - Relative powerlifting scoring applies the official DOTS coefficient formula developed by powerlifting federations.
-          </p>
+          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-1.5">
+            <p>
+              ASCEND is an analytical workout journal and mathematical strength calculator. It is NOT a medical device and does NOT provide medical advice, diagnosis, or treatment. Resistance training carries inherent risks of injury. Always consult a healthcare professional before beginning any physical exercise regimen.
+            </p>
+            <p>
+              For complete details, please read our dedicated <Link href="/disclaimer" className="text-accent underline font-semibold">Medical &amp; Safety Disclaimer</Link>.
+            </p>
+          </div>
         </section>
       </div>
 
-      <div className="pt-4 border-t border-border/60 text-center">
+      <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+        <Link
+          href="/terms"
+          className="text-2xs font-mono text-accent hover:underline"
+        >
+          View Terms of Service &rarr;
+        </Link>
         <Link
           href="/"
-          className="btn-primary inline-flex items-center justify-center gap-2 py-2.5 px-6 text-xs font-bold font-mono"
+          className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold font-mono"
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Return to Dashboard</span>
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Dashboard</span>
         </Link>
       </div>
     </div>

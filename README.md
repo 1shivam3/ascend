@@ -1,251 +1,238 @@
-# ASCEND — Strength & Progression Tracker
+# ASCEND — Elite Powerlifting, Strength & Habit Tracker
 
 <p align="center">
-  <img src="public/icon.svg" alt="ASCEND Logo" width="72" height="72" />
+  <img src="public/icon.svg" alt="ASCEND Logo" width="80" height="80" />
 </p>
 
 <p align="center">
-  A minimalist, mobile-first strength tracking PWA built with Next.js 14, Tailwind CSS, and TypeScript.<br/>
-  <strong>100% local-first — no backend, no accounts, no data sent anywhere.</strong>
+  A high-performance, mobile-first strength and powerlifting tracking PWA built with Next.js 14, Tailwind CSS, TypeScript, and Google Gemini AI.<br/>
+  <strong>100% local-first — zero cloud tracking, zero forced accounts, on-device data vault, and offline-first resilience.</strong>
 </p>
 
 <p align="center">
-  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" />
-  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" />
-  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" />
-  <img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" />
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-green" />
+  <a href="https://nextjs.org/"><img alt="Next.js" src="https://img.shields.io/badge/Next.js-14-black?logo=next.js" /></a>
+  <a href="https://www.typescriptlang.org/"><img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-blue?logo=typescript" /></a>
+  <a href="https://tailwindcss.com/"><img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" /></a>
+  <a href="https://ai.google.dev/"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-AI-orange?logo=google" /></a>
+  <a href="https://web.dev/progressive-web-apps/"><img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" /></a>
+  <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></a>
 </p>
 
 ---
 
-## Features
+## ⚡ Key Highlights
 
-### ⚡ Daily Essentials & Habit Operating System (New)
-- **Daily Essentials Checklist**: Unified home dashboard status tracking your 5 core daily objectives:
-  - `🏋️ Workout / 🛌 Active Recovery` (automatically recognizes planned rest days without penalty)
-  - `💧 Hydration Target`
-  - `🥤 Creatine Intake`
-  - `🍗 Protein Target`
-  - `⚖ Morning Bodyweight`
-  - Real-time completion progress: `3/5 DAILY OBJECTIVES COMPLETE`
-- **Dynamic Training Day vs. Rest Day Modes**:
-  - Training day ethos: `TRAIN • HYDRATE • FUEL • RECOVER` (adds +500 ml hydration bonus)
-  - Rest day ethos: `RECOVER • HYDRATE • FUEL • MOBILITY` (automatically completes recovery objective)
-  - 1-tap toggle between training and rest days anytime without penalizing habit streaks.
-- **Next Best Action**: High-impact, zero-clutter single dynamic banner on Home guiding your immediate next priority:
-  - `💧 Drink 500 ml water (1.8 / 2.7 L)`
-  - `🥤 Creatine not logged today`
-  - `🏋️ Complete today's workout`
-  - `⚖ Log morning bodyweight`
-  - `🍗 You're 42g short of protein`
-- **1-Tap Quick Log Bar**: Home screen action strip for instant 1-tap logging of `+250ml`, `+500ml`, `✓ Creatine`, `+25g Protein`, and `⚖ Weight` with tactile toast feedback.
-- **Context-Aware Prompts**: Intelligent in-app alerts (e.g. Post-Workout Rehydration reminder with 1-tap `[+500 ML]` button, and afternoon hydration checks).
-- **Daily Activity Timeline**: Chronological event feed tracking every completed workout, creatine dose, water batch, meal, and bodyweight log throughout the day.
-- **Weekly Consistency Breakdown**: Honest 7-day multi-habit score across all 4 pillars (Gym, Water, Creatine, Protein) with overall adherence percentage.
-- **Monthly Ascension Report & Share Card**: Comprehensive monthly progression report detailing total sessions, PRs set, volume tonnage lifted, hydration %, creatine days, and top lift increases, with 1-click clipboard export.
-
-### 💧 Hydration Target & 1-Tap Logging
-- **Personalized Hydration Target**: Calibrated fluid requirements based on bodyweight (~35 ml/kg), training day bonus (+500 ml), and hot climate adjustment (+300 ml), with optional manual custom target override.
-- **1-Tap Quick Logging**: `+250ml`, `+500ml`, `+750ml`, and `+1000ml` buttons on Home, in Nutrition, and in the dedicated Hydration modal.
-- Detailed daily water intake history and batch timestamps.
-
-### 🥤 Creatine Daily Tracker & Supply Management
-- **Custom Dose & Reminder**: User-configured target (e.g. 5g daily) and preferred reminder time.
-- **Non-Punishing Consistency**: 30-day rolling consistency (`23 / 30 days`), cellular saturation estimate (`Full`, `Maintaining`, `Building`), and streak preservation.
-- **Creatine Container Supply Tracker**: Monitors container capacity (e.g. 500g) and remaining grams, auto-decrements on daily intake, calculates estimated days remaining, alerts on low supply (`< 10 days remaining`), and offers 1-tap container refills.
-
-### 📅 Multi-Habit Monthly Heatmap Matrix
-- **Calendar & Matrix Views**: Toggle between a monthly calendar grid and multi-habit rows:
-  - `WATER ■ ■ ■ □ ■ ■ ■`
-  - `CREATINE ■ ■ ■ ■ ■ □ ■`
-  - `GYM ■ □ ■ ■ ■ □ ■`
-  - `PROTEIN ■ ■ □ ■ ■ ■ ■`
-- **Interactive Day Inspector**: Tap any day to open a rich drawer showing workout exercises and sets, water volume, creatine status, protein intake, and timeline events.
-
-### 🏆 Personal Records & Strength Levels (1–100)
-- Log PRs for 30+ major lifts across Barbell Compounds, Dumbbells, Bodyweight, and Cable & Machines — plus custom exercises.
-- **Categorized Exercise Selector**: beautiful modal dropdown with live search and color-coded category pills (BB, DB, BW, CM).
-- **Bodyweight Exercise Support**: Pull-ups, Dips, and Push-ups support pure bodyweight tracking (optional added weight; defaults to your bodyweight baseline with 0 extra weight).
-- **Dumbbell Exercise Library**: calibrated per-hand standards for Dumbbell Press, Dumbbell Row, Incline DB Press, DB Shoulder Press, DB Lateral Raise, DB Fly, Hammer Curl, Goblet Squat, Arnold Press, Preacher Curl, and more.
-- **Interactive Level Progression Modal**: tap any level ring or badge to see the exact 1RM needed in `kg`/`lbs` to reach the next level, remaining levels until the next rank tier, and a full 7-tier journey overview.
-- Calculates your **exact 1-Rep Max** using the validated **Epley formula**: `weight × (1 + reps/30)`.
-- Ranks every lift on a **Level 1–100 scale** using real bodyweight-ratio strength standards with gender-adjusted multipliers and smooth interpolation between breakpoints.
-- **10 progression titles** across the scale:
-  | Range | Title |
-  |---|---|
-  | 1–10 | First Steps |
-  | 11–20 | Iron Initiate |
-  | 21–30 | Steel Apprentice |
-  | 31–40 | Forge Bound |
-  | 41–50 | Iron Forged |
-  | 51–60 | Steel Tempered |
-  | 61–70 | Iron Will |
-  | 71–80 | Titan Rising |
-  | 81–90 | Apex Predator |
-  | 91–100 | Mythic |
-- **Rank categories**: Untrained → Beginner → Novice → Intermediate → Advanced → Elite → World Class.
-- **DOTS Powerlifting Score** computed for Squat, Bench, and Deadlift to give a bodyweight-equalized total.
-- **Overall Strength Level**: weighted average across all your logged lifts.
-- **Milestone targets**: set a target weight per exercise; the plate calculator pre-loads both your best working set and the milestone in one tap.
-
-### 🏋️ Barbell Plate Calculator
-- Enter any target weight and your available plate denominations — instantly see the exact plates to load on each side.
-- **Warm-up Ramp Generator**: auto-calculates a 5-set ramp (empty bar × 10, 50% × 5, 70% × 3, 85% × 1–2, 100% work set); tap any row to instantly preview that weight's plate breakdown.
-- **Working Set / Milestone toggle**: pre-load your best PR set weight or your milestone goal with one tap.
-- Available anywhere in the app (PRs page header, Workout page header, PR card).
-
-### 📅 Workout Logger, Pre-Planning & Auto-PR Detection
-- **Pre-Plan Workouts**: create named workout routines (e.g. "Push Day", "Leg Day") with planned exercises, target sets, reps, and target weights before going to the gym.
-- **1-Tap Start from Plan**: hit "Start Workout" on any plan to pre-load all exercises and sets directly into the logger so you can execute and log with zero friction.
-- Log any workout session: multiple exercises, sets, reps, and weights in `kg` or `lbs`.
-- **Auto-PR Detection**: on saving a session, ASCEND computes the Epley 1RM for every set and compares it against your existing bests — new PRs are recorded automatically and a toast announces how many were detected.
-- **Rest Interval Timer**: built-in countdown timer with presets (1 min, 1.5 min, 2 min, 3 min) and ±15 s fine-tune buttons. Fires an audio beep + haptic vibration when time is up. Shows an animated progress bar.
-- **Monthly Activity Heatmap**: green-tinted calendar showing every day you logged a gym session; tap *"I hit the gym today"* to log a quick check-in without a full workout.
-- Full expandable workout history (most recent 20 sessions).
-
-### 🥗 Nutrition: Barcode Scanner, Favorites & Macro Targets
-- **Live Barcode Scanner**: Scan packaged food barcodes using your device camera powered by `@zxing/browser` and the worldwide **Open Food Facts API** database with live nutritional retrieval and serving size calculation.
-- **Manual Barcode Lookup**: Enter or paste any barcode manually with instant fallback.
-- **Frequent & Pinned Foods (1-Tap Logging)**: Pin staple daily foods (eggs, chicken breast, oats, protein scoop, rice) with custom portions for instant 1-tap logging.
-- **Repeat Yesterday's Diet (Copy Meals)**: 1-tap "Copy Yesterday's Meals" banner and historical day cloning to duplicate meals across days for consistent diets with zero repetitive logging.
-- **Instant Food Autocomplete**: As you type, matching foods from the 130+ item database appear with 1-tap autofill.
-- **Blank Quantity by Default**: No irritating default numbers (no forced 100g); enter exact quantities only when you know them.
-- **Expanded Serving Units**: Support for `g`, `ml`, `oz`, `piece`, `pieces`, `scoop`, `tbsp`, `tsp`, `cup`, `bowl`, `serving`, `slice`, and `handful`.
-- **Quick-Log Templates**: 1-tap buttons for "Breakfast", "Lunch", "Dinner", "Pre-Workout", and "Post-Workout".
-- **Daily Macro Targets**: Set per-day goals for Calories, Protein, Carbs, and Fat with visual progress bars. Auto-calculate button suggests targets based on bodyweight.
-- Today's running totals (Kcal, Protein, Carbs, Fat) always visible at the top of the page.
-- Last 14 days of meal history with per-day grouping and expandable food details.
-
-### 📱 Navigation & Mobile Back-Button
-- **Native-Like Back Navigation**: tapping the hardware/browser back button returns to the Home dashboard rather than abruptly quitting the application.
-
-### 📊 Body Metrics Tracking
-- Log bodyweight and height at any time; history is stored and charted.
-- **BW Ratio** displayed on your profile — strength-to-bodyweight comparison across all your tracked lifts.
-- Unit-aware: switch between `kg`/`lbs` at any point; all stored values are converted automatically.
-
-### 💡 Daily Motivational Quote
-- 60+ real, curated hard-hitting quotes from legendary athletes, coaches, and philosophers (Henry Rollins, Socrates, Arnold Schwarzenegger, David Goggins, Bruce Lee, Muhammad Ali, and more).
-- Synchronized to the day-of-year — same quote all day, fresh one tomorrow.
-
-### 🔒 Local-First Data Vault (Backup & Restore)
-- Every piece of data lives in your browser's `localStorage` under the `ascend_` namespace.
-- **Data Vault modal**: export all your data as a structured JSON file with one tap.
-- **Restore**: drag-and-drop or select your JSON backup to fully restore your account.
-- **Emergency Snapshot**: on first launch after reinstalling the PWA, ASCEND detects any `ascend_emergency_snapshot` key left in storage and offers to auto-restore it.
-- On data clear, prompted to download a backup before deletion.
-
-### 📱 PWA — Installable & Offline-Capable
-- Full Progressive Web App with a Web App Manifest and service worker.
-- Install prompt banner appears automatically on supported browsers.
-- Runs completely offline after first load — no internet connection required.
-- Safe-area support for notched devices; optimized for iOS Safari, Android Chrome, and desktop browsers.
-
-### ⚖️ Legal & Compliance
-- [Privacy Policy](/privacy) — details local-only data storage, no tracking, no cookies.
-- [Terms of Service](/terms) — usage terms and conditions.
-- [Medical & Safety Disclaimer](/disclaimer) — fitness information is for educational purposes only.
-- Custom [404 Not Found](/404) page.
+* **100% Local-First Data Privacy:** All workout sessions, personal records, body metrics, and habit checks are stored solely on your device in `localStorage`. You own your data completely.
+* **Offline-First Resilience:** Track gym sessions, compute plates, and log meals with zero internet connection.
+* **Scientific Strength Standards:** Calibrate your true strength levels (1–100 scale) across 30+ lifts with smooth bodyweight-ratio interpolation, gender adjustments, and official **DOTS powerlifting coefficients**.
+* **Active Workout Engine with Session Recovery:** Live sets/reps tracking with direct keyboard entry, auto-saved drafts (so you never lose your workout if your battery dies), previous-session comparisons, and automatic rest timers.
+* **Smart Workout Plan Generator:** Build targeted multi-bodypart splits (Chest, Back, Shoulders, Arms, Quads, Hamstrings, Glutes, Calves, Abs) tailored for Hypertrophy, Maximum Strength, or Endurance, with compound movements prioritized first.
+* **AI-Assisted Nutrition & Offline Staples:** 80+ offline food database with instant 1-tap logging, live barcode scanning (Open Food Facts), and optional Google Gemini Vision meal photo scanning & natural language parsing.
+* **Daily Habit Operating System:** Hydration targets (fluid requirements + workout bonus), Creatine monohydrate saturation tracker with supply management, 5-pillar daily checklist, and monthly consistency heatmap.
 
 ---
 
-## Tech Stack
+## 🚀 Features
+
+### 🏋️ 1. Active Workout Engine & Session Recovery
+* **Live Session Tracking:** Log sets, reps, and weights in either `kg` or `lbs`.
+* **Direct Keyboard Typing & Steppers:** Type exact numbers directly via the numeric keyboard or use fine-tune steppers (+2.5 kg, etc.).
+* **Session Draft Auto-Save:** Active workouts are automatically saved in local storage on every change. If you close your browser or your phone turns off, reopening the app immediately prompts you to resume your workout where you left off.
+* **Previous Set History:** Displays what weight and reps you hit last time for that specific exercise (`"Last: 80 kg × 8"`) for continuous progressive overload.
+* **Live Rest Interval Timer:** Built-in countdown timer with presets (1m, 1.5m, 2m, 3m) and ±15s fine-tuning. Automatically triggers when a set is completed, with audio chime and haptic vibration feedback.
+* **Barbell Plate Calculator:** Instantly calculates the exact plate breakdown for 20kg/15kg barbells. Includes an automated **5-Stage Warm-Up Ramp** (empty bar × 10, 50% × 5, 70% × 3, 85% × 2, working weight).
+* **Auto-PR Detection:** Upon finishing a workout, ASCEND computes the Epley 1RM for every set and compares it against your historical bests—automatically creating and announcing new personal records.
+
+### ⚡ 2. Automated Workout Plan Generator
+* **Multi-Bodypart Split Builder:** Multi-select any combination of target muscle groups:
+  * Upper: *Chest, Back, Shoulders, Arms*
+  * Lower: *Quads, Hamstrings, Glutes, Calves*
+  * Core: *Abs*
+* **Calibrated Training Stimulus:**
+  * **Maximum Strength:** Heavy loading (4–5 sets × 3–5 reps).
+  * **Hypertrophy:** Muscle growth volume (3–4 sets × 8–12 reps).
+  * **Muscular Endurance:** Conditioning & pump (2–3 sets × 15–20 reps).
+* **Compounds-First Logic:** Heavy compound lifts (Barbell Bench Press, Squat, Deadlift, Overhead Press) are sequenced first before isolation movements.
+* **1-Tap Launch:** Tap "Start Workout" on any generated or saved routine to pre-load all exercises directly into the workout logger.
+
+### 🏆 3. Strength Standards & Level Calibration (1–100)
+* **Validated 1-Rep Max Math:** Uses the established **Epley Equation**: `1RM = weight × (1 + reps / 30)`.
+* **Level 1–100 Scale:** Ranks every lift against bodyweight-ratio breakpoints with gender multipliers and continuous interpolation.
+* **10 Progression Titles:**
+  `First Steps` → `Iron Initiate` → `Steel Apprentice` → `Forge Bound` → `Iron Forged` → `Steel Tempered` → `Iron Will` → `Titan Rising` → `Apex Predator` → `Mythic`.
+* **7 Rank Tiers:** `Foundation` (1–15) → `Trained` (16–30) → `Skilled` (31–45) → `Advanced` (46–65) → `Elite` (66–80) → `Master` (81–95) → `Grandmaster` (96–100).
+* **Official DOTS Score:** Computes the official DOTS coefficient for Squat, Bench, and Deadlift for a bodyweight-equalized powerlifting total.
+* **Interactive Level Progression Modal:** Tap any level badge to see the exact 1RM needed in `kg`/`lbs` to reach the next level and how many points remain until the next tier.
+
+### 🥗 4. Nutrition & Macro Tracking
+* **4-Macro Tracking:** Real-time tracking of Calories, Protein, Carbohydrates, and Fats.
+* **Offline Staples Database:** 80+ common bodybuilding and everyday foods (chicken breast, eggs, paneer, roti, dal, rice, curd, whey protein, oats, almonds, peanut butter, etc.) with pre-calibrated macros per 100g.
+* **Frequent & Pinned Foods:** Pin staple foods with custom portions for instant 1-tap logging.
+* **Barcode Scanner:** Real-time barcode scanning using the device camera (`@zxing/browser`) and the worldwide **Open Food Facts API**.
+* **AI Meal Photo Scanner (Google Gemini Vision):** Snap or upload a photo of your plate; Gemini Vision analyzes the meal and estimates food items, portion weights, and macros.
+* **AI Natural Language Meal Logging:** Type or dictate what you ate in natural language (e.g. *"2 rotis with a bowl of dal, 100g paneer, and a scoop of whey"*); Gemini parses it into structured meal items.
+* **Duplicate Yesterday's Meals:** 1-tap "Copy Yesterday's Diet" banner to replicate previous nutrition days with zero friction.
+
+### 💧 5. Hydration & Creatine Operating System
+* **Personalized Hydration Targets:** Fluid recommendations calculated based on bodyweight (~35 ml/kg), training day bonuses (+500 ml), and hot climate adjustments, with manual target overrides.
+* **1-Tap Water Logging:** Quick-log buttons (`+250ml`, `+500ml`, `+750ml`, `+1000ml`) on Home and in Nutrition.
+* **Creatine Monohydrate Saturation:** Rolling 30-day consistency score and cellular saturation models (`Full`, `Maintaining`, `Building`).
+* **Creatine Container Supply Tracker:** Monitors container capacity (e.g. 500g) and remaining grams, auto-decrements on daily intake, and alerts when supply falls below 10 days.
+
+### 📅 6. Progress Analytics & Daily Essentials
+* **5-Pillar Daily Checklist:** Unified home tracker monitoring:
+  1. *Workout / Active Recovery*
+  2. *Hydration Target*
+  3. *Creatine Intake*
+  4. *Daily Protein Goal*
+  5. *Morning Bodyweight*
+* **Dynamic Rest Day Mode:** Rest days automatically complete the recovery objective and adjust daily hydration and nutrition targets without penalizing streaks.
+* **Activity Heatmap Matrix:** GitHub-style calendar matrix visualizing daily consistency across gym sessions, water, creatine, and protein adherence.
+* **Body Metrics & Trend Analysis:** Bodyweight logging with rolling rate-of-change indicators (kg/week) and baseline calibration.
+
+### 🎨 7. Premium UI & Clean Typography
+* **OLED Dark & Premium Light Modes:** High-contrast color palette with gold/amber accents (`#e5c07b`).
+* **Clean Typography:** Styled using sans-serif typography, clean sentence-case labels, and tabular numerals (`tabular-nums`) for jitter-free numbers.
+* **Native Navigation Support:** Hardware and browser back buttons navigate seamlessly between app tabs rather than exiting the application.
+
+---
+
+## 🔒 Privacy, Security & Data Ownership
+
+ASCEND was built because athletes shouldn't have to surrender their personal health and fitness data to centralized cloud databases or ad networks.
+
+* **100% Local Storage:** All records reside in client-side HTML5 Web Storage (`localStorage` under the `ascend_store` key).
+* **Zero Telemetry & Zero Cookies:** No tracking pixels, no behavioral analytics, no third-party tracking cookies.
+* **Bring-Your-Own-Key (BYOK) for Gemini AI:** You can optionally provide your own Google Gemini API Key in Settings for unlimited AI features. Your API key is stored exclusively on your device and is never sent to any ASCEND server.
+* **Data Vault (Backup & Restore):** Export your entire athletic history as a formatted `.json` file at any time, or restore previous backups with 1 tap.
+* **Full Legal Transparency:** Complete in-app and standalone documentation:
+  * [Privacy Policy](src/app/privacy/page.tsx)
+  * [Medical & Safety Disclaimer](src/app/disclaimer/page.tsx)
+  * [Terms of Service](src/app/terms/page.tsx)
+
+---
+
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Framework | [Next.js 14](https://nextjs.org/) (App Router) |
-| Language | TypeScript 5 |
-| Styling | Tailwind CSS 3 with custom design tokens |
-| State | [Zustand](https://zustand-demo.pmnd.rs/) with `persist` middleware |
-| Icons | [Lucide React](https://lucide.dev/) |
-| Charts | Custom SVG + CSS animations |
-| Storage | Browser `localStorage` only |
-| PWA | Web App Manifest + Next.js metadata |
+| **Framework** | [Next.js 14](https://nextjs.org/) (App Router, React 18) |
+| **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
+| **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) with custom tokens |
+| **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) with `persist` middleware |
+| **AI Engine** | [Google Gemini API](https://ai.google.dev/) (`gemini-2.5-flash` / `gemini-1.5-flash`) |
+| **Barcode Scanning** | [@zxing/browser](https://github.com/zxing-js/browser) + [Open Food Facts API](https://world.openfoodfacts.org/) |
+| **Icons** | [Lucide React](https://lucide.dev/) |
+| **Storage** | Client-Side `localStorage` |
+| **Deployment & PWA** | Web App Manifest, Service Worker ready, Vercel |
 
 ---
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-src/
-├── app/
-│   ├── layout.tsx           # Root layout (meta, PWA manifest link)
-│   ├── page.tsx             # SPA shell — tab router
-│   ├── globals.css          # Design tokens + utility classes
-│   ├── not-found.tsx        # Custom 404 page
-│   ├── disclaimer/page.tsx  # Medical & Safety Disclaimer
-│   ├── privacy/page.tsx     # Privacy Policy
-│   └── terms/page.tsx       # Terms of Service
-├── components/
-│   ├── HomePage.tsx          # Dashboard — quote, level, quick actions, heatmap
-│   ├── PRsPage.tsx           # Personal Records — levels, DOTS, plate calc
-│   ├── WorkoutPage.tsx       # Workout logger — sets, rest timer, auto-PR
-│   ├── MealsPage.tsx         # Nutrition — food log, macro progress bars
-│   ├── Onboarding.tsx        # First-launch onboarding flow
-│   ├── PlateCalculatorModal.tsx  # Plate calc + warm-up ramp
-│   ├── WorkoutHeatmap.tsx    # Monthly gym activity heatmap
-│   ├── BodyMetricsModal.tsx  # Bodyweight & height history
-│   ├── DataVaultModal.tsx    # Backup / restore JSON
-│   ├── DOTSCard.tsx          # DOTS score display
-│   ├── ProgressChart.tsx     # Lift progress over time
-│   ├── InstallAppBanner.tsx  # PWA install prompt
-│   ├── LegalHubModal.tsx     # Links to legal pages
-│   ├── PrivacyPolicyModal.tsx # In-app privacy policy
-│   ├── SettingsModal.tsx     # App settings
-│   └── ui/
-│       ├── CircularProgress.tsx  # SVG circular progress ring
-│       ├── RankBadge.tsx         # Rank tier badge
-│       ├── ThemeToggle.tsx       # Dark / light theme switch
-│       └── Toast.tsx             # Toast notification system
-└── lib/
-    ├── types.ts              # All shared TypeScript interfaces
-    ├── store.ts              # Zustand global store (state + actions)
-    ├── strength-standards.ts # Level calculation, Epley, breakpoints
-    ├── dots.ts               # DOTS powerlifting score calculation
-    ├── macros.ts             # Food database + macro estimator
-    ├── plate-calculator.ts   # Plate breakdown algorithm
-    ├── quotes.ts             # 60+ daily motivational quotes
-    └── storage.ts            # localStorage helpers
+ascend/
+├── public/
+│   ├── icon.svg             # ASCEND vector brandmark
+│   └── manifest.json        # PWA Web App Manifest
+├── src/
+│   ├── app/
+│   │   ├── api/             # Next.js route handlers
+│   │   │   ├── ai/
+│   │   │   │   ├── coach/       # Gemini AI training coach endpoint
+│   │   │   │   ├── parse-meal/  # Natural language meal parser endpoint
+│   │   │   │   └── scan-meal/   # Gemini Vision photo meal scanner endpoint
+│   │   │   └── barcode/         # Open Food Facts barcode proxy
+│   │   ├── disclaimer/      # Medical & Safety Disclaimer page
+│   │   ├── privacy/         # Privacy Policy page
+│   │   ├── terms/           # Terms of Service page
+│   │   ├── globals.css      # Custom design tokens, theme variables & utilities
+│   │   ├── layout.tsx       # Root metadata, theme scripts, PWA headers
+│   │   ├── not-found.tsx    # Custom 404 Rep Failed screen
+│   │   └── page.tsx         # Main single-page application shell & tab router
+│   ├── components/
+│   │   ├── HomePage.tsx               # Dashboard: 7-day strip, quote, daily objectives, heatmap
+│   │   ├── WorkoutPage.tsx            # Workout engine: logger, active session, plan generator
+│   │   ├── ProgressPage.tsx           # Progress hub: Overview, Strength, PRs, Bodyweight, Consistency
+│   │   ├── MealsPage.tsx              # Nutrition hub: macro bars, staples, barcode & AI scanning
+│   │   ├── Onboarding.tsx             # 30-second initial calibration flow
+│   │   ├── QuickActionSheetModal.tsx  # Global floating action drawer
+│   │   ├── PlateCalculatorModal.tsx   # Plate breakdown & 5-stage warm-up ramp
+│   │   ├── LegalHubModal.tsx          # In-app legal & formula viewer
+│   │   ├── PrivacyPolicyModal.tsx     # In-app privacy confirmation dialog
+│   │   └── SettingsModal.tsx          # Preferences, units, Gemini API Key, Data Vault
+│   └── lib/
+│       ├── types.ts              # TypeScript domain types & interfaces
+│       ├── store.ts              # Zustand global store with automatic hydration & migration
+│       ├── strength-standards.ts # Bodyweight ratio breakpoints, Epley 1RM, strength levels
+│       ├── dots.ts               # Official DOTS powerlifting polynomial equations
+│       ├── macros.ts             # 80+ item offline food database & fuzzy matcher
+│       ├── quotes.ts             # 60+ real motivational quotes indexed by day-of-year
+│       └── storage.ts            # Local storage serialization helpers
+└── package.json
 ```
 
 ---
 
-## Getting Started
+## 💻 Getting Started
 
+### Prerequisites
+* [Node.js](https://nodejs.org/) 18.17 or later
+* npm / yarn / pnpm
+
+### 1. Clone the repository
 ```bash
-# 1. Clone the repo
 git clone https://github.com/1shivam3/ascend.git
 cd ascend
+```
 
-# 2. Install dependencies
+### 2. Install dependencies
+```bash
 npm install
+```
 
-# 3. Run the development server
+### 3. Configure Environment Variables (Optional)
+Copy the example environment file:
+```bash
+cp .env.example .env.local
+```
+Add your optional Google Gemini API key if you wish to run AI features through server environment variables:
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+*(Alternatively, you can leave this blank and input your custom Gemini API Key directly inside the app under **Settings → AI Intelligence**!)*
+
+### 4. Run the development server
+```bash
 npm run dev
 ```
-
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+### 5. Production build
 ```bash
-# Build for production
 npm run build
-
-# Start production server
-npm start
-
-# Run linter
-npm run lint
+npm run start
 ```
 
 ---
 
-## Privacy
+## 📱 Running as an Android App
 
-ASCEND stores **all data exclusively in your browser's `localStorage`**. No data is ever sent to any server. There are no analytics, no tracking cookies, and no third-party SDKs. You own your data — export it any time from the Data Vault.
+ASCEND is fully optimized for mobile devices:
+1. **As an Instant PWA:** Open the deployed app in Chrome on Android and tap **"Install App"** or **"Add to Home Screen"**. It runs full-screen without browser UI.
+2. **As an Android APK (via Capacitor):** Because ASCEND uses static web tech and offline local storage, it can be packaged directly into a native Android APK using [Capacitor](https://capacitorjs.com/):
+   ```bash
+   npm install @capacitor/core @capacitor/cli @capacitor/android
+   npx cap init Ascend com.ascend.app
+   npm run build
+   npx cap add android
+   npx cap open android
+   ```
 
 ---
 
-## License
+## ⚖️ License
 
-MIT © 2024 Shivam Kumar
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
+
+Copyright (c) 2024–2026 **Shivam Kumar**.

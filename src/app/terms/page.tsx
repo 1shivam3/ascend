@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { Dumbbell, ArrowLeft, Scale, Shield, AlertTriangle, FileText, CheckCircle2 } from 'lucide-react';
+import { Dumbbell, ArrowLeft, Scale, Shield, AlertTriangle, FileText, CheckCircle2, Sparkles, HardDrive } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | ASCEND',
-  description: 'ASCEND Powerlifting WebApp Terms of Service and End-User Agreement. Medical disclaimers, local data ownership, and limitations of liability.',
+  description: 'ASCEND Powerlifting WebApp Terms of Service and End-User Agreement. Medical disclaimers, local data ownership, AI feature terms, and limitations of liability.',
 };
 
 export default function TermsPage() {
@@ -41,7 +41,7 @@ export default function TermsPage() {
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Effective Date: September 2026 • Version 2.0
+          Effective Date: October 2026 • Version 2.2 • Global Agreement
         </p>
       </div>
 
@@ -53,15 +53,19 @@ export default function TermsPage() {
         <ul className="space-y-1.5 text-2xs">
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>ASCEND is an analytical tracking logbook, NOT a doctor, physical therapist, or personal coach.</span>
+            <span>ASCEND is an analytical tracking journal, NOT a doctor, physical therapist, or clinical dietitian.</span>
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>Heavy resistance training carries risk of serious injury; you voluntarily assume all training risks.</span>
+            <span>Heavy resistance training carries inherent risks of injury; you voluntarily assume all training risks.</span>
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>Your data is stored 100% locally on your device; you are responsible for maintaining your own backup files.</span>
+            <span>Your data is stored 100% locally on your device; you are responsible for maintaining your own backup files via the Data Vault.</span>
+          </li>
+          <li className="flex items-start gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <span>AI features are synthetic assistants; custom Gemini API keys remain strictly on your local device.</span>
           </li>
         </ul>
       </div>
@@ -89,10 +93,10 @@ export default function TermsPage() {
           </h2>
           <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-2">
             <p>
-              <strong>WARNING:</strong> Weightlifting, powerlifting, and maximal strength attempts (such as 1-Rep Max squats, bench presses, and deadlifts) involve intrinsic physical hazards, including but not limited to musculoskeletal strains, tears, joint injuries, drops, and acute cardiovascular strain.
+              <strong>WARNING:</strong> Weightlifting, powerlifting, and maximal strength attempts (such as 1-Rep Max squats, bench presses, and deadlifts) involve intrinsic physical hazards, including musculoskeletal strains, tears, joint injuries, drops, and acute cardiovascular strain.
             </p>
             <p>
-              ASCEND provides mathematical estimations (e.g. Epley formula, DOTS coefficients) for informational and entertainment purposes only. ASCEND does not provide professional medical diagnosis, treatment, or individualized coaching.
+              ASCEND provides mathematical estimations (e.g. Epley formula, DOTS coefficients, warm-up plate breakdowns) for informational and entertainment purposes only. ASCEND does not provide professional medical diagnosis, treatment, or individualized coaching.
             </p>
             <p>
               You expressly agree that your participation in athletic activities tracked via ASCEND is voluntary, and you assume full responsibility for any risks, injuries, or damages that may arise. Always consult a physician before engaging in strenuous resistance programs.
@@ -102,54 +106,66 @@ export default function TermsPage() {
 
         {/* Section 3 */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-text-primary">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+            <HardDrive className="w-4 h-4 text-accent" />
             3. Local Data Storage &amp; User Backup Responsibilities
           </h2>
           <p className="text-2xs">
-            ASCEND operates on a 100% client-side local architecture. Your personal records, body metrics, workouts, and meals reside strictly within your device&apos;s browser memory (`localStorage`).
+            ASCEND operates on a 100% client-side local architecture. Your personal records, body metrics, workouts, active drafts, and meals reside strictly within your device&apos;s browser memory (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>).
           </p>
           <p className="text-2xs">
-            Because we do not store your data on remote cloud servers, ASCEND cannot recover your data if you clear your browser history, reset your device, or delete web storage without a previously exported backup file. You are solely responsible for downloading regular `.json` backups via the Data Vault.
+            Because we do not store your data on remote cloud servers, ASCEND cannot recover your data if you clear your browser history, reset your device, or delete web storage without a previously exported backup file. You are solely responsible for downloading regular <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">.json</code> backups via the Data Vault.
           </p>
         </section>
 
         {/* Section 4 */}
         <section className="space-y-2">
-          <h2 className="text-sm font-bold text-text-primary">
-            4. Intellectual Property &amp; Open Formulas
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+            <Sparkles className="w-4 h-4 text-accent" />
+            4. Generative AI Features &amp; Third-Party Services
           </h2>
           <p className="text-2xs">
-            The ASCEND brand, user interface, software code, and styling are protected by copyright and intellectual property laws. You may not copy, reverse engineer, or redistribute the source code without authorization.
+            ASCEND provides optional AI-assisted features (AI Coach, Meal Vision Scanning, Natural Language Parsing) powered by Google Gemini. Output generated by AI is synthetic and probabilistic. ASCEND does not warrant the clinical accuracy of AI nutrition estimates or the fitness suitability of AI training splits.
           </p>
           <p className="text-2xs">
-            Scientific formulas utilized within the app (including the Epley equation for 1RM estimation and the DOTS polynomial scoring formula for bodyweight normalization) remain open mathematical standards credited to their respective researchers and powerlifting federations.
+            Users who configure custom Gemini API keys are responsible for complying with Google&apos;s API Terms of Service and managing their own API quotas.
           </p>
         </section>
 
         {/* Section 5 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary">
-            5. Disclaimer of Warranties (&quot;As-Is&quot;)
+            5. Intellectual Property &amp; Open Scientific Formulas
           </h2>
           <p className="text-2xs">
-            ASCEND IS PROVIDED ON AN &quot;AS-IS&quot; AND &quot;AS-AVAILABLE&quot; BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING FITNESS FOR A PARTICULAR PURPOSE, ACCURACY OF FORMULAS, OR UNINTERRUPTED AVAILABILITY.
+            The ASCEND brand, user interface, software code, and styling are protected by copyright and intellectual property laws. Scientific formulas utilized within the app (including the Epley equation for 1RM estimation and the DOTS polynomial scoring formula for bodyweight normalization) remain open mathematical standards credited to their respective researchers and powerlifting federations.
           </p>
         </section>
 
         {/* Section 6 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary">
-            6. Limitation of Liability
+            6. Disclaimer of Warranties (&quot;As-Is&quot;)
           </h2>
           <p className="text-2xs">
-            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ASCEND, ITS CREATORS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, PUNITIVE, OR CONSEQUENTIAL DAMAGES ARISING OUT OF YOUR USE OF THE APPLICATION, INCLUDING PHYSICAL INJURY, LOSS OF DATA, OR HARDWARE FAILURE.
+            ASCEND IS PROVIDED ON AN &quot;AS-IS&quot; AND &quot;AS-AVAILABLE&quot; BASIS WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS OR IMPLIED, INCLUDING FITNESS FOR A PARTICULAR PURPOSE, ACCURACY OF FORMULAS, OR UNINTERRUPTED AVAILABILITY.
           </p>
         </section>
 
         {/* Section 7 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary">
-            7. Contact &amp; Updates to Terms
+            7. Limitation of Liability
+          </h2>
+          <p className="text-2xs">
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL ASCEND, ITS CREATORS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, PUNITIVE, OR CONSEQUENTIAL DAMAGES ARISING OUT OF YOUR USE OF THE APPLICATION, INCLUDING PHYSICAL INJURY, LOSS OF DATA, OR HARDWARE FAILURE.
+          </p>
+        </section>
+
+        {/* Section 8 */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary">
+            8. Contact &amp; Updates to Terms
           </h2>
           <p className="text-2xs">
             We reserve the right to modify these Terms of Service at any time. Continued use of the application following any modifications signifies your acceptance of the updated terms.
