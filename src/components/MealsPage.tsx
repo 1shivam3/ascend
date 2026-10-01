@@ -99,6 +99,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const toggleCreatine     = useStore((state) => state.toggleCreatine);
   const hydrationConfig    = useStore((state) => state.hydrationConfig);
   const creatineConfig     = useStore((state) => state.creatineConfig);
+  const customGeminiKey    = useStore((state) => state.customGeminiKey);
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
@@ -114,6 +115,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [confirmClearAll,      setConfirmClearAll]      = useState(false);
   const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
   const [showAllStaples,       setShowAllStaples]       = useState(false);
+  const [selectedEatPreference, setSelectedEatPreference] = useState<'staples' | 'shake' | 'high_protein' | 'light' | null>(null);
+  const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(false);
+  const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
+  const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
 
   // ── Pinned food edit / add form ───────────────────────────────────────────
   const [pinnedName,     setPinnedName]     = useState('');
@@ -572,10 +577,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     setIsNaturalParsing(true);
     try {
+      const customKey = customGeminiKey;
       const res = await fetch('/api/ai/parse-meal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(customKey ? { 'x-gemini-api-key': customKey } : {}),
+        },
+        body: JSON.stringify({
+          query: q,
+          customApiKey: customKey,
+        }),
       });
 
       const data = await res.json();
@@ -590,8 +602,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         addMeal(newMeal);
         setNaturalQuery('');
+        const sourceBadge = data.source === 'gemini' ? '✨ Gemini AI' : '📊 Calibrated IFCT';
         toast.success(
-          `Logged ${data.foods.length} items (~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P)!`,
+          `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
         );
       } else {
@@ -614,15 +627,56 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
   const dynamicCloseoutSuggestions = useMemo(() => {
-    const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 6);
+    if (!selectedEatPreference) return [];
 
-    if (candidates.length === 0) {
+    if (selectedEatPreference === 'staples') {
+      const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 4);
+      if (candidates.length === 0) {
+        return [
+          {
+            tag: '⭐ STAPLE IDEA',
+            tagCls: 'bg-accent/10 text-accent',
+            name: 'Paneer & Roti',
+            description: '100g fresh paneer with 2 rotis',
+            calories: 505,
+            proteinG: 24,
+            carbsG: 48,
+            foods: [
+              { name: 'Paneer', quantity: 100, unit: 'g', calories: 265, proteinG: 18.3, carbsG: 4.5, fatG: 20.8 },
+              { name: 'Roti', quantity: 2, unit: 'piece', calories: 240, proteinG: 6.4, carbsG: 44, fatG: 3 },
+            ],
+          },
+        ];
+      }
+      return candidates.slice(0, 3).map((cand) => ({
+        tag: '⭐ FROM YOUR STAPLES',
+        tagCls: 'bg-accent/10 text-accent',
+        name: cand.name,
+        description: `${cand.defaultQuantity || 100}${cand.unit || 'g'} ${cand.name}`,
+        calories: Math.round(cand.calories),
+        proteinG: Math.round(cand.proteinG),
+        carbsG: Math.round(cand.carbsG || 0),
+        foods: [
+          {
+            name: cand.name,
+            quantity: cand.defaultQuantity || 100,
+            unit: cand.unit || 'g',
+            calories: cand.calories,
+            proteinG: cand.proteinG,
+            carbsG: cand.carbsG || 0,
+            fatG: cand.fatG || 0,
+          },
+        ],
+      }));
+    }
+
+    if (selectedEatPreference === 'shake') {
       return [
         {
-          tag: '⚡ FASTEST (1 MIN PREP)',
+          tag: '⚡ 1 MIN PREP',
           tagCls: 'bg-accent/10 text-accent',
           name: 'Whey Protein Shake',
-          description: '1 scoop whey protein + 250ml milk or water',
+          description: '1 scoop whey protein + 250ml milk',
           calories: 200,
           proteinG: 30,
           carbsG: 14,
@@ -632,46 +686,82 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ],
         },
         {
-          tag: '🍽️ HIGH PROTEIN STAPLE',
-          tagCls: 'bg-[#22C55E]/10 text-[#22C55E]',
-          name: 'Soya Chunks Bowl',
-          description: '50g boiled soya chunks with spices',
-          calories: 172,
-          proteinG: 26,
-          carbsG: 16,
+          tag: '🥤 DESI SATTU SHAKE',
+          tagCls: 'bg-amber-500/10 text-amber-400',
+          name: 'Sattu Protein Drink',
+          description: '50g sattu in 300ml cold water with lemon & jeera',
+          calories: 206,
+          proteinG: 13,
+          carbsG: 32,
           foods: [
-            { name: 'Soya Chunks', quantity: 50, unit: 'g', calories: 172, proteinG: 26, carbsG: 16, fatG: 0.3 },
+            { name: 'Sattu', quantity: 50, unit: 'g', calories: 206, proteinG: 13, carbsG: 32, fatG: 2.5 },
           ],
         },
       ];
     }
 
-    const sorted = [...candidates].sort((a, b) => (b.proteinG || 0) - (a.proteinG || 0)).slice(0, 2);
+    if (selectedEatPreference === 'high_protein') {
+      return [
+        {
+          tag: '💪 MAXIMUM PROTEIN',
+          tagCls: 'bg-emerald-500/10 text-emerald-400',
+          name: 'Soya Chunks Bowl',
+          description: '60g boiled soya chunks with chaat masala',
+          calories: 206,
+          proteinG: 31,
+          carbsG: 20,
+          foods: [
+            { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+          ],
+        },
+        {
+          tag: '🥚 4 BOILED EGGS',
+          tagCls: 'bg-emerald-500/10 text-emerald-400',
+          name: 'Boiled Eggs (3 Whole + 1 White)',
+          description: 'Complete high-bioavailability protein',
+          calories: 239,
+          proteinG: 22,
+          carbsG: 2,
+          foods: [
+            { name: 'Whole Egg', quantity: 3, unit: 'piece', calories: 222, proteinG: 18.9, carbsG: 1.8, fatG: 15 },
+            { name: 'Egg White', quantity: 1, unit: 'piece', calories: 17, proteinG: 3.6, carbsG: 0.2, fatG: 0.1 },
+          ],
+        },
+      ];
+    }
 
-    return sorted.map((cand, idx) => {
-      const isFirst = idx === 0;
-      return {
-        tag: isFirst ? '⚡ PINNED HIGH PROTEIN' : '🍽️ WHOLE FOOD STAPLE',
-        tagCls: isFirst ? 'bg-accent/10 text-accent' : 'bg-[#22C55E]/10 text-[#22C55E]',
-        name: cand.name,
-        description: `${cand.defaultQuantity || 100}${cand.unit || 'g'} ${cand.name}`,
-        calories: Math.round(cand.calories),
-        proteinG: Math.round(cand.proteinG),
-        carbsG: Math.round(cand.carbsG),
-        foods: [
-          {
-            name: cand.name,
-            quantity: cand.defaultQuantity || 100,
-            unit: cand.unit || 'g',
-            calories: cand.calories,
-            proteinG: cand.proteinG,
-            carbsG: cand.carbsG,
-            fatG: cand.fatG,
-          },
-        ],
-      };
-    });
-  }, [favoriteFoods]);
+    if (selectedEatPreference === 'light') {
+      return [
+        {
+          tag: '🥗 LOW CALORIE BOOST',
+          tagCls: 'bg-sky-500/10 text-sky-400',
+          name: 'Curd / Dahi Bowl with Roasted Chana',
+          description: '150g curd + 30g roasted chana',
+          calories: 141,
+          proteinG: 8,
+          carbsG: 15,
+          foods: [
+            { name: 'Curd', quantity: 150, unit: 'g', calories: 92, proteinG: 5.3, carbsG: 7, fatG: 5 },
+            { name: 'Roasted Chana', quantity: 30, unit: 'g', calories: 49, proteinG: 2.7, carbsG: 8.2, fatG: 0.8 },
+          ],
+        },
+        {
+          tag: '⚡ WHEY IN WATER',
+          tagCls: 'bg-sky-500/10 text-sky-400',
+          name: '1 Scoop Whey Protein in Water',
+          description: 'Fastest pure protein with minimal calories',
+          calories: 120,
+          proteinG: 24,
+          carbsG: 2,
+          foods: [
+            { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2.2, fatG: 1 },
+          ],
+        },
+      ];
+    }
+
+    return [];
+  }, [selectedEatPreference, favoriteFoods]);
 
   const waterToday = waterLogs[todayDate] || 0;
   const waterTargetMl = calculateHydrationTarget({
@@ -1103,50 +1193,98 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
 
           <p className="text-xs text-text-secondary">
-            Quick high-protein suggestions to hit your daily target:
+            {selectedEatPreference
+              ? 'Tailored high-protein options based on your selection:'
+              : 'Choose what you feel like having to view tailored high-protein options:'}
           </p>
 
-          <div className="space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {dynamicCloseoutSuggestions.map((sug, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
+          {/* User Choice Selector */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: 'staples', label: '⭐ Pinned Staples', sub: 'Your daily foods' },
+              { id: 'shake', label: '⚡ Quick Shake', sub: 'Under 2 min' },
+              { id: 'high_protein', label: '💪 High Protein (25g+)', sub: 'Hit goal fast' },
+              { id: 'light', label: '🥗 Light Snack', sub: 'Low calorie' },
+            ].map((opt) => {
+              const isSelected = selectedEatPreference === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelectedEatPreference(isSelected ? null : (opt.id as any))}
+                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-emerald-500 bg-emerald-500/15 shadow-xs'
+                      : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
+                  }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
-                        {sug.tag}
-                      </span>
-                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
-                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
-                    <p className="text-3xs text-text-secondary mt-1 font-mono">
-                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newMeal: MealEntry = {
-                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                        date: todayDate,
-                        name: sug.name,
-                        foods: sug.foods,
-                      };
-                      addMeal(newMeal);
-                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
-                    }}
-                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Log 1-Tap</span>
-                  </button>
-                </div>
-              ))}
-            </div>
+                  <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                    {opt.label}
+                  </span>
+                  <span className="text-3xs text-text-muted">{opt.sub}</span>
+                </button>
+              );
+            })}
           </div>
+
+          {/* Display suggestions ONLY when user has chosen a preference */}
+          {selectedEatPreference !== null ? (
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {dynamicCloseoutSuggestions.map((sug, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
+                          {sug.tag}
+                        </span>
+                        <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
+                      </div>
+                      <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
+                      <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
+                      <p className="text-3xs text-text-secondary mt-1 font-mono">
+                        ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newMeal: MealEntry = {
+                          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                          date: todayDate,
+                          name: sug.name,
+                          foods: sug.foods,
+                        };
+                        addMeal(newMeal);
+                        toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
+                      }}
+                      className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Log 1-Tap</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEatPreference(null)}
+                  className="text-3xs text-text-muted hover:text-accent underline font-medium"
+                >
+                  Clear preference
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-3xs text-text-muted text-center pt-0.5">
+              Tap any preference above to see suggestions tailored to your remaining macros.
+            </p>
+          )}
         </section>
       )}
 
@@ -1426,222 +1564,297 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         )}
       </section>
 
-        {/* ── Recent Meals (1-Tap Repeat) ── */}
+        {/* ── Recent Meals (Collapsible Dropdown) ── */}
         {recentUniqueMeals.length > 0 && (
-          <section className="pt-1.5 space-y-1.5">
-            <div className="flex items-center justify-between px-0.5">
-              <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider font-mono block">
-                RECENT MEALS (1-TAP REPEAT)
-              </span>
-              <span className="text-2xs text-text-muted">
-                {recentUniqueMeals.length} recent
-              </span>
-            </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-              {recentUniqueMeals.map((meal) => {
-                const mMacros = calculateMealMacros(meal.foods);
-                const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                });
-                return (
-                  <div
-                    key={meal.id}
-                    className="flex-shrink-0 p-2.5 rounded-xl bg-bg-card border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
-                        <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted shrink-0">
-                          {mealDate}
-                        </span>
-                      </div>
-                      <div className="text-2xs text-text-muted truncate mt-0.5" title={meal.foods.map((f) => f.name).join(', ')}>
-                        {meal.foods.map((f) => f.name).join(', ')}
-                      </div>
-                      <div className="text-2xs text-text-muted mt-1">
-                        {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-600 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleLogFrequentMeal(meal)}
-                        className="btn-primary flex-1 py-1 text-2xs font-semibold flex items-center justify-center gap-1"
+          <section className="rounded-xl border border-border/70 bg-bg-card/70 overflow-hidden shadow-xs">
+            <button
+              type="button"
+              onClick={() => setIsRecentMealsOpen((prev) => !prev)}
+              className="w-full flex items-center justify-between p-3 hover:bg-bg-secondary/40 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-accent" />
+                <span className="text-[11px] font-bold text-text-primary uppercase tracking-wider font-mono">
+                  RECENT MEALS (1-TAP REPEAT)
+                </span>
+                <span className="text-2xs font-mono font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent">
+                  {recentUniqueMeals.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-text-muted text-2xs font-semibold">
+                <span>{isRecentMealsOpen ? 'Hide' : 'Show'}</span>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isRecentMealsOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isRecentMealsOpen && (
+              <div className="p-3 pt-0 border-t border-border/40">
+                <div className="flex gap-2 overflow-x-auto pb-1 pt-2 scrollbar-none">
+                  {recentUniqueMeals.map((meal) => {
+                    const mMacros = calculateMealMacros(meal.foods);
+                    const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    });
+                    return (
+                      <div
+                        key={meal.id}
+                        className="flex-shrink-0 p-2.5 rounded-xl bg-bg-secondary/70 border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs flex flex-col justify-between"
                       >
-                        <Plus className="w-3 h-3" />
-                        <span>Repeat Today</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handlePinMealFoods(meal)}
-                        className="p-1 rounded-lg border border-border text-accent hover:border-accent hover:bg-accent/10 transition-colors"
-                        title="Pin all foods from this meal"
-                      >
-                        <Star className="w-3 h-3 fill-accent/20" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                        <div>
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
+                            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-bg-card text-text-muted shrink-0">
+                              {mealDate}
+                            </span>
+                          </div>
+                          <div className="text-2xs text-text-muted truncate mt-0.5" title={meal.foods.map((f) => f.name).join(', ')}>
+                            {meal.foods.map((f) => f.name).join(', ')}
+                          </div>
+                          <div className="text-2xs text-text-muted mt-1">
+                            {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-500 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleLogFrequentMeal(meal)}
+                            className="btn-primary flex-1 py-1 text-2xs font-semibold flex items-center justify-center gap-1"
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Repeat Today</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePinMealFoods(meal)}
+                            className="p-1 rounded-lg border border-border text-accent hover:border-accent hover:bg-accent/10 transition-colors"
+                            title="Pin all foods from this meal"
+                          >
+                            <Star className="w-3 h-3 fill-accent/20" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-      {/* ── Meal History (Item 18: Clean action empty state) ── */}
-      <section className="space-y-2.5">
-        <div className="flex justify-between items-center px-0.5">
-          <h2 className="section-title text-[11px] mb-0 font-sans">MEAL HISTORY</h2>
-          <span className="text-xs text-text-muted">{meals.length} logged</span>
-        </div>
-
-        {groupedMeals.length === 0 ? (
-          /* Item 18: Clean empty state without bloated feature list */
-          <div className="card text-center py-8 px-4 space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent mx-auto">
-              <Utensils className="w-5 h-5" />
+      {/* ── Meal History (Hidden by Default, Day-by-Day View) ── */}
+      <section className="rounded-xl border border-border/70 bg-bg-card/70 overflow-hidden shadow-xs">
+        <button
+          type="button"
+          onClick={() => setIsMealHistoryOpen((prev) => !prev)}
+          className="w-full flex items-center justify-between p-3.5 hover:bg-bg-secondary/40 transition-colors text-left"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
+              <Utensils className="w-3.5 h-3.5" />
             </div>
             <div>
-              <p className="text-sm font-bold text-text-primary">No meals logged</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                Log your first meal to start tracking calories and protein.
+              <h2 className="section-title text-[11px] mb-0 font-sans">
+                MEAL HISTORY (BY DATE)
+              </h2>
+              <p className="text-3xs text-text-muted">
+                {meals.length} meals logged across {groupedMeals.length} days
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                if (foods.length === 0) handleAddFood();
-                setIsModalOpen(true);
-              }}
-              className="btn-primary mx-auto text-xs py-2 px-4 flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>LOG MEAL</span>
-            </button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-5">
-            {groupedMeals.map(([date, dayMeals]) => {
-              const isToday = date === todayDate;
-              return (
-                <div key={date}>
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider font-mono">
-                      {isToday
-                        ? 'Today'
-                        : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    </h3>
-                    {!isToday && (
+          <div className="flex items-center gap-1.5 text-text-secondary text-xs font-semibold px-2.5 py-1 rounded-lg bg-bg-secondary border border-border">
+            <span>{isMealHistoryOpen ? 'Hide History' : 'View by Date'}</span>
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMealHistoryOpen ? 'rotate-180' : ''}`} />
+          </div>
+        </button>
+
+        {isMealHistoryOpen && (
+          <div className="p-3.5 pt-0 border-t border-border/40 space-y-3">
+            {groupedMeals.length === 0 ? (
+              <div className="text-center py-6 px-4 space-y-2">
+                <p className="text-xs font-bold text-text-primary">No meals logged yet</p>
+                <p className="text-2xs text-text-muted">
+                  Log your first meal above or via Natural Food Logging.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pt-2">
+                {/* Date Filter Pills */}
+                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedHistoryDate(null)}
+                    className={`px-2.5 py-1 rounded-lg text-2xs font-semibold whitespace-nowrap transition-colors ${
+                      selectedHistoryDate === null
+                        ? 'bg-accent text-white font-bold'
+                        : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    All Days ({groupedMeals.length})
+                  </button>
+                  {groupedMeals.map(([date]) => {
+                    const isToday = date === todayDate;
+                    const dateLabel = isToday
+                      ? 'Today'
+                      : new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    const isSelected = selectedHistoryDate === date;
+                    return (
                       <button
+                        key={date}
                         type="button"
-                        onClick={() => handleCopySpecificDay(date)}
-                        className="text-2xs font-mono text-accent hover:underline flex items-center gap-1 font-semibold"
-                        title="Copy all meals from this day to Today"
+                        onClick={() => setSelectedHistoryDate(date)}
+                        className={`px-2.5 py-1 rounded-lg text-2xs font-semibold whitespace-nowrap transition-colors ${
+                          isSelected
+                            ? 'bg-accent text-white font-bold'
+                            : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
+                        }`}
                       >
-                        <Copy className="w-3 h-3" />
-                        <span>Copy to Today</span>
+                        {dateLabel}
                       </button>
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-2.5">
-                    {dayMeals.map((meal) => {
-                      const isExpanded = expandedMeals.has(meal.id);
-                      const macros = calculateMealMacros(meal.foods);
-                      return (
-                        <div key={meal.id} className="card">
-                          <div
-                            className="flex justify-between items-center cursor-pointer"
-                            onClick={() => toggleExpand(meal.id)}
-                          >
-                            <div className="flex-1">
-                              <div className="flex justify-between items-center mb-1">
-                                <h4 className="font-semibold text-text-primary text-sm">{meal.name}</h4>
-                                <span className="font-bold text-accent text-sm font-mono">
-                                  ~{Math.round(macros.calories)} kcal
-                                </span>
-                              </div>
-                              <div className="flex gap-3 text-xs text-text-secondary font-mono">
-                                <span className="text-info">~{Math.round(macros.proteinG)}g P</span>
-                                <span>•</span>
-                                <span className="text-warning">~{Math.round(macros.carbsG)}g C</span>
-                                <span>•</span>
-                                <span className="text-danger">~{Math.round(macros.fatG)}g F</span>
-                              </div>
-                            </div>
-                            <div className="ml-3 flex items-center text-text-muted">
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </div>
+                    );
+                  })}
+                </div>
+
+                {/* Day-by-Day Meals */}
+                {groupedMeals
+                  .filter(([date]) => selectedHistoryDate === null || selectedHistoryDate === date)
+                  .map(([date, dayMeals]) => {
+                    const isToday = date === todayDate;
+                    const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
+                    return (
+                      <div key={date} className="rounded-xl border border-border/70 bg-bg-secondary/40 p-3 space-y-2.5">
+                        <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                          <div>
+                            <h3 className="text-xs font-bold text-text-primary">
+                              {isToday
+                                ? 'Today'
+                                : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </h3>
+                            <span className="text-3xs text-text-muted font-mono">
+                              {dayMeals.length} meals • ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
+                            </span>
                           </div>
-
-                          {isExpanded && (
-                            <div className="mt-3.5 flex flex-col gap-2 border-t border-border pt-3">
-                              {meal.foods.map((food, i) => (
-                                <div key={i} className="flex justify-between items-center text-xs py-1 px-2 rounded bg-bg-elevated/50">
-                                  <div className="text-text-primary flex items-center gap-1.5">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleToggleFavorite(food);
-                                      }}
-                                      className="text-text-muted hover:text-accent p-0.5"
-                                      title={isItemFavorited(food.name) ? 'Unpin favorite' : 'Pin to favorites'}
-                                    >
-                                      <Star
-                                        className={`w-3.5 h-3.5 ${
-                                          isItemFavorited(food.name) ? 'text-accent fill-accent' : 'text-text-muted'
-                                        }`}
-                                      />
-                                    </button>
-                                    <span className="font-medium">{food.name}</span>{' '}
-                                    <span className="text-text-muted">({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})</span>
-                                  </div>
-                                  <div className="text-text-secondary font-mono">
-                                    <span className="text-accent">~{Math.round(food.calories)} kcal</span>
-                                    <span className="text-text-muted ml-2">P:~{Math.round(food.proteinG)}g</span>
-                                  </div>
-                                </div>
-                              ))}
-                              <div className="mt-1 flex justify-between items-center">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const today = new Date().toISOString().split('T')[0];
-                                    const repeatedMeal: MealEntry = {
-                                      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                                      date: today,
-                                      name: meal.name,
-                                      foods: meal.foods.map((f) => ({ ...f })),
-                                    };
-                                    addMeal(repeatedMeal);
-                                    toast.success(`Repeated "${meal.name}" for Today!`, 'Meal Logged');
-                                  }}
-                                  className="text-accent hover:underline text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-accent/10 transition-colors font-medium"
-                                >
-                                  <Copy className="w-3.5 h-3.5" /> Repeat Meal
-                                </button>
-
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    deleteMeal(meal.id);
-                                    toast.info(`Deleted ${meal.name} entry.`, 'Meal Removed');
-                                  }}
-                                  className="text-danger hover:text-danger/80 text-xs flex items-center gap-1 px-2 py-1 rounded hover:bg-danger/10 transition-colors"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" /> Delete Meal
-                                </button>
-                              </div>
-                            </div>
+                          {!isToday && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopySpecificDay(date)}
+                              className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
+                              title="Copy all meals from this day to Today"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Copy Day</span>
+                            </button>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+
+                        {/* Meals on this day */}
+                        <div className="flex flex-col gap-2">
+                          {dayMeals.map((meal) => {
+                            const isExpanded = expandedMeals.has(meal.id);
+                            const mMacros = calculateMealMacros(meal.foods);
+                            return (
+                              <div key={meal.id} className="rounded-lg bg-bg-card border border-border p-2.5 space-y-2">
+                                <div
+                                  className="flex justify-between items-center cursor-pointer"
+                                  onClick={() => toggleExpand(meal.id)}
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <h4 className="font-bold text-xs text-text-primary">{meal.name}</h4>
+                                      <span className="text-[10px] text-accent font-mono font-semibold">
+                                        ~{Math.round(mMacros.calories)} kcal
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-2 text-3xs text-text-muted font-mono mt-0.5">
+                                      <span className="text-emerald-400 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
+                                      <span>•</span>
+                                      <span>~{Math.round(mMacros.carbsG)}g C</span>
+                                      <span>•</span>
+                                      <span>~{Math.round(mMacros.fatG)}g F</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-3xs text-text-muted">
+                                      {meal.foods.length} items
+                                    </span>
+                                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-text-muted" /> : <ChevronDown className="w-3.5 h-3.5 text-text-muted" />}
+                                  </div>
+                                </div>
+
+                                {isExpanded && (
+                                  <div className="pt-2 border-t border-border/50 space-y-1.5">
+                                    {meal.foods.map((food, i) => (
+                                      <div key={i} className="flex justify-between items-center text-2xs py-1 px-2 rounded bg-bg-secondary/60">
+                                        <div className="flex items-center gap-1.5 truncate">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleToggleFavorite(food);
+                                            }}
+                                            className="text-text-muted hover:text-accent p-0.5"
+                                          >
+                                            <Star
+                                              className={`w-3 h-3 ${
+                                                isItemFavorited(food.name) ? 'text-accent fill-accent' : 'text-text-muted'
+                                              }`}
+                                            />
+                                          </button>
+                                          <span className="text-text-primary font-medium truncate">{food.name}</span>
+                                          <span className="text-text-muted text-3xs">
+                                            ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
+                                          </span>
+                                        </div>
+                                        <div className="text-3xs text-text-muted font-mono shrink-0 ml-2">
+                                          <span className="text-accent">~{Math.round(food.calories)} kcal</span> • <span className="text-emerald-400">P:~{Math.round(food.proteinG)}g</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                    <div className="flex justify-between items-center pt-1">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const today = new Date().toISOString().split('T')[0];
+                                          const repeatedMeal: MealEntry = {
+                                            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                                            date: today,
+                                            name: meal.name,
+                                            foods: meal.foods.map((f) => ({ ...f })),
+                                          };
+                                          addMeal(repeatedMeal);
+                                          toast.success(`Repeated "${meal.name}" for Today!`, 'Meal Logged');
+                                        }}
+                                        className="text-2xs text-accent hover:underline flex items-center gap-1 font-semibold"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                        <span>Repeat Today</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          deleteMeal(meal.id);
+                                          toast.info(`Deleted ${meal.name}`);
+                                        }}
+                                        className="text-2xs text-text-muted hover:text-danger flex items-center gap-0.5"
+                                        title="Delete this meal"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
           </div>
         )}
       </section>

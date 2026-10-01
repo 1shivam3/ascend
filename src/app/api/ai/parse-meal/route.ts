@@ -6,6 +6,7 @@ import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { FoodItem } from '@/lib/types';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
   if (headerKey && headerKey.trim()) return headerKey.trim();
@@ -79,7 +80,9 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
     const candidateModels = [
-      'gemini-2.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.8-flash',
       'gemini-flash-latest',
       'gemini-2.0-flash',
     ];
