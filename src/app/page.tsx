@@ -60,7 +60,16 @@ export default function AppPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  if (!_hasHydrated) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    if (!_hasHydrated) {
+      useStore.getState().setHasHydrated(true);
+    }
+  }, [_hasHydrated]);
+
+  if (!_hasHydrated && !mounted) {
     return (
       <div className="min-h-screen bg-bg-primary flex items-center justify-center">
         <div className="text-text-muted text-sm tracking-widest uppercase font-mono animate-pulse">
