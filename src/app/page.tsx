@@ -9,6 +9,9 @@ import ProgressPage from '@/components/ProgressPage';
 import WorkoutPage from '@/components/WorkoutPage';
 import MealsPage from '@/components/MealsPage';
 import QuickActionSheetModal from '@/components/QuickActionSheetModal';
+import ImportProgramModal from '@/components/ImportProgramModal';
+import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
+import { PlannedWorkout } from '@/lib/types';
 
 const tabs = [
   { id: 'home', label: 'Home', icon: Home },
@@ -23,7 +26,37 @@ export default function AppPage() {
   const [activeTab, setActiveTab] = useState<TabId>('home');
   const [progressInitialTab, setProgressInitialTab] = useState<'overview' | 'strength' | 'prs' | 'bodyweight' | 'training'>('overview');
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
   const { profile, theme, _hasHydrated, activeWorkoutDraft } = useStore();
+
+  // Listen for shared program links (#plan=...) in URL
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const checkHash = () => {
+      const hash = window.location.hash;
+      if (hash && (hash.includes('plan=') || hash.startsWith('#v1_'))) {
+        const decoded = decodeProgramFromHash(hash);
+        if (decoded) {
+          setSharedProgram(decoded);
+          setIsImportModalOpen(true);
+          window.history.replaceState(null, '', window.location.pathname + window.location.search);
+        }
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
+  const handleStartSharedWorkout = (plan: PlannedWorkout) => {
+    setPendingStartPlan(plan);
+    setActiveTab('workout');
+    setTimeout(() => setPendingStartPlan(null), 800);
+  };
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
@@ -100,6 +133,7 @@ export default function AppPage() {
         )}
         {activeTab === 'workout' && (
           <WorkoutPage
+            startPlanOnMount={pendingStartPlan}
             onNavigate={(tab) => {
               if (tab === 'prs') {
                 setProgressInitialTab('prs');
@@ -271,6 +305,14 @@ export default function AppPage() {
             setActiveTab(tab as TabId);
           }
         }}
+      />
+
+      {/* Shared Program Import Modal (Distribution Loop) */}
+      <ImportProgramModal
+        program={sharedProgram}
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onStartWorkout={handleStartSharedWorkout}
       />
     </div>
   );

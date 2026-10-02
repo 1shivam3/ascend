@@ -22,6 +22,7 @@ import {
   Layers,
   ArrowRightLeft,
   Edit2,
+  Mic,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord } from '@/lib/types';
@@ -33,6 +34,8 @@ import {
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
+import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
+import { VoiceWorkoutResult } from '@/lib/voice-logger';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -92,6 +95,7 @@ export default function ActiveWorkoutScreen({
   const [warmupWorkingWeight, setWarmupWorkingWeight] = useState<number>(60);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
 
@@ -350,6 +354,60 @@ export default function ActiveWorkoutScreen({
         };
       })
     );
+  };
+
+  const handleApplyVoiceSet = (result: VoiceWorkoutResult) => {
+    let targetExIdx = activeExerciseIdx;
+    if (result.exerciseName) {
+      const matchIdx = exercises.findIndex(
+        (ex) => ex.name.toLowerCase() === result.exerciseName!.toLowerCase()
+      );
+      if (matchIdx !== -1) {
+        targetExIdx = matchIdx;
+        setActiveExerciseIdx(matchIdx);
+      }
+    }
+
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== targetExIdx) return ex;
+
+        let targetSetIdx = -1;
+        if (result.setIndex && result.setIndex > 0) {
+          targetSetIdx = result.setIndex - 1;
+        } else {
+          targetSetIdx = ex.sets.findIndex((s) => !s.completed);
+        }
+
+        let nextSets = [...ex.sets];
+        if (targetSetIdx >= 0 && targetSetIdx < nextSets.length) {
+          nextSets[targetSetIdx] = {
+            ...nextSets[targetSetIdx],
+            weight: result.weight,
+            reps: result.reps,
+            rpe: result.rpe ?? nextSets[targetSetIdx].rpe ?? 8,
+            completed: true,
+          };
+        } else {
+          nextSets.push({
+            weight: result.weight,
+            reps: result.reps,
+            unit: userUnit,
+            rpe: result.rpe ?? 8,
+            completed: true,
+          });
+        }
+
+        return { ...ex, sets: nextSets };
+      })
+    );
+
+    // Auto-trigger rest interval timer
+    const restDuration = isCurrentMainLift ? 180 : 90;
+    setRestTotalSeconds(restDuration);
+    setRestSecondsLeft(restDuration);
+    setIsRestRunning(true);
+    setIsRestFinished(false);
   };
 
   // Warm-up sets generator
@@ -691,8 +749,18 @@ export default function ActiveWorkoutScreen({
               </div>
             </div>
 
-            {/* Quick Actions (Warm-up & Plates) */}
+            {/* Quick Actions (Voice, Warm-up & Plates) */}
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setIsVoiceModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-accent/20 hover:bg-accent/30 border border-accent/40 text-2xs font-bold text-accent transition-all flex items-center gap-1 shadow-xs"
+                title="Hinglish Voice Log (e.g. '80 pe 5, RPE 8')"
+              >
+                <Mic className="w-3.5 h-3.5" />
+                <span>Voice</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsWarmupModalOpen(true)}
@@ -1327,6 +1395,16 @@ export default function ActiveWorkoutScreen({
           </div>
         </div>
       )}
+
+      {/* Voice Workout Logger Modal */}
+      <VoiceWorkoutLoggerModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        currentExerciseName={currentExercise?.name}
+        defaultUnit={userUnit}
+        onApplySet={handleApplyVoiceSet}
+      />
+
       {/* Datalist for autocomplete */}
       <datalist id="active-exercises-list">
         {availableExercises.map((name) => (

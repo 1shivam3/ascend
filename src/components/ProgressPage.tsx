@@ -21,6 +21,7 @@ import {
   Bot,
   Layers,
   Award,
+  Share2,
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
@@ -29,6 +30,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import ProgressChart from '@/components/ProgressChart';
 import BodyweightChart from '@/components/BodyweightChart';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
+import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { plural } from '@/lib/formatters';
 
@@ -56,6 +58,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
+  const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
 
   const userUnit = profile?.unit || 'kg';
 
@@ -180,6 +183,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <p className="text-2xs text-text-muted font-mono">Strength, Body &amp; Training Intelligence</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsWeeklyRecapOpen(true)}
+            className="btn-secondary py-1.5 px-2.5 text-xs font-bold flex items-center gap-1.5 text-text-primary hover:text-accent border-border hover:border-accent/40 transition-colors shadow-xs"
+            title="Generate Weekly Training Card (WhatsApp / Instagram)"
+          >
+            <Share2 className="w-3.5 h-3.5 text-accent" />
+            <span className="text-2xs font-bold hidden sm:inline">Weekly Card</span>
+          </button>
           <ThemeToggle />
         </div>
       </header>
@@ -462,6 +474,27 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <WorkoutHeatmap />
           </div>
 
+          {/* Weekly Social Recap Card Banner */}
+          <div className="card p-3.5 bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/30 flex items-center justify-between gap-3 shadow-xs">
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
+                <span>Weekly WhatsApp / IG Card</span>
+              </h4>
+              <p className="text-2xs text-text-muted mt-0.5 truncate">
+                Export an aesthetic dark onyx &amp; gold summary of your tonnage, sessions, and DOTS rating.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsWeeklyRecapOpen(true)}
+              className="btn-primary py-2 px-3 text-xs font-bold flex items-center gap-1.5 shrink-0 shadow-xs hover:brightness-105 active:scale-95 transition-all"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share Card</span>
+            </button>
+          </div>
+
           {/* Recent Completed Workouts List */}
           <div className="card p-4 bg-bg-card border border-border space-y-3">
             <h4 className="section-title text-[11px] mb-0 font-sans">RECENT COMPLETED WORKOUTS</h4>
@@ -493,6 +526,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
       {/* Powerlifting Meet Attempt Planner Modal */}
       <MeetAttemptPlannerModal isOpen={isMeetModalOpen} onClose={() => setIsMeetModalOpen(false)} />
+
+      {/* Weekly Training Social Recap Card Modal */}
+      <WeeklyRecapModal isOpen={isWeeklyRecapOpen} onClose={() => setIsWeeklyRecapOpen(false)} />
     </div>
   );
 }

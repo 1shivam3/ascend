@@ -30,6 +30,7 @@ import {
   FastForward,
   Check,
   AlertTriangle,
+  Share2,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -51,10 +52,12 @@ import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import { AISubstitutionResult } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import ShareProgramModal from '@/components/ShareProgramModal';
 import { plural } from '@/lib/formatters';
 
 interface WorkoutPageProps {
   onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
+  startPlanOnMount?: PlannedWorkout | null;
 }
 
 // ─── Plan Creation / Edit Modal ──────────────────────────────────────────────
@@ -321,9 +324,10 @@ interface PlanCardProps {
   onStart: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onShare: () => void;
 }
 
-function PlanCard({ plan, onStart, onEdit, onDelete }: PlanCardProps) {
+function PlanCard({ plan, onStart, onEdit, onDelete, onShare }: PlanCardProps) {
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -340,6 +344,13 @@ function PlanCard({ plan, onStart, onEdit, onDelete }: PlanCardProps) {
         </div>
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onShare}
+            title="Share plan via WhatsApp or QR"
+            className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onEdit}
             title="Edit plan"
@@ -402,7 +413,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete }: PlanCardProps) {
 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
-export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
+export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPageProps = {}) {
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -439,6 +450,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   /** When the logger is pre-filled from a plan, store its name here */
   const [startedFromPlan, setStartedFromPlan] = useState<string | null>(null);
+  const [sharingPlan, setSharingPlan] = useState<PlannedWorkout | null>(null);
 
   // ── Rest Timer State ───────────────────────────────────────────────────────
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
@@ -739,6 +751,13 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
     setStartedFromPlan(plan.name);
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (startPlanOnMount) {
+      handleStartPlan(startPlanOnMount);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startPlanOnMount]);
 
   // ─── Close logger ─────────────────────────────────────────────────────────
 
@@ -1331,6 +1350,7 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
                 onStart={() => handleStartPlan(plan)}
                 onEdit={() => handleEditPlan(plan)}
                 onDelete={() => handleDeletePlan(plan)}
+                onShare={() => setSharingPlan(plan)}
               />
             ))}
           </div>
@@ -1570,6 +1590,13 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         workouts={workouts}
         prs={prs}
         userUnit={userUnit}
+      />
+
+      {/* Share Program Modal (Distribution Loop) */}
+      <ShareProgramModal
+        plan={sharingPlan}
+        isOpen={Boolean(sharingPlan)}
+        onClose={() => setSharingPlan(null)}
       />
     </div>
   );
