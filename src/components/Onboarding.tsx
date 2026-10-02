@@ -108,7 +108,8 @@ export default function OnboardingScreen() {
             reps: r,
             oneRepMax: Math.round(oneRepMaxKg * 10) / 10,
             date: today,
-            notes: 'Baseline calibration (entered)'
+            notes: 'Baseline calibration (entered)',
+            isBaseline: true,
           });
         }
       };

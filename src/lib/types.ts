@@ -51,6 +51,7 @@ export interface PersonalRecord {
   oneRepMax: number;
   date: string;
   notes?: string;
+  isBaseline?: boolean;
 }
 
 export interface WorkoutSet {

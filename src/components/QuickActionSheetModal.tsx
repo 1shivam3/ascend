@@ -112,13 +112,13 @@ export default function QuickActionSheetModal({
 
           <div className="p-4 space-y-4">
             {/* 1. Quick Natural Language Food Logger */}
-            <div className="p-3 rounded-2xl bg-bg-secondary border border-border space-y-2">
-              <div className="flex items-center justify-between text-2xs">
-                <span className="font-bold text-accent flex items-center gap-1">
+            <div className="p-3.5 rounded-2xl bg-bg-secondary border border-border space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-accent flex items-center gap-1 font-sans">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>NATURAL FOOD LOG</span>
+                  <span>Natural food log</span>
                 </span>
-                <span className="text-label text-text-muted font-mono">AI &amp; IFCT</span>
+                <span className="text-[11px] text-text-secondary font-medium font-sans">AI &amp; IFCT</span>
               </div>
               <form onSubmit={handleQuickFoodSubmit} className="relative">
                 <input
@@ -127,12 +127,12 @@ export default function QuickActionSheetModal({
                   value={quickFoodQuery}
                   onChange={(e) => setQuickFoodQuery(e.target.value)}
                   disabled={isParsingFood}
-                  className="w-full bg-bg-card border border-border rounded-xl py-2 pl-2.5 pr-20 text-xs text-text-primary outline-none focus:border-accent"
+                  className="w-full bg-bg-card border border-border rounded-xl py-2 pl-2.5 pr-20 text-xs text-text-primary placeholder:text-text-muted outline-none focus:border-accent"
                 />
                 <button
                   type="submit"
                   disabled={!quickFoodQuery.trim() || isParsingFood}
-                  className="absolute right-1 top-1 bottom-1 px-2.5 rounded-lg bg-accent text-white font-bold text-2xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
+                  className="absolute right-1 top-1 bottom-1 px-2.5 rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
                 >
                   {isParsingFood ? (
                     <span className="animate-pulse">Parsing...</span>
@@ -147,13 +147,13 @@ export default function QuickActionSheetModal({
             </div>
 
             {/* 2. Quick Water Presets (250, 500, 750, 1000ml) */}
-            <div className="p-3 rounded-2xl bg-bg-secondary border border-border space-y-2">
-              <div className="flex items-center justify-between text-2xs">
-                <span className="font-bold text-sky-500 flex items-center gap-1">
+            <div className="p-3.5 rounded-2xl bg-bg-secondary border border-border space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-500 flex items-center gap-1 font-sans">
                   <Droplet className="w-3.5 h-3.5 fill-sky-500/20" />
-                  <span>ADD HYDRATION</span>
+                  <span>Add hydration</span>
                 </span>
-                <span className="text-label text-text-muted font-mono">1-Tap Bottle Presets</span>
+                <span className="text-[11px] text-text-secondary font-medium font-sans">1-Tap Bottle Presets</span>
               </div>
               <div className="grid grid-cols-4 gap-1.5">
                 {[
@@ -166,7 +166,7 @@ export default function QuickActionSheetModal({
                     key={item.ml}
                     type="button"
                     onClick={() => handleWaterPreset(item.ml)}
-                    className="py-2 rounded-xl bg-bg-card hover:bg-sky-500/10 border border-border hover:border-sky-500/40 text-text-primary hover:text-sky-500 font-mono font-bold text-2xs transition-all active:scale-90 text-center"
+                    className="py-2 rounded-xl bg-bg-card hover:bg-sky-500/10 border border-border hover:border-sky-500/40 text-text-primary hover:text-sky-500 font-bold text-xs tabular-nums transition-all active:scale-90 text-center"
                   >
                     {item.label}
                   </button>
@@ -182,13 +182,13 @@ export default function QuickActionSheetModal({
                   onNavigate('workout');
                   onClose();
                 }}
-                className="p-3 rounded-xl bg-bg-secondary border border-border hover:border-accent/50 text-left transition-all active:scale-95 group"
+                className="p-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border hover:border-accent/50 text-left transition-all active:scale-95 group shadow-xs"
               >
                 <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <Dumbbell className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-text-primary block">Start Workout</span>
-                <span className="text-label text-text-muted">Launch gym session</span>
+                <span className="text-sm font-bold text-text-primary block">Start Workout</span>
+                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Launch gym session</span>
               </button>
 
               <button
@@ -197,13 +197,13 @@ export default function QuickActionSheetModal({
                   onNavigate('meals');
                   onClose();
                 }}
-                className="p-3 rounded-xl bg-bg-secondary border border-border hover:border-emerald-500/50 text-left transition-all active:scale-95 group"
+                className="p-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border hover:border-emerald-500/50 text-left transition-all active:scale-95 group shadow-xs"
               >
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <UtensilsCrossed className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-text-primary block">Log Nutrition</span>
-                <span className="text-label text-text-muted">Full meal &amp; macros</span>
+                <span className="text-sm font-bold text-text-primary block">Log Nutrition</span>
+                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Full meal &amp; macros</span>
               </button>
 
               <button
@@ -211,13 +211,13 @@ export default function QuickActionSheetModal({
                 onClick={() => {
                   setIsWeightModalOpen(true);
                 }}
-                className="p-3 rounded-xl bg-bg-secondary border border-border hover:border-purple-400/50 text-left transition-all active:scale-95 group"
+                className="p-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border hover:border-purple-400/50 text-left transition-all active:scale-95 group shadow-xs"
               >
                 <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <Scale className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-text-primary block">Log Weight</span>
-                <span className="text-label text-text-muted">Track body mass</span>
+                <span className="text-sm font-bold text-text-primary block">Log Weight</span>
+                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Track body mass</span>
               </button>
 
               <button
@@ -225,13 +225,13 @@ export default function QuickActionSheetModal({
                 onClick={() => {
                   setIsMeetModalOpen(true);
                 }}
-                className="p-3 rounded-xl bg-bg-secondary border border-border hover:border-amber-400/50 text-left transition-all active:scale-95 group"
+                className="p-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border hover:border-amber-400/50 text-left transition-all active:scale-95 group shadow-xs"
               >
                 <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <Trophy className="w-4 h-4" />
                 </div>
-                <span className="text-xs font-bold text-text-primary block">Meet Planner</span>
-                <span className="text-label text-text-muted">90% • 95% • 100%</span>
+                <span className="text-sm font-bold text-text-primary block">Meet Planner</span>
+                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">90% • 95% • 100%</span>
               </button>
             </div>
           </div>

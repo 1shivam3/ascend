@@ -38,6 +38,7 @@ import {
   getQuickSubstitutes,
   compressWorkout,
   parseVoiceWorkout,
+  getTodaySessionState,
   ExerciseSubstitute,
 } from '@/lib/workout-engine';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -419,6 +420,17 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
 
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todaySessionInfo = useMemo(() => {
+    return getTodaySessionState(
+      todayStr,
+      workouts,
+      plannedWorkouts,
+      activeWorkoutDraft,
+      userUnit
+    );
+  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
 
   // ── Logger modal state ─────────────────────────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1058,36 +1070,90 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
         </div>
       )}
 
-      {/* ── 1. TODAY'S WORKOUT HERO (Item 13: Strong "let's train" moment) ── */}
+      {/* ── 1. TODAY'S WORKOUT HERO (Single Source of Truth) ── */}
       <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <h2 className="section-title text-[11px] mb-0">TODAY&apos;S WORKOUT</h2>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                todaySessionInfo.status === 'completed'
+                  ? 'bg-emerald-500'
+                  : todaySessionInfo.status === 'in_progress'
+                  ? 'bg-accent animate-pulse'
+                  : todaySessionInfo.status === 'planned'
+                  ? 'bg-accent'
+                  : 'bg-text-muted'
+              }`}
+            />
+            <h2 className="section-title text-[11px] mb-0">
+              {todaySessionInfo.status === 'completed'
+                ? 'TODAY COMPLETED'
+                : todaySessionInfo.status === 'in_progress'
+                ? 'IN PROGRESS'
+                : "TODAY'S WORKOUT"}
+            </h2>
           </div>
-          {plannedWorkouts.length > 0 && (
-            <span className="text-label text-text-muted font-medium">
-              {plural(plannedWorkouts.length, 'plan')} ready
-            </span>
-          )}
+          <span className="text-label text-text-muted font-medium">
+            {todaySessionInfo.status === 'completed' && todaySessionInfo.totalSets
+              ? plural(todaySessionInfo.totalSets, 'set')
+              : todaySessionInfo.status === 'planned'
+              ? `${plural(todaySessionInfo.exercises.length, 'exercise')} ready`
+              : todaySessionInfo.status === 'in_progress'
+              ? 'Draft active'
+              : `${plural(plannedWorkouts.length, 'plan')} available`}
+          </span>
         </div>
 
         <div>
           <h3 className="text-lg font-bold text-text-primary leading-tight">
-            {plannedWorkouts.length > 0
-              ? plannedWorkouts[0].name
-              : 'No workout planned'}
+            {todaySessionInfo.title}
           </h3>
           <p className="text-body text-text-secondary mt-0.5">
-            {plannedWorkouts.length > 0
-              ? `${plural(plannedWorkouts[0].exercises.length, 'exercise')} configured • Ready to train`
-              : 'Start a workout from scratch or create a plan'}
+            {todaySessionInfo.subtitle}
           </p>
         </div>
 
+        {/* If completed today, show verified summary metrics */}
+        {todaySessionInfo.status === 'completed' && (
+          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-label tabular-nums">
+            {todaySessionInfo.volumeKg && todaySessionInfo.volumeKg > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
+                {todaySessionInfo.volumeKg.toLocaleString()} kg volume
+              </span>
+            ) : null}
+            {todaySessionInfo.durationMin && todaySessionInfo.durationMin > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {todaySessionInfo.durationMin} min
+              </span>
+            ) : todaySessionInfo.totalSets && todaySessionInfo.totalSets > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {plural(todaySessionInfo.totalSets, 'set')}
+              </span>
+            ) : null}
+          </div>
+        )}
+
+        {/* Load hint for planned workout */}
+        {todaySessionInfo.status === 'planned' && todaySessionInfo.firstExerciseLoadHint && (
+          <div className="pt-0.5">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-2xs font-mono text-text-secondary">
+              {todaySessionInfo.firstExerciseLoadHint}
+            </span>
+          </div>
+        )}
+
         {/* Consolidated Primary & Secondary CTA */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-          {plannedWorkouts.length > 0 ? (
+          {todaySessionInfo.status === 'in_progress' ? (
+            <button
+              type="button"
+              onClick={handleResumeWorkout}
+              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            >
+              <Play className="w-4 h-4 fill-white stroke-white" />
+              <span>Resume Session</span>
+            </button>
+          ) : todaySessionInfo.status === 'planned' ? (
             <button
               type="button"
               onClick={() => handleStartPlan(plannedWorkouts[0])}
@@ -1095,6 +1161,15 @@ export default function WorkoutPage({ onNavigate }: WorkoutPageProps = {}) {
             >
               <Play className="w-4 h-4 fill-white stroke-white" />
               <span className="truncate">Start: {plannedWorkouts[0].name}</span>
+            </button>
+          ) : todaySessionInfo.status === 'completed' ? (
+            <button
+              type="button"
+              onClick={openBlankLogger}
+              className="btn-secondary py-3 px-4 text-xs font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+            >
+              <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
+              <span>Log Additional Session</span>
             </button>
           ) : (
             <button

@@ -205,31 +205,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TAB 1: STRENGTH ───────────────────────────────────────────────── */}
       {activeTab === 'strength' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Sub-view toggle (Overview vs Personal Records) */}
-          <div className="flex rounded-xl bg-bg-secondary/70 p-1 border border-border/60 max-w-sm">
+          {strengthSubView === 'prs' && (
             <button
               type="button"
               onClick={() => setStrengthSubView('overview')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                strengthSubView === 'overview'
-                  ? 'bg-bg-card text-text-primary shadow-xs font-bold'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
+              className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 pb-1 transition-colors"
             >
-              Powerlifting &amp; Standards
+              <span>&larr; Back to Strength Overview</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setStrengthSubView('prs')}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                strengthSubView === 'prs'
-                  ? 'bg-bg-card text-text-primary shadow-xs font-bold'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
-            >
-              Personal Records ({prs.length})
-            </button>
-          </div>
+          )}
 
           {strengthSubView === 'overview' ? (
             <div className="space-y-4">

@@ -296,6 +296,32 @@ export default function ActiveWorkoutScreen({
     }
   };
 
+  const handleApplyCoachTarget = () => {
+    if (!progRec) return;
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) => {
+            if (!s.completed) {
+              return {
+                ...s,
+                weight: progRec.targetWeight,
+                reps: progRec.targetReps,
+              };
+            }
+            return s;
+          }),
+        };
+      })
+    );
+    toast.success(
+      `Applied target: ${progRec.targetWeight}${userUnit} × ${progRec.targetReps} reps!`,
+      'Target Applied'
+    );
+  };
+
   const handleAddSet = () => {
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -656,7 +682,7 @@ export default function ActiveWorkoutScreen({
                     className="flex items-center gap-2 cursor-pointer group/title"
                     title="Tap to rename exercise"
                   >
-                    <h2 className="text-lg sm:text-xl font-extrabold text-text-primary tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">
                       {currentExercise.name || 'Untitled Exercise'}
                     </h2>
                     <Edit2 className="w-3.5 h-3.5 text-text-muted group-hover/title:text-accent transition-colors" />
@@ -704,13 +730,21 @@ export default function ActiveWorkoutScreen({
                 </div>
               )}
               {progRec && (
-                <div className="p-2 rounded-xl bg-accent/10 border border-accent/25 space-y-1">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 font-bold text-accent">
+                <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 font-bold text-accent text-2xs">
                       <Sparkles className="w-3.5 h-3.5" />
                       <span>COACH TARGET:</span>
+                      <span className="font-mono text-text-primary">{progRec.targetSummary}</span>
                     </div>
-                    <span className="font-mono font-bold text-text-primary">{progRec.targetSummary}</span>
+                    <button
+                      type="button"
+                      onClick={handleApplyCoachTarget}
+                      className="px-2 py-0.5 rounded-md bg-accent text-bg-primary font-bold text-3xs hover:bg-accent-hover transition-colors shadow-xs"
+                      title="Apply recommended weight and reps to uncompleted sets"
+                    >
+                      Apply Target
+                    </button>
                   </div>
                   <p className="text-3xs text-text-secondary leading-snug">{progRec.rationale}</p>
                 </div>
@@ -721,13 +755,13 @@ export default function ActiveWorkoutScreen({
 
         {/* ── Set Rows Table (weight | reps | RPE | ✓) ─────────────────── */}
         <section className="space-y-2.5">
-          <div className="flex items-center justify-between px-3 text-3xs font-mono text-text-muted uppercase tracking-wider">
-            <span className="w-10 sm:w-12 shrink-0">Set</span>
+          <div className="flex items-center justify-between px-3 text-3xs font-mono text-text-secondary uppercase tracking-wider">
+            <span className="w-14 sm:w-16 shrink-0 font-bold">SET / PREV</span>
             <div className="flex-1 flex items-center justify-between pl-1 sm:pl-2 pr-1">
-              <span className="text-center w-28 sm:w-32">Weight ({userUnit})</span>
-              <span className="text-center w-24 sm:w-28">Reps</span>
-              <span className="text-center w-12 sm:w-14">RPE</span>
-              <span className="w-9 sm:w-10 text-center">Done</span>
+              <span className="text-center w-28 sm:w-32 font-bold">Weight ({userUnit})</span>
+              <span className="text-center w-24 sm:w-28 font-bold">Reps</span>
+              <span className="text-center w-12 sm:w-14 font-bold">RPE</span>
+              <span className="w-9 sm:w-10 text-center font-bold">Done</span>
             </div>
           </div>
 
@@ -754,7 +788,7 @@ export default function ActiveWorkoutScreen({
                 >
                   <div className="flex items-center justify-between gap-1.5 sm:gap-2">
                     {/* Set Number & Previous session in grey */}
-                    <div className="w-10 sm:w-12 shrink-0">
+                    <div className="w-14 sm:w-16 shrink-0">
                       <div className="flex items-center gap-1">
                         <span className="text-xs font-mono font-bold text-accent">S{sIdx + 1}</span>
                         <button
@@ -768,17 +802,17 @@ export default function ActiveWorkoutScreen({
                       </div>
                       {prevSet ? (
                         <span
-                          className="text-[10px] text-text-muted/80 font-mono block truncate"
+                          className="text-[10px] text-text-secondary font-mono block truncate"
                           title={`Last session: ${prevSet.weight}${userUnit} × ${prevSet.reps}`}
                         >
-                          {prevSet.weight}×{prevSet.reps}
+                          Prev: {prevSet.weight}×{prevSet.reps}
                         </span>
                       ) : fallbackPR ? (
                         <span
-                          className="text-[10px] text-text-muted/80 font-mono block truncate"
-                          title={`Personal Record: ${userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}${userUnit} × ${fallbackPR.reps}`}
+                          className="text-[10px] text-text-secondary font-mono block truncate"
+                          title={`${fallbackPR.isBaseline ? 'Baseline' : 'PR'}: ${userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}${userUnit} × ${fallbackPR.reps}`}
                         >
-                          {userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}×{fallbackPR.reps}
+                          {fallbackPR.isBaseline ? 'Base' : 'PR'}: {userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}×{fallbackPR.reps}
                         </span>
                       ) : (
                         <span className="text-[10px] text-text-muted/40 font-mono block">—</span>

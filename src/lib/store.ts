@@ -315,12 +315,15 @@ export const useAppStore = create<AppState>()(
 
       setMacroGoals: (goals) => set({ macroGoals: goals }),
 
-      addBodyMetric: (entry) => set((state) => ({ bodyMetrics: [entry, ...state.bodyMetrics] })),
+      addBodyMetric: (entry) => set((state) => ({
+        bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)]
+      })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
       updateBodyMetrics: (weightKg, heightCm) => set((state) => {
+        const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
           id: crypto.randomUUID(),
-          date: new Date().toISOString().split('T')[0],
+          date: todayDate,
           weightKg: Math.round(weightKg * 10) / 10,
           heightCm: heightCm ? Math.round(heightCm) : undefined,
         };
@@ -332,7 +335,7 @@ export const useAppStore = create<AppState>()(
         } : null;
         return {
           profile: updatedProfile,
-          bodyMetrics: [entry, ...state.bodyMetrics],
+          bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== todayDate)],
         };
       }),
 
@@ -645,6 +648,19 @@ export const useAppStore = create<AppState>()(
               notes: 'Baseline calibration',
             };
             useAppStore.setState({ bodyMetrics: [entry] });
+          } else if (state.bodyMetrics && state.bodyMetrics.length > 0) {
+            // Deduplicate existing bodyMetrics by date
+            const seenDates = new Set<string>();
+            const deduped: BodyMetricEntry[] = [];
+            for (const m of state.bodyMetrics) {
+              if (!seenDates.has(m.date)) {
+                seenDates.add(m.date);
+                deduped.push(m);
+              }
+            }
+            if (deduped.length !== state.bodyMetrics.length) {
+              useAppStore.setState({ bodyMetrics: deduped });
+            }
           }
 
           // Ensure staple foods are populated if empty

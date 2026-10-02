@@ -94,17 +94,17 @@ const SPLIT_PRESETS: SplitPreset[] = [
   {
     id: 'arnold',
     name: 'Arnold Split',
-    description: 'Agonist/Antagonist pairing for massive pump and upper body development.',
+    description: 'Agonist & antagonist pairing for balanced upper body and arm development.',
     days: [
-      { name: 'Chest & Back (Superset Focus)', bodyParts: ['chest', 'back'] },
+      { name: 'Chest & Back (Antagonist Pairs)', bodyParts: ['chest', 'back'] },
       { name: 'Shoulders & Arms', bodyParts: ['shoulders', 'arms'] },
       { name: 'Legs & Abs', bodyParts: ['legs', 'core'] },
     ],
   },
   {
     id: 'bro_split',
-    name: 'Bro Split (1 Muscle / Day)',
-    description: 'Classic bodybuilding 5-day split targeting one muscle group per session.',
+    name: 'Targeted Bodypart Split',
+    description: 'Focused 5-day split targeting one primary muscle group per session.',
     days: [
       { name: 'Chest Day', bodyParts: ['chest'] },
       { name: 'Back Day', bodyParts: ['back'] },
@@ -128,23 +128,23 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
   {
     id: 'low',
     label: 'Low',
-    tag: 'Deload / Form / Mobility',
-    description: '3 exercises • 2–3 sets • 10–12 reps • Focus on technique',
+    tag: 'Deload / Recovery / Form',
+    description: '3–4 exercises • 2–3 sets • 12–15 reps • Focus on technique',
     badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
   },
   {
     id: 'medium',
     label: 'Medium',
-    tag: 'Hypertrophy & Growth',
-    description: '4–5 exercises • 3 sets • 8–10 reps • Balanced overload',
+    tag: 'Hypertrophy & Muscle Growth',
+    description: '5 exercises • 3–4 sets • 8–10 reps • Balanced progressive overload',
     badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   {
     id: 'high',
     label: 'High',
-    tag: 'Maximum Strength & Density',
-    description: '4–5 exercises • 4–5 heavy sets • 3–5 reps • Maximum strength focus',
-    badgeColor: 'text-accent bg-accent/15 border-accent/40',
+    tag: 'Maximum Strength',
+    description: '5–6 exercises • 4–5 sets • 3–5 reps (compounds) • Peak neural drive',
+    badgeColor: 'text-accent bg-accent/10 border-accent/30',
   },
 ];
 
@@ -199,66 +199,101 @@ export function generateExercisesFromSelection(
   const isHigh = intensity === 'high';
   const isLow = intensity === 'low';
 
-  const defaultSets = isLow ? 3 : isHigh ? 5 : 3;
-  const defaultReps = isLow ? 12 : isHigh ? 4 : 8;
-  const maxTotal = isLow ? 4 : isHigh ? 6 : 6;
-
+  // Target count: 4 for low (deload), 5 for medium, 5-6 for high
+  const maxTotal = isLow ? 4 : isHigh ? 6 : 5;
   const validParts = bodyParts.length > 0 ? bodyParts : (['full_body'] as BodyPartOption[]);
 
-  const compoundExercises: string[] = [];
-  const isolationExercises: string[] = [];
-  const addedNames = new Set<string>();
+  const selectedExercises: string[] = [];
+  const added = new Set<string>();
 
-  // Pass 1: Gather primary compound lifts from selected body parts FIRST
-  validParts.forEach((bp) => {
+  const addEx = (name: string) => {
+    if (!added.has(name) && selectedExercises.length < maxTotal) {
+      selectedExercises.push(name);
+      added.add(name);
+      return true;
+    }
+    return false;
+  };
+
+  // Special balanced allocation if 'arms' is selected
+  const hasArms = validParts.includes('arms');
+  const hasChest = validParts.includes('chest');
+
+  // Step 1: Ensure primary compound for each non-arm body part first
+  for (const bp of validParts) {
+    if (bp === 'arms') continue;
     const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
     for (const c of pool.compound) {
-      if (!addedNames.has(c) && compoundExercises.length + isolationExercises.length < maxTotal) {
-        compoundExercises.push(c);
-        addedNames.add(c);
-        if (compoundExercises.length >= 4) break;
-      }
-    }
-  });
-
-  // Pass 2: Gather accessories/isolations from selected body parts
-  validParts.forEach((bp) => {
-    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-    for (const iso of pool.isolation) {
-      if (!addedNames.has(iso) && compoundExercises.length + isolationExercises.length < maxTotal) {
-        isolationExercises.push(iso);
-        addedNames.add(iso);
-      }
-    }
-  });
-
-  // Pass 3: If still room under maxTotal, fill remaining compounds first, then isolations
-  if (compoundExercises.length + isolationExercises.length < maxTotal) {
-    for (const bp of validParts) {
-      const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-      for (const c of pool.compound) {
-        if (!addedNames.has(c) && compoundExercises.length + isolationExercises.length < maxTotal) {
-          compoundExercises.push(c);
-          addedNames.add(c);
-        }
-      }
-      for (const iso of pool.isolation) {
-        if (!addedNames.has(iso) && compoundExercises.length + isolationExercises.length < maxTotal) {
-          isolationExercises.push(iso);
-          addedNames.add(iso);
-        }
-      }
+      if (addEx(c)) break; // Add 1 primary compound per body part
     }
   }
 
-  // Compounds are strictly ordered first
-  const finalExerciseList = [...compoundExercises, ...isolationExercises];
+  // Step 2: If arms is selected, explicitly guarantee 1 BICEP exercise and 1 TRICEP exercise
+  if (hasArms) {
+    // Guaranteed bicep
+    const biceps = ['Dumbbell Curl', 'Hammer Curl', 'Preacher Curl', 'Chin-ups'];
+    for (const b of biceps) {
+      if (addEx(b)) break;
+    }
+    // Guaranteed tricep
+    const triceps = ['Tricep Pushdown', 'Dips', 'Close Grip Bench', 'Skull Crushers'];
+    for (const t of triceps) {
+      if (addEx(t)) break;
+    }
+  }
 
-  return finalExerciseList.map((name) => {
+  // Step 3: Add second compound or primary accessory for each body part
+  for (const bp of validParts) {
+    if (selectedExercises.length >= maxTotal) break;
+    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+
+    // Secondary compound
+    for (const c of pool.compound) {
+      if (addEx(c)) break;
+    }
+
+    // Secondary isolation
+    for (const iso of pool.isolation) {
+      if (addEx(iso)) break;
+    }
+  }
+
+  // Step 4: Fill remaining slots if still below maxTotal
+  if (selectedExercises.length < maxTotal) {
+    for (const bp of validParts) {
+      const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+      for (const iso of pool.isolation) {
+        addEx(iso);
+        if (selectedExercises.length >= maxTotal) break;
+      }
+      if (selectedExercises.length >= maxTotal) break;
+    }
+  }
+
+  // Sort exercises: heavy primary compounds first, then accessories & isolations
+  const priorityLifts = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row'];
+  selectedExercises.sort((a, b) => {
+    const aPri = priorityLifts.indexOf(a);
+    const bPri = priorityLifts.indexOf(b);
+    if (aPri !== -1 && bPri !== -1) return aPri - bPri;
+    if (aPri !== -1) return -1;
+    if (bPri !== -1) return 1;
+
+    const aComp = ALL_COMPOUND_NAMES.has(a);
+    const bComp = ALL_COMPOUND_NAMES.has(b);
+    if (aComp && !bComp) return -1;
+    if (!aComp && bComp) return 1;
+    return 0;
+  });
+
+  return selectedExercises.map((name) => {
     const isCompound = ALL_COMPOUND_NAMES.has(name);
-    // In High intensity: compounds get 5 sets x 4 reps, accessories get 4 sets x 6 reps
-    const targetSets = isHigh ? (isCompound ? 5 : 4) : defaultSets;
-    const targetReps = isHigh ? (isCompound ? 4 : 6) : defaultReps;
+    // Calibrated sets & reps:
+    // High (Maximum Strength): compounds 4-5 sets x 3-5 reps; accessories 3-4 sets x 6 reps
+    // Medium (Hypertrophy): compounds 3-4 sets x 8 reps; accessories 3 sets x 10 reps
+    // Low (Deload/Endurance): 2-3 sets x 12 reps
+    const targetSets = isHigh ? (isCompound ? 5 : 4) : isLow ? 2 : (isCompound ? 4 : 3);
+    const targetReps = isHigh ? (isCompound ? 4 : 6) : isLow ? 12 : (isCompound ? 8 : 10);
 
     return {
       name,
@@ -752,22 +787,22 @@ export default function SuggestedWorkoutModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 border-t border-border bg-bg-card flex gap-2.5">
+        <div className="p-3.5 border-t border-border bg-bg-card flex gap-2.5 shrink-0">
           <button
             type="button"
             onClick={handleSaveToPlans}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-slate-800 dark:text-slate-100 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-[0.98]"
+            className="btn-secondary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5"
           >
             <BookmarkPlus className="w-4 h-4 text-accent" />
-            <span className="text-slate-900 dark:text-white font-bold">Save to Plans</span>
+            <span>Save to Plans</span>
           </button>
           <button
             type="button"
             onClick={handleStartNow}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-accent hover:brightness-105 active:scale-[0.98] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-accent/25 transition-all"
+            className="btn-primary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5"
           >
-            <Play className="w-4 h-4 fill-white text-white" />
-            <span className="text-white font-bold">Start Workout</span>
+            <Play className="w-4 h-4 fill-white stroke-white" />
+            <span>Start Workout</span>
           </button>
         </div>
       </div>

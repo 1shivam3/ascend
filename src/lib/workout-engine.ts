@@ -444,3 +444,115 @@ export function parseVoiceWorkout(
     sets,
   };
 }
+
+export type TodaySessionStatus = 'in_progress' | 'completed' | 'planned' | 'none';
+
+export interface TodaySessionInfo {
+  status: TodaySessionStatus;
+  title: string;
+  subtitle: string;
+  exercises: string[];
+  firstExerciseLoadHint?: string;
+  primaryActionLabel: string;
+  isDraft: boolean;
+  isDone: boolean;
+  totalSets?: number;
+  volumeKg?: number;
+  durationMin?: number;
+  prCount?: number;
+}
+
+/**
+ * Single source of truth for today's workout state across Home, Workouts, and Consistency.
+ */
+export function getTodaySessionState(
+  todayStr: string,
+  workouts: WorkoutEntry[],
+  plannedWorkouts: { id: string; name: string; exercises: { name: string }[] }[],
+  activeDraft: { exercises: { name: string }[]; startedFromPlan?: string | null; name?: string } | null,
+  userUnit: 'kg' | 'lbs' = 'kg'
+): TodaySessionInfo {
+  // 1. In-progress draft takes highest priority
+  if (activeDraft && activeDraft.exercises && activeDraft.exercises.length > 0) {
+    const validEx = activeDraft.exercises.filter((e) => e.name && e.name.trim());
+    return {
+      status: 'in_progress',
+      title: activeDraft.startedFromPlan || activeDraft.name || 'Workout in Progress',
+      subtitle: `${validEx.length} exercise${validEx.length === 1 ? '' : 's'} active • Tap to resume`,
+      exercises: validEx.map((e) => e.name),
+      primaryActionLabel: 'Resume Session',
+      isDraft: true,
+      isDone: false,
+    };
+  }
+
+  // 2. Completed workout for today
+  const todayWorkouts = workouts.filter((w) => w.date && w.date.startsWith(todayStr));
+  if (todayWorkouts.length > 0) {
+    const w = todayWorkouts[0];
+    let vol = 0;
+    let sets = 0;
+    for (const tw of todayWorkouts) {
+      for (const ex of tw.exercises) {
+        for (const s of ex.sets) {
+          if (s.weight > 0 && s.reps > 0) {
+            const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+            vol += wKg * s.reps;
+          }
+          if (s.reps > 0) sets++;
+        }
+      }
+    }
+
+    const exList = w.exercises.map((e) => e.name);
+    return {
+      status: 'completed',
+      title: w.name || 'Gym Session Completed',
+      subtitle: exList.slice(0, 4).join(', ') || 'Workout logged',
+      exercises: exList,
+      primaryActionLabel: 'Log Additional Session',
+      isDraft: false,
+      isDone: true,
+      totalSets: sets,
+      volumeKg: Math.round(vol),
+      durationMin: w.durationMinutes || 0,
+    };
+  }
+
+  // 3. User has a planned routine
+  if (plannedWorkouts && plannedWorkouts.length > 0) {
+    const plan = plannedWorkouts[0];
+    const exNames = plan.exercises.map((e) => e.name);
+    const firstEx = plan.exercises[0];
+    let loadHint: string | undefined = undefined;
+    if (firstEx) {
+      const pastPerf = getLastExercisePerformance(firstEx.name, workouts);
+      if (pastPerf && pastPerf.bestWeight > 0) {
+        loadHint = `Last: ${pastPerf.bestWeight}${userUnit} × ${pastPerf.bestReps}`;
+      }
+    }
+
+    return {
+      status: 'planned',
+      title: plan.name,
+      subtitle: exNames.slice(0, 4).join(', '),
+      exercises: exNames,
+      firstExerciseLoadHint: loadHint,
+      primaryActionLabel: `Start: ${plan.name}`,
+      isDraft: false,
+      isDone: false,
+    };
+  }
+
+  // 4. No planned routine
+  return {
+    status: 'none',
+    title: 'No Session Scheduled',
+    subtitle: 'Start an empty workout or select a training routine',
+    exercises: [],
+    primaryActionLabel: 'Start Workout',
+    isDraft: false,
+    isDone: false,
+  };
+}
+

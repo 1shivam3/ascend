@@ -31,7 +31,9 @@ import {
   Layers,
   Activity,
   Filter,
+  Sliders,
 } from 'lucide-react';
+import { getBigThreeStats, calculateDOTS } from '@/lib/dots';
 import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -444,6 +446,8 @@ function LiftCard({
       ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
       : Math.round(item.best1RMKg * 10) / 10;
   const isMain = isMainCompoundLift(item.exercise);
+  const toGo = Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10);
+  const isBaselineLift = item.prs.length === 1 && (item.prs[0].isBaseline || item.prs[0].notes?.includes('Baseline'));
 
   return (
     <div className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border">
@@ -453,13 +457,20 @@ function LiftCard({
           <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
             {item.exercise}
           </h3>
-          <p className="text-xs text-text-muted mt-1">
-            Best:{' '}
-            <strong className="text-text-primary font-medium">
-              {item.bestSet.isBodyweight
-                ? `BW × ${item.bestSet.reps}`
-                : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
-            </strong>
+          <p className="text-xs text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
+            <span>
+              Best:{' '}
+              <strong className="text-text-primary font-medium">
+                {item.bestSet.isBodyweight
+                  ? `BW × ${item.bestSet.reps}`
+                  : `${item.bestSet.weight} ${userUnit} × ${item.bestSet.reps}`}
+              </strong>
+            </span>
+            {isBaselineLift && (
+              <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-sans">
+                Baseline
+              </span>
+            )}
           </p>
         </div>
 
@@ -492,8 +503,8 @@ function LiftCard({
             >
               Edit Target
             </button>
-            <span className="font-bold text-text-primary text-xs font-mono">
-              {item.milestoneProgress}%
+            <span className="font-bold text-accent text-xs font-mono tabular-nums">
+              {toGo > 0 ? `${toGo} ${userUnit} to go` : 'Target reached!'}
             </span>
           </div>
         </div>
@@ -571,9 +582,16 @@ function LiftCard({
                   className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
                 >
                   <div>
-                    <span className="font-bold text-text-primary">
-                      {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-text-primary">
+                        {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
+                      </span>
+                      {(p.isBaseline || p.notes?.includes('Baseline')) && (
+                        <span className="text-[9px] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
+                          Baseline
+                        </span>
+                      )}
+                    </div>
                     <div className="text-2xs text-text-muted flex gap-2 mt-0.5">
                       <span>
                         e1RM: {Math.round(single1RM * 10) / 10} {userUnit}
@@ -612,6 +630,19 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const bodyweightKg = profile?.bodyweightKg || 75;
   const gender = profile?.gender || 'male';
   const toast = useToast();
+
+  const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
+  const dotsScore = useMemo(() => {
+    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0) return 0;
+    return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
+  }, [profile, bigThreeStats.totalKg]);
+
+  const displayWeight = (kg: number) => {
+    if (userUnit === 'lbs') {
+      return `${Math.round(kg * 2.20462)} lbs`;
+    }
+    return `${Math.round(kg * 10) / 10} kg`;
+  };
 
   // ── Existing state ──
   const [showAddModal, setShowAddModal] = useState(false);
@@ -967,49 +998,63 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         </div>
       </div>
 
-      {/* Overall Strength Summary Card */}
-      {overallLevel && (
+      {/* Powerlifting Scoreboard (Clean, Real Big 3 & DOTS) */}
+      {bigThreeStats.totalKg > 0 && (
         <div className="card space-y-3 bg-bg-card border border-border">
           <div className="flex justify-between items-baseline">
             <div>
-              <div className="flex items-center gap-1.5">
-                <span className="section-title text-[11px] mb-0">OVERALL STRENGTH</span>
-                {overallLevel.isMainLiftsOnly && (
-                  <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
-                    Main Lifts
-                  </span>
-                )}
-              </div>
+              <span className="section-title text-[11px] mb-0 font-sans">POWERLIFTING SCOREBOARD</span>
               <div className="flex items-baseline gap-2 mt-1">
-                <span className="text-3xl font-black text-accent font-sans">
-                  {overallLevel.averageRatio}×
+                <span className="text-3xl font-black text-accent font-sans tabular-nums">
+                  {displayWeight(bigThreeStats.totalKg)}
                 </span>
                 <span className="text-sm font-semibold text-text-primary">
-                  Bodyweight Ratio
+                  Big 3 Total
                 </span>
               </div>
             </div>
-            <span className="text-xs text-text-muted font-medium">
-              {overallLevel.isMainLiftsOnly
-                ? `${overallLevel.mainLiftsCount} Core Lifts Ranked`
-                : `${exerciseStats.length} Lifts Ranked`}
-            </span>
+            <div className="text-right">
+              <span className="text-base font-bold text-accent tabular-nums font-mono block">
+                {dotsScore > 0 ? `${Math.round(dotsScore)} DOTS` : '—'}
+              </span>
+              <span className="text-3xs text-text-muted block">Normalized Score</span>
+            </div>
           </div>
 
-          <div className="level-bar h-2">
-            <div
-              className="level-bar-fill"
-              style={{ width: `${Math.min(100, Math.max(2, overallLevel.level))}%` }}
-            />
-          </div>
-
-          <div className="flex justify-between text-xs text-text-muted">
-            <span className="font-medium text-text-secondary">
-              Classification: <strong className="text-text-primary">{overallLevel.title}</strong>
-            </span>
-            <span>
-              Relative Score: <strong className="text-text-primary">{overallLevel.level}/100</strong>
-            </span>
+          <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center">
+            <div>
+              <span className="text-3xs text-text-muted block font-medium">Squat</span>
+              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+                {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+              </span>
+              {profile?.bodyweightKg && bigThreeStats.squatMax > 0 && (
+                <span className="text-[10px] text-text-muted font-mono block">
+                  {(bigThreeStats.squatMax / profile.bodyweightKg).toFixed(2)}×BW
+                </span>
+              )}
+            </div>
+            <div className="border-l border-border">
+              <span className="text-3xs text-text-muted block font-medium">Bench</span>
+              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+                {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
+              </span>
+              {profile?.bodyweightKg && bigThreeStats.benchMax > 0 && (
+                <span className="text-[10px] text-text-muted font-mono block">
+                  {(bigThreeStats.benchMax / profile.bodyweightKg).toFixed(2)}×BW
+                </span>
+              )}
+            </div>
+            <div className="border-l border-border">
+              <span className="text-3xs text-text-muted block font-medium">Deadlift</span>
+              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+                {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
+              </span>
+              {profile?.bodyweightKg && bigThreeStats.deadliftMax > 0 && (
+                <span className="text-[10px] text-text-muted font-mono block">
+                  {(bigThreeStats.deadliftMax / profile.bodyweightKg).toFixed(2)}×BW
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -1021,7 +1066,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
-            <h2 className="section-title mb-0">YOUR LIFTS &amp; MILESTONES</h2>
+            <h2 className="section-title mb-0 font-sans">YOUR LIFTS &amp; MILESTONES</h2>
             <p className="text-2xs text-text-muted mt-0.5 font-sans">
               {mainCompoundLifts.length} Core Compound Lifts • {otherLifts.length} Accessory Exercises
             </p>
@@ -1030,29 +1075,33 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           {/* Equipment Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             {[
-              { id: 'all', label: 'All Lifts', count: exerciseStats.length },
-              { id: 'barbell', label: '🏋️ Barbell', count: equipmentCounts.barbell },
-              { id: 'dumbbell', label: '🪙 Dumbbell', count: equipmentCounts.dumbbell },
-              { id: 'cable', label: '🔗 Cable', count: equipmentCounts.cable },
-              { id: 'bodyweight', label: '🤸 Bodyweight', count: equipmentCounts.bodyweight },
-              { id: 'machine', label: '⚙️ Machine', count: equipmentCounts.machine },
+              { id: 'all', label: 'All Lifts', count: exerciseStats.length, icon: null },
+              { id: 'barbell', label: 'Barbell', count: equipmentCounts.barbell, icon: Dumbbell },
+              { id: 'dumbbell', label: 'Dumbbell', count: equipmentCounts.dumbbell, icon: Activity },
+              { id: 'cable', label: 'Cable', count: equipmentCounts.cable, icon: Layers },
+              { id: 'bodyweight', label: 'Bodyweight', count: equipmentCounts.bodyweight, icon: Target },
+              { id: 'machine', label: 'Machine', count: equipmentCounts.machine, icon: Sliders },
             ]
               .filter((chip) => chip.id === 'all' || chip.count > 0)
-              .map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setSelectedEquipmentFilter(chip.id as any)}
-                  className={`px-2.5 py-1 rounded-lg text-2xs font-bold border transition-colors whitespace-nowrap flex items-center gap-1 ${
-                    selectedEquipmentFilter === chip.id
-                      ? 'bg-accent/15 border-accent text-accent'
-                      : 'bg-bg-card border-border text-text-secondary hover:border-accent/40'
-                  }`}
-                >
-                  <span>{chip.label}</span>
-                  <span className="text-3xs opacity-75 font-mono">({chip.count})</span>
-                </button>
-              ))}
+              .map((chip) => {
+                const Icon = chip.icon;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => setSelectedEquipmentFilter(chip.id as any)}
+                    className={`px-2.5 py-1 rounded-lg text-2xs font-bold border transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      selectedEquipmentFilter === chip.id
+                        ? 'bg-accent/15 border-accent text-accent'
+                        : 'bg-bg-card border-border text-text-secondary hover:border-accent/40'
+                    }`}
+                  >
+                    {Icon && <Icon className="w-3 h-3 text-accent shrink-0" />}
+                    <span>{chip.label}</span>
+                    <span className="text-3xs opacity-75 font-mono">({chip.count})</span>
+                  </button>
+                );
+              })}
           </div>
         </div>
 

@@ -41,6 +41,7 @@ import { calculateHydrationTarget, formatWaterLiters, toLocalDateString } from '
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise } from '@/lib/types';
 import { plural } from '@/lib/formatters';
+import { getTodaySessionState } from '@/lib/workout-engine';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
@@ -78,70 +79,20 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     });
   }, [today]);
 
-  // Today's workout state
-  const todayWorkouts = useMemo(() => {
-    return workouts.filter((w) => w.date && w.date.startsWith(todayStr));
-  }, [workouts, todayStr]);
+  const userUnit = profile?.unit || 'kg';
 
-  const hasManualGym = !!gymLogs?.[todayStr];
-  const hasTrainedToday = hasManualGym || todayWorkouts.length > 0;
-  const activePlan = plannedWorkouts?.[0] || null;
+  // Single source of truth for today's workout state
+  const sessionInfo = useMemo(() => {
+    return getTodaySessionState(
+      todayStr,
+      workouts,
+      plannedWorkouts,
+      activeWorkoutDraft,
+      userUnit
+    );
+  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
 
-  // Actual exercises, volume, and PR summary for today
-  const todaySummary = useMemo(() => {
-    if (todayWorkouts.length === 0) return null;
-    const workout = todayWorkouts[0];
-    let volumeKg = 0;
-    let totalSets = 0;
-    let prCount = 0;
-    let durationMin = workout.durationMinutes || 0;
-
-    for (const w of todayWorkouts) {
-      if (w.durationMinutes && !durationMin) durationMin = w.durationMinutes;
-      for (const ex of w.exercises) {
-        for (const s of ex.sets) {
-          if (s.reps && s.weight) {
-            const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-            volumeKg += wKg * s.reps;
-            totalSets += 1;
-          }
-          if (s.isPR) prCount++;
-        }
-      }
-    }
-
-    const exercisesList = workout.exercises
-      .map((e) => {
-        const validSets = e.sets.filter((s) => s.reps > 0);
-        if (validSets.length > 0) {
-          const bestSet = validSets.reduce((best, cur) => (cur.weight > best.weight ? cur : best), validSets[0]);
-          return `${e.name} ${bestSet.weight}${bestSet.unit || 'kg'} × ${bestSet.reps}`;
-        }
-        return e.name;
-      })
-      .join(', ');
-
-    return {
-      name: workout.name || 'Gym Session Done',
-      exercisesList: exercisesList || 'Exercises recorded',
-      volumeKg: Math.round(volumeKg),
-      totalSets,
-      prCount,
-      durationMin,
-    };
-  }, [todayWorkouts]);
-
-  const handleToggleGym = () => {
-    const isNowDone = toggleGymToday(todayStr);
-    if (isNowDone) {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([80, 40, 80]);
-      }
-      toast.success('Gym session recorded for today! Keep up the momentum.', 'Gym Logged');
-    } else {
-      toast.info('Gym session un-marked for today.', 'Gym Status Updated');
-    }
-  };
+  const hasTrainedToday = sessionInfo.isDone;
 
   // Lifts and Overall Level Calculation
   const { topLifts, overallLevel } = useMemo(() => {
@@ -307,93 +258,99 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── 2. TODAY'S SESSION HERO CARD (Gradient Accent Hero) ───────────── */}
+      {/* ── 2. TODAY'S SESSION HERO CARD (Single Source of Truth) ───────────── */}
       <section className="card p-4 sm:p-5 bg-radial-at-tr from-accent/20 via-bg-card to-bg-card border border-accent/35 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${hasTrainedToday ? 'bg-emerald-500' : 'bg-accent animate-pulse'}`} />
+            <span
+              className={`w-2 h-2 rounded-full ${
+                sessionInfo.status === 'completed'
+                  ? 'bg-emerald-500'
+                  : sessionInfo.status === 'in_progress'
+                  ? 'bg-accent animate-pulse'
+                  : sessionInfo.status === 'planned'
+                  ? 'bg-accent'
+                  : 'bg-text-muted'
+              }`}
+            />
             <span className="text-label font-medium text-text-muted">
-              {hasTrainedToday ? 'Today completed' : "Today's session"}
+              {sessionInfo.status === 'completed'
+                ? 'Today completed'
+                : sessionInfo.status === 'in_progress'
+                ? 'Workout in progress'
+                : sessionInfo.status === 'planned'
+                ? "Today's planned routine"
+                : "Today's session"}
             </span>
           </div>
           <span className="text-label text-text-muted">
-            {hasTrainedToday && todaySummary ? `${todaySummary.totalSets} sets` : activePlan ? 'Planned routine' : 'Main strength'}
+            {sessionInfo.status === 'completed' && sessionInfo.totalSets
+              ? plural(sessionInfo.totalSets, 'set')
+              : sessionInfo.status === 'planned'
+              ? `${plural(sessionInfo.exercises.length, 'exercise')} ready`
+              : sessionInfo.status === 'in_progress'
+              ? 'Draft active'
+              : 'Main strength'}
           </span>
         </div>
 
         <div>
           <h2 className="text-title sm:text-display font-black text-text-primary tracking-tight font-sans">
-            {hasTrainedToday && todaySummary
-              ? todaySummary.name
-              : hasTrainedToday
-              ? 'Gym Session Done'
-              : activePlan
-              ? activePlan.name
-              : 'Upper A'}
+            {sessionInfo.title}
           </h2>
           <p className="text-body text-text-secondary mt-0.5 line-clamp-2">
-            {hasTrainedToday && todaySummary
-              ? todaySummary.exercisesList
-              : activePlan
-              ? activePlan.exercises.map((e) => e.name).slice(0, 4).join(', ')
-              : 'Bench Press, Barbell Row, Overhead Press, Pull-ups'}
+            {sessionInfo.subtitle}
           </p>
         </div>
 
-        {/* If trained today with summary stats, show summary pills: volume, duration/sets, PRs */}
-        {hasTrainedToday && todaySummary && (
+        {/* If completed today, show verified summary metrics: volume, duration/sets */}
+        {sessionInfo.status === 'completed' && (
           <div className="flex flex-wrap items-center gap-2 pt-1 text-label tabular-nums">
-            {todaySummary.volumeKg > 0 && (
+            {sessionInfo.volumeKg && sessionInfo.volumeKg > 0 ? (
               <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
-                {todaySummary.volumeKg.toLocaleString()} kg volume
-              </span>
-            )}
-            {todaySummary.durationMin > 0 ? (
-              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                {todaySummary.durationMin} min
-              </span>
-            ) : todaySummary.totalSets > 0 ? (
-              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                {plural(todaySummary.totalSets, 'set')}
+                {sessionInfo.volumeKg.toLocaleString()} kg volume
               </span>
             ) : null}
-            {todaySummary.prCount > 0 && (
-              <span className="px-2.5 py-1 rounded-lg bg-accent/15 border border-accent/40 text-accent font-bold">
-                {plural(todaySummary.prCount, 'PR')}
+            {sessionInfo.durationMin && sessionInfo.durationMin > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {sessionInfo.durationMin} min
               </span>
-            )}
+            ) : sessionInfo.totalSets && sessionInfo.totalSets > 0 ? (
+              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                {plural(sessionInfo.totalSets, 'set')}
+              </span>
+            ) : null}
           </div>
         )}
 
-        {/* Action Row: Start Workout + "I Hit Gym Today" 1-Tap Toggle */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-          {/* Main CTA */}
+        {/* Load hint for planned workout if available */}
+        {sessionInfo.status === 'planned' && sessionInfo.firstExerciseLoadHint && (
+          <div className="pt-0.5">
+            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-2xs font-mono text-text-secondary">
+              {sessionInfo.firstExerciseLoadHint}
+            </span>
+          </div>
+        )}
+
+        {/* Action Row */}
+        <div className="pt-1">
           <button
             type="button"
             onClick={() => onNavigate('workout')}
-            className={`sm:col-span-2 py-3 text-body font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all ${
-              hasTrainedToday
-                ? 'btn-secondary text-text-primary'
+            className={`w-full py-3 text-body font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all ${
+              sessionInfo.status === 'completed'
+                ? 'btn-secondary text-text-primary hover:border-accent/40'
                 : 'btn-primary shadow-md shadow-accent/25 hover:brightness-105'
             }`}
           >
-            <Play className={`w-4 h-4 ${hasTrainedToday ? 'fill-text-primary stroke-text-primary' : 'fill-white stroke-white'}`} />
-            <span>{activeWorkoutDraft ? 'Continue Workout' : hasTrainedToday ? 'Log another workout' : 'Start Workout'}</span>
-          </button>
-
-          {/* 1-Tap "I Hit Gym Today" Quick Toggle */}
-          <button
-            type="button"
-            onClick={handleToggleGym}
-            className={`py-3 px-3 rounded-xl border text-label font-bold flex items-center justify-center gap-1.5 transition-all select-none active:scale-95 ${
-              hasTrainedToday
-                ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-xs'
-               : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent hover:text-text-primary'
-            }`}
-            title="Mark gym session done for today"
-          >
-            <CheckCircle2 className={`w-4 h-4 ${hasTrainedToday ? 'text-emerald-400' : 'text-text-muted'}`} />
-            <span>{hasTrainedToday ? 'Gym Done ✓' : 'I Hit Gym Today'}</span>
+            <Play
+              className={`w-4 h-4 ${
+                sessionInfo.status === 'completed'
+                  ? 'fill-text-primary stroke-text-primary'
+                  : 'fill-white stroke-white'
+              }`}
+            />
+            <span>{sessionInfo.primaryActionLabel}</span>
           </button>
         </div>
 
@@ -477,7 +434,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
 
           <div className="flex items-center justify-between text-label text-text-secondary pt-1">
-            <span>Official DOTS Classification: <strong className="text-text-primary">{dotsClassification.tier}</strong></span>
+            <span>DOTS Rating: <strong className="text-text-primary">{Math.round(dotsScore)} ({dotsClassification.tier})</strong></span>
             <button
               type="button"
               onClick={() => onNavigate('progress')}

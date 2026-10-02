@@ -29,6 +29,8 @@ import {
   Settings2,
   Sliders,
   AlertTriangle,
+  Zap,
+  Leaf,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
@@ -541,6 +543,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     toast.info(`Targets calibrated for ${bw}kg bodyweight (2g/kg protein).`, 'Targets Calculated');
   };
 
+  const handleReconcileCarbs = () => {
+    const cal = parseFloat(goalCalories) || 0;
+    const prot = parseFloat(goalProtein) || 0;
+    const fat = parseFloat(goalFat) || 0;
+    if (cal <= 0) {
+      toast.error('Please enter a daily calorie target first.', 'Calorie Target Required');
+      return;
+    }
+    const carbsG = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
+    setGoalCarbs(String(carbsG));
+    toast.success(`Carbs balanced to ${carbsG}g so macros total exactly ${cal} kcal.`, 'Carbs Reconciled');
+  };
+
   const handleSaveGoals = () => {
     const cal  = parseFloat(goalCalories);
     const prot = parseFloat(goalProtein);
@@ -627,14 +642,66 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
   const dynamicCloseoutSuggestions = useMemo(() => {
-    if (!selectedEatPreference) return [];
+    if (!selectedEatPreference) {
+      // Default: show top 2 high-protein closeout recommendations immediately
+      const stapleCandidate = favoriteFoods.find((f) => (f.proteinG || 0) >= 15);
+      return [
+        stapleCandidate
+          ? {
+              tag: 'TOP STAPLE',
+              tagCls: 'bg-accent/10 text-accent',
+              name: stapleCandidate.name,
+              description: `${stapleCandidate.defaultQuantity || 100}${stapleCandidate.unit || 'g'} ${stapleCandidate.name}`,
+              calories: Math.round(stapleCandidate.calories),
+              proteinG: Math.round(stapleCandidate.proteinG),
+              carbsG: Math.round(stapleCandidate.carbsG || 0),
+              foods: [
+                {
+                  name: stapleCandidate.name,
+                  quantity: stapleCandidate.defaultQuantity || 100,
+                  unit: stapleCandidate.unit || 'g',
+                  calories: stapleCandidate.calories,
+                  proteinG: stapleCandidate.proteinG,
+                  carbsG: stapleCandidate.carbsG || 0,
+                  fatG: stapleCandidate.fatG || 0,
+                },
+              ],
+            }
+          : {
+              tag: 'QUICK SHAKE',
+              tagCls: 'bg-accent/10 text-accent',
+              name: 'Whey Protein Shake',
+              description: '1 scoop whey protein + 250ml milk',
+              calories: 200,
+              proteinG: 30,
+              carbsG: 14,
+              foods: [
+                { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+              ],
+            },
+        {
+          tag: 'CLEAN PROTEIN',
+          tagCls: 'bg-emerald-500/10 text-emerald-400',
+          name: 'Boiled Eggs (3 Whole + 1 White)',
+          description: 'High bioavailability complete protein',
+          calories: 239,
+          proteinG: 22,
+          carbsG: 2,
+          foods: [
+            { name: 'Whole Egg', quantity: 3, unit: 'piece', calories: 222, proteinG: 18.9, carbsG: 1.8, fatG: 15 },
+            { name: 'Egg White', quantity: 1, unit: 'piece', calories: 17, proteinG: 3.6, carbsG: 0.2, fatG: 0.1 },
+          ],
+        },
+      ];
+    }
 
     if (selectedEatPreference === 'staples') {
       const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 4);
       if (candidates.length === 0) {
         return [
           {
-            tag: '⭐ STAPLE IDEA',
+            tag: 'STAPLE IDEA',
             tagCls: 'bg-accent/10 text-accent',
             name: 'Paneer & Roti',
             description: '100g fresh paneer with 2 rotis',
@@ -649,7 +716,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         ];
       }
       return candidates.slice(0, 3).map((cand) => ({
-        tag: '⭐ FROM YOUR STAPLES',
+        tag: 'FROM YOUR STAPLES',
         tagCls: 'bg-accent/10 text-accent',
         name: cand.name,
         description: `${cand.defaultQuantity || 100}${cand.unit || 'g'} ${cand.name}`,
@@ -673,7 +740,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (selectedEatPreference === 'shake') {
       return [
         {
-          tag: '⚡ 1 MIN PREP',
+          tag: '1 MIN PREP',
           tagCls: 'bg-accent/10 text-accent',
           name: 'Whey Protein Shake',
           description: '1 scoop whey protein + 250ml milk',
@@ -686,7 +753,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ],
         },
         {
-          tag: '🥤 DESI SATTU SHAKE',
+          tag: 'DESI SATTU SHAKE',
           tagCls: 'bg-amber-500/10 text-amber-400',
           name: 'Sattu Protein Drink',
           description: '50g sattu in 300ml cold water with lemon & jeera',
@@ -703,7 +770,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (selectedEatPreference === 'high_protein') {
       return [
         {
-          tag: '💪 MAXIMUM PROTEIN',
+          tag: 'MAXIMUM PROTEIN',
           tagCls: 'bg-emerald-500/10 text-emerald-400',
           name: 'Soya Chunks Bowl',
           description: '60g boiled soya chunks with chaat masala',
@@ -715,7 +782,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ],
         },
         {
-          tag: '🥚 4 BOILED EGGS',
+          tag: '4 BOILED EGGS',
           tagCls: 'bg-emerald-500/10 text-emerald-400',
           name: 'Boiled Eggs (3 Whole + 1 White)',
           description: 'Complete high-bioavailability protein',
@@ -733,7 +800,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (selectedEatPreference === 'light') {
       return [
         {
-          tag: '🥗 LOW CALORIE BOOST',
+          tag: 'LOW CALORIE BOOST',
           tagCls: 'bg-sky-500/10 text-sky-400',
           name: 'Curd / Dahi Bowl with Roasted Chana',
           description: '150g curd + 30g roasted chana',
@@ -746,7 +813,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ],
         },
         {
-          tag: '⚡ WHEY IN WATER',
+          tag: 'WHEY IN WATER',
           tagCls: 'bg-sky-500/10 text-sky-400',
           name: '1 Scoop Whey Protein in Water',
           description: 'Fastest pure protein with minimal calories',
@@ -1149,17 +1216,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <p className="text-xs text-text-secondary">
             {selectedEatPreference
               ? 'Tailored high-protein options based on your selection:'
-              : 'Choose what you feel like having to view tailored high-protein options:'}
+              : 'Recommended options to close your protein gap today:'}
           </p>
 
           {/* User Choice Selector */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {[
-              { id: 'staples', label: '⭐ Pinned Staples', sub: 'Your daily foods' },
-              { id: 'shake', label: '⚡ Quick Shake', sub: 'Under 2 min' },
-              { id: 'high_protein', label: '💪 High Protein (25g+)', sub: 'Hit goal fast' },
-              { id: 'light', label: '🥗 Light Snack', sub: 'Low calorie' },
+              { id: 'staples', label: 'Pinned Staples', sub: 'Your daily foods', icon: Star },
+              { id: 'shake', label: 'Quick Shake', sub: 'Under 2 min', icon: Zap },
+              { id: 'high_protein', label: 'High Protein (25g+)', sub: 'Hit goal fast', icon: Flame },
+              { id: 'light', label: 'Light Snack', sub: 'Low calorie', icon: Leaf },
             ].map((opt) => {
+              const IconComp = opt.icon;
               const isSelected = selectedEatPreference === opt.id;
               return (
                 <button
@@ -1172,73 +1240,72 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
                   }`}
                 >
-                  <span className={`text-label font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
-                    {opt.label}
-                  </span>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-text-secondary'}`} />
+                    <span className={`text-label font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                      {opt.label}
+                    </span>
+                  </div>
                   <span className="text-label text-text-muted">{opt.sub}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Display suggestions ONLY when user has chosen a preference */}
-          {selectedEatPreference !== null ? (
-            <div className="space-y-2 pt-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {dynamicCloseoutSuggestions.map((sug, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
-                          {sug.tag}
-                        </span>
-                        <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
-                      </div>
-                      <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
-                      <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
-                      <p className="text-3xs text-text-secondary mt-1 font-mono">
-                        ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
-                      </p>
+          {/* Display suggestions: always show default recommendations or tailored filtered options */}
+          <div className="space-y-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {dynamicCloseoutSuggestions.map((sug, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
+                        {sug.tag}
+                      </span>
+                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newMeal: MealEntry = {
-                          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                          date: todayDate,
-                          name: sug.name,
-                          foods: sug.foods,
-                        };
-                        addMeal(newMeal);
-                        toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
-                      }}
-                      className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Log 1-Tap</span>
-                    </button>
+                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
+                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
+                    <p className="text-3xs text-text-secondary mt-1 font-mono">
+                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newMeal: MealEntry = {
+                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                        date: todayDate,
+                        name: sug.name,
+                        foods: sug.foods,
+                      };
+                      addMeal(newMeal);
+                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
+                    }}
+                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Log 1-Tap</span>
+                  </button>
+                </div>
+              ))}
+            </div>
 
+            {selectedEatPreference && (
               <div className="flex justify-center pt-1">
                 <button
                   type="button"
                   onClick={() => setSelectedEatPreference(null)}
                   className="text-3xs text-text-muted hover:text-accent underline font-medium"
                 >
-                  Clear preference
+                  Reset to default recommendations
                 </button>
               </div>
-            </div>
-          ) : (
-            <p className="text-3xs text-text-muted text-center pt-0.5">
-              Tap any preference above to see suggestions tailored to your remaining macros.
-            </p>
-          )}
+            )}
+          </div>
         </section>
       )}
 
@@ -2254,6 +2321,44 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   />
                 </div>
               </div>
+
+              {/* Real-time Macro Math & Calorie Reconcile */}
+              {(() => {
+                const calVal = parseFloat(goalCalories) || 0;
+                const protVal = parseFloat(goalProtein) || 0;
+                const carbVal = parseFloat(goalCarbs) || 0;
+                const fatVal = parseFloat(goalFat) || 0;
+                const macroSum = Math.round(protVal * 4 + carbVal * 4 + fatVal * 9);
+                const delta = calVal > 0 ? macroSum - calVal : 0;
+                const showCheck = calVal > 0 && (protVal > 0 || carbVal > 0 || fatVal > 0);
+
+                if (!showCheck) return null;
+
+                return (
+                  <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 flex items-center justify-between text-xs font-mono">
+                    <div>
+                      <span className="text-text-muted">Macro sum: </span>
+                      <span className="font-bold text-text-primary">{macroSum} kcal</span>
+                      {Math.abs(delta) > 5 ? (
+                        <span className={`ml-1.5 text-2xs font-semibold ${delta > 0 ? 'text-amber-400' : 'text-sky-400'}`}>
+                          ({delta > 0 ? `+${delta}` : `${delta}`} kcal)
+                        </span>
+                      ) : (
+                        <span className="ml-1.5 text-2xs font-semibold text-emerald-400">✓ Balanced</span>
+                      )}
+                    </div>
+                    {Math.abs(delta) > 5 && calVal > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleReconcileCarbs}
+                        className="px-2 py-0.5 rounded bg-accent/15 text-accent text-3xs font-bold hover:bg-accent/25 transition-colors"
+                      >
+                        Auto-balance Carbs
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Action Buttons */}
