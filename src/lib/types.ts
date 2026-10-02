@@ -310,3 +310,74 @@ export interface MealAnalysisResult {
   imageUrl?: string;
 }
 
+// ─── Lifter Twin & Adaptive Training Ledger Types ───────────────────────────
+
+export type TrainingDecisionReason =
+  | 'exceeded_rpe'
+  | 'missed_reps'
+  | 'progressive_overload'
+  | 'rpe_drift'
+  | 'fatigue_hold'
+  | 'time_constraint'
+  | 'equipment_unavailable'
+  | 'low_recovery'
+  | 'user_override';
+
+export interface TrainingDecision {
+  id: string;
+  exerciseName: string;
+  date: string; // YYYY-MM-DD
+  previousPerformance: {
+    weight: number;
+    reps: number;
+    rpe?: number;
+    sets: number;
+  };
+  nextPrescription: {
+    weight: number;
+    reps: number;
+    targetRpe: number;
+    sets: number;
+  };
+  reasonType: TrainingDecisionReason;
+  headline: string;
+  explanation: string;
+  deltaKg: number;
+  deltaPercent: number;
+  confidence: 'high' | 'medium' | 'calibrating';
+  evidenceCount: number;
+  status: 'pending' | 'accepted' | 'overridden';
+  userOverrideWeight?: number;
+  timestamp: string;
+}
+
+export interface LifterExerciseProfile {
+  exerciseName: string;
+  evidenceCount: number;
+  calibrationStatus: 'calibrating' | 'early_trend' | 'calibrated';
+  optimalRepRange: { min: number; max: number };
+  targetRpeRange: { min: number; max: number };
+  fatigueSensitivity: 'low' | 'moderate' | 'high';
+  rpeDriftPerSet: number; // e.g. +0.4 RPE / set
+  recommendedWeeklyFrequency: number; // e.g. 2
+  bestProgressionStepKg: number; // e.g. 2.5
+  recoveryDaysNeeded: number; // e.g. 2 or 3
+  e1RMTrend: 'rising' | 'plateau' | 'fatigued';
+  observations: string[]; // transparent empirical evidence bullets
+}
+
+export interface LifterTwinProfile {
+  totalAnalyzedExposures: number;
+  exercises: Record<string, LifterExerciseProfile>;
+  lastUpdated: string;
+}
+
+export interface RealWorldConstraint {
+  type: 'time' | 'equipment' | 'fatigue';
+  availableMinutes?: number;
+  targetExerciseName?: string;
+  substituteExerciseName?: string;
+  fatigueLevel?: 'mild' | 'severe';
+  notes?: string;
+}
+

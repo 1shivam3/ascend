@@ -22,10 +22,12 @@ import {
   Layers,
   Award,
   Share2,
+  Activity,
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import PRsPage from '@/components/PRsPage';
+import LifterProfileView from '@/components/LifterProfileView';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import ProgressChart from '@/components/ProgressChart';
 import BodyweightChart from '@/components/BodyweightChart';
@@ -48,7 +50,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   }, [initialTab]);
 
   const [activeTab, setActiveTab] = useState<'strength' | 'body' | 'consistency'>(resolvedInitialTab);
-  const [strengthSubView, setStrengthSubView] = useState<'overview' | 'prs'>('overview');
+  const [strengthSubView, setStrengthSubView] = useState<'overview' | 'twin' | 'prs'>('overview');
 
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs || []);
@@ -217,15 +219,43 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TAB 1: STRENGTH ───────────────────────────────────────────────── */}
       {activeTab === 'strength' && (
         <div className="space-y-4 animate-fade-in">
-          {strengthSubView === 'prs' && (
+          {/* Sub-view selector for Strength */}
+          <div className="flex items-center gap-1.5 p-1 bg-bg-secondary rounded-xl border border-border/70">
             <button
               type="button"
               onClick={() => setStrengthSubView('overview')}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 pb-1 transition-colors"
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
+                strengthSubView === 'overview'
+                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
             >
-              <span>&larr; Back to Strength Overview</span>
+              Overview
             </button>
-          )}
+            <button
+              type="button"
+              onClick={() => setStrengthSubView('twin')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                strengthSubView === 'twin'
+                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5 text-accent" />
+              <span>Lifter Twin</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setStrengthSubView('prs')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
+                strengthSubView === 'prs'
+                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
+                  : 'text-text-muted hover:text-text-primary'
+              }`}
+            >
+              PRs &amp; Ranks
+            </button>
+          </div>
 
           {strengthSubView === 'overview' ? (
             <div className="space-y-4">
@@ -245,6 +275,33 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       ? `${workouts.length} of 3 baseline workouts logged. Complete 3 workouts to establish verified progressive overload trends.`
                       : 'Baseline 1RM entered. Log at least 3 workouts to unlock progressive overload trends and DOTS rating progression.')}
                 </p>
+              </div>
+
+              {/* ASCEND Lifter Twin Callout */}
+              <div
+                onClick={() => setStrengthSubView('twin')}
+                className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/5 border border-accent/40 space-y-2 shadow-xs cursor-pointer hover:border-accent transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent shrink-0">
+                      <Activity className="w-4 h-4 animate-pulse" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold font-mono text-text-primary group-hover:text-accent transition-colors flex items-center gap-1.5">
+                        <span>ASCEND LIFTER TWIN</span>
+                        <span className="text-3xs font-normal text-text-muted uppercase">Response Engine</span>
+                      </h4>
+                      <p className="text-2xs text-text-secondary">
+                        View fatigue drift, rep brackets &amp; auditable training decisions
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-accent flex items-center gap-0.5">
+                    <span>Inspect</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </span>
+                </div>
               </div>
 
               {/* Big 3 Total & Official DOTS Rating Card */}
@@ -356,6 +413,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <span>View All Personal Records &amp; Milestones &rarr;</span>
                 </button>
               </div>
+            </div>
+          ) : strengthSubView === 'twin' ? (
+            <div className="animate-fade-in">
+              <LifterProfileView
+                onStartWorkoutForExercise={() => {
+                  if (onNavigate) onNavigate('workout');
+                }}
+              />
             </div>
           ) : (
             /* Embedded PRs Page Component */

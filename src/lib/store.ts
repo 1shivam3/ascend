@@ -22,9 +22,12 @@ import {
   AICoachInsight,
   AITrainingProfile,
   AIPlannedWorkout,
-  AIWeeklyReview
+  AIWeeklyReview,
+  TrainingDecision,
+  LifterTwinProfile,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
+import { generateLifterTwinProfile } from './lifter-twin';
 
 export * from './types';
 
@@ -133,6 +136,15 @@ export interface AppState {
   setTodaysAIWorkoutPlan: (plan: AIPlannedWorkout | undefined) => void;
   saveWeeklyReview: (review: AIWeeklyReview) => void;
 
+  // Lifter Twin & Decisions Ledger
+  trainingDecisions: Record<string, TrainingDecision>;
+  decisionsLedgerHistory: TrainingDecision[];
+  lifterProfile: LifterTwinProfile | null;
+  acceptTrainingDecision: (exerciseName: string) => void;
+  overrideTrainingDecision: (exerciseName: string, customWeight?: number) => void;
+  recordTrainingDecision: (decision: TrainingDecision) => void;
+  refreshLifterProfile: () => void;
+
   clearAllData: () => void;
   
   importAllData: (data: any) => boolean;
@@ -217,6 +229,11 @@ export const useAppStore = create<AppState>()(
       trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
       todaysAIWorkoutPlan: undefined,
       latestWeeklyReview: undefined,
+
+      // Lifter Twin & Decisions Ledger State
+      trainingDecisions: {},
+      decisionsLedgerHistory: [],
+      lifterProfile: null,
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -287,8 +304,22 @@ export const useAppStore = create<AppState>()(
         return { prTargets: next };
       }),
 
-      addWorkout: (workout) => set((state) => ({ workouts: [...state.workouts, workout] })),
-      deleteWorkout: (id) => set((state) => ({ workouts: state.workouts.filter(w => w.id !== id) })),
+      addWorkout: (workout) => set((state) => {
+        const nextWorkouts = [...state.workouts, workout];
+        const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
+        return {
+          workouts: nextWorkouts,
+          lifterProfile: nextProfile,
+        };
+      }),
+      deleteWorkout: (id) => set((state) => {
+        const nextWorkouts = state.workouts.filter(w => w.id !== id);
+        const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
+        return {
+          workouts: nextWorkouts,
+          lifterProfile: nextProfile,
+        };
+      }),
       
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
@@ -561,6 +592,62 @@ export const useAppStore = create<AppState>()(
 
       saveWeeklyReview: (review) => set({ latestWeeklyReview: review }),
 
+      // Lifter Twin & Decisions Ledger Handlers
+      acceptTrainingDecision: (exerciseName: string) => {
+        set((state) => {
+          const existing = state.trainingDecisions[exerciseName];
+          if (!existing) return state;
+          const updated: TrainingDecision = {
+            ...existing,
+            status: 'accepted',
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            trainingDecisions: {
+              ...state.trainingDecisions,
+              [exerciseName]: updated,
+            },
+            decisionsLedgerHistory: [updated, ...state.decisionsLedgerHistory.filter((d) => d.id !== existing.id).slice(0, 49)],
+          };
+        });
+      },
+
+      overrideTrainingDecision: (exerciseName: string, customWeight?: number) => {
+        set((state) => {
+          const existing = state.trainingDecisions[exerciseName];
+          if (!existing) return state;
+          const updated: TrainingDecision = {
+            ...existing,
+            status: 'overridden',
+            userOverrideWeight: customWeight ?? existing.previousPerformance.weight,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            trainingDecisions: {
+              ...state.trainingDecisions,
+              [exerciseName]: updated,
+            },
+            decisionsLedgerHistory: [updated, ...state.decisionsLedgerHistory.filter((d) => d.id !== existing.id).slice(0, 49)],
+          };
+        });
+      },
+
+      recordTrainingDecision: (decision: TrainingDecision) => {
+        set((state) => ({
+          trainingDecisions: {
+            ...state.trainingDecisions,
+            [decision.exerciseName]: decision,
+          },
+          decisionsLedgerHistory: [decision, ...state.decisionsLedgerHistory.filter((d) => d.id !== decision.id).slice(0, 49)],
+        }));
+      },
+
+      refreshLifterProfile: () => {
+        set((state) => ({
+          lifterProfile: generateLifterTwinProfile(state.workouts, state.profile?.unit || 'kg'),
+        }));
+      },
+
       clearAllData: () => {
         set({
           profile: null,
@@ -585,6 +672,9 @@ export const useAppStore = create<AppState>()(
           trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
           todaysAIWorkoutPlan: undefined,
           latestWeeklyReview: undefined,
+          trainingDecisions: {},
+          decisionsLedgerHistory: [],
+          lifterProfile: null,
         });
         if (typeof window !== 'undefined') {
           try {
@@ -624,6 +714,9 @@ export const useAppStore = create<AppState>()(
             trainingProfile: data.trainingProfile || state.trainingProfile,
             todaysAIWorkoutPlan: data.todaysAIWorkoutPlan || state.todaysAIWorkoutPlan,
             latestWeeklyReview: data.latestWeeklyReview || state.latestWeeklyReview,
+            trainingDecisions: data.trainingDecisions || state.trainingDecisions,
+            decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
+            lifterProfile: data.lifterProfile || state.lifterProfile,
           }));
           return true;
         } catch {
@@ -668,6 +761,11 @@ export const useAppStore = create<AppState>()(
             useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
           }
 
+          // Initialize or refresh Lifter Twin Profile if workouts exist
+          if (state.workouts && state.workouts.length > 0 && !state.lifterProfile) {
+            state.refreshLifterProfile();
+          }
+
           // Apply active theme to DOM immediately upon hydration
           if (typeof document !== 'undefined') {
             const currentTheme = state.theme || 'light';
@@ -706,6 +804,9 @@ export const useAppStore = create<AppState>()(
         trainingProfile: state.trainingProfile,
         todaysAIWorkoutPlan: state.todaysAIWorkoutPlan,
         latestWeeklyReview: state.latestWeeklyReview,
+        trainingDecisions: state.trainingDecisions,
+        decisionsLedgerHistory: state.decisionsLedgerHistory,
+        lifterProfile: state.lifterProfile,
       })
     }
   )

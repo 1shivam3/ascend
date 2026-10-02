@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseList, calculateOneRepMax } from '@/lib/strength-standards';
+import { getExerciseList, calculateOneRepMax, isMainCompoundLift } from '@/lib/strength-standards';
+import { generateTrainingDecision } from '@/lib/lifter-twin';
+import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 import {
   Plus,
   X,
@@ -443,6 +445,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     );
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
 
+  // ── Training Decision Ledger (Auditable prescription) ──────────────────────
+  const targetExerciseForDecision = useMemo(() => {
+    if (plannedWorkouts.length > 0 && plannedWorkouts[0].exercises.length > 0) {
+      const compound = plannedWorkouts[0].exercises.find((e) => isMainCompoundLift(e.name));
+      if (compound) return compound.name;
+      return plannedWorkouts[0].exercises[0].name;
+    }
+    if (workouts.length > 0 && workouts[0].exercises.length > 0) {
+      const compound = workouts[0].exercises.find((e) => isMainCompoundLift(e.name));
+      if (compound) return compound.name;
+      return workouts[0].exercises[0].name;
+    }
+    return null;
+  }, [plannedWorkouts, workouts]);
+
+  const activeTrainingDecision = useMemo(() => {
+    if (!targetExerciseForDecision || workouts.length === 0) return null;
+    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit);
+  }, [targetExerciseForDecision, workouts, userUnit]);
+
   // ── Logger modal state ─────────────────────────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
@@ -738,14 +760,29 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleStartPlan = (plan: PlannedWorkout) => {
     setSessionStartTime(Date.now());
-    const preFilledExercises: WorkoutExercise[] = plan.exercises.map(pe => ({
-      name: pe.name,
-      sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-        weight: pe.targetWeight ?? 0,
-        reps: pe.targetReps,
-        unit: pe.targetUnit ?? userUnit,
-      })),
-    }));
+    const storedDecisions = useStore.getState().trainingDecisions;
+    const preFilledExercises: WorkoutExercise[] = plan.exercises.map(pe => {
+      const activeDecision = storedDecisions[pe.name];
+      let assignedWeight = pe.targetWeight ?? 0;
+      let assignedRpe = 8;
+      if (activeDecision?.status === 'accepted') {
+        assignedWeight = activeDecision.nextPrescription.weight;
+        assignedRpe = activeDecision.nextPrescription.targetRpe;
+      } else if (activeDecision?.status === 'overridden' && activeDecision.userOverrideWeight !== undefined) {
+        assignedWeight = activeDecision.userOverrideWeight;
+        assignedRpe = activeDecision.nextPrescription.targetRpe;
+      }
+
+      return {
+        name: pe.name,
+        sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
+          weight: assignedWeight,
+          reps: pe.targetReps,
+          unit: pe.targetUnit ?? userUnit,
+          rpe: assignedRpe,
+        })),
+      };
+    });
     setExercises(preFilledExercises);
     setDate(new Date().toISOString().split('T')[0]);
     setStartedFromPlan(plan.name);
@@ -1254,6 +1291,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </button>
         </div>
       </section>
+
+      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER ── */}
+      {activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <h2 className="section-title text-[11px] mb-0 font-mono">
+                WHY DID MY PRESCRIPTION CHANGE?
+              </h2>
+            </div>
+            <span className="text-3xs text-text-muted font-mono">
+              Auditable AI Coach
+            </span>
+          </div>
+          <TrainingDecisionCard
+            decision={activeTrainingDecision}
+            userUnit={userUnit}
+          />
+        </section>
+      )}
 
       {/* ── 2. CONTEXTUAL REST TIMER (Only visible during active rest) ── */}
       {(isRestRunning || isTimerFinished || restSecondsLeft > 0) && (

@@ -23,6 +23,7 @@ import {
   ArrowRightLeft,
   Edit2,
   Mic,
+  Zap,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord } from '@/lib/types';
@@ -35,6 +36,7 @@ import {
 import { calculatePlates, PlateInfo } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
+import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 
 interface ActiveWorkoutScreenProps {
@@ -96,6 +98,7 @@ export default function ActiveWorkoutScreen({
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
 
@@ -787,6 +790,16 @@ export default function ActiveWorkoutScreen({
                 <Dumbbell className="w-3.5 h-3.5 text-accent" />
                 <span>Plates</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => setIsAdaptModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-2xs font-bold text-amber-400 transition-all flex items-center gap-1 shadow-xs"
+                title="Real-World Constraint Adaptation (Time limit, equipment occupied, high fatigue)"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Adapt</span>
+              </button>
             </div>
           </div>
 
@@ -1407,6 +1420,17 @@ export default function ActiveWorkoutScreen({
         currentExerciseName={currentExercise?.name}
         defaultUnit={userUnit}
         onApplySet={handleApplyVoiceSet}
+      />
+
+      {/* Real-World Constraint Adapter Modal */}
+      <ConstraintAdapterModal
+        isOpen={isAdaptModalOpen}
+        onClose={() => setIsAdaptModalOpen(false)}
+        exercises={exercises}
+        userUnit={userUnit}
+        onApplyAdaptedWorkout={(adaptedExercises) => {
+          setExercises(adaptedExercises);
+        }}
       />
 
       {/* Datalist for autocomplete */}
