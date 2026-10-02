@@ -8,6 +8,8 @@ import {
   LifterTwinProfile,
   RealWorldConstraint,
   LifterConfidenceTier,
+  AthleteGoal,
+  ATHLETE_GOAL_CONFIGS,
 } from './types';
 import { calculateOneRepMax, isMainCompoundLift } from './strength-standards';
 
@@ -155,10 +157,19 @@ export function generateTrainingDecision(
   exerciseName: string,
   workouts: WorkoutEntry[],
   userUnit: 'kg' | 'lbs' = 'kg',
-  targetRpe: number = 8.0
+  targetRpe: number = 8.0,
+  goals?: AthleteGoal[]
 ): TrainingDecision | null {
   const history = getExerciseHistorySessions(exerciseName, workouts);
   if (history.length === 0) return null;
+
+  const activeGoals: AthleteGoal[] = goals && goals.length > 0 ? goals : ['get_stronger', 'build_muscle'];
+  const hasStrength = activeGoals.includes('get_stronger');
+  const hasMuscle = activeGoals.includes('build_muscle');
+  const hasFatLoss = activeGoals.includes('lose_fat');
+  const hasStamina = activeGoals.includes('stamina');
+  const isPowerbuilding = hasStrength && hasMuscle;
+  const goalsLabel = activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
 
   const evidenceCount = history.length;
   const lastSession = history[history.length - 1];
@@ -188,6 +199,10 @@ export function generateTrainingDecision(
     const deltaKg = Math.round((safeWeight - lastWeight) * 10) / 10;
     const deltaPercent = Math.round((deltaKg / Math.max(1, lastWeight)) * 1000) / 10;
 
+    const deficitNote = hasFatLoss
+      ? ` Under your active goal of Fat Loss, managing recovery debt and systemic fatigue is vital.`
+      : '';
+
     return {
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
@@ -208,7 +223,7 @@ export function generateTrainingDecision(
       expectedRpe: 8.0,
       reasonType: 'exceeded_rpe',
       headline: 'Target RPE Exceeded — Load Adjusted',
-      explanation: `In your previous session (${lastSession.date}), effort spiked to RPE ${effort.averageRpe} with a within-session drift of +${effort.rpeDriftPerSet} RPE/set. Load is adjusted by ${deltaKg}${userUnit} (${deltaPercent}%) to restore clean bar velocity at target RPE 8.0 across comparable exposures.`,
+      explanation: `In your previous session (${lastSession.date}), effort spiked to RPE ${effort.averageRpe} with a within-session drift of +${effort.rpeDriftPerSet} RPE/set.${deficitNote} Load is adjusted by ${deltaKg}${userUnit} (${deltaPercent}%) to restore clean bar velocity at target RPE 8.0 across comparable exposures.`,
       deltaKg,
       deltaPercent,
       confidence,
@@ -221,11 +236,13 @@ export function generateTrainingDecision(
   // ── CASE B: Missed Reps (Rep drop-off) ───────────────────────────────────────
   if (effort.repDrop >= 2 || (lastSets.length >= 2 && lastSets[lastSets.length - 1].reps <= 3 && lastReps >= 6)) {
     const holdWeight = lastWeight;
+    const isHypertrophyFocus = hasMuscle && !hasStrength;
+
     return {
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
       date: todayStr,
-      programIntent: 'technique',
+      programIntent: isHypertrophyFocus ? 'hypertrophy' : 'technique',
       previousPerformance: {
         weight: lastWeight,
         reps: lastReps,
@@ -240,8 +257,8 @@ export function generateTrainingDecision(
       },
       expectedRpe: 8.0,
       reasonType: 'missed_reps',
-      headline: 'Rep Drop Detected — Volume Consolidation',
-      explanation: `Reps dropped across later sets in your last exposure (${lastSets[0].reps} → ${lastSets[lastSets.length - 1].reps}). Load is held at ${holdWeight}${userUnit} to consolidate repeatable technical execution across all sets before adding weight.`,
+      headline: isHypertrophyFocus ? 'Volume Consolidation (Hypertrophy)' : 'Rep Drop Detected — Volume Consolidation',
+      explanation: `Reps dropped across later sets in your last exposure (${lastSets[0].reps} → ${lastSets[lastSets.length - 1].reps}). Load is held at ${holdWeight}${userUnit} to consolidate repeatable technical execution and quality mechanical tension across all working sets.`,
       deltaKg: 0,
       deltaPercent: 0,
       confidence,
@@ -258,11 +275,46 @@ export function generateTrainingDecision(
     const deltaKg = increment;
     const deltaPercent = Math.round((deltaKg / Math.max(1, lastWeight)) * 1000) / 10;
 
+    // Reps & sets targets tailored to athlete's active goals
+    let targetRepPrescription = Math.max(4, lastReps - 1);
+    let targetSetsPrescription = lastSetsCount;
+    let intent: 'progressive_overload' | 'strength' | 'hypertrophy' = 'progressive_overload';
+
+    if (isPowerbuilding) {
+      targetRepPrescription = Math.max(4, Math.min(6, lastReps - 1));
+      targetSetsPrescription = Math.min(4, Math.max(3, lastSetsCount));
+      intent = 'progressive_overload';
+    } else if (hasStrength) {
+      targetRepPrescription = Math.max(3, Math.min(5, lastReps - 1));
+      targetSetsPrescription = Math.min(4, Math.max(3, lastSetsCount));
+      intent = 'strength';
+    } else if (hasMuscle) {
+      targetRepPrescription = Math.max(8, Math.min(12, lastReps - 1));
+      targetSetsPrescription = Math.min(4, Math.max(3, lastSetsCount));
+      intent = 'hypertrophy';
+    } else if (hasStamina) {
+      targetRepPrescription = Math.max(12, Math.min(15, lastReps - 1));
+      targetSetsPrescription = lastSetsCount;
+      intent = 'progressive_overload';
+    } else if (hasFatLoss) {
+      targetRepPrescription = Math.max(5, Math.min(8, lastReps - 1));
+      targetSetsPrescription = Math.min(3, lastSetsCount); // Capped to avoid excess fatigue in deficit
+      intent = 'strength';
+    }
+
+    const headline = isPowerbuilding
+      ? `Powerbuilding Overload Prescribed (+${increment} ${userUnit})`
+      : hasMuscle && !hasStrength
+      ? `Hypertrophy Overload Prescribed (+${increment} ${userUnit})`
+      : hasStrength
+      ? `Strength Overload Prescribed (+${increment} ${userUnit})`
+      : `Progressive Overload Prescribed (+${increment} ${userUnit})`;
+
     return {
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
       date: todayStr,
-      programIntent: 'progressive_overload',
+      programIntent: intent,
       previousPerformance: {
         weight: lastWeight,
         reps: lastReps,
@@ -271,14 +323,14 @@ export function generateTrainingDecision(
       },
       nextPrescription: {
         weight: nextWeight,
-        reps: Math.max(4, lastReps - 1),
+        reps: targetRepPrescription,
         targetRpe: 8.0,
-        sets: lastSetsCount,
+        sets: targetSetsPrescription,
       },
       expectedRpe: 8.0,
       reasonType: 'progressive_overload',
-      headline: `Progressive Overload Prescribed (+${increment} ${userUnit})`,
-      explanation: `All working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended for today's exposure.`,
+      headline,
+      explanation: `All working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended, targeting ${targetRepPrescription} reps tailored to your ${goalsLabel} focus.`,
       deltaKg,
       deltaPercent,
       confidence,
@@ -289,11 +341,12 @@ export function generateTrainingDecision(
   }
 
   // ── CASE D: Baseline Progression (+1 Rep Target) ───────────────────────────
+  const isHyper = hasMuscle && !hasStrength;
   return {
     id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     exerciseName,
     date: todayStr,
-    programIntent: 'strength',
+    programIntent: isHyper ? 'hypertrophy' : 'strength',
     previousPerformance: {
       weight: lastWeight,
       reps: lastReps,
@@ -308,8 +361,8 @@ export function generateTrainingDecision(
     },
     expectedRpe: 8.5,
     reasonType: 'fatigue_hold',
-    headline: 'Target +1 Rep Overload',
-    explanation: `Your performance on ${lastWeight}${userUnit} is calibrated. Today's target is pushing for +1 rep on your top set (${lastReps} → ${lastReps + 1} reps) while maintaining RPE ≤ 8.5.`,
+    headline: `Target +1 Rep Overload (${lastReps} → ${lastReps + 1})`,
+    explanation: `Your performance on ${lastWeight}${userUnit} is calibrated. Today's target is pushing for +1 rep on your top set (${lastReps} → ${lastReps + 1} reps) while maintaining RPE ≤ 8.5, building work capacity for your ${goalsLabel} goal.`,
     deltaKg: 0,
     deltaPercent: 0,
     confidence,

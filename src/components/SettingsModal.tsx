@@ -27,6 +27,8 @@ import LegalHubModal from '@/components/LegalHubModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
+import GoalSelectorModal from '@/components/GoalSelectorModal';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -36,6 +38,7 @@ interface SettingsModalProps {
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const profile = useStore((state) => state.profile);
   const setProfile = useStore((state) => state.setProfile);
+  const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const customGeminiKey = useStore((state) => state.customGeminiKey);
   const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const toast = useToast();
@@ -44,6 +47,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
 
   // Sub-modal states
+  const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   const [isLegalHubOpen, setIsLegalHubOpen] = useState(false);
   const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
@@ -133,6 +137,34 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <span className="text-2xs text-text-muted font-mono">
                       {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : 'Not set'} • {profile?.gender || 'male'}
                     </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </div>
+
+              {/* Active Training & Nutrition Goals */}
+              <div
+                onClick={() => setIsGoalSelectorOpen(true)}
+                className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Target className="w-4 h-4 text-accent" />
+                  <div>
+                    <span className="text-xs font-semibold text-text-primary block">Active Goals &amp; Focus</span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {goals && goals.length > 0 ? (
+                        goals.map((g) => (
+                          <span
+                            key={g}
+                            className="text-3xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25"
+                          >
+                            {ATHLETE_GOAL_CONFIGS[g]?.label || g}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-2xs text-text-muted font-mono">Not configured</span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -284,6 +316,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       </div>
 
       {/* Sub Modals */}
+      <GoalSelectorModal isOpen={isGoalSelectorOpen} onClose={() => setIsGoalSelectorOpen(false)} />
       <DataVaultModal isOpen={isDataVaultOpen} onClose={() => setIsDataVaultOpen(false)} />
       <LegalHubModal isOpen={isLegalHubOpen} onClose={() => setIsLegalHubOpen(false)} />
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />

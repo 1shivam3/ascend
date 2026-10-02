@@ -25,6 +25,7 @@ import {
   AIWeeklyReview,
   TrainingDecision,
   LifterTwinProfile,
+  AthleteGoal,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile } from './lifter-twin';
@@ -54,6 +55,11 @@ export interface AppState {
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
+
+  // Athlete Multi-Goal Selection
+  goals: AthleteGoal[];
+  setGoals: (goals: AthleteGoal[]) => void;
+  toggleGoal: (goal: AthleteGoal) => void;
 
   // Active workout persistence
   activeWorkoutDraft: ActiveWorkoutDraft | null;
@@ -207,6 +213,30 @@ export const useAppStore = create<AppState>()(
       hasCompletedOnboarding: false,
       _hasHydrated: false,
 
+      // Athlete Multi-Goal Selection
+      goals: ['get_stronger', 'build_muscle'],
+      setGoals: (goals) => set((state) => {
+        const nextGoals = goals && goals.length > 0 ? goals : (['get_stronger'] as AthleteGoal[]);
+        return {
+          goals: nextGoals,
+          profile: state.profile ? { ...state.profile, goals: nextGoals } : null,
+        };
+      }),
+      toggleGoal: (goal) => set((state) => {
+        const current: AthleteGoal[] = state.goals && state.goals.length > 0 ? state.goals : ['get_stronger', 'build_muscle'];
+        const exists = current.includes(goal);
+        let next: AthleteGoal[];
+        if (exists) {
+          next = current.length > 1 ? current.filter((g) => g !== goal) : current;
+        } else {
+          next = [...current, goal];
+        }
+        return {
+          goals: next,
+          profile: state.profile ? { ...state.profile, goals: next } : null,
+        };
+      }),
+
       // Active workout persistence
       activeWorkoutDraft: null,
 
@@ -253,8 +283,10 @@ export const useAppStore = create<AppState>()(
         if (!nextFavorites || nextFavorites.length === 0) {
           nextFavorites = DEFAULT_FAVORITE_FOODS;
         }
+        const nextGoals = profile.goals && profile.goals.length > 0 ? profile.goals : (state.goals || ['get_stronger', 'build_muscle']);
         return {
-          profile,
+          profile: { ...profile, goals: nextGoals },
+          goals: nextGoals,
           hasCompletedOnboarding: true,
           bodyMetrics: nextMetrics,
           favoriteFoods: nextFavorites,
@@ -756,6 +788,7 @@ export const useAppStore = create<AppState>()(
             trainingDecisions: data.trainingDecisions || state.trainingDecisions,
             decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
             lifterProfile: data.lifterProfile || state.lifterProfile,
+            goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
           }));
           return true;
         } catch {
@@ -846,6 +879,7 @@ export const useAppStore = create<AppState>()(
         trainingDecisions: state.trainingDecisions,
         decisionsLedgerHistory: state.decisionsLedgerHistory,
         lifterProfile: state.lifterProfile,
+        goals: state.goals,
       })
     }
   )

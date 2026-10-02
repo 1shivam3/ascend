@@ -2,6 +2,66 @@ export type Gender = 'male' | 'female';
 export type Unit = 'kg' | 'lbs';
 export type Theme = 'dark' | 'light';
 
+export type AthleteGoal = 'build_muscle' | 'get_stronger' | 'lose_fat' | 'stamina' | 'general_fitness';
+
+export interface AthleteGoalConfig {
+  id: AthleteGoal;
+  label: string;
+  tagline: string;
+  trainingEmphasis: string;
+  nutritionEmphasis: string;
+  defaultRepRange: { min: number; max: number };
+  defaultRestSeconds: number;
+}
+
+export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
+  build_muscle: {
+    id: 'build_muscle',
+    label: 'Build Muscle',
+    tagline: 'Hypertrophy volume, exercise selection, progressive overload',
+    trainingEmphasis: 'Moderate-to-high rep brackets (8–12 reps), high set volume, hypertrophy progressive overload',
+    nutritionEmphasis: 'Lean surplus (+250 kcal), optimal protein (1.8g/kg) to fuel muscle protein synthesis',
+    defaultRepRange: { min: 8, max: 12 },
+    defaultRestSeconds: 90,
+  },
+  get_stronger: {
+    id: 'get_stronger',
+    label: 'Get Stronger',
+    tagline: 'Compound lifts, RPE, strength progression, PRs',
+    trainingEmphasis: 'Heavy compound singles/triples (3–6 reps), velocity maintenance, 1RM milestones & DOTS tracking',
+    nutritionEmphasis: 'Maintenance to slight surplus (+150 kcal), high complex carbohydrates for CNS and glycogen stores',
+    defaultRepRange: { min: 3, max: 6 },
+    defaultRestSeconds: 150,
+  },
+  lose_fat: {
+    id: 'lose_fat',
+    label: 'Lose Fat',
+    tagline: 'Calorie target, weight trend, resistance training, activity',
+    trainingEmphasis: 'Preserve heavy mechanical tension to spare lean mass while maintaining training density',
+    nutritionEmphasis: 'Moderate deficit (-450 kcal), elevated protein (2.0–2.2g/kg) to prevent muscle breakdown',
+    defaultRepRange: { min: 6, max: 10 },
+    defaultRestSeconds: 75,
+  },
+  stamina: {
+    id: 'stamina',
+    label: 'Improve Fitness / Stamina',
+    tagline: 'Conditioning, work capacity, cardio progression',
+    trainingEmphasis: 'High density sets (12–15+ reps), supersets, shorter rest timers to elevate aerobic capacity',
+    nutritionEmphasis: 'Maintenance calories, balanced hydration, electrolyte replenishment, and sustained energy carbs',
+    defaultRepRange: { min: 12, max: 15 },
+    defaultRestSeconds: 60,
+  },
+  general_fitness: {
+    id: 'general_fitness',
+    label: 'General Fitness',
+    tagline: 'Balanced strength + conditioning',
+    trainingEmphasis: 'Well-rounded strength, joint longevity, functional movements, and sustainable routine adherence',
+    nutritionEmphasis: 'Nutritious whole-food baseline, consistent hydration, and balanced macros (~1.6g/kg protein)',
+    defaultRepRange: { min: 6, max: 10 },
+    defaultRestSeconds: 90,
+  },
+};
+
 export type OverallTitle =
   | 'INITIATE'
   | 'FORGED'
@@ -40,6 +100,7 @@ export interface UserProfile {
   heightCm?: number;
   unit: Unit;
   createdAt: string;
+  goals?: AthleteGoal[];
 }
 
 export interface PersonalRecord {

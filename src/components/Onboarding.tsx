@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
-import { ChevronRight, Dumbbell, ArrowRight, RotateCcw, Upload, Ruler } from 'lucide-react';
+import { ChevronRight, Dumbbell, ArrowRight, RotateCcw, Upload, Ruler, Check, Zap, Flame, Scale, Activity, Sparkles } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
-import { PersonalRecord, BodyMetricEntry } from '@/lib/types';
+import { PersonalRecord, BodyMetricEntry, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
 export default function OnboardingScreen() {
@@ -44,11 +44,11 @@ export default function OnboardingScreen() {
   const [ohpWeight, setOhpWeight] = useState('');
   const [ohpReps, setOhpReps] = useState('1');
 
-  // Training profile preferences
-  const [goal, setGoal] = useState<'strength' | 'muscle_gain' | 'fat_loss' | 'general_fitness'>('strength');
+  // Training profile multi-goal preferences
+  const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(['get_stronger', 'build_muscle']);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
 
-  const { setProfile, setTrainingProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
+  const { setProfile, setGoals, setTrainingProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
 
   const handleFinish = (skipLifts = false) => {
     const bw = parseFloat(bodyweight);
@@ -68,11 +68,19 @@ export default function OnboardingScreen() {
       heightCm: validHeight,
       unit,
       createdAt: new Date().toISOString(),
+      goals: selectedGoals,
     };
 
     setProfile(profileData);
+    setGoals(selectedGoals);
     setTrainingProfile({
-      goal,
+      goal: selectedGoals.includes('get_stronger')
+        ? 'strength'
+        : selectedGoals.includes('build_muscle')
+        ? 'muscle_gain'
+        : selectedGoals.includes('lose_fat')
+        ? 'fat_loss'
+        : 'general_fitness',
       daysPerWeek,
       preferredSplit: daysPerWeek >= 5 ? 'push_pull_legs' : daysPerWeek === 4 ? 'upper_lower' : 'full_body',
     });
@@ -378,34 +386,73 @@ export default function OnboardingScreen() {
 
         {/* Step 3: Goal & Training Days */}
         {step === 3 && (
-          <div className="space-y-4 animate-fade-in card">
+          <div className="space-y-4 animate-fade-in card max-h-[80vh] overflow-y-auto">
             <div>
-              <label className="section-title block mb-1">PRIMARY GOAL</label>
+              <label className="section-title block mb-1">WHAT ARE YOU TRYING TO ACHIEVE RIGHT NOW?</label>
               <p className="text-text-muted text-xs mb-3">
-                Tailors your progressive overload guidelines and nutritional targets.
+                Select one or combine multiple goals. ASCEND will adapt your training prescriptions, rep targets, and nutrition priorities.
               </p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'strength', label: 'Strength', sub: 'Max 1RM & DOTS' },
-                  { id: 'muscle_gain', label: 'Hypertrophy', sub: 'Muscle growth' },
-                  { id: 'fat_loss', label: 'Fat Loss', sub: 'Cut body fat' },
-                  { id: 'general_fitness', label: 'Conditioning', sub: 'Health & stamina' },
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setGoal(item.id as any)}
-                    className={`p-3 rounded-lg text-left transition-all border ${
-                      goal === item.id
-                        ? 'bg-accent/15 border-accent text-accent shadow-xs'
-                        : 'bg-bg-elevated border-border text-text-secondary hover:border-border-hover'
-                    }`}
-                  >
-                    <span className="block text-xs font-bold text-text-primary">{item.label}</span>
-                    <span className="block text-3xs text-text-muted mt-0.5">{item.sub}</span>
-                  </button>
-                ))}
+
+              <div className="space-y-2">
+                {(Object.keys(ATHLETE_GOAL_CONFIGS) as AthleteGoal[]).map((goalId) => {
+                  const config = ATHLETE_GOAL_CONFIGS[goalId];
+                  const isSelected = selectedGoals.includes(goalId);
+
+                  return (
+                    <button
+                      key={goalId}
+                      type="button"
+                      onClick={() => {
+                        setSelectedGoals((prev) => {
+                          if (prev.includes(goalId)) {
+                            return prev.length > 1 ? prev.filter((g) => g !== goalId) : prev;
+                          }
+                          return [...prev, goalId];
+                        });
+                      }}
+                      className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
+                        isSelected
+                          ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                          : 'bg-bg-elevated border-border text-text-secondary hover:border-border-hover'
+                      }`}
+                    >
+                      <div
+                        className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
+                          isSelected ? 'border-accent bg-accent text-white' : 'border-border bg-bg-secondary'
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-bold ${isSelected ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            {config.label}
+                          </span>
+                          <span className="text-3xs font-mono text-text-muted">
+                            {config.defaultRepRange.min}–{config.defaultRepRange.max} reps
+                          </span>
+                        </div>
+                        <p className="text-3xs text-text-muted mt-0.5 line-clamp-1">{config.tagline}</p>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Dynamic Synergy Preview */}
+              {selectedGoals.length > 1 && (
+                <div className="mt-3 p-2.5 rounded-xl bg-accent/10 border border-accent/30 text-2xs text-accent flex items-center gap-2">
+                  <Zap className="w-4 h-4 shrink-0" />
+                  <span>
+                    {selectedGoals.includes('get_stronger') && selectedGoals.includes('build_muscle')
+                      ? 'Powerbuilding Focus: Heavy compound progression (3–5 reps) paired with hypertrophy accessory volume.'
+                      : selectedGoals.includes('lose_fat') && selectedGoals.includes('build_muscle')
+                      ? 'Lean Recomposition: Calibrated deficit with high protein to protect lean tissue.'
+                      : `${selectedGoals.length} goals active: ASCEND will balance strength, work capacity & nutrition priorities.`}
+                  </span>
+                </div>
+              )}
             </div>
 
             <div>

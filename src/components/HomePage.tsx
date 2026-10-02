@@ -20,7 +20,8 @@ import {
   FastForward,
   Settings,
   Calendar,
-  Check
+  Check,
+  Target,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { getLiftLevel, getOverallLevel, isMainCompoundLift } from '@/lib/strength-standards';
@@ -30,6 +31,7 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import SettingsModal from '@/components/SettingsModal';
+import GoalSelectorModal from '@/components/GoalSelectorModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import ActivityRingsCard from '@/components/ActivityRingsCard';
@@ -41,7 +43,7 @@ import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import HomeActivityHeatmap from '@/components/HomeActivityHeatmap';
 import { calculateHydrationTarget, formatWaterLiters, toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
-import { PlannedWorkout, PlannedExercise } from '@/lib/types';
+import { PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { plural } from '@/lib/formatters';
 import { getTodaySessionState } from '@/lib/workout-engine';
 
@@ -60,6 +62,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     clearWorkoutDraft,
     gymLogs,
     toggleGymToday,
+    goals,
   } = useStore();
 
   const toast = useToast();
@@ -82,6 +85,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [today]);
 
   const userUnit = profile?.unit || 'kg';
+
+  // Dynamic synergy / goals label
+  const goalSynergyLabel = useMemo(() => {
+    const activeGoals = goals || ['get_stronger', 'build_muscle'];
+    if (activeGoals.length === 0) return 'Set Goals';
+    const isPowerbuilding = activeGoals.includes('get_stronger') && activeGoals.includes('build_muscle');
+    const isRecomp = activeGoals.includes('lose_fat') && activeGoals.includes('build_muscle');
+    const isAthletic = activeGoals.includes('stamina') && activeGoals.includes('get_stronger');
+
+    if (isPowerbuilding) return '⚡ Powerbuilding';
+    if (isRecomp) return '🔥 Recomp';
+    if (isAthletic) return '🏃 Hybrid';
+    if (activeGoals.length === 1) return ATHLETE_GOAL_CONFIGS[activeGoals[0]]?.label || 'Goal Set';
+    return activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
+  }, [goals]);
 
   // Single source of truth for today's workout state
   const sessionInfo = useMemo(() => {
@@ -113,8 +131,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   const activeTrainingDecision = useMemo(() => {
     if (!targetExerciseForDecision || workouts.length === 0) return null;
-    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit);
-  }, [targetExerciseForDecision, workouts, userUnit]);
+    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit, 8.0, goals);
+  }, [targetExerciseForDecision, workouts, userUnit, goals]);
 
   // Lifts and Overall Level Calculation
   const { topLifts, overallLevel } = useMemo(() => {
@@ -164,6 +182,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   // Modals state
+  const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
@@ -195,9 +214,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <h1 className="text-2xl font-black text-text-primary tracking-wider font-sans leading-none">
             ASCEND
           </h1>
-          <p className="text-xs text-text-muted mt-1 font-medium">
-            {greeting} • {formattedDate}
-          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-xs text-text-muted font-medium">
+              {greeting} • {formattedDate}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsGoalSelectorOpen(true)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 hover:border-accent/50 text-accent text-3xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer"
+              title="Click to customize active goals"
+            >
+              <Target className="w-2.5 h-2.5" />
+              <span>{goalSynergyLabel}</span>
+              <ChevronRight className="w-2.5 h-2.5 opacity-60" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -495,6 +526,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </details>
 
       {/* ── MODALS ── */}
+      <GoalSelectorModal
+        isOpen={isGoalSelectorOpen}
+        onClose={() => setIsGoalSelectorOpen(false)}
+      />
+
       <PlateCalculatorModal
         isOpen={isPlateModalOpen}
         onClose={() => setIsPlateModalOpen(false)}

@@ -33,6 +33,7 @@ import {
   Check,
   AlertTriangle,
   Share2,
+  Target,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -51,7 +52,8 @@ import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
-import { AISubstitutionResult } from '@/lib/types';
+import GoalSelectorModal from '@/components/GoalSelectorModal';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import ShareProgramModal from '@/components/ShareProgramModal';
@@ -429,6 +431,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const activeWorkoutDraft = useStore((state) => state.activeWorkoutDraft);
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
+  const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const toast = useToast();
 
   const userUnit = profile?.unit || 'kg';
@@ -444,6 +447,30 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       userUnit
     );
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
+
+  // Dynamic synergy / goals label
+  const goalSynergyLabel = useMemo(() => {
+    const activeGoals = goals || ['get_stronger', 'build_muscle'];
+    if (activeGoals.length === 0) return 'Set Goals';
+    const isPowerbuilding = activeGoals.includes('get_stronger') && activeGoals.includes('build_muscle');
+    const isRecomp = activeGoals.includes('lose_fat') && activeGoals.includes('build_muscle');
+    const isAthletic = activeGoals.includes('stamina') && activeGoals.includes('get_stronger');
+
+    if (isPowerbuilding) return '⚡ Powerbuilding';
+    if (isRecomp) return '🔥 Recomp';
+    if (isAthletic) return '🏃 Hybrid';
+    if (activeGoals.length === 1) return ATHLETE_GOAL_CONFIGS[activeGoals[0]]?.label || 'Goal Set';
+    return activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
+  }, [goals]);
+
+  // Goal-adaptive default rest period
+  const defaultRestSeconds = useMemo(() => {
+    const activeGoals = goals || ['get_stronger', 'build_muscle'];
+    if (activeGoals.includes('get_stronger')) return 150;
+    if (activeGoals.includes('stamina')) return 60;
+    if (activeGoals.includes('lose_fat')) return 75;
+    return 90;
+  }, [goals]);
 
   // ── Training Decision Ledger (Auditable prescription) ──────────────────────
   const targetExerciseForDecision = useMemo(() => {
@@ -462,11 +489,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const activeTrainingDecision = useMemo(() => {
     if (!targetExerciseForDecision || workouts.length === 0) return null;
-    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit);
-  }, [targetExerciseForDecision, workouts, userUnit]);
+    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit, 8.0, goals);
+  }, [targetExerciseForDecision, workouts, userUnit, goals]);
 
   // ── Logger modal state ─────────────────────────────────────────────────────
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -476,9 +504,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ── Rest Timer State ───────────────────────────────────────────────────────
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
-  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(90);
+  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(defaultRestSeconds);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isTimerFinished, setIsTimerFinished] = useState<boolean>(false);
+
+  useEffect(() => {
+    setRestTotalSeconds(defaultRestSeconds);
+  }, [defaultRestSeconds]);
 
   // ── Workout Logger Form State ──────────────────────────────────────────────
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -1072,7 +1104,18 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <header className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2.5">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Workouts</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Workouts</h1>
+              <button
+                type="button"
+                onClick={() => setIsGoalSelectorOpen(true)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 hover:border-accent/50 text-accent text-3xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer"
+                title="Click to customize active goals"
+              >
+                <Target className="w-2.5 h-2.5" />
+                <span>{goalSynergyLabel}</span>
+              </button>
+            </div>
             <p className="text-label text-text-muted">Log your sessions &amp; track consistency</p>
           </div>
         </div>
@@ -1630,6 +1673,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           completedWorkout={postWorkoutSummary}
         />
       )}
+
+      {/* Goal Selector Modal */}
+      <GoalSelectorModal
+        isOpen={isGoalSelectorOpen}
+        onClose={() => setIsGoalSelectorOpen(false)}
+      />
 
       {/* Suggested Workout Plan Generator Modal */}
       <SuggestedWorkoutModal

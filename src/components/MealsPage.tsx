@@ -32,12 +32,13 @@ import {
   Zap,
   Leaf,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
+import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 
@@ -102,11 +103,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const hydrationConfig    = useStore((state) => state.hydrationConfig);
   const creatineConfig     = useStore((state) => state.creatineConfig);
   const customGeminiKey    = useStore((state) => state.customGeminiKey);
+  const goals              = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
   const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
+  const [isGoalSelectorOpen,   setIsGoalSelectorOpen]   = useState(false);
   const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen,  setIsCreatineModalOpen]  = useState(false);
@@ -531,16 +534,72 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAutoCalculateGoals = () => {
-    const bw   = profile?.bodyweightKg || 75;
-    const cal  = Math.round(bw * 32);
-    const prot = Math.round(bw * 2);
-    const fat  = Math.round(bw * 0.9);
+    const bw = profile?.bodyweightKg || 75;
+    const activeGoals = goals || ['get_stronger', 'build_muscle'];
+    let calMultiplier = 32;
+    let protPerKg = 2.0;
+    let fatPerKg = 0.9;
+    let strategyName = 'Balanced Maintenance';
+
+    const hasFatLoss = activeGoals.includes('lose_fat');
+    const hasMuscle = activeGoals.includes('build_muscle');
+    const hasStrength = activeGoals.includes('get_stronger');
+    const hasStamina = activeGoals.includes('stamina');
+
+    if (hasFatLoss && hasMuscle) {
+      // Recomposition: slight deficit, elevated protein to preserve/build LBM
+      calMultiplier = 28;
+      protPerKg = 2.2;
+      fatPerKg = 0.8;
+      strategyName = 'Lean Recomposition (Deficit -300 kcal, High Protein 2.2g/kg)';
+    } else if (hasFatLoss) {
+      // Caloric deficit for fat loss
+      calMultiplier = 26;
+      protPerKg = 2.0;
+      fatPerKg = 0.75;
+      strategyName = 'Fat Loss Caloric Deficit (~450 kcal deficit, 2.0g/kg protein)';
+    } else if (hasMuscle && hasStrength) {
+      // Powerbuilding: controlled surplus, high protein
+      calMultiplier = 34;
+      protPerKg = 2.0;
+      fatPerKg = 0.9;
+      strategyName = 'Powerbuilding (Lean Surplus +250 kcal, 2.0g/kg protein)';
+    } else if (hasMuscle) {
+      // Hypertrophy
+      calMultiplier = 33;
+      protPerKg = 1.8;
+      fatPerKg = 0.9;
+      strategyName = 'Hypertrophy Surplus (+200 kcal, 1.8g/kg protein)';
+    } else if (hasStrength) {
+      // Strength progression
+      calMultiplier = 32;
+      protPerKg = 1.9;
+      fatPerKg = 0.9;
+      strategyName = 'Strength Progression (Maintenance/Slight Surplus, 1.9g/kg protein)';
+    } else if (hasStamina) {
+      // Stamina / conditioning: high carbohydrate ratio for glycogen replenishment
+      calMultiplier = 33;
+      protPerKg = 1.7;
+      fatPerKg = 0.8;
+      strategyName = 'Stamina & Conditioning (Elevated Carbs for Glycogen Replenishment)';
+    } else {
+      // General fitness
+      calMultiplier = 30;
+      protPerKg = 1.8;
+      fatPerKg = 0.85;
+      strategyName = 'General Fitness & Energy Balance';
+    }
+
+    const cal = Math.round(bw * calMultiplier);
+    const prot = Math.round(bw * protPerKg);
+    const fat = Math.round(bw * fatPerKg);
     const carb = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
+
     setGoalCalories(String(cal));
     setGoalProtein(String(prot));
     setGoalCarbs(String(carb));
     setGoalFat(String(fat));
-    toast.info(`Targets calibrated for ${bw}kg bodyweight (2g/kg protein).`, 'Targets Calculated');
+    toast.success(`Targets calibrated for ${bw}kg bodyweight: ${strategyName}`, 'Goals Calibrated');
   };
 
   const handleReconcileCarbs = () => {
@@ -2251,23 +2310,47 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </div>
 
             {/* Quick Auto-Calculate Banner */}
-            <div className="p-3 rounded-lg bg-bg-secondary border border-border/70 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-text-primary flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-accent" />
-                  Auto-Calculate
-                </p>
-                <p className="text-[11px] text-text-muted font-mono">
-                  Based on {profile?.bodyweightKg || 75}kg bodyweight
-                </p>
+            <div className="p-3 rounded-lg bg-bg-secondary border border-border/70 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-text-primary flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 text-accent" />
+                    Goal-Adaptive Macro Engine
+                  </p>
+                  <p className="text-[11px] text-text-muted font-mono">
+                    Based on {profile?.bodyweightKg || 75}kg bodyweight
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoCalculateGoals}
+                  className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors font-bold"
+                >
+                  Apply
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleAutoCalculateGoals}
-                className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors"
-              >
-                Apply
-              </button>
+
+              {/* Active Goals Tagline & Change button */}
+              <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-text-muted">Focus:</span>
+                  {(goals || ['get_stronger', 'build_muscle']).map((g) => (
+                    <span
+                      key={g}
+                      className="px-1.5 py-0.5 rounded bg-accent/15 text-accent text-3xs font-mono font-semibold"
+                    >
+                      {ATHLETE_GOAL_CONFIGS[g]?.label || g}
+                    </span>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsGoalSelectorOpen(true)}
+                  className="text-text-muted hover:text-accent underline text-3xs font-mono shrink-0 ml-2 cursor-pointer"
+                >
+                  Change
+                </button>
+              </div>
             </div>
 
             {/* Input Fields */}
@@ -2399,6 +2482,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         isOpen={isBarcodeModalOpen}
         onClose={() => setIsBarcodeModalOpen(false)}
         onAddFood={handleAddScannedFood}
+      />
+
+      {/* Goal Selector Modal */}
+      <GoalSelectorModal
+        isOpen={isGoalSelectorOpen}
+        onClose={() => setIsGoalSelectorOpen(false)}
       />
 
       {/* Hydration Target Modal */}
