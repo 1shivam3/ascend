@@ -359,8 +359,12 @@ export default function ActiveWorkoutScreen({
   const handleApplyVoiceSet = (result: VoiceWorkoutResult) => {
     let targetExIdx = activeExerciseIdx;
     if (result.exerciseName) {
+      const targetLower = result.exerciseName.toLowerCase();
       const matchIdx = exercises.findIndex(
-        (ex) => ex.name.toLowerCase() === result.exerciseName!.toLowerCase()
+        (ex) => {
+          const exLower = ex.name.toLowerCase();
+          return exLower === targetLower || exLower.includes(targetLower) || targetLower.includes(exLower);
+        }
       );
       if (matchIdx !== -1) {
         targetExIdx = matchIdx;
