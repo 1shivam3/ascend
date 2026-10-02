@@ -56,7 +56,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     const totalBig3 = squatPR + benchPR + deadliftPR;
 
     const dotsScore = profile?.bodyweightKg
-      ? calculateDOTS(totalBig3, profile.bodyweightKg, profile.gender || 'male')
+      ? calculateDOTS(profile.bodyweightKg, totalBig3, profile.gender || 'male')
       : 0;
 
     const classification = getDOTSClassification(dotsScore);
