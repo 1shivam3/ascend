@@ -423,54 +423,74 @@ export default function ActiveWorkoutScreen({
     const workingWeight = firstWorkingSet ? (parseFloat(String(firstWorkingSet.weight)) || 0) : 80;
     const barWeight = 20;
 
-    // Standard warm-up ramp:
-    // Set 1: Empty Bar (20kg) x 10
-    // Set 2: 40% x 5
-    // Set 3: 60% x 3
-    // Set 4: 80% x 1
-    const warmups: WorkoutSet[] = [];
+    const roundStep = (w: number) => {
+      const step = userUnit === 'lbs' ? 5 : 2.5;
+      return Math.round(w / step) * step;
+    };
 
-    // Empty bar
+    const warmups: WorkoutSet[] = [];
+    const targetReps = currentExercise?.sets[0]?.reps || 5;
+
+    // Set 1: Empty Bar / Motor Pattern Prep
     warmups.push({
       weight: barWeight,
-      reps: 10,
+      reps: targetReps >= 8 ? 10 : 8,
       unit: userUnit,
       completed: false,
       rpe: 5,
     });
 
-    if (workingWeight > barWeight * 1.5) {
-      const set40 = Math.round((workingWeight * 0.4) / 2.5) * 2.5;
-      if (set40 > barWeight) {
+    // Case 1: Light load (<= 45kg) - 1 ramp set avoids pre-fatigue
+    if (workingWeight <= barWeight * 2.2) {
+      const mid = roundStep(barWeight + (workingWeight - barWeight) * 0.55);
+      if (mid > barWeight && mid < workingWeight) {
         warmups.push({
-          weight: set40,
+          weight: mid,
           reps: 5,
           unit: userUnit,
           completed: false,
-          rpe: 6,
+          rpe: 6.5,
         });
       }
+    }
+    // Case 2: Moderate load (45-85kg) - 2 ramp sets (50%, 75%)
+    else if (workingWeight <= barWeight * 4.2) {
+      const s1 = roundStep(workingWeight * 0.50);
+      const s2 = roundStep(workingWeight * 0.75);
 
-      const set60 = Math.round((workingWeight * 0.6) / 2.5) * 2.5;
-      if (set60 > set40) {
-        warmups.push({
-          weight: set60,
-          reps: 3,
-          unit: userUnit,
-          completed: false,
-          rpe: 7,
-        });
+      if (s1 > barWeight) {
+        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6 });
       }
+      if (s2 > s1 && s2 < workingWeight) {
+        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 7 });
+      }
+      // If doing heavy low reps (<= 4 reps), prime CNS with an 88% potentiator single
+      if (targetReps <= 4) {
+        const s3 = roundStep(workingWeight * 0.88);
+        if (s3 > s2 && s3 < workingWeight) {
+          warmups.push({ weight: s3, reps: 1, unit: userUnit, completed: false, rpe: 7.5 });
+        }
+      }
+    }
+    // Case 3: Heavy load (> 85kg) - 3-4 progressive sets to prime nervous system without metabolic fatigue
+    else {
+      const s1 = roundStep(workingWeight * 0.45);
+      const s2 = roundStep(workingWeight * 0.65);
+      const s3 = roundStep(workingWeight * 0.82);
 
-      const set80 = Math.round((workingWeight * 0.8) / 2.5) * 2.5;
-      if (set80 > set60) {
-        warmups.push({
-          weight: set80,
-          reps: 1,
-          unit: userUnit,
-          completed: false,
-          rpe: 7.5,
-        });
+      if (s1 > barWeight) {
+        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6 });
+      }
+      if (s2 > s1) {
+        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 6.5 });
+      }
+      if (s3 > s2) {
+        warmups.push({ weight: s3, reps: 2, unit: userUnit, completed: false, rpe: 7 });
+      }
+      // Potentiating single at 91% for high-threshold motor unit recruitment
+      const single = roundStep(workingWeight * 0.91);
+      if (single > s3 && single < workingWeight) {
+        warmups.push({ weight: single, reps: 1, unit: userUnit, completed: false, rpe: 7.5 });
       }
     }
 

@@ -567,15 +567,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
 
+    const targetFat = !isNaN(fat) && fat > 0 ? Math.round(fat) : Math.round((cal * 0.25) / 9);
+    const targetCarbs = Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
+
     const newGoals: MacroGoals = {
       calories:  Math.round(cal),
       proteinG:  Math.round(prot),
-      carbsG:    !isNaN(carb) && carb > 0 ? Math.round(carb) : undefined,
-      fatG:      !isNaN(fat)  && fat  > 0 ? Math.round(fat)  : undefined,
+      fatG:      targetFat,
+      carbsG:    targetCarbs,
     };
 
     setMacroGoals(newGoals);
-    toast.success(`Daily goals set: ${newGoals.calories} kcal & ${newGoals.proteinG}g protein.`, 'Goals Saved');
+    toast.success(`Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).`, 'Goals Saved');
     setIsGoalsModalOpen(false);
   };
 

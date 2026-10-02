@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { WorkoutExercise, RealWorldConstraint } from '@/lib/types';
-import { adaptWorkoutForConstraints } from '@/lib/lifter-twin';
+import { adaptWorkoutForConstraints, STIMULUS_PRESERVING_SWAPS } from '@/lib/lifter-twin';
 import {
   Clock,
   Dumbbell,
@@ -10,9 +10,7 @@ import {
   Zap,
   Check,
   X,
-  ArrowRight,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 
@@ -33,7 +31,7 @@ export default function ConstraintAdapterModal({
 }: ConstraintAdapterModalProps) {
   const toast = useToast();
 
-  const [activeConstraintType, setActiveConstraintType] = useState<'time' | 'equipment' | 'fatigue'>('time');
+  const [activeConstraintType, setActiveConstraintType] = useState<'time' | 'equipment' | 'readiness'>('time');
   const [selectedMinutes, setSelectedMinutes] = useState<number>(45);
   const [selectedExName, setSelectedExName] = useState<string>(exercises[0]?.name || '');
   const [selectedSubstitute, setSelectedSubstitute] = useState<string>('');
@@ -60,6 +58,8 @@ export default function ConstraintAdapterModal({
     onClose();
   };
 
+  const availableSwaps = STIMULUS_PRESERVING_SWAPS[selectedExName] || [];
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
@@ -74,10 +74,10 @@ export default function ConstraintAdapterModal({
             </div>
             <div>
               <h3 className="font-bold text-base text-text-primary leading-tight">
-                Real-World Adaptation
+                Real-World Constraint Adaptation
               </h3>
               <p className="text-3xs text-text-muted font-mono">
-                Preserve program intent when gym conditions change
+                Preserve training intent when real-world conditions change
               </p>
             </div>
           </div>
@@ -115,20 +115,20 @@ export default function ConstraintAdapterModal({
             }`}
           >
             <Dumbbell className="w-3.5 h-3.5" />
-            <span className="text-3xs font-mono uppercase">Gear Busy</span>
+            <span className="text-3xs font-mono uppercase">Equipment Busy</span>
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveConstraintType('fatigue')}
+            onClick={() => setActiveConstraintType('readiness')}
             className={`py-2 px-1.5 rounded-lg text-xs font-bold font-sans transition-all flex flex-col items-center gap-1 ${
-              activeConstraintType === 'fatigue'
+              activeConstraintType === 'readiness'
                 ? 'bg-accent text-white shadow-xs'
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
             <BatteryLow className="w-3.5 h-3.5" />
-            <span className="text-3xs font-mono uppercase">Low Recovery</span>
+            <span className="text-3xs font-mono uppercase">Low Readiness</span>
           </button>
         </div>
 
@@ -155,7 +155,7 @@ export default function ConstraintAdapterModal({
               ))}
             </div>
             <p className="text-3xs text-text-muted font-sans pt-1">
-              Keeps main heavy compounds intact; compresses secondary accessory sets.
+              Protects core compound intensity; caps working sets at 3 and streams accessory volume.
             </p>
           </div>
         )}
@@ -164,11 +164,14 @@ export default function ConstraintAdapterModal({
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-2.5 text-left">
             <div>
               <span className="text-3xs font-mono font-bold text-text-muted uppercase block mb-1">
-                Occupied Exercise:
+                Occupied Station / Exercise:
               </span>
               <select
                 value={selectedExName}
-                onChange={(e) => setSelectedExName(e.target.value)}
+                onChange={(e) => {
+                  setSelectedExName(e.target.value);
+                  setSelectedSubstitute('');
+                }}
                 className="w-full bg-bg-card border border-border rounded-lg py-1.5 px-2.5 text-xs text-text-primary outline-none focus:border-accent"
               >
                 {exercises.map((ex, i) => (
@@ -181,44 +184,50 @@ export default function ConstraintAdapterModal({
 
             <div>
               <span className="text-3xs font-mono font-bold text-text-muted uppercase block mb-1">
-                Auto-Substitutes Available:
+                Stimulus-Preserving Substitutes:
               </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  'Dumbbell Press',
-                  'Incline Bench',
-                  'Dips',
-                  'Leg Press',
-                  'Front Squat',
-                  'Romanian Deadlift',
-                  'Dumbbell Row',
-                ].map((alt) => (
-                  <button
-                    key={alt}
-                    type="button"
-                    onClick={() => setSelectedSubstitute(alt)}
-                    className={`py-1.5 px-2 rounded-lg text-2xs font-sans text-left truncate border transition-all ${
-                      selectedSubstitute === alt
-                        ? 'border-accent bg-accent/15 text-accent font-bold'
-                        : 'border-border bg-bg-card text-text-secondary hover:border-accent/40'
-                    }`}
-                  >
-                    {alt}
-                  </button>
-                ))}
-              </div>
+              {availableSwaps.length > 0 ? (
+                <div className="grid grid-cols-1 gap-1.5">
+                  {availableSwaps.map((alt) => (
+                    <button
+                      key={alt.target}
+                      type="button"
+                      onClick={() => setSelectedSubstitute(alt.target)}
+                      className={`p-2 rounded-lg text-xs font-sans text-left border transition-all ${
+                        selectedSubstitute === alt.target
+                          ? 'border-accent bg-accent/15 text-accent font-bold'
+                          : 'border-border bg-bg-card text-text-secondary hover:border-accent/40'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span>{alt.target}</span>
+                        <span className="text-3xs font-mono text-text-muted">
+                          {alt.targetSets}×{alt.targetReps} @ RPE {alt.targetRpe}
+                        </span>
+                      </div>
+                      <p className="text-3xs text-text-muted mt-0.5 font-normal">
+                        {alt.stimulusReason}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-2xs text-text-muted">
+                  No automated swap registered. A dumbbell or cable equivalent will preserve movement volume.
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {activeConstraintType === 'fatigue' && (
+        {activeConstraintType === 'readiness' && (
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 text-left space-y-1.5">
             <span className="text-xs font-bold text-amber-400 font-sans flex items-center gap-1.5">
               <BatteryLow className="w-4 h-4" />
-              <span>CNS Recovery Shield</span>
+              <span>Low Readiness Adaptation</span>
             </span>
             <p className="text-2xs text-text-secondary leading-relaxed font-sans">
-              Bad sleep, high exam stress, or sore joints? ASCEND drops 1 working set across all exercises and caps RPE at 7.5. You keep your motor coordination and strength stimulus without digging into systemic overtraining.
+              Poor sleep, elevated life stress, or joint fatigue? ASCEND trims 1 accessory set to manage session fatigue and caps target RPE at ≤ 7.5. Preserves technical execution without digging into systemic recovery debt.
             </p>
           </div>
         )}

@@ -23,7 +23,9 @@ import {
   Check
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
+import { getLiftLevel, getOverallLevel, isMainCompoundLift } from '@/lib/strength-standards';
+import { generateTrainingDecision } from '@/lib/lifter-twin';
+import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
@@ -93,6 +95,26 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
 
   const hasTrainedToday = sessionInfo.isDone;
+
+  // ── Training Decision Ledger (Auditable prescription) ──────────────────────
+  const targetExerciseForDecision = useMemo(() => {
+    if (sessionInfo.exercises && sessionInfo.exercises.length > 0) {
+      const compound = sessionInfo.exercises.find((name) => isMainCompoundLift(name));
+      if (compound) return compound;
+      return sessionInfo.exercises[0];
+    }
+    if (workouts.length > 0 && workouts[0].exercises.length > 0) {
+      const compound = workouts[0].exercises.find((e) => isMainCompoundLift(e.name));
+      if (compound) return compound.name;
+      return workouts[0].exercises[0].name;
+    }
+    return null;
+  }, [sessionInfo, workouts]);
+
+  const activeTrainingDecision = useMemo(() => {
+    if (!targetExerciseForDecision || workouts.length === 0) return null;
+    return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit);
+  }, [targetExerciseForDecision, workouts, userUnit]);
 
   // Lifts and Overall Level Calculation
   const { topLifts, overallLevel } = useMemo(() => {
@@ -367,6 +389,32 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </section>
+
+      {/* ── TODAY'S TRAINING DECISION (Auditable Prescription) ─────────────── */}
+      {activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
+        <section className="space-y-2 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="text-3xs font-mono uppercase font-bold tracking-wider text-accent">
+                Today&apos;s Training Decision
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('progress')}
+              className="text-3xs font-mono text-text-muted hover:text-accent flex items-center gap-1 transition-colors"
+            >
+              <span>Audit Ledger &rarr;</span>
+            </button>
+          </div>
+
+          <TrainingDecisionCard
+            decision={activeTrainingDecision}
+            userUnit={userUnit}
+          />
+        </section>
+      )}
 
       {/* ── 3. THREE HABIT RINGS (Training, Protein, Water) ────────────────── */}
       <ActivityRingsCard

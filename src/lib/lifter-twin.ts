@@ -7,18 +7,20 @@ import {
   LifterExerciseProfile,
   LifterTwinProfile,
   RealWorldConstraint,
+  LifterConfidenceTier,
 } from './types';
-import { calculateOneRepMax, isMainCompoundLift, isDumbbellExercise, isBodyweightExercise } from './strength-standards';
+import { calculateOneRepMax, isMainCompoundLift } from './strength-standards';
 
 /**
- * Calculates fatigue slope and RPE drift across working sets within a single session.
+ * Calculates within-session effort drift and rep drop across comparable working sets.
  */
-export function calculateSetFatigueSlope(sets: WorkoutSet[]): {
+export function calculateSetEffortDrift(sets: WorkoutSet[]): {
   rpeDriftTotal: number;
   rpeDriftPerSet: number;
   repDrop: number;
-  hasFatigueSpike: boolean;
+  hasEffortSpike: boolean;
   averageRpe: number;
+  withinSessionEffortTrend: 'low' | 'moderate' | 'high';
 } {
   const validSets = sets.filter((s) => s.reps > 0);
   if (validSets.length <= 1) {
@@ -27,8 +29,9 @@ export function calculateSetFatigueSlope(sets: WorkoutSet[]): {
       rpeDriftTotal: 0,
       rpeDriftPerSet: 0,
       repDrop: 0,
-      hasFatigueSpike: singleRpe >= 9.5,
+      hasEffortSpike: singleRpe >= 9.5,
       averageRpe: singleRpe,
+      withinSessionEffortTrend: singleRpe >= 9 ? 'high' : singleRpe >= 8 ? 'moderate' : 'low',
     };
   }
 
@@ -43,16 +46,23 @@ export function calculateSetFatigueSlope(sets: WorkoutSet[]): {
   const repDrop = Math.max(0, firstReps - lastReps);
 
   const avgRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
-  const hasFatigueSpike = lastRpe >= 9.5 || rpeDriftTotal >= 1.5 || repDrop >= 2;
+  const hasEffortSpike = lastRpe >= 9.5 || rpeDriftTotal >= 1.5 || repDrop >= 2;
+
+  const withinSessionEffortTrend: 'low' | 'moderate' | 'high' =
+    rpeDriftPerSet > 0.4 ? 'high' : rpeDriftPerSet > 0.15 ? 'moderate' : 'low';
 
   return {
     rpeDriftTotal,
     rpeDriftPerSet,
     repDrop,
-    hasFatigueSpike,
+    hasEffortSpike,
     averageRpe: avgRpe,
+    withinSessionEffortTrend,
   };
 }
+
+// Backward-compatible alias
+export const calculateSetFatigueSlope = calculateSetEffortDrift;
 
 /**
  * Extracts and chronologically sorts past sessions for a specific exercise.
@@ -67,7 +77,7 @@ export function getExerciseHistorySessions(
   bestReps: number;
   bestE1RM: number;
   totalVolume: number;
-  fatigue: ReturnType<typeof calculateSetFatigueSlope>;
+  fatigue: ReturnType<typeof calculateSetEffortDrift>;
 }[] {
   if (!exerciseName || !workouts || workouts.length === 0) return [];
 
@@ -79,7 +89,7 @@ export function getExerciseHistorySessions(
     bestReps: number;
     bestE1RM: number;
     totalVolume: number;
-    fatigue: ReturnType<typeof calculateSetFatigueSlope>;
+    fatigue: ReturnType<typeof calculateSetEffortDrift>;
   }[] = [];
 
   // Sort workouts oldest first for longitudinal progression analysis
@@ -103,13 +113,14 @@ export function getExerciseHistorySessions(
       let totalVolume = 0;
 
       for (const s of validSets) {
-        const e1rm = calculateOneRepMax(s.weight, s.reps);
+        const wKg = s.weight;
+        const e1rm = calculateOneRepMax(wKg, s.reps);
+        totalVolume += wKg * s.reps;
         if (e1rm > bestE1RM) {
-          bestE1RM = e1rm;
+          bestE1RM = Math.round(e1rm * 10) / 10;
           bestWeight = s.weight;
           bestReps = s.reps;
         }
-        totalVolume += s.weight * s.reps;
       }
 
       history.push({
@@ -117,9 +128,9 @@ export function getExerciseHistorySessions(
         sets: validSets,
         bestWeight,
         bestReps,
-        bestE1RM: Math.round(bestE1RM * 10) / 10,
-        totalVolume,
-        fatigue: calculateSetFatigueSlope(validSets),
+        bestE1RM,
+        totalVolume: Math.round(totalVolume),
+        fatigue: calculateSetEffortDrift(validSets),
       });
     }
   }
@@ -128,12 +139,23 @@ export function getExerciseHistorySessions(
 }
 
 /**
- * Generates an auditable Training Decision with transparent rationale and Accept / Override controls.
+ * Determines feature-specific confidence tier based on verified comparable exposures.
+ */
+export function getConfidenceTier(evidenceCount: number): LifterConfidenceTier {
+  if (evidenceCount >= 20) return 'high_confidence';
+  if (evidenceCount >= 10) return 'established';
+  if (evidenceCount >= 5) return 'early_signal';
+  return 'calibrating';
+}
+
+/**
+ * Generates an auditable training prescription decision with prediction tracking.
  */
 export function generateTrainingDecision(
   exerciseName: string,
   workouts: WorkoutEntry[],
-  userUnit: 'kg' | 'lbs' = 'kg'
+  userUnit: 'kg' | 'lbs' = 'kg',
+  targetRpe: number = 8.0
 ): TrainingDecision | null {
   const history = getExerciseHistorySessions(exerciseName, workouts);
   if (history.length === 0) return null;
@@ -144,18 +166,24 @@ export function generateTrainingDecision(
   const lastWeight = lastSession.bestWeight;
   const lastReps = lastSession.bestReps;
   const lastSetsCount = lastSets.length;
-  const fatigue = lastSession.fatigue;
+  const effort = lastSession.fatigue;
 
   const todayStr = new Date().toISOString().split('T')[0];
   const increment = userUnit === 'lbs' ? 5 : 2.5;
 
-  // 1. Evidence calibration status
-  const confidence: 'high' | 'medium' | 'calibrating' =
-    evidenceCount >= 6 ? 'high' : evidenceCount >= 3 ? 'medium' : 'calibrating';
+  const confidenceTier = getConfidenceTier(evidenceCount);
+  const confidence =
+    confidenceTier === 'high_confidence'
+      ? 'high'
+      : confidenceTier === 'established'
+      ? 'established'
+      : confidenceTier === 'early_signal'
+      ? 'early_signal'
+      : 'calibrating';
 
-  // ── CASE A: Fatigue Spike / Exceeded Target RPE ──────────────────────────────
-  if (fatigue.hasFatigueSpike || fatigue.averageRpe >= 9.2) {
-    const reductionKg = Math.max(increment, Math.round((lastWeight * 0.04) / increment) * increment);
+  // ── CASE A: Exceeded Target RPE / Elevated Effort Drift ─────────────────────
+  if (effort.hasEffortSpike || effort.averageRpe >= 9.2) {
+    const reductionKg = Math.max(increment, Math.round((lastWeight * 0.035) / increment) * increment);
     const safeWeight = Math.max(userUnit === 'kg' ? 20 : 45, lastWeight - reductionKg);
     const deltaKg = Math.round((safeWeight - lastWeight) * 10) / 10;
     const deltaPercent = Math.round((deltaKg / Math.max(1, lastWeight)) * 1000) / 10;
@@ -164,21 +192,23 @@ export function generateTrainingDecision(
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
       date: todayStr,
+      programIntent: 'readiness_adaptation',
       previousPerformance: {
         weight: lastWeight,
         reps: lastReps,
-        rpe: fatigue.averageRpe,
+        rpe: effort.averageRpe,
         sets: lastSetsCount,
       },
       nextPrescription: {
         weight: safeWeight,
         reps: lastReps,
-        targetRpe: 8,
+        targetRpe: 8.0,
         sets: Math.min(3, lastSetsCount),
       },
+      expectedRpe: 8.0,
       reasonType: 'exceeded_rpe',
-      headline: 'RPE Drift Exceeded Target — Velocity Reset',
-      explanation: `In your previous session (${lastSession.date}), RPE spiked to ${fatigue.averageRpe} with a set-to-set drift of +${fatigue.rpeDriftPerSet}/set. Holding this load risks technical breakdown. Load is reduced by ${Math.abs(deltaKg)}${userUnit} (${deltaPercent}%) to restore explosive bar velocity at target RPE 8.`,
+      headline: 'Target RPE Exceeded — Load Adjusted',
+      explanation: `In your previous session (${lastSession.date}), effort spiked to RPE ${effort.averageRpe} with a within-session drift of +${effort.rpeDriftPerSet} RPE/set. Load is adjusted by ${deltaKg}${userUnit} (${deltaPercent}%) to restore clean bar velocity at target RPE 8.0 across comparable exposures.`,
       deltaKg,
       deltaPercent,
       confidence,
@@ -189,27 +219,29 @@ export function generateTrainingDecision(
   }
 
   // ── CASE B: Missed Reps (Rep drop-off) ───────────────────────────────────────
-  if (fatigue.repDrop >= 2 || (lastSets.length >= 2 && lastSets[lastSets.length - 1].reps <= 3 && lastReps >= 6)) {
+  if (effort.repDrop >= 2 || (lastSets.length >= 2 && lastSets[lastSets.length - 1].reps <= 3 && lastReps >= 6)) {
     const holdWeight = lastWeight;
     return {
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
       date: todayStr,
+      programIntent: 'technique',
       previousPerformance: {
         weight: lastWeight,
         reps: lastReps,
-        rpe: fatigue.averageRpe,
+        rpe: effort.averageRpe,
         sets: lastSetsCount,
       },
       nextPrescription: {
         weight: holdWeight,
         reps: lastReps,
-        targetRpe: 8,
+        targetRpe: 8.0,
         sets: lastSetsCount,
       },
+      expectedRpe: 8.0,
       reasonType: 'missed_reps',
-      headline: 'Volume Consolidation — Hold Load',
-      explanation: `Rep completion dropped across later sets in your last session. Rather than adding weight, ASCEND holds load at ${holdWeight}${userUnit} to consolidate clean technique across all sets before advancing.`,
+      headline: 'Rep Drop Detected — Volume Consolidation',
+      explanation: `Reps dropped across later sets in your last exposure (${lastSets[0].reps} → ${lastSets[lastSets.length - 1].reps}). Load is held at ${holdWeight}${userUnit} to consolidate repeatable technical execution across all sets before adding weight.`,
       deltaKg: 0,
       deltaPercent: 0,
       confidence,
@@ -219,9 +251,9 @@ export function generateTrainingDecision(
     };
   }
 
-  // ── CASE C: Positive Overload (RPE <= 8 across sets) ─────────────────────────
+  // ── CASE C: Positive Overload (Reserve confirmed) ───────────────────────────
   const allSetsClean = lastSets.every((s) => (s.rpe ?? 8) <= 8.0 && s.reps >= 4);
-  if (allSetsClean || (evidenceCount >= 2 && fatigue.averageRpe <= 8.0)) {
+  if (allSetsClean || (evidenceCount >= 2 && effort.averageRpe <= 8.0)) {
     const nextWeight = lastWeight + increment;
     const deltaKg = increment;
     const deltaPercent = Math.round((deltaKg / Math.max(1, lastWeight)) * 1000) / 10;
@@ -230,21 +262,23 @@ export function generateTrainingDecision(
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       exerciseName,
       date: todayStr,
+      programIntent: 'progressive_overload',
       previousPerformance: {
         weight: lastWeight,
         reps: lastReps,
-        rpe: fatigue.averageRpe,
+        rpe: effort.averageRpe,
         sets: lastSetsCount,
       },
       nextPrescription: {
         weight: nextWeight,
         reps: Math.max(4, lastReps - 1),
-        targetRpe: 8,
+        targetRpe: 8.0,
         sets: lastSetsCount,
       },
+      expectedRpe: 8.0,
       reasonType: 'progressive_overload',
-      headline: 'Positive Overload Unlocked (+2.5 kg)',
-      explanation: `All working sets on ${lastSession.date} were completed with reserve (average RPE ${fatigue.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended for today's exposure.`,
+      headline: `Progressive Overload Prescribed (+${increment} ${userUnit})`,
+      explanation: `All working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended for today's exposure.`,
       deltaKg,
       deltaPercent,
       confidence,
@@ -254,15 +288,16 @@ export function generateTrainingDecision(
     };
   }
 
-  // ── CASE D: Baseline Progression / +1 Rep Target ────────────────────────────
+  // ── CASE D: Baseline Progression (+1 Rep Target) ───────────────────────────
   return {
     id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     exerciseName,
     date: todayStr,
+    programIntent: 'strength',
     previousPerformance: {
       weight: lastWeight,
       reps: lastReps,
-      rpe: fatigue.averageRpe,
+      rpe: effort.averageRpe,
       sets: lastSetsCount,
     },
     nextPrescription: {
@@ -271,6 +306,7 @@ export function generateTrainingDecision(
       targetRpe: 8.5,
       sets: lastSetsCount,
     },
+    expectedRpe: 8.5,
     reasonType: 'fatigue_hold',
     headline: 'Target +1 Rep Overload',
     explanation: `Your performance on ${lastWeight}${userUnit} is calibrated. Today's target is pushing for +1 rep on your top set (${lastReps} → ${lastReps + 1} reps) while maintaining RPE ≤ 8.5.`,
@@ -284,7 +320,7 @@ export function generateTrainingDecision(
 }
 
 /**
- * Builds the complete empirical Lifter Twin Profile for all primary compound lifts.
+ * Builds the empirical Lifter Training Response Profile grounded in verified gym exposures.
  */
 export function generateLifterTwinProfile(
   workouts: WorkoutEntry[],
@@ -316,12 +352,9 @@ export function generateLifterTwinProfile(
 
     totalExposuresCount += history.length;
     const evidenceCount = history.length;
+    const confidenceTier = getConfidenceTier(evidenceCount);
 
-    // Calibration tier
-    const calibrationStatus: 'calibrating' | 'early_trend' | 'calibrated' =
-      evidenceCount >= 7 ? 'calibrated' : evidenceCount >= 3 ? 'early_trend' : 'calibrating';
-
-    // 1. Optimal Rep Range (Where e1RM peaks)
+    // 1. Best-Supported Rep Range (Evidence statement where top-set performance was most consistent)
     const sortedByE1RM = [...history].sort((a, b) => b.bestE1RM - a.bestE1RM);
     const topSessions = sortedByE1RM.slice(0, Math.min(3, sortedByE1RM.length));
     const avgBestReps = Math.round(
@@ -330,14 +363,14 @@ export function generateLifterTwinProfile(
     const minRepRange = Math.max(3, avgBestReps - 1);
     const maxRepRange = Math.max(minRepRange + 2, avgBestReps + 1);
 
-    // 2. Average RPE Drift & Fatigue Sensitivity
+    // 2. Within-Session Effort Drift
     const avgRpeDrift =
       history.reduce((sum, s) => sum + s.fatigue.rpeDriftPerSet, 0) / history.length;
     const cleanDrift = Math.round(avgRpeDrift * 10) / 10;
-    const fatigueSensitivity: 'low' | 'moderate' | 'high' =
-      cleanDrift > 0.5 ? 'high' : cleanDrift > 0.2 ? 'moderate' : 'low';
+    const withinSessionEffortDrift: 'low' | 'moderate' | 'high' =
+      cleanDrift > 0.4 ? 'high' : cleanDrift > 0.15 ? 'moderate' : 'low';
 
-    // 3. Recovery Gap (Days between sessions)
+    // 3. Observed Successful Recovery Interval (Days between sessions)
     let avgDaysBetween = 3;
     if (history.length >= 2) {
       const dayDiffs: number[] = [];
@@ -354,8 +387,15 @@ export function generateLifterTwinProfile(
       }
     }
 
-    // 4. e1RM Trend (last 3 vs overall)
-    let e1RMTrend: 'rising' | 'plateau' | 'fatigued' = 'stable' as any;
+    const minRecoveryDays = Math.max(2, avgDaysBetween - 1);
+    const maxRecoveryDays = Math.max(minRecoveryDays + 1, avgDaysBetween + 1);
+
+    // 4. Observed Frequency Range (No fake decimals)
+    const minWeeklyFreq = Math.max(1, Math.floor(7 / Math.max(3, maxRecoveryDays)));
+    const maxWeeklyFreq = Math.max(minWeeklyFreq, Math.min(3, Math.ceil(7 / Math.max(2, minRecoveryDays))));
+
+    // 5. e1RM Trend
+    let e1RMTrend: 'rising' | 'stable' | 'fatigued' = 'stable';
     if (history.length >= 3) {
       const recent = history.slice(-3);
       const recentAvg = recent.reduce((sum, s) => sum + s.bestE1RM, 0) / 3;
@@ -365,42 +405,50 @@ export function generateLifterTwinProfile(
       } else if (recentAvg < initialAvg * 0.97) {
         e1RMTrend = 'fatigued';
       } else {
-        e1RMTrend = 'plateau';
+        e1RMTrend = 'stable';
       }
     } else {
       e1RMTrend = 'rising';
     }
 
-    // 5. Grounded Empirical Observations
+    // 6. Grounded Empirical Observations
     const observations: string[] = [];
 
-    if (evidenceCount >= 3) {
+    if (evidenceCount >= 5) {
       observations.push(
-        `Highest peak strength occurs in the ${minRepRange}–${maxRepRange} rep bracket (e1RM peak: ${sortedByE1RM[0]?.bestE1RM}${userUnit}).`
+        `${minRepRange}–${maxRepRange} reps produced your most consistent top-set performance across ${evidenceCount} comparable exposures.`
       );
       observations.push(
-        `Fatigue drift across working sets: ${cleanDrift >= 0 ? `+${cleanDrift}` : cleanDrift} RPE/set (${fatigueSensitivity} fatigue sensitivity).`
+        `Within-session effort drift averages ${cleanDrift >= 0 ? `+${cleanDrift}` : cleanDrift} RPE/set across working sets (${withinSessionEffortDrift} effort drift).`
       );
       observations.push(
-        `Optimal recovery window: ~${Math.max(2, avgDaysBetween)} days between exposures for positive progressive overload.`
+        `Performance has been most consistent when heavy exposures are separated by ${minRecoveryDays}–${maxRecoveryDays} days.`
+      );
+      observations.push(
+        `Observed training frequency: ${minWeeklyFreq === maxWeeklyFreq ? `${minWeeklyFreq}×` : `${minWeeklyFreq}–${maxWeeklyFreq}×`} / week.`
       );
     } else {
       observations.push(
-        `Calibrating baseline: ${evidenceCount} of 3 sessions recorded. Log ${3 - evidenceCount} more session(s) to verify individual response curves.`
+        `Calibrating baseline: ${evidenceCount} of 5 comparable sessions recorded. Log ${5 - evidenceCount} more session(s) to verify individual response patterns.`
       );
     }
 
     profile.exercises[name] = {
       exerciseName: name,
       evidenceCount,
-      calibrationStatus,
+      confidenceTier,
+      calibrationStatus: evidenceCount >= 10 ? 'calibrated' : evidenceCount >= 5 ? 'early_trend' : 'calibrating',
+      bestSupportedRepRange: { min: minRepRange, max: maxRepRange },
       optimalRepRange: { min: minRepRange, max: maxRepRange },
       targetRpeRange: { min: 7.5, max: 8.5 },
-      fatigueSensitivity,
+      withinSessionEffortDrift,
+      fatigueSensitivity: withinSessionEffortDrift,
       rpeDriftPerSet: cleanDrift,
-      recommendedWeeklyFrequency: Math.max(1, Math.min(3, Math.round(7 / Math.max(2, avgDaysBetween)))),
+      observedWeeklyFrequencyRange: { min: minWeeklyFreq, max: maxWeeklyFreq },
+      recommendedWeeklyFrequency: maxWeeklyFreq,
       bestProgressionStepKg: userUnit === 'lbs' ? 5 : 2.5,
-      recoveryDaysNeeded: Math.max(2, avgDaysBetween),
+      observedRecoveryIntervalDays: { min: minRecoveryDays, max: maxRecoveryDays },
+      recoveryDaysNeeded: avgDaysBetween,
       e1RMTrend,
       observations,
     };
@@ -411,40 +459,46 @@ export function generateLifterTwinProfile(
 }
 
 /**
- * Biomechanical equipment substitution dictionary with carryover multipliers
+ * Stimulus-Preserving Substitution Dictionary:
+ * Matches movement patterns & target effort brackets WITHOUT fake numerical load multipliers.
  */
-const EQUIPMENT_SWAP_MAP: Record<
-  string,
-  { target: string; weightMultiplier: number; reason: string }[]
-> = {
+export interface StimulusPreservingSwap {
+  target: string;
+  targetSets: number;
+  targetReps: number;
+  targetRpe: number;
+  stimulusReason: string;
+}
+
+export const STIMULUS_PRESERVING_SWAPS: Record<string, StimulusPreservingSwap[]> = {
   'Bench Press': [
-    { target: 'Dumbbell Press', weightMultiplier: 0.38, reason: 'Dumbbell flat press preserves chest hypertrophy when barbell bench is occupied' },
-    { target: 'Incline Bench', weightMultiplier: 0.85, reason: 'Incline barbell bench preserves pressing motor pattern' },
-    { target: 'Dips', weightMultiplier: 0, reason: 'Chest dips provide high tricep & lower pec stimulus' },
+    { target: 'Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves horizontal chest press stimulus; athlete selects dumbbell load to hit target RPE 8' },
+    { target: 'Incline Bench', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves compound pressing motor pattern with clavicular head emphasis' },
+    { target: 'Dips', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Bodyweight/weighted push stimulus preserving pectoral and tricep volume' },
   ],
   'Squat': [
-    { target: 'Leg Press', weightMultiplier: 2.2, reason: 'Leg press provides equivalent quad volume without axial spine loading' },
-    { target: 'Front Squat', weightMultiplier: 0.8, reason: 'Front squat provides intense quad stimulus with less spinal compression' },
-    { target: 'Goblet Squat', weightMultiplier: 0.35, reason: 'Dumbbell goblet squat when squat rack is unavailable' },
+    { target: 'Leg Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves quad mechanical tension without axial spine loading; select machine pin load to match RPE 8' },
+    { target: 'Front Squat', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Barbell quad driver with upright torso mechanics' },
+    { target: 'Goblet Squat', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Preserves knee flexion and quad stimulus when rack is unavailable' },
   ],
   'Deadlift': [
-    { target: 'Romanian Deadlift', weightMultiplier: 0.75, reason: 'RDL targets posterior chain and hamstrings with lower neural fatigue' },
-    { target: 'Barbell Row', weightMultiplier: 0.65, reason: 'Barbell row preserves heavy back bracing' },
+    { target: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves hip hinge and posterior chain recruitment with reduced systemic fatigue' },
+    { target: 'Barbell Row', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves spinal erector bracing and posterior back tension' },
   ],
   'Barbell Row': [
-    { target: 'Dumbbell Row', weightMultiplier: 0.45, reason: 'Single-arm DB row preserves lat volume without lower back strain' },
-    { target: 'Lat Pulldown', weightMultiplier: 0.8, reason: 'Lat pulldown targets upper back when row area is busy' },
+    { target: 'Dumbbell Row', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves lat and upper back stimulus without lower back fatigue' },
+    { target: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves vertical pulling volume when row station is busy' },
   ],
   'Overhead Press': [
-    { target: 'Dumbbell Shoulder Press', weightMultiplier: 0.4, reason: 'Dumbbell shoulder press preserves vertical pressing volume' },
-    { target: 'Arnold Press', weightMultiplier: 0.35, reason: 'Arnold press provides 3D deltoid stimulus' },
+    { target: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves vertical pressing stimulus; athlete selects dumbbell weight to hit target RPE 8' },
+    { target: 'Arnold Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Full 3D deltoid rotation and hypertrophy stimulus' },
   ],
 };
 
 /**
  * Real-world constraint adaptation engine:
- * Adapts an entire workout session in 1 tap when life happens (time short, equipment busy, poor sleep/fatigue),
- * preserving 85%+ of training stimulus and compound movement intent.
+ * Adapts workout session when life happens (time short, equipment busy, low readiness),
+ * preserving training intent without fake biomechanical load conversions.
  */
 export function adaptWorkoutForConstraints(
   exercises: WorkoutExercise[],
@@ -463,26 +517,26 @@ export function adaptWorkoutForConstraints(
   const changesSummary: string[] = [];
   let timeSavedMinutes = 0;
 
-  // ── 1. TIME CONSTRAINT (e.g. 35m, 45m quick mode) ──────────────────────────
+  // ── 1. TIME CONSTRAINT (e.g. 30m, 45m quick mode) ──────────────────────────
   if (constraint.type === 'time') {
     const limit = constraint.availableMinutes || 45;
 
-    // A. Keep Exercise 0 (Main Compound) with 100% intensity, cap working sets at 3
+    // A. Keep Exercise 0 (Main Compound) with full intensity, cap working sets at 3
     if (adapted[0] && adapted[0].sets.length > 3) {
       const removedSets = adapted[0].sets.length - 3;
       adapted[0].sets = adapted[0].sets.slice(0, 3);
       timeSavedMinutes += removedSets * 3;
-      changesSummary.push(`Capped ${adapted[0].name} at 3 heavy sets (saved ~${removedSets * 3}m)`);
+      changesSummary.push(`Capped ${adapted[0].name} at 3 primary sets (saved ~${removedSets * 3}m)`);
     }
 
-    // B. Trim or compress accessories (exercises 2 and beyond)
+    // B. Trim lowest-priority accessory if session is long
     if (adapted.length > 3) {
       const removedEx = adapted.pop()!;
       timeSavedMinutes += 10;
       changesSummary.push(`Dropped accessory (${removedEx.name}) to protect core compound volume (saved ~10m)`);
     }
 
-    // C. Reduce rest-heavy accessory sets across remaining exercises
+    // C. Streamline remaining accessories to 2 focused sets
     for (let i = 1; i < adapted.length; i++) {
       if (adapted[i].sets.length > 2) {
         adapted[i].sets = adapted[i].sets.slice(0, 2);
@@ -491,7 +545,7 @@ export function adaptWorkoutForConstraints(
       }
     }
 
-    changesSummary.push(`Program intent preserved: Completed main compound in ~${limit}m`);
+    changesSummary.push(`Program intent preserved: Completed session within ~${limit}m`);
     return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: Math.max(12, timeSavedMinutes) };
   }
 
@@ -506,37 +560,36 @@ export function adaptWorkoutForConstraints(
 
     if (exIndex !== -1) {
       const currentEx = adapted[exIndex];
-      let newName = substituteName;
-      let multiplier = 1.0;
-      let reasonText = '';
+      const swapOptions = STIMULUS_PRESERVING_SWAPS[currentEx.name];
 
-      // Check swap map
-      const swapOptions = EQUIPMENT_SWAP_MAP[currentEx.name];
+      let newName = substituteName;
+      let targetSets = currentEx.sets.length;
+      let targetReps = currentEx.sets[0]?.reps || 8;
+      let targetRpe = 8.0;
+      let stimulusReason = 'Preserved primary movement stimulus on alternative apparatus';
+
       if (swapOptions && swapOptions.length > 0) {
         const chosen = substituteName
           ? swapOptions.find((o) => o.target.toLowerCase() === substituteName.toLowerCase()) || swapOptions[0]
           : swapOptions[0];
         newName = chosen.target;
-        multiplier = chosen.weightMultiplier;
-        reasonText = chosen.reason;
+        targetSets = chosen.targetSets;
+        targetReps = chosen.targetReps;
+        targetRpe = chosen.targetRpe;
+        stimulusReason = chosen.stimulusReason;
       } else {
         newName = substituteName || `${currentEx.name} (DB / Machine)`;
-        multiplier = 0.85;
-        reasonText = 'Substituted with equivalent movement pattern';
       }
 
-      // Convert weights
-      const nextSets = currentEx.sets.map((s) => {
-        let newWeight = s.weight;
-        if (multiplier > 0) {
-          const step = userUnit === 'lbs' ? 5 : 2.5;
-          newWeight = Math.round((s.weight * multiplier) / step) * step;
-        }
-        return {
-          ...s,
-          weight: Math.max(0, newWeight),
-        };
-      });
+      // Stimulus-preserving sets: Do NOT fake a load multiplier!
+      // Athlete chooses weight based on warm-up feel on the substitute machine/dumbbells
+      const nextSets: WorkoutSet[] = Array.from({ length: targetSets }, (_, idx) => ({
+        weight: currentEx.sets[idx]?.weight || 0,
+        reps: targetReps,
+        rpe: targetRpe,
+        unit: currentEx.sets[0]?.unit || userUnit,
+        completed: false,
+      }));
 
       adapted[exIndex] = {
         ...currentEx,
@@ -544,29 +597,29 @@ export function adaptWorkoutForConstraints(
         sets: nextSets,
       };
 
-      changesSummary.push(`Swapped "${currentEx.name}" → "${newName}" (${reasonText})`);
-      changesSummary.push(`Calibrated target load from ${currentEx.sets[0]?.weight}${userUnit} to ~${nextSets[0]?.weight}${userUnit}`);
+      changesSummary.push(`Swapped "${currentEx.name}" → "${newName}" (${stimulusReason})`);
+      changesSummary.push(`Prescribed: ${targetSets} sets × ${targetReps} reps @ target RPE ${targetRpe}. Select working load by feel on the new apparatus.`);
       return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: 8 };
     }
   }
 
-  // ── 3. HIGH FATIGUE / LOW SLEEP / EXAM STRESS ───────────────────────────────
-  if (constraint.type === 'fatigue') {
+  // ── 3. LOW READINESS / POOR SLEEP ADJUSTMENT ─────────────────────────────────
+  if (constraint.type === 'readiness' || constraint.type === 'fatigue') {
     for (let i = 0; i < adapted.length; i++) {
-      // Reduce 1 set across all exercises
-      if (adapted[i].sets.length > 2) {
+      // Reduce 1 set across secondary exercises
+      if (i > 0 && adapted[i].sets.length > 2) {
         adapted[i].sets = adapted[i].sets.slice(0, adapted[i].sets.length - 1);
       }
-      // Cap RPE at 7.5 to prevent CNS exhaustion
+      // Cap RPE at 7.5 to preserve movement pattern without digging into recovery debt
       adapted[i].sets = adapted[i].sets.map((s) => ({
         ...s,
         rpe: Math.min(7.5, s.rpe ?? 7.5),
       }));
     }
 
-    changesSummary.push('Reduced total session volume by 25% (dropped 1 set per exercise)');
-    changesSummary.push('Capped target RPE at 7.5 to reinforce motor patterning without digging into systemic recovery debt');
-    changesSummary.push('Maintained compound intensity to preserve neurological strength gains');
+    changesSummary.push('Low Readiness Adaptation applied (poor sleep / elevated stress)');
+    changesSummary.push('Trimmed secondary accessory volume by 1 set to manage fatigue accumulation');
+    changesSummary.push('Capped target RPE at ≤ 7.5 across sets to preserve technique without digging into recovery debt');
     return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: 14 };
   }
 

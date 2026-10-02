@@ -1,6 +1,7 @@
 import { PersonalRecord, Gender } from './types';
 
-// Official DOTS Coefficients (standardized by WRPF, USAPL, IPF affiliates)
+// DOTS Formula Coefficients (standardized bodyweight-normalized powerlifting comparison score)
+// Note: Official IPF competitions use IPF GL Points; DOTS is widely used across federations as a bodyweight comparison metric.
 const DOTS_MALE = {
   A: -307.75076,
   B: 24.0900756,
@@ -18,7 +19,8 @@ const DOTS_FEMALE = {
 };
 
 /**
- * Calculates official DOTS powerlifting score given bodyweight and Big 3 Total (in kg)
+ * Calculates DOTS powerlifting coefficient given bodyweight and Big 3 Total (in kg).
+ * Provides a standardized bodyweight-normalized comparison across weight classes.
  */
 export function calculateDOTS(
   bodyweightKg: number,

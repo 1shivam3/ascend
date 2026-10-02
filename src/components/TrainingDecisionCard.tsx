@@ -13,6 +13,8 @@ import {
   ArrowRight,
   Info,
   ShieldCheck,
+  Target,
+  Activity,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 
@@ -55,8 +57,28 @@ export default function TrainingDecisionCard({
   const isPositive = decision.deltaKg > 0;
   const isNegative = decision.deltaKg < 0;
 
+  // Format program intent
+  const intentLabel =
+    decision.programIntent === 'readiness_adaptation'
+      ? 'Readiness Adaptation'
+      : decision.programIntent === 'progressive_overload'
+      ? 'Progressive Overload'
+      : decision.programIntent === 'technique'
+      ? 'Technique Consolidation'
+      : 'Strength Development';
+
+  // Format confidence label
+  const confidenceLabel =
+    decision.confidence === 'high'
+      ? 'High Confidence'
+      : decision.confidence === 'established'
+      ? 'Established Pattern'
+      : decision.confidence === 'early_signal'
+      ? 'Early Signal'
+      : 'Calibrating Baseline';
+
   return (
-    <div className="card p-3.5 sm:p-4 bg-bg-card border border-accent/30 space-y-3 shadow-xs relative overflow-hidden">
+    <div className="card p-3.5 sm:p-4 bg-bg-card border border-accent/30 space-y-3 shadow-xs relative overflow-hidden font-sans">
       {/* Accent subtle glow top border */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-accent/60 via-accent to-accent/20" />
 
@@ -72,11 +94,14 @@ export default function TrainingDecisionCard({
                 {decision.exerciseName}
               </h4>
               <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted border border-border/80">
-                {decision.evidenceCount} {decision.evidenceCount === 1 ? 'session' : 'sessions'}
+                {decision.evidenceCount} {decision.evidenceCount === 1 ? 'exposure' : 'exposures'}
+              </span>
+              <span className="text-3xs font-mono px-1.5 py-0.2 rounded bg-accent/10 text-accent border border-accent/30">
+                {confidenceLabel}
               </span>
             </div>
             <p className="text-3xs text-accent font-mono font-semibold">
-              Training Decision Ledger
+              Training Memory • {intentLabel}
             </p>
           </div>
         </div>
@@ -123,10 +148,37 @@ export default function TrainingDecisionCard({
               : `${decision.nextPrescription.weight} ${userUnit} × ${decision.nextPrescription.reps}`}
           </span>
           <span className="text-3xs text-accent font-medium block">
-            {decision.nextPrescription.sets} sets @ RPE {decision.nextPrescription.targetRpe}
+            {decision.nextPrescription.sets} sets @ Expected RPE {decision.expectedRpe || decision.nextPrescription.targetRpe}
           </span>
         </div>
       </div>
+
+      {/* Prediction vs Outcome (If workout was executed) */}
+      {decision.actualExecution && (
+        <div className="p-2.5 rounded-xl bg-bg-secondary/90 border border-border flex items-center justify-between text-2xs font-mono">
+          <div className="flex items-center gap-1.5 text-text-secondary">
+            <Target className="w-3.5 h-3.5 text-accent" />
+            <span>Actual Execution:</span>
+            <span className="font-bold text-text-primary">
+              {decision.actualExecution.weight} {userUnit} × {decision.actualExecution.reps} @ RPE {decision.actualExecution.actualRpe}
+            </span>
+          </div>
+          {decision.predictionError !== undefined && (
+            <div className="flex items-center gap-1">
+              <span className="text-3xs text-text-muted uppercase">Prediction Error:</span>
+              <span
+                className={`font-bold px-1.5 py-0.2 rounded ${
+                  Math.abs(decision.predictionError) <= 0.5
+                    ? 'bg-emerald-500/15 text-emerald-400'
+                    : 'bg-amber-500/15 text-amber-400'
+                }`}
+              >
+                {decision.predictionError >= 0 ? `+${decision.predictionError}` : decision.predictionError} RPE
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Auditable Rationale */}
       <div className="p-2.5 rounded-lg bg-bg-secondary/40 border border-border/60 text-left space-y-1">
@@ -178,39 +230,42 @@ export default function TrainingDecisionCard({
             </div>
           ) : isOverridden ? (
             <div className="flex items-center gap-1.5 text-amber-400 text-xs font-mono font-bold">
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>User Override ({decision.userOverrideWeight}{userUnit})</span>
+              <Sparkles className="w-4 h-4" />
+              <span>User Override Applied</span>
             </div>
           ) : (
-            <div className="flex items-center gap-2 w-full">
-              <button
-                type="button"
-                onClick={handleAccept}
-                className="btn-primary flex-1 py-2 px-3 text-xs font-bold flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>Accept ({decision.nextPrescription.weight}{userUnit})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsOverriding(true)}
-                className="btn-secondary py-2 px-3 text-xs font-semibold text-text-secondary hover:text-text-primary"
-                title="Override with custom weight"
-              >
-                <span>Override</span>
-              </button>
+            <div className="flex items-center gap-1.5 text-text-muted text-3xs font-mono">
+              <Activity className="w-3.5 h-3.5 text-accent animate-pulse" />
+              <span>Auditable Recommendation</span>
             </div>
           )}
 
-          {(isAccepted || isOverridden) && (
+          <div className="flex items-center gap-1.5">
+            {!isAccepted && (
+              <button
+                type="button"
+                onClick={handleAccept}
+                className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1 shadow-xs"
+              >
+                <Check className="w-3.5 h-3.5" />
+                <span>Accept</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={() => setIsOverriding(true)}
-              className="text-3xs font-mono text-text-muted hover:text-accent underline transition-colors"
+              onClick={() => {
+                setCustomWeight(
+                  isOverridden
+                    ? decision.userOverrideWeight || decision.nextPrescription.weight
+                    : decision.nextPrescription.weight
+                );
+                setIsOverriding(true);
+              }}
+              className="btn-secondary py-1.5 px-2.5 text-xs text-text-secondary hover:text-text-primary"
             >
-              Change
+              {isOverridden ? 'Edit Override' : 'Override'}
             </button>
-          )}
+          </div>
         </div>
       )}
     </div>

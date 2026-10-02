@@ -22,6 +22,7 @@ import {
   Info,
   Calendar,
   Layers,
+  Target,
   ArrowRight,
 } from 'lucide-react';
 
@@ -63,28 +64,40 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
     return list.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [decisionsLedgerHistory, trainingDecisions]);
 
+  // Average prediction error across evaluated decisions
+  const predictionStats = useMemo(() => {
+    const evaluated = allDecisions.filter((d) => d.predictionError !== undefined);
+    if (evaluated.length === 0) return null;
+    const avgError =
+      evaluated.reduce((sum, d) => sum + Math.abs(d.predictionError || 0), 0) / evaluated.length;
+    return {
+      count: evaluated.length,
+      avgError: Math.round(avgError * 10) / 10,
+    };
+  }, [allDecisions]);
+
   const lifterName = profile?.name ? profile.name.trim().toUpperCase() : 'ATHLETE';
 
   return (
     <div className="space-y-4 animate-fade-in font-sans">
-      {/* ── 1. Top Lifter Twin Header & Longitudinal Badge ─────────────────── */}
+      {/* ── 1. Top Lifter Training Response Header ─────────────────────────── */}
       <div className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/30 space-y-3 shadow-sm relative overflow-hidden">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-accent/20 text-accent border border-accent/40">
                 <Activity className="w-3 h-3 animate-pulse" />
-                ASCEND LIFTER TWIN
+                ASCEND TRAINING MEMORY
               </span>
               <span className="text-3xs text-text-muted font-mono">
-                Longitudinal Response Engine
+                Prescription &amp; Response Engine
               </span>
             </div>
             <h2 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-mono">
-              {lifterName} — TRAINING RESPONSE
+              {lifterName} — TRAINING RESPONSE PROFILE
             </h2>
             <p className="text-xs text-text-secondary leading-relaxed max-w-xl">
-              Learns how your physiology specifically responds to volume, load, and fatigue—and continuously audits why prescriptions change.
+              Learns how you respond to load, within-session effort, and recovery—and continuously maintains an auditable trail of why prescriptions change.
             </p>
           </div>
 
@@ -94,18 +107,26 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                 {lifterProfile.totalAnalyzedExposures}
               </span>
               <span className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
-                Logged Exposures Analyzed
+                Comparable Exposures Analyzed
               </span>
             </div>
           </div>
         </div>
 
-        {/* Verification Guarantee Pill */}
-        <div className="pt-2 border-t border-border/60 flex items-center justify-between text-3xs text-text-muted font-mono">
+        {/* Prediction Accuracy & Verification Guarantee */}
+        <div className="pt-2 border-t border-border/60 flex flex-wrap items-center justify-between text-3xs text-text-muted font-mono gap-2">
           <span className="flex items-center gap-1.5 text-accent font-semibold">
             <ShieldCheck className="w-3.5 h-3.5" />
             100% Grounded in Your Performance Logs • 0% Generic Assumptions
           </span>
+
+          {predictionStats && (
+            <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20">
+              <Target className="w-3 h-3" />
+              <span>Prediction Accuracy: ±{predictionStats.avgError} RPE ({predictionStats.count} verified)</span>
+            </span>
+          )}
+
           <button
             type="button"
             onClick={() => refreshLifterProfile()}
@@ -130,7 +151,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Response Fingerprint</span>
+          <span>Response Profile</span>
           {exerciseEntries.length > 0 && (
             <span className="text-3xs px-1.5 py-0.2 rounded-full bg-white/20 font-mono">
               {exerciseEntries.length}
@@ -157,7 +178,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
         </button>
       </div>
 
-      {/* ── TAB 1: RESPONSE FINGERPRINT ────────────────────────────────────── */}
+      {/* ── TAB 1: RESPONSE PROFILE ────────────────────────────────────────── */}
       {activeSubTab === 'fingerprint' && (
         <div className="space-y-4">
           {exerciseEntries.length === 0 ? (
@@ -170,31 +191,52 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                   Awaiting Baseline Training Exposures
                 </h3>
                 <p className="text-xs text-text-secondary leading-relaxed">
-                  The Lifter Twin does not generate generic template advice. It maps your real physiological response curve once you log workouts with sets and RPE.
+                  ASCEND does not invent fictional physiological scores. It maps your empirical response patterns once you log comparable sessions with sets and RPE.
                 </p>
               </div>
 
               {/* Calibration Roadmap */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-left max-w-lg mx-auto pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-left max-w-xl mx-auto pt-2">
                 <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 space-y-1">
-                  <span className="text-3xs font-mono font-bold text-accent uppercase">Tier 1 • Log Sets</span>
-                  <p className="text-2xs text-text-muted">Record weight, reps, and RPE for working sets.</p>
+                  <span className="text-3xs font-mono font-bold text-text-muted uppercase">&lt; 5 Exposures</span>
+                  <p className="text-2xs text-text-muted font-bold">Calibrating</p>
+                  <p className="text-3xs text-text-muted">Establishing baseline load &amp; set execution.</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 space-y-1">
-                  <span className="text-3xs font-mono font-bold text-amber-400 uppercase">Tier 2 • 3 Sessions</span>
-                  <p className="text-2xs text-text-muted">Unlocks early fatigue drift &amp; optimal recovery gap.</p>
+                  <span className="text-3xs font-mono font-bold text-amber-400 uppercase">5–10 Exposures</span>
+                  <p className="text-2xs text-amber-400 font-bold">Early Signal</p>
+                  <p className="text-3xs text-text-muted">Detects initial within-session effort drift.</p>
                 </div>
                 <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 space-y-1">
-                  <span className="text-3xs font-mono font-bold text-emerald-400 uppercase">Tier 3 • 7+ Sessions</span>
-                  <p className="text-2xs text-text-muted">Verified individual response fingerprint unlocked.</p>
+                  <span className="text-3xs font-mono font-bold text-sky-400 uppercase">10–20 Exposures</span>
+                  <p className="text-2xs text-sky-400 font-bold">Established</p>
+                  <p className="text-3xs text-text-muted">Identifies best-supported rep ranges.</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 space-y-1">
+                  <span className="text-3xs font-mono font-bold text-emerald-400 uppercase">20+ Exposures</span>
+                  <p className="text-2xs text-emerald-400 font-bold">High Confidence</p>
+                  <p className="text-3xs text-text-muted">High predictive accuracy on load response.</p>
                 </div>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {exerciseEntries.map((item: LifterExerciseProfile) => {
-                const isCalibrated = item.calibrationStatus === 'calibrated';
-                const isEarlyTrend = item.calibrationStatus === 'early_trend';
+                const tier = item.confidenceTier || 'calibrating';
+                const isHigh = tier === 'high_confidence';
+                const isEstablished = tier === 'established';
+                const isEarly = tier === 'early_signal';
+
+                const repMin = item.bestSupportedRepRange?.min || item.optimalRepRange?.min || 3;
+                const repMax = item.bestSupportedRepRange?.max || item.optimalRepRange?.max || 5;
+
+                const recMin = item.observedRecoveryIntervalDays?.min || Math.max(2, (item.recoveryDaysNeeded || 3) - 1);
+                const recMax = item.observedRecoveryIntervalDays?.max || Math.max(3, (item.recoveryDaysNeeded || 3) + 1);
+
+                const freqMin = item.observedWeeklyFrequencyRange?.min || 1;
+                const freqMax = item.observedWeeklyFrequencyRange?.max || 2;
+
+                const effortTrend = item.withinSessionEffortDrift || item.fatigueSensitivity || 'moderate';
 
                 return (
                   <div
@@ -215,7 +257,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                               <span>Responding Well</span>
                             </span>
                           )}
-                          {item.e1RMTrend === 'plateau' && (
+                          {item.e1RMTrend === 'stable' && (
                             <span className="inline-flex items-center gap-1 text-3xs font-bold font-mono text-text-muted bg-bg-secondary px-2 py-0.5 rounded-md border border-border">
                               <Minus className="w-3 h-3" />
                               <span>Stable Load</span>
@@ -224,77 +266,81 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                           {item.e1RMTrend === 'fatigued' && (
                             <span className="inline-flex items-center gap-1 text-3xs font-bold font-mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/30">
                               <TrendingDown className="w-3 h-3" />
-                              <span>Fatigue Sensitive</span>
+                              <span>Effort Sensitive</span>
                             </span>
                           )}
                         </div>
                         <span className="text-3xs text-text-muted font-mono">
-                          Based on {item.evidenceCount} verified gym exposures
+                          Based on {item.evidenceCount} comparable exposures
                         </span>
                       </div>
 
-                      {/* Calibration Status Badge */}
+                      {/* Feature-Specific Confidence Badge */}
                       <span
                         className={`text-3xs font-mono font-bold px-2.5 py-1 rounded-lg border ${
-                          isCalibrated
+                          isHigh
                             ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                            : isEarlyTrend
+                            : isEstablished
+                            ? 'bg-sky-500/15 text-sky-400 border-sky-500/30'
+                            : isEarly
                             ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
                             : 'bg-bg-secondary text-text-muted border-border'
                         }`}
                       >
-                        {isCalibrated
-                          ? 'CALIBRATED PROFILE'
-                          : isEarlyTrend
-                          ? 'EARLY TREND DETECTED'
-                          : `CALIBRATING (${item.evidenceCount}/3)`}
+                        {isHigh
+                          ? `HIGH CONFIDENCE (${item.evidenceCount} EXP)`
+                          : isEstablished
+                          ? `ESTABLISHED (${item.evidenceCount} EXP)`
+                          : isEarly
+                          ? `EARLY SIGNAL (${item.evidenceCount} EXP)`
+                          : `CALIBRATING (${item.evidenceCount}/5)`}
                       </span>
                     </div>
 
-                    {/* 4 Core Physiological Fingerprint Tiles */}
+                    {/* 4 Core Evidence-Grounded Metric Tiles */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
-                      {/* Optimal Reps */}
+                      {/* Best-Supported Rep Range */}
                       <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-0.5">
-                        <span className="text-3xs text-text-muted block font-sans">OPTIMAL REP BRACKET</span>
+                        <span className="text-3xs text-text-muted block font-sans">BEST-SUPPORTED REPS</span>
                         <span className="text-sm font-bold text-text-primary block">
-                          {item.optimalRepRange.min}–{item.optimalRepRange.max} reps
+                          {repMin}–{repMax} reps
                         </span>
-                        <span className="text-3xs text-text-muted/80 block">Where e1RM peaks</span>
+                        <span className="text-3xs text-text-muted/80 block">Observed peak top-set bracket</span>
                       </div>
 
-                      {/* Fatigue Sensitivity */}
+                      {/* Within-Session Effort Drift */}
                       <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-0.5">
-                        <span className="text-3xs text-text-muted block font-sans">FATIGUE SENSITIVITY</span>
+                        <span className="text-3xs text-text-muted block font-sans">EFFORT DRIFT PER SET</span>
                         <span
                           className={`text-sm font-bold block ${
-                            item.fatigueSensitivity === 'high'
+                            effortTrend === 'high'
                               ? 'text-amber-400'
-                              : item.fatigueSensitivity === 'moderate'
+                              : effortTrend === 'moderate'
                               ? 'text-text-primary'
                               : 'text-emerald-400'
                           }`}
                         >
-                          {item.fatigueSensitivity.toUpperCase()}
+                          {effortTrend.toUpperCase()}
                         </span>
                         <span className="text-3xs text-text-muted/80 block">
-                          {item.rpeDriftPerSet >= 0 ? `+${item.rpeDriftPerSet}` : item.rpeDriftPerSet} RPE/set
+                          {item.rpeDriftPerSet >= 0 ? `+${item.rpeDriftPerSet}` : item.rpeDriftPerSet} RPE drift/set
                         </span>
                       </div>
 
-                      {/* Recovery Window */}
+                      {/* Observed Recovery Interval */}
                       <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-0.5">
-                        <span className="text-3xs text-text-muted block font-sans">RECOVERY WINDOW</span>
+                        <span className="text-3xs text-text-muted block font-sans">RECOVERY INTERVAL</span>
                         <span className="text-sm font-bold text-text-primary block">
-                          ~{item.recoveryDaysNeeded} days
+                          {recMin}–{recMax} days
                         </span>
                         <span className="text-3xs text-text-muted/80 block">Between heavy exposures</span>
                       </div>
 
-                      {/* Frequency & Step */}
+                      {/* Frequency Range */}
                       <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-0.5">
-                        <span className="text-3xs text-text-muted block font-sans">OPTIMAL FREQUENCY</span>
+                        <span className="text-3xs text-text-muted block font-sans">OBSERVED FREQUENCY</span>
                         <span className="text-sm font-bold text-accent block">
-                          {item.recommendedWeeklyFrequency}× / week
+                          {freqMin === freqMax ? `${freqMin}×` : `${freqMin}–${freqMax}×`} / week
                         </span>
                         <span className="text-3xs text-text-muted/80 block">
                           +{item.bestProgressionStepKg} {userUnit} step
@@ -302,10 +348,10 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                       </div>
                     </div>
 
-                    {/* Empirical Observations */}
+                    {/* Empirical Evidence Statements */}
                     <div className="pt-2 border-t border-border/60 space-y-1.5">
                       <span className="text-3xs font-mono font-bold text-text-muted uppercase tracking-wider block">
-                        Grounded Empirical Observations:
+                        Grounded Evidence Statements:
                       </span>
                       <ul className="space-y-1">
                         {item.observations.map((obs, idx) => (
@@ -327,17 +373,17 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
         </div>
       )}
 
-      {/* ── TAB 2: TRAINING DECISIONS LEDGER (Auditable Coach) ─────────────── */}
+      {/* ── TAB 2: TRAINING DECISIONS LEDGER (Auditable Memory) ─────────────── */}
       {activeSubTab === 'ledger' && (
         <div className="space-y-4">
           {/* Explanation Banner */}
           <div className="card p-3.5 bg-bg-secondary/50 border border-border text-xs text-text-secondary space-y-1">
             <div className="flex items-center gap-1.5 text-text-primary font-bold">
               <ShieldCheck className="w-4 h-4 text-accent" />
-              <span>Auditable Training Decisions</span>
+              <span>Auditable Training Memory</span>
             </div>
             <p className="leading-relaxed text-2xs text-text-muted">
-              Most AI apps make secret algorithm decisions. ASCEND is accountable: every load increase, deload, or fatigue adjustment explains the exact empirical trigger, and you retain complete override authority.
+              Every automated change records the exact empirical trigger, predicted effort vs actual outcome, and provides full athlete override authority.
             </p>
           </div>
 
@@ -351,7 +397,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                   No Decisions Recorded Yet
                 </h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  As you log workouts where set RPE drifts, targets are exceeded, or volume exceeds recovery tolerance, ASCEND will log auditable prescription decisions here.
+                  As you log workouts where set RPE drifts, targets are exceeded, or volume exceeds recovery tolerance, ASCEND logs auditable prescription decisions and tracks prediction accuracy here.
                 </p>
               </div>
             </div>

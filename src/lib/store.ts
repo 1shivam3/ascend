@@ -307,9 +307,48 @@ export const useAppStore = create<AppState>()(
       addWorkout: (workout) => set((state) => {
         const nextWorkouts = [...state.workouts, workout];
         const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
+
+        // Correlate completed workout with active training decisions to track prediction error
+        const updatedDecisions = { ...state.trainingDecisions };
+        let updatedLedger = [...state.decisionsLedgerHistory];
+
+        for (const ex of workout.exercises) {
+          const decision = updatedDecisions[ex.name];
+          if (decision && ex.sets.length > 0) {
+            const validSets = ex.sets.filter((s) => s.reps > 0);
+            if (validSets.length > 0) {
+              const topSet = validSets.reduce((prev, curr) => curr.weight >= prev.weight ? curr : prev, validSets[0]);
+              const rpes = validSets.map((s) => s.rpe ?? 8);
+              const actualRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
+              const expectedRpe = decision.expectedRpe || decision.nextPrescription.targetRpe || 8.0;
+              const predictionError = Math.round((actualRpe - expectedRpe) * 10) / 10;
+
+              const evaluatedDecision: TrainingDecision = {
+                ...decision,
+                actualExecution: {
+                  weight: topSet.weight,
+                  reps: topSet.reps,
+                  actualRpe,
+                  completedSets: validSets.length,
+                },
+                predictionError,
+                timestamp: new Date().toISOString(),
+              };
+
+              updatedDecisions[ex.name] = evaluatedDecision;
+              updatedLedger = [
+                evaluatedDecision,
+                ...updatedLedger.filter((d) => d.id !== evaluatedDecision.id),
+              ].slice(0, 50);
+            }
+          }
+        }
+
         return {
           workouts: nextWorkouts,
           lifterProfile: nextProfile,
+          trainingDecisions: updatedDecisions,
+          decisionsLedgerHistory: updatedLedger,
         };
       }),
       deleteWorkout: (id) => set((state) => {

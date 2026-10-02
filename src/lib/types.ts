@@ -320,13 +320,14 @@ export type TrainingDecisionReason =
   | 'fatigue_hold'
   | 'time_constraint'
   | 'equipment_unavailable'
-  | 'low_recovery'
+  | 'low_readiness'
   | 'user_override';
 
 export interface TrainingDecision {
   id: string;
   exerciseName: string;
   date: string; // YYYY-MM-DD
+  programIntent: 'strength' | 'hypertrophy' | 'technique' | 'readiness_adaptation' | 'progressive_overload';
   previousPerformance: {
     weight: number;
     reps: number;
@@ -339,31 +340,47 @@ export interface TrainingDecision {
     targetRpe: number;
     sets: number;
   };
+  expectedRpe: number;
+  actualExecution?: {
+    weight: number;
+    reps: number;
+    actualRpe: number;
+    completedSets: number;
+  };
+  predictionError?: number; // actualRpe - expectedRpe (e.g. +0.5 RPE)
   reasonType: TrainingDecisionReason;
   headline: string;
   explanation: string;
   deltaKg: number;
   deltaPercent: number;
-  confidence: 'high' | 'medium' | 'calibrating';
+  confidence: 'high' | 'established' | 'early_signal' | 'calibrating' | 'medium';
   evidenceCount: number;
   status: 'pending' | 'accepted' | 'overridden';
   userOverrideWeight?: number;
   timestamp: string;
 }
 
+export type LifterConfidenceTier = 'calibrating' | 'early_signal' | 'established' | 'high_confidence';
+
 export interface LifterExerciseProfile {
   exerciseName: string;
   evidenceCount: number;
-  calibrationStatus: 'calibrating' | 'early_trend' | 'calibrated';
-  optimalRepRange: { min: number; max: number };
+  confidenceTier: LifterConfidenceTier;
+  calibrationStatus?: 'calibrating' | 'early_trend' | 'calibrated'; // legacy compatibility
+  bestSupportedRepRange: { min: number; max: number };
+  optimalRepRange?: { min: number; max: number }; // legacy compatibility
   targetRpeRange: { min: number; max: number };
-  fatigueSensitivity: 'low' | 'moderate' | 'high';
-  rpeDriftPerSet: number; // e.g. +0.4 RPE / set
-  recommendedWeeklyFrequency: number; // e.g. 2
+  withinSessionEffortDrift: 'low' | 'moderate' | 'high';
+  fatigueSensitivity?: 'low' | 'moderate' | 'high'; // legacy compatibility
+  rpeDriftPerSet: number; // e.g. +0.3 RPE / set
+  observedWeeklyFrequencyRange: { min: number; max: number }; // e.g. 1-2x/week (honest integer range)
+  recommendedWeeklyFrequency?: number; // legacy compatibility
   bestProgressionStepKg: number; // e.g. 2.5
-  recoveryDaysNeeded: number; // e.g. 2 or 3
-  e1RMTrend: 'rising' | 'plateau' | 'fatigued';
-  observations: string[]; // transparent empirical evidence bullets
+  observedRecoveryIntervalDays: { min: number; max: number }; // e.g. 3-5 days
+  recoveryDaysNeeded?: number; // legacy compatibility
+  e1RMTrend: 'rising' | 'stable' | 'fatigued' | 'plateau';
+  averagePredictionError?: number; // e.g. ±0.4 RPE
+  observations: string[]; // transparent empirical evidence statements
 }
 
 export interface LifterTwinProfile {
@@ -373,11 +390,11 @@ export interface LifterTwinProfile {
 }
 
 export interface RealWorldConstraint {
-  type: 'time' | 'equipment' | 'fatigue';
+  type: 'time' | 'equipment' | 'readiness' | 'fatigue';
   availableMinutes?: number;
   targetExerciseName?: string;
   substituteExerciseName?: string;
-  fatigueLevel?: 'mild' | 'severe';
+  readinessOption?: 'reduce_volume' | 'cap_rpe' | 'maintain_load';
   notes?: string;
 }
 
