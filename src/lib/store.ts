@@ -153,6 +153,7 @@ export interface AppState {
   refreshLifterProfile: () => void;
 
   clearAllData: () => void;
+  logout: (options?: { clearLocalData?: boolean }) => void;
   
   importAllData: (data: any) => boolean;
 }
@@ -754,6 +755,53 @@ export const useAppStore = create<AppState>()(
             localStorage.removeItem('ascend_store');
           } catch {}
         }
+      },
+
+      logout: (options) => {
+        if (options?.clearLocalData) {
+          set({
+            profile: null,
+            prs: [],
+            workouts: [],
+            meals: [],
+            bodyMetrics: [],
+            prTargets: {},
+            macroGoals: null,
+            plannedWorkouts: [],
+            favoriteFoods: DEFAULT_FAVORITE_FOODS,
+            hasCompletedOnboarding: false,
+            waterLogs: {},
+            waterBatches: {},
+            hydrationConfig: DEFAULT_HYDRATION_CONFIG,
+            creatineLogs: {},
+            creatineConfig: DEFAULT_CREATINE_CONFIG,
+            creatineSupply: DEFAULT_CREATINE_SUPPLY,
+            dayTypeOverrides: {},
+            customGeminiKey: undefined,
+            aiInsightsCache: {},
+            trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
+            todaysAIWorkoutPlan: undefined,
+            latestWeeklyReview: undefined,
+            trainingDecisions: {},
+            decisionsLedgerHistory: [],
+            lifterProfile: null,
+          });
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('ascend_store');
+            } catch {}
+          }
+          return;
+        }
+
+        set({
+          profile: null,
+          hasCompletedOnboarding: false,
+          activeWorkoutDraft: null,
+          todaysAIWorkoutPlan: undefined,
+          latestWeeklyReview: undefined,
+          lifterProfile: null,
+        });
       },
 
       importAllData: (data) => {

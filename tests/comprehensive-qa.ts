@@ -59,6 +59,8 @@ import {
   getExerciseHistorySessions,
 } from '../src/lib/lifter-twin';
 
+import { useAppStore } from '../src/lib/store';
+
 import fs from 'fs';
 import path from 'path';
 
@@ -914,6 +916,73 @@ runSection('Section 27: PWA, Offline Resilience & Production Bundle Hygiene', ()
   const pagePath = path.resolve('src/app/page.tsx');
   const pageContent = fs.readFileSync(pagePath, 'utf8');
   assert(pageContent.includes('Offline Gym Mode Active'), 'App page renders clear offline gym mode reassurance banner');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 15. ACCOUNT SESSION MANAGEMENT & SAFE LOGOUT PROTOCOL (Section 28)
+// ─────────────────────────────────────────────────────────────────────────────
+runSection('Section 28: Account Session Management & Safe Logout Protocol', () => {
+  // 1. Verify logout action exists on store
+  const store = useAppStore.getState();
+  assert(typeof store.logout === 'function', 'store.logout is a callable function');
+
+  // Set up mock authenticated state
+  useAppStore.setState({
+    profile: {
+      id: 'test_user_1',
+      name: 'Shivam Test',
+      gender: 'male',
+      bodyweightKg: 80,
+      bodyweightLbs: 176,
+      unit: 'kg',
+      createdAt: '2026-10-04T00:00:00.000Z',
+    },
+    hasCompletedOnboarding: true,
+    workouts: [
+      {
+        id: 'w1',
+        date: '2026-10-04',
+        exercises: [{ name: 'Squat', sets: [{ reps: 5, weight: 140, unit: 'kg' }] }],
+      },
+    ],
+    prs: [
+      {
+        id: 'pr1',
+        exercise: 'Squat',
+        weightKg: 140,
+        weightLbs: 308,
+        reps: 5,
+        oneRepMax: 163.3,
+        date: '2026-10-04',
+      },
+    ],
+  });
+
+  // Verify state set correctly
+  assert(useAppStore.getState().profile !== null, 'Mock athlete profile is active');
+  assert(useAppStore.getState().workouts.length === 1, 'Mock workout history exists');
+
+  // Test Safe Logout (preserves history on device)
+  useAppStore.getState().logout({ clearLocalData: false });
+  const afterSafeLogout = useAppStore.getState();
+  assert(afterSafeLogout.profile === null, 'Safe logout cleared active profile');
+  assert(afterSafeLogout.hasCompletedOnboarding === false, 'Safe logout reset hasCompletedOnboarding to false');
+  assert(afterSafeLogout.workouts.length === 1, 'Safe logout preserved workout history on device');
+  assert(afterSafeLogout.prs.length === 1, 'Safe logout preserved personal records on device');
+
+  // Test Erase & Logout (clears all local data)
+  useAppStore.getState().logout({ clearLocalData: true });
+  const afterEraseLogout = useAppStore.getState();
+  assert(afterEraseLogout.profile === null, 'Erase logout cleared profile');
+  assert(afterEraseLogout.workouts.length === 0, 'Erase logout wiped workout history');
+  assert(afterEraseLogout.prs.length === 0, 'Erase logout wiped personal records');
+
+  // Verify SettingsModal contains logout button & dialog options
+  const settingsModalPath = path.resolve('src/components/SettingsModal.tsx');
+  const settingsContent = fs.readFileSync(settingsModalPath, 'utf8');
+  assert(settingsContent.includes('Log Out of ASCEND'), 'SettingsModal contains Log Out of ASCEND action');
+  assert(settingsContent.includes('Log Out (Keep Local History)'), 'SettingsModal provides safe logout keeping local history');
+  assert(settingsContent.includes('Erase Local Data'), 'SettingsModal provides erase & logout option');
 });
 
 // Helper to recursively find all files in directory

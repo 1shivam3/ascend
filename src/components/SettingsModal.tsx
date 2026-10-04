@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   ChevronRight,
   ExternalLink,
+  LogOut,
 } from 'lucide-react';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
@@ -38,6 +39,7 @@ interface SettingsModalProps {
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const profile = useStore((state) => state.profile);
   const setProfile = useStore((state) => state.setProfile);
+  const logout = useStore((state) => state.logout);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const customGeminiKey = useStore((state) => state.customGeminiKey);
   const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
@@ -45,6 +47,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const [activeSection, setActiveSection] = useState<'main' | 'ai'>('main');
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   // Sub-modal states
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -100,6 +103,30 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
             >
               <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Athlete Profile & Quick Logout */}
+          <div className="card p-3.5 bg-bg-card border border-border flex items-center justify-between shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center font-bold text-accent text-sm select-none">
+                {profile?.name ? profile.name.charAt(0).toUpperCase() : 'A'}
+              </div>
+              <div>
+                <span className="text-sm font-bold text-text-primary block leading-tight">{profile?.name || 'Athlete'}</span>
+                <span className="text-2xs text-text-muted font-mono">
+                  {profile?.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Male'} • {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : ''} • {profile?.unit?.toUpperCase() || 'KG'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLogoutConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+              title="Log Out of Session"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Log Out</span>
             </button>
           </div>
 
@@ -287,6 +314,32 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </div>
           </div>
 
+          {/* Section: Account & Session */}
+          <div className="space-y-2">
+            <span className="text-label font-bold text-text-muted px-1">
+              Account &amp; session
+            </span>
+
+            <div className="card p-3 bg-bg-card border border-border flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
+                  <LogOut className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Log Out of ASCEND</span>
+                  <span className="text-2xs text-text-muted">Exit active session or switch athlete profile</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(true)}
+                className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 text-xs font-bold transition-all active:scale-95 cursor-pointer shrink-0"
+              >
+                Log Out
+              </button>
+            </div>
+          </div>
+
           {/* Section 5: Legal & Privacy */}
           <div className="space-y-2">
             <span className="text-label font-bold text-text-muted px-1">
@@ -322,6 +375,90 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />
       <HydrationModal isOpen={isHydrationOpen} onClose={() => setIsHydrationOpen(false)} />
       <CreatineModal isOpen={isCreatineOpen} onClose={() => setIsCreatineOpen(false)} />
+
+      {/* Logout Confirmation Dialog */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-60 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div
+            className="bg-bg-card border border-border rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center shrink-0">
+                <LogOut className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-text-primary">Log Out of ASCEND</h3>
+                <p className="text-2xs text-text-muted font-mono">Currently active: {profile?.name || 'Athlete'}</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-text-secondary leading-relaxed">
+              How would you like to log out? You can preserve your workout history on this device or erase all data.
+            </p>
+
+            <div className="space-y-2 pt-1">
+              {/* Option 1: Safe Logout (Keep History) */}
+              <button
+                type="button"
+                onClick={() => {
+                  logout({ clearLocalData: false });
+                  setShowLogoutConfirm(false);
+                  onClose();
+                  toast.info('Logged out. You can now switch or create an athlete profile.', 'Logged Out');
+                }}
+                className="w-full p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+              >
+                <div className="mt-0.5 w-4 h-4 rounded-full bg-accent/20 text-accent flex items-center justify-center shrink-0 text-3xs font-bold">
+                  ✓
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-text-primary group-hover:text-accent">
+                    Log Out (Keep Local History)
+                  </div>
+                  <div className="text-3xs text-text-muted mt-0.5 leading-snug">
+                    Preserves your logged workouts, PRs, and meals on this device. Returns to the welcome screen to switch or re-enter profile.
+                  </div>
+                </div>
+              </button>
+
+              {/* Option 2: Erase & Logout */}
+              <button
+                type="button"
+                onClick={() => {
+                  logout({ clearLocalData: true });
+                  setShowLogoutConfirm(false);
+                  onClose();
+                  toast.info('All device data cleared and logged out.', 'Data Cleared');
+                }}
+                className="w-full p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+              >
+                <div className="mt-0.5 w-4 h-4 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center shrink-0 text-3xs font-bold">
+                  ✕
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-red-400">
+                    Log Out &amp; Erase Local Data
+                  </div>
+                  <div className="text-3xs text-red-400/80 mt-0.5 leading-snug">
+                    Completely wipes all workouts, meals, and PRs from this device.
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="btn-ghost py-1.5 px-3 text-xs"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
