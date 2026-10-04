@@ -36,6 +36,20 @@ import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { plural } from '@/lib/formatters';
 
+function formatProgressDate(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.split('-');
+    if (y && m && d) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIdx = parseInt(m, 10) - 1;
+      return `${months[monthIdx] || m} ${parseInt(d, 10)}, ${y}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
 interface ProgressPageProps {
   initialTab?: 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training' | 'body' | 'consistency';
   onNavigate?: (tab: 'home' | 'workout' | 'progress' | 'meals' | 'prs') => void;
@@ -57,6 +71,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const workouts = useStore((state) => state.workouts || []);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const latestWeeklyReview = useStore((state) => state.latestWeeklyReview);
+
+  const isPowerlifter = (profile?.goals?.[0] === 'get_stronger') || profile?.goals?.includes('get_stronger');
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
@@ -290,7 +306,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <div>
                       <h4 className="text-xs font-bold font-mono text-text-primary group-hover:text-accent transition-colors flex items-center gap-1.5">
                         <span>ASCEND LIFTER TWIN</span>
-                        <span className="text-3xs font-normal text-text-muted uppercase">Response Engine</span>
+                        <span className="text-3xs font-normal text-text-muted uppercase">Lifter Twin</span>
                       </h4>
                       <p className="text-2xs text-text-secondary">
                         View fatigue drift, rep brackets &amp; auditable training decisions
@@ -304,11 +320,66 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               </div>
 
+              {/* Big 4 Compound Lifts Snapshot (Leads for Hypertrophy / Build Muscle) */}
+              {!isPowerlifter && (
+                <section className="card p-4 space-y-3 bg-bg-card border border-border">
+                  <div className="flex items-center justify-between">
+                    <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
+                    <span className="text-3xs text-text-muted">
+                      {workouts.length < 3 ? 'Baseline calibration' : 'Progressive overload verified'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {liftTrends.map((l) => (
+                      <div
+                        key={l.name}
+                        className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-text-primary truncate">{l.name}</span>
+                          {workouts.length >= 3 ? (
+                            l.trend === 'up' ? (
+                              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Minus className="w-3.5 h-3.5 text-text-muted" />
+                            )
+                          ) : null}
+                        </div>
+
+                        <div className="text-lg font-black text-text-primary font-sans tabular-nums">
+                          {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
+                        </div>
+
+                        <div className="text-3xs text-text-muted font-mono">
+                          {profile?.bodyweightKg && l.best1RM > 0 ? (
+                            <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× BW</span>
+                          ) : (
+                            <span>Uncalibrated</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {liftTrends.some((l) => l.isBaseline) && (
+                    <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
+                      * Values based on baseline 1RM entered during onboarding
+                    </p>
+                  )}
+                </section>
+              )}
+
+              {/* Interactive e1RM Strength Trend Line per Lift */}
+              {!isPowerlifter && <ProgressChart />}
+
               {/* Big 3 Total & Official DOTS Rating Card */}
               <div className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="section-title text-[10px] mb-0 font-sans">POWERLIFTING TOTAL</span>
+                    <span className="section-title text-[10px] mb-0 font-sans">
+                      {isPowerlifter ? 'POWERLIFTING TOTAL' : 'POWERLIFTING BENCHMARKS (OPTIONAL)'}
+                    </span>
                     <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; DOTS Standard</h3>
                   </div>
                   <div className="flex items-center gap-2">
@@ -351,56 +422,60 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               </div>
 
-              {/* Interactive e1RM Strength Trend Line per Lift */}
-              <ProgressChart />
+              {/* Powerlifting layout shows Compound Lifts & Chart below Big 3 */}
+              {isPowerlifter && (
+                <>
+                  <ProgressChart />
 
-              {/* Big 4 Compound Lifts Snapshot (Short Labels: Bench, Squat, Deadlift, OHP) */}
-              <section className="card p-4 space-y-3 bg-bg-card border border-border">
-                <div className="flex items-center justify-between">
-                  <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
-                  <span className="text-3xs text-text-muted">
-                    {workouts.length < 3 ? 'Baseline calibration' : 'Progressive overload verified'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                  {liftTrends.map((l) => (
-                    <div
-                      key={l.name}
-                      className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-text-primary truncate">{l.name}</span>
-                        {workouts.length >= 3 ? (
-                          l.trend === 'up' ? (
-                            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                          ) : (
-                            <Minus className="w-3 h-3 text-text-muted" />
-                          )
-                        ) : null}
-                      </div>
-
-                      <div className="text-lg font-black text-text-primary font-sans tabular-nums">
-                        {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
-                      </div>
-
-                      <div className="text-3xs text-text-muted">
-                        {profile?.bodyweightKg && l.best1RM > 0 ? (
-                          <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× bodyweight</span>
-                        ) : (
-                          <span>Uncalibrated</span>
-                        )}
-                      </div>
+                  {/* Big 4 Compound Lifts Snapshot (Short Labels: Bench, Squat, Deadlift, OHP) */}
+                  <section className="card p-4 space-y-3 bg-bg-card border border-border">
+                    <div className="flex items-center justify-between">
+                      <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
+                      <span className="text-3xs text-text-muted">
+                        {workouts.length < 3 ? 'Baseline calibration' : 'Progressive overload verified'}
+                      </span>
                     </div>
-                  ))}
-                </div>
 
-                {liftTrends.some((l) => l.isBaseline) && (
-                  <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
-                    * Values based on baseline 1RM entered during onboarding
-                  </p>
-                )}
-              </section>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {liftTrends.map((l) => (
+                        <div
+                          key={l.name}
+                          className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-text-primary truncate">{l.name}</span>
+                            {workouts.length >= 3 ? (
+                              l.trend === 'up' ? (
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                              ) : (
+                                <Minus className="w-3.5 h-3.5 text-text-muted" />
+                              )
+                            ) : null}
+                          </div>
+
+                          <div className="text-lg font-black text-text-primary font-sans tabular-nums">
+                            {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
+                          </div>
+
+                          <div className="text-3xs text-text-muted font-mono">
+                            {profile?.bodyweightKg && l.best1RM > 0 ? (
+                              <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× BW</span>
+                            ) : (
+                              <span>Uncalibrated</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {liftTrends.some((l) => l.isBaseline) && (
+                      <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
+                        * Values based on baseline 1RM entered during onboarding
+                      </p>
+                    )}
+                  </section>
+                </>
+              )}
 
               {/* Action to switch to PR details */}
               <div className="text-center pt-1">
@@ -482,7 +557,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       {bodyweightAnalytics?.current ? displayWeight(bodyweightAnalytics.current.weightKg) : '—'}
                     </div>
                     <span className="text-3xs text-text-muted">
-                      {bodyweightAnalytics?.current ? `Logged ${bodyweightAnalytics.current.date}` : 'No logs yet'}
+                      {bodyweightAnalytics?.current ? `Logged ${formatProgressDate(bodyweightAnalytics.current.date)}` : 'No logs yet'}
                     </span>
                   </div>
 
@@ -491,10 +566,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       7-day moving avg
                     </span>
                     <div className="text-2xl font-black text-purple-400 font-sans tabular-nums mt-0.5">
-                      {bodyweightAnalytics && bodyMetrics.length >= 3 ? displayWeight(bodyweightAnalytics.avgKg) : '—'}
+                      {bodyweightAnalytics && bodyMetrics.length >= 3 ? displayWeight(bodyweightAnalytics.avgKg) : 'Calibrating'}
                     </div>
                     <span className="text-3xs text-text-muted">
-                      Rate: {bodyweightAnalytics && bodyMetrics.length >= 3 ? bodyweightAnalytics.trendText : '—'}
+                      Rate: {bodyweightAnalytics && bodyMetrics.length >= 3 ? bodyweightAnalytics.trendText : 'Need 3+ logs'}
                     </span>
                   </div>
                 </div>
@@ -512,7 +587,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     .slice(0, 15)
                     .map((log) => (
                       <div key={log.id} className="py-2.5 flex items-center justify-between text-xs">
-                        <span className="text-text-secondary">{log.date}</span>
+                        <span className="text-text-secondary">{formatProgressDate(log.date)}</span>
                         <span className="font-bold text-text-primary tabular-nums">{displayWeight(log.weightKg)}</span>
                       </div>
                     ))}
@@ -547,7 +622,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <span>Weekly WhatsApp / IG Card</span>
               </h4>
               <p className="text-2xs text-text-muted mt-0.5 truncate">
-                Export an aesthetic dark onyx &amp; gold summary of your tonnage, sessions, and DOTS rating.
+                Export a shareable weekly summary of your tonnage, sessions, and strength metrics.
               </p>
             </div>
             <button
@@ -589,7 +664,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <span className="font-semibold text-text-primary block truncate">
                           {plural(w.exercises.length, 'exercise')} ({w.exercises.map((e) => e.name).slice(0, 2).join(', ')}...)
                         </span>
-                        <span className="text-3xs text-text-muted font-mono">{w.date}</span>
+                        <span className="text-3xs text-text-muted font-mono">{formatProgressDate(w.date)}</span>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-2xs font-medium text-text-secondary tabular-nums block">

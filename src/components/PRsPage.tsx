@@ -24,7 +24,6 @@ import {
   ChevronDown,
   ChevronUp,
   Dumbbell,
-  ArrowLeft,
   Search,
   TrendingUp,
   BarChart2,
@@ -36,7 +35,6 @@ import {
 import { getBigThreeStats, calculateDOTS } from '@/lib/dots';
 import RankBadge from '@/components/ui/RankBadge';
 import ProgressChart from '@/components/ProgressChart';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
@@ -957,23 +955,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     <div className="page animate-fade-in space-y-6">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          {onNavigate && (
-            <button
-              type="button"
-              onClick={() => onNavigate('home')}
-              className="w-8 h-8 rounded-lg bg-bg-card border border-border flex items-center justify-center text-accent hover:border-accent transition-colors active:scale-95"
-              title="Return to Home Dashboard"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-          )}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
-              Personal Records
-            </h1>
-            <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
-          </div>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
+            Personal Records
+          </h1>
+          <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
         </div>
         <div className="flex items-center gap-1.5">
           <button
@@ -987,7 +973,6 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           >
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
-          <ThemeToggle />
           <button
             className="btn-primary flex items-center gap-1.5"
             onClick={() => setShowAddModal(true)}
@@ -1023,35 +1008,35 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
           <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center">
             <div>
-              <span className="text-3xs text-text-muted block font-medium">Squat</span>
-              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+              <span className="text-xs font-bold text-text-secondary block">Squat</span>
+              <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.squatMax > 0 && (
-                <span className="text-[10px] text-text-muted font-mono block">
-                  {(bigThreeStats.squatMax / profile.bodyweightKg).toFixed(2)}×BW
+                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                  {(bigThreeStats.squatMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
             </div>
             <div className="border-l border-border">
-              <span className="text-3xs text-text-muted block font-medium">Bench</span>
-              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+              <span className="text-xs font-bold text-text-secondary block">Bench</span>
+              <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.benchMax > 0 && (
-                <span className="text-[10px] text-text-muted font-mono block">
-                  {(bigThreeStats.benchMax / profile.bodyweightKg).toFixed(2)}×BW
+                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                  {(bigThreeStats.benchMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
             </div>
             <div className="border-l border-border">
-              <span className="text-3xs text-text-muted block font-medium">Deadlift</span>
-              <span className="text-xs font-bold text-text-primary mt-0.5 block tabular-nums">
+              <span className="text-xs font-bold text-text-secondary block">Deadlift</span>
+              <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.deadliftMax > 0 && (
-                <span className="text-[10px] text-text-muted font-mono block">
-                  {(bigThreeStats.deadliftMax / profile.bodyweightKg).toFixed(2)}×BW
+                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                  {(bigThreeStats.deadliftMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
             </div>

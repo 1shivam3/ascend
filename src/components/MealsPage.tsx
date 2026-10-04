@@ -581,7 +581,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setGoalFat(String(rec.fatG || 0));
 
     toast.success(
-      `Targets calibrated for ${bw}kg (${goalConfig.label}): ${rec.calories} kcal (${rec.proteinG}P / ${rec.carbsG}C / ${rec.fatG}F, 0 kcal Atwater drift)`,
+      `Targets calibrated for ${bw}kg (${goalConfig.label}): ${rec.calories} kcal (${rec.proteinG}P / ${rec.carbsG}C / ${rec.fatG}F)`,
       'Goals Calibrated'
     );
   };
@@ -1298,23 +1298,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               )}
             </div>
 
-            {/* Atwater Drift Reconciliation Indicator */}
-            <div className="flex items-center gap-1 text-3xs text-text-muted">
-              {Math.abs(todayAtwaterDrift) <= 5 ? (
-                <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Atwater Verified (0 kcal drift)</span>
-                </span>
-              ) : (
+            {/* Energy Reconciliation Indicator if variance exists */}
+            {Math.abs(todayAtwaterDrift) > 15 && (
+              <div className="flex items-center gap-1 text-3xs text-text-muted">
                 <span
                   className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
-                  title="Difference between reported food calories and Atwater 4P+4C+9F energy values"
+                  title="Difference between reported food calories and macro sum values"
                 >
                   <AlertTriangle className="w-3 h-3" />
-                  <span>{todayAtwaterDrift > 0 ? `+${todayAtwaterDrift}` : todayAtwaterDrift} kcal Atwater drift</span>
+                  <span>{todayAtwaterDrift > 0 ? `+${todayAtwaterDrift}` : todayAtwaterDrift} kcal macro variance</span>
                 </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           {goalNutritionStatus && (
@@ -1330,7 +1325,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
             <input
               type="text"
-              placeholder='Log meal naturally (e.g. "2 roti, 1 bowl dal, 100g paneer")...'
+              placeholder='Log meal (e.g. "2 eggs, 100g oats")...'
               value={naturalQuery}
               onChange={(e) => setNaturalQuery(e.target.value)}
               disabled={isNaturalParsing}
@@ -1368,7 +1363,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </form>
 
           <div className="flex items-center justify-between text-label text-text-muted px-0.5">
-            <span>AI &amp; Indian IFCT calibrated</span>
+            <span>Indian food list</span>
             <button
               type="button"
               onClick={() => {
@@ -1428,11 +1423,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 >
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-text-secondary'}`} />
-                    <span className={`text-label font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                    <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
                       {opt.label}
                     </span>
                   </div>
-                  <span className="text-label text-text-muted">{opt.sub}</span>
+                  <span className="text-3xs text-text-muted block leading-tight">{opt.sub}</span>
                 </button>
               );
             })}

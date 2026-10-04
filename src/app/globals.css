@@ -28,8 +28,8 @@
   --bg-card: 20 24 33;            /* #141821 */
   --bg-elevated: 27 32 48;        /* #1B2030 */
   --text-primary: 244 246 250;    /* #F4F6FA */
-  --text-secondary: 139 147 167;  /* #8B93A7 */
-  --text-muted: 100 116 139;
+  --text-secondary: 156 163 175;  /* #9CA3AF - improved contrast */
+  --text-muted: 156 163 175;      /* #9CA3AF - WCAG AA compliant on dark */
   --border: 35 42 56;
   --border-subtle: 25 30 42;
   --border-hover: 50 60 80;

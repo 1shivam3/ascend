@@ -24,10 +24,11 @@ import {
   Edit2,
   Mic,
   Zap,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
-import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad } from '@/lib/strength-standards';
+import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
@@ -73,25 +74,46 @@ export default function ActiveWorkoutScreen({
   const [exercises, setExercises] = useState<WorkoutExercise[]>(() => {
     const defaultReps = Math.round((goalConfig.defaultRepRange.min + goalConfig.defaultRepRange.max) / 2);
     if (initialExercises && initialExercises.length > 0) {
-      return initialExercises.map((e, idx) => ({
-        ...e,
-        name: e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`),
-        sets: (e.sets && e.sets.length > 0 ? e.sets : [
-          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
-        ]).map((s) => ({
-          ...s,
-          unit: s.unit || userUnit,
-          completed: s.completed || false,
-        })),
-      }));
+      return initialExercises.map((e, idx) => {
+        const exName = e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`);
+        const pr = prs.find((p) => p.exercise.toLowerCase() === exName.toLowerCase());
+        const rawSets = (e.sets && e.sets.length > 0) ? e.sets : [
+          { weight: 0, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+        ];
+        return {
+          ...e,
+          name: exName,
+          sets: rawSets.map((s) => {
+            const numW = parseFloat(String(s.weight));
+            let finalWeight: any = s.weight;
+            if (isNaN(numW) || numW <= 0) {
+              if (pr && pr.oneRepMax > 0) {
+                finalWeight = suggestLoad(pr.oneRepMax, s.reps || defaultReps, s.rpe || 8, userUnit);
+              } else {
+                finalWeight = '';
+              }
+            }
+            return {
+              ...s,
+              weight: finalWeight,
+              unit: s.unit || userUnit,
+              completed: s.completed || false,
+            };
+          }),
+        };
+      });
     }
+    const benchPr = prs.find((p) => p.exercise.toLowerCase() === 'bench press');
+    const defaultBenchW = benchPr && benchPr.oneRepMax > 0
+      ? suggestLoad(benchPr.oneRepMax, defaultReps, 8, userUnit)
+      : (userUnit === 'kg' ? 60 : 135);
     return [
       {
         name: 'Bench Press',
         sets: [
-          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
-          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
-          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
         ],
       },
     ];
@@ -111,6 +133,7 @@ export default function ActiveWorkoutScreen({
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
 
@@ -168,14 +191,19 @@ export default function ActiveWorkoutScreen({
     return isMainCompoundLift(currentExercise.name);
   }, [currentExercise]);
 
-  // Dynamic rest duration adapting to athlete goal and movement demands
+  // Dynamic rest duration adapting to athlete goal, movement demands, and set reps
   const defaultRestDuration = useMemo(() => {
-    const baseRest = goalConfig.defaultRestSeconds;
+    const targetReps = parseInt(String(currentExercise?.sets?.[0]?.reps), 10) || defaultTargetReps;
+    // Heavy compounds at 6 reps or fewer need ~3 minutes (180s) regardless of goal
     if (isCurrentMainLift) {
-      return primaryGoal === 'get_stronger' ? 180 : Math.round((baseRest * 1.33) / 15) * 15;
+      if (targetReps <= 6) return 180;
+      if (targetReps <= 8) return 120;
+      return 90;
     }
-    return baseRest;
-  }, [goalConfig.defaultRestSeconds, isCurrentMainLift, primaryGoal]);
+    // Accessories and isolations
+    if (targetReps <= 8) return 90;
+    return 60;
+  }, [currentExercise?.sets, defaultTargetReps, isCurrentMainLift]);
 
   // Screen Wake Lock API: Keep mobile screen on while in active workout
   useEffect(() => {
@@ -898,8 +926,8 @@ export default function ActiveWorkoutScreen({
               </div>
             </div>
 
-            {/* Quick Actions (Voice, Warm-up & Plates) */}
-            <div className="flex items-center gap-1.5">
+            {/* Quick Actions (Voice, Plates & More menu) */}
+            <div className="flex items-center gap-1.5 relative">
               <button
                 type="button"
                 onClick={() => setIsVoiceModalOpen(true)}
@@ -908,16 +936,6 @@ export default function ActiveWorkoutScreen({
               >
                 <Mic className="w-3.5 h-3.5" />
                 <span>Voice</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsWarmupModalOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border hover:border-accent/40 text-2xs font-semibold text-text-secondary hover:text-accent transition-all flex items-center gap-1"
-                title="Generate Warm-up Sets"
-              >
-                <Flame className="w-3.5 h-3.5 text-accent" />
-                <span>Warm-up</span>
               </button>
 
               <button
@@ -933,15 +951,47 @@ export default function ActiveWorkoutScreen({
                 <span>Plates</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setIsAdaptModalOpen(true)}
-                className="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-2xs font-bold text-amber-400 transition-all flex items-center gap-1 shadow-xs"
-                title="Real-World Constraint Adaptation (Time limit, equipment occupied, high fatigue)"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span>Adapt</span>
-              </button>
+              {/* ⋯ Overflow Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                  className="p-1.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border text-text-muted hover:text-text-primary transition-all flex items-center justify-center"
+                  title="More actions"
+                >
+                  <MoreHorizontal className="w-4 h-4" />
+                </button>
+
+                {isMoreMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1 w-44 rounded-xl bg-bg-card border border-border shadow-xl p-1 z-50 animate-fade-in space-y-0.5"
+                    onClick={() => setIsMoreMenuOpen(false)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsWarmupModalOpen(true);
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium text-text-primary hover:bg-accent/15 hover:text-accent transition-colors flex items-center gap-2"
+                    >
+                      <Flame className="w-3.5 h-3.5 text-accent" />
+                      <span>Warm-up Sets</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdaptModalOpen(true);
+                        setIsMoreMenuOpen(false);
+                      }}
+                      className="w-full px-2.5 py-1.5 rounded-lg text-left text-xs font-medium text-amber-400 hover:bg-amber-500/15 transition-colors flex items-center gap-2"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Adapt Routine</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1042,7 +1092,7 @@ export default function ActiveWorkoutScreen({
                         >
                           Prev: {prevSet.weight}×{prevSet.reps}
                         </span>
-                      ) : fallbackPR ? (
+                      ) : (fallbackPR && workouts.length === 0) ? (
                         <span
                           className="text-[10px] text-text-secondary font-mono block truncate"
                           title={`${fallbackPR.isBaseline ? 'Baseline' : 'PR'}: ${userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}${userUnit} × ${fallbackPR.reps}`}
@@ -1050,16 +1100,16 @@ export default function ActiveWorkoutScreen({
                           {fallbackPR.isBaseline ? 'Base' : 'PR'}: {userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg}×{fallbackPR.reps}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-text-muted/40 font-mono block">—</span>
+                        <span className="text-[10px] text-text-muted/60 font-mono block">Last: —</span>
                       )}
                     </div>
 
                     {/* Weight Steppers & Direct Input */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 bg-bg-secondary p-1 rounded-xl border border-border/60">
+                    <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border/60">
                       <button
                         type="button"
                         onClick={() => handleWeightStep(sIdx, -currentWeightStep)}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
+                        className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
                         title={`-${currentWeightStep} ${userUnit}`}
                       >
                         -{currentWeightStep}
@@ -1086,7 +1136,7 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleWeightStep(sIdx, currentWeightStep)}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
+                        className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
                         title={`+${currentWeightStep} ${userUnit}`}
                       >
                         +{currentWeightStep}
@@ -1094,11 +1144,11 @@ export default function ActiveWorkoutScreen({
                     </div>
 
                     {/* Reps Steppers & Direct Input */}
-                    <div className="flex items-center gap-0.5 sm:gap-1 bg-bg-secondary p-1 rounded-xl border border-border/60">
+                    <div className="flex items-center gap-1 bg-bg-secondary p-1 rounded-xl border border-border/60">
                       <button
                         type="button"
                         onClick={() => handleRepsStep(sIdx, -1)}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
+                        className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
                         title="-1 Rep"
                       >
                         -1
@@ -1125,7 +1175,7 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleRepsStep(sIdx, 1)}
-                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
+                        className="min-w-[40px] min-h-[40px] sm:min-w-[44px] sm:min-h-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
                         title="+1 Rep"
                       >
                         +1
@@ -1201,10 +1251,11 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={() => handleRemoveSet(currentExercise.sets.length - 1)}
-                className="px-3 py-2.5 rounded-xl bg-bg-card border border-border/70 text-text-muted hover:text-danger text-xs font-semibold"
+                className="px-3 py-2.5 rounded-xl bg-bg-card border border-border/70 text-text-muted hover:text-danger text-xs font-semibold flex items-center gap-1.5"
                 title="Remove Last Set"
               >
                 <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove Set</span>
               </button>
             )}
           </div>
@@ -1222,9 +1273,6 @@ export default function ActiveWorkoutScreen({
               <div className="flex items-center gap-1.5">
                 <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
                   REST TIMER
-                </span>
-                <span className="text-3xs font-mono text-text-muted">
-                  • {goalConfig.label}
                 </span>
                 {isRestFinished && (
                   <span className="text-3xs font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded-full animate-bounce">

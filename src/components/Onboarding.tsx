@@ -16,6 +16,7 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('');
   const [heightCm, setHeightCm] = useState('');
+  const [age, setAge] = useState('25');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
 
   // Emergency snapshot detection & restore
@@ -46,8 +47,8 @@ export default function OnboardingScreen() {
   const [ohpWeight, setOhpWeight] = useState('');
   const [ohpReps, setOhpReps] = useState('1');
 
-  // Training profile multi-goal preferences
-  const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(['get_stronger', 'build_muscle']);
+  // Training profile goal preference (single-select)
+  const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(['build_muscle']);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
 
   const {
@@ -69,6 +70,8 @@ export default function OnboardingScreen() {
     const bodyweightLbs = unit === 'kg' ? bw * 2.20462 : bw;
     const parsedHeight = parseFloat(heightCm);
     const validHeight = !isNaN(parsedHeight) && parsedHeight > 50 && parsedHeight < 260 ? parsedHeight : undefined;
+    const parsedAge = parseInt(age, 10);
+    const validAge = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 90 ? parsedAge : 25;
 
     const profileData = {
       id: crypto.randomUUID(),
@@ -77,6 +80,7 @@ export default function OnboardingScreen() {
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
       heightCm: validHeight,
+      age: validAge,
       unit,
       createdAt: new Date().toISOString(),
       goals: selectedGoals,
@@ -104,7 +108,7 @@ export default function OnboardingScreen() {
     setPlannedWorkouts(initialSplit);
 
     // 2. Initialize calibrated nutritional baseline with zero Atwater drift
-    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight);
+    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight, validAge);
     setMacroGoals(initialMacros);
 
     const today = new Date().toISOString().split('T')[0];
@@ -294,11 +298,11 @@ export default function OnboardingScreen() {
           </div>
         )}
 
-        {/* Step 1: Gender */}
+        {/* Step 1: Sex */}
         {step === 1 && (
           <div className="space-y-5 animate-fade-in card">
             <div>
-              <label className="section-title block mb-2">BIOLOGICAL GENDER</label>
+              <label className="section-title block mb-2">SEX</label>
               <p className="text-text-muted text-xs mb-3">
                 Used to evaluate your lift ratio against calibrated strength standards.
               </p>
@@ -329,7 +333,7 @@ export default function OnboardingScreen() {
           </div>
         )}
 
-        {/* Step 2: Bodyweight & Height */}
+        {/* Step 2: Bodyweight, Height & Age */}
         {step === 2 && (
           <div className="space-y-4 animate-fade-in card">
             <div>
@@ -391,6 +395,29 @@ export default function OnboardingScreen() {
               </div>
             </div>
 
+            {/* Age input */}
+            <div>
+              <label className="section-title block mb-1">AGE</label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="1"
+                  min="14"
+                  max="90"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                  placeholder="25"
+                  className="w-full text-base font-mono py-2 pl-3 pr-16"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted">
+                  years old
+                </span>
+              </div>
+              <p className="text-3xs text-text-muted mt-1 font-mono">
+                Used for Mifflin–St Jeor BMR &amp; calorie targets (assumed 25 if default).
+              </p>
+            </div>
+
             <button
               onClick={() => {
                 if (bodyweight && parseFloat(bodyweight) > 0) {
@@ -410,28 +437,38 @@ export default function OnboardingScreen() {
         {step === 3 && (
           <div className="space-y-4 animate-fade-in card max-h-[80vh] overflow-y-auto">
             <div>
-              <label className="section-title block mb-1">WHAT ARE YOU TRYING TO ACHIEVE RIGHT NOW?</label>
+              <label className="section-title block mb-1">WHAT IS YOUR PRIMARY TRAINING GOAL?</label>
               <p className="text-text-muted text-xs mb-3">
-                Select one or combine multiple goals. ASCEND will adapt your training prescriptions, rep targets, and nutrition priorities.
+                ASCEND will adapt your training prescriptions, rep targets, and nutrition priorities.
               </p>
 
               <div className="space-y-2">
-                {(Object.keys(ATHLETE_GOAL_CONFIGS) as AthleteGoal[]).map((goalId) => {
-                  const config = ATHLETE_GOAL_CONFIGS[goalId];
-                  const isSelected = selectedGoals.includes(goalId);
-
+                {[
+                  {
+                    id: 'build_muscle' as AthleteGoal,
+                    label: 'Build Muscle',
+                    tagline: 'Hypertrophy volume, progressive overload & muscle growth',
+                    repRange: '8–12 reps',
+                  },
+                  {
+                    id: 'get_stronger' as AthleteGoal,
+                    label: 'Get Stronger',
+                    tagline: 'Heavy compound strength, 1RM milestones & neural drive',
+                    repRange: '3–6 reps',
+                  },
+                  {
+                    id: 'lose_fat' as AthleteGoal,
+                    label: 'Lose Fat',
+                    tagline: 'Lean tissue preservation, caloric deficit & training density',
+                    repRange: '6–10 reps',
+                  },
+                ].map((item) => {
+                  const isSelected = selectedGoals.includes(item.id);
                   return (
                     <button
-                      key={goalId}
+                      key={item.id}
                       type="button"
-                      onClick={() => {
-                        setSelectedGoals((prev) => {
-                          if (prev.includes(goalId)) {
-                            return prev.length > 1 ? prev.filter((g) => g !== goalId) : prev;
-                          }
-                          return [...prev, goalId];
-                        });
-                      }}
+                      onClick={() => setSelectedGoals([item.id])}
                       className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 ${
                         isSelected
                           ? 'bg-accent/15 border-accent text-accent shadow-xs'
@@ -449,32 +486,18 @@ export default function OnboardingScreen() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <span className={`text-xs font-bold ${isSelected ? 'text-text-primary' : 'text-text-secondary'}`}>
-                            {config.label}
+                            {item.label}
                           </span>
                           <span className="text-3xs font-mono text-text-muted">
-                            {config.defaultRepRange.min}–{config.defaultRepRange.max} reps
+                            {item.repRange}
                           </span>
                         </div>
-                        <p className="text-3xs text-text-muted mt-0.5 line-clamp-1">{config.tagline}</p>
+                        <p className="text-3xs text-text-muted mt-0.5 line-clamp-1">{item.tagline}</p>
                       </div>
                     </button>
                   );
                 })}
               </div>
-
-              {/* Dynamic Synergy Preview */}
-              {selectedGoals.length > 1 && (
-                <div className="mt-3 p-2.5 rounded-xl bg-accent/10 border border-accent/30 text-2xs text-accent flex items-center gap-2">
-                  <Zap className="w-4 h-4 shrink-0" />
-                  <span>
-                    {selectedGoals.includes('get_stronger') && selectedGoals.includes('build_muscle')
-                      ? 'Powerbuilding Focus: Heavy compound progression (3–5 reps) paired with hypertrophy accessory volume.'
-                      : selectedGoals.includes('lose_fat') && selectedGoals.includes('build_muscle')
-                      ? 'Lean Recomposition: Calibrated deficit with high protein to protect lean tissue.'
-                      : `${selectedGoals.length} goals active: ASCEND will balance strength, work capacity & nutrition priorities.`}
-                  </span>
-                </div>
-              )}
             </div>
 
             <div>
@@ -524,22 +547,28 @@ export default function OnboardingScreen() {
             <div className="p-3 rounded-lg bg-bg-secondary/70 border border-border/70 space-y-2">
               <span className="text-xs font-bold text-text-primary font-mono block">BENCH PRESS</span>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder={`Weight (${unit})`}
-                  value={benchWeight}
-                  onChange={(e) => setBenchWeight(e.target.value)}
-                  className="text-xs py-2"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Reps (e.g. 1, 5)"
-                  value={benchReps}
-                  onChange={(e) => setBenchReps(e.target.value)}
-                  className="text-xs py-2"
-                />
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Weight ({unit})</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder={`e.g. ${unit === 'kg' ? '75' : '165'}`}
+                    value={benchWeight}
+                    onChange={(e) => setBenchWeight(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Reps</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={benchReps}
+                    onChange={(e) => setBenchReps(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
               </div>
             </div>
 
@@ -547,22 +576,28 @@ export default function OnboardingScreen() {
             <div className="p-3 rounded-lg bg-bg-secondary/70 border border-border/70 space-y-2">
               <span className="text-xs font-bold text-text-primary font-mono block">SQUAT</span>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder={`Weight (${unit})`}
-                  value={squatWeight}
-                  onChange={(e) => setSquatWeight(e.target.value)}
-                  className="text-xs py-2"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Reps (e.g. 1, 5)"
-                  value={squatReps}
-                  onChange={(e) => setSquatReps(e.target.value)}
-                  className="text-xs py-2"
-                />
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Weight ({unit})</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder={`e.g. ${unit === 'kg' ? '100' : '225'}`}
+                    value={squatWeight}
+                    onChange={(e) => setSquatWeight(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Reps</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={squatReps}
+                    onChange={(e) => setSquatReps(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
               </div>
             </div>
 
@@ -570,22 +605,28 @@ export default function OnboardingScreen() {
             <div className="p-3 rounded-lg bg-bg-secondary/70 border border-border/70 space-y-2">
               <span className="text-xs font-bold text-text-primary font-mono block">DEADLIFT</span>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder={`Weight (${unit})`}
-                  value={deadliftWeight}
-                  onChange={(e) => setDeadliftWeight(e.target.value)}
-                  className="text-xs py-2"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Reps (e.g. 1, 5)"
-                  value={deadliftReps}
-                  onChange={(e) => setDeadliftReps(e.target.value)}
-                  className="text-xs py-2"
-                />
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Weight ({unit})</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder={`e.g. ${unit === 'kg' ? '120' : '265'}`}
+                    value={deadliftWeight}
+                    onChange={(e) => setDeadliftWeight(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Reps</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={deadliftReps}
+                    onChange={(e) => setDeadliftReps(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
               </div>
             </div>
 
@@ -593,22 +634,28 @@ export default function OnboardingScreen() {
             <div className="p-3 rounded-lg bg-bg-secondary/70 border border-border/70 space-y-2">
               <span className="text-xs font-bold text-text-primary font-mono block">OVERHEAD PRESS</span>
               <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="number"
-                  step="0.5"
-                  placeholder={`Weight (${unit})`}
-                  value={ohpWeight}
-                  onChange={(e) => setOhpWeight(e.target.value)}
-                  className="text-xs py-2"
-                />
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Reps (e.g. 1, 5)"
-                  value={ohpReps}
-                  onChange={(e) => setOhpReps(e.target.value)}
-                  className="text-xs py-2"
-                />
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Weight ({unit})</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    placeholder={`e.g. ${unit === 'kg' ? '45' : '100'}`}
+                    value={ohpWeight}
+                    onChange={(e) => setOhpWeight(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-text-muted block mb-0.5">Reps</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="1"
+                    value={ohpReps}
+                    onChange={(e) => setOhpReps(e.target.value)}
+                    className="text-xs py-2 w-full"
+                  />
+                </div>
               </div>
             </div>
 

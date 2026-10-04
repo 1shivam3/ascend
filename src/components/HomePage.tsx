@@ -35,7 +35,6 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import ActivityRingsCard from '@/components/ActivityRingsCard';
-import QuickLogBar from '@/components/QuickLogBar';
 import AICoachCard from '@/components/AICoachCard';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
@@ -188,31 +187,31 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       case 'get_stronger':
         return {
           title: 'Strength Snapshot & DOTS Score',
-          pill: dotsScore > 0 ? `${Math.round(dotsScore)} DOTS • ${bigThreeStats.totalKg} kg` : 'Big 3 & DOTS',
+          pill: dotsScore > 0 ? `${Math.round(dotsScore)} DOTS • ${bigThreeStats.totalKg} kg` : 'Powerlifting Baseline',
         };
       case 'build_muscle':
         return {
           title: 'Hypertrophy Benchmarks & Top Lifts',
-          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : (topLifts.length > 0 ? `${topLifts.length} Compound Lifts` : 'Top Lifts'),
+          pill: workouts.length > 0 ? `${workouts.length} Sessions Logged` : (topLifts.length > 0 ? `${topLifts.length} Compound Lifts` : 'Top Lifts'),
         };
       case 'lose_fat':
         return {
           title: 'Lean Mass & Strength Retention',
-          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level}` : 'Preservation Baseline',
+          pill: workouts.length > 0 ? `${workouts.length} Sessions Logged` : 'Preservation Baseline',
         };
       case 'stamina':
         return {
           title: 'Work Capacity & Strength Standards',
-          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : 'Work Capacity',
+          pill: workouts.length > 0 ? `${workouts.length} Sessions Logged` : 'Work Capacity',
         };
       case 'general_fitness':
       default:
         return {
           title: 'Strength & Fitness Standards',
-          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : 'Fitness Baseline',
+          pill: workouts.length > 0 ? `${workouts.length} Sessions Logged` : 'Fitness Baseline',
         };
     }
-  }, [primaryGoal, dotsScore, bigThreeStats.totalKg, overallLevel, topLifts.length]);
+  }, [primaryGoal, dotsScore, bigThreeStats.totalKg, workouts.length, topLifts.length]);
 
   // Modals state
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -269,11 +268,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => setIsBodyMetricsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-card border border-border text-xs font-semibold text-text-primary hover:border-accent/40 active:scale-95 transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bg-card border border-border text-xs font-semibold text-text-primary hover:border-accent/40 active:scale-95 transition-all shadow-xs whitespace-nowrap shrink-0"
             title="Update Bodyweight"
           >
-            <Scale className="w-3.5 h-3.5 text-accent" />
-            <span>
+            <Scale className="w-3.5 h-3.5 text-accent shrink-0" />
+            <span className="whitespace-nowrap">
               {profile?.unit === 'lbs'
                 ? `${Math.round((profile?.bodyweightKg || 72) * 2.20462)} lbs`
                 : `${Math.round(profile?.bodyweightKg || 72)} kg`}
@@ -488,14 +487,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
       />
 
-      {/* ── 4. QUICK 1-TAP LOG ROW (High Reachability) ─────────────────────── */}
-      <QuickLogBar
-        onOpenWeightModal={() => setIsBodyMetricsModalOpen(true)}
-        onOpenHydrationModal={() => setIsHydrationModalOpen(true)}
-        onOpenCreatineModal={() => setIsCreatineModalOpen(true)}
-      />
-
-      {/* ── 5. COACH INSIGHT (Compact 2-Line Summary with Expand) ──────────── */}
+      {/* ── 4. COACH INSIGHT (Compact 2-Line Summary with Expand) ──────────── */}
       <AICoachCard
         onOpenSettings={() => setIsSettingsOpen(true)}
         onNavigateWorkout={() => onNavigate('workout')}
@@ -636,6 +628,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         isOpen={isSuggestedModalOpen}
         onClose={() => setIsSuggestedModalOpen(false)}
         userUnit={profile?.unit || 'kg'}
+        defaultIntensity={primaryGoal === 'get_stronger' ? 'high' : 'medium'}
         onStartWorkout={handleStartSuggestedWorkout}
         onSavePlan={(plan) => {
           const newPlan: PlannedWorkout = {

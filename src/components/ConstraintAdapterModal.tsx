@@ -227,7 +227,7 @@ export default function ConstraintAdapterModal({
               <span>Low Readiness Adaptation</span>
             </span>
             <p className="text-2xs text-text-secondary leading-relaxed font-sans">
-              Poor sleep, elevated life stress, or joint fatigue? ASCEND trims 1 accessory set to manage session fatigue and caps target RPE at ≤ 7.5. Preserves technical execution without digging into systemic recovery debt.
+              Poor sleep, elevated life stress, or joint fatigue? ASCEND trims 1 accessory set to manage session fatigue and caps target RPE at ≤ 7.5. Preserves technical execution without excessive fatigue.
             </p>
           </div>
         )}
@@ -237,7 +237,7 @@ export default function ConstraintAdapterModal({
           <div className="flex items-center justify-between">
             <span className="text-3xs font-mono font-bold uppercase text-emerald-400 flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Program Intent Preserved</span>
+              <span>Changes</span>
             </span>
             {timeSavedMinutes > 0 && (
               <span className="text-3xs font-mono font-bold text-accent">

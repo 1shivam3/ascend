@@ -9,13 +9,11 @@ import {
   Droplet,
   Scale,
   Sparkles,
-  Trophy,
   Check,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
-import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import { MealEntry } from '@/lib/types';
 
 interface QuickActionSheetModalProps {
@@ -33,7 +31,6 @@ export default function QuickActionSheetModal({
   const toast = useToast();
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
-  const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [quickFoodQuery, setQuickFoodQuery] = useState('');
   const [isParsingFood, setIsParsingFood] = useState(false);
 
@@ -175,7 +172,7 @@ export default function QuickActionSheetModal({
             </div>
 
             {/* 3. Primary Destination Buttons */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -187,8 +184,8 @@ export default function QuickActionSheetModal({
                 <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <Dumbbell className="w-4 h-4" />
                 </div>
-                <span className="text-sm font-bold text-text-primary block">Start Workout</span>
-                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Launch gym session</span>
+                <span className="text-xs font-bold text-text-primary block">Workout</span>
+                <span className="text-[10px] text-text-secondary leading-tight mt-0.5 block">Start gym</span>
               </button>
 
               <button
@@ -202,8 +199,8 @@ export default function QuickActionSheetModal({
                 <div className="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <UtensilsCrossed className="w-4 h-4" />
                 </div>
-                <span className="text-sm font-bold text-text-primary block">Log Nutrition</span>
-                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Full meal &amp; macros</span>
+                <span className="text-xs font-bold text-text-primary block">Nutrition</span>
+                <span className="text-[10px] text-text-secondary leading-tight mt-0.5 block">Log meals</span>
               </button>
 
               <button
@@ -216,22 +213,8 @@ export default function QuickActionSheetModal({
                 <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
                   <Scale className="w-4 h-4" />
                 </div>
-                <span className="text-sm font-bold text-text-primary block">Log Weight</span>
-                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">Track body mass</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMeetModalOpen(true);
-                }}
-                className="p-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border hover:border-amber-400/50 text-left transition-all active:scale-95 group shadow-xs"
-              >
-                <div className="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
-                  <Trophy className="w-4 h-4" />
-                </div>
-                <span className="text-sm font-bold text-text-primary block">Meet Planner</span>
-                <span className="text-[11px] text-text-secondary leading-tight mt-0.5 block">90% • 95% • 100%</span>
+                <span className="text-xs font-bold text-text-primary block">Weight</span>
+                <span className="text-[10px] text-text-secondary leading-tight mt-0.5 block">Log body</span>
               </button>
             </div>
           </div>
@@ -239,7 +222,6 @@ export default function QuickActionSheetModal({
       </div>
 
       <BodyMetricsModal isOpen={isWeightModalOpen} onClose={() => setIsWeightModalOpen(false)} />
-      <MeetAttemptPlannerModal isOpen={isMeetModalOpen} onClose={() => setIsMeetModalOpen(false)} />
     </>
   );
 }

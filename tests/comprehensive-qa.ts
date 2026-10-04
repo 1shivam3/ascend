@@ -977,12 +977,12 @@ runSection('Section 28: Account Session Management & Safe Logout Protocol', () =
   assert(afterEraseLogout.workouts.length === 0, 'Erase logout wiped workout history');
   assert(afterEraseLogout.prs.length === 0, 'Erase logout wiped personal records');
 
-  // Verify SettingsModal contains logout button & dialog options
+  // Verify SettingsModal contains clean logout button & confirmation modal
   const settingsModalPath = path.resolve('src/components/SettingsModal.tsx');
   const settingsContent = fs.readFileSync(settingsModalPath, 'utf8');
-  assert(settingsContent.includes('Log Out of ASCEND'), 'SettingsModal contains Log Out of ASCEND action');
-  assert(settingsContent.includes('Log Out (Keep Local History)'), 'SettingsModal provides safe logout keeping local history');
-  assert(settingsContent.includes('Erase Local Data'), 'SettingsModal provides erase & logout option');
+  assert(settingsContent.includes('Log Out'), 'SettingsModal contains Log Out action');
+  assert(settingsContent.includes('Confirm Log Out'), 'SettingsModal provides safe logout confirmation');
+  assert(settingsContent.includes('logout({ clearLocalData: false })'), 'SettingsModal executes safe logout keeping local history');
 });
 
 // Helper to recursively find all files in directory

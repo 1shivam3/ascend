@@ -45,7 +45,6 @@ export default function WorkoutHeatmap({
   const meals = useStore((state) => state.meals || []);
   const macroGoals = useStore((state) => state.macroGoals);
   const hydrationConfig = useStore((state) => state.hydrationConfig);
-  const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
 
   const today = useMemo(() => new Date(), []);
@@ -148,23 +147,6 @@ export default function WorkoutHeatmap({
   const resetToToday = () => {
     setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1));
     setSelectedDate(todayStr);
-  };
-
-  const handleQuickHitGym = (targetDateStr: string = todayStr) => {
-    const existing = workoutMap.get(targetDateStr) || [];
-    if (existing.length > 0) return;
-
-    const newId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `w_${Date.now()}`;
-    addWorkout({
-      id: newId,
-      date: targetDateStr,
-      exercises: [
-        {
-          name: 'Gym Session',
-          sets: [{ reps: 1, weight: 0, unit: 'kg' }],
-        },
-      ],
-    });
   };
 
   // Selected Day Details
@@ -575,18 +557,6 @@ export default function WorkoutHeatmap({
               </span>
             </div>
           </div>
-
-          {/* If selected is today and not worked out: quick button */}
-          {selectedDate === todayStr && selectedWorkouts.length === 0 && (
-            <button
-              type="button"
-              onClick={() => handleQuickHitGym(todayStr)}
-              className="w-full py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-600 active:scale-[0.98] transition-all"
-            >
-              <Dumbbell className="w-3.5 h-3.5" />
-              <span>Mark Workout Complete For Today</span>
-            </button>
-          )}
         </div>
       )}
     </div>

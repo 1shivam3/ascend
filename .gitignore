@@ -16,3 +16,7 @@ build/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+.agents/
+.agent/
+.gemini/
+.gsd/

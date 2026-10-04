@@ -74,11 +74,11 @@ const SPLIT_PRESETS: SplitPreset[] = [
   {
     id: 'ppl',
     name: 'Push / Pull / Legs (PPL)',
-    description: 'Gold standard 3-day or 6-day split grouping biomechanical muscle actions.',
+    description: '3-day or 6-day split grouping push, pull, and leg movements.',
     days: [
-      { name: 'Push (Chest, Shoulders, Triceps)', bodyParts: ['chest', 'shoulders', 'arms'] },
-      { name: 'Pull (Back, Biceps, Rear Delts)', bodyParts: ['back', 'arms'] },
-      { name: 'Legs (Quads, Hamstrings, Calves)', bodyParts: ['legs', 'core'] },
+      { name: 'Push Day (Chest & Triceps)', bodyParts: ['push'] },
+      { name: 'Pull Day (Back & Biceps)', bodyParts: ['pull'] },
+      { name: 'Leg Day (Quads & Posterior)', bodyParts: ['legs', 'core'] },
     ],
   },
   {
@@ -86,10 +86,10 @@ const SPLIT_PRESETS: SplitPreset[] = [
     name: 'Upper / Lower',
     description: 'High-frequency 4-day split alternating upper body and lower body.',
     days: [
-      { name: 'Upper A (Heavy Bench & Row)', bodyParts: ['chest', 'back', 'shoulders', 'arms'] },
-      { name: 'Lower A (Heavy Squat)', bodyParts: ['legs', 'core'] },
-      { name: 'Upper B (Incline & OHP)', bodyParts: ['shoulders', 'chest', 'back', 'arms'] },
-      { name: 'Lower B (Heavy Deadlift)', bodyParts: ['legs', 'core'] },
+      { name: 'Upper A (Bench & Row)', bodyParts: ['chest', 'back', 'shoulders'] },
+      { name: 'Lower A (Squat & Quads)', bodyParts: ['legs', 'core'] },
+      { name: 'Upper B (Incline & OHP)', bodyParts: ['shoulders', 'chest', 'back'] },
+      { name: 'Lower B (Deadlift & Posterior)', bodyParts: ['legs', 'core'] },
     ],
   },
   {
@@ -97,7 +97,7 @@ const SPLIT_PRESETS: SplitPreset[] = [
     name: 'Arnold Split',
     description: 'Agonist & antagonist pairing for balanced upper body and arm development.',
     days: [
-      { name: 'Chest & Back (Antagonist Pairs)', bodyParts: ['chest', 'back'] },
+      { name: 'Chest & Back', bodyParts: ['chest', 'back'] },
       { name: 'Shoulders & Arms', bodyParts: ['shoulders', 'arms'] },
       { name: 'Legs & Abs', bodyParts: ['legs', 'core'] },
     ],
@@ -119,8 +119,8 @@ const SPLIT_PRESETS: SplitPreset[] = [
     name: 'Full Body Compound',
     description: '3 days a week full body strength progression for maximum efficiency.',
     days: [
-      { name: 'Full Body Session A', bodyParts: ['full_body'] },
-      { name: 'Full Body Session B', bodyParts: ['full_body'] },
+      { name: 'Full Body A', bodyParts: ['full_body'] },
+      { name: 'Full Body B', bodyParts: ['full_body'] },
     ],
   },
 ];
@@ -130,7 +130,7 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
     id: 'low',
     label: 'Low',
     tag: 'Deload / Recovery / Form',
-    description: '3–4 exercises • 2–3 sets • 12–15 reps • Focus on technique',
+    description: '4 exercises • 2–3 sets • 12–15 reps • Focus on technique',
     badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
   },
   {
@@ -144,7 +144,7 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
     id: 'high',
     label: 'High',
     tag: 'Maximum Strength',
-    description: '5–6 exercises • 4–5 sets • 3–5 reps (compounds) • Peak neural drive',
+    description: '5 exercises • 4–5 sets • 4–6 reps (compounds) • Peak neural drive',
     badgeColor: 'text-accent bg-accent/10 border-accent/30',
   },
 ];
@@ -157,7 +157,7 @@ const BODY_PART_POOLS: Record<BodyPartOption, { compound: string[]; isolation: s
   },
   back: {
     compound: ['Deadlift', 'Barbell Row', 'Pull-ups', 'Lat Pulldown', 'T-Bar Row'],
-    isolation: ['Cable Row', 'Dumbbell Row', 'Face Pull', 'Straight Arm Pulldown'],
+    isolation: ['Face Pull', 'Cable Row', 'Dumbbell Row', 'Straight Arm Pulldown'],
   },
   legs: {
     compound: ['Squat', 'Front Squat', 'Romanian Deadlift', 'Leg Press'],
@@ -176,12 +176,12 @@ const BODY_PART_POOLS: Record<BodyPartOption, { compound: string[]; isolation: s
     isolation: ['Hanging Leg Raise', 'Plank', 'Cable Crunch', 'Ab Wheel Rollout', 'Russian Twist'],
   },
   push: {
-    compound: ['Bench Press', 'Incline Bench', 'Overhead Press', 'Dips'],
-    isolation: ['Dumbbell Lateral Raise', 'Tricep Pushdown', 'Incline Dumbbell Press', 'Chest Fly'],
+    compound: ['Bench Press', 'Overhead Press', 'Incline Bench', 'Dips'],
+    isolation: ['Chest Fly', 'Dumbbell Lateral Raise', 'Tricep Pushdown'],
   },
   pull: {
-    compound: ['Deadlift', 'Pull-ups', 'Barbell Row', 'Lat Pulldown'],
-    isolation: ['Cable Row', 'Dumbbell Curl', 'Hammer Curl', 'Face Pull'],
+    compound: ['Deadlift', 'Barbell Row', 'Pull-ups', 'Lat Pulldown'],
+    isolation: ['Face Pull', 'Dumbbell Curl', 'Hammer Curl', 'Cable Row'],
   },
   full_body: {
     compound: ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row', 'Pull-ups'],
@@ -200,8 +200,8 @@ export function generateExercisesFromSelection(
   const isHigh = intensity === 'high';
   const isLow = intensity === 'low';
 
-  // Target count: 4 for low (deload), 5 for medium, 5-6 for high
-  const maxTotal = isLow ? 4 : isHigh ? 6 : 5;
+  // Strict target count: 4 for low (deload), exactly 5 for medium & high
+  const maxTotal = isLow ? 4 : 5;
   const validParts = bodyParts.length > 0 ? bodyParts : (['full_body'] as BodyPartOption[]);
 
   const selectedExercises: string[] = [];
@@ -216,63 +216,84 @@ export function generateExercisesFromSelection(
     return false;
   };
 
-  // Special balanced allocation if 'arms' is selected
-  const hasArms = validParts.includes('arms');
-  const hasChest = validParts.includes('chest');
-
-  // Step 1: Ensure primary compound for each non-arm body part first
-  for (const bp of validParts) {
-    if (bp === 'arms') continue;
-    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-    for (const c of pool.compound) {
-      if (addEx(c)) break; // Add 1 primary compound per body part
+  // Specific handling for pure 'push' routine
+  if (validParts.length === 1 && validParts[0] === 'push') {
+    // 1. Primary chest compound
+    addEx('Bench Press');
+    // 2. Primary shoulder compound
+    addEx('Overhead Press');
+    // 3. Secondary chest (incline)
+    addEx('Incline Bench');
+    // 4. Chest isolation
+    addEx('Chest Fly');
+    // 5. Lateral raise or triceps
+    addEx('Dumbbell Lateral Raise');
+    if (selectedExercises.length < maxTotal) {
+      addEx('Tricep Pushdown');
     }
-  }
+  } else if (validParts.length === 1 && validParts[0] === 'pull') {
+    // 1. Primary back compound
+    addEx('Barbell Row');
+    // 2. Primary vertical pull
+    addEx('Lat Pulldown');
+    // 3. Heavy hinge / deadlift
+    addEx('Deadlift');
+    // 4. Rear delt / posture
+    addEx('Face Pull');
+    // 5. Bicep isolation
+    addEx('Dumbbell Curl');
+  } else {
+    // Generic multi-body part allocation
+    const hasArms = validParts.includes('arms');
 
-  // Step 2: If arms is selected, explicitly guarantee 1 BICEP exercise and 1 TRICEP exercise
-  if (hasArms) {
-    // Guaranteed bicep
-    const biceps = ['Dumbbell Curl', 'Hammer Curl', 'Preacher Curl', 'Chin-ups'];
-    for (const b of biceps) {
-      if (addEx(b)) break;
-    }
-    // Guaranteed tricep
-    const triceps = ['Tricep Pushdown', 'Dips', 'Close Grip Bench', 'Skull Crushers'];
-    for (const t of triceps) {
-      if (addEx(t)) break;
-    }
-  }
-
-  // Step 3: Add second compound or primary accessory for each body part
-  for (const bp of validParts) {
-    if (selectedExercises.length >= maxTotal) break;
-    const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
-
-    // Secondary compound
-    for (const c of pool.compound) {
-      if (addEx(c)) break;
-    }
-
-    // Secondary isolation
-    for (const iso of pool.isolation) {
-      if (addEx(iso)) break;
-    }
-  }
-
-  // Step 4: Fill remaining slots if still below maxTotal
-  if (selectedExercises.length < maxTotal) {
+    // Step 1: Ensure primary compound for each non-arm body part first
     for (const bp of validParts) {
+      if (bp === 'arms') continue;
       const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+      for (const c of pool.compound) {
+        if (addEx(c)) break;
+      }
+    }
+
+    // Step 2: If arms is explicitly selected (and not push), guarantee tricep & bicep
+    if (hasArms && !validParts.includes('push')) {
+      const biceps = ['Dumbbell Curl', 'Hammer Curl', 'Preacher Curl'];
+      for (const b of biceps) {
+        if (addEx(b)) break;
+      }
+      const triceps = ['Tricep Pushdown', 'Skull Crushers', 'Dips'];
+      for (const t of triceps) {
+        if (addEx(t)) break;
+      }
+    }
+
+    // Step 3: Add second compound or primary accessory for each body part
+    for (const bp of validParts) {
+      if (selectedExercises.length >= maxTotal) break;
+      const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+      for (const c of pool.compound) {
+        if (addEx(c)) break;
+      }
       for (const iso of pool.isolation) {
-        addEx(iso);
+        if (addEx(iso)) break;
+      }
+    }
+
+    // Step 4: Fill remaining slots if still below maxTotal
+    if (selectedExercises.length < maxTotal) {
+      for (const bp of validParts) {
+        const pool = BODY_PART_POOLS[bp] || BODY_PART_POOLS.chest;
+        for (const iso of pool.isolation) {
+          addEx(iso);
+          if (selectedExercises.length >= maxTotal) break;
+        }
         if (selectedExercises.length >= maxTotal) break;
       }
-      if (selectedExercises.length >= maxTotal) break;
     }
   }
 
   // Sort exercises: heavy primary compounds first, then accessories & isolations
-  const priorityLifts = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row'];
+  const priorityLifts = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press', 'Barbell Row', 'Incline Bench', 'Pull-ups', 'Front Squat', 'Romanian Deadlift'];
   selectedExercises.sort((a, b) => {
     const aPri = priorityLifts.indexOf(a);
     const bPri = priorityLifts.indexOf(b);
@@ -741,40 +762,44 @@ export default function SuggestedWorkoutModal({
                   </div>
 
                   {/* Steppers for Sets & Reps */}
-                  <div className="flex items-center gap-2 shrink-0 font-mono text-xs">
-                    <div className="flex items-center gap-1 bg-bg-card px-2 py-1 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px]">Sets:</span>
+                  <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
+                    <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
+                      <span className="text-text-muted text-[10px] pl-1">Sets:</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', Math.max(1, ex.targetSets - 1))}
-                        className="px-1 text-text-muted hover:text-text-primary"
+                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        aria-label="Decrease sets"
                       >
-                        -
+                        −
                       </button>
-                      <span className="font-bold text-text-primary">{ex.targetSets}</span>
+                      <span className="font-bold text-text-primary min-w-[16px] text-center">{ex.targetSets}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', ex.targetSets + 1)}
-                        className="px-1 text-text-muted hover:text-text-primary"
+                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        aria-label="Increase sets"
                       >
                         +
                       </button>
                     </div>
 
-                    <div className="flex items-center gap-1 bg-bg-card px-2 py-1 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px]">Reps:</span>
+                    <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
+                      <span className="text-text-muted text-[10px] pl-1">Reps:</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', Math.max(1, ex.targetReps - 1))}
-                        className="px-1 text-text-muted hover:text-text-primary"
+                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        aria-label="Decrease reps"
                       >
-                        -
+                        −
                       </button>
-                      <span className="font-bold text-text-primary">{ex.targetReps}</span>
+                      <span className="font-bold text-text-primary min-w-[16px] text-center">{ex.targetReps}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', ex.targetReps + 1)}
-                        className="px-1 text-text-muted hover:text-text-primary"
+                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        aria-label="Increase reps"
                       >
                         +
                       </button>
@@ -783,7 +808,7 @@ export default function SuggestedWorkoutModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveExercise(idx)}
-                      className="p-1 text-text-muted hover:text-danger transition-colors"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                       title="Remove exercise"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

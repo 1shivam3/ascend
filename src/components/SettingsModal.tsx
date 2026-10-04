@@ -81,18 +81,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     toast.info(`Preferred unit switched to ${nextUnit.toUpperCase()}`, 'Unit Updated');
   };
 
-  const handleSafeLogout = () => {
+  const handleConfirmLogout = () => {
     setShowLogoutConfirm(false);
     onClose();
     logout({ clearLocalData: false });
     toast.info('Logged out. Switched to welcome screen.', 'Logged Out');
-  };
-
-  const handleEraseLogout = () => {
-    setShowLogoutConfirm(false);
-    onClose();
-    logout({ clearLocalData: true });
-    toast.info('All device data cleared and logged out.', 'Data Cleared');
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   return (
@@ -135,9 +131,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </span>
               </div>
             </div>
-            <span className="text-3xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-              Active Session
-            </span>
           </div>
 
           {/* Section 1: Profile & Preferences */}
@@ -298,7 +291,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               <p className="text-[11px] text-text-muted flex items-center gap-1.5 pt-0.5">
                 <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Your API key stays on this device in local storage and is never sent to our servers.</span>
+                <span>Your API key is stored locally in your browser and used directly when making AI requests.</span>
               </p>
             </div>
           </div>
@@ -337,8 +330,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     <LogOut className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-text-primary block">Log Out of ASCEND</span>
-                    <span className="text-2xs text-text-muted">Exit active session ({profile?.name || 'Athlete'})</span>
+                    <span className="text-xs font-bold text-text-primary block">Log Out</span>
+                    <span className="text-2xs text-text-muted">Exit active athlete profile ({profile?.name || 'Athlete'})</span>
                   </div>
                 </div>
                 {!showLogoutConfirm ? (
@@ -349,60 +342,29 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   >
                     Log Out
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setShowLogoutConfirm(false)}
-                    className="px-2.5 py-1 rounded-lg text-text-muted hover:text-text-primary text-xs font-mono transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                )}
+                ) : null}
               </div>
 
               {showLogoutConfirm && (
                 <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in">
                   <p className="text-2xs text-text-secondary leading-relaxed">
-                    Choose how you want to log out. You can keep your local workout history or erase all data:
+                    Are you sure you want to log out of <strong>{profile?.name || 'Athlete'}</strong>? Your workouts and records remain safely stored on this device.
                   </p>
-
-                  <div className="space-y-2">
-                    {/* Option 1: Safe Logout */}
+                  <div className="flex items-center gap-2 pt-1">
                     <button
                       type="button"
-                      onClick={handleSafeLogout}
-                      className="w-full p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="btn-secondary flex-1 py-1.5 text-xs font-semibold"
                     >
-                      <div className="mt-0.5 w-4 h-4 rounded-full bg-accent/20 text-accent flex items-center justify-center shrink-0 text-3xs font-bold">
-                        <Check className="w-2.5 h-2.5" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-text-primary group-hover:text-accent">
-                          Log Out (Keep Local History)
-                        </div>
-                        <div className="text-3xs text-text-muted mt-0.5 leading-snug">
-                          Preserves workouts, PRs, and meals on this device. Returns to welcome screen to switch or re-enter profile.
-                        </div>
-                      </div>
+                      Cancel
                     </button>
-
-                    {/* Option 2: Erase & Logout */}
                     <button
                       type="button"
-                      onClick={handleEraseLogout}
-                      className="w-full p-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/25 text-left transition-all flex items-start gap-2.5 group cursor-pointer"
+                      onClick={handleConfirmLogout}
+                      className="flex-1 py-1.5 px-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                     >
-                      <div className="mt-0.5 w-4 h-4 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center shrink-0 text-3xs font-bold">
-                        <Trash2 className="w-2.5 h-2.5" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-red-400">
-                          Log Out &amp; Erase Local Data
-                        </div>
-                        <div className="text-3xs text-red-400/80 mt-0.5 leading-snug">
-                          Completely wipes all workouts, meals, and PRs from this device.
-                        </div>
-                      </div>
+                      <LogOut className="w-3.5 h-3.5" />
+                      <span>Confirm Log Out</span>
                     </button>
                   </div>
                 </div>

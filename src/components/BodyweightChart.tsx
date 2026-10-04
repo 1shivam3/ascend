@@ -4,6 +4,20 @@ import React, { useState, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { Scale, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
+function formatDisplayDate(dateStr: string): string {
+  try {
+    const [y, m, d] = dateStr.split('-');
+    if (y && m && d) {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthIdx = parseInt(m, 10) - 1;
+      return `${months[monthIdx] || m} ${parseInt(d, 10)}, ${y}`;
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+}
+
 export default function BodyweightChart() {
   const { bodyMetrics, profile } = useStore();
   const userUnit = profile?.unit || 'kg';
@@ -124,14 +138,20 @@ export default function BodyweightChart() {
               {activePoint ? activePoint.weight : latest.weight} {userUnit}
             </span>
             <span className="text-2xs font-mono text-purple-400">
-              Avg: {activePoint ? activePoint.avg7d : latest.avg7d} {userUnit}
+              {chartPointsData.length >= 3
+                ? `7d Avg: ${activePoint ? activePoint.avg7d : latest.avg7d} ${userUnit}`
+                : `Avg: Calibrating`}
             </span>
           </div>
         </div>
 
         <div className="text-right">
           <div className="flex items-center justify-end gap-1 text-xs font-mono font-bold">
-            {delta > 0 ? (
+            {chartPointsData.length < 3 ? (
+              <span className="text-text-muted flex items-center gap-0.5">
+                <Minus className="w-3.5 h-3.5" /> Baseline
+              </span>
+            ) : delta > 0 ? (
               <span className="text-emerald-500 flex items-center gap-0.5">
                 <TrendingUp className="w-3.5 h-3.5" /> +{delta} {userUnit}
               </span>
@@ -146,7 +166,9 @@ export default function BodyweightChart() {
             )}
           </div>
           <span className="text-3xs text-text-muted font-mono">
-            {activePoint ? activePoint.date : `${chartPointsData.length} records`}
+            {activePoint
+              ? formatDisplayDate(activePoint.date)
+              : `${chartPointsData.length} ${chartPointsData.length === 1 ? 'record' : 'records'}`}
           </span>
         </div>
       </div>

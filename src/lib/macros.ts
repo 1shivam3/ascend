@@ -527,11 +527,12 @@ export function calculateRecommendedMacroGoals(
   bodyweightKg: number,
   goal: AthleteGoal = 'build_muscle',
   gender: Gender = 'male',
-  heightCm?: number
+  heightCm?: number,
+  ageYears?: number
 ): MacroGoals {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
   const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : (gender === 'male' ? 175 : 162);
-  const age = 28; // Standard reference athlete age
+  const age = ageYears && ageYears >= 14 && ageYears <= 90 ? ageYears : 25; // User age (default 25 if unspecified)
 
   // Mifflin-St Jeor BMR
   const bmr = 10 * bw + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161);

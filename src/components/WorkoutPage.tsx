@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad } from '@/lib/strength-standards';
+import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 import {
@@ -304,7 +304,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare }: PlanCardProps) {
       {/* Card top row */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-bold text-text-primary truncate">{plan.name}</h3>
+          <h3 className="font-bold text-text-primary line-clamp-2 leading-tight">{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
           </p>
@@ -767,9 +767,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const handleStartPlan = (plan: PlannedWorkout) => {
     setSessionStartTime(Date.now());
     const storedDecisions = useStore.getState().trainingDecisions;
+    const userPrs = useStore.getState().prs;
     const preFilledExercises: WorkoutExercise[] = plan.exercises.map(pe => {
       const activeDecision = storedDecisions[pe.name];
-      let assignedWeight = pe.targetWeight ?? 0;
+      let assignedWeight: number | '' = pe.targetWeight ?? 0;
       let assignedRpe = 8;
       if (activeDecision?.status === 'accepted') {
         assignedWeight = activeDecision.nextPrescription.weight;
@@ -777,12 +778,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       } else if (activeDecision?.status === 'overridden' && activeDecision.userOverrideWeight !== undefined) {
         assignedWeight = activeDecision.userOverrideWeight;
         assignedRpe = activeDecision.nextPrescription.targetRpe;
+      } else if (!assignedWeight || assignedWeight === 0) {
+        const pr = userPrs.find(p => p.exercise.toLowerCase() === pe.name.toLowerCase());
+        if (pr && pr.oneRepMax > 0) {
+          assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, assignedRpe, userUnit);
+        } else {
+          assignedWeight = '';
+        }
       }
 
       return {
         name: pe.name,
         sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-          weight: assignedWeight,
+          weight: assignedWeight !== '' && assignedWeight > 0 ? assignedWeight : ('' as any),
           reps: pe.targetReps,
           unit: pe.targetUnit ?? userUnit,
           rpe: assignedRpe,

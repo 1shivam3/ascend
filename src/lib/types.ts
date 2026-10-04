@@ -98,6 +98,7 @@ export interface UserProfile {
   bodyweightKg: number;
   bodyweightLbs: number;
   heightCm?: number;
+  age?: number;
   unit: Unit;
   createdAt: string;
   goals?: AthleteGoal[];

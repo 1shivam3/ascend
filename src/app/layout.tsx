@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: '%s | ASCEND',
   },
   description:
-    'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, macro tracking with zero Atwater drift, and 100% offline privacy for every gym-goer.',
+    'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, calibrated macro tracking, and 100% offline privacy for every gym-goer.',
   keywords: [
     'gym tracker',
     'workout log',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     siteName: 'ASCEND',
     title: 'ASCEND | Evidence-Based Training & Nutrition System',
     description:
-      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, macro tracking with zero Atwater drift, and 100% offline privacy for every gym-goer.',
+      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, calibrated macro tracking, and 100% offline privacy for every gym-goer.',
   },
   twitter: {
     card: 'summary_large_image',

@@ -197,6 +197,50 @@ export default function ActivityRingsCard({
           </span>
         </button>
       </div>
+
+      {/* Compact Secondary Quick Actions */}
+      <div className="flex items-center justify-between border-t border-border/50 pt-2.5 mt-2 text-2xs text-text-muted">
+        <span className="text-3xs font-mono font-medium">Quick Habits:</span>
+        <div className="flex items-center gap-1.5 font-mono">
+          <button
+            type="button"
+            onClick={() => {
+              store.logWater(250, todayStr);
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+            }}
+            className="px-2 py-0.5 rounded-md bg-bg-secondary hover:bg-sky-500/10 hover:text-sky-400 border border-border text-text-secondary text-3xs font-bold transition-all active:scale-95"
+            title="Log 250ml water"
+          >
+            +250ml
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              store.logWater(500, todayStr);
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+            }}
+            className="px-2 py-0.5 rounded-md bg-bg-secondary hover:bg-sky-500/10 hover:text-sky-400 border border-border text-text-secondary text-3xs font-bold transition-all active:scale-95"
+            title="Log 500ml water"
+          >
+            +500ml
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              store.toggleCreatine(todayStr);
+              if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+            }}
+            className={`px-2 py-0.5 rounded-md border text-3xs font-bold transition-all active:scale-95 ${
+              creatineTaken
+                ? 'bg-amber-500/15 text-amber-500 border-amber-500/30'
+                : 'bg-bg-secondary hover:bg-amber-500/10 hover:text-amber-400 border-border text-text-secondary'
+            }`}
+            title="Toggle Creatine"
+          >
+            {creatineTaken ? 'Creatine ✓' : '+ Creatine'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

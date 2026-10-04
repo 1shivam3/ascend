@@ -207,7 +207,7 @@ export function generateTrainingDecision(
     const deltaPercent = Math.round((deltaKg / Math.max(1, lastWeight)) * 1000) / 10;
 
     const deficitNote = hasFatLoss
-      ? ` Under your active goal of Fat Loss, managing recovery debt and systemic fatigue is vital.`
+      ? ` Under your active goal of Fat Loss, managing systemic fatigue is vital.`
       : '';
 
     return {
@@ -560,9 +560,9 @@ export interface StimulusPreservingSwap {
 export const STIMULUS_PRESERVING_SWAPS: Record<string, StimulusPreservingSwap[]> = {
   'Bench Press': [
     { target: 'Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves horizontal chest press stimulus; athlete selects dumbbell load to hit target RPE 8' },
-    { target: 'Incline Bench', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves compound pressing motor pattern with clavicular head emphasis' },
-    { target: 'Dips', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Bodyweight/weighted push stimulus preserving pectoral and tricep volume' },
-    { target: 'Chest Press Machine', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'High stability chest isolation when bench is occupied' },
+    { target: 'Chest Press Machine', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'High stability machine compound press when bench station is occupied' },
+    { target: 'Dips', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Bodyweight or weighted compound push preserving pectoral and tricep stimulus' },
+    { target: 'Push-ups', targetSets: 3, targetReps: 15, targetRpe: 8, stimulusReason: 'Bodyweight horizontal pressing alternative without requiring equipment' },
   ],
   'Incline Bench': [
     { target: 'Incline Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Independent arm movement with deep stretch on clavicular fibers' },
@@ -706,17 +706,20 @@ export function adaptWorkoutForConstraints(
       changesSummary.push(`Dropped accessory (${removedEx.name}) to protect core compound volume (saved ~10m)`);
     }
 
-    // C. Streamline remaining accessories to 2 focused sets
+    // C. Streamline remaining accessories to 2 focused sets, protect compound lifts
     for (let i = 1; i < adapted.length; i++) {
-      if (adapted[i].sets.length > 2) {
-        adapted[i].sets = adapted[i].sets.slice(0, 2);
-        timeSavedMinutes += 4;
-        changesSummary.push(`Streamlined ${adapted[i].name} to 2 focused sets`);
+      const isCompound = isMainCompoundLift(adapted[i].name);
+      const capSets = isCompound ? 3 : 2;
+      if (adapted[i].sets.length > capSets) {
+        const removed = adapted[i].sets.length - capSets;
+        adapted[i].sets = adapted[i].sets.slice(0, capSets);
+        timeSavedMinutes += removed * 2.5;
+        changesSummary.push(`Streamlined ${adapted[i].name} to ${capSets} focused sets (saved ~${Math.round(removed * 2.5)}m)`);
       }
     }
 
-    changesSummary.push(`Program intent preserved: Completed session within ~${limit}m`);
-    return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: Math.max(12, timeSavedMinutes) };
+    changesSummary.push(`Session adjusted to fit within ~${limit}m`);
+    return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: Math.max(8, Math.round(timeSavedMinutes)) };
   }
 
   // ── 2. EQUIPMENT OCCUPIED / UNAVAILABLE ──────────────────────────────────────
@@ -733,7 +736,7 @@ export function adaptWorkoutForConstraints(
       const swapOptions = getStimulusPreservingSwaps(currentEx.name);
 
       let newName = substituteName;
-      let targetSets = currentEx.sets.length;
+      let targetSets = currentEx.sets.length > 0 ? currentEx.sets.length : 3;
       let targetReps = currentEx.sets[0]?.reps || 8;
       let targetRpe = 8.0;
       let stimulusReason = 'Preserved primary movement stimulus on alternative apparatus';
@@ -743,7 +746,7 @@ export function adaptWorkoutForConstraints(
           ? swapOptions.find((o) => o.target.toLowerCase() === substituteName.toLowerCase()) || swapOptions[0]
           : swapOptions[0];
         newName = chosen.target;
-        targetSets = chosen.targetSets;
+        targetSets = currentEx.sets.length > 0 ? currentEx.sets.length : chosen.targetSets;
         targetReps = chosen.targetReps;
         targetRpe = chosen.targetRpe;
         stimulusReason = chosen.stimulusReason;
@@ -788,22 +791,25 @@ export function adaptWorkoutForConstraints(
 
   // ── 3. LOW READINESS / POOR SLEEP ADJUSTMENT ─────────────────────────────────
   if (constraint.type === 'readiness' || constraint.type === 'fatigue') {
+    let trimmedSets = 0;
     for (let i = 0; i < adapted.length; i++) {
       // Reduce 1 set across secondary exercises
       if (i > 0 && adapted[i].sets.length > 2) {
         adapted[i].sets = adapted[i].sets.slice(0, adapted[i].sets.length - 1);
+        trimmedSets++;
       }
-      // Cap RPE at 7.5 to preserve movement pattern without digging into recovery debt
+      // Cap RPE at 7.5 to preserve movement pattern without excessive fatigue
       adapted[i].sets = adapted[i].sets.map((s) => ({
         ...s,
         rpe: Math.min(7.5, s.rpe ?? 7.5),
       }));
     }
 
+    const calculatedTimeSaved = Math.max(5, Math.round(trimmedSets * 2.5));
     changesSummary.push('Low Readiness Adaptation applied (poor sleep / elevated stress)');
-    changesSummary.push('Trimmed secondary accessory volume by 1 set to manage fatigue accumulation');
-    changesSummary.push('Capped target RPE at ≤ 7.5 across sets to preserve technique without digging into recovery debt');
-    return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: 14 };
+    changesSummary.push(`Trimmed ${trimmedSets} secondary set${trimmedSets === 1 ? '' : 's'} to manage fatigue accumulation`);
+    changesSummary.push('Capped target RPE at ≤ 7.5 across sets to preserve technique without excessive fatigue');
+    return { adaptedExercises: adapted, changesSummary, timeSavedMinutes: calculatedTimeSaved };
   }
 
   return { adaptedExercises: adapted, changesSummary: ['Workout intact'], timeSavedMinutes: 0 };

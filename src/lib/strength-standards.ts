@@ -13,6 +13,26 @@ export function calculateOneRepMax(weight: number, reps: number): number {
   return weight * (1 + 10 / 30 + (reps - 10) / 45);
 }
 
+/**
+ * Suggests working load based on estimated 1RM, target reps, and target RPE.
+ * Rounds to nearest standard plate step (2.5 kg or 5 lbs).
+ * e.g. suggestLoad(75, 4, 8) → 62.5
+ */
+export function suggestLoad(
+  e1rm: number,
+  reps: number,
+  rpe: number = 8,
+  unit: 'kg' | 'lbs' = 'kg'
+): number {
+  if (!e1rm || e1rm <= 0) return 0;
+  const safeReps = Math.max(1, reps);
+  const safeRpe = Math.min(10, Math.max(5, rpe));
+  const load = e1rm / (1 + (safeReps + (10 - safeRpe)) / 30);
+  const step = unit === 'lbs' ? 5 : 2.5;
+  return Math.round(load / step) * step;
+}
+
+
 // Breakpoints for males. Keys are level milestones (1, 20, 35, 50, 70, 85, 100)
 // Calibrated so a 120kg squat at 75-80kg bodyweight is Level ~43, 85kg bench is ~31, 175kg deadlift is ~47.
 const MALE_STANDARDS: Record<string, { [key: number]: number }> = {

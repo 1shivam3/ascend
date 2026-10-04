@@ -87,10 +87,10 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-accent/20 text-accent border border-accent/40">
                 <Activity className="w-3 h-3 animate-pulse" />
-                ASCEND TRAINING MEMORY
+                LIFTER TWIN
               </span>
               <span className="text-3xs text-text-muted font-mono">
-                Prescription &amp; Response Engine
+                Training Memory &amp; Insights
               </span>
             </div>
             <h2 className="text-lg sm:text-xl font-black text-text-primary tracking-tight font-mono">
@@ -117,7 +117,9 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
         <div className="pt-2 border-t border-border/60 flex flex-wrap items-center justify-between text-3xs text-text-muted font-mono gap-2">
           <span className="flex items-center gap-1.5 text-accent font-semibold">
             <ShieldCheck className="w-3.5 h-3.5" />
-            100% Grounded in Your Performance Logs • 0% Generic Assumptions
+            {lifterProfile.totalAnalyzedExposures > 0
+              ? `Built from your logs (${lifterProfile.totalAnalyzedExposures} sessions analyzed)`
+              : 'Built from your logs. Confidence: low (0 sessions).'}
           </span>
 
           {predictionStats && (
@@ -380,10 +382,10 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
           <div className="card p-3.5 bg-bg-secondary/50 border border-border text-xs text-text-secondary space-y-1">
             <div className="flex items-center gap-1.5 text-text-primary font-bold">
               <ShieldCheck className="w-4 h-4 text-accent" />
-              <span>Auditable Training Memory</span>
+              <span>Lifter Twin Decision History</span>
             </div>
             <p className="leading-relaxed text-2xs text-text-muted">
-              Every automated change records the exact empirical trigger, predicted effort vs actual outcome, and provides full athlete override authority.
+              Every automated change explains why it changed, predicted effort vs actual outcome, and you can override anytime.
             </p>
           </div>
 

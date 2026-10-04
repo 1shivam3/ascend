@@ -16,7 +16,7 @@
   <a href="https://tailwindcss.com/"><img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" /></a>
   <a href="https://ai.google.dev/"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-AI-orange?logo=google" /></a>
   <a href="https://web.dev/progressive-web-apps/"><img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" /></a>
-  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-297%20Passed-emerald" /></a>
+  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-310%20Passed-emerald" /></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></a>
 </p>
 
@@ -76,8 +76,8 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
   * *"Deadlift 120 paanch rpe aath"*
 * Parses exercise, weight, reps, and RPE completely on-device or via fast local speech matching.
 
-### 🥗 6. Precision Nutrition & Atwater Math Reconciliation
-* **Zero Atwater Calorie Drift:** Guaranteed exact mathematical alignment between calories and macronutrients:
+### 🥗 6. Precision Nutrition & Macro Tracking
+* **Calibrated Macronutrient Alignment:** Balanced calculation between calories and macronutrients:
   $$\text{Calories} = (4 \times \text{Protein}) + (4 \times \text{Carbs}) + (9 \times \text{Fat})$$
 * **Goal-Adaptive Macro Engine:** Uses Mifflin-St Jeor BMR and resistance training activity multipliers to generate evidence-based macro splits:
   * **Build Muscle:** Lean growth surplus (+250 kcal, 1.8 g/kg protein).
@@ -137,7 +137,7 @@ npx tsc --noEmit
 # 2. Lint check (0 errors, 0 warnings)
 npm run lint
 
-# 3. Comprehensive QA Test Suite (238 automated tests)
+# 3. Comprehensive QA Test Suite (251 automated tests)
 npx tsx tests/comprehensive-qa.ts
 
 # 4. Experiment & Adaptation Features QA Suite (59 automated tests)
