@@ -1,9 +1,16 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 
 export function calculateOneRepMax(weight: number, reps: number): number {
-  if (reps <= 1) return weight;
-  // Epley formula
-  return weight * (1 + reps / 30);
+  if (weight <= 0) return 0;
+  if (reps <= 0) return weight;
+  if (reps === 1) return weight;
+  // Dampened Epley formula:
+  // For reps <= 10: standard linear Epley (weight * (1 + reps / 30))
+  // For reps > 10: non-linear dampening to prevent physiological divergence (high rep fatigue)
+  if (reps <= 10) {
+    return weight * (1 + reps / 30);
+  }
+  return weight * (1 + 10 / 30 + (reps - 10) / 45);
 }
 
 // Breakpoints for males. Keys are level milestones (1, 20, 35, 50, 70, 85, 100)
@@ -109,19 +116,54 @@ const MACHINE_EXERCISES = new Set([
 ]);
 
 export function isBodyweightExercise(exercise: string): boolean {
-  return BODYWEIGHT_EXERCISES.has(exercise);
+  if (BODYWEIGHT_EXERCISES.has(exercise)) return true;
+  const name = exercise.toLowerCase();
+  return (
+    name.includes('pull-up') ||
+    name.includes('pullup') ||
+    name.includes('chin-up') ||
+    name.includes('chinup') ||
+    name.includes('dip') ||
+    name.includes('push-up') ||
+    name.includes('pushup') ||
+    name.includes('bodyweight')
+  );
 }
 
 export function isDumbbellExercise(exercise: string): boolean {
-  return DUMBBELL_EXERCISES.has(exercise);
+  if (DUMBBELL_EXERCISES.has(exercise)) return true;
+  const name = exercise.toLowerCase();
+  return (
+    name.includes('dumbbell') ||
+    name.includes('db ') ||
+    name.includes('goblet') ||
+    name.includes('arnold')
+  );
 }
 
 export function isCableExercise(exercise: string): boolean {
-  return CABLE_EXERCISES.has(exercise);
+  if (CABLE_EXERCISES.has(exercise)) return true;
+  const name = exercise.toLowerCase();
+  return (
+    name.includes('cable') ||
+    name.includes('pulldown') ||
+    name.includes('pushdown') ||
+    name.includes('face pull')
+  );
 }
 
 export function isMachineExercise(exercise: string): boolean {
-  return MACHINE_EXERCISES.has(exercise);
+  if (MACHINE_EXERCISES.has(exercise)) return true;
+  const name = exercise.toLowerCase();
+  return (
+    name.includes('machine') ||
+    name.includes('press machine') ||
+    name.includes('smith') ||
+    name.includes('hack') ||
+    name.includes('leg press') ||
+    name.includes('leg curl') ||
+    name.includes('leg extension')
+  );
 }
 
 export function getExerciseEquipment(exerciseName: string): EquipmentType {
@@ -147,6 +189,84 @@ export function getExerciseEquipment(exerciseName: string): EquipmentType {
 }
 
 export { getExerciseEquipment as getEquipmentType };
+
+/**
+ * Movement-specific female ratio multipliers grounded in exercise physiology.
+ * Lower body lifts retain ~72% ratio, upper body compounds ~58%, accessories/cables ~65%.
+ */
+export function getFemaleMultiplier(exercise: string): number {
+  const name = exercise.toLowerCase();
+  // Lower body compound & leg lifts: ~72% of male bodyweight ratio
+  if (
+    name.includes('squat') ||
+    name.includes('deadlift') ||
+    name.includes('leg press') ||
+    name.includes('leg curl') ||
+    name.includes('leg extension') ||
+    name.includes('lunge') ||
+    name.includes('hip thrust')
+  ) {
+    return 0.72;
+  }
+  // Upper body compound pressing: ~58% of male bodyweight ratio
+  if (
+    name.includes('bench') ||
+    name.includes('overhead press') ||
+    name.includes('shoulder press') ||
+    name.includes('incline') ||
+    name.includes('dip') ||
+    name.includes('push-up') ||
+    name.includes('arnold')
+  ) {
+    return 0.58;
+  }
+  // Pulling, back, arms, cables, general defaults: ~65%
+  return 0.65;
+}
+
+/**
+ * Canonical exercise name normalizer to resolve aliases, whitespace, and case differences
+ */
+export function normalizeExerciseName(exercise: string): string {
+  if (!exercise) return '';
+  const trimmed = exercise.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Map common aliases to canonical names in MALE_STANDARDS
+  if (lower === 'bench' || lower === 'barbell bench' || lower === 'flat bench' || lower === 'flat bench press' || lower === 'barbell bench press') return 'Bench Press';
+  if (lower === 'back squat' || lower === 'barbell squat') return 'Squat';
+  if (lower === 'conventional deadlift' || lower === 'barbell deadlift') return 'Deadlift';
+  if (lower === 'ohp' || lower === 'military press' || lower === 'strict press' || lower === 'barbell overhead press') return 'Overhead Press';
+  if (lower === 'bent over row' || lower === 'barbell bent over row') return 'Barbell Row';
+  if (lower === 'rdl') return 'Romanian Deadlift';
+  if (lower === 'pullup' || lower === 'pullups' || lower === 'pull up' || lower === 'pull ups' || lower === 'chin up' || lower === 'chinups' || lower === 'chin-up') return 'Pull-ups';
+  if (lower === 'dip') return 'Dips';
+  if (lower === 'pushup' || lower === 'pushups' || lower === 'push up') return 'Push-ups';
+  if (lower === 'lat pull' || lower === 'lat pulldowns') return 'Lat Pulldown';
+  if (lower === 'seated cable row') return 'Cable Row';
+
+  // Return matching standard key if case differs
+  const stdKeys = Object.keys(MALE_STANDARDS);
+  const found = stdKeys.find((k) => k.toLowerCase() === lower);
+  return found || trimmed;
+}
+
+/**
+ * Calculates the true physiological load for an exercise set,
+ * properly accounting for bodyweight in exercises like Pull-ups, Dips, and Push-ups.
+ */
+export function getEffectiveExerciseLoad(
+  exercise: string,
+  externalWeightKg: number,
+  bodyweightKg: number
+): number {
+  const safeBW = Math.max(20, bodyweightKg || 75);
+  const safeExt = Math.max(0, externalWeightKg || 0);
+  if (isBodyweightExercise(exercise)) {
+    return safeBW + safeExt;
+  }
+  return safeExt;
+}
 
 export function getExerciseList(): string[] {
   return Object.keys(MALE_STANDARDS);
@@ -216,10 +336,11 @@ export function getLiftLevel(
   bodyweightKg: number,
   gender: Gender
 ): LiftLevel {
-  const standards = MALE_STANDARDS[exercise] || MALE_STANDARDS['Bench Press'];
+  const normExercise = normalizeExerciseName(exercise);
+  const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
   const ratio = oneRepMaxKg / safeBW;
-  const genderMultiplier = gender === 'female' ? 0.65 : 1.0;
+  const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
 
   let level = 1;
   let lowerBoundLevel = 1;
@@ -331,9 +452,10 @@ export function getNextLevelInfo(
   currentRank: ExerciseRank;
   levelsToNextRank: number;
 } {
-  const standards = MALE_STANDARDS[exercise] || MALE_STANDARDS['Bench Press'];
+  const normExercise = normalizeExerciseName(exercise);
+  const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
-  const genderMultiplier = gender === 'female' ? 0.65 : 1.0;
+  const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
   const nextLevel = Math.min(100, currentLevel + 1);
 
   // Reverse-interpolate: given target level, find required ratio

@@ -18,12 +18,18 @@ import {
   isMachineExercise,
   getNextLevelInfo,
   getNextMilestone,
+  getFemaleMultiplier,
+  normalizeExerciseName,
+  getEffectiveExerciseLoad,
 } from '../src/lib/strength-standards';
 
 import {
   estimateMacros,
   calculateMealMacros,
   getFoodSuggestions,
+  calculateCaloriesFromMacros,
+  getMacroCalorieDrift,
+  calculateRecommendedMacroGoals,
 } from '../src/lib/macros';
 
 import {
@@ -44,6 +50,14 @@ import {
 import {
   buildCompactUserContext,
 } from '../src/lib/ai-context';
+
+import { ATHLETE_GOAL_CONFIGS, AthleteGoal, WorkoutEntry } from '../src/lib/types';
+import { getGoalAdaptiveSplitTemplates, getProgressionRecommendation } from '../src/lib/workout-engine';
+import {
+  generateTrainingDecision,
+  calculateSetEffortDrift,
+  getExerciseHistorySessions,
+} from '../src/lib/lifter-twin';
 
 import fs from 'fs';
 import path from 'path';
@@ -123,6 +137,26 @@ runSection('Section 8: PRs, Strength Progress, and 1RM Calculations', () => {
   // Negative and 0 reps edge cases
   assert(calculateOneRepMax(100, 0) === 100, 'calculateOneRepMax with 0 reps falls back to weight');
   assert(calculateOneRepMax(0, 10) === 0, 'calculateOneRepMax with 0 weight returns 0');
+
+  // Dampened Epley at high repetitions (r > 10) prevents physiological divergence
+  const e1rm20 = calculateOneRepMax(100, 20);
+  assert(e1rm20 < 166.6, `High-rep set (100x20) is dampened to physiologically realistic value (got ${e1rm20.toFixed(1)}kg < 166.7kg)`);
+  assert(e1rm20 > 150, `High-rep set (100x20) maintains continuous monotonic progression (got ${e1rm20.toFixed(1)}kg > 150kg)`);
+
+  // Physiological female multipliers
+  assert(getFemaleMultiplier('Squat') === 0.72, 'Female lower body multiplier reflects higher relative lower-body mass (0.72)');
+  assert(getFemaleMultiplier('Bench Press') === 0.58, 'Female upper body pressing multiplier reflects upper body dimorphism (0.58)');
+  assert(getFemaleMultiplier('Dumbbell Curl') === 0.65, 'Female accessory multiplier defaults to 0.65');
+
+  // Exercise normalization & alias resolution
+  assert(normalizeExerciseName('  barbell bench press  ') === 'Bench Press', 'Normalizes "barbell bench press" to canonical "Bench Press"');
+  assert(normalizeExerciseName('rdl') === 'Romanian Deadlift', 'Resolves alias "rdl" to "Romanian Deadlift"');
+  assert(normalizeExerciseName('pullup') === 'Pull-ups', 'Resolves alias "pullup" to "Pull-ups"');
+
+  // Effective exercise load computation
+  assert(getEffectiveExerciseLoad('Pull-ups', 0, 75) === 75, 'Bodyweight exercise with 0 added weight has effective load equal to bodyweight (75kg)');
+  assert(getEffectiveExerciseLoad('Pull-ups', 15, 75) === 90, 'Bodyweight exercise with 15kg added has effective load of BW + added (90kg)');
+  assert(getEffectiveExerciseLoad('Bench Press', 100, 75) === 100, 'Standard exercise uses purely external barbell load (100kg)');
 
   // Exercise levels
   const bw = 80;
@@ -231,6 +265,104 @@ runSection('Section 6: Workout Logging & Auto-PR Detection', () => {
   const decimalSet = { weight: 72.5, reps: 8 };
   const e1rmDecimal = calculateOneRepMax(decimalSet.weight, decimalSet.reps);
   assert(!isNaN(e1rmDecimal) && e1rmDecimal > 72.5, `WORK-11: Decimal weight (72.5kg x 8) calculates valid e1RM (~${e1rmDecimal.toFixed(1)}kg)`);
+
+  // Goal-adaptive rest timer and rep targets in active workout
+  const strengthGoal = ATHLETE_GOAL_CONFIGS['get_stronger'];
+  const staminaGoal = ATHLETE_GOAL_CONFIGS['stamina'];
+  const hypertrophyGoal = ATHLETE_GOAL_CONFIGS['build_muscle'];
+
+  assert(strengthGoal.defaultRestSeconds === 150, 'Strength athlete base rest is 150s');
+  assert(staminaGoal.defaultRestSeconds === 60, 'Stamina athlete base rest is 60s');
+  assert(hypertrophyGoal.defaultRestSeconds === 90, 'Hypertrophy athlete base rest is 90s');
+
+  const strengthMidReps = Math.round((strengthGoal.defaultRepRange.min + strengthGoal.defaultRepRange.max) / 2);
+  const staminaMidReps = Math.round((staminaGoal.defaultRepRange.min + staminaGoal.defaultRepRange.max) / 2);
+  const hypertrophyMidReps = Math.round((hypertrophyGoal.defaultRepRange.min + hypertrophyGoal.defaultRepRange.max) / 2);
+
+  assert(strengthMidReps === 5, `Strength goal target reps midpoint is 5 (got ${strengthMidReps})`);
+  assert(staminaMidReps === 14, `Stamina goal target reps midpoint is 14 (got ${staminaMidReps})`);
+  assert(hypertrophyMidReps === 10, `Hypertrophy goal target reps midpoint is 10 (got ${hypertrophyMidReps})`);
+
+  // Goal-adaptive split templates verification
+  const strengthSplits = getGoalAdaptiveSplitTemplates('get_stronger', 'kg');
+  assert(strengthSplits.length === 4, 'Strength goal returns 4 core split templates (Upper/Lower A/B)');
+  const strengthUpperA = strengthSplits.find(s => s.id === 'builtin_upper_a');
+  assert(Boolean(strengthUpperA), 'Strength Upper A exists');
+  const strengthBench = strengthUpperA?.exercises.find(e => e.name === 'Bench Press');
+  assert(strengthBench?.targetReps === 5 && strengthBench.targetSets === 4, `Strength Bench Press target reps is 5 (got ${strengthBench?.targetReps})`);
+
+  const hypertrophySplits = getGoalAdaptiveSplitTemplates('build_muscle', 'kg');
+  const hypertrophyUpperA = hypertrophySplits.find(s => s.id === 'builtin_upper_a');
+  const hypertrophyBench = hypertrophyUpperA?.exercises.find(e => e.name === 'Bench Press');
+  assert(hypertrophyBench?.targetReps === 8, `Hypertrophy Bench Press target reps is 8 (got ${hypertrophyBench?.targetReps})`);
+
+  const staminaSplits = getGoalAdaptiveSplitTemplates('stamina', 'kg');
+  const staminaUpperA = staminaSplits.find(s => s.id === 'builtin_upper_a');
+  const staminaBench = staminaUpperA?.exercises.find(e => e.name === 'Bench Press');
+  assert(staminaBench?.targetReps === 12, `Stamina Bench Press target reps is 12 (got ${staminaBench?.targetReps})`);
+
+  const fatLossSplits = getGoalAdaptiveSplitTemplates('lose_fat', 'kg');
+  const fatLossUpperA = fatLossSplits.find(s => s.id === 'builtin_upper_a');
+  const fatLossBench = fatLossUpperA?.exercises.find(e => e.name === 'Bench Press');
+  assert(fatLossBench?.targetReps === 6, `Fat loss Bench Press preserves tension at 6 reps (got ${fatLossBench?.targetReps})`);
+
+  const imperialStrengthSplits = getGoalAdaptiveSplitTemplates('get_stronger', 'lbs');
+  const impBench = imperialStrengthSplits[0]?.exercises.find(e => e.name === 'Bench Press');
+  assert(impBench?.targetWeight === 165 && impBench?.targetUnit === 'lbs', `Imperial strength bench defaults to 165 lbs (got ${impBench?.targetWeight}${impBench?.targetUnit})`);
+
+  // Goal-adaptive progression recommendations & plain-English rationale
+  const mockWorkoutsForProg: WorkoutEntry[] = [
+    {
+      id: 'w_test_1',
+      date: '2026-04-01',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 5, weight: 100, unit: 'kg', rpe: 8.0 },
+            { reps: 5, weight: 100, unit: 'kg', rpe: 8.0 },
+            { reps: 5, weight: 100, unit: 'kg', rpe: 7.5 },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const strengthProg = getProgressionRecommendation('Bench Press', mockWorkoutsForProg, 'kg', 'get_stronger');
+  assert(Boolean(strengthProg), 'Strength progression recommendation generated');
+  assert(strengthProg?.targetWeight === 102.5, `Strength bench target weight is 102.5kg (got ${strengthProg?.targetWeight})`);
+  assert(strengthProg?.targetReps === 5, `Strength bench target reps is 5 (got ${strengthProg?.targetReps})`);
+  assert(Boolean(strengthProg?.rationale.includes('neural strength')), 'Strength rationale references neural strength adaptation');
+
+  const fatLossProg = getProgressionRecommendation('Bench Press', mockWorkoutsForProg, 'kg', 'lose_fat');
+  assert(Boolean(fatLossProg), 'Fat loss progression recommendation generated');
+  assert(fatLossProg?.targetWeight === 102.5, `Fat loss bench target weight is 102.5kg (got ${fatLossProg?.targetWeight})`);
+  assert(Boolean(fatLossProg?.rationale.includes('caloric deficit')), 'Fat loss rationale references caloric deficit');
+
+  const mockStaminaWorkouts: WorkoutEntry[] = [
+    {
+      id: 'w_test_stamina',
+      date: '2026-04-01',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 14, weight: 60, unit: 'kg', rpe: 8.0 },
+            { reps: 14, weight: 60, unit: 'kg', rpe: 8.0 },
+          ],
+        },
+      ],
+    },
+  ];
+  const staminaProg = getProgressionRecommendation('Bench Press', mockStaminaWorkouts, 'kg', 'stamina');
+  assert(Boolean(staminaProg), 'Stamina progression recommendation generated');
+  assert(staminaProg?.targetWeight === 62.5, `Stamina bench target weight is 62.5kg (got ${staminaProg?.targetWeight})`);
+  assert(Boolean(staminaProg?.rationale.includes('stamina and work capacity')), 'Stamina rationale references stamina and work capacity');
+
+  const fatLossDecision = generateTrainingDecision('Bench Press', mockWorkoutsForProg, 'kg', 8.0, ['lose_fat']);
+  assert(fatLossDecision !== null, 'Fat loss training decision generated');
+  assert(Boolean(fatLossDecision?.headline.includes('Tension-Sparing')), `Fat loss decision headline is tension-sparing (got ${fatLossDecision?.headline})`);
+  assert(Boolean(fatLossDecision?.explanation.includes('caloric deficit')), 'Fat loss decision explanation references caloric deficit');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,6 +413,19 @@ runSection('Section 9: Nutrition, Pinned Foods & Manual Logging', () => {
   }));
   const frequentItems = Object.entries(counts).filter(([_, c]) => c >= 2);
   assert(frequentItems.length === 1 && frequentItems[0][0] === 'greek yogurt', 'Auto-detects foods logged >= 2 times from meal history');
+
+  // Atwater Calorie Math & Reconciliation
+  const atwaterCals = calculateCaloriesFromMacros(30, 40, 10);
+  assert(atwaterCals === 370, `calculateCaloriesFromMacros(30, 40, 10) = 370 kcal (got ${atwaterCals})`);
+
+  // Calorie drift calculation
+  const drift = getMacroCalorieDrift(380, 30, 40, 10);
+  assert(drift === 10, 'getMacroCalorieDrift detects positive calorie difference (+10)');
+
+  // calculateMealMacros reconciles missing calories when macros are present
+  const foodWithoutCal = { name: 'Custom Whey', calories: 0, proteinG: 25, carbsG: 2, fatG: 1 };
+  const singleMealTotals = calculateMealMacros([foodWithoutCal]);
+  assert(singleMealTotals.calories === 117, `calculateMealMacros reconciles 0-calorie food to Atwater sum (got ${singleMealTotals.calories} kcal)`);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -518,6 +663,257 @@ runSection('Section 23: Data Corruption & Edge Cases', () => {
   } catch (e) {
     assert(false, 'Unexpected failure during corrupted JSON test');
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 11. ONBOARDING & PROFILE GOAL SYNCHRONIZATION (Section 24)
+// ─────────────────────────────────────────────────────────────────────────────
+runSection('Section 24: Onboarding Goal Sync & Nutritional Calibration Engine', () => {
+  // Test calculateRecommendedMacroGoals across all 5 goals for zero Atwater drift
+  const goals: AthleteGoal[] = ['build_muscle', 'get_stronger', 'lose_fat', 'stamina', 'general_fitness'];
+  const testBwKg = 75;
+
+  for (const g of goals) {
+    const macros = calculateRecommendedMacroGoals(testBwKg, g, 'male', 178);
+    const carbs = macros.carbsG || 0;
+    const fat = macros.fatG || 0;
+    const atwaterCals = macros.proteinG * 4 + carbs * 4 + fat * 9;
+    assert(macros.calories === atwaterCals, `Goal ${g} has exact zero Atwater drift (${macros.calories} === ${atwaterCals})`);
+    assert(macros.proteinG >= 100, `Goal ${g} has adequate protein (${macros.proteinG}g for 75kg)`);
+    assert(fat >= 40, `Goal ${g} has healthy essential fatty acid baseline (${fat}g)`);
+    assert(carbs >= 50, `Goal ${g} has healthy glycogen carbohydrate baseline (${carbs}g)`);
+  }
+
+  // Verify goal-specific calibrations
+  const muscleMacros = calculateRecommendedMacroGoals(testBwKg, 'build_muscle', 'male', 178);
+  const fatLossMacros = calculateRecommendedMacroGoals(testBwKg, 'lose_fat', 'male', 178);
+  const staminaMacros = calculateRecommendedMacroGoals(testBwKg, 'stamina', 'male', 178);
+
+  assert(muscleMacros.calories > fatLossMacros.calories, 'Muscle building prescribes higher calories than fat loss deficit');
+  assert(fatLossMacros.proteinG >= muscleMacros.proteinG, 'Fat loss prescribes elevated protein ratio (2.2g/kg) to spare lean mass');
+  assert((staminaMacros.carbsG || 0) > (fatLossMacros.carbsG || 0), 'Stamina prescribes high carbohydrate energy allocation');
+
+  // Verify Onboarding split generation for all goals
+  for (const g of goals) {
+    const templates = getGoalAdaptiveSplitTemplates(g, 'kg');
+    assert(templates.length === 4, `Goal ${g} generates full 4-session split (Upper A, Lower A, Upper B, Lower B)`);
+    assert(templates[0].exercises.length >= 4, `Goal ${g} Upper A has comprehensive exercise routine`);
+
+    // Check rep range targeting
+    const bench = templates[0].exercises.find(e => e.name === 'Bench Press');
+    assert(!!bench, `Goal ${g} split contains primary compound bench press`);
+    if (g === 'get_stronger') {
+      assert(bench!.targetReps <= 6, 'Strength goal sets low heavy rep bracket (≤ 6 reps)');
+    } else if (g === 'build_muscle') {
+      assert(bench!.targetReps >= 8 && bench!.targetReps <= 10, 'Muscle goal sets hypertrophy rep bracket (8–10 reps)');
+    } else if (g === 'stamina') {
+      assert(bench!.targetReps >= 12, 'Stamina goal sets endurance rep bracket (≥ 12 reps)');
+    }
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SECTION 25: RPE, RIR, & Autoregulation Progression Analytics Suite
+// ─────────────────────────────────────────────────────────────────────────────
+runSection('Section 25: RPE, RIR, & Autoregulation Progression Analytics Suite', () => {
+  // 1. Mathematical RPE to RIR relationship
+  const rpeToRir = (rpe: number) => Math.max(0, Math.round((10 - rpe) * 10) / 10);
+  assert(rpeToRir(10) === 0, 'RPE 10 corresponds exactly to 0 RIR (failure/limit)');
+  assert(rpeToRir(9.5) === 0.5, 'RPE 9.5 corresponds to 0.5 RIR (maybe 1 rep)');
+  assert(rpeToRir(9) === 1, 'RPE 9 corresponds to 1 RIR');
+  assert(rpeToRir(8.5) === 1.5, 'RPE 8.5 corresponds to 1.5 RIR');
+  assert(rpeToRir(8) === 2, 'RPE 8 corresponds to 2 RIR');
+  assert(rpeToRir(7) === 3, 'RPE 7 corresponds to 3 RIR');
+  assert(rpeToRir(6) === 4, 'RPE 6 corresponds to 4 RIR');
+
+  // 2. Effort drift across sets
+  // Case A: Single set
+  const singleSetDrift = calculateSetEffortDrift([
+    { reps: 5, weight: 100, unit: 'kg', rpe: 8 },
+  ]);
+  assert(singleSetDrift.rpeDriftTotal === 0, 'Single set drift total is 0');
+  assert(singleSetDrift.rpeDriftPerSet === 0, 'Single set drift per set is 0');
+  assert(singleSetDrift.averageRpe === 8, 'Single set average RPE matches set RPE');
+  assert(singleSetDrift.withinSessionEffortTrend === 'moderate', 'RPE 8 single set is moderate effort');
+  assert(!singleSetDrift.hasEffortSpike, 'Single set @8 has no effort spike');
+
+  // Case B: Controlled multiple working sets (low/moderate drift)
+  const controlledSets = [
+    { reps: 5, weight: 100, unit: 'kg' as const, rpe: 8 },
+    { reps: 5, weight: 100, unit: 'kg' as const, rpe: 8 },
+    { reps: 5, weight: 100, unit: 'kg' as const, rpe: 8.5 },
+  ];
+  const controlledDrift = calculateSetEffortDrift(controlledSets);
+  assert(controlledDrift.rpeDriftTotal === 0.5, 'Controlled sets have +0.5 total RPE drift');
+  assert(controlledDrift.rpeDriftPerSet === 0.3, 'Controlled sets have +0.25 rounded to 0.3 RPE drift per set');
+  assert(controlledDrift.averageRpe === 8.2, 'Controlled sets average RPE is 8.2');
+  assert(controlledDrift.withinSessionEffortTrend === 'moderate', 'Effort trend is moderate');
+  assert(!controlledDrift.hasEffortSpike, 'No effort spike in controlled working sets');
+
+  // Case C: Fatigue spike / excessive drift
+  const fatigueSets = [
+    { reps: 5, weight: 105, unit: 'kg' as const, rpe: 7.5 },
+    { reps: 5, weight: 105, unit: 'kg' as const, rpe: 8.5 },
+    { reps: 5, weight: 105, unit: 'kg' as const, rpe: 9.5 },
+    { reps: 4, weight: 105, unit: 'kg' as const, rpe: 10 },
+  ];
+  const fatigueDrift = calculateSetEffortDrift(fatigueSets);
+  assert(fatigueDrift.rpeDriftTotal === 2.5, 'Fatigue sets have +2.5 total RPE drift');
+  assert(fatigueDrift.rpeDriftPerSet > 0.4, 'Fatigue sets drift per set exceeds 0.4 RPE/set');
+  assert(fatigueDrift.withinSessionEffortTrend === 'high', 'Effort trend identified as high');
+  assert(fatigueDrift.hasEffortSpike, 'Detects effort spike due to RPE 10 and high drift');
+
+  // 3. Exercise history extraction and volume load tonnage calculation
+  const mockWorkouts: WorkoutEntry[] = [
+    {
+      id: 'w1',
+      date: '2026-09-01',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 5, weight: 100, unit: 'kg', rpe: 8 },
+            { reps: 5, weight: 100, unit: 'kg', rpe: 8 },
+            { reps: 5, weight: 100, unit: 'kg', rpe: 8.5 },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'w2',
+      date: '2026-09-08',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 5, weight: 102.5, unit: 'kg', rpe: 8 },
+            { reps: 5, weight: 102.5, unit: 'kg', rpe: 8.5 },
+            { reps: 5, weight: 102.5, unit: 'kg', rpe: 8.5 },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'w3',
+      date: '2026-09-15',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 5, weight: 105, unit: 'kg', rpe: 8.5 },
+            { reps: 5, weight: 105, unit: 'kg', rpe: 9.5 },
+            { reps: 4, weight: 105, unit: 'kg', rpe: 10 },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const sessions = getExerciseHistorySessions('Bench Press', mockWorkouts);
+  assert(sessions.length === 3, 'Extracted 3 sessions for Bench Press');
+  assert(sessions[0].totalVolume === 1500, 'Session 1 volume load is 1500 kg (3x5x100)');
+  assert(sessions[1].totalVolume === 1538, 'Session 2 volume load is 1538 kg (3x5x102.5 rounded)');
+  assert(sessions[2].totalVolume === 1470, 'Session 3 volume load reflects rep drop (2x5x105 + 1x4x105 = 1470 kg)');
+
+  // Verify autoregulation signal: Session 2 is progressive overload, Session 3 shows fatigue spike
+  assert(sessions[1].totalVolume > sessions[0].totalVolume, 'Volume load increased in session 2');
+  assert(!sessions[1].fatigue.hasEffortSpike, 'Session 2 completed without effort spike');
+  assert(sessions[2].fatigue.hasEffortSpike, 'Session 3 flagged with fatigue accumulation / effort spike');
+  assert(sessions[2].fatigue.withinSessionEffortTrend === 'high', 'Session 3 within-session effort trend is high');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 13. NUTRITION PRECISION & GOAL REBALANCING (Section 26)
+// ─────────────────────────────────────────────────────────────────────────────
+runSection('Section 26: Nutrition Precision, Atwater Math & Goal Rebalancing', () => {
+  const muscleGoals = calculateRecommendedMacroGoals(80, 'build_muscle', 'male');
+  assert(muscleGoals.calories > 0, 'Build muscle calculated calories is positive');
+  assert(muscleGoals.proteinG >= 140, `Build muscle protein is >= 1.8g/kg (got ${muscleGoals.proteinG}g for 80kg)`);
+  // Verify Atwater reconciliation: 4*P + 4*C + 9*F === calories
+  const muscleAtwater = calculateCaloriesFromMacros(muscleGoals.proteinG, muscleGoals.carbsG || 0, muscleGoals.fatG || 0);
+  assert(muscleAtwater === muscleGoals.calories, `Build muscle macros perfectly match Atwater math (got ${muscleAtwater} kcal == ${muscleGoals.calories} kcal)`);
+
+  const fatLossGoals = calculateRecommendedMacroGoals(80, 'lose_fat', 'male');
+  assert(fatLossGoals.calories < muscleGoals.calories, `Fat loss calorie target (${fatLossGoals.calories}) is lower than muscle building target (${muscleGoals.calories})`);
+  assert(fatLossGoals.proteinG >= 160, `Fat loss preserves lean mass with high protein (${fatLossGoals.proteinG}g >= 160g)`);
+  const fatLossAtwater = calculateCaloriesFromMacros(fatLossGoals.proteinG, fatLossGoals.carbsG || 0, fatLossGoals.fatG || 0);
+  assert(fatLossAtwater === fatLossGoals.calories, `Fat loss macros perfectly match Atwater math (got ${fatLossAtwater} kcal == ${fatLossGoals.calories} kcal)`);
+
+  const staminaGoals = calculateRecommendedMacroGoals(60, 'stamina', 'female');
+  assert((staminaGoals.carbsG || 0) > staminaGoals.proteinG, `Stamina goal prioritizes glycogen fueling with high carbs (${staminaGoals.carbsG}g carbs > ${staminaGoals.proteinG}g protein)`);
+  const staminaAtwater = calculateCaloriesFromMacros(staminaGoals.proteinG, staminaGoals.carbsG || 0, staminaGoals.fatG || 0);
+  assert(staminaAtwater === staminaGoals.calories, `Stamina macros perfectly match Atwater math (got ${staminaAtwater} kcal == ${staminaGoals.calories} kcal)`);
+
+  // Test drift reconciliation on individual food items and meal totals
+  const mockFoodWithLabelDrift = {
+    name: 'Packaged Bar',
+    calories: 250, // label says 250
+    proteinG: 20,  // 20 * 4 = 80
+    carbsG: 25,    // 25 * 4 = 100
+    fatG: 10,      // 10 * 9 = 90 -> Atwater = 270 (drift is -20)
+  };
+  const driftVal = getMacroCalorieDrift(
+    mockFoodWithLabelDrift.calories,
+    mockFoodWithLabelDrift.proteinG,
+    mockFoodWithLabelDrift.carbsG,
+    mockFoodWithLabelDrift.fatG
+  );
+  assert(driftVal === -20, `Drift is correctly identified as -20 kcal (got ${driftVal})`);
+  assert(Math.abs(driftVal) > 5, 'Drift exceeds 5 kcal threshold');
+
+  const cleanMeal = {
+    calories: 200,
+    proteinG: 25, // 100
+    carbsG: 25,   // 100
+    fatG: 0,      // 0 -> Atwater = 200
+  };
+  const cleanDrift = getMacroCalorieDrift(
+    cleanMeal.calories,
+    cleanMeal.proteinG,
+    cleanMeal.carbsG,
+    cleanMeal.fatG
+  );
+  assert(cleanDrift === 0, 'Clean meal drift is exactly 0 kcal');
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 14. PWA, OFFLINE RESILIENCE & PRODUCTION BUNDLE HYGIENE (Section 27)
+// ─────────────────────────────────────────────────────────────────────────────
+runSection('Section 27: PWA, Offline Resilience & Production Bundle Hygiene', () => {
+  // 1. Verify manifest.json exists and is valid PWA spec
+  const manifestPath = path.resolve('public/manifest.json');
+  assert(fs.existsSync(manifestPath), 'public/manifest.json exists');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  assert(manifest.name && manifest.name.includes('ASCEND'), 'Manifest has valid ASCEND name');
+  assert(manifest.display === 'standalone', 'Manifest specifies standalone display mode');
+  assert(manifest.start_url === '/', 'Manifest sets start_url to root /');
+  assert(Array.isArray(manifest.icons) && manifest.icons.length > 0, 'Manifest defines icons');
+
+  // 2. Verify service worker file exists and contains offline cache logic
+  const swPath = path.resolve('public/sw.js');
+  assert(fs.existsSync(swPath), 'public/sw.js exists for offline gym resilience');
+  const swContent = fs.readFileSync(swPath, 'utf8');
+  assert(swContent.includes('caches.open'), 'Service worker implements CacheStorage API');
+  assert(swContent.includes('skipWaiting'), 'Service worker implements skipWaiting lifecycle hook');
+  assert(swContent.includes('clients.claim'), 'Service worker claims clients on activation');
+  assert(swContent.includes('STATIC_PRECACHE'), 'Service worker defines static precache assets');
+
+  // 3. Verify next.config.js configures headers for service worker & manifest
+  const nextConfigPath = path.resolve('next.config.js');
+  assert(fs.existsSync(nextConfigPath), 'next.config.js exists');
+  const nextConfigContent = fs.readFileSync(nextConfigPath, 'utf8');
+  assert(nextConfigContent.includes('/sw.js'), 'next.config.js defines specific headers for /sw.js');
+  assert(nextConfigContent.includes('no-cache'), 'next.config.js ensures service worker is not stale-cached');
+
+  // 4. Verify root layout registers service worker
+  const layoutPath = path.resolve('src/app/layout.tsx');
+  const layoutContent = fs.readFileSync(layoutPath, 'utf8');
+  assert(layoutContent.includes('navigator.serviceWorker.register'), 'Root layout registers PWA service worker');
+
+  // 5. Verify page.tsx includes offline gym mode listener
+  const pagePath = path.resolve('src/app/page.tsx');
+  const pageContent = fs.readFileSync(pagePath, 'utf8');
+  assert(pageContent.includes('Offline Gym Mode Active'), 'App page renders clear offline gym mode reassurance banner');
 });
 
 // Helper to recursively find all files in directory

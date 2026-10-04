@@ -26,8 +26,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord } from '@/lib/types';
-import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList } from '@/lib/strength-standards';
+import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad } from '@/lib/strength-standards';
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
@@ -56,16 +56,28 @@ export default function ActiveWorkoutScreen({
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
 
+  // Athlete goal personalization
+  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
+    ? (profile.goals[0] as AthleteGoal)
+    : 'build_muscle';
+  const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
+
+  const defaultTargetReps = useMemo(() => {
+    const { min, max } = goalConfig.defaultRepRange;
+    return Math.round((min + max) / 2);
+  }, [goalConfig.defaultRepRange]);
+
   const availableExercises = useMemo(() => getExerciseList(), []);
 
   // Session state
   const [exercises, setExercises] = useState<WorkoutExercise[]>(() => {
+    const defaultReps = Math.round((goalConfig.defaultRepRange.min + goalConfig.defaultRepRange.max) / 2);
     if (initialExercises && initialExercises.length > 0) {
       return initialExercises.map((e, idx) => ({
         ...e,
         name: e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`),
         sets: (e.sets && e.sets.length > 0 ? e.sets : [
-          { weight: userUnit === 'kg' ? 60 : 135, reps: 8, unit: userUnit, completed: false, rpe: 8 },
+          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
         ]).map((s) => ({
           ...s,
           unit: s.unit || userUnit,
@@ -77,9 +89,9 @@ export default function ActiveWorkoutScreen({
       {
         name: 'Bench Press',
         sets: [
-          { weight: 60, reps: 8, unit: userUnit, completed: false, rpe: 8 },
-          { weight: 60, reps: 8, unit: userUnit, completed: false, rpe: 8 },
-          { weight: 60, reps: 8, unit: userUnit, completed: false, rpe: 8 },
+          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: userUnit === 'kg' ? 60 : 135, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
         ],
       },
     ];
@@ -102,14 +114,49 @@ export default function ActiveWorkoutScreen({
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
 
-  // Sticky Rest Timer state
-  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(180);
+  // Sticky Rest Timer state (initialized to athlete's goal rest duration)
+  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
 
+  // Intensity metric preference: RPE vs RIR
+  const [intensityMode, setIntensityMode] = useState<'rpe' | 'rir'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return (localStorage.getItem('ascend_intensity_mode') as 'rpe' | 'rir') || 'rpe';
+      } catch {
+        return 'rpe';
+      }
+    }
+    return 'rpe';
+  });
+
+  const toggleIntensityMode = () => {
+    setIntensityMode((prev) => {
+      const next = prev === 'rpe' ? 'rir' : 'rpe';
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ascend_intensity_mode', next);
+        } catch {
+          // ignore storage error
+        }
+      }
+      return next;
+    });
+  };
+
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
+
+  // Adaptive weight stepper step based on exercise type and unit
+  const currentWeightStep = useMemo(() => {
+    const isDB = isDumbbellExercise(currentExercise?.name || '');
+    if (userUnit === 'lbs') {
+      return isDB ? 2.5 : 5;
+    }
+    return isDB ? 1 : 2.5;
+  }, [currentExercise?.name, userUnit]);
 
   useEffect(() => {
     setIsEditingName(false);
@@ -120,6 +167,72 @@ export default function ActiveWorkoutScreen({
     if (!currentExercise) return false;
     return isMainCompoundLift(currentExercise.name);
   }, [currentExercise]);
+
+  // Dynamic rest duration adapting to athlete goal and movement demands
+  const defaultRestDuration = useMemo(() => {
+    const baseRest = goalConfig.defaultRestSeconds;
+    if (isCurrentMainLift) {
+      return primaryGoal === 'get_stronger' ? 180 : Math.round((baseRest * 1.33) / 15) * 15;
+    }
+    return baseRest;
+  }, [goalConfig.defaultRestSeconds, isCurrentMainLift, primaryGoal]);
+
+  // Screen Wake Lock API: Keep mobile screen on while in active workout
+  useEffect(() => {
+    let wakeLock: any = null;
+    let isMounted = true;
+
+    const requestWakeLock = async () => {
+      try {
+        if (typeof navigator !== 'undefined' && 'wakeLock' in navigator && isMounted) {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        }
+      } catch {
+        // Battery/power-saving may reject wake lock request
+      }
+    };
+
+    requestWakeLock();
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isMounted) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      isMounted = false;
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
+    };
+  }, []);
+
+  // Web Audio chime when rest finishes
+  const playRestDoneChime = useCallback(() => {
+    try {
+      const AudioCtx = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+      osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.4);
+    } catch {
+      // Autoplay restrictions or unsupported audio
+    }
+  }, []);
 
   // Elapsed workout timer
   useEffect(() => {
@@ -137,6 +250,7 @@ export default function ActiveWorkoutScreen({
         if (prev <= 1) {
           setIsRestRunning(false);
           setIsRestFinished(true);
+          playRestDoneChime();
           if (typeof navigator !== 'undefined' && navigator.vibrate) {
             navigator.vibrate([100, 50, 100, 50, 200]);
           }
@@ -146,19 +260,18 @@ export default function ActiveWorkoutScreen({
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRestRunning]);
+  }, [isRestRunning, playRestDoneChime]);
 
   // Start rest timer
   const startTimer = useCallback(
     (seconds?: number) => {
-      const defaultSec = isCurrentMainLift ? 180 : 90;
-      const targetSec = seconds || restTotalSeconds || defaultSec;
+      const targetSec = seconds || defaultRestDuration;
       setRestTotalSeconds(targetSec);
       setRestSecondsLeft(targetSec);
       setIsRestRunning(true);
       setIsRestFinished(false);
     },
-    [isCurrentMainLift, restTotalSeconds]
+    [defaultRestDuration]
   );
 
   const togglePauseTimer = () => {
@@ -193,8 +306,8 @@ export default function ActiveWorkoutScreen({
 
   const progRec = useMemo(() => {
     if (!currentExercise?.name) return null;
-    return getProgressionRecommendation(currentExercise.name, workouts, userUnit);
-  }, [currentExercise?.name, workouts, userUnit]);
+    return getProgressionRecommendation(currentExercise.name, workouts, userUnit, primaryGoal);
+  }, [currentExercise?.name, workouts, userUnit, primaryGoal]);
 
   // Weight & Reps handlers (direct typing + steppers)
   const handleSetWeightChange = (setIdx: number, val: string | number) => {
@@ -290,8 +403,8 @@ export default function ActiveWorkoutScreen({
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate(15);
       }
-      // Auto start rest timer immediately (3 min for main lifts, 90s for accessories)
-      const restDuration = isCurrentMainLift ? 180 : 90;
+      // Auto start rest timer immediately based on athlete goal & lift type
+      const restDuration = defaultRestDuration;
       setRestTotalSeconds(restDuration);
       setRestSecondsLeft(restDuration);
       setIsRestRunning(true);
@@ -334,8 +447,8 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const lastSet = ex.sets[ex.sets.length - 1];
-        const newWeight = lastSet ? (parseFloat(String(lastSet.weight)) || 0) : 60;
-        const newReps = lastSet ? (parseInt(String(lastSet.reps), 10) || 0) : 8;
+        const newWeight = lastSet ? (parseFloat(String(lastSet.weight)) || 0) : (userUnit === 'lbs' ? 135 : 60);
+        const newReps = lastSet ? (parseInt(String(lastSet.reps), 10) || 0) : defaultTargetReps;
         return {
           ...ex,
           sets: [
@@ -410,7 +523,7 @@ export default function ActiveWorkoutScreen({
     );
 
     // Auto-trigger rest interval timer
-    const restDuration = isCurrentMainLift ? 180 : 90;
+    const restDuration = defaultRestDuration;
     setRestTotalSeconds(restDuration);
     setRestSecondsLeft(restDuration);
     setIsRestRunning(true);
@@ -429,7 +542,7 @@ export default function ActiveWorkoutScreen({
     };
 
     const warmups: WorkoutSet[] = [];
-    const targetReps = currentExercise?.sets[0]?.reps || 5;
+    const targetReps = currentExercise?.sets[0]?.reps || defaultTargetReps;
 
     // Set 1: Empty Bar / Motor Pattern Prep
     warmups.push({
@@ -583,7 +696,9 @@ export default function ActiveWorkoutScreen({
 
     // PR detection
     let newPRsCount = 0;
+    const userBW = profile?.bodyweightKg || 75;
     for (const ex of validExercises) {
+      const isBW = isBodyweightExercise(ex.name);
       const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
       const currentBest1RMKg =
         existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
@@ -592,9 +707,10 @@ export default function ActiveWorkoutScreen({
       for (const s of ex.sets) {
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
-        if (sWeight > 0 && sReps > 0) {
+        if (sReps > 0 && (sWeight > 0 || isBW)) {
           const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
-          const e1rm = calculateOneRepMax(wKg, sReps);
+          const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
+          const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
           if (e1rm > topSet.e1RMKg) {
             topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
           }
@@ -737,7 +853,13 @@ export default function ActiveWorkoutScreen({
                 </span>
                 {isCurrentMainLift && (
                   <span className="text-3xs uppercase font-mono font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-md">
-                    POWERLIFTING CORE
+                    {primaryGoal === 'get_stronger'
+                      ? 'STRENGTH CORE'
+                      : primaryGoal === 'build_muscle'
+                      ? 'HYPERTROPHY CORE'
+                      : primaryGoal === 'stamina'
+                      ? 'ENDURANCE CORE'
+                      : 'PRIMARY COMPOUND'}
                   </span>
                 )}
               </div>
@@ -865,7 +987,15 @@ export default function ActiveWorkoutScreen({
             <div className="flex-1 flex items-center justify-between pl-1 sm:pl-2 pr-1">
               <span className="text-center w-28 sm:w-32 font-bold">Weight ({userUnit})</span>
               <span className="text-center w-24 sm:w-28 font-bold">Reps</span>
-              <span className="text-center w-12 sm:w-14 font-bold">RPE</span>
+              <button
+                type="button"
+                onClick={toggleIntensityMode}
+                className="text-center w-12 sm:w-14 font-bold text-accent hover:text-accent/80 transition-colors flex items-center justify-center gap-0.5"
+                title="Click to toggle between RPE and RIR (Reps In Reserve)"
+              >
+                <span>{intensityMode === 'rpe' ? 'RPE' : 'RIR'}</span>
+                <span className="text-[8px] opacity-70">⇄</span>
+              </button>
               <span className="w-9 sm:w-10 text-center font-bold">Done</span>
             </div>
           </div>
@@ -928,11 +1058,11 @@ export default function ActiveWorkoutScreen({
                     <div className="flex items-center gap-0.5 sm:gap-1 bg-bg-secondary p-1 rounded-xl border border-border/60">
                       <button
                         type="button"
-                        onClick={() => handleWeightStep(sIdx, -2.5)}
+                        onClick={() => handleWeightStep(sIdx, -currentWeightStep)}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
-                        title="-2.5 kg"
+                        title={`-${currentWeightStep} ${userUnit}`}
                       >
-                        -2.5
+                        -{currentWeightStep}
                       </button>
                       <input
                         type="text"
@@ -951,15 +1081,15 @@ export default function ActiveWorkoutScreen({
                           handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
                         }}
                         className="w-12 sm:w-14 text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-bg-card hover:bg-bg-secondary focus:bg-bg-card border border-border/40 focus:border-accent rounded-lg py-1 px-0.5 outline-none transition-all"
-                        title="Type weight directly or use -2.5 / +2.5"
+                        title={`Type weight directly or use -${currentWeightStep} / +${currentWeightStep}`}
                       />
                       <button
                         type="button"
-                        onClick={() => handleWeightStep(sIdx, 2.5)}
+                        onClick={() => handleWeightStep(sIdx, currentWeightStep)}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all shrink-0 border border-border/40"
-                        title="+2.5 kg"
+                        title={`+${currentWeightStep} ${userUnit}`}
                       >
-                        +2.5
+                        +{currentWeightStep}
                       </button>
                     </div>
 
@@ -1002,23 +1132,39 @@ export default function ActiveWorkoutScreen({
                       </button>
                     </div>
 
-                    {/* RPE Selector */}
+                    {/* RPE / RIR Selector */}
                     <div className="shrink-0">
                       <select
                         value={set.rpe || 8}
                         onChange={(e) => handleRPESelect(sIdx, Number(e.target.value))}
                         className="bg-bg-secondary border border-border/60 text-accent font-mono font-bold text-2xs p-1.5 sm:p-2 rounded-xl outline-none focus:border-accent"
-                        title="RPE (Rate of Perceived Exertion)"
+                        title={intensityMode === 'rpe' ? "RPE (Rate of Perceived Exertion)" : "RIR (Reps In Reserve)"}
                       >
-                        <option value="6">@6</option>
-                        <option value="6.5">@6.5</option>
-                        <option value="7">@7</option>
-                        <option value="7.5">@7.5</option>
-                        <option value="8">@8</option>
-                        <option value="8.5">@8.5</option>
-                        <option value="9">@9</option>
-                        <option value="9.5">@9.5</option>
-                        <option value="10">@10</option>
+                        {intensityMode === 'rpe' ? (
+                          <>
+                            <option value="6">@6</option>
+                            <option value="6.5">@6.5</option>
+                            <option value="7">@7</option>
+                            <option value="7.5">@7.5</option>
+                            <option value="8">@8</option>
+                            <option value="8.5">@8.5</option>
+                            <option value="9">@9</option>
+                            <option value="9.5">@9.5</option>
+                            <option value="10">@10</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="10">0 RIR</option>
+                            <option value="9.5">0.5 RIR</option>
+                            <option value="9">1 RIR</option>
+                            <option value="8.5">1.5 RIR</option>
+                            <option value="8">2 RIR</option>
+                            <option value="7.5">2.5 RIR</option>
+                            <option value="7">3 RIR</option>
+                            <option value="6.5">3.5 RIR</option>
+                            <option value="6">4+ RIR</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -1076,6 +1222,9 @@ export default function ActiveWorkoutScreen({
               <div className="flex items-center gap-1.5">
                 <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
                   REST TIMER
+                </span>
+                <span className="text-3xs font-mono text-text-muted">
+                  • {goalConfig.label}
                 </span>
                 {isRestFinished && (
                   <span className="text-3xs font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.2 rounded-full animate-bounce">
@@ -1311,9 +1460,9 @@ export default function ActiveWorkoutScreen({
                       {
                         name,
                         sets: [
-                          { weight: 50, reps: 8, unit: userUnit, completed: false, rpe: 8 },
-                          { weight: 50, reps: 8, unit: userUnit, completed: false, rpe: 8 },
-                          { weight: 50, reps: 8, unit: userUnit, completed: false, rpe: 8 },
+                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
+                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
+                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
                         ],
                       },
                     ]);

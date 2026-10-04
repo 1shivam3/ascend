@@ -5,6 +5,8 @@ import { useStore } from '@/lib/store';
 import { ChevronRight, Dumbbell, ArrowRight, RotateCcw, Upload, Ruler, Check, Zap, Flame, Scale, Activity, Sparkles } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { PersonalRecord, BodyMetricEntry, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { getGoalAdaptiveSplitTemplates } from '@/lib/workout-engine';
+import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import { useToast } from '@/components/ui/Toast';
 
 export default function OnboardingScreen() {
@@ -48,7 +50,16 @@ export default function OnboardingScreen() {
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(['get_stronger', 'build_muscle']);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
 
-  const { setProfile, setGoals, setTrainingProfile, addMultiplePRs, addBodyMetric, importAllData } = useStore();
+  const {
+    setProfile,
+    setGoals,
+    setTrainingProfile,
+    addMultiplePRs,
+    addBodyMetric,
+    importAllData,
+    setPlannedWorkouts,
+    setMacroGoals,
+  } = useStore();
 
   const handleFinish = (skipLifts = false) => {
     const bw = parseFloat(bodyweight);
@@ -73,6 +84,9 @@ export default function OnboardingScreen() {
 
     setProfile(profileData);
     setGoals(selectedGoals);
+
+    const primaryGoal: AthleteGoal = selectedGoals[0] || 'build_muscle';
+
     setTrainingProfile({
       goal: selectedGoals.includes('get_stronger')
         ? 'strength'
@@ -84,6 +98,14 @@ export default function OnboardingScreen() {
       daysPerWeek,
       preferredSplit: daysPerWeek >= 5 ? 'push_pull_legs' : daysPerWeek === 4 ? 'upper_lower' : 'full_body',
     });
+
+    // 1. Initialize 4-session split routine tailored to athlete's primary goal & weight unit
+    const initialSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
+    setPlannedWorkouts(initialSplit);
+
+    // 2. Initialize calibrated nutritional baseline with zero Atwater drift
+    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight);
+    setMacroGoals(initialMacros);
 
     const today = new Date().toISOString().split('T')[0];
 

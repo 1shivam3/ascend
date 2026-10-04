@@ -7,24 +7,24 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    default: 'ASCEND | Elite Powerlifting & Strength Tracker',
+    default: 'ASCEND | Evidence-Based Training & Nutrition System',
     template: '%s | ASCEND',
   },
   description:
-    'Calibrate your true strength levels, track 1RM personal records, compute official DOTS powerlifting scores, log workouts, and monitor bodyweight ratios with 100% offline privacy.',
+    'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, macro tracking with zero Atwater drift, and 100% offline privacy for every gym-goer.',
   keywords: [
+    'gym tracker',
+    'workout log',
+    'hypertrophy tracker',
+    'progressive overload',
+    'RPE RIR autoregulation',
+    'macro tracker',
     'powerlifting tracker',
     'strength standards',
     '1RM calculator',
     'DOTS calculator',
-    'workout log',
-    'personal records',
-    'bench press',
-    'deadlift',
-    'squat',
-    'gym tracker',
     'offline fitness webapp',
-    'PWA powerlifting',
+    'PWA fitness app',
   ],
   authors: [{ name: 'Shivam Kumar' }],
   creator: 'Shivam Kumar',
@@ -35,15 +35,15 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://ascend-alpha.vercel.app',
     siteName: 'ASCEND',
-    title: 'ASCEND | Elite Powerlifting & Strength Tracker',
+    title: 'ASCEND | Evidence-Based Training & Nutrition System',
     description:
-      'Track PRs, evaluate pound-for-pound strength standards, calculate DOTS scores, and log workouts with full offline device privacy.',
+      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, macro tracking with zero Atwater drift, and 100% offline privacy for every gym-goer.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ASCEND | Elite Powerlifting & Strength Tracker',
+    title: 'ASCEND | Evidence-Based Training & Nutrition System',
     description:
-      'Track PRs, evaluate strength levels, and log workouts with 100% offline privacy.',
+      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, and macro tracking with 100% offline privacy.',
   },
   appleWebApp: {
     capable: true,
@@ -72,6 +72,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(err) {
+                    console.warn('[PWA] ServiceWorker registration notice:', err);
+                  });
+                });
+              }
+            `,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ToastProvider>{children}</ToastProvider>
       </body>

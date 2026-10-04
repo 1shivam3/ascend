@@ -203,6 +203,8 @@ export interface PlannedWorkout {
   name: string;
   exercises: PlannedExercise[];
   createdAt: string;
+  description?: string;
+  goalTag?: string;
 }
 
 export interface FavoriteFood {

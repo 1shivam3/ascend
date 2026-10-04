@@ -1,4 +1,4 @@
-import { FoodItem, MacroTotals } from './types';
+import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types';
 
 // Macros per 100g or 100ml (unless noted)
 const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
@@ -394,17 +394,51 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
   };
 }
 
+/**
+ * Computes exact Atwater calories from macronutrients: (4 * P) + (4 * C) + (9 * F)
+ */
+export function calculateCaloriesFromMacros(proteinG: number, carbsG: number, fatG: number): number {
+  const p = Math.max(0, Number(proteinG) || 0);
+  const c = Math.max(0, Number(carbsG) || 0);
+  const f = Math.max(0, Number(fatG) || 0);
+  return Math.round(4 * p + 4 * c + 9 * f);
+}
+
+/**
+ * Returns difference between stated calories and expected Atwater calories.
+ */
+export function getMacroCalorieDrift(calories: number, proteinG: number, carbsG: number, fatG: number): number {
+  const expected = calculateCaloriesFromMacros(proteinG, carbsG, fatG);
+  const stated = Math.max(0, Number(calories) || 0);
+  return stated - expected;
+}
+
 export function calculateMealMacros(foods: FoodItem[]): MacroTotals {
   if (!foods || !Array.isArray(foods)) {
     return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
   }
 
-  return foods.reduce((acc, food) => ({
-    calories: acc.calories + (Number(food.calories) || 0),
-    proteinG: Number((acc.proteinG + (Number(food.proteinG) || 0)).toFixed(1)),
-    carbsG: Number((acc.carbsG + (Number(food.carbsG) || 0)).toFixed(1)),
-    fatG: Number((acc.fatG + (Number(food.fatG) || 0)).toFixed(1))
-  }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
+  return foods.reduce(
+    (acc, food) => {
+      const p = Math.max(0, Number(food.proteinG) || 0);
+      const c = Math.max(0, Number(food.carbsG) || 0);
+      const f = Math.max(0, Number(food.fatG) || 0);
+      let cal = Math.max(0, Number(food.calories) || 0);
+
+      // If calories is 0 or unrecorded but macros are present, reconcile via Atwater
+      if (cal === 0 && (p > 0 || c > 0 || f > 0)) {
+        cal = Math.round(4 * p + 4 * c + 9 * f);
+      }
+
+      return {
+        calories: acc.calories + cal,
+        proteinG: Number((acc.proteinG + p).toFixed(1)),
+        carbsG: Number((acc.carbsG + c).toFixed(1)),
+        fatG: Number((acc.fatG + f).toFixed(1)),
+      };
+    },
+    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }
+  );
 }
 
 /** Returns food names from DB for autocomplete */
@@ -482,4 +516,74 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
   }
 
   return parsedItems;
+}
+
+/**
+ * Calculates evidence-based macro targets and caloric goals based on athlete bodyweight,
+ * primary goal, gender, and optional height.
+ * Uses Mifflin-St Jeor / standard active gym-goer TDEE multipliers with zero Atwater drift.
+ */
+export function calculateRecommendedMacroGoals(
+  bodyweightKg: number,
+  goal: AthleteGoal = 'build_muscle',
+  gender: Gender = 'male',
+  heightCm?: number
+): MacroGoals {
+  const bw = Math.max(35, Math.min(250, bodyweightKg));
+  const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : (gender === 'male' ? 175 : 162);
+  const age = 28; // Standard reference athlete age
+
+  // Mifflin-St Jeor BMR
+  const bmr = 10 * bw + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161);
+  // Active trainee activity factor (~3-5 days/week resistance training)
+  const maintenance = Math.round(bmr * 1.4);
+
+  let targetCalories = maintenance;
+  let proteinPerKg = 1.8;
+
+  switch (goal) {
+    case 'build_muscle':
+      targetCalories = maintenance + 250; // Lean caloric surplus
+      proteinPerKg = 1.8;
+      break;
+    case 'get_stronger':
+      targetCalories = maintenance + 150; // Performance slight surplus
+      proteinPerKg = 1.8;
+      break;
+    case 'lose_fat':
+      targetCalories = Math.max(1400, maintenance - 450); // Moderate deficit
+      proteinPerKg = 2.2; // Elevated protein to preserve lean mass
+      break;
+    case 'stamina':
+      targetCalories = maintenance; // Energy balance
+      proteinPerKg = 1.6;
+      break;
+    case 'general_fitness':
+    default:
+      targetCalories = maintenance; // Sustainable baseline
+      proteinPerKg = 1.6;
+      break;
+  }
+
+  // Protein calculation
+  const proteinG = Math.round(bw * proteinPerKg);
+  const proteinCalories = proteinG * 4;
+
+  // Fat calculation (approx 25% of calories, minimum 40g)
+  const fatCalories = Math.max(360, Math.round(targetCalories * 0.25));
+  const fatG = Math.max(40, Math.round(fatCalories / 9));
+
+  // Carbs calculation (remaining calories, minimum 50g)
+  const remainingCalories = Math.max(200, targetCalories - proteinCalories - (fatG * 9));
+  const carbsG = Math.round(remainingCalories / 4);
+
+  // Reconcile total calories exactly to 4P + 4C + 9F to guarantee zero Atwater drift
+  const exactCalories = proteinG * 4 + carbsG * 4 + fatG * 9;
+
+  return {
+    calories: exactCalories,
+    proteinG,
+    fatG,
+    carbsG,
+  };
 }

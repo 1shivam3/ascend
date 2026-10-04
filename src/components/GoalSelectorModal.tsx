@@ -33,6 +33,7 @@ const GOAL_ICONS: Record<AthleteGoal, React.ElementType> = {
 export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModalProps) {
   const currentGoals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const setGoals = useStore((state) => state.setGoals);
+  const setTrainingProfile = useStore((state) => state.setTrainingProfile);
   const toast = useToast();
 
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(currentGoals);
@@ -55,6 +56,17 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
   const handleSave = () => {
     setGoals(selectedGoals);
+    const primaryGoal = selectedGoals[0] || 'build_muscle';
+    setTrainingProfile({
+      goal: primaryGoal === 'get_stronger'
+        ? 'strength'
+        : primaryGoal === 'build_muscle'
+        ? 'muscle_gain'
+        : primaryGoal === 'lose_fat'
+        ? 'fat_loss'
+        : 'general_fitness',
+    });
+
     const count = selectedGoals.length;
     toast.success(
       `Updated active goal${count > 1 ? 's' : ''} to: ${selectedGoals

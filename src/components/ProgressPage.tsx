@@ -567,19 +567,44 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <p className="text-xs text-text-muted text-center py-4">No workouts logged yet.</p>
             ) : (
               <div className="divide-y divide-border/60">
-                {workouts.slice(0, 10).map((w) => (
-                  <div key={w.id} className="py-2.5 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-semibold text-text-primary block">
-                        {plural(w.exercises.length, 'exercise')} ({w.exercises.map((e) => e.name).slice(0, 2).join(', ')}...)
-                      </span>
-                      <span className="text-3xs text-text-muted font-mono">{w.date}</span>
+                {workouts.slice(0, 10).map((w) => {
+                  const totalSets = w.exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+                  const totalTonnage = w.exercises.reduce(
+                    (sum, ex) =>
+                      sum +
+                      ex.sets.reduce((sSum, s) => sSum + (s.weight || 0) * (s.reps || 0), 0),
+                    0
+                  );
+                  const allRpes = w.exercises.flatMap((e) =>
+                    e.sets.map((s) => s.rpe).filter((r): r is number => typeof r === 'number')
+                  );
+                  const avgRpe =
+                    allRpes.length > 0
+                      ? (allRpes.reduce((a, b) => a + b, 0) / allRpes.length).toFixed(1)
+                      : null;
+
+                  return (
+                    <div key={w.id} className="py-2.5 flex items-center justify-between text-xs gap-2">
+                      <div className="min-w-0 pr-1">
+                        <span className="font-semibold text-text-primary block truncate">
+                          {plural(w.exercises.length, 'exercise')} ({w.exercises.map((e) => e.name).slice(0, 2).join(', ')}...)
+                        </span>
+                        <span className="text-3xs text-text-muted font-mono">{w.date}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-2xs font-medium text-text-secondary tabular-nums block">
+                          {plural(totalSets, 'set')}
+                          {totalTonnage > 0 && ` • ${Math.round(totalTonnage).toLocaleString()} ${userUnit}`}
+                        </span>
+                        {avgRpe && (
+                          <span className="text-3xs font-mono font-bold text-accent block">
+                            Avg @{avgRpe} RPE
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <span className="text-2xs font-medium text-text-secondary tabular-nums">
-                      {plural(w.exercises.reduce((acc, ex) => acc + ex.sets.length, 0), 'set')}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

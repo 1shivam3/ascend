@@ -181,6 +181,39 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(weightKg)} kg`;
   };
 
+  const primaryGoal: AthleteGoal = goals?.[0] || 'build_muscle';
+
+  const strengthSectionConfig = useMemo(() => {
+    switch (primaryGoal) {
+      case 'get_stronger':
+        return {
+          title: 'Strength Snapshot & DOTS Score',
+          pill: dotsScore > 0 ? `${Math.round(dotsScore)} DOTS • ${bigThreeStats.totalKg} kg` : 'Big 3 & DOTS',
+        };
+      case 'build_muscle':
+        return {
+          title: 'Hypertrophy Benchmarks & Top Lifts',
+          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : (topLifts.length > 0 ? `${topLifts.length} Compound Lifts` : 'Top Lifts'),
+        };
+      case 'lose_fat':
+        return {
+          title: 'Lean Mass & Strength Retention',
+          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level}` : 'Preservation Baseline',
+        };
+      case 'stamina':
+        return {
+          title: 'Work Capacity & Strength Standards',
+          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : 'Work Capacity',
+        };
+      case 'general_fitness':
+      default:
+        return {
+          title: 'Strength & Fitness Standards',
+          pill: overallLevel && overallLevel.level > 1 ? `Rank: Lvl ${overallLevel.level} • ${overallLevel.title}` : 'Fitness Baseline',
+        };
+    }
+  }, [primaryGoal, dotsScore, bigThreeStats.totalKg, overallLevel, topLifts.length]);
+
   // Modals state
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -471,49 +504,91 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 6. ACTIVITY 7-DAY STRIP ──────────── */}
       <HomeActivityHeatmap onNavigateProgress={() => onNavigate('progress')} />
 
-      {/* ── 7. ORGANIZED DISCLOSURE: POWERLIFTING & STRENGTH SNAPSHOT ──────── */}
+      {/* ── 7. ORGANIZED DISCLOSURE: GOAL-ADAPTIVE STRENGTH & BENCHMARKS SNAPSHOT ──────── */}
       <details className="card p-3.5 sm:p-4 bg-bg-card border border-border group transition-all">
         <summary className="cursor-pointer list-none flex items-center justify-between select-none">
           <div className="flex items-center gap-2">
             <Trophy className="w-4 h-4 text-accent" />
             <h3 className="text-label font-bold text-text-primary">
-              Strength Snapshot &amp; DOTS Score
+              {strengthSectionConfig.title}
             </h3>
           </div>
           <div className="flex items-center gap-1.5 text-text-muted text-label font-medium tabular-nums">
-            {dotsScore > 0 ? (
-              <span>{Math.round(dotsScore)} DOTS • {bigThreeStats.totalKg} kg</span>
-            ) : (
-              <span>View Big 3</span>
-            )}
+            <span>{strengthSectionConfig.pill}</span>
             <ChevronRight className="w-3.5 h-3.5 transition-transform group-open:rotate-90" />
           </div>
         </summary>
 
-        <div className="pt-3 space-y-3 border-t border-border mt-3 text-label">
-          <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center font-sans">
-            <div>
-              <span className="text-label text-text-muted block">Bench</span>
-              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
-                {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
+        <div className="pt-3 space-y-3.5 border-t border-border mt-3 text-label">
+          {/* Top Lifts (If available) */}
+          {topLifts.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-3xs font-mono uppercase tracking-wider text-text-muted font-bold block">
+                Top Strength &amp; Rank Tiers
               </span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {topLifts.map((lift) => (
+                  <div
+                    key={lift.exercise}
+                    className="p-2.5 rounded-xl bg-bg-secondary border border-border/80 flex items-center justify-between sm:flex-col sm:items-start gap-1"
+                  >
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-text-primary block truncate max-w-[150px]">
+                        {lift.exercise}
+                      </span>
+                      <span className="text-3xs font-mono text-accent">
+                        Lvl {lift.levelInfo?.level || 1} • {lift.levelInfo?.category || 'Initiate'}
+                      </span>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-text-primary shrink-0">
+                      {displayWeight(lift.oneRepMax)} 1RM
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="border-l border-border">
-              <span className="text-label text-text-muted block">Squat</span>
-              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
-                {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+          )}
+
+          {/* Powerlifting Big 3 & DOTS */}
+          <div className="space-y-1.5 pt-0.5">
+            <div className="flex items-center justify-between">
+              <span className="text-3xs font-mono uppercase tracking-wider text-text-muted font-bold block">
+                Powerlifting Big 3 &amp; DOTS Score
               </span>
+              {dotsScore > 0 && (
+                <span className="text-3xs font-mono text-text-muted">
+                  DOTS: <strong className="text-accent">{Math.round(dotsScore)}</strong> ({dotsClassification.tier})
+                </span>
+              )}
             </div>
-            <div className="border-l border-border">
-              <span className="text-label text-text-muted block">Deadlift</span>
-              <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
-                {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
-              </span>
+
+            <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center font-sans">
+              <div>
+                <span className="text-label text-text-muted block">Bench</span>
+                <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
+                  {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
+                </span>
+              </div>
+              <div className="border-l border-border">
+                <span className="text-label text-text-muted block">Squat</span>
+                <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
+                  {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
+                </span>
+              </div>
+              <div className="border-l border-border">
+                <span className="text-label text-text-muted block">Deadlift</span>
+                <span className="font-bold text-text-primary text-body mt-0.5 block tabular-nums">
+                  {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
+                </span>
+              </div>
             </div>
           </div>
 
+          {/* Summary Footer */}
           <div className="flex items-center justify-between text-label text-text-secondary pt-1">
-            <span>DOTS Rating: <strong className="text-text-primary">{Math.round(dotsScore)} ({dotsClassification.tier})</strong></span>
+            <span>
+              Total: <strong className="text-text-primary">{bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}</strong>
+            </span>
             <button
               type="button"
               onClick={() => onNavigate('progress')}

@@ -11,7 +11,14 @@ import {
   AthleteGoal,
   ATHLETE_GOAL_CONFIGS,
 } from './types';
-import { calculateOneRepMax, isMainCompoundLift } from './strength-standards';
+import {
+  calculateOneRepMax,
+  isMainCompoundLift,
+  normalizeExerciseName,
+  getEquipmentType,
+  isBodyweightExercise,
+  isDumbbellExercise,
+} from './strength-standards';
 
 /**
  * Calculates within-session effort drift and rep drop across comparable working sets.
@@ -308,7 +315,22 @@ export function generateTrainingDecision(
       ? `Hypertrophy Overload Prescribed (+${increment} ${userUnit})`
       : hasStrength
       ? `Strength Overload Prescribed (+${increment} ${userUnit})`
+      : hasFatLoss
+      ? `Tension-Sparing Overload Prescribed (+${increment} ${userUnit})`
+      : hasStamina
+      ? `Work Capacity Overload Prescribed (+${increment} ${userUnit})`
       : `Progressive Overload Prescribed (+${increment} ${userUnit})`;
+
+    let goalExplanation = `All working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended, targeting ${targetRepPrescription} reps tailored to your ${goalsLabel} focus.`;
+    if (hasStrength && !isPowerbuilding) {
+      goalExplanation = `All working sets on ${lastSession.date} were completed with clean bar velocity (average RPE ${effort.averageRpe} ≤ 8.0). Adding +${increment}${userUnit} (+${deltaPercent}%) targeting ${targetRepPrescription} reps drives high-threshold motor unit recruitment and peak neurological strength adaptation.`;
+    } else if (hasMuscle && !hasStrength) {
+      goalExplanation = `Working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Overloading with +${increment}${userUnit} (+${deltaPercent}%) targeting ${targetRepPrescription} reps delivers the progressive mechanical tension needed for sustained myofibrillar hypertrophy.`;
+    } else if (hasFatLoss) {
+      goalExplanation = `Sets completed with solid technical reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) targeting ${targetRepPrescription} reps maintains high contractile tension to signal muscle retention while in a caloric deficit.`;
+    } else if (hasStamina) {
+      goalExplanation = `Endurance threshold was maintained cleanly (average RPE ${effort.averageRpe} ≤ 8.0). Incrementing load by +${increment}${userUnit} (+${deltaPercent}%) for ${targetRepPrescription} reps builds muscular stamina and expands your lactate threshold under load.`;
+    }
 
     return {
       id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -330,7 +352,7 @@ export function generateTrainingDecision(
       expectedRpe: 8.0,
       reasonType: 'progressive_overload',
       headline,
-      explanation: `All working sets on ${lastSession.date} were completed with reserve (average RPE ${effort.averageRpe} ≤ 8.0). Progressive overload of +${increment}${userUnit} (+${deltaPercent}%) is recommended, targeting ${targetRepPrescription} reps tailored to your ${goalsLabel} focus.`,
+      explanation: goalExplanation,
       deltaKg,
       deltaPercent,
       confidence,
@@ -342,6 +364,18 @@ export function generateTrainingDecision(
 
   // ── CASE D: Baseline Progression (+1 Rep Target) ───────────────────────────
   const isHyper = hasMuscle && !hasStrength;
+
+  let caseDExplanation = `Your performance on ${lastWeight}${userUnit} is calibrated. Today's target is pushing for +1 rep on your top set (${lastReps} → ${lastReps + 1} reps) while maintaining RPE ≤ 8.5, building work capacity for your ${goalsLabel} goal.`;
+  if (hasStrength && !isPowerbuilding) {
+    caseDExplanation = `Your previous top set was ${lastWeight}${userUnit} × ${lastReps}. Pushing for +1 rep (${lastReps} → ${lastReps + 1} reps) today demonstrates repeatable bar control before stepping up to the next weight milestone.`;
+  } else if (hasMuscle && !hasStrength) {
+    caseDExplanation = `Target +1 rep volume overload (${lastReps} → ${lastReps + 1} reps) at ${lastWeight}${userUnit}. Squeezing out one more high-quality rep near failure accumulates effective hypertrophic volume with zero joint penalty.`;
+  } else if (hasFatLoss) {
+    caseDExplanation = `Hold ${lastWeight}${userUnit} and aim for +1 clean rep (${lastReps} → ${lastReps + 1} reps). Controlled volume progression preserves contractile tissue without generating excessive systemic fatigue.`;
+  } else if (hasStamina) {
+    caseDExplanation = `Maintain ${lastWeight}${userUnit} and push the set ceiling by +1 rep (${lastReps} → ${lastReps + 1} reps) to condition your muscular endurance and aerobic recovery.`;
+  }
+
   return {
     id: `decision_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     exerciseName,
@@ -362,7 +396,7 @@ export function generateTrainingDecision(
     expectedRpe: 8.5,
     reasonType: 'fatigue_hold',
     headline: `Target +1 Rep Overload (${lastReps} → ${lastReps + 1})`,
-    explanation: `Your performance on ${lastWeight}${userUnit} is calibrated. Today's target is pushing for +1 rep on your top set (${lastReps} → ${lastReps + 1} reps) while maintaining RPE ≤ 8.5, building work capacity for your ${goalsLabel} goal.`,
+    explanation: caseDExplanation,
     deltaKg: 0,
     deltaPercent: 0,
     confidence,
@@ -528,25 +562,108 @@ export const STIMULUS_PRESERVING_SWAPS: Record<string, StimulusPreservingSwap[]>
     { target: 'Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves horizontal chest press stimulus; athlete selects dumbbell load to hit target RPE 8' },
     { target: 'Incline Bench', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves compound pressing motor pattern with clavicular head emphasis' },
     { target: 'Dips', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Bodyweight/weighted push stimulus preserving pectoral and tricep volume' },
+    { target: 'Chest Press Machine', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'High stability chest isolation when bench is occupied' },
+  ],
+  'Incline Bench': [
+    { target: 'Incline Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Independent arm movement with deep stretch on clavicular fibers' },
+    { target: 'Barbell Bench Press', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Compound bilateral pressing overload' },
+    { target: 'Chest Press Machine', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Safe, stable upper chest path' },
+  ],
+  'Dumbbell Press': [
+    { target: 'Barbell Bench Press', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Bilateral heavy compound chest driver' },
+    { target: 'Incline Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Upper chest emphasis with dumbbell stretch' },
+    { target: 'Dips', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Bodyweight compound push builder' },
   ],
   'Squat': [
     { target: 'Leg Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves quad mechanical tension without axial spine loading; select machine pin load to match RPE 8' },
+    { target: 'Hack Squat', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Deep quad knee flexion with fixed lumbar support' },
     { target: 'Front Squat', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Barbell quad driver with upright torso mechanics' },
     { target: 'Goblet Squat', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Preserves knee flexion and quad stimulus when rack is unavailable' },
   ],
+  'Leg Press': [
+    { target: 'Hack Squat', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Continuous quad tension with lumbar support' },
+    { target: 'Barbell Squat', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Full systemic leg & core driver' },
+    { target: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Unilateral quad and glute focus' },
+  ],
   'Deadlift': [
     { target: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves hip hinge and posterior chain recruitment with reduced systemic fatigue' },
+    { target: 'Trap Bar Deadlift', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Lower lumbar shear with great quad and trap drive' },
     { target: 'Barbell Row', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves spinal erector bracing and posterior back tension' },
+  ],
+  'Romanian Deadlift': [
+    { target: 'Dumbbell Romanian Deadlift', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Natural hip hinge with dumbbell positioning' },
+    { target: 'Seated Leg Curl', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Isolated knee flexion hamstring work' },
+    { target: 'Good Mornings', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Posterior chain hip hinge loading' },
   ],
   'Barbell Row': [
     { target: 'Dumbbell Row', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves lat and upper back stimulus without lower back fatigue' },
     { target: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Preserves vertical pulling volume when row station is busy' },
+    { target: 'Cable Seated Row', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Smooth cable resistance across full range of motion' },
+  ],
+  'Pull-ups': [
+    { target: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Vertical pulling volume with micro-adjustable resistance' },
+    { target: 'Underhand Chin-ups', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Higher bicep leverage vertical pull' },
+    { target: 'Straight Arm Pulldown', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Pure lat isolation without arm fatigue' },
+  ],
+  'Lat Pulldown': [
+    { target: 'Pull-ups', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Bodyweight vertical pulling gold standard' },
+    { target: 'Underhand Cable Pulldown', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Closer grip targeting lower lat fibers' },
+    { target: 'Cable Seated Row', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Horizontal pulling volume when pulldown tower is busy' },
   ],
   'Overhead Press': [
     { target: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Preserves vertical pressing stimulus; athlete selects dumbbell weight to hit target RPE 8' },
     { target: 'Arnold Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Full 3D deltoid rotation and hypertrophy stimulus' },
+    { target: 'Machine Shoulder Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Stable overhead burnout without core stabilization fatigue' },
+  ],
+  'Dumbbell Shoulder Press': [
+    { target: 'Barbell Overhead Press', targetSets: 3, targetReps: 6, targetRpe: 8, stimulusReason: 'Heavy bilateral strength builder' },
+    { target: 'Machine Shoulder Press', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Fixed deltoid path' },
+    { target: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Direct side deltoid hypertrophy' },
+  ],
+  'Dumbbell Curl': [
+    { target: 'Incline Dumbbell Curl', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Maximum stretch on long head of biceps' },
+    { target: 'Barbell Bicep Curl', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Heavy bilateral overload' },
+    { target: 'Hammer Curl', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Brachialis and forearm thickness focus' },
+  ],
+  'Tricep Pushdown': [
+    { target: 'Overhead Cable Tricep Extension', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Long head tricep stretch' },
+    { target: 'Skull Crushers', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Heavy compound tricep builder' },
+    { target: 'Dips', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Compound tricep press with bodyweight' },
+  ],
+  'Dips': [
+    { target: 'Close Grip Bench', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Heavy tricep compound pressing' },
+    { target: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Isolated cable elbow extension' },
+    { target: 'Dumbbell Press', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Chest & tricep pressing' },
   ],
 };
+
+export function getStimulusPreservingSwaps(exerciseName: string): StimulusPreservingSwap[] {
+  if (!exerciseName) return [];
+  const norm = normalizeExerciseName(exerciseName);
+
+  if (STIMULUS_PRESERVING_SWAPS[norm]) {
+    return STIMULUS_PRESERVING_SWAPS[norm];
+  }
+
+  const lower = exerciseName.trim().toLowerCase();
+  for (const [key, swaps] of Object.entries(STIMULUS_PRESERVING_SWAPS)) {
+    if (key.toLowerCase() === lower || lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
+      return swaps;
+    }
+  }
+
+  const eq = getEquipmentType(exerciseName);
+  if (eq === 'dumbbell') {
+    return [
+      { target: 'Barbell equivalent', targetSets: 3, targetReps: 8, targetRpe: 8, stimulusReason: 'Heavier bilateral loading to preserve motor recruitment' },
+      { target: 'Cable variation', targetSets: 3, targetReps: 12, targetRpe: 8, stimulusReason: 'Continuous resistance curve and joint comfort' },
+    ];
+  }
+  return [
+    { target: 'Dumbbell alternative', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'Independent limb freedom and stabilizer recruitment' },
+    { target: 'Machine alternative', targetSets: 3, targetReps: 10, targetRpe: 8, stimulusReason: 'High stability and controlled path when free weights are busy' },
+  ];
+}
 
 /**
  * Real-world constraint adaptation engine:
@@ -613,7 +730,7 @@ export function adaptWorkoutForConstraints(
 
     if (exIndex !== -1) {
       const currentEx = adapted[exIndex];
-      const swapOptions = STIMULUS_PRESERVING_SWAPS[currentEx.name];
+      const swapOptions = getStimulusPreservingSwaps(currentEx.name);
 
       let newName = substituteName;
       let targetSets = currentEx.sets.length;
@@ -634,10 +751,23 @@ export function adaptWorkoutForConstraints(
         newName = substituteName || `${currentEx.name} (DB / Machine)`;
       }
 
-      // Stimulus-preserving sets: Do NOT fake a load multiplier!
-      // Athlete chooses weight based on warm-up feel on the substitute machine/dumbbells
-      const nextSets: WorkoutSet[] = Array.from({ length: targetSets }, (_, idx) => ({
-        weight: currentEx.sets[idx]?.weight || 0,
+      // Safe, evidence-based load handling:
+      // Do NOT copy a 100kg barbell load onto dumbbells or bodyweight movements!
+      const isNewBodyweight = isBodyweightExercise(newName);
+      const isNewDumbbell = isDumbbellExercise(newName);
+      const isOldDumbbell = isDumbbellExercise(currentEx.name);
+
+      let targetWeight = currentEx.sets[0]?.weight || 0;
+      if (isNewBodyweight) {
+        targetWeight = 0; // Pure bodyweight baseline
+      } else if (isNewDumbbell && !isOldDumbbell) {
+        // Barbell to dumbbell conversion without personal history:
+        // Set safe exploratory calibration weight (~35% of barbell weight per hand)
+        targetWeight = Math.max(userUnit === 'kg' ? 12 : 25, Math.round(targetWeight * 0.35));
+      }
+
+      const nextSets: WorkoutSet[] = Array.from({ length: targetSets }, () => ({
+        weight: targetWeight,
         reps: targetReps,
         rpe: targetRpe,
         unit: currentEx.sets[0]?.unit || userUnit,

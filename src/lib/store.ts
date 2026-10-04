@@ -117,6 +117,7 @@ export interface AppState {
   addPlannedWorkout: (plan: PlannedWorkout) => void;
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
+  setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
 
   addFavoriteFood: (food: Omit<FavoriteFood, 'id'>) => void;
   updateFavoriteFood: (id: string, updated: Partial<FavoriteFood>) => void;
@@ -450,6 +451,7 @@ export const useAppStore = create<AppState>()(
       deletePlannedWorkout: (id) => set((state) => ({
         plannedWorkouts: state.plannedWorkouts.filter(p => p.id !== id)
       })),
+      setPlannedWorkouts: (plans) => set({ plannedWorkouts: plans }),
 
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [

@@ -2,7 +2,13 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { estimateMacros, calculateMealMacros, getFoodSuggestions } from '@/lib/macros';
+import {
+  estimateMacros,
+  calculateMealMacros,
+  getFoodSuggestions,
+  calculateRecommendedMacroGoals,
+  getMacroCalorieDrift,
+} from '@/lib/macros';
 import {
   Plus,
   X,
@@ -104,6 +110,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const creatineConfig     = useStore((state) => state.creatineConfig);
   const customGeminiKey    = useStore((state) => state.customGeminiKey);
   const goals              = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+
+  // Athlete goal personalization
+  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
+    ? (profile.goals[0] as AthleteGoal)
+    : (goals && goals.length > 0 ? (goals[0] as AthleteGoal) : 'build_muscle');
+  const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
@@ -253,6 +265,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             fatG:     est.fatG,
           };
         }
+      }
+
+      if (field === 'proteinG' || field === 'carbsG' || field === 'fatG') {
+        const val = Math.max(0, Number(value) || 0);
+        const p = field === 'proteinG' ? val : (Number(next[index].proteinG) || 0);
+        const c = field === 'carbsG' ? val : (Number(next[index].carbsG) || 0);
+        const f = field === 'fatG' ? val : (Number(next[index].fatG) || 0);
+        next[index] = {
+          ...next[index],
+          [field]: val,
+          calories: Math.round(4 * p + 4 * c + 9 * f),
+        };
+      }
+
+      if (field === 'calories') {
+        next[index] = {
+          ...next[index],
+          calories: Math.max(0, Math.round(Number(value) || 0)),
+        };
       }
 
       return next;
@@ -520,86 +551,39 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       setGoalCarbs(macroGoals.carbsG ? String(macroGoals.carbsG) : '');
       setGoalFat(macroGoals.fatG ? String(macroGoals.fatG) : '');
     } else {
-      const bw   = profile?.bodyweightKg || 75;
-      const cal  = Math.round(bw * 32);
-      const prot = Math.round(bw * 2);
-      const fat  = Math.round(bw * 0.9);
-      const carb = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
-      setGoalCalories(String(cal));
-      setGoalProtein(String(prot));
-      setGoalCarbs(String(carb));
-      setGoalFat(String(fat));
+      const bw = profile?.bodyweightKg || 75;
+      const rec = calculateRecommendedMacroGoals(
+        bw,
+        primaryGoal,
+        profile?.gender || 'male',
+        profile?.heightCm
+      );
+      setGoalCalories(String(rec.calories));
+      setGoalProtein(String(rec.proteinG));
+      setGoalCarbs(String(rec.carbsG || 0));
+      setGoalFat(String(rec.fatG || 0));
     }
     setIsGoalsModalOpen(true);
   };
 
   const handleAutoCalculateGoals = () => {
     const bw = profile?.bodyweightKg || 75;
-    const activeGoals = goals || ['get_stronger', 'build_muscle'];
-    let calMultiplier = 32;
-    let protPerKg = 2.0;
-    let fatPerKg = 0.9;
-    let strategyName = 'Balanced Maintenance';
+    const rec = calculateRecommendedMacroGoals(
+      bw,
+      primaryGoal,
+      profile?.gender || 'male',
+      profile?.heightCm
+    );
 
-    const hasFatLoss = activeGoals.includes('lose_fat');
-    const hasMuscle = activeGoals.includes('build_muscle');
-    const hasStrength = activeGoals.includes('get_stronger');
-    const hasStamina = activeGoals.includes('stamina');
+    setGoalCalories(String(rec.calories));
+    setGoalProtein(String(rec.proteinG));
+    setGoalCarbs(String(rec.carbsG || 0));
+    setGoalFat(String(rec.fatG || 0));
 
-    if (hasFatLoss && hasMuscle) {
-      // Recomposition: slight deficit, elevated protein to preserve/build LBM
-      calMultiplier = 28;
-      protPerKg = 2.2;
-      fatPerKg = 0.8;
-      strategyName = 'Lean Recomposition (Deficit -300 kcal, High Protein 2.2g/kg)';
-    } else if (hasFatLoss) {
-      // Caloric deficit for fat loss
-      calMultiplier = 26;
-      protPerKg = 2.0;
-      fatPerKg = 0.75;
-      strategyName = 'Fat Loss Caloric Deficit (~450 kcal deficit, 2.0g/kg protein)';
-    } else if (hasMuscle && hasStrength) {
-      // Powerbuilding: controlled surplus, high protein
-      calMultiplier = 34;
-      protPerKg = 2.0;
-      fatPerKg = 0.9;
-      strategyName = 'Powerbuilding (Lean Surplus +250 kcal, 2.0g/kg protein)';
-    } else if (hasMuscle) {
-      // Hypertrophy
-      calMultiplier = 33;
-      protPerKg = 1.8;
-      fatPerKg = 0.9;
-      strategyName = 'Hypertrophy Surplus (+200 kcal, 1.8g/kg protein)';
-    } else if (hasStrength) {
-      // Strength progression
-      calMultiplier = 32;
-      protPerKg = 1.9;
-      fatPerKg = 0.9;
-      strategyName = 'Strength Progression (Maintenance/Slight Surplus, 1.9g/kg protein)';
-    } else if (hasStamina) {
-      // Stamina / conditioning: high carbohydrate ratio for glycogen replenishment
-      calMultiplier = 33;
-      protPerKg = 1.7;
-      fatPerKg = 0.8;
-      strategyName = 'Stamina & Conditioning (Elevated Carbs for Glycogen Replenishment)';
-    } else {
-      // General fitness
-      calMultiplier = 30;
-      protPerKg = 1.8;
-      fatPerKg = 0.85;
-      strategyName = 'General Fitness & Energy Balance';
-    }
-
-    const cal = Math.round(bw * calMultiplier);
-    const prot = Math.round(bw * protPerKg);
-    const fat = Math.round(bw * fatPerKg);
-    const carb = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
-
-    setGoalCalories(String(cal));
-    setGoalProtein(String(prot));
-    setGoalCarbs(String(carb));
-    setGoalFat(String(fat));
-    toast.success(`Targets calibrated for ${bw}kg bodyweight: ${strategyName}`, 'Goals Calibrated');
+    toast.success(
+      `Targets calibrated for ${bw}kg (${goalConfig.label}): ${rec.calories} kcal (${rec.proteinG}P / ${rec.carbsG}C / ${rec.fatG}F, 0 kcal Atwater drift)`,
+      'Goals Calibrated'
+    );
   };
 
   const handleReconcileCarbs = () => {
@@ -627,10 +611,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     const targetFat = !isNaN(fat) && fat > 0 ? Math.round(fat) : Math.round((cal * 0.25) / 9);
-    const targetCarbs = Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
+    const targetCarbs = !isNaN(carb) && carb > 0 ? Math.round(carb) : Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
+    const targetCalories = (!isNaN(carb) && carb > 0 && !isNaN(fat) && fat > 0)
+      ? Math.round(prot * 4 + targetCarbs * 4 + targetFat * 9)
+      : Math.round(cal);
 
     const newGoals: MacroGoals = {
-      calories:  Math.round(cal),
+      calories:  targetCalories,
       proteinG:  Math.round(prot),
       fatG:      targetFat,
       carbsG:    targetCarbs,
@@ -702,6 +689,84 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
   const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
+
+  // Calorie drift between sum of foods and Atwater formula
+  const todayAtwaterDrift = useMemo(() => {
+    return getMacroCalorieDrift(
+      todayMacros.calories,
+      todayMacros.proteinG,
+      todayMacros.carbsG,
+      todayMacros.fatG
+    );
+  }, [todayMacros]);
+
+  // Goal pacing & surplus/deficit evaluation
+  const goalNutritionStatus = useMemo(() => {
+    if (!macroGoals) return null;
+    const calDelta = Math.round(todayMacros.calories - macroGoals.calories);
+    const protDelta = Math.round(todayMacros.proteinG - (macroGoals.proteinG || proteinTargetG));
+
+    switch (primaryGoal) {
+      case 'lose_fat': {
+        const isDeficitKept = calDelta <= 0;
+        return {
+          isPositive: isDeficitKept,
+          badgeText: isDeficitKept
+            ? `✓ Deficit Preserved (${Math.abs(calDelta)} kcal under ceiling)`
+            : `⚠ Over Deficit Limit (+${calDelta} kcal)`,
+          subtext: isDeficitKept
+            ? 'Maintaining caloric deficit to oxidize fat stores while preserving lean tissue.'
+            : 'Exceeded caloric limit for today. Prioritize lean protein and low-density foods.',
+          protStatus: protDelta >= 0 ? '✓ Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
+        };
+      }
+      case 'build_muscle': {
+        const isSurplusMet = calDelta >= 0;
+        return {
+          isPositive: isSurplusMet,
+          badgeText: isSurplusMet
+            ? `✓ Growth Surplus Reached (+${calDelta} kcal)`
+            : `${Math.abs(calDelta)} kcal to reach lean surplus target`,
+          subtext: isSurplusMet
+            ? 'Lean surplus secured. Muscle protein synthesis and recovery are fully fueled.'
+            : 'Consume remaining calories to ensure positive energy balance for muscle hypertrophy.',
+          protStatus: protDelta >= 0 ? '✓ Protein synthesis optimized' : `${Math.abs(protDelta)}g protein needed to hit target`,
+        };
+      }
+      case 'get_stronger': {
+        const isFueled = calDelta >= -150;
+        return {
+          isPositive: isFueled,
+          badgeText: isFueled
+            ? '✓ Strength Energy Fueled'
+            : `${Math.abs(calDelta)} kcal to fuel target`,
+          subtext: 'Glycogen and ATP replenishment on target for heavy compound progression.',
+          protStatus: protDelta >= 0 ? '✓ Structural repair protein met' : `${Math.abs(protDelta)}g protein remaining`,
+        };
+      }
+      case 'stamina': {
+        return {
+          isPositive: Math.abs(calDelta) <= 200,
+          badgeText: Math.abs(calDelta) <= 200
+            ? '✓ Endurance Energy Balance'
+            : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs maintenance`,
+          subtext: 'Carbohydrate and hydration balance prioritized for sustained work capacity.',
+          protStatus: protDelta >= 0 ? '✓ Recovery protein met' : `${Math.abs(protDelta)}g protein remaining`,
+        };
+      }
+      case 'general_fitness':
+      default: {
+        return {
+          isPositive: Math.abs(calDelta) <= 250,
+          badgeText: Math.abs(calDelta) <= 250
+            ? '✓ Balanced Energy Adherence'
+            : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs target`,
+          subtext: 'Healthy macro balance supporting overall wellness and joint longevity.',
+          protStatus: protDelta >= 0 ? '✓ Daily protein met' : `${Math.abs(protDelta)}g protein remaining`,
+        };
+      }
+    }
+  }, [macroGoals, todayMacros, primaryGoal, proteinTargetG]);
 
   const dynamicCloseoutSuggestions = useMemo(() => {
     if (!selectedEatPreference) {
@@ -1085,17 +1150,28 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </header>
 
-      {/* ── Today's Nutrition & Goals (Item 16: Emphasize Calories & Protein) ── */}
+      {/* ── Today's Nutrition & Goals ── */}
       <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
-            <p className="text-2xs text-text-muted mt-0.5">Strength &amp; macro targets</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
+              <button
+                type="button"
+                onClick={() => setIsGoalSelectorOpen(true)}
+                className="px-2 py-0.5 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors flex items-center gap-1"
+                title="Tap to change athlete goal"
+              >
+                <span>{goalConfig.label}</span>
+                <span className="text-[9px] opacity-70">⇄</span>
+              </button>
+            </div>
+            <p className="text-2xs text-text-muted mt-0.5">{goalConfig.nutritionEmphasis}</p>
           </div>
           <button
             type="button"
             onClick={handleOpenGoalsModal}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 shrink-0"
           >
             <Target className="w-3.5 h-3.5" />
             <span>{macroGoals ? 'Edit Targets' : 'Set Targets'}</span>
@@ -1199,6 +1275,54 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             )}
           </div>
+        </div>
+
+        {/* Goal Pacing & Calorie Drift Indicator */}
+        <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-2 text-2xs font-mono">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span className="font-bold text-text-primary">
+                {goalConfig.label.toUpperCase()} PACING:
+              </span>
+              {goalNutritionStatus && (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                    goalNutritionStatus.isPositive
+                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  }`}
+                >
+                  {goalNutritionStatus.badgeText}
+                </span>
+              )}
+            </div>
+
+            {/* Atwater Drift Reconciliation Indicator */}
+            <div className="flex items-center gap-1 text-3xs text-text-muted">
+              {Math.abs(todayAtwaterDrift) <= 5 ? (
+                <span className="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Atwater Verified (0 kcal drift)</span>
+                </span>
+              ) : (
+                <span
+                  className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
+                  title="Difference between reported food calories and Atwater 4P+4C+9F energy values"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  <span>{todayAtwaterDrift > 0 ? `+${todayAtwaterDrift}` : todayAtwaterDrift} kcal Atwater drift</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {goalNutritionStatus && (
+            <div className="flex items-center justify-between text-3xs text-text-secondary pt-1 border-t border-border/50 gap-2">
+              <span className="truncate pr-2">{goalNutritionStatus.subtext}</span>
+              <span className="shrink-0 text-text-muted font-bold">{goalNutritionStatus.protStatus}</span>
+            </div>
+          )}
         </div>
 
         {/* Consolidated 1-Input Food Logger Bar (Natural, Camera & Barcode) */}
@@ -1804,17 +1928,45 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   .map(([date, dayMeals]) => {
                     const isToday = date === todayDate;
                     const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
+                    const dayDelta = macroGoals ? Math.round(dayMacros.calories - macroGoals.calories) : null;
+                    const isGoalMet =
+                      dayDelta !== null
+                        ? primaryGoal === 'lose_fat'
+                          ? dayDelta <= 0
+                          : primaryGoal === 'build_muscle'
+                          ? dayDelta >= 0
+                          : Math.abs(dayDelta) <= 200
+                        : null;
+
                     return (
                       <div key={date} className="rounded-xl border border-border/70 bg-bg-secondary/40 p-3 space-y-2.5">
                         <div className="flex justify-between items-center pb-2 border-b border-border/50">
                           <div>
-                            <h3 className="text-xs font-bold text-text-primary">
-                              {isToday
-                                ? 'Today'
-                                : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xs font-bold text-text-primary">
+                                {isToday
+                                  ? 'Today'
+                                  : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                              </h3>
+                              {isGoalMet !== null && (
+                                <span
+                                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold ${
+                                    isGoalMet
+                                      ? 'bg-emerald-500/15 text-emerald-400'
+                                      : 'bg-amber-500/15 text-amber-400'
+                                  }`}
+                                >
+                                  {primaryGoal === 'lose_fat'
+                                    ? isGoalMet ? 'Deficit Preserved' : `+${dayDelta} kcal`
+                                    : primaryGoal === 'build_muscle'
+                                    ? isGoalMet ? 'Surplus Met' : `${dayDelta} kcal`
+                                    : isGoalMet ? 'Target Met' : `${dayDelta && dayDelta > 0 ? `+${dayDelta}` : dayDelta} kcal`}
+                                </span>
+                              )}
+                            </div>
                             <span className="text-3xs text-text-muted font-mono">
                               {dayMeals.length} meals • ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
+                              {macroGoals && ` (Target: ${macroGoals.calories} kcal)`}
                             </span>
                           </div>
                           {!isToday && (

@@ -94,6 +94,22 @@ export default function AppPage() {
   }, [activeTab]);
 
   const [mounted, setMounted] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const updateOnlineStatus = () => {
+      setIsOffline(!navigator.onLine);
+    };
+
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -118,6 +134,16 @@ export default function AppPage() {
 
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
+      {isOffline && (
+        <aside
+          role="status"
+          aria-live="polite"
+          className="bg-amber-950/70 border-b border-amber-500/30 text-amber-200 text-xs px-3 py-1.5 flex items-center justify-center text-center sticky top-0 z-50 backdrop-blur"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2" />
+          <span>Offline Gym Mode Active &bull; All workouts, PRs, and meals are safely saved locally</span>
+        </aside>
+      )}
       <main className="w-full">
         {activeTab === 'home' && (
           <HomePage

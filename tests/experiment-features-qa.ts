@@ -14,7 +14,14 @@ import {
   getConfidenceTier,
   adaptWorkoutForConstraints,
   STIMULUS_PRESERVING_SWAPS,
+  getStimulusPreservingSwaps,
 } from '../src/lib/lifter-twin';
+import {
+  isBodyweightExercise,
+  isDumbbellExercise,
+  isCableExercise,
+  isMachineExercise,
+} from '../src/lib/strength-standards';
 import { ATHLETE_GOAL_CONFIGS, AthleteGoal, PlannedWorkout, WorkoutEntry } from '../src/lib/types';
 
 let total = 0;
@@ -156,6 +163,35 @@ const eqAdapted = adaptWorkoutForConstraints(testWorkout, {
   substituteExerciseName: 'Dumbbell Press',
 });
 check(eqAdapted.adaptedExercises[0].name === 'Dumbbell Press', 'Bench Press swapped for Dumbbell Press');
+check(eqAdapted.adaptedExercises[0].sets[0].weight < 80, 'Bench 80kg converted to safe dumbbell load (< 80kg)');
+
+// Bodyweight equipment swap sets load to 0kg instead of machine load
+const bwAdapted = adaptWorkoutForConstraints([
+  {
+    name: 'Lat Pulldown',
+    sets: [{ weight: 70, reps: 10, unit: 'kg' as const }],
+  },
+], {
+  type: 'equipment',
+  targetExerciseName: 'Lat Pulldown',
+  substituteExerciseName: 'Pull-ups',
+});
+check(bwAdapted.adaptedExercises[0].name === 'Pull-ups', 'Lat Pulldown swapped to Pull-ups');
+check(bwAdapted.adaptedExercises[0].sets[0].weight === 0, 'Bodyweight Pull-ups load set to 0kg instead of 70kg pin load');
+
+// Stimulus-preserving swap lookup resilience
+const pullupSwaps = getStimulusPreservingSwaps('pullups');
+check(pullupSwaps.length > 0, 'Substrings/aliases like pullups resolve stimulus-preserving swaps');
+const latSwaps = getStimulusPreservingSwaps('Lat Pulldown');
+check(latSwaps.some(s => s.target === 'Pull-ups'), 'Lat Pulldown swaps include Pull-ups');
+const legPressSwaps = getStimulusPreservingSwaps('Leg Press');
+check(legPressSwaps.some(s => s.target === 'Hack Squat'), 'Leg Press swaps include Hack Squat');
+
+// Robust equipment categorization across naming variations
+check(isBodyweightExercise('Pull-ups') && isBodyweightExercise('Push-ups') && isBodyweightExercise('dips'), 'isBodyweightExercise identifies pullups, pushups, dips');
+check(isDumbbellExercise('Dumbbell Bench Press') && isDumbbellExercise('DB Curl'), 'isDumbbellExercise identifies variations');
+check(isCableExercise('Cable Lat Pulldown') && isCableExercise('Tricep Cable Pushdown'), 'isCableExercise identifies variations');
+check(isMachineExercise('Hack Squat Machine') && isMachineExercise('Seated Leg Curl'), 'isMachineExercise identifies variations');
 
 console.log('\n======================================================');
 console.log('TEST SUITE 4: Functional Multi-Goal Personalization Engine');

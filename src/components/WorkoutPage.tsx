@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseList, calculateOneRepMax, isMainCompoundLift } from '@/lib/strength-standards';
-import { generateTrainingDecision } from '@/lib/lifter-twin';
+import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad } from '@/lib/strength-standards';
+import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
 import {
   Plus,
@@ -44,6 +44,7 @@ import {
   parseVoiceWorkout,
   getTodaySessionState,
   ExerciseSubstitute,
+  getGoalAdaptiveSplitTemplates,
 } from '@/lib/workout-engine';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
@@ -72,89 +73,51 @@ interface PlanModalProps {
   initial?: PlannedWorkout | null;
   availableExercises: string[];
   userUnit: 'kg' | 'lbs';
+  defaultTargetReps?: number;
   onSave: (plan: Omit<PlannedWorkout, 'id' | 'createdAt'>) => void;
 }
 
-const emptyPlanExercise = (unit: 'kg' | 'lbs'): PlannedExercise => ({
+const emptyPlanExercise = (unit: 'kg' | 'lbs', targetReps = 8): PlannedExercise => ({
   name: '',
   targetSets: 3,
-  targetReps: 8,
+  targetReps,
   targetWeight: undefined,
   targetUnit: unit,
   notes: '',
 });
 
-export const BUILTIN_SPLIT_TEMPLATES: PlannedWorkout[] = [
-  {
-    id: 'builtin_upper_a',
-    name: 'Upper A',
-    createdAt: '2026-01-01',
-    exercises: [
-      { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: 70, targetUnit: 'kg' },
-      { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: 60, targetUnit: 'kg' },
-      { name: 'Overhead Press', targetSets: 3, targetReps: 10, targetWeight: 40, targetUnit: 'kg' },
-      { name: 'Lat Pulldown', targetSets: 3, targetReps: 12, targetWeight: 55, targetUnit: 'kg' },
-      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 12, targetWeight: 14, targetUnit: 'kg' },
-    ],
-  },
-  {
-    id: 'builtin_lower_a',
-    name: 'Lower A',
-    createdAt: '2026-01-01',
-    exercises: [
-      { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: 100, targetUnit: 'kg' },
-      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 10, targetWeight: 80, targetUnit: 'kg' },
-      { name: 'Leg Press', targetSets: 3, targetReps: 12, targetWeight: 160, targetUnit: 'kg' },
-      { name: 'Calf Raise', targetSets: 4, targetReps: 15, targetWeight: 50, targetUnit: 'kg' },
-    ],
-  },
-  {
-    id: 'builtin_upper_b',
-    name: 'Upper B',
-    createdAt: '2026-01-01',
-    exercises: [
-      { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: 60, targetUnit: 'kg' },
-      { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: 'kg' },
-      { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: 22, targetUnit: 'kg' },
-      { name: 'Lateral Raise', targetSets: 4, targetReps: 15, targetWeight: 10, targetUnit: 'kg' },
-      { name: 'Tricep Extension', targetSets: 3, targetReps: 12, targetWeight: 25, targetUnit: 'kg' },
-    ],
-  },
-  {
-    id: 'builtin_lower_b',
-    name: 'Lower B',
-    createdAt: '2026-01-01',
-    exercises: [
-      { name: 'Deadlift', targetSets: 4, targetReps: 5, targetWeight: 120, targetUnit: 'kg' },
-      { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: 70, targetUnit: 'kg' },
-      { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetWeight: 16, targetUnit: 'kg' },
-      { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: 45, targetUnit: 'kg' },
-    ],
-  },
-];
+export const BUILTIN_SPLIT_TEMPLATES: PlannedWorkout[] = getGoalAdaptiveSplitTemplates('build_muscle', 'kg');
 
-function PlanModal({ isOpen, onClose, initial, availableExercises, userUnit, onSave }: PlanModalProps) {
+function PlanModal({
+  isOpen,
+  onClose,
+  initial,
+  availableExercises,
+  userUnit,
+  defaultTargetReps = 8,
+  onSave,
+}: PlanModalProps) {
   const [planName, setPlanName] = useState('');
-  const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit)]);
+  const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
 
   // Sync state when opening or switching between create/edit
   useEffect(() => {
     if (isOpen) {
       if (initial) {
         setPlanName(initial.name);
-        setPlanExercises(initial.exercises.length > 0 ? initial.exercises : [emptyPlanExercise(userUnit)]);
+        setPlanExercises(initial.exercises.length > 0 ? initial.exercises : [emptyPlanExercise(userUnit, defaultTargetReps)]);
       } else {
         setPlanName('');
-        setPlanExercises([emptyPlanExercise(userUnit)]);
+        setPlanExercises([emptyPlanExercise(userUnit, defaultTargetReps)]);
       }
     }
-  }, [isOpen, initial, userUnit]);
+  }, [isOpen, initial, userUnit, defaultTargetReps]);
 
   const updateExercise = useCallback((idx: number, field: keyof PlannedExercise, value: unknown) => {
     setPlanExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
   }, []);
 
-  const addExercise = () => setPlanExercises(prev => [...prev, emptyPlanExercise(userUnit)]);
+  const addExercise = () => setPlanExercises(prev => [...prev, emptyPlanExercise(userUnit, defaultTargetReps)]);
   const removeExercise = (idx: number) => setPlanExercises(prev => prev.filter((_, i) => i !== idx));
 
   const handleSave = () => {
@@ -463,14 +426,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
   }, [goals]);
 
+  // Athlete goal personalization
+  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
+    ? (profile.goals[0] as AthleteGoal)
+    : (goals && goals.length > 0 ? (goals[0] as AthleteGoal) : 'build_muscle');
+  const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
+
+  const defaultTargetReps = useMemo(() => {
+    const { min, max } = goalConfig.defaultRepRange;
+    return Math.round((min + max) / 2);
+  }, [goalConfig.defaultRepRange]);
+
+  const adaptiveSplitTemplates = useMemo(() => {
+    return getGoalAdaptiveSplitTemplates(primaryGoal, userUnit);
+  }, [primaryGoal, userUnit]);
+
   // Goal-adaptive default rest period
   const defaultRestSeconds = useMemo(() => {
-    const activeGoals = goals || ['get_stronger', 'build_muscle'];
-    if (activeGoals.includes('get_stronger')) return 150;
-    if (activeGoals.includes('stamina')) return 60;
-    if (activeGoals.includes('lose_fat')) return 75;
-    return 90;
-  }, [goals]);
+    return goalConfig.defaultRestSeconds;
+  }, [goalConfig.defaultRestSeconds]);
 
   // ── Training Decision Ledger (Auditable prescription) ──────────────────────
   const targetExerciseForDecision = useMemo(() => {
@@ -947,8 +921,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
     // Auto-PR Detection
     let newPRCount = 0;
+    const userBW = profile?.bodyweightKg || 75;
     for (const ex of validExercises) {
       const exName = ex.name.trim();
+      const isBW = isBodyweightExercise(exName);
       const existingPRs = prs.filter(p => p.exercise.toLowerCase() === exName.toLowerCase());
       const currentBest1RMKg = existingPRs.length > 0 ? Math.max(...existingPRs.map(p => p.oneRepMax)) : 0;
 
@@ -957,10 +933,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       for (const s of ex.sets) {
         const wNum = s.weight;
         const rNum = s.reps;
-        if (wNum > 0 && rNum > 0) {
+        if (rNum > 0 && (wNum > 0 || isBW)) {
           const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
           const wLbs = s.unit === 'lbs' ? wNum : wNum * 2.20462;
-          const e1RM = calculateOneRepMax(wKg, rNum);
+          const effectiveLoadKg = getEffectiveExerciseLoad(exName, wKg, userBW);
+          const e1RM = calculateOneRepMax(effectiveLoadKg, rNum);
           if (e1RM > topSet.e1RMKg) {
             topSet = {
               weightKg: Math.round(wKg * 10) / 10,
@@ -1294,7 +1271,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         {/* Quick Split Templates Bar */}
         <div className="pt-2 border-t border-border/50 space-y-1.5">
           <div className="flex items-center justify-between text-2xs text-text-muted">
-            <span className="font-mono uppercase font-bold tracking-wider text-accent">Quick Split Templates:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-mono uppercase font-bold tracking-wider text-accent">Quick Split Templates:</span>
+              <span className="text-3xs font-mono text-accent bg-accent/15 px-1.5 py-0.5 rounded border border-accent/30 font-bold">
+                {goalConfig.label}
+              </span>
+            </div>
             {workouts.length > 0 && (
               <button
                 type="button"
@@ -1307,15 +1289,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             )}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {BUILTIN_SPLIT_TEMPLATES.map((tmpl) => (
+            {adaptiveSplitTemplates.map((tmpl) => (
               <button
                 key={tmpl.id}
                 type="button"
                 onClick={() => handleStartPlan(tmpl)}
-                className="py-1.5 px-2.5 rounded-lg bg-bg-secondary/70 border border-border/70 text-2xs font-semibold text-text-primary hover:border-accent/50 hover:bg-accent/10 transition-colors text-left flex items-center justify-between"
-                title={`Start ${tmpl.name} (${tmpl.exercises.length} movements)`}
+                className="py-1.5 px-2.5 rounded-lg bg-bg-secondary/70 border border-border/70 text-2xs font-semibold text-text-primary hover:border-accent/50 hover:bg-accent/10 transition-colors text-left flex items-center justify-between group"
+                title={`${tmpl.description || tmpl.name} (${tmpl.exercises.length} movements)`}
               >
-                <span className="truncate">{tmpl.name}</span>
+                <div className="min-w-0 pr-1">
+                  <span className="truncate block font-bold">{tmpl.name}</span>
+                  {tmpl.goalTag && (
+                    <span className="text-3xs font-mono text-text-muted group-hover:text-accent/80 block truncate">
+                      {tmpl.goalTag}
+                    </span>
+                  )}
+                </div>
                 <Play className="w-2.5 h-2.5 text-accent shrink-0" />
               </button>
             ))}
@@ -1526,22 +1515,86 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
                   {isExpanded && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
-                      {workout.exercises.map((ex, i) => (
-                        <div key={i} className="bg-bg-elevated p-3 rounded-lg">
-                          <p className="font-medium text-accent mb-2 text-sm">{ex.name}</p>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-text-secondary">
-                            {ex.sets.map((set, j) => (
-                              <div key={j} className="bg-bg-primary px-2.5 py-1.5 rounded border border-border">
-                                Set {j + 1}:{' '}
-                                <span className="text-text-primary font-medium tabular-nums">
-                                  {set.weight} {set.unit}
-                                </span>{' '}
-                                × {set.reps} reps
-                              </div>
-                            ))}
+                      {workout.exercises.map((ex, i) => {
+                        const effortSummary = ex.sets.some((s) => s.rpe !== undefined)
+                          ? calculateSetEffortDrift(ex.sets)
+                          : null;
+
+                        return (
+                          <div key={i} className="bg-bg-elevated p-3 rounded-lg space-y-2">
+                            <div className="flex items-center justify-between flex-wrap gap-1">
+                              <p className="font-medium text-accent text-sm">{ex.name}</p>
+                              {effortSummary && effortSummary.averageRpe > 0 && (
+                                <div className="flex items-center gap-1.5 text-3xs font-mono">
+                                  <span className="text-text-muted">Effort:</span>
+                                  <span className="px-1.5 py-0.5 rounded bg-bg-primary border border-border text-accent font-bold">
+                                    Avg @{effortSummary.averageRpe} RPE
+                                  </span>
+                                  {effortSummary.rpeDriftTotal !== 0 && (
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded ${
+                                        effortSummary.withinSessionEffortTrend === 'high'
+                                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                                          : 'bg-bg-primary text-text-muted border border-border'
+                                      }`}
+                                      title={`Within-session effort drift across sets: ${
+                                        effortSummary.rpeDriftTotal >= 0 ? '+' : ''
+                                      }${effortSummary.rpeDriftTotal} RPE`}
+                                    >
+                                      {effortSummary.rpeDriftTotal > 0
+                                        ? `+${effortSummary.rpeDriftTotal}`
+                                        : effortSummary.rpeDriftTotal} drift
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-text-secondary">
+                              {ex.sets.map((set, j) => {
+                                const rpeVal = set.rpe;
+                                const rirVal =
+                                  rpeVal !== undefined
+                                    ? Math.max(0, Math.round((10 - rpeVal) * 10) / 10)
+                                    : undefined;
+
+                                return (
+                                  <div
+                                    key={j}
+                                    className="bg-bg-primary px-2.5 py-1.5 rounded border border-border flex items-center justify-between gap-1.5"
+                                  >
+                                    <div className="truncate">
+                                      Set {j + 1}:{' '}
+                                      <span className="text-text-primary font-medium tabular-nums">
+                                        {set.weight} {set.unit}
+                                      </span>{' '}
+                                      × {set.reps}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {rpeVal !== undefined && (
+                                        <span
+                                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
+                                          title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
+                                        >
+                                          @{rpeVal}
+                                        </span>
+                                      )}
+                                      {set.isPR && (
+                                        <span
+                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
+                                          title="Personal Record Set"
+                                        >
+                                          PR
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
 
                       <div className="flex justify-end pt-2">
                         {confirmDeleteId === workout.id ? (
@@ -1625,6 +1678,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         initial={editingPlan}
         availableExercises={availableExercises}
         userUnit={userUnit}
+        defaultTargetReps={defaultTargetReps}
         onSave={handleSavePlan}
       />
 
@@ -1685,6 +1739,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         isOpen={isSuggestedModalOpen}
         onClose={() => setIsSuggestedModalOpen(false)}
         userUnit={userUnit}
+        defaultIntensity={primaryGoal === 'get_stronger' ? 'high' : primaryGoal === 'stamina' ? 'low' : 'medium'}
         onStartWorkout={handleStartSuggestedWorkout}
         onSavePlan={handleSaveSuggestedPlan}
       />

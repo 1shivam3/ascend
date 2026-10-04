@@ -46,6 +46,7 @@ interface SuggestedWorkoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   userUnit: 'kg' | 'lbs';
+  defaultIntensity?: IntensityOption;
   onStartWorkout: (workoutName: string, exercises: PlannedExercise[]) => void;
   onSavePlan: (plan: Omit<PlannedWorkout, 'id' | 'createdAt'>) => void;
 }
@@ -310,6 +311,7 @@ export default function SuggestedWorkoutModal({
   isOpen,
   onClose,
   userUnit,
+  defaultIntensity = 'medium',
   onStartWorkout,
   onSavePlan,
 }: SuggestedWorkoutModalProps) {
@@ -320,7 +322,14 @@ export default function SuggestedWorkoutModal({
 
   // Multi-select body parts
   const [selectedBodyParts, setSelectedBodyParts] = useState<BodyPartOption[]>(['chest', 'arms']);
-  const [selectedIntensity, setSelectedIntensity] = useState<IntensityOption>('medium');
+  const [selectedIntensity, setSelectedIntensity] = useState<IntensityOption>(defaultIntensity);
+
+  // Sync intensity with user's primary goal when opened
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedIntensity(defaultIntensity);
+    }
+  }, [isOpen, defaultIntensity]);
 
   // Split selection state
   const [selectedSplitId, setSelectedSplitId] = useState<string>('ppl');

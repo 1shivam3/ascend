@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { WorkoutExercise, RealWorldConstraint } from '@/lib/types';
-import { adaptWorkoutForConstraints, STIMULUS_PRESERVING_SWAPS } from '@/lib/lifter-twin';
+import { adaptWorkoutForConstraints, STIMULUS_PRESERVING_SWAPS, getStimulusPreservingSwaps } from '@/lib/lifter-twin';
 import {
   Clock,
   Dumbbell,
@@ -58,7 +58,7 @@ export default function ConstraintAdapterModal({
     onClose();
   };
 
-  const availableSwaps = STIMULUS_PRESERVING_SWAPS[selectedExName] || [];
+  const availableSwaps = getStimulusPreservingSwaps(selectedExName);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
