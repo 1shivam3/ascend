@@ -266,7 +266,79 @@ const repPRs = testPRs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps
 
 assert.strictEqual(maxPRs.length, 2, 'Should have 2 1RM maxes');
 assert.strictEqual(repPRs.length, 1, 'Should have 1 Rep PR');
-console.log(`  ✓ [PASS] Correctly partitioned ${maxPRs.length} 1RM maxes and ${repPRs.length} Rep PRs`);
+console.log(`  ✓ [PASS] Correctly partitioned ${maxPRs.length} 1RM maxes and ${repPRs.length} Rep PRs\n`);
+
+// 9. Missed Workout Catch-Up Detection
+console.log('--- 9. Missed Workout Catch-Up Detection ---');
+import { toLocalDateString } from '../src/lib/habits';
+import { getScheduledWorkoutForDay } from '../src/lib/workout-schedule';
+import { WeeklySchedule, PlannedWorkout } from '../src/lib/types';
+
+const mockWeeklySchedule: WeeklySchedule = {
+  monday: { workoutPlanId: 'p_upper', customTitle: 'Upper Body Heavy', bodyParts: ['Chest', 'Back'] },
+  tuesday: { workoutPlanId: 'p_lower', customTitle: 'Lower Body Focus', bodyParts: ['Quads', 'Hamstrings'] },
+  wednesday: { workoutPlanId: 'rest', customTitle: 'Rest & Recover', bodyParts: [] },
+  thursday: { workoutPlanId: 'p_push', customTitle: 'Push Strength', bodyParts: ['Chest', 'Shoulders'] },
+  friday: { workoutPlanId: 'p_pull', customTitle: 'Pull Hypertrophy', bodyParts: ['Back', 'Arms'] },
+  saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+  sunday: { workoutPlanId: 'rest', customTitle: 'Active Recovery', bodyParts: [] },
+};
+
+const mockPlans: PlannedWorkout[] = [
+  { id: 'p_upper', name: 'Upper Body Heavy', exercises: [{ name: 'Bench Press', targetSets: 4, targetReps: 6 }], createdAt: '2026-10-01' },
+];
+
+const schedMonday = getScheduledWorkoutForDay(mockWeeklySchedule, 'monday', mockPlans);
+assert(!schedMonday.isRest, 'Monday should be scheduled training');
+assert.strictEqual(schedMonday.title, 'Upper Body Heavy');
+console.log('  ✓ [PASS] Identified scheduled training session for catch-up');
+
+const schedWednesday = getScheduledWorkoutForDay(mockWeeklySchedule, 'wednesday', mockPlans);
+assert(schedWednesday.isRest, 'Wednesday should be rest day');
+console.log('  ✓ [PASS] Rest day correctly filtered out of missed catch-up prompt\n');
+
+// 10. Hydration Yesterday Date Calculation & Offset
+console.log('--- 10. Hydration Yesterday Date Calculation ---');
+const todayDate = new Date('2026-10-06T12:00:00Z');
+const calcTodayStr = toLocalDateString(todayDate);
+const yesterdayDate = new Date(todayDate);
+yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+const calcYesterdayStr = toLocalDateString(yesterdayDate);
+
+assert.strictEqual(calcTodayStr, '2026-10-06');
+assert.strictEqual(calcYesterdayStr, '2026-10-05');
+console.log(`  ✓ [PASS] Date offset properly resolves yesterday (${calcYesterdayStr}) vs today (${calcTodayStr})\n`);
+
+// 11. All-Time Peak PR Identification
+console.log('--- 11. All-Time Peak PR Identification ---');
+const exerciseHistoryPRs: PersonalRecord[] = [
+  { id: 'h1', exercise: 'Bench Press', weightKg: 90, weightLbs: 198, reps: 5, oneRepMax: 105, date: '2026-08-01' },
+  { id: 'h2', exercise: 'Bench Press', weightKg: 100, weightLbs: 220, reps: 3, oneRepMax: 110, date: '2026-09-01' },
+  { id: 'h3', exercise: 'Bench Press', weightKg: 105, weightLbs: 231, reps: 2, oneRepMax: 112, date: '2026-09-20' }, // PEAK
+  { id: 'h4', exercise: 'Bench Press', weightKg: 85, weightLbs: 187, reps: 8, oneRepMax: 108, date: '2026-10-02' },
+];
+
+let peakPR = exerciseHistoryPRs[0];
+let peakE1RM = 0;
+exerciseHistoryPRs.forEach((pr) => {
+  const e1rm = calculateOneRepMax(pr.weightKg, pr.reps);
+  if (e1rm > peakE1RM) {
+    peakE1RM = e1rm;
+    peakPR = pr;
+  }
+});
+
+assert.strictEqual(peakPR.id, 'h3', 'Peak PR should be h3 with 105kg x 2');
+assert.strictEqual(peakE1RM, 112, 'Peak e1RM should be 112kg');
+
+const peakCheckMap = exerciseHistoryPRs.map((p) => ({
+  id: p.id,
+  isAllTimePeak: p.id === peakPR.id,
+}));
+
+assert.strictEqual(peakCheckMap.find((p) => p.id === 'h3')?.isAllTimePeak, true);
+assert.strictEqual(peakCheckMap.find((p) => p.id === 'h1')?.isAllTimePeak, false);
+console.log(`  ✓ [PASS] Accurately flagged all-time peak record (ID: ${peakPR.id}, e1RM: ${peakE1RM}kg) with 👑 All-Time badge condition`);
 
 console.log('\n======================================================');
 console.log('ALL POLISH & EXPERIMENT VERIFICATIONS PASSED CLEANLY (100%)');

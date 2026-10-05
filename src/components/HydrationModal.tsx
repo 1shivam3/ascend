@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Droplet,
@@ -29,12 +29,20 @@ interface HydrationModalProps {
 
 export default function HydrationModal({ isOpen, onClose }: HydrationModalProps) {
   const toast = useToast();
-  const todayStr = toLocalDateString(new Date());
+  const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
+  const todayStr = useMemo(() => toLocalDateString(new Date()), []);
+  const yesterdayStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return toLocalDateString(d);
+  }, []);
+
+  const activeDateStr = selectedDay === 'today' ? todayStr : yesterdayStr;
 
   const profile = useStore((state) => state.profile);
   const workouts = useStore((state) => state.workouts);
   const waterLogs = useStore((state) => state.waterLogs || {});
-  const waterBatches = useStore((state) => (state.waterBatches || {})[todayStr] || []);
+  const waterBatches = useStore((state) => (state.waterBatches || {})[activeDateStr] || []);
   const hydrationConfig = useStore((state) => state.hydrationConfig);
   const dayTypeOverrides = useStore((state) => state.dayTypeOverrides || {});
 
@@ -42,7 +50,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   const resetWater = useStore((state) => state.resetWater);
   const setHydrationConfig = useStore((state) => state.setHydrationConfig);
 
-  const currentDayType = getDayType(todayStr, workouts, dayTypeOverrides);
+  const currentDayType = getDayType(activeDateStr, workouts, dayTypeOverrides);
 
   // Form states for target adjustment
   const [showConfig, setShowConfig] = useState(false);
@@ -57,7 +65,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
 
   if (!isOpen) return null;
 
-  const currentWaterMl = waterLogs[todayStr] || 0;
+  const currentWaterMl = waterLogs[activeDateStr] || 0;
 
   const currentTargetMl = calculateHydrationTarget({
     bodyweightKg: profile?.bodyweightKg || 75,
@@ -71,23 +79,26 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   const pct = Math.min(100, Math.round((currentWaterMl / currentTargetMl) * 100));
 
   const handleQuickAdd = (amt: number) => {
-    logWater(amt, todayStr);
-    toast.success(`+${amt} ml logged!`, 'Hydration Updated');
+    logWater(amt, activeDateStr);
+    const dayLabel = selectedDay === 'today' ? 'today' : 'yesterday';
+    toast.success(`+${amt} ml logged for ${dayLabel}!`, 'Hydration Updated');
   };
 
   const handleManualAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const amt = parseInt(manualLogAmount, 10);
     if (isNaN(amt) || amt <= 0) return;
-    logWater(amt, todayStr);
+    logWater(amt, activeDateStr);
     setManualLogAmount('');
-    toast.success(`+${amt} ml logged!`, 'Hydration Updated');
+    const dayLabel = selectedDay === 'today' ? 'today' : 'yesterday';
+    toast.success(`+${amt} ml logged for ${dayLabel}!`, 'Hydration Updated');
   };
 
   const handleReset = () => {
-    if (confirm('Reset today’s logged water to 0 ml?')) {
-      resetWater(todayStr);
-      toast.info('Today’s water reset to 0 ml', 'Hydration Reset');
+    const dayLabel = selectedDay === 'today' ? 'today’s' : 'yesterday’s';
+    if (confirm(`Reset ${dayLabel} logged water to 0 ml?`)) {
+      resetWater(activeDateStr);
+      toast.info(`${selectedDay === 'today' ? 'Today’s' : 'Yesterday’s'} water reset to 0 ml`, 'Hydration Reset');
     }
   };
 
@@ -130,11 +141,39 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
           </button>
         </div>
 
+        {/* Day Selector: Today vs Yesterday */}
+        <div className="flex p-1 bg-bg-secondary rounded-2xl border border-border/70 text-xs">
+          <button
+            type="button"
+            onClick={() => setSelectedDay('today')}
+            className={`flex-1 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+              selectedDay === 'today'
+                ? 'bg-sky-500 text-white shadow-xs'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <span>Today</span>
+            <span className="text-3xs opacity-80 font-mono">({todayStr})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedDay('yesterday')}
+            className={`flex-1 py-1.5 rounded-xl font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+              selectedDay === 'yesterday'
+                ? 'bg-sky-500 text-white shadow-xs'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+          >
+            <span>Yesterday</span>
+            <span className="text-3xs opacity-80 font-mono">({yesterdayStr})</span>
+          </button>
+        </div>
+
         {/* Target & Current Progress Display */}
         <div className="card p-4 bg-gradient-to-br from-bg-card to-sky-500/5 border border-sky-500/20 space-y-3">
           <div className="flex items-baseline justify-between">
             <span className="section-title text-[10px] text-sky-600 block mb-0">
-              TODAY&apos;S HYDRATION TARGET
+              {selectedDay === 'today' ? "TODAY'S HYDRATION TARGET" : "YESTERDAY'S HYDRATION TARGET"}
             </span>
             <span className="text-xs font-semibold text-text-muted">
               {currentDayType === 'training' ? 'Training Day (+500ml)' : 'Rest Day'}
@@ -295,11 +334,11 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
           )}
         </div>
 
-        {/* Today's Log Batches */}
+        {/* Log Batches */}
         {waterBatches.length > 0 && (
           <div className="border-t border-border pt-3 space-y-2">
             <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
-              TODAY&apos;S LOG ENTRIES ({waterBatches.length})
+              {selectedDay === 'today' ? "TODAY'S LOG ENTRIES" : "YESTERDAY'S LOG ENTRIES"} ({waterBatches.length})
             </span>
             <div className="max-h-28 overflow-y-auto space-y-1 text-xs pr-1">
               {waterBatches.map((b) => {

@@ -170,6 +170,7 @@ export default function ActiveWorkoutScreen({
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  const [isExerciseJumpOpen, setIsExerciseJumpOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
@@ -210,6 +211,12 @@ export default function ActiveWorkoutScreen({
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
+
+  const completedSetsThisEx = useMemo(() => {
+    return currentExercise?.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0)).length || 0;
+  }, [currentExercise?.sets]);
+
+  const totalSetsThisEx = currentExercise?.sets.length || 0;
 
   // Adaptive weight stepper step based on exercise type and unit
   const currentWeightStep = useMemo(() => {
@@ -1760,97 +1767,199 @@ export default function ActiveWorkoutScreen({
         )}
       </main>
 
-      {/* ── Sticky Bottom Rest Timer (Dismissable & Non-intrusive) ────────── */}
-      {isRestTimerDismissed ? (
-        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1 p-1 rounded-full bg-bg-card/95 backdrop-blur border border-accent/40 shadow-xl">
-          <button
-            type="button"
-            onClick={() => setIsRestTimerDismissed(false)}
-            className="px-2.5 py-1.5 text-xs font-mono font-bold text-accent flex items-center gap-1.5 active:scale-95 transition-all hover:text-accent/80"
-            title="Open rest timer bar"
-          >
-            <Timer className="w-3.5 h-3.5" />
-            <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}</span>
-          </button>
-          <div className="flex items-center gap-0.5 border-l border-border/70 pl-1 pr-1">
+      {/* ── Sticky Bottom Session Bar: Pulse Strip + Rest Controls ── */}
+      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-2xl">
+        <div className="max-w-[480px] mx-auto space-y-2">
+          {/* Live Pulse Strip & Quick Exercise Jump */}
+          <div className="flex items-center justify-between text-2xs font-mono">
+            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
+              <span className="text-text-muted shrink-0">Ex {activeExerciseIdx + 1}/{exercises.length}:</span>
+              <span className="font-bold text-text-primary truncate">{currentExercise?.name}</span>
+              <span className="text-text-muted shrink-0">•</span>
+              <span className="text-text-secondary shrink-0">
+                Sets: {completedSetsThisEx}/{totalSetsThisEx} (Total {sessionStats.completedSetsCount}/{sessionStats.totalSetsCount})
+              </span>
+            </div>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                adjustTimer(-30);
-              }}
-              className="px-1.5 py-0.5 rounded text-3xs font-mono font-bold text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all"
-              title="Subtract 30 seconds"
+              onClick={() => setIsExerciseJumpOpen(true)}
+              className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent border border-border/80 text-text-primary font-sans font-bold text-3xs shrink-0 flex items-center gap-1 active:scale-95 transition-all shadow-2xs"
+              title="Quick Jump to any exercise"
             >
-              -30s
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                adjustTimer(30);
-              }}
-              className="px-1.5 py-0.5 rounded text-3xs font-mono font-bold text-accent hover:bg-accent/15 active:scale-95 transition-all"
-              title="Add 30 seconds"
-            >
-              +30s
+              <span>Jump</span>
+              <span className="text-[10px] text-accent">▾</span>
             </button>
           </div>
-        </div>
-      ) : (
-        <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-2xl">
-          <div className="max-w-[480px] mx-auto flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
+
+          {/* Rest Timer row (if not dismissed) or compact rest pill toggle (if dismissed) */}
+          {isRestTimerDismissed ? (
+            <div className="flex items-center justify-between pt-1 border-t border-border/40 text-3xs font-mono text-text-muted">
               <button
                 type="button"
-                onClick={() => setIsRestTimerDismissed(true)}
-                className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-                title="Hide timer bar"
+                onClick={() => setIsRestTimerDismissed(false)}
+                className="flex items-center gap-1.5 text-accent hover:underline font-semibold"
               >
-                <X className="w-3.5 h-3.5" />
+                <Timer className="w-3 h-3" />
+                <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)} (Tap to show)</span>
               </button>
-              <div>
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
-                  REST
-                </span>
-                <div className="text-xl sm:text-2xl font-black font-mono text-text-primary tracking-tight leading-none mt-0.5 tabular-nums">
-                  {isRestFinished ? (
-                    <span className="text-emerald-400">READY</span>
-                  ) : (
-                    formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-                  )}
-                </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(-30)}
+                  className="px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted hover:text-text-primary active:scale-95"
+                >
+                  -30s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(30)}
+                  className="px-1.5 py-0.5 rounded bg-bg-secondary text-accent hover:bg-accent/15 active:scale-95"
+                >
+                  +30s
+                </button>
               </div>
             </div>
+          ) : (
+            <div className="flex items-center justify-between pt-1.5 border-t border-border/40">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsRestTimerDismissed(true)}
+                  className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                  title="Hide timer controls"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <div>
+                  <span className="text-[9px] font-semibold uppercase tracking-wider text-text-muted block leading-none">
+                    REST TIMER
+                  </span>
+                  <div className="text-lg sm:text-xl font-black font-mono text-text-primary tracking-tight leading-none mt-0.5 tabular-nums">
+                    {isRestFinished ? (
+                      <span className="text-emerald-400">READY</span>
+                    ) : (
+                      formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                    )}
+                  </div>
+                </div>
+              </div>
 
-            {/* Quick timer adjustments */}
-            <div className="flex items-center gap-1.5">
+              {/* Quick timer adjustments */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(-30)}
+                  className="px-2 py-1 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
+                  title="Subtract 30 seconds"
+                >
+                  -30s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(30)}
+                  className="px-2.5 py-1 rounded-lg bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
+                  title="Add 30 seconds"
+                >
+                  +30s
+                </button>
+                <button
+                  type="button"
+                  onClick={skipTimer}
+                  className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-bold active:scale-95 transition-all shadow-xs"
+                >
+                  SKIP
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </footer>
+
+      {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
+      {isExerciseJumpOpen && (
+        <div className="modal-overlay" onClick={() => setIsExerciseJumpOpen(false)}>
+          <div
+            className="modal-content max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-4 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div>
+                <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
+                  QUICK NAVIGATION
+                </span>
+                <h3 className="text-base font-black text-text-primary font-sans mt-0.5">
+                  Jump to Exercise
+                </h3>
+              </div>
               <button
                 type="button"
-                onClick={() => adjustTimer(-30)}
-                className="px-2.5 py-1.5 rounded-xl bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
-                title="Subtract 30 seconds"
+                onClick={() => setIsExerciseJumpOpen(false)}
+                className="p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
               >
-                -30s
-              </button>
-              <button
-                type="button"
-                onClick={() => adjustTimer(30)}
-                className="px-3 py-1.5 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
-                title="Add 30 seconds"
-              >
-                +30s
-              </button>
-              <button
-                type="button"
-                onClick={skipTimer}
-                className="px-3.5 py-1.5 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all shadow-xs"
-              >
-                SKIP
+                <X className="w-4 h-4" />
               </button>
             </div>
+
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar">
+              {exercises.map((ex, idx) => {
+                const isCurrent = idx === activeExerciseIdx;
+                const completedCount = ex.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0)).length;
+                const totalCount = ex.sets.length;
+                const isDone = totalCount > 0 && completedCount === totalCount;
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setActiveExerciseIdx(idx);
+                      setIsExerciseJumpOpen(false);
+                    }}
+                    className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between transition-all active:scale-[0.98] ${
+                      isCurrent
+                        ? 'bg-accent/15 border-accent text-text-primary shadow-xs'
+                        : isDone
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-text-secondary hover:border-emerald-500/60'
+                        : 'bg-bg-secondary/60 border-border/70 text-text-primary hover:border-accent/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
+                          isCurrent
+                            ? 'bg-accent text-white'
+                            : isDone
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-bg-secondary text-text-muted border border-border'
+                        }`}
+                      >
+                        {isDone ? '✓' : idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="font-bold text-xs truncate font-sans">
+                          {ex.name}
+                        </div>
+                        <div className="text-3xs font-mono text-text-muted">
+                          {completedCount} of {totalCount} sets completed
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                      {isCurrent && (
+                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent text-white">
+                          Active
+                        </span>
+                      )}
+                      <ChevronRight className="w-4 h-4 text-text-muted" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </footer>
+        </div>
       )}
 
       {/* ── Warm-up Generator Modal ─────────────────────────────────────── */}

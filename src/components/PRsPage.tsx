@@ -582,16 +582,27 @@ function LiftCard({
                 isBWRecord ? bodyweightKg : w,
                 p.reps
               );
+              const isAllTimePeak = item.bestPR?.id === p.id;
               return (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
+                  className={`flex items-center justify-between p-2.5 rounded-lg text-xs font-mono transition-all ${
+                    isAllTimePeak
+                      ? 'border-l-4 border-l-accent bg-accent/10 border-accent/40 shadow-xs'
+                      : 'border border-border bg-bg-secondary'
+                  }`}
                 >
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-bold text-text-primary">
                         {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
                       </span>
+                      {isAllTimePeak && (
+                        <span className="text-[9px] font-sans font-black text-accent bg-accent/20 px-1.5 py-0.5 rounded border border-accent/40 flex items-center gap-1 shadow-2xs">
+                          <span>👑</span>
+                          <span>All-Time Record</span>
+                        </span>
+                      )}
                       {p.prType === 'reps' && (
                         <span className="text-[9px] font-sans font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25">
                           ⚡ Rep PR

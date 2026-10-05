@@ -30,7 +30,7 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
-import { PlannedWorkout, PlannedExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
+import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
 import { getTodaySessionState, getLastExercisePerformance } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO } from '@/lib/workout-schedule';
 import { plural } from '@/lib/formatters';
@@ -100,6 +100,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     plannedWorkouts,
     addPlannedWorkout,
     activeWorkoutDraft,
+    saveWorkoutDraft,
     clearWorkoutDraft,
     goals,
     weeklySchedule,
@@ -290,6 +291,91 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
 
+  // Missed workout catch-up state & detection
+  const [dismissedMissedWorkout, setDismissedMissedWorkout] = useState(false);
+
+  const missedWorkoutCatchUp = useMemo(() => {
+    if (dismissedMissedWorkout || activeWorkoutDraft || workouts.length === 0 || sessionInfo.status === 'completed') {
+      return null;
+    }
+
+    const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const yesterdayStr = toLocalDateString(yesterdayDate);
+    const loggedYesterday = workouts.some((w) => w.date.split('T')[0] === yesterdayStr);
+    if (loggedYesterday) return null;
+
+    const daysOrder: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const now = new Date();
+    const yesterdayDayIdx = (now.getDay() + 5) % 7;
+    const yesterdayDay = daysOrder[yesterdayDayIdx];
+
+    const yesterdaySched = getScheduledWorkoutForDay(weeklySchedule, yesterdayDay, plannedWorkouts);
+    if (yesterdaySched.isRest) return null;
+
+    const routineName = yesterdaySched.plan?.name.replace('Builtin ', '') || yesterdaySched.title;
+    const todayRoutineName = sessionInfo.title;
+
+    return {
+      yesterdaySched,
+      routineName,
+      todayRoutineName,
+    };
+  }, [dismissedMissedWorkout, activeWorkoutDraft, workouts, sessionInfo.status, sessionInfo.title, weeklySchedule, plannedWorkouts]);
+
+  const handleMakeUpMissedWorkout = () => {
+    if (!missedWorkoutCatchUp) return;
+    const { yesterdaySched, routineName } = missedWorkoutCatchUp;
+    let exercisesToDraft: WorkoutExercise[] = [];
+
+    if (yesterdaySched.plan?.exercises && yesterdaySched.plan.exercises.length > 0) {
+      exercisesToDraft = yesterdaySched.plan.exercises.map((pe) => {
+        const pr = prs.find((p) => p.exercise.toLowerCase() === pe.name.toLowerCase());
+        let assignedWeight: number = pe.targetWeight ?? 0;
+        if (!assignedWeight || assignedWeight === 0) {
+          if (pr && pr.oneRepMax > 0) {
+            assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
+          }
+        }
+        return {
+          name: pe.name,
+          sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
+            weight: assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60),
+            reps: pe.targetReps,
+            unit: pe.targetUnit ?? userUnit,
+            rpe: 8,
+          })),
+        };
+      });
+    } else {
+      exercisesToDraft = [
+        {
+          name: 'Bench Press',
+          sets: [
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
+          ],
+        },
+      ];
+    }
+
+    saveWorkoutDraft({
+      date: todayStr,
+      exercises: exercisesToDraft,
+      startedFromPlan: routineName,
+      sessionStartTime: Date.now(),
+      savedAt: new Date().toISOString(),
+    });
+
+    toast.info(`Loaded yesterday's ${routineName} for today. Let's get it!`, 'Missed Session Loaded');
+    onNavigate('workout');
+  };
+
+  const handleStickToSchedule = () => {
+    setDismissedMissedWorkout(true);
+    toast.info(`Sticking to today's schedule: ${sessionInfo.title}.`, 'On Schedule');
+  };
+
   const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
     const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
     const plannedWorkout: PlannedWorkout = {
@@ -415,6 +501,42 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </span>
         </button>
       </section>
+
+      {/* Empathetic Missed Workout Catch-Up Prompt */}
+      {missedWorkoutCatchUp && (
+        <div className="p-4 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-xs shadow-md animate-scale-in space-y-3">
+          <div className="flex items-start gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
+              <Flame className="w-4 h-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 text-3xs font-mono font-bold uppercase tracking-wider text-amber-500">
+                <span>SCHEDULE RECOVERY</span>
+              </div>
+              <p className="font-semibold text-text-primary mt-0.5 text-xs leading-relaxed">
+                You missed yesterday&apos;s <span className="text-amber-400 font-bold">{missedWorkoutCatchUp.routineName}</span> — would you like to make it up today, or stick with <span className="text-text-primary font-bold">{missedWorkoutCatchUp.todayRoutineName}</span>?
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={handleMakeUpMissedWorkout}
+              className="flex-1 py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-black font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>Make Up Missed Session</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleStickToSchedule}
+              className="py-2 px-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 active:scale-95 text-text-secondary hover:text-text-primary text-xs font-semibold border border-border/60 transition-all"
+            >
+              Stick to Schedule
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── 2. TODAY'S TRAINING HERO CARD (Visual Centerpiece) ─────────────── */}
       <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/30 shadow-lg rounded-3xl space-y-4">
