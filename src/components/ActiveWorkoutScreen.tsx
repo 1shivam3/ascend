@@ -38,6 +38,7 @@ import { calculatePlates, PlateInfo } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
+import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 
 interface ActiveWorkoutScreenProps {
@@ -162,12 +163,15 @@ export default function ActiveWorkoutScreen({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
+  const [localExerciseName, setLocalExerciseName] = useState('');
 
   // Sticky Rest Timer state (initialized to athlete's goal rest duration)
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
+  const [isRestTimerDismissed, setIsRestTimerDismissed] = useState<boolean>(false);
+  const [isRestTimerEnabled, setIsRestTimerEnabled] = useState<boolean>(true);
 
   // Intensity metric preference: RPE vs RIR
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'rir'>(() => {
@@ -207,14 +211,31 @@ export default function ActiveWorkoutScreen({
     return isDB ? 1 : 2.5;
   }, [currentExercise?.name, userUnit]);
 
+  const isCurrentBodyweight = useMemo(() => {
+    return isBodyweightExercise(currentExercise?.name || '');
+  }, [currentExercise?.name]);
+
   useEffect(() => {
     setIsEditingName(false);
+    setLocalExerciseName(exercises[activeExerciseIdx]?.name || '');
     const currentSets = exercises[activeExerciseIdx]?.sets || [];
     const firstIncomplete = currentSets.findIndex((s) => !s.completed);
     setActiveSetIdx(firstIncomplete !== -1 ? firstIncomplete : 0);
     setShowEffortPrompt(currentSets.length > 0 && currentSets.every((s) => s.completed));
     setEffortChosen(null);
-  }, [activeExerciseIdx, exercises]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeExerciseIdx]);
+
+  const handleRemoveExercise = (idxToRemove: number) => {
+    if (exercises.length <= 1) {
+      toast.error('Workout must have at least one exercise.', 'Cannot Remove');
+      return;
+    }
+    const removedName = exercises[idxToRemove]?.name || 'Exercise';
+    setExercises((prev) => prev.filter((_, i) => i !== idxToRemove));
+    setActiveExerciseIdx((prev) => (prev >= idxToRemove ? Math.max(0, prev - 1) : prev));
+    toast.info(`Removed "${removedName}" from workout.`, 'Exercise Removed');
+  };
 
   // Check if current exercise is a main compound lift (Bench, Squat, Deadlift, OHP)
   const isCurrentMainLift = useMemo(() => {
@@ -891,20 +912,6 @@ export default function ActiveWorkoutScreen({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Athlete Mode Toggle (🌱 Beginner vs ⚡ Advanced) */}
-          <button
-            type="button"
-            onClick={toggleUserMode}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
-              userMode === 'beginner'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-accent/10 border-accent/30 text-accent'
-            }`}
-            title={`Currently in ${userMode} mode. Tap to switch.`}
-          >
-            <span>{userMode === 'beginner' ? '🌱 Beginner' : '⚡ Advanced'}</span>
-          </button>
-
           {/* Secondary ⋯ Tools Menu (In advanced mode, or available for quick tools) */}
           {userMode === 'advanced' && (
             <div className="relative">
@@ -1074,34 +1081,66 @@ export default function ActiveWorkoutScreen({
             </span>
           </div>
 
-          <div>
-            {isEditingName ? (
-              <input
-                type="text"
-                autoFocus
-                list="active-exercises-list"
-                value={currentExercise.name}
-                placeholder="Exercise Name"
-                onBlur={() => setIsEditingName(false)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') setIsEditingName(false);
-                }}
-                onChange={(e) => {
-                  const newName = e.target.value;
-                  setExercises((prev) =>
-                    prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: newName } : ex))
-                  );
-                }}
-                className="text-2xl sm:text-3xl font-black text-text-primary bg-bg-secondary rounded-xl px-3 py-1 border border-accent outline-none w-full tracking-tight"
-              />
-            ) : (
-              <h2
-                onClick={() => setIsEditingName(true)}
-                className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans cursor-pointer hover:text-accent transition-colors"
-                title="Tap to rename"
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              {isEditingName ? (
+                <input
+                  type="text"
+                  autoFocus
+                  value={localExerciseName}
+                  placeholder="Exercise Name"
+                  onBlur={() => {
+                    const trimmed = localExerciseName.trim();
+                    if (trimmed) {
+                      setExercises((prev) =>
+                        prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: trimmed } : ex))
+                      );
+                    }
+                    setIsEditingName(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const trimmed = localExerciseName.trim();
+                      if (trimmed) {
+                        setExercises((prev) =>
+                          prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: trimmed } : ex))
+                        );
+                      }
+                      setIsEditingName(false);
+                    } else if (e.key === 'Escape') {
+                      setLocalExerciseName(currentExercise.name);
+                      setIsEditingName(false);
+                    }
+                  }}
+                  onChange={(e) => setLocalExerciseName(e.target.value)}
+                  className="text-2xl sm:text-3xl font-black text-text-primary bg-bg-secondary rounded-xl px-3 py-1 border border-accent outline-none w-full tracking-tight font-sans"
+                />
+              ) : (
+                <div
+                  onClick={() => {
+                    setLocalExerciseName(currentExercise.name);
+                    setIsEditingName(true);
+                  }}
+                  className="flex items-center gap-2 cursor-pointer group"
+                  title="Tap to rename exercise"
+                >
+                  <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans truncate group-hover:text-accent transition-colors">
+                    {currentExercise.name || 'Untitled Exercise'}
+                  </h2>
+                  <Edit2 className="w-4 h-4 text-text-muted opacity-40 group-hover:opacity-100 group-hover:text-accent transition-opacity shrink-0" />
+                </div>
+              )}
+            </div>
+
+            {exercises.length > 1 && (
+              <button
+                type="button"
+                onClick={() => handleRemoveExercise(activeExerciseIdx)}
+                className="p-2 rounded-xl text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                title="Remove this exercise from workout"
               >
-                {currentExercise.name || 'Untitled Exercise'}
-              </h2>
+                <Trash2 className="w-4 h-4" />
+              </button>
             )}
           </div>
 
@@ -1266,7 +1305,7 @@ export default function ActiveWorkoutScreen({
                   {/* Weight Stepper */}
                   <div className="text-center space-y-2">
                     <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                      WEIGHT ({userUnit})
+                      {isCurrentBodyweight ? `ADDED WEIGHT (${userUnit})` : `WEIGHT (${userUnit})`}
                     </span>
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <button
@@ -1276,19 +1315,27 @@ export default function ActiveWorkoutScreen({
                       >
                         -
                       </button>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={currentExercise.sets[activeSetIdx]?.weight ?? ''}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            handleSetWeightChange(activeSetIdx, val);
-                          }
-                        }}
-                        className="w-16 sm:w-20 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
-                      />
+                      <div className="flex flex-col items-center">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={currentExercise.sets[activeSetIdx]?.weight ?? ''}
+                          placeholder={isCurrentBodyweight ? '0 (BW)' : '0'}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                              handleSetWeightChange(activeSetIdx, val);
+                            }
+                          }}
+                          className="w-16 sm:w-20 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
+                        />
+                        {isCurrentBodyweight && (
+                          <span className="text-3xs text-accent font-semibold mt-0.5">
+                            {(parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0) === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
+                          </span>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, currentWeightStep)}
@@ -1352,37 +1399,37 @@ export default function ActiveWorkoutScreen({
               </div>
             )}
 
-            {/* Quick Exercise Switcher Links */}
+            {/* Exercise Switcher Navigation CTA */}
             {!showEffortPrompt && (
-              <div className="flex items-center justify-between text-xs text-text-muted px-1 pt-1">
-                {activeExerciseIdx > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                    className="hover:text-text-primary flex items-center gap-1 py-1"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    <span>Previous</span>
-                  </button>
-                ) : <div />}
-
+              <div className="pt-3 space-y-2">
                 {activeExerciseIdx < exercises.length - 1 ? (
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
-                    className="text-text-secondary hover:text-accent font-semibold flex items-center gap-1 py-1"
+                    className="btn-secondary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:border-accent text-text-primary transition-all shadow-xs"
                   >
-                    <span>Next: {exercises[activeExerciseIdx + 1]?.name}</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <span>NEXT EXERCISE: {exercises[activeExerciseIdx + 1]?.name}</span>
+                    <ChevronRight className="w-4 h-4 text-accent" />
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsFinishModalOpen(true)}
-                    className="text-accent font-bold flex items-center gap-1 py-1"
+                    className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20"
                   >
-                    <span>Finish workout</span>
-                    <Check className="w-4 h-4" />
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>FINISH WORKOUT</span>
+                  </button>
+                )}
+
+                {activeExerciseIdx > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
+                    className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span>Previous: {exercises[activeExerciseIdx - 1]?.name}</span>
                   </button>
                 )}
               </div>
@@ -1506,45 +1553,101 @@ export default function ActiveWorkoutScreen({
                 </button>
               )}
             </div>
+
+            {/* Next Exercise / Finish CTA in Advanced Mode */}
+            <div className="pt-4 pb-2 space-y-2">
+              {activeExerciseIdx < exercises.length - 1 ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
+                  className="btn-secondary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:border-accent text-text-primary transition-all shadow-xs"
+                >
+                  <span>NEXT EXERCISE: {exercises[activeExerciseIdx + 1]?.name}</span>
+                  <ChevronRight className="w-4 h-4 text-accent" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsFinishModalOpen(true)}
+                  className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20"
+                >
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>FINISH WORKOUT</span>
+                </button>
+              )}
+
+              {activeExerciseIdx > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
+                  className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Previous: {exercises[activeExerciseIdx - 1]?.name}</span>
+                </button>
+              )}
+            </div>
           </section>
         )}
       </main>
 
-      {/* ── Sticky Bottom Rest Timer (Clean, unboxed & focused) ────────── */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 shadow-2xl">
-        <div className="max-w-[480px] mx-auto flex items-center justify-between">
-          <div>
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-text-muted block">
-              REST
-            </span>
-            <div className="text-2xl font-black font-mono text-text-primary tracking-tight leading-none mt-0.5 tabular-nums">
-              {isRestFinished ? (
-                <span className="text-emerald-400">READY</span>
-              ) : (
-                formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-              )}
+      {/* ── Sticky Bottom Rest Timer (Dismissable & Non-intrusive) ────────── */}
+      {isRestTimerDismissed ? (
+        <button
+          type="button"
+          onClick={() => setIsRestTimerDismissed(false)}
+          className="fixed bottom-4 right-4 z-40 px-3.5 py-2 rounded-full bg-bg-card/95 backdrop-blur border border-accent/40 shadow-xl text-xs font-mono font-bold text-accent flex items-center gap-1.5 active:scale-95 transition-all"
+          title="Open rest timer"
+        >
+          <Timer className="w-3.5 h-3.5" />
+          <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}</span>
+        </button>
+      ) : (
+        <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-2xl">
+          <div className="max-w-[480px] mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsRestTimerDismissed(true)}
+                className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                title="Hide timer bar"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                  REST
+                </span>
+                <div className="text-xl sm:text-2xl font-black font-mono text-text-primary tracking-tight leading-none mt-0.5 tabular-nums">
+                  {isRestFinished ? (
+                    <span className="text-emerald-400">READY</span>
+                  ) : (
+                    formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Quick timer adjustments */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => adjustTimer(30)}
+                className="px-3 py-1.5 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
+              >
+                +30s
+              </button>
+              <button
+                type="button"
+                onClick={skipTimer}
+                className="px-3.5 py-1.5 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all shadow-xs"
+              >
+                SKIP
+              </button>
             </div>
           </div>
-
-          {/* Quick timer adjustments */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => adjustTimer(30)}
-              className="px-3.5 py-2 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
-            >
-              +30s
-            </button>
-            <button
-              type="button"
-              onClick={skipTimer}
-              className="px-4 py-2 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all shadow-xs"
-            >
-              SKIP
-            </button>
-          </div>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* ── Warm-up Generator Modal ─────────────────────────────────────── */}
       {isWarmupModalOpen && (
@@ -1695,65 +1798,31 @@ export default function ActiveWorkoutScreen({
         </div>
       )}
 
-      {/* ── Add Exercise Modal ───────────────────────────────────────────── */}
-      {isAddExerciseModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAddExerciseModalOpen(false)}>
-          <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-border flex items-center justify-between">
-              <h3 className="font-bold text-text-primary">Add Exercise</h3>
-              <button onClick={() => setIsAddExerciseModalOpen(false)} className="text-text-muted hover:text-text-primary">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <input
-                type="text"
-                list="active-exercises-list"
-                placeholder="Exercise name (e.g. Incline Bench)"
-                value={newExerciseName}
-                onChange={(e) => setNewExerciseName(e.target.value)}
-                autoFocus
-                className="w-full bg-bg-secondary border border-border rounded-xl p-2.5 text-sm text-text-primary outline-none focus:border-accent"
-              />
+      {/* ── Add Exercise Modal (With muscle categories & search) ──────────── */}
+      <ExerciseSelectorModal
+        isOpen={isAddExerciseModalOpen}
+        onClose={() => setIsAddExerciseModalOpen(false)}
+        onSelectExercise={(selected) => {
+          const isBW = selected.isBodyweight || isBodyweightExercise(selected.name);
+          const defaultW = isBW ? 0 : (selected.defaultWeightKg || (userUnit === 'lbs' ? 115 : 50));
+          const defaultR = selected.defaultReps || defaultTargetReps;
 
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddExerciseModalOpen(false)}
-                  className="btn-secondary flex-1 py-2 text-xs"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!newExerciseName.trim()}
-                  onClick={() => {
-                    const name = newExerciseName.trim();
-                    setExercises((prev) => [
-                      ...prev,
-                      {
-                        name,
-                        sets: [
-                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
-                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
-                          { weight: userUnit === 'lbs' ? 115 : 50, reps: defaultTargetReps, unit: userUnit, completed: false, rpe: 8 },
-                        ],
-                      },
-                    ]);
-                    setActiveExerciseIdx(exercises.length);
-                    setNewExerciseName('');
-                    setIsAddExerciseModalOpen(false);
-                    toast.success(`Added "${name}" to session`, 'Exercise Added');
-                  }}
-                  className="btn-primary flex-1 py-2 text-xs font-bold disabled:opacity-40"
-                >
-                  Add Exercise
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+          setExercises((prev) => [
+            ...prev,
+            {
+              name: selected.name,
+              sets: [
+                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
+                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
+                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
+              ],
+            },
+          ]);
+          setActiveExerciseIdx(exercises.length);
+          setIsAddExerciseModalOpen(false);
+          toast.success(`Added "${selected.name}" to workout`, 'Exercise Added');
+        }}
+      />
 
       {/* ── Discard Confirmation Modal ───────────────────────────────────── */}
       {isDiscardConfirmOpen && (

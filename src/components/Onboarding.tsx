@@ -67,6 +67,7 @@ export default function OnboardingScreen() {
   const {
     setProfile,
     setGoals,
+    setUserMode,
     setTrainingProfile,
     addMultiplePRs,
     addBodyMetric,
@@ -74,6 +75,8 @@ export default function OnboardingScreen() {
     setPlannedWorkouts,
     setMacroGoals,
   } = useStore();
+
+  const [experienceLevel, setExperienceLevel] = useState<'beginner' | 'advanced'>('beginner');
 
   const handleFinish = (skipLifts = false) => {
     const bw = parseFloat(bodyweight) || 72;
@@ -101,6 +104,7 @@ export default function OnboardingScreen() {
 
     setProfile(profileData);
     setGoals(selectedGoals);
+    setUserMode(experienceLevel);
 
     const primaryGoal: AthleteGoal = selectedGoals[0] || 'build_muscle';
 
@@ -514,6 +518,60 @@ export default function OnboardingScreen() {
                   </span>
                 </button>
               ))}
+            </div>
+
+            {/* Experience Level Selection */}
+            <div className="pt-2 space-y-2">
+              <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                WHAT IS YOUR LIFTING EXPERIENCE?
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExperienceLevel('beginner')}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                    experienceLevel === 'beginner'
+                      ? 'border-emerald-500 bg-emerald-500/10 shadow-xs'
+                      : 'border-border/60 bg-bg-secondary text-text-secondary hover:border-border'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                      <span>🌱</span>
+                      <span className={experienceLevel === 'beginner' ? 'text-emerald-400' : ''}>Beginner</span>
+                    </span>
+                    {experienceLevel === 'beginner' && (
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    )}
+                  </div>
+                  <p className="text-3xs text-text-muted leading-relaxed">
+                    New to lifting or gym apps. Simple 1-tap logging, pre-filled weights, clean distraction-free screen.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExperienceLevel('advanced')}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
+                    experienceLevel === 'advanced'
+                      ? 'border-accent bg-accent/15 shadow-xs'
+                      : 'border-border/60 bg-bg-secondary text-text-secondary hover:border-border'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-bold text-text-primary flex items-center gap-1.5">
+                      <span>⚡</span>
+                      <span className={experienceLevel === 'advanced' ? 'text-accent' : ''}>Advanced</span>
+                    </span>
+                    {experienceLevel === 'advanced' && (
+                      <span className="w-2 h-2 rounded-full bg-accent" />
+                    )}
+                  </div>
+                  <p className="text-3xs text-text-muted leading-relaxed">
+                    Experienced lifter. Multi-set tables, RPE/RIR tracking, plate loading helper &amp; progressive warm-up ramp.
+                  </p>
+                </button>
+              </div>
             </div>
 
             <button

@@ -9,22 +9,82 @@ import {
   Scale,
   UtensilsCrossed,
   Check,
+  Flame,
+  Zap,
+  Trophy,
+  Dumbbell,
+  Calendar,
+  ArrowRight,
+  Target,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { isMainCompoundLift, suggestLoad } from '@/lib/strength-standards';
+import { isMainCompoundLift, suggestLoad, getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
+import { getDailyQuote } from '@/lib/quotes';
 import SettingsModal from '@/components/SettingsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
+import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { getTodaySessionState, getLastExercisePerformance } from '@/lib/workout-engine';
+import { plural } from '@/lib/formatters';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
+}
+
+function CircularRing({
+  size = 54,
+  strokeWidth = 5,
+  progress = 0,
+  strokeColor = '#e5c07b',
+  trackColor = '#27272a',
+  children,
+}: {
+  size?: number;
+  strokeWidth?: number;
+  progress: number;
+  strokeColor?: string;
+  trackColor?: string;
+  children?: React.ReactNode;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
+
+  return (
+    <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={trackColor}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={strokeColor}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          fill="transparent"
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
@@ -69,6 +129,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return `${Math.round(bwKg)} kg`;
   }, [profile?.bodyweightKg, userUnit]);
 
+  // Overall Strength Level from PRs
+  const overallLevel = useMemo(() => {
+    if (!prs || prs.length === 0) return null;
+    const liftLevels = prs.map((p) =>
+      getLiftLevel(p.exercise, p.oneRepMax, profile?.bodyweightKg || 72, profile?.gender || 'male')
+    );
+    return getOverallLevel(liftLevels);
+  }, [prs, profile?.bodyweightKg, profile?.gender]);
+
+  // Daily Mindset Quote
+  const dailyQuote = useMemo(() => getDailyQuote(), []);
+
   // Today's workout session state (single source of truth)
   const sessionInfo = useMemo(() => {
     return getTodaySessionState(
@@ -83,23 +155,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Top focus lift for today
   const topFocus = useMemo(() => {
-    // 1. Identify primary compound lift
     const exercises = sessionInfo.exercises || [];
     const compoundName = exercises.find((name) => isMainCompoundLift(name)) || exercises[0] || 'Bench Press';
-
-    // 2. Check previous session performance
     const lastPerf = getLastExercisePerformance(compoundName, workouts);
-
-    // 3. Check baseline PR if no workouts logged
     const baselinePR = prs.find((p) => p.exercise.toLowerCase() === compoundName.toLowerCase());
 
-    // 4. Determine target prescription
     const targetReps = primaryGoal === 'get_stronger' ? 4 : 8;
     const targetRPE = 8;
     let targetLoadStr = '';
 
     if (lastPerf?.bestWeight && lastPerf.bestWeight > 0) {
-      // Small progressive overload step
       const step = userUnit === 'lbs' ? 5 : 2.5;
       const targetWeight = lastPerf.bestWeight + step;
       targetLoadStr = `${targetWeight} ${userUnit} × ${targetReps} @${targetRPE}`;
@@ -130,7 +195,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const weeklyStats = useMemo(() => {
     const targetDays = trainingProfile?.daysPerWeek || 4;
     const now = new Date();
-    // Monday of current week
     const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - dayOfWeek);
@@ -194,6 +258,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
+  const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
 
   const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
     const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
@@ -209,49 +274,71 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   return (
-    <div className="page animate-fade-in space-y-6 pb-24 max-w-md mx-auto px-4">
+    <div className="page animate-fade-in space-y-5 pb-24 max-w-md mx-auto px-4">
       <InstallAppBanner />
 
-      {/* ── 1. GREETING & ATHLETE PROFILE ───────────────────────────────────── */}
-      <header className="flex justify-between items-start pt-2">
-        <div>
-          <h1 className="text-2xl font-black text-text-primary tracking-tight font-sans">
-            {greeting}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            <button
-              type="button"
-              onClick={() => setIsGoalSelectorOpen(true)}
-              className="text-sm font-semibold text-text-secondary hover:text-accent transition-colors cursor-pointer"
-            >
-              {goalLabel}
-            </button>
-            <span className="text-xs text-text-muted">•</span>
-            <button
-              type="button"
-              onClick={() => setIsBodyMetricsModalOpen(true)}
-              className="text-sm font-semibold text-text-secondary hover:text-accent transition-colors cursor-pointer"
-            >
-              {bodyweightDisplay}
-            </button>
+      {/* ── 1. KINETIC ATHLETE MOMENTUM HEADER ─────────────────────────────── */}
+      <header className="pt-2 space-y-2">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-1.5 text-3xs font-mono font-bold uppercase tracking-wider text-text-muted">
+              <span>ASCEND ATHLETE</span>
+              <span>•</span>
+              <span className="text-accent">{goalLabel.toUpperCase()}</span>
+            </div>
+            <h1 className="text-2xl font-black text-text-primary tracking-tight font-sans mt-0.5">
+              {greeting}, {profile?.name ? profile.name.split(' ')[0] : 'ATHLETE'}
+            </h1>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsSettingsOpen(true)}
+            className="w-9 h-9 rounded-2xl bg-bg-secondary/80 border border-border/80 flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-all shadow-xs"
+            title="Settings"
+            aria-label="Settings"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsSettingsOpen(true)}
-          className="w-9 h-9 rounded-full bg-bg-secondary flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-all"
-          title="Settings"
-          aria-label="Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
+        {/* Athletic Momentum Bar: Strength Rank & Streak */}
+        <div className="flex items-center gap-2 pt-0.5">
+          {overallLevel ? (
+            <button
+              type="button"
+              onClick={() => onNavigate('prs')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/15 border border-accent/30 text-accent text-xs font-bold font-mono active:scale-95 transition-all shadow-xs"
+              title="View Strength Level & Standards"
+            >
+              <Zap className="w-3.5 h-3.5 fill-accent stroke-accent" />
+              <span>LEVEL {overallLevel.level} • {overallLevel.title.toUpperCase()}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigate('prs')}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-bg-secondary border border-border/70 text-text-secondary text-xs font-medium hover:text-accent hover:border-accent/40 active:scale-95 transition-all"
+            >
+              <Trophy className="w-3.5 h-3.5 text-accent" />
+              <span>Calibrate Level</span>
+            </button>
+          )}
+
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-bg-secondary border border-border/70 text-xs font-mono text-text-secondary">
+            <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400/20" />
+            <span>{weeklyStats.completedCount}/{weeklyStats.targetDays} SESSIONS</span>
+          </div>
+        </div>
       </header>
 
       {/* Active Workout Draft Alert */}
       {activeWorkoutDraft && (
-        <div className="p-3 rounded-xl bg-accent/10 border border-accent/30 flex items-center justify-between text-xs">
-          <span className="font-semibold text-accent">Active session in progress</span>
+        <div className="p-3.5 rounded-2xl bg-accent/15 border border-accent/40 flex items-center justify-between text-xs shadow-md animate-scale-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+            <span className="font-bold text-accent">Active session in progress</span>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -259,14 +346,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 clearWorkoutDraft();
                 toast.info('Session draft discarded.');
               }}
-              className="text-text-muted hover:text-danger"
+              className="text-text-muted hover:text-danger text-2xs px-2 py-1"
             >
               Discard
             </button>
             <button
               type="button"
               onClick={() => onNavigate('workout')}
-              className="px-2.5 py-1 rounded-lg bg-accent text-white font-bold"
+              className="px-3 py-1 rounded-xl bg-accent text-white font-bold text-xs shadow-xs"
             >
               Resume
             </button>
@@ -274,123 +361,207 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── 2. TODAY'S WORKOUT ────────────────────────────────────────────── */}
-      <section className="space-y-3">
+      {/* ── 2. TODAY'S TRAINING HERO CARD (Visual Centerpiece) ─────────────── */}
+      <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/30 shadow-lg rounded-3xl space-y-4">
         <div className="flex items-center justify-between">
-          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-            TODAY
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                sessionInfo.status === 'completed'
+                  ? 'bg-emerald-500'
+                  : sessionInfo.status === 'in_progress'
+                  ? 'bg-accent animate-pulse'
+                  : 'bg-accent'
+              }`}
+            />
+            <span className="text-2xs font-mono font-bold tracking-wider uppercase text-text-muted">
+              {sessionInfo.status === 'completed'
+                ? 'TODAY COMPLETED'
+                : sessionInfo.status === 'in_progress'
+                ? 'IN PROGRESS'
+                : `TODAY'S MISSION`}
+            </span>
+          </div>
           <button
             type="button"
             onClick={() => onNavigate('workout')}
-            className="text-2xs font-medium text-text-muted hover:text-accent flex items-center gap-1 transition-colors"
+            className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1 transition-colors"
           >
-            <span>Change Plan</span>
+            <span>Change</span>
             <ChevronRight className="w-3 h-3" />
           </button>
         </div>
 
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-2xl font-black text-text-primary tracking-tight font-sans">
               {sessionInfo.title}
             </h2>
             {sessionInfo.bodyParts && sessionInfo.bodyParts.length > 0 && !sessionInfo.isRestDay && (
-              <span className="text-3xs font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent">
+              <span className="text-3xs font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent">
                 {sessionInfo.bodyParts.join(' • ')}
               </span>
             )}
           </div>
 
           {sessionInfo.isRestDay ? (
-            <p className="mt-1.5 text-sm text-text-secondary leading-relaxed">
-              Scheduled rest day. Hydrate, hit your protein goals, and let your body recover.
+            <p className="mt-1.5 text-xs text-text-secondary leading-relaxed">
+              Scheduled rest day. Hydrate, hit your protein target, and let muscle tissue adapt.
             </p>
           ) : sessionInfo.exercises && sessionInfo.exercises.length > 0 ? (
-            <div className="mt-2 space-y-1">
-              {sessionInfo.exercises.slice(0, 5).map((ex, idx) => (
-                <div key={idx} className="text-sm text-text-secondary flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent/60 shrink-0" />
-                  <span>{ex}</span>
+            <div className="mt-2.5 space-y-1.5">
+              {sessionInfo.exercises.slice(0, 4).map((ex, idx) => (
+                <div key={idx} className="text-xs text-text-secondary flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent/70 shrink-0" />
+                  <span className="font-medium text-text-primary">{ex}</span>
                 </div>
               ))}
-              {sessionInfo.exercises.length > 5 && (
-                <span className="text-xs text-text-muted pl-3.5 block">
-                  +{sessionInfo.exercises.length - 5} more
+              {sessionInfo.exercises.length > 4 && (
+                <span className="text-3xs text-text-muted font-mono pl-3.5 block">
+                  +{sessionInfo.exercises.length - 4} more exercises planned
                 </span>
               )}
             </div>
           ) : null}
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate('workout')}
-          className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer ${
-            sessionInfo.isRestDay || sessionInfo.status === 'completed'
-              ? 'bg-bg-secondary text-text-primary hover:bg-bg-secondary/80 border border-border/50'
-              : 'btn-primary shadow-lg shadow-accent/20'
-          }`}
-        >
-          <Play
-            className={`w-4 h-4 ${
+        {/* Action Buttons: Primary Start + Secondary Log Past */}
+        <div className="pt-1 space-y-2">
+          <button
+            type="button"
+            onClick={() => onNavigate('workout')}
+            className={`w-full py-3.5 rounded-xl font-black tracking-wide text-xs sm:text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer ${
               sessionInfo.isRestDay || sessionInfo.status === 'completed'
-                ? 'fill-text-primary stroke-text-primary'
-                : 'fill-white stroke-white'
+                ? 'bg-bg-secondary text-text-primary hover:bg-bg-secondary/80 border border-border/70'
+                : 'btn-primary shadow-lg shadow-accent/25'
             }`}
-          />
-          <span>
-            {activeWorkoutDraft
-              ? 'RESUME WORKOUT'
-              : sessionInfo.status === 'completed'
-              ? 'VIEW WORKOUT LOG'
-              : sessionInfo.isRestDay
-              ? 'START A WORKOUT ANYWAY'
-              : 'START WORKOUT'}
-          </span>
-        </button>
+          >
+            <Play
+              className={`w-4 h-4 ${
+                sessionInfo.isRestDay || sessionInfo.status === 'completed'
+                  ? 'fill-text-primary stroke-text-primary'
+                  : 'fill-white stroke-white'
+              }`}
+            />
+            <span>
+              {activeWorkoutDraft
+                ? 'RESUME ACTIVE WORKOUT'
+                : sessionInfo.status === 'completed'
+                ? 'VIEW TODAY\'S LOG'
+                : sessionInfo.isRestDay
+                ? 'TRAIN ANYWAY'
+                : 'START WORKOUT'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsLogPastModalOpen(true)}
+            className="w-full py-2.5 rounded-xl bg-bg-secondary/70 hover:bg-bg-secondary border border-border/60 hover:border-accent/40 text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+          >
+            <Calendar className="w-3.5 h-3.5 text-accent" />
+            <span>Log Past / Finished Workout</span>
+          </button>
+        </div>
       </section>
 
-      {/* ── DIVIDER ───────────────────────────────────────────────────────── */}
-      <div className="divider" />
+      {/* ── 3. DUAL FUEL HUD: ENERGY RINGS ─────────────────────────────────── */}
+      <section
+        onClick={() => onNavigate('meals')}
+        className="card p-4 sm:p-5 bg-bg-card border border-border/80 rounded-3xl space-y-3 cursor-pointer group hover:border-accent/40 transition-all shadow-xs"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed className="w-4 h-4 text-accent" />
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+              TODAY&apos;S NUTRITION FUEL
+            </span>
+          </div>
+          <div className="flex items-center gap-1 text-xs font-semibold text-text-muted group-hover:text-accent transition-colors">
+            <span>Log Food</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </div>
+        </div>
 
-      {/* ── 3. TOP FOCUS ──────────────────────────────────────────────────── */}
-      <section className="space-y-1.5">
-        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-          {sessionInfo.isRestDay ? 'UPCOMING FOCUS' : 'TOP FOCUS'}
-        </span>
-        <div className="flex items-baseline justify-between">
-          <h3 className="text-base font-bold text-text-primary font-sans">
-            {topFocus.name}
-          </h3>
-          <span className="text-xs font-mono text-text-muted">
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          {/* Calorie Ring */}
+          <div className="p-3 rounded-2xl bg-bg-secondary/60 border border-border/50 flex items-center gap-3">
+            <CircularRing progress={fuelStats.calPct} strokeColor="#e5c07b" trackColor="#27272a" size={54}>
+              <span className="text-[11px] font-black font-mono text-accent">
+                {fuelStats.calPct}%
+              </span>
+            </CircularRing>
+            <div className="min-w-0">
+              <span className="text-3xs uppercase font-mono text-text-muted block">ENERGY</span>
+              <span className="text-sm font-black font-mono text-text-primary block leading-tight">
+                {fuelStats.calories.toLocaleString()}
+              </span>
+              <span className="text-3xs text-text-muted font-mono">
+                of {fuelStats.targetCalories.toLocaleString()} kcal
+              </span>
+            </div>
+          </div>
+
+          {/* Protein Ring */}
+          <div className="p-3 rounded-2xl bg-bg-secondary/60 border border-border/50 flex items-center gap-3">
+            <CircularRing progress={fuelStats.protPct} strokeColor="#10b981" trackColor="#27272a" size={54}>
+              <span className="text-[11px] font-black font-mono text-emerald-400">
+                {fuelStats.protPct}%
+              </span>
+            </CircularRing>
+            <div className="min-w-0">
+              <span className="text-3xs uppercase font-mono text-text-muted block">PROTEIN</span>
+              <span className="text-sm font-black font-mono text-text-primary block leading-tight">
+                {fuelStats.protein}g
+              </span>
+              <span className="text-3xs text-text-muted font-mono">
+                of {fuelStats.targetProtein}g target
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 4. STRENGTH OVERLOAD FOCUS ────────────────────────────────────── */}
+      <section className="card p-4 sm:p-5 bg-bg-card border border-border/80 rounded-3xl space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Dumbbell className="w-4 h-4 text-accent" />
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+              {sessionInfo.isRestDay ? 'UPCOMING FOCUS' : 'KEY LIFT TODAY'}
+            </span>
+          </div>
+          <span className="text-3xs font-mono text-text-muted">
             {topFocus.lastDisplay}
           </span>
         </div>
-        <div className="text-lg font-bold text-accent font-mono tracking-tight">
-          {topFocus.targetLoadStr}
+
+        <div className="flex items-baseline justify-between pt-0.5">
+          <h3 className="text-base font-bold text-text-primary font-sans">
+            {topFocus.name}
+          </h3>
+          <span className="text-sm sm:text-base font-black text-accent font-mono tracking-tight">
+            {topFocus.targetLoadStr}
+          </span>
         </div>
       </section>
 
-      {/* ── DIVIDER ───────────────────────────────────────────────────────── */}
-      <div className="divider" />
-
-      {/* ── 4. THIS WEEK CONSISTENCY ──────────────────────────────────────── */}
-      <section className="space-y-2.5">
+      {/* ── 5. THIS WEEK CONSISTENCY ──────────────────────────────────────── */}
+      <section className="card p-4 bg-bg-card border border-border/80 rounded-3xl space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-            THIS WEEK
+            WEEKLY CONSISTENCY
           </span>
-          <span className="text-xs font-semibold text-text-primary">
-            {weeklyStats.completedCount} / {weeklyStats.targetDays} sessions
+          <span className="text-xs font-semibold font-mono text-text-primary">
+            {weeklyStats.completedCount} / {weeklyStats.targetDays} completed
           </span>
         </div>
 
         {/* 7-day strip */}
-        <div className="grid grid-cols-7 gap-2 pt-1">
+        <div className="grid grid-cols-7 gap-1.5 pt-1">
           {weeklyStats.days.map((day, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1.5">
-              <span className="text-2xs font-medium text-text-muted">
+              <span className="text-2xs font-semibold text-text-muted font-mono">
                 {day.letter}
               </span>
               <div
@@ -415,47 +586,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </section>
 
-      {/* ── DIVIDER ───────────────────────────────────────────────────────── */}
-      <div className="divider" />
-
-      {/* ── 5. TODAY'S FUEL ───────────────────────────────────────────────── */}
-      <section
-        onClick={() => onNavigate('meals')}
-        className="space-y-2 cursor-pointer group"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-            TODAY&apos;S FUEL
+      {/* ── 6. DAILY MINDSET CATALYST ──────────────────────────────────────── */}
+      {dailyQuote && (
+        <div className="p-4 rounded-2xl bg-bg-secondary/40 border-l-2 border-accent space-y-1">
+          <p className="text-xs text-text-secondary italic leading-relaxed">
+            &ldquo;{dailyQuote.text}&rdquo;
+          </p>
+          <span className="text-3xs text-text-muted font-mono block text-right">
+            — {dailyQuote.author}
           </span>
-          <div className="flex items-center gap-1 text-xs font-medium text-text-muted group-hover:text-accent transition-colors">
-            <span>Log Meal</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </div>
         </div>
-
-        <div className="flex items-baseline justify-between text-xs">
-          <div>
-            <span className="text-sm font-bold text-text-primary font-mono">
-              {fuelStats.calories.toLocaleString()}
-            </span>
-            <span className="text-text-muted"> / {fuelStats.targetCalories.toLocaleString()} kcal</span>
-          </div>
-          <div>
-            <span className="text-sm font-bold text-text-primary font-mono">
-              {fuelStats.protein}g
-            </span>
-            <span className="text-text-muted"> / {fuelStats.targetProtein}g protein</span>
-          </div>
-        </div>
-
-        {/* Minimal macro bar */}
-        <div className="h-1.5 w-full bg-bg-secondary rounded-full overflow-hidden flex gap-1">
-          <div
-            className="h-full bg-accent rounded-full transition-all"
-            style={{ width: `${fuelStats.calPct}%` }}
-          />
-        </div>
-      </section>
+      )}
 
       {/* ── MODALS ── */}
       <GoalSelectorModal
@@ -471,6 +612,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      <LogPastWorkoutModal
+        isOpen={isLogPastModalOpen}
+        onClose={() => setIsLogPastModalOpen(false)}
+        onSaved={() => toast.success('Past workout logged and synced!', 'Workout Saved')}
       />
 
       <SuggestedWorkoutModal

@@ -41,6 +41,8 @@ interface SettingsModalProps {
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const profile = useStore((state) => state.profile);
   const setProfile = useStore((state) => state.setProfile);
+  const userMode = useStore((state) => state.userMode) || 'beginner';
+  const setUserMode = useStore((state) => state.setUserMode);
   const logout = useStore((state) => state.logout);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const customGeminiKey = useStore((state) => state.customGeminiKey);
@@ -153,6 +155,48 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 >
                   {profile?.unit?.toUpperCase() || 'KG'}
                 </button>
+              </div>
+
+              {/* Training Experience (Beginner vs Advanced) */}
+              <div className="py-2.5 flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-semibold text-text-primary block">Training Experience</span>
+                  <span className="text-2xs text-text-muted">
+                    {userMode === 'beginner'
+                      ? 'Beginner: 1-tap logging, simple interface'
+                      : 'Advanced: Multi-set tables, RPE & tools'}
+                  </span>
+                </div>
+                <div className="flex bg-bg-secondary rounded-xl border border-border/80 overflow-hidden p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMode('beginner');
+                      toast.info('Switched to Beginner mode.', 'Mode Updated');
+                    }}
+                    className={`px-2.5 py-1 text-2xs font-semibold rounded-lg transition-all ${
+                      userMode === 'beginner'
+                        ? 'bg-emerald-500 text-white font-bold shadow-xs'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    🌱 Beginner
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMode('advanced');
+                      toast.info('Switched to Advanced mode.', 'Mode Updated');
+                    }}
+                    className={`px-2.5 py-1 text-2xs font-semibold rounded-lg transition-all ${
+                      userMode === 'advanced'
+                        ? 'bg-accent text-white font-bold shadow-xs'
+                        : 'text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    ⚡ Advanced
+                  </button>
+                </div>
               </div>
 
               {/* Bodyweight & Height */}

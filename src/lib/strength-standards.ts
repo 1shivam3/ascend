@@ -1,4 +1,5 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
+import { getAllExerciseNames } from './exercise-library';
 
 export function calculateOneRepMax(weight: number, reps: number): number {
   if (weight <= 0) return 0;
@@ -146,7 +147,14 @@ export function isBodyweightExercise(exercise: string): boolean {
     name.includes('dip') ||
     name.includes('push-up') ||
     name.includes('pushup') ||
-    name.includes('bodyweight')
+    name.includes('bodyweight') ||
+    name.includes('leg raise') ||
+    name.includes('knee raise') ||
+    name.includes('plank') ||
+    name.includes('crunch') ||
+    name.includes('sit-up') ||
+    name.includes('hyperextension') ||
+    name.includes('inverted row')
   );
 }
 
@@ -289,7 +297,9 @@ export function getEffectiveExerciseLoad(
 }
 
 export function getExerciseList(): string[] {
-  return Object.keys(MALE_STANDARDS);
+  const stdLifts = Object.keys(MALE_STANDARDS);
+  const libLifts = getAllExerciseNames();
+  return Array.from(new Set([...stdLifts, ...libLifts]));
 }
 
 /** Group exercises by category for pretty dropdown with 5 clean equipment categories */

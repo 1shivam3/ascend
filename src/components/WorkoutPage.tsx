@@ -10,6 +10,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Calendar,
   Trash2,
   ArrowLeft,
@@ -59,6 +60,8 @@ import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import ShareProgramModal from '@/components/ShareProgramModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
+import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
+import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import {
   DAYS_OF_WEEK,
   DAY_DISPLAY_INFO,
@@ -121,12 +124,43 @@ function PlanModal({
     }
   }, [isOpen, initial, userUnit, defaultTargetReps]);
 
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [targetExerciseIndex, setTargetExerciseIndex] = useState<number | null>(null);
+
   const updateExercise = useCallback((idx: number, field: keyof PlannedExercise, value: unknown) => {
     setPlanExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
   }, []);
 
   const addExercise = () => setPlanExercises(prev => [...prev, emptyPlanExercise(userUnit, defaultTargetReps)]);
   const removeExercise = (idx: number) => setPlanExercises(prev => prev.filter((_, i) => i !== idx));
+
+  const handleSelectFromLibrary = (selected: { name: string; isBodyweight: boolean; defaultWeightKg?: number; defaultReps?: number }) => {
+    if (targetExerciseIndex !== null) {
+      updateExercise(targetExerciseIndex, 'name', selected.name);
+      if (selected.defaultReps) updateExercise(targetExerciseIndex, 'targetReps', selected.defaultReps);
+      if (selected.isBodyweight) {
+        updateExercise(targetExerciseIndex, 'targetWeight', 0);
+      } else if (selected.defaultWeightKg) {
+        updateExercise(targetExerciseIndex, 'targetWeight', userUnit === 'lbs' ? Math.round(selected.defaultWeightKg * 2.20462) : selected.defaultWeightKg);
+      }
+    } else {
+      const isBW = selected.isBodyweight || isBodyweightExercise(selected.name);
+      const w = isBW ? 0 : (selected.defaultWeightKg ? (userUnit === 'lbs' ? Math.round(selected.defaultWeightKg * 2.20462) : selected.defaultWeightKg) : (userUnit === 'lbs' ? 115 : 50));
+      setPlanExercises(prev => [
+        ...prev,
+        {
+          name: selected.name,
+          targetSets: 3,
+          targetReps: selected.defaultReps || defaultTargetReps,
+          targetWeight: w,
+          targetUnit: userUnit,
+          notes: '',
+        }
+      ]);
+    }
+    setIsSelectorOpen(false);
+    setTargetExerciseIndex(null);
+  };
 
   const handleSave = () => {
     const trimmedName = planName.trim();
@@ -177,12 +211,26 @@ function PlanModal({
           <div>
             <div className="flex justify-between items-center mb-3">
               <label className="section-title">Exercises</label>
-              <button
-                onClick={addExercise}
-                className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
-              >
-                <Plus className="w-3.5 h-3.5" /> Add Exercise
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetExerciseIndex(null);
+                    setIsSelectorOpen(true);
+                  }}
+                  className="text-text-muted hover:text-accent text-xs font-semibold flex items-center gap-1 transition-colors"
+                >
+                  <Dumbbell className="w-3.5 h-3.5" />
+                  <span>Browse Library</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={addExercise}
+                  className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Exercise
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -200,6 +248,19 @@ function PlanModal({
                   </div>
 
                   {/* Name */}
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-3xs text-text-muted font-mono">NAME</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTargetExerciseIndex(i);
+                        setIsSelectorOpen(true);
+                      }}
+                      className="text-3xs text-accent hover:underline font-mono"
+                    >
+                      Pick from library
+                    </button>
+                  </div>
                   <input
                     type="text"
                     placeholder="Exercise name (e.g. Bench Press)"
@@ -288,6 +349,15 @@ function PlanModal({
           </button>
         </div>
       </div>
+
+      <ExerciseSelectorModal
+        isOpen={isSelectorOpen}
+        onClose={() => {
+          setIsSelectorOpen(false);
+          setTargetExerciseIndex(null);
+        }}
+        onSelectExercise={handleSelectFromLibrary}
+      />
     </div>
   );
 }
@@ -482,6 +552,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [expandedWorkouts, setExpandedWorkouts] = useState<Set<string>>(new Set());
@@ -1103,37 +1174,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     <div className="page animate-fade-in space-y-4">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <header className="flex justify-between items-center mb-2">
-        <div className="flex items-center gap-2.5">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Train</h1>
-              <button
-                type="button"
-                onClick={() => setIsGoalSelectorOpen(true)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 hover:border-accent/50 text-accent text-3xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer"
-                title="Click to customize active goals"
-              >
-                <Target className="w-2.5 h-2.5" />
-                <span>{goalSynergyLabel}</span>
-              </button>
-            </div>
-            <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
-          </div>
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">Train</h1>
+          <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Athlete Mode Toggle (🌱 Beginner vs ⚡ Advanced) */}
-          <button
-            type="button"
-            onClick={toggleUserMode}
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-              userMode === 'beginner'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                : 'bg-accent/10 border-accent/30 text-accent'
-            }`}
-            title={`Currently in ${userMode} mode. Tap to switch.`}
-          >
-            <span>{userMode === 'beginner' ? '🌱 Beginner' : '⚡ Advanced'}</span>
-          </button>
           {userMode === 'advanced' && (
             <button
               type="button"
@@ -1204,7 +1249,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {DAYS_OF_WEEK.map((day) => {
             const info = DAY_DISPLAY_INFO[day];
             const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
@@ -1221,12 +1266,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     setIsScheduleModalOpen(true);
                   }
                 }}
-                className={`p-1 sm:p-1.5 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[62px] sm:min-h-[70px] cursor-pointer ${
+                className={`py-2 px-1 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[72px] sm:min-h-[80px] cursor-pointer group active:scale-95 ${
                   isToday
-                    ? 'border-accent bg-accent/15 shadow-xs ring-1 ring-accent'
+                    ? 'border-accent bg-gradient-to-b from-accent/20 via-accent/10 to-transparent shadow-sm ring-1 ring-accent'
                     : sched.isRest
-                    ? 'border-border/50 bg-bg-secondary/30 text-text-muted hover:border-border'
-                    : 'border-border/80 bg-bg-card hover:border-accent/40'
+                    ? 'border-border/40 bg-bg-secondary/40 text-text-muted hover:border-border'
+                    : 'border-border/70 bg-bg-card hover:border-accent/50 hover:bg-bg-card/80'
                 }`}
                 title={
                   sched.isRest
@@ -1234,28 +1279,39 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     : `${info.label}: ${sched.title} (${sched.bodyParts.join(', ') || 'Workout'})`
                 }
               >
-                <span
-                  className={`text-3xs font-mono font-black uppercase ${
-                    isToday ? 'text-accent' : 'text-text-muted'
-                  }`}
-                >
-                  {info.short}
-                </span>
+                <div className="flex items-center gap-1">
+                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
+                  <span
+                    className={`text-[11px] font-mono font-black uppercase ${
+                      isToday ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'
+                    }`}
+                  >
+                    {info.short}
+                  </span>
+                </div>
 
-                <div className="my-0.5">
+                <div className="my-1 w-full px-0.5">
                   {sched.isRest ? (
-                    <span className="text-3xs text-text-muted font-medium block">
-                      Rest
+                    <span className="text-[10px] font-mono font-medium text-text-muted block">
+                      REST
                     </span>
                   ) : (
-                    <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight">
+                    <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight font-sans">
                       {sched.plan?.name.replace('Builtin ', '') || sched.title}
                     </span>
                   )}
                 </div>
 
-                <span className="text-3xs text-accent font-medium line-clamp-1 block leading-none">
-                  {sched.isRest ? '☕' : sched.bodyParts[0] || 'Train'}
+                <span
+                  className={`text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full line-clamp-1 block ${
+                    sched.isRest
+                      ? 'bg-bg-secondary text-text-muted'
+                      : isToday
+                      ? 'bg-accent text-white'
+                      : 'bg-accent/15 text-accent border border-accent/20'
+                  }`}
+                >
+                  {sched.isRest ? 'OFF' : sched.bodyParts[0] || 'TRAIN'}
                 </span>
               </button>
             );
@@ -1466,6 +1522,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   <span>Change workout</span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => setIsLogPastModalOpen(true)}
+                  className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                >
+                  <Calendar className="w-3.5 h-3.5 text-accent" />
+                  <span>Log completed workout</span>
+                </button>
+
                 {workouts.length > 0 ? (
                   <button
                     type="button"
@@ -1473,7 +1538,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
                   >
                     <RotateCcw className="w-3.5 h-3.5 text-accent" />
-                    <span>Repeat last workout</span>
+                    <span>Repeat last</span>
                   </button>
                 ) : (
                   <button
@@ -1482,7 +1547,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
                   >
                     <Plus className="w-3.5 h-3.5 text-accent" />
-                    <span>Start empty workout</span>
+                    <span>Empty workout</span>
                   </button>
                 )}
               </div>
@@ -1850,6 +1915,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onSave={handleSavePlan}
       />
 
+      {/* Log Completed / Past Workout Modal */}
+      <LogPastWorkoutModal
+        isOpen={isLogPastModalOpen}
+        onClose={() => setIsLogPastModalOpen(false)}
+      />
+
       {/* Datalists */}
       <datalist id="exercises-list">
         {availableExercises.map(ex => <option key={ex} value={ex} />)}
@@ -1953,6 +2024,30 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
             {/* Content */}
             <div className="p-4 overflow-y-auto space-y-4">
+              {/* Option to log past/finished workout */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsChangeWorkoutOpen(false);
+                  setIsLogPastModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-accent/10 border border-accent/30 hover:border-accent/60 flex items-center justify-between text-left transition-colors cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-text-primary block group-hover:text-accent transition-colors">
+                      Log Finished / Past Workout
+                    </span>
+                    <span className="text-3xs text-text-muted">
+                      Already completed your session? Record weights and reps now
+                    </span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
+              </button>
               {/* My Workouts & Weekly Schedule */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
