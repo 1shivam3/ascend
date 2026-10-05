@@ -18,7 +18,7 @@ import {
   Target,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { isMainCompoundLift, suggestLoad, getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
+import { isMainCompoundLift, suggestLoad } from '@/lib/strength-standards';
 import { getDailyQuote } from '@/lib/quotes';
 import SettingsModal from '@/components/SettingsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
@@ -26,6 +26,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
@@ -128,15 +129,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }
     return `${Math.round(bwKg)} kg`;
   }, [profile?.bodyweightKg, userUnit]);
-
-  // Overall Strength Level from PRs
-  const overallLevel = useMemo(() => {
-    if (!prs || prs.length === 0) return null;
-    const liftLevels = prs.map((p) =>
-      getLiftLevel(p.exercise, p.oneRepMax, profile?.bodyweightKg || 72, profile?.gender || 'male')
-    );
-    return getOverallLevel(liftLevels);
-  }, [prs, profile?.bodyweightKg, profile?.gender]);
 
   // Daily Mindset Quote
   const dailyQuote = useMemo(() => getDailyQuote(), []);
@@ -277,9 +269,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     <div className="page animate-fade-in space-y-5 pb-24 max-w-md mx-auto px-4">
       <InstallAppBanner />
 
-      {/* ── 1. KINETIC ATHLETE MOMENTUM HEADER ─────────────────────────────── */}
-      <header className="pt-2 space-y-2">
-        <div className="flex justify-between items-start">
+      {/* ── 1. HEADER (Greeting, Goal & Controls) ─────────────────────────── */}
+      <header className="pt-2">
+        <div className="flex justify-between items-center">
           <div>
             <div className="flex items-center gap-1.5 text-3xs font-mono font-bold uppercase tracking-wider text-text-muted">
               <span>ASCEND ATHLETE</span>
@@ -291,43 +283,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </h1>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsSettingsOpen(true)}
-            className="w-9 h-9 rounded-2xl bg-bg-secondary/80 border border-border/80 flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-all shadow-xs"
-            title="Settings"
-            aria-label="Settings"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Athletic Momentum Bar: Strength Rank & Streak */}
-        <div className="flex items-center gap-2 pt-0.5">
-          {overallLevel ? (
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             <button
               type="button"
-              onClick={() => onNavigate('prs')}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-accent/15 border border-accent/30 text-accent text-xs font-bold font-mono active:scale-95 transition-all shadow-xs"
-              title="View Strength Level & Standards"
+              onClick={() => setIsSettingsOpen(true)}
+              className="w-9 h-9 rounded-xl bg-bg-secondary/80 border border-border/80 flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-all shadow-xs"
+              title="Settings"
+              aria-label="Settings"
             >
-              <Zap className="w-3.5 h-3.5 fill-accent stroke-accent" />
-              <span>LEVEL {overallLevel.level} • {overallLevel.title.toUpperCase()}</span>
+              <Settings className="w-4 h-4" />
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => onNavigate('prs')}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-bg-secondary border border-border/70 text-text-secondary text-xs font-medium hover:text-accent hover:border-accent/40 active:scale-95 transition-all"
-            >
-              <Trophy className="w-3.5 h-3.5 text-accent" />
-              <span>Calibrate Level</span>
-            </button>
-          )}
-
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-bg-secondary border border-border/70 text-xs font-mono text-text-secondary">
-            <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400/20" />
-            <span>{weeklyStats.completedCount}/{weeklyStats.targetDays} SESSIONS</span>
           </div>
         </div>
       </header>

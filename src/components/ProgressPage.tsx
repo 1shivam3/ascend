@@ -33,7 +33,6 @@ import ProgressChart from '@/components/ProgressChart';
 import BodyweightChart from '@/components/BodyweightChart';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 import { plural } from '@/lib/formatters';
 
 function formatProgressDate(dateStr: string): string {
@@ -210,7 +209,6 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <Share2 className="w-3.5 h-3.5 text-accent" />
             <span className="text-2xs font-bold hidden sm:inline">Weekly Card</span>
           </button>
-          <ThemeToggle />
         </div>
       </header>
 

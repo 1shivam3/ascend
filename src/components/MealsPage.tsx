@@ -39,7 +39,6 @@ import {
   Leaf,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
@@ -1144,9 +1143,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Meals &amp; Macros</h1>
             <p className="text-label text-text-muted">Track nutrition &amp; fuel your strength</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
         </div>
       </header>
 

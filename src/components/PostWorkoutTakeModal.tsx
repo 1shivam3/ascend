@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake } from '@/lib/types';
 import { fetchPostWorkoutTake } from '@/lib/ai-coach';
@@ -62,9 +62,33 @@ export default function PostWorkoutTakeModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  const userUnit = store.profile?.unit || 'kg';
+  const totalSets = useMemo(() => {
+    return completedWorkout.exercises.reduce((acc, e) => acc + e.sets.length, 0);
+  }, [completedWorkout.exercises]);
 
-  const totalSets = completedWorkout.exercises.reduce((acc, e) => acc + e.sets.length, 0);
+  const totalVolume = useMemo(() => {
+    let volKg = 0;
+    for (const ex of completedWorkout.exercises) {
+      for (const s of ex.sets) {
+        const w = parseFloat(String(s.weight)) || 0;
+        const r = parseInt(String(s.reps), 10) || 0;
+        if (r > 0 && w > 0) {
+          const wKg = s.unit === 'lbs' ? w * 0.453592 : w;
+          volKg += wKg * r;
+        }
+      }
+    }
+    const displayVal = userUnit === 'lbs' ? Math.round(volKg * 2.20462) : Math.round(volKg);
+    return `${displayVal.toLocaleString()} ${userUnit}`;
+  }, [completedWorkout.exercises, userUnit]);
+
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayPRs = useMemo(() => {
+    return (store.prs || []).filter((p) => p.date === todayStr);
+  }, [store.prs, todayStr]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
@@ -92,27 +116,53 @@ export default function PostWorkoutTakeModal({
           </button>
         </div>
 
-        {/* Quick Numbers Bar */}
-        <div className="grid grid-cols-3 gap-2 py-2 border-y border-border text-center">
+        {/* Quick Numbers Bar: 4 Core Athletic Metrics */}
+        <div className="grid grid-cols-4 gap-1.5 py-2.5 border-y border-border text-center bg-bg-secondary/30 rounded-xl px-2">
           <div>
             <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
-            <span className="font-bold text-sm text-text-primary">
-              {completedWorkout.durationMinutes || 45} min
+            <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
+              {completedWorkout.durationMinutes || 45}m
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Exercises</span>
-            <span className="font-bold text-sm text-text-primary">
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">Volume</span>
+            <span className="font-bold text-xs sm:text-sm text-accent font-mono truncate block" title={totalVolume}>
+              {totalVolume}
+            </span>
+          </div>
+          <div>
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">Lifts</span>
+            <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.exercises.length}
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Total Sets</span>
-            <span className="font-bold text-sm text-accent font-mono">
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">Sets</span>
+            <span className="font-bold text-xs sm:text-sm text-emerald-500 font-mono">
               {totalSets}
             </span>
           </div>
         </div>
+
+        {/* New PR Milestone Banner (if achieved) */}
+        {todayPRs.length > 0 && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 animate-scale-in">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
+              <Zap className="w-4 h-4 fill-amber-500" />
+              <span>{todayPRs.length} NEW PERSONAL RECORD{todayPRs.length > 1 ? 'S' : ''} DETECTED!</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {todayPRs.map((pr) => (
+                <span
+                  key={pr.id}
+                  className="px-2 py-0.5 rounded-md bg-bg-card border border-amber-500/40 text-2xs font-mono text-text-primary font-semibold"
+                >
+                  {pr.exercise}: {userUnit === 'lbs' ? pr.weightLbs : pr.weightKg} {userUnit} × {pr.reps}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Coach's Take Card */}
         {loading ? (

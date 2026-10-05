@@ -47,7 +47,6 @@ import {
   ExerciseSubstitute,
   getGoalAdaptiveSplitTemplates,
 } from '@/lib/workout-engine';
-import ThemeToggle from '@/components/ui/ThemeToggle';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
@@ -1189,7 +1188,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <Dumbbell className="w-4 h-4 text-accent" />
             </button>
           )}
-          <ThemeToggle />
         </div>
       </header>
 
@@ -1880,6 +1878,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
+            const durationMin = Math.max(15, Math.round((Date.now() - sessionStartTime) / 60000));
+            setPostWorkoutSummary({
+              name: startedFromPlan || 'Workout Session',
+              durationMinutes: durationMin,
+              exercises: workoutEntry.exercises,
+            });
             setIsModalOpen(false);
             setExercises([]);
             setStartedFromPlan(null);
@@ -1919,6 +1923,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <LogPastWorkoutModal
         isOpen={isLogPastModalOpen}
         onClose={() => setIsLogPastModalOpen(false)}
+        onSaved={(entry) => {
+          setPostWorkoutSummary({
+            name: 'Completed Workout',
+            durationMinutes: 45,
+            exercises: entry.exercises,
+          });
+        }}
       />
 
       {/* Datalists */}
