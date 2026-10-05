@@ -85,7 +85,7 @@ export default function PostWorkoutTakeModal({
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const todayPRs = useMemo(() => {
-    return (store.prs || []).filter((p) => p.date === todayStr);
+    return (store.prs || []).filter((p) => p.date && p.date.startsWith(todayStr));
   }, [store.prs, todayStr]);
 
   if (!isOpen) return null;

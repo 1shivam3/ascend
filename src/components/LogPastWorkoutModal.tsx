@@ -452,6 +452,7 @@ export default function LogPastWorkoutModal({
                           <div className="col-span-5">
                             <input
                               type="number"
+                              inputMode="decimal"
                               step="0.5"
                               min="0"
                               placeholder={isBW ? '0 (BW)' : '60'}
@@ -463,6 +464,7 @@ export default function LogPastWorkoutModal({
                           <div className="col-span-3">
                             <input
                               type="number"
+                              inputMode="numeric"
                               min="1"
                               max="100"
                               placeholder="8"

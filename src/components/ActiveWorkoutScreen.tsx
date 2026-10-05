@@ -54,7 +54,7 @@ export default function ActiveWorkoutScreen({
   onFinish,
   onCancel,
 }: ActiveWorkoutScreenProps) {
-  const { profile, workouts, addPR, prs } = useStore();
+  const { profile, workouts, addPR, prs, saveWorkoutDraft } = useStore();
   const userMode = useStore((state) => state.userMode) || 'beginner';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const toast = useToast();
@@ -225,6 +225,20 @@ export default function ActiveWorkoutScreen({
     setEffortChosen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExerciseIdx]);
+
+  // ── Auto-save In-Progress Session to Local Storage ────────────────────────
+  useEffect(() => {
+    if (exercises.some((e) => e.name.trim() || e.sets.some((s) => s.completed || (parseFloat(String(s.weight)) || 0) > 0))) {
+      saveWorkoutDraft({
+        date: new Date().toISOString().split('T')[0],
+        name: workoutName,
+        exercises,
+        startedFromPlan: workoutName,
+        sessionStartTime,
+        savedAt: new Date().toISOString(),
+      });
+    }
+  }, [exercises, workoutName, sessionStartTime, saveWorkoutDraft]);
 
   const handleRemoveExercise = (idxToRemove: number) => {
     if (exercises.length <= 1) {
