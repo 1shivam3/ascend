@@ -23,6 +23,8 @@ import {
   Award,
   Share2,
   Activity,
+  HelpCircle,
+  X,
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
@@ -76,6 +78,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
+  const [isDotsInfoOpen, setIsDotsInfoOpen] = useState(false);
 
   const userUnit = profile?.unit || 'kg';
 
@@ -399,17 +402,24 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
 
                 {/* Strength Score Banner */}
-                <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-center justify-between">
+                <div
+                  onClick={() => setIsDotsInfoOpen(true)}
+                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-all group"
+                  title="What is DOTS? Tap for explanation"
+                >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent font-bold font-mono text-sm">
+                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent font-bold font-mono text-sm group-hover:scale-105 transition-transform">
                       {dotsScore > 0 ? Math.round(dotsScore) : '—'}
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-text-primary block font-sans">
-                        Strength Score (DOTS)
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-text-primary block font-sans group-hover:text-accent transition-colors">
+                          Strength Score (DOTS)
+                        </span>
+                        <HelpCircle className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
+                      </div>
                       <span className="text-2xs text-text-muted">
-                        Bodyweight-normalized strength benchmark
+                        Bodyweight-normalized strength benchmark (tap to learn)
                       </span>
                     </div>
                   </div>
@@ -691,6 +701,87 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
       {/* Weekly Training Social Recap Card Modal */}
       <WeeklyRecapModal isOpen={isWeeklyRecapOpen} onClose={() => setIsWeeklyRecapOpen(false)} />
+
+      {/* ── What is DOTS? Modal ────────────────────────────────────────── */}
+      {isDotsInfoOpen && (
+        <div className="modal-overlay" onClick={() => setIsDotsInfoOpen(false)}>
+          <div
+            className="modal-content max-w-md w-full p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
+                  <Award className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-text-primary">What is the DOTS Score?</h3>
+                  <p className="text-2xs text-text-muted">Standardized pound-for-pound strength formula</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDotsInfoOpen(false)}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
+              <p>
+                The <strong>DOTS formula</strong> is the official standard used by the International Powerlifting Federation (IPF). It normalizes strength against bodyweight using a polynomial curve, allowing lifters of different bodyweights and genders to fairly compare strength.
+              </p>
+
+              <div className="card p-3 bg-bg-secondary/70 border border-border/80 space-y-1.5">
+                <span className="text-2xs font-mono font-bold text-accent uppercase block">
+                  ASCEND TIER CLASSIFICATIONS
+                </span>
+                <div className="space-y-1 text-2xs font-mono">
+                  <div className="flex justify-between py-0.5 border-b border-border/40">
+                    <span className="text-text-muted">&lt; 250</span>
+                    <span className="font-semibold text-text-primary">Novice</span>
+                  </div>
+                  <div className="flex justify-between py-0.5 border-b border-border/40">
+                    <span className="text-text-muted">250 – 349</span>
+                    <span className="font-semibold text-text-primary">Intermediate</span>
+                  </div>
+                  <div className="flex justify-between py-0.5 border-b border-border/40">
+                    <span className="text-text-muted">350 – 424</span>
+                    <span className="font-semibold text-accent">Advanced</span>
+                  </div>
+                  <div className="flex justify-between py-0.5 border-b border-border/40">
+                    <span className="text-text-muted">425 – 499</span>
+                    <span className="font-semibold text-amber-500">Elite</span>
+                  </div>
+                  <div className="flex justify-between py-0.5">
+                    <span className="text-text-muted">500+</span>
+                    <span className="font-bold text-emerald-500">World Class</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-accent/10 border border-accent/20 text-text-primary text-2xs space-y-1">
+                <strong className="text-accent block">How to Improve Your Score:</strong>
+                <p>
+                  1. Increase your 1RM on the Big 3 (Squat, Bench Press, and Deadlift).
+                </p>
+                <p>
+                  2. Maintain or improve body composition—higher strength at a leaner bodyweight yields a higher DOTS coefficient.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsDotsInfoOpen(false)}
+              className="w-full btn-primary py-2.5 text-xs font-bold"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

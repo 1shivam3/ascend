@@ -32,12 +32,14 @@ interface WeeklyScheduleModalProps {
   isOpen: boolean;
   onClose: () => void;
   plannedWorkouts: PlannedWorkout[];
+  initialDay?: DayOfWeek;
 }
 
 export default function WeeklyScheduleModal({
   isOpen,
   onClose,
   plannedWorkouts,
+  initialDay,
 }: WeeklyScheduleModalProps) {
   const toast = useToast();
   const currentWeeklySchedule = useStore((state) => state.weeklySchedule);
@@ -204,7 +206,9 @@ export default function WeeklyScheduleModal({
               <div
                 key={day}
                 className={`p-3.5 rounded-xl border transition-all ${
-                  isToday
+                  day === initialDay
+                    ? 'border-accent bg-accent/10 ring-2 ring-accent shadow-md'
+                    : isToday
                     ? 'border-accent bg-accent/5 shadow-xs'
                     : isRest
                     ? 'border-border/60 bg-bg-secondary/30'

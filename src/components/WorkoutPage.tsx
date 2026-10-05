@@ -35,6 +35,8 @@ import {
   AlertTriangle,
   Share2,
   Target,
+  Copy,
+  Search,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -54,7 +56,7 @@ import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import ShareProgramModal from '@/components/ShareProgramModal';
@@ -369,9 +371,10 @@ interface PlanCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onShare: () => void;
+  onDuplicate: () => void;
 }
 
-function PlanCard({ plan, onStart, onEdit, onDelete, onShare }: PlanCardProps) {
+function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: PlanCardProps) {
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -388,6 +391,13 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare }: PlanCardProps) {
         </div>
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={onDuplicate}
+            title="Duplicate plan"
+            className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+          >
+            <Copy className="w-3.5 h-3.5" />
+          </button>
           <button
             onClick={onShare}
             title="Share plan via WhatsApp or QR"
@@ -596,7 +606,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState('');
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
   useEffect(() => {
@@ -1124,6 +1136,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
   };
 
+  const handleDuplicatePlan = (plan: PlannedWorkout) => {
+    const duplicatedPlan: PlannedWorkout = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      name: `${plan.name} (Copy)`,
+      exercises: plan.exercises.map(e => ({ ...e })),
+    };
+    addPlannedWorkout(duplicatedPlan);
+    toast.success(`Duplicated "${plan.name}"`, 'Plan Duplicated');
+  };
+
   const openCreatePlan = () => {
     setEditingPlan(null);
     setIsPlanModalOpen(true);
@@ -1165,6 +1188,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     () => [...workouts].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 20),
     [workouts]
   );
+
+  const filteredWorkouts = useMemo(() => {
+    if (!historyFilter.trim()) return sortedWorkouts;
+    const q = historyFilter.toLowerCase().trim();
+    return sortedWorkouts.filter((w) =>
+      w.exercises.some((e) => e.name.toLowerCase().includes(q))
+    );
+  }, [sortedWorkouts, historyFilter]);
 
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1239,8 +1270,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </div>
           <button
             type="button"
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+            onClick={() => {
+              setTargetScheduleDay(todayDayOfWeek);
+              setIsScheduleModalOpen(true);
+            }}
+            className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2.5 py-1 rounded-lg hover:bg-accent/20 flex items-center gap-1 transition-colors shadow-xs"
           >
             <Edit2 className="w-3 h-3" />
             <span>Customize Days</span>
@@ -1258,11 +1292,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 key={day}
                 type="button"
                 onClick={() => {
-                  if (sched.plan) {
-                    handleStartPlan(sched.plan);
-                  } else {
-                    setIsScheduleModalOpen(true);
-                  }
+                  setTargetScheduleDay(day);
+                  setIsScheduleModalOpen(true);
                 }}
                 className={`py-2 px-1 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[72px] sm:min-h-[80px] cursor-pointer group active:scale-95 ${
                   isToday
@@ -1671,6 +1702,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   onEdit={() => handleEditPlan(plan)}
                   onDelete={() => handleDeletePlan(plan)}
                   onShare={() => setSharingPlan(plan)}
+                  onDuplicate={() => handleDuplicatePlan(plan)}
                 />
               ))}
             </div>
@@ -1692,6 +1724,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
 
+        {sortedWorkouts.length > 2 && (
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              type="text"
+              placeholder="Search past workouts (e.g. Bench, Squat, Pull-ups)..."
+              value={historyFilter}
+              onChange={(e) => setHistoryFilter(e.target.value)}
+              className="w-full bg-bg-card border border-border rounded-xl pl-9 pr-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-accent outline-none font-sans"
+            />
+          </div>
+        )}
+
         {sortedWorkouts.length === 0 ? (
           <div className="card text-center py-8 px-4 space-y-2.5">
             <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent mx-auto">
@@ -1712,9 +1757,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <span>START WORKOUT</span>
             </button>
           </div>
+        ) : filteredWorkouts.length === 0 && historyFilter.trim() !== '' ? (
+          <div className="card text-center py-6 px-4 space-y-1 text-text-muted text-xs">
+            <p className="font-semibold text-text-primary">No workouts found</p>
+            <p>No logged sessions matched &ldquo;{historyFilter}&rdquo;.</p>
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {sortedWorkouts.map(workout => {
+            {filteredWorkouts.map(workout => {
               const isExpanded = expandedWorkouts.has(workout.id);
               const totalSets = workout.exercises.reduce((sum, e) => sum + e.sets.length, 0);
 
@@ -2236,8 +2286,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       {/* Weekly Schedule & Body Parts Modal */}
       <WeeklyScheduleModal
         isOpen={isScheduleModalOpen}
-        onClose={() => setIsScheduleModalOpen(false)}
+        onClose={() => {
+          setIsScheduleModalOpen(false);
+          setTargetScheduleDay(undefined);
+        }}
         plannedWorkouts={plannedWorkouts}
+        initialDay={targetScheduleDay}
       />
     </div>
   );

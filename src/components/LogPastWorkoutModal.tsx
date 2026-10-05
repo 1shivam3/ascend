@@ -11,6 +11,7 @@ import {
   Clock,
   FileText,
   ChevronDown,
+  Copy,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, PlannedWorkout } from '@/lib/types';
@@ -41,6 +42,11 @@ export default function LogPastWorkoutModal({
 
   const userUnit = profile?.unit || 'kg';
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const yesterdayStr = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }, []);
 
   const [date, setDate] = useState(todayStr);
   const [workoutName, setWorkoutName] = useState('Completed Workout');
@@ -145,6 +151,27 @@ export default function LogPastWorkoutModal({
         return {
           ...ex,
           sets: ex.sets.filter((_, j) => j !== setIdx),
+        };
+      })
+    );
+  };
+
+  const handleDuplicateSet = (exIdx: number, setIdx: number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        const targetSet = ex.sets[setIdx];
+        const clonedSet: WorkoutSet = {
+          weight: targetSet ? targetSet.weight : (userUnit === 'lbs' ? 115 : 50),
+          reps: targetSet ? targetSet.reps : 8,
+          unit: userUnit,
+          completed: true,
+        };
+        const updated = [...ex.sets];
+        updated.splice(setIdx + 1, 0, clonedSet);
+        return {
+          ...ex,
+          sets: updated,
         };
       })
     );
@@ -271,9 +298,31 @@ export default function LogPastWorkoutModal({
             {/* Meta Row: Date, Duration, Name */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               <div>
-                <label className="text-2xs font-mono font-bold uppercase text-text-muted block mb-1">
-                  DATE
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-2xs font-mono font-bold uppercase text-text-muted">
+                    DATE
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setDate(todayStr)}
+                      className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                        date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-secondary'
+                      }`}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDate(yesterdayStr)}
+                      className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                        date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-secondary'
+                      }`}
+                    >
+                      Yesterday
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="date"
                   value={date}
@@ -391,8 +440,8 @@ export default function LogPastWorkoutModal({
                       <div className="grid grid-cols-12 text-3xs font-mono text-text-muted px-1">
                         <span className="col-span-2">SET</span>
                         <span className="col-span-5">{isBW ? `ADDED WT (${userUnit})` : `WEIGHT (${userUnit})`}</span>
-                        <span className="col-span-4">REPS</span>
-                        <span className="col-span-1 text-right"></span>
+                        <span className="col-span-3">REPS</span>
+                        <span className="col-span-2 text-right">ACTIONS</span>
                       </div>
 
                       {ex.sets.map((set, sIdx) => (
@@ -411,7 +460,7 @@ export default function LogPastWorkoutModal({
                               className="w-full bg-bg-secondary border border-border/80 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
                             />
                           </div>
-                          <div className="col-span-4">
+                          <div className="col-span-3">
                             <input
                               type="number"
                               min="1"
@@ -422,14 +471,23 @@ export default function LogPastWorkoutModal({
                               className="w-full bg-bg-secondary border border-border/80 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
                             />
                           </div>
-                          <div className="col-span-1 text-right">
+                          <div className="col-span-2 flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateSet(exIdx, sIdx)}
+                              className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+                              title="Duplicate set"
+                            >
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
                             {ex.sets.length > 1 && (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveSet(exIdx, sIdx)}
-                                className="text-text-muted hover:text-red-400 p-1"
+                                className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                title="Remove set"
                               >
-                                <X className="w-3 h-3" />
+                                <X className="w-3.5 h-3.5" />
                               </button>
                             )}
                           </div>

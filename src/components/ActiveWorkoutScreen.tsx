@@ -1127,7 +1127,7 @@ export default function ActiveWorkoutScreen({
                   <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans truncate group-hover:text-accent transition-colors">
                     {currentExercise.name || 'Untitled Exercise'}
                   </h2>
-                  <Edit2 className="w-4 h-4 text-text-muted opacity-40 group-hover:opacity-100 group-hover:text-accent transition-opacity shrink-0" />
+                  <Edit2 className="w-3.5 h-3.5 text-accent opacity-80 group-hover:opacity-100 transition-opacity shrink-0" />
                 </div>
               )}
             </div>
@@ -1593,15 +1593,41 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Sticky Bottom Rest Timer (Dismissable & Non-intrusive) ────────── */}
       {isRestTimerDismissed ? (
-        <button
-          type="button"
-          onClick={() => setIsRestTimerDismissed(false)}
-          className="fixed bottom-4 right-4 z-40 px-3.5 py-2 rounded-full bg-bg-card/95 backdrop-blur border border-accent/40 shadow-xl text-xs font-mono font-bold text-accent flex items-center gap-1.5 active:scale-95 transition-all"
-          title="Open rest timer"
-        >
-          <Timer className="w-3.5 h-3.5" />
-          <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}</span>
-        </button>
+        <div className="fixed bottom-4 right-4 z-40 flex items-center gap-1 p-1 rounded-full bg-bg-card/95 backdrop-blur border border-accent/40 shadow-xl">
+          <button
+            type="button"
+            onClick={() => setIsRestTimerDismissed(false)}
+            className="px-2.5 py-1.5 text-xs font-mono font-bold text-accent flex items-center gap-1.5 active:scale-95 transition-all hover:text-accent/80"
+            title="Open rest timer bar"
+          >
+            <Timer className="w-3.5 h-3.5" />
+            <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}</span>
+          </button>
+          <div className="flex items-center gap-0.5 border-l border-border/70 pl-1 pr-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                adjustTimer(-30);
+              }}
+              className="px-1.5 py-0.5 rounded text-3xs font-mono font-bold text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all"
+              title="Subtract 30 seconds"
+            >
+              -30s
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                adjustTimer(30);
+              }}
+              className="px-1.5 py-0.5 rounded text-3xs font-mono font-bold text-accent hover:bg-accent/15 active:scale-95 transition-all"
+              title="Add 30 seconds"
+            >
+              +30s
+            </button>
+          </div>
+        </div>
       ) : (
         <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-2xl">
           <div className="max-w-[480px] mx-auto flex items-center justify-between">
@@ -1629,11 +1655,20 @@ export default function ActiveWorkoutScreen({
             </div>
 
             {/* Quick timer adjustments */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => adjustTimer(-30)}
+                className="px-2.5 py-1.5 rounded-xl bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
+                title="Subtract 30 seconds"
+              >
+                -30s
+              </button>
               <button
                 type="button"
                 onClick={() => adjustTimer(30)}
                 className="px-3 py-1.5 rounded-xl bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
+                title="Add 30 seconds"
               >
                 +30s
               </button>

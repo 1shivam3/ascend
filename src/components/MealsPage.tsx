@@ -104,9 +104,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const waterLogs          = useStore((state) => state.waterLogs || {});
   const creatineLogs       = useStore((state) => state.creatineLogs || {});
   const logWater           = useStore((state) => state.logWater);
+  const resetWater         = useStore((state) => state.resetWater);
   const toggleCreatine     = useStore((state) => state.toggleCreatine);
   const hydrationConfig    = useStore((state) => state.hydrationConfig);
   const creatineConfig     = useStore((state) => state.creatineConfig);
+  const creatineSupply     = useStore((state) => state.creatineSupply);
   const customGeminiKey    = useStore((state) => state.customGeminiKey);
   const goals              = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
 
@@ -290,8 +292,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   }, []);
 
   const handleSelectSuggestion = (index: number, suggestion: string) => {
-    const currentQty  = foods[index]?.quantity;
+    let currentQty = foods[index]?.quantity;
     const currentUnit = foods[index]?.unit || 'g';
+    if (!currentQty || currentQty <= 0) {
+      currentQty = ['piece', 'pieces', 'scoop', 'slice', 'bowl', 'cup', 'serving', 'handful'].includes(currentUnit) ? 1 : 100;
+    }
     const est = estimateMacros(suggestion, currentQty, currentUnit);
 
     setFoods((prev) => {
@@ -299,6 +304,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       next[index] = {
         ...next[index],
         name:     suggestion,
+        quantity: currentQty,
+        unit:     currentUnit,
         calories: est.calories,
         proteinG: est.proteinG,
         carbsG:   est.carbsG,
@@ -1510,9 +1517,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <Droplet className="w-3.5 h-3.5 fill-sky-500/20 stroke-sky-500" />
                 WATER
               </span>
-              <span className="text-[10px] text-text-muted font-medium">
-                {waterRemaining === 0 ? '✓ Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
-              </span>
+              <div className="flex items-center gap-1.5">
+                {waterToday > 0 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      resetWater(todayDate);
+                      toast.info("Today's water log reset to 0L", 'Hydration Reset');
+                    }}
+                    className="text-3xs text-text-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                    title="Reset today's water"
+                  >
+                    Reset
+                  </button>
+                )}
+                <span className="text-[10px] text-text-muted font-medium">
+                  {waterRemaining === 0 ? '✓ Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
+                </span>
+              </div>
             </div>
             <div className="flex items-baseline gap-1">
               <span className="text-xl font-black text-text-primary font-sans">
@@ -1549,44 +1572,59 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
 
           {/* Creatine widget */}
-          <div
-            onClick={() => setIsCreatineModalOpen(true)}
-            className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-amber-500/40 cursor-pointer transition-all space-y-1.5"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 fill-amber-500/20 stroke-amber-500" />
-                CREATINE
-              </span>
-              <span className="text-[10px] text-text-muted font-medium">
-                {creatineTaken ? '✓ Taken' : 'Pending'}
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-600' : 'text-text-primary'}`}>
-                {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleCreatine(todayDate);
-                if (!creatineTaken) {
-                  toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
-                } else {
-                  toast.info('Creatine marked as not taken', 'Creatine');
-                }
-              }}
-              className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 ${
-                creatineTaken
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
-                  : 'bg-bg-card border-border text-text-primary hover:border-amber-500'
-              }`}
-            >
-              {creatineTaken ? '✓ Taken Today' : '+ Log Creatine'}
-            </button>
-          </div>
+          {(() => {
+            const creatineDaysLeft = Math.max(
+              0,
+              Math.floor((creatineSupply?.currentAmountG ?? 450) / Math.max(1, creatineConfig?.dailyTargetG || 5))
+            );
+            return (
+              <div
+                onClick={() => setIsCreatineModalOpen(true)}
+                className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-amber-500/40 cursor-pointer transition-all space-y-1.5"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                    <Sparkles className="w-3.5 h-3.5 fill-amber-500/20 stroke-amber-500" />
+                    CREATINE
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {creatineDaysLeft <= 7 && (
+                      <span className="text-[9px] font-mono font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/25">
+                        ~{creatineDaysLeft}d left
+                      </span>
+                    )}
+                    <span className="text-[10px] text-text-muted font-medium">
+                      {creatineTaken ? '✓ Taken' : 'Pending'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-600' : 'text-text-primary'}`}>
+                    {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCreatine(todayDate);
+                    if (!creatineTaken) {
+                      toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
+                    } else {
+                      toast.info('Creatine marked as not taken', 'Creatine');
+                    }
+                  }}
+                  className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 ${
+                    creatineTaken
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
+                      : 'bg-bg-card border-border text-text-primary hover:border-amber-500'
+                  }`}
+                >
+                  {creatineTaken ? '✓ Taken Today' : '+ Log Creatine'}
+                </button>
+              </div>
+            );
+          })()}
         </div>
       </section>
 

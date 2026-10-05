@@ -353,7 +353,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             onClick={() => onNavigate('workout')}
             className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1 transition-colors"
           >
-            <span>Change</span>
+            <span>Change Today&apos;s Session</span>
             <ChevronRight className="w-3 h-3" />
           </button>
         </div>
@@ -510,6 +510,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             {topFocus.targetLoadStr}
           </span>
         </div>
+        {(!prs || prs.length === 0) && workouts.length === 0 && (
+          <button
+            type="button"
+            onClick={() => onNavigate('prs')}
+            className="pt-1 text-2xs font-semibold text-accent hover:underline flex items-center gap-1 transition-colors"
+          >
+            <span>Calibrate Your Baseline Lifts</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        )}
       </section>
 
       {/* ── 5. THIS WEEK CONSISTENCY ──────────────────────────────────────── */}
@@ -519,7 +529,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             WEEKLY CONSISTENCY
           </span>
           <span className="text-xs font-semibold font-mono text-text-primary">
-            {weeklyStats.completedCount} / {weeklyStats.targetDays} completed
+            {weeklyStats.completedCount} of {weeklyStats.targetDays} completed this week
           </span>
         </div>
 

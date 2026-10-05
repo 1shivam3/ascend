@@ -56,6 +56,9 @@ export default function BodyweightChart() {
     avg7d: number;
   } | null>(null);
 
+  const [showAvg, setShowAvg] = useState(true);
+  const [showDaily, setShowDaily] = useState(true);
+
   // SVG dimensions
   const width = 380;
   const height = 150;
@@ -173,16 +176,29 @@ export default function BodyweightChart() {
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-3xs font-mono text-text-muted border-t border-border/50 pt-2">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-0.5 bg-accent rounded" />
-          <span>Daily Weight</span>
+      {/* Legend with interactive toggles */}
+      <div className="flex items-center justify-between text-3xs font-mono text-text-muted border-t border-border/50 pt-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowDaily(!showDaily)}
+            className={`flex items-center gap-1.5 transition-opacity ${showDaily ? 'opacity-100 font-semibold' : 'opacity-35 line-through'}`}
+            title="Toggle daily weight line"
+          >
+            <span className="w-2.5 h-0.5 bg-accent rounded" />
+            <span>Daily Weight</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAvg(!showAvg)}
+            className={`flex items-center gap-1.5 transition-opacity ${showAvg ? 'opacity-100 font-bold text-purple-400' : 'opacity-35 line-through'}`}
+            title="Toggle 7-day moving average"
+          >
+            <span className="w-2.5 h-0.5 bg-purple-400 rounded" />
+            <span>7-Day Moving Avg</span>
+          </button>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-0.5 bg-purple-400 rounded" />
-          <span>7-Day Moving Avg</span>
-        </div>
+        <span className="text-3xs text-text-muted hidden sm:inline">Tap point to inspect</span>
       </div>
 
       {/* SVG Chart */}
@@ -222,7 +238,7 @@ export default function BodyweightChart() {
           />
 
           {/* 7-Day Average Smoothed Line (Purple) */}
-          {pointsAvg && (
+          {showAvg && pointsAvg && (
             <polyline
               fill="none"
               stroke="#c084fc"
@@ -234,7 +250,7 @@ export default function BodyweightChart() {
           )}
 
           {/* Daily Weight Line (Accent Gold/Orange) */}
-          {pointsDaily && (
+          {showDaily && pointsDaily && (
             <polyline
               fill="none"
               stroke="var(--accent)"
