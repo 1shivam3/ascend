@@ -421,6 +421,7 @@ interface LiftCardProps {
   userUnit: 'kg' | 'lbs';
   bodyweightKg: number;
   isExpanded: boolean;
+  prTypeFilter?: 'all' | '1rm' | 'reps';
   onToggleExpand: () => void;
   onOpenLevelModal: () => void;
   onOpenPlateModal: () => void;
@@ -433,6 +434,7 @@ function LiftCard({
   userUnit,
   bodyweightKg,
   isExpanded,
+  prTypeFilter = 'all',
   onToggleExpand,
   onOpenLevelModal,
   onOpenPlateModal,
@@ -446,6 +448,12 @@ function LiftCard({
   const isMain = isMainCompoundLift(item.exercise);
   const toGo = Math.max(0, Math.round((item.nextMilestone - display1RM) * 10) / 10);
   const isBaselineLift = item.prs.length === 1 && (item.prs[0].isBaseline || item.prs[0].notes?.includes('Baseline'));
+
+  const filteredPrList = useMemo(() => {
+    if (!prTypeFilter || prTypeFilter === 'all') return item.prs;
+    if (prTypeFilter === '1rm') return item.prs.filter((p) => p.prType === '1rm' || (!p.prType && p.reps === 1));
+    return item.prs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps > 1));
+  }, [item.prs, prTypeFilter]);
 
   return (
     <div className="card p-4 space-y-3 transition-all duration-150 hover:border-border-hover bg-bg-card border border-border">
@@ -567,7 +575,7 @@ function LiftCard({
           </div>
 
           <div className="space-y-2">
-            {item.prs.map((p) => {
+            {filteredPrList.map((p) => {
               const w = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
               const isBWRecord = isBodyweightExercise(p.exercise) && p.weightKg === 0;
               const single1RM = calculateOneRepMax(
@@ -580,10 +588,20 @@ function LiftCard({
                   className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono"
                 >
                   <div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-bold text-text-primary">
                         {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
                       </span>
+                      {p.prType === 'reps' && (
+                        <span className="text-[9px] font-sans font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25">
+                          ⚡ Rep PR
+                        </span>
+                      )}
+                      {(p.prType === '1rm' || (!p.prType && p.reps === 1)) && (
+                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/25">
+                          🥇 1RM PR
+                        </span>
+                      )}
                       {(p.isBaseline || p.notes?.includes('Baseline')) && (
                         <span className="text-[9px] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
                           Baseline
@@ -659,6 +677,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   // ── Equipment filter and show-more state ──
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<'all' | EquipmentType>('all');
+  const [prTypeFilter, setPrTypeFilter] = useState<'all' | '1rm' | 'reps'>('all');
   const [showAllOtherLifts, setShowAllOtherLifts] = useState(false);
 
   // ── Form state ──
@@ -916,22 +935,28 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     return exerciseStats.find((s) => s.exercise === levelModalExercise) || null;
   }, [levelModalExercise, exerciseStats]);
 
-  // ─── Partition lifts & Equipment Filters ──────────────────────────────────────
-
-  const mainCompoundLifts = useMemo(() => {
-    return exerciseStats.filter((e) => isMainCompoundLift(e.exercise));
-  }, [exerciseStats]);
-
-  const otherLifts = useMemo(() => {
-    return exerciseStats.filter((e) => !isMainCompoundLift(e.exercise));
-  }, [exerciseStats]);
+  // ─── Partition lifts & Equipment / PR Type Filters ───────────────────────────
 
   const filteredStats = useMemo(() => {
-    if (selectedEquipmentFilter === 'all') return exerciseStats;
-    return exerciseStats.filter(
+    let stats = exerciseStats;
+    if (prTypeFilter === '1rm') {
+      stats = stats.filter((e) => e.prs.some((p) => p.prType === '1rm' || (!p.prType && p.reps === 1)));
+    } else if (prTypeFilter === 'reps') {
+      stats = stats.filter((e) => e.prs.some((p) => p.prType === 'reps' || (!p.prType && p.reps > 1)));
+    }
+    if (selectedEquipmentFilter === 'all') return stats;
+    return stats.filter(
       (e) => getExerciseEquipment(e.exercise) === selectedEquipmentFilter
     );
-  }, [exerciseStats, selectedEquipmentFilter]);
+  }, [exerciseStats, selectedEquipmentFilter, prTypeFilter]);
+
+  const mainCompoundLifts = useMemo(() => {
+    return filteredStats.filter((e) => isMainCompoundLift(e.exercise));
+  }, [filteredStats]);
+
+  const otherLifts = useMemo(() => {
+    return filteredStats.filter((e) => !isMainCompoundLift(e.exercise));
+  }, [filteredStats]);
 
   const equipmentCounts = useMemo(() => {
     const counts: Record<string, number> = {
@@ -1049,6 +1074,33 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       {/* Lift Cards List */}
       <div className="space-y-4">
+        {/* PR Type Filter Tabs (All / 1RM Maxes / Rep Milestones) */}
+        {prs.length > 0 && (
+          <div className="flex items-center bg-bg-card border border-border/80 rounded-xl p-1 gap-1 shadow-xs">
+            {[
+              { id: 'all', label: 'All PRs', count: prs.length },
+              { id: '1rm', label: '1RM Maxes', count: prs.filter((p) => p.prType === '1rm' || (!p.prType && p.reps === 1)).length },
+              { id: 'reps', label: 'Rep Milestones', count: prs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps > 1)).length },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setPrTypeFilter(tab.id as any)}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-2xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                  prTypeFilter === tab.id
+                    ? 'bg-accent text-bg-primary font-black shadow-xs'
+                    : 'text-text-muted hover:text-text-primary'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] font-mono ${prTypeFilter === tab.id ? 'opacity-80' : 'opacity-50'}`}>
+                  ({tab.count})
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
             <h2 className="section-title mb-0 font-sans">YOUR LIFTS &amp; MILESTONES</h2>
@@ -1101,13 +1153,16 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         ) : filteredStats.length === 0 ? (
           <div className="card text-center py-12 space-y-2">
             <Filter className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
-            <p className="text-text-secondary text-sm">No records found for this equipment filter.</p>
+            <p className="text-text-secondary text-sm">No records found for this filter combination.</p>
             <button
               type="button"
-              onClick={() => setSelectedEquipmentFilter('all')}
+              onClick={() => {
+                setSelectedEquipmentFilter('all');
+                setPrTypeFilter('all');
+              }}
               className="btn-secondary text-xs py-1.5 px-3 mx-auto"
             >
-              Clear Filter
+              Clear Filters
             </button>
           </div>
         ) : selectedEquipmentFilter !== 'all' ? (
@@ -1120,6 +1175,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 userUnit={userUnit}
                 bodyweightKg={bodyweightKg}
                 isExpanded={expandedExercise === item.exercise}
+                prTypeFilter={prTypeFilter}
                 onToggleExpand={() =>
                   setExpandedExercise(expandedExercise === item.exercise ? null : item.exercise)
                 }
@@ -1175,6 +1231,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                       userUnit={userUnit}
                       bodyweightKg={bodyweightKg}
                       isExpanded={expandedExercise === item.exercise}
+                      prTypeFilter={prTypeFilter}
                       onToggleExpand={() =>
                         setExpandedExercise(expandedExercise === item.exercise ? null : item.exercise)
                       }
@@ -1252,6 +1309,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                             userUnit={userUnit}
                             bodyweightKg={bodyweightKg}
                             isExpanded={expandedExercise === item.exercise}
+                            prTypeFilter={prTypeFilter}
                             onToggleExpand={() =>
                               setExpandedExercise(
                                 expandedExercise === item.exercise ? null : item.exercise

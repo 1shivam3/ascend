@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseMuscle, MuscleGroup, MUSCLE_GROUPS } from '@/lib/exercise-library';
+import { getExerciseMuscle, getExerciseSecondaryMuscles, MuscleGroup, MUSCLE_GROUPS } from '@/lib/exercise-library';
 import { Layers, Flame, CheckCircle2, TrendingUp, Info } from 'lucide-react';
 
 interface LandmarkConfig {
@@ -43,9 +43,15 @@ export default function MuscleVolumeLandmarks() {
 
     recentWorkouts.forEach((w) => {
       w.exercises.forEach((ex) => {
-        const muscle = getExerciseMuscle(ex.name);
+        const primary = getExerciseMuscle(ex.name);
+        const secondaries = getExerciseSecondaryMuscles(ex.name);
         const completedCount = ex.sets.filter((s) => s.completed !== false && (s.reps > 0 || (s.weight && s.weight > 0))).length;
-        setCounts[muscle] = (setCounts[muscle] || 0) + completedCount;
+        setCounts[primary] = (setCounts[primary] || 0) + completedCount;
+        secondaries.forEach((sec) => {
+          if (sec !== primary) {
+            setCounts[sec] = (setCounts[sec] || 0) + completedCount * 0.5;
+          }
+        });
       });
     });
 
@@ -53,7 +59,8 @@ export default function MuscleVolumeLandmarks() {
   }, [workouts]);
 
   const totalWeeklySets = useMemo(() => {
-    return Object.values(weeklyMuscleStats).reduce((sum, n) => sum + n, 0);
+    const sum = Object.values(weeklyMuscleStats).reduce((acc, n) => acc + n, 0);
+    return sum % 1 === 0 ? sum : sum.toFixed(1);
   }, [weeklyMuscleStats]);
 
   return (
@@ -119,7 +126,7 @@ export default function MuscleVolumeLandmarks() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 font-mono text-2xs">
-                  <span className="font-bold text-text-primary text-xs">{sets}</span>
+                  <span className="font-bold text-text-primary text-xs">{sets % 1 === 0 ? sets : sets.toFixed(1)}</span>
                   <span className="text-text-muted">/ {config.mavMin}–{config.mavMax} target</span>
                 </div>
               </div>
@@ -137,7 +144,7 @@ export default function MuscleVolumeLandmarks() {
       </div>
 
       {/* Guide explanation footer */}
-      <div className="pt-2 border-t border-border/50 flex items-center justify-between text-3xs font-mono text-text-muted">
+      <div className="pt-2 border-t border-border/50 flex flex-col sm:flex-row sm:items-center justify-between text-3xs font-mono text-text-muted gap-1.5">
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
@@ -148,6 +155,9 @@ export default function MuscleVolumeLandmarks() {
             <span>Maintenance: 6–10 sets</span>
           </span>
         </div>
+        <span className="text-[10px] text-text-muted/80">
+          *1.0x primary + 0.5x synergist stimulus
+        </span>
       </div>
     </div>
   );

@@ -183,3 +183,38 @@ export function getExerciseMuscle(name: string): MuscleGroup {
 
   return 'Chest';
 }
+
+/**
+ * Returns secondary muscle groups that receive partial (~0.5 set) stimulus from compound movements.
+ */
+export function getExerciseSecondaryMuscles(name: string): MuscleGroup[] {
+  if (!name || typeof name !== 'string') return [];
+  const clean = name.toLowerCase().trim();
+
+  // Horizontal push: Chest compounds activate Triceps (Arms) & Anterior Deltoids (Shoulders)
+  if (clean.includes('bench') || clean.includes('push-up') || clean.includes('pushup') || clean.includes('chest press') || clean.includes('fly')) {
+    return ['Arms', 'Shoulders'];
+  }
+
+  // Vertical push: Overhead presses activate Triceps (Arms)
+  if (clean.includes('overhead') || clean.includes('ohp') || clean.includes('military') || clean.includes('shoulder press')) {
+    return ['Arms'];
+  }
+
+  // Pulling: Lat pulldown / pull-ups / rows activate Biceps (Arms)
+  if (clean.includes('pull') || clean.includes('row') || clean.includes('chin') || clean.includes('lat')) {
+    return ['Arms'];
+  }
+
+  // Dips: Chest / Triceps compound activates Shoulders
+  if (clean.includes('dip')) {
+    return ['Shoulders'];
+  }
+
+  // Heavy compound squats & deadlifts activate Core as stabilizers
+  if (clean.includes('squat') || clean.includes('deadlift')) {
+    return ['Core'];
+  }
+
+  return [];
+}

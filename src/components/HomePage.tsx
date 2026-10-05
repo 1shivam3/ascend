@@ -30,8 +30,9 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
-import { PlannedWorkout, PlannedExercise, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { PlannedWorkout, PlannedExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
 import { getTodaySessionState, getLastExercisePerformance } from '@/lib/workout-engine';
+import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO } from '@/lib/workout-schedule';
 import { plural } from '@/lib/formatters';
 
 interface HomePageProps {
@@ -157,6 +158,30 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }
     return raw;
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
+
+  // Next scheduled workout session anchor (motivating commitment for tomorrow / next training day)
+  const nextScheduledSession = useMemo(() => {
+    const daysOrder: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const now = new Date();
+    const currentDayIdx = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+
+    for (let offset = 1; offset <= 7; offset++) {
+      const targetIdx = (currentDayIdx + offset) % 7;
+      const targetDay = daysOrder[targetIdx];
+      const sched = getScheduledWorkoutForDay(weeklySchedule, targetDay, plannedWorkouts);
+      if (!sched.isRest) {
+        const dayLabel = offset === 1 ? 'Tomorrow' : (DAY_DISPLAY_INFO[targetDay]?.label || targetDay);
+        const routineName = sched.plan?.name.replace('Builtin ', '') || sched.title;
+        const bodyParts = sched.bodyParts && sched.bodyParts.length > 0 ? sched.bodyParts.join(' • ') : '';
+        return {
+          dayLabel,
+          routineName,
+          bodyParts,
+        };
+      }
+    }
+    return null;
+  }, [weeklySchedule, plannedWorkouts]);
 
   // Top focus lift for today
   const topFocus = useMemo(() => {
@@ -340,6 +365,57 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
+      {/* ── QUICK ACTIONS STRIP ────────────────────────────────────────────── */}
+      <section className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={() => onNavigate('workout')}
+          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
+        >
+          <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <Play className="w-3.5 h-3.5 fill-accent" />
+          </div>
+          <span className="font-black text-xs text-text-primary block font-sans">
+            Train
+          </span>
+          <span className="text-3xs text-text-muted font-mono truncate block">
+            {activeWorkoutDraft ? 'Resume Draft' : 'Log / Plans'}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('meals')}
+          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
+        >
+          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <UtensilsCrossed className="w-3.5 h-3.5" />
+          </div>
+          <span className="font-black text-xs text-text-primary block font-sans">
+            Fuel
+          </span>
+          <span className="text-3xs text-text-muted font-mono truncate block">
+            {fuelStats.calories} / {fuelStats.targetCalories} kcal
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onNavigate('prs')}
+          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
+        >
+          <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
+            <Trophy className="w-3.5 h-3.5" />
+          </div>
+          <span className="font-black text-xs text-text-primary block font-sans">
+            Records
+          </span>
+          <span className="text-3xs text-text-muted font-mono truncate block">
+            {prs.length} PRs Logged
+          </span>
+        </button>
+      </section>
+
       {/* ── 2. TODAY'S TRAINING HERO CARD (Visual Centerpiece) ─────────────── */}
       <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/30 shadow-lg rounded-3xl space-y-4">
         <div className="flex items-center justify-between">
@@ -404,6 +480,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               )}
             </div>
           ) : null}
+
+          {/* Next Scheduled Session Anchor */}
+          {(sessionInfo.status === 'completed' || sessionInfo.isRestDay) && nextScheduledSession && (
+            <div className="mt-2.5 p-2.5 rounded-xl bg-bg-secondary/70 border border-border/60 flex items-center justify-between text-2xs animate-fade-in">
+              <div className="flex items-center gap-2 min-w-0">
+                <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
+                <div className="truncate">
+                  <span className="text-text-muted">Next Up: </span>
+                  <span className="font-bold text-text-primary">{nextScheduledSession.dayLabel}</span>
+                  <span className="text-text-secondary font-medium"> — {nextScheduledSession.routineName}</span>
+                </div>
+              </div>
+              {nextScheduledSession.bodyParts && (
+                <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/10 text-accent border border-accent/20 shrink-0 ml-2">
+                  {nextScheduledSession.bodyParts}
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons: Primary Start + Secondary Log Past */}

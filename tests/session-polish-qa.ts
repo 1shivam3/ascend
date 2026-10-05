@@ -210,7 +210,63 @@ const sampleMeals: MealEntry[] = [
 const mealMacros = calculateMealMacros(sampleMeals[0].foods);
 assert(mealMacros.calories >= 420, 'Calories should be computed properly');
 assert(mealMacros.proteinG >= 34, 'Protein should be computed properly');
-console.log(`  ✓ [PASS] Usual meal macros: ~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein`);
+console.log(`  ✓ [PASS] Usual meal macros: ~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein\n`);
+
+// 6. Portion Multiplier Scaling Test
+console.log('--- 6. Quick Log Portion Scaling Multipliers ---');
+function scaleMeal(meal: MealEntry, multiplier: number) {
+  return meal.foods.map((f) => ({
+    ...f,
+    quantity: f.quantity ? Math.round(f.quantity * multiplier * 10) / 10 : undefined,
+    calories: Math.round(f.calories * multiplier),
+    proteinG: Math.round((f.proteinG || 0) * multiplier * 10) / 10,
+    carbsG: Math.round((f.carbsG || 0) * multiplier * 10) / 10,
+    fatG: Math.round((f.fatG || 0) * multiplier * 10) / 10,
+  }));
+}
+
+const halfMeal = scaleMeal(sampleMeals[0], 0.5);
+const halfMacros = calculateMealMacros(halfMeal);
+assert.strictEqual(halfMacros.calories, 210, '0.5x meal should scale calories to 210');
+assert.strictEqual(halfMacros.proteinG, 17, '0.5x meal should scale protein to 17g');
+console.log(`  ✓ [PASS] 0.5x portion scaling: ${halfMacros.calories} kcal, ${halfMacros.proteinG}g protein`);
+
+const bigMeal = scaleMeal(sampleMeals[0], 1.5);
+const bigMacros = calculateMealMacros(bigMeal);
+assert.strictEqual(bigMacros.calories, 630, '1.5x meal should scale calories to 630');
+assert.strictEqual(bigMacros.proteinG, 51, '1.5x meal should scale protein to 51g');
+console.log(`  ✓ [PASS] 1.5x portion scaling: ${bigMacros.calories} kcal, ${bigMacros.proteinG}g protein\n`);
+
+// 7. Secondary Muscle Group Stimulus Mapping
+console.log('--- 7. Secondary Muscle Stimulus Mapping ---');
+import { getExerciseSecondaryMuscles } from '../src/lib/exercise-library';
+
+const benchSecondary = getExerciseSecondaryMuscles('Barbell Bench Press');
+assert(benchSecondary.includes('Arms') && benchSecondary.includes('Shoulders'), 'Bench should stimulate Arms & Shoulders');
+console.log(`  ✓ [PASS] Bench Press secondary stimulus: ${benchSecondary.join(' & ')}`);
+
+const rowSecondary = getExerciseSecondaryMuscles('Barbell Row');
+assert(rowSecondary.includes('Arms'), 'Row should stimulate Arms');
+console.log(`  ✓ [PASS] Barbell Row secondary stimulus: ${rowSecondary.join(' & ')}`);
+
+const squatSecondary = getExerciseSecondaryMuscles('Barbell Back Squat');
+assert(squatSecondary.includes('Core'), 'Squat should stimulate Core');
+console.log(`  ✓ [PASS] Back Squat secondary stimulus: ${squatSecondary.join(' & ')}\n`);
+
+// 8. PR Type Partitioning Verification
+console.log('--- 8. PR Type Partitioning Verification ---');
+const testPRs: PersonalRecord[] = [
+  { id: 'pr1', exercise: 'Bench Press', weightKg: 100, weightLbs: 220, reps: 1, oneRepMax: 100, date: '2026-10-01', prType: '1rm' },
+  { id: 'pr2', exercise: 'Bench Press', weightKg: 80, weightLbs: 176, reps: 10, oneRepMax: 106, date: '2026-10-03', prType: 'reps' },
+  { id: 'pr3', exercise: 'Barbell Squat', weightKg: 140, weightLbs: 308, reps: 1, oneRepMax: 140, date: '2026-10-02' }, // legacy 1rm
+];
+
+const maxPRs = testPRs.filter((p) => p.prType === '1rm' || (!p.prType && p.reps === 1));
+const repPRs = testPRs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps > 1));
+
+assert.strictEqual(maxPRs.length, 2, 'Should have 2 1RM maxes');
+assert.strictEqual(repPRs.length, 1, 'Should have 1 Rep PR');
+console.log(`  ✓ [PASS] Correctly partitioned ${maxPRs.length} 1RM maxes and ${repPRs.length} Rep PRs`);
 
 console.log('\n======================================================');
 console.log('ALL POLISH & EXPERIMENT VERIFICATIONS PASSED CLEANLY (100%)');

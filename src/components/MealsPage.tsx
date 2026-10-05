@@ -137,6 +137,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(true);
   const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
+  const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
 
   // ── Pinned food edit / add form ───────────────────────────────────────────
   const [pinnedName,     setPinnedName]     = useState('');
@@ -491,17 +492,28 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     toast.success(`Pinned ${count} frequent foods to your favorites!`, 'Foods Pinned');
   };
 
-  const handleLogFrequentMeal = (meal: MealEntry) => {
+  const handleLogFrequentMeal = (meal: MealEntry, multiplier: number = 1) => {
     const today = new Date().toISOString().split('T')[0];
+    const scaledFoods = meal.foods.map((f) => {
+      const q = f.quantity ? Math.round(f.quantity * multiplier * 10) / 10 : undefined;
+      return {
+        ...f,
+        quantity: q,
+        calories: Math.round(f.calories * multiplier),
+        proteinG: Math.round((f.proteinG || 0) * multiplier * 10) / 10,
+        carbsG: Math.round((f.carbsG || 0) * multiplier * 10) / 10,
+        fatG: Math.round((f.fatG || 0) * multiplier * 10) / 10,
+      };
+    });
     const newMeal: MealEntry = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
       date: today,
-      name: meal.name,
-      foods: meal.foods.map((f) => ({ ...f })),
+      name: multiplier !== 1 ? `${meal.name} (${multiplier}x)` : meal.name,
+      foods: scaledFoods,
     };
     addMeal(newMeal);
-    const mMacros = calculateMealMacros(meal.foods);
-    toast.success(`Logged ${meal.name} (~${Math.round(mMacros.calories)} kcal)!`, 'Meal Added');
+    const mMacros = calculateMealMacros(scaledFoods);
+    toast.success(`Logged ${newMeal.name} (~${Math.round(mMacros.calories)} kcal, ~${Math.round(mMacros.proteinG)}g P)!`, 'Meal Added');
   };
 
   const handlePinMealFoods = (meal: MealEntry) => {
@@ -1382,117 +1394,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </section>
 
-      {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
-      {proteinRemaining > 10 && (
-        <section className="card p-4 bg-gradient-to-br from-bg-card via-bg-card to-emerald-500/5 border border-emerald-500/30 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h3 className="section-title text-[10px] mb-0 text-emerald-500 font-sans">
-                WHAT SHOULD I EAT NEXT?
-              </h3>
-            </div>
-            <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-              {Math.round(proteinRemaining)}g protein left
-            </span>
-          </div>
-
-          <p className="text-xs text-text-secondary">
-            {selectedEatPreference
-              ? 'Tailored high-protein options based on your selection:'
-              : 'Recommended options to close your protein gap today:'}
-          </p>
-
-          {/* User Choice Selector */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { id: 'staples', label: 'Pinned Staples', sub: 'Your daily foods', icon: Star },
-              { id: 'shake', label: 'Quick Shake', sub: 'Under 2 min', icon: Zap },
-              { id: 'high_protein', label: 'High Protein (25g+)', sub: 'Hit goal fast', icon: Flame },
-              { id: 'light', label: 'Light Snack', sub: 'Low calorie', icon: Leaf },
-            ].map((opt) => {
-              const IconComp = opt.icon;
-              const isSelected = selectedEatPreference === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSelectedEatPreference(isSelected ? null : (opt.id as any))}
-                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-emerald-500 bg-emerald-500/15 shadow-xs'
-                      : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-text-secondary'}`} />
-                    <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
-                      {opt.label}
-                    </span>
-                  </div>
-                  <span className="text-3xs text-text-muted block leading-tight">{opt.sub}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Display suggestions: always show default recommendations or tailored filtered options */}
-          <div className="space-y-2 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {dynamicCloseoutSuggestions.map((sug, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
-                        {sug.tag}
-                      </span>
-                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
-                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
-                    <p className="text-3xs text-text-secondary mt-1 font-mono">
-                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newMeal: MealEntry = {
-                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
-                        date: todayDate,
-                        name: sug.name,
-                        foods: sug.foods,
-                      };
-                      addMeal(newMeal);
-                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
-                    }}
-                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Log 1-Tap</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {selectedEatPreference && (
-              <div className="flex justify-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedEatPreference(null)}
-                  className="text-3xs text-text-muted hover:text-accent underline font-medium"
-                >
-                  Reset to default recommendations
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
       {/* ── Daily Hydration & Supplements Habit Strip (Unified System) ── */}
       <section className="card p-3.5 bg-bg-card border border-border space-y-2.5">
         <div className="flex items-center justify-between">
@@ -1627,6 +1528,117 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           })()}
         </div>
       </section>
+
+      {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
+      {proteinRemaining > 10 && (
+        <section className="card p-4 bg-gradient-to-br from-bg-card via-bg-card to-emerald-500/5 border border-emerald-500/30 space-y-3 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="section-title text-[10px] mb-0 text-emerald-500 font-sans">
+                WHAT SHOULD I EAT NEXT?
+              </h3>
+            </div>
+            <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+              {Math.round(proteinRemaining)}g protein left
+            </span>
+          </div>
+
+          <p className="text-xs text-text-secondary">
+            {selectedEatPreference
+              ? 'Tailored high-protein options based on your selection:'
+              : 'Recommended options to close your protein gap today:'}
+          </p>
+
+          {/* User Choice Selector */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[
+              { id: 'staples', label: 'Pinned Staples', sub: 'Your daily foods', icon: Star },
+              { id: 'shake', label: 'Quick Shake', sub: 'Under 2 min', icon: Zap },
+              { id: 'high_protein', label: 'High Protein (25g+)', sub: 'Hit goal fast', icon: Flame },
+              { id: 'light', label: 'Light Snack', sub: 'Low calorie', icon: Leaf },
+            ].map((opt) => {
+              const IconComp = opt.icon;
+              const isSelected = selectedEatPreference === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setSelectedEatPreference(isSelected ? null : (opt.id as any))}
+                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
+                    isSelected
+                      ? 'border-emerald-500 bg-emerald-500/15 shadow-xs'
+                      : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-text-secondary'}`} />
+                    <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
+                      {opt.label}
+                    </span>
+                  </div>
+                  <span className="text-3xs text-text-muted block leading-tight">{opt.sub}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Display suggestions: always show default recommendations or tailored filtered options */}
+          <div className="space-y-2 pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {dynamicCloseoutSuggestions.map((sug, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
+                        {sug.tag}
+                      </span>
+                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
+                    </div>
+                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
+                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
+                    <p className="text-3xs text-text-secondary mt-1 font-mono">
+                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newMeal: MealEntry = {
+                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                        date: todayDate,
+                        name: sug.name,
+                        foods: sug.foods,
+                      };
+                      addMeal(newMeal);
+                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
+                    }}
+                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>Log 1-Tap</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {selectedEatPreference && (
+              <div className="flex justify-center pt-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedEatPreference(null)}
+                  className="text-3xs text-text-muted hover:text-accent underline font-medium"
+                >
+                  Reset to default recommendations
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ── Feature: Copy Yesterday's Meals (High Consistency) ── */}
       {yesterdayMeals.length > 0 && todayMeals.length === 0 && (
@@ -1828,6 +1840,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <div className="flex gap-2.5 overflow-x-auto pb-1 pt-2 scrollbar-none">
                   {recentUniqueMeals.map((meal) => {
                     const mMacros = calculateMealMacros(meal.foods);
+                    const multiplier = mealPortionMultipliers[meal.id] ?? 1;
+                    const scaledCalories = Math.round(mMacros.calories * multiplier);
+                    const scaledProtein = Math.round(mMacros.proteinG * multiplier);
                     const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
                       month: 'short',
                       day: 'numeric',
@@ -1848,17 +1863,38 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {meal.foods.map((f) => f.name).join(', ')}
                           </div>
                           <div className="text-2xs text-text-muted mt-1.5 font-mono">
-                            <span className="text-accent font-bold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-500 font-bold">~{Math.round(mMacros.proteinG)}g P</span>
+                            <span className="text-accent font-bold">~{scaledCalories} kcal</span> • <span className="text-emerald-500 font-bold">~{scaledProtein}g P</span>
+                          </div>
+
+                          {/* Portion Scaling Chips */}
+                          <div className="flex items-center justify-between pt-1.5 border-t border-border/40 mt-1.5">
+                            <span className="text-[10px] text-text-muted font-mono font-medium">Scale:</span>
+                            <div className="flex items-center gap-1">
+                              {[0.5, 1, 1.5].map((m) => (
+                                <button
+                                  key={m}
+                                  type="button"
+                                  onClick={() => setMealPortionMultipliers((prev) => ({ ...prev, [meal.id]: m }))}
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
+                                    multiplier === m
+                                      ? 'bg-accent text-bg-primary font-black shadow-xs'
+                                      : 'bg-bg-card hover:bg-bg-tertiary text-text-muted border border-border/60'
+                                  }`}
+                                >
+                                  {m}x
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 pt-1">
                           <button
                             type="button"
-                            onClick={() => handleLogFrequentMeal(meal)}
+                            onClick={() => handleLogFrequentMeal(meal, multiplier)}
                             className="btn-primary flex-1 py-1.5 text-xs font-bold flex items-center justify-center gap-1 shadow-xs"
                           >
                             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Log for Today</span>
+                            <span>Log {multiplier !== 1 ? `(${multiplier}x)` : 'Today'}</span>
                           </button>
                           <button
                             type="button"

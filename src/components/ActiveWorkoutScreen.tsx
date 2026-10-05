@@ -228,6 +228,12 @@ export default function ActiveWorkoutScreen({
     return getEquipmentType(currentExercise?.name || '') === 'barbell';
   }, [currentExercise?.name]);
 
+  const isCurrentDumbbell = useMemo(() => {
+    return isDumbbellExercise(currentExercise?.name || '');
+  }, [currentExercise?.name]);
+
+  const [activeRpePickerSetIdx, setActiveRpePickerSetIdx] = useState<number | null>(null);
+
   useEffect(() => {
     setIsEditingName(false);
     setLocalExerciseName(exercises[activeExerciseIdx]?.name || '');
@@ -1053,6 +1059,27 @@ export default function ActiveWorkoutScreen({
 
           <button
             type="button"
+            onClick={() => {
+              saveWorkoutDraft({
+                date: new Date().toISOString().split('T')[0],
+                name: workoutName,
+                exercises,
+                startedFromPlan: workoutName,
+                sessionStartTime,
+                savedAt: new Date().toISOString(),
+              });
+              toast.info('Workout saved! You can resume anytime from the Home screen.', 'Session Paused');
+              onCancel();
+            }}
+            className="bg-bg-secondary hover:bg-bg-tertiary active:scale-95 text-text-secondary hover:text-text-primary border border-border/80 font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
+            title="Pause and save workout draft to resume later"
+          >
+            <Pause className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Pause</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsFinishModalOpen(true)}
             className="bg-accent hover:brightness-105 active:scale-95 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm shadow-accent/25 transition-all flex items-center gap-1.5"
           >
@@ -1379,7 +1406,7 @@ export default function ActiveWorkoutScreen({
                   {/* Weight Stepper */}
                   <div className="text-center space-y-2">
                     <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                      {isCurrentBodyweight ? `ADDED WEIGHT (${userUnit})` : `WEIGHT (${userUnit})`}
+                      {isCurrentBodyweight ? `ADDED WEIGHT (${userUnit})` : isCurrentDumbbell ? `WEIGHT / DB (${userUnit})` : `WEIGHT (${userUnit})`}
                     </span>
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <button
@@ -1407,6 +1434,11 @@ export default function ActiveWorkoutScreen({
                         {isCurrentBodyweight && (
                           <span className="text-3xs text-accent font-semibold mt-0.5">
                             {(parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0) === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
+                          </span>
+                        )}
+                        {isCurrentDumbbell && (
+                          <span className="text-[10px] font-mono font-medium text-amber-500/90 mt-0.5" title="Weight per dumbbell">
+                            (per dumbbell)
                           </span>
                         )}
                         {isCurrentBarbell && (
@@ -1561,6 +1593,11 @@ export default function ActiveWorkoutScreen({
                         />
                         <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
                       </div>
+                      {isCurrentDumbbell && (
+                        <span className="text-[9px] font-mono text-amber-500/90 mt-0.5 truncate max-w-[100px] text-center" title="Weight per dumbbell">
+                          / dumbbell
+                        </span>
+                      )}
                       {isCurrentBarbell && (
                         (() => {
                           const w = parseFloat(String(set.weight)) || 0;
@@ -1602,13 +1639,9 @@ export default function ActiveWorkoutScreen({
                     {/* Effort / RPE badge */}
                     <button
                       type="button"
-                      onClick={() => {
-                        const cur = set.rpe || 8;
-                        const next = cur >= 10 ? 6 : cur + 0.5;
-                        handleRPESelect(sIdx, next);
-                      }}
-                      className="text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent active:scale-95 transition-all"
-                      title="Tap to adjust effort / RPE"
+                      onClick={() => setActiveRpePickerSetIdx(sIdx)}
+                      className="text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all"
+                      title="Tap to select effort (RPE)"
                     >
                       @{set.rpe || 8}
                     </button>
@@ -2091,6 +2124,77 @@ export default function ActiveWorkoutScreen({
                   Save &amp; Finish
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 1-Tap RPE / Effort Picker Modal */}
+      {activeRpePickerSetIdx !== null && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+          <div
+            className="w-full max-w-sm bg-bg-card border border-border/80 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 animate-slide-up"
+            role="dialog"
+            aria-modal="true"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-border/60">
+              <div>
+                <h3 className="font-bold text-text-primary text-sm font-sans">
+                  Select Effort (RPE)
+                </h3>
+                <p className="text-3xs text-text-muted">
+                  Set {activeRpePickerSetIdx + 1} • Rate of Perceived Exertion
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveRpePickerSetIdx(null)}
+                className="p-1 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto pr-1">
+              {[
+                { rpe: 6, label: 'Warm-up / Light', rir: '4+ RIR', desc: 'Could do 4+ more' },
+                { rpe: 7, label: 'Moderate', rir: '3 RIR', desc: 'Fast bar speed' },
+                { rpe: 7.5, label: 'Moderate+', rir: '2-3 RIR', desc: 'Crisp & strong' },
+                { rpe: 8, label: 'Sweet Spot', rir: '2 RIR', desc: 'Standard target' },
+                { rpe: 8.5, label: 'Heavy', rir: '1-2 RIR', desc: 'Challenging' },
+                { rpe: 9, label: 'Very Heavy', rir: '1 RIR', desc: 'Could do 1 more' },
+                { rpe: 9.5, label: 'Near Limit', rir: '<1 RIR', desc: 'Grind / Almost max' },
+                { rpe: 10, label: 'Maximum Effort', rir: '0 RIR', desc: 'Absolute limit' },
+              ].map((item) => {
+                const currentVal = currentExercise?.sets[activeRpePickerSetIdx]?.rpe || 8;
+                const isSelected = currentVal === item.rpe;
+                return (
+                  <button
+                    key={item.rpe}
+                    type="button"
+                    onClick={() => {
+                      handleRPESelect(activeRpePickerSetIdx, item.rpe);
+                      setActiveRpePickerSetIdx(null);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition-all active:scale-95 ${
+                      isSelected
+                        ? 'bg-accent/15 border-accent text-accent shadow-xs'
+                        : 'bg-bg-secondary/70 border-border/70 hover:border-border text-text-primary'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-mono font-black text-sm">@{item.rpe}</span>
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-accent/20 text-accent' : 'bg-bg-tertiary text-text-muted'
+                      }`}>
+                        {item.rir}
+                      </span>
+                    </div>
+                    <div className="text-2xs font-bold truncate">{item.label}</div>
+                    <div className="text-[10px] text-text-muted truncate">{item.desc}</div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
