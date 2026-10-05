@@ -293,7 +293,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </p>
               </div>
 
-              {/* ASCEND Lifter Twin Callout */}
+              {/* Lifter Twin Callout */}
               <div
                 onClick={() => setStrengthSubView('twin')}
                 className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/5 border border-accent/40 space-y-2 shadow-xs cursor-pointer hover:border-accent transition-all group"
@@ -301,15 +301,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center text-accent shrink-0">
-                      <Activity className="w-4 h-4 animate-pulse" />
+                      <Activity className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold font-mono text-text-primary group-hover:text-accent transition-colors flex items-center gap-1.5">
-                        <span>ASCEND LIFTER TWIN</span>
-                        <span className="text-3xs font-normal text-text-muted uppercase">Lifter Twin</span>
+                      <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors flex items-center gap-1.5">
+                        <span>Lifter Twin</span>
                       </h4>
                       <p className="text-2xs text-text-secondary">
-                        View fatigue drift, rep brackets &amp; auditable training decisions
+                        What ASCEND has learned about your fatigue, recovery &amp; progression
                       </p>
                     </div>
                   </div>
@@ -378,9 +377,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex items-center justify-between">
                   <div>
                     <span className="section-title text-[10px] mb-0 font-sans">
-                      {isPowerlifter ? 'POWERLIFTING TOTAL' : 'POWERLIFTING BENCHMARKS (OPTIONAL)'}
+                      {isPowerlifter ? 'POWERLIFTING TOTAL' : 'STRENGTH BENCHMARKS'}
                     </span>
-                    <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; DOTS Standard</h3>
+                    <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; Strength Score</h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -401,7 +400,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                 </div>
 
-                {/* DOTS Rating Banner */}
+                {/* Strength Score Banner */}
                 <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent font-bold font-mono text-sm">
@@ -409,10 +408,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                     <div>
                       <span className="text-xs font-bold text-text-primary block font-sans">
-                        DOTS Powerlifting Rating
+                        Strength Score (DOTS)
                       </span>
                       <span className="text-2xs text-text-muted">
-                        Bodyweight-normalized international powerlifting score
+                        Bodyweight-normalized strength benchmark
                       </span>
                     </div>
                   </div>

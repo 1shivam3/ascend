@@ -21,21 +21,21 @@
 }
 
 .dark {
-  /* Deep Premium Dark Gym Palette */
-  --bg-primary: 11 13 18;         /* #0B0D12 - deep dark background */
-  --bg-secondary: 20 24 33;       /* #141821 - card surface */
-  --bg-tertiary: 27 32 48;        /* #1B2030 - elevated surface */
-  --bg-card: 20 24 33;            /* #141821 */
-  --bg-elevated: 27 32 48;        /* #1B2030 */
-  --text-primary: 244 246 250;    /* #F4F6FA */
-  --text-secondary: 156 163 175;  /* #9CA3AF - improved contrast */
-  --text-muted: 156 163 175;      /* #9CA3AF - WCAG AA compliant on dark */
-  --border: 35 42 56;
-  --border-subtle: 25 30 42;
-  --border-hover: 50 60 80;
-  --accent: 255 106 26;           /* #FF6A1A vibrant orange */
+  /* Strict "Precision Training" Near-Black Palette */
+  --bg-primary: 9 9 11;           /* #09090B - true near-black canvas */
+  --bg-secondary: 20 20 23;       /* #141417 - single dark elevated surface */
+  --bg-tertiary: 28 28 33;        /* #1C1C21 - high contrast surface */
+  --bg-card: 20 20 23;            /* #141417 */
+  --bg-elevated: 28 28 33;        /* #1C1C21 */
+  --text-primary: 250 250 250;    /* #FAFAFA - crisp strong white */
+  --text-secondary: 161 161 170;  /* #A1A1AA - neutral secondary */
+  --text-muted: 113 113 122;      /* #71717A - clean muted text */
+  --border: 39 39 42;             /* #27272A - subtle hairline divider */
+  --border-subtle: 28 28 31;      /* #1C1C1F */
+  --border-hover: 63 63 70;       /* #3F3F46 */
+  --accent: 249 115 22;           /* #F97316 - ASCEND orange for action */
   --accent-dim: 234 88 12;
-  --accent-glow: rgba(255, 106, 26, 0.2);
+  --accent-glow: rgba(249, 115, 22, 0.15);
 }
 
 @layer base {
@@ -63,7 +63,7 @@
     @apply bg-bg-elevated text-text-primary border border-border rounded-xl px-3 py-2.5 text-base sm:text-sm;
     @apply outline-none transition-colors duration-150;
     @apply placeholder:text-text-muted;
-    @apply focus:border-accent focus:ring-2 focus:ring-accent/20;
+    @apply focus:border-accent focus:ring-1 focus:ring-accent;
   }
 
   select {
@@ -72,13 +72,17 @@
 }
 
 @layer components {
-  /* Restrained rounded corners (16-18px) to reduce card-heavy bubble feel */
+  /* Restrained card: for meaningful separation, not visual decoration */
   .card {
-    @apply bg-bg-card border border-border/80 rounded-2xl p-4 sm:p-5 shadow-sm transition-all duration-150;
+    @apply bg-bg-card border border-border/60 rounded-2xl p-4 sm:p-5 transition-all duration-150;
   }
 
   .card-elevated {
-    @apply bg-bg-elevated border border-border/80 rounded-2xl p-4 sm:p-5 shadow-sm;
+    @apply bg-bg-elevated border border-border/60 rounded-2xl p-4 sm:p-5;
+  }
+
+  .divider {
+    @apply border-t border-border/40 my-4;
   }
 
   .btn-circle {
@@ -86,19 +90,19 @@
     @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
-  /* Solid vibrant orange primary CTA, white text, strong presence */
+  /* Solid vibrant orange primary CTA — exclusively for actionable intent */
   .btn-primary {
     @apply bg-accent text-white font-semibold px-4 py-2.5 rounded-xl text-sm;
-    @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/25;
+    @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
     @apply hover:brightness-105 flex items-center justify-center gap-2;
-    min-height: 44px;
+    min-height: 48px;
   }
 
-  /* Secondary: White background, subtle border, hover state */
+  /* Secondary: Neutral surface, quiet border */
   .btn-secondary {
     @apply bg-bg-card text-text-primary font-medium px-4 py-2.5 rounded-xl text-sm;
-    @apply border border-border hover:border-accent/40;
-    @apply active:scale-[0.98] transition-all duration-150 shadow-sm;
+    @apply border border-border/80 hover:border-border;
+    @apply active:scale-[0.98] transition-all duration-150;
     @apply hover:bg-bg-secondary flex items-center justify-center gap-2;
     min-height: 44px;
   }
@@ -116,44 +120,42 @@
     min-height: 40px;
   }
 
-  /* Cleaner typography hierarchy: sans-serif for section titles, no excessive monospace */
+  /* Section Title: disciplined 13-14px, sentence case or subtle uppercase */
   .section-title {
-    @apply text-xs font-bold tracking-wider uppercase text-text-muted font-sans;
+    @apply text-[13px] font-semibold tracking-wide text-text-muted font-sans;
   }
 
   .level-bar {
-    @apply h-2 rounded-full bg-bg-secondary border border-border/50 overflow-hidden;
+    @apply h-1.5 rounded-full bg-bg-secondary border border-border/40 overflow-hidden;
   }
 
   .level-bar-fill {
     @apply h-full rounded-full bg-accent transition-all duration-500 ease-out;
   }
 
-  /* Floating Pill Bottom Navigation */
-  .floating-pill-nav {
-    @apply fixed left-4 right-4 max-w-sm mx-auto z-40;
-    @apply bg-bg-card/95 backdrop-blur-xl;
-    @apply border border-border/90;
-    @apply rounded-2xl shadow-xl;
-    @apply flex items-center justify-around px-2 py-1.5;
-    bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
+  /* Native Bottom Navigation Bar */
+  .native-tab-bar {
+    @apply fixed left-0 right-0 bottom-0 z-40;
+    @apply bg-bg-primary/95 backdrop-blur-xl;
+    @apply border-t border-border/50;
+    @apply flex items-center justify-around px-2 pt-2;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
   }
 
-  .pill-nav-item {
-    @apply relative flex flex-col items-center justify-center py-1.5 px-3 rounded-xl text-xs font-medium transition-all duration-200 select-none;
+  .native-tab-item {
+    @apply relative flex-1 flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none;
     @apply text-text-muted hover:text-text-primary;
-    min-width: 54px;
-    min-height: 44px;
+    min-height: 48px;
   }
 
-  .pill-nav-item.active {
-    @apply text-accent font-bold bg-accent/10;
+  .native-tab-item.active {
+    @apply text-accent font-semibold;
   }
 
-  /* Desktop centered container (480-540px), mobile full width with safe bottom nav spacing */
+  /* Mobile-first centered container with safe bottom spacing */
   .page {
-    @apply min-h-[100dvh] px-4 sm:px-5 pt-3 max-w-[520px] mx-auto;
-    padding-bottom: calc(96px + env(safe-area-inset-bottom, 1.25rem));
+    @apply min-h-[100dvh] px-4 sm:px-6 pt-3 max-w-[480px] mx-auto;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 1rem));
   }
 
   .tabular-nums {
