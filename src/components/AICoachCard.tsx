@@ -14,7 +14,9 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
+  Flag,
 } from 'lucide-react';
+import ReportAIModal from '@/components/ReportAIModal';
 
 interface AICoachCardProps {
   onOpenSettings?: () => void;
@@ -31,6 +33,7 @@ export default function AICoachCard({ onOpenSettings, onNavigateWorkout }: AICoa
   const [insight, setInsight] = useState<AICoachInsight | undefined>(cachedInsight);
   const [loading, setLoading] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
 
   // Sync with store cache
   useEffect(() => {
@@ -153,6 +156,20 @@ export default function AICoachCard({ onOpenSettings, onNavigateWorkout }: AICoa
               )}
             </div>
           )}
+
+          {/* AI Disclosure & Reporting for Google Play compliance */}
+          <div className="flex items-center justify-between pt-1 border-t border-border/40 text-3xs text-text-muted">
+            <span className="font-mono">✨ AI Generated • Not medical advice</span>
+            <button
+              type="button"
+              onClick={() => setIsReportOpen(true)}
+              className="hover:text-danger flex items-center gap-1 transition-colors cursor-pointer"
+              title="Report inaccurate or objectionable AI response"
+            >
+              <Flag className="w-2.5 h-2.5" />
+              <span>Report</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="py-2 text-center">
@@ -166,6 +183,15 @@ export default function AICoachCard({ onOpenSettings, onNavigateWorkout }: AICoa
           </button>
         </div>
       )}
+
+      {/* In-app AI Report Modal */}
+      <ReportAIModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        aiContentSnippet={insight?.tacticalAdvice || insight?.volumeTrend || ''}
+        sourceFeature="Home Coach Insight"
+        onReported={() => setInsight(undefined)}
+      />
     </div>
   );
 }

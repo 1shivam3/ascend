@@ -40,6 +40,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     activeWorkoutDraft,
     clearWorkoutDraft,
     goals,
+    weeklySchedule,
   } = useStore();
 
   const toast = useToast();
@@ -75,9 +76,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       workouts,
       plannedWorkouts,
       activeWorkoutDraft,
-      userUnit
+      userUnit,
+      weeklySchedule
     );
-  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
+  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
   // Top focus lift for today
   const topFocus = useMemo(() => {
@@ -280,19 +282,31 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </span>
           <button
             type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
+            onClick={() => onNavigate('workout')}
             className="text-2xs font-medium text-text-muted hover:text-accent flex items-center gap-1 transition-colors"
           >
-            <Sparkles className="w-3 h-3" />
-            <span>Switch Split</span>
+            <span>Change Plan</span>
+            <ChevronRight className="w-3 h-3" />
           </button>
         </div>
 
         <div>
-          <h2 className="text-2xl font-black text-text-primary tracking-tight font-sans">
-            {sessionInfo.title}
-          </h2>
-          {sessionInfo.exercises && sessionInfo.exercises.length > 0 && (
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-black text-text-primary tracking-tight font-sans">
+              {sessionInfo.title}
+            </h2>
+            {sessionInfo.bodyParts && sessionInfo.bodyParts.length > 0 && !sessionInfo.isRestDay && (
+              <span className="text-3xs font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent">
+                {sessionInfo.bodyParts.join(' • ')}
+              </span>
+            )}
+          </div>
+
+          {sessionInfo.isRestDay ? (
+            <p className="mt-1.5 text-sm text-text-secondary leading-relaxed">
+              Scheduled rest day. Hydrate, hit your protein goals, and let your body recover.
+            </p>
+          ) : sessionInfo.exercises && sessionInfo.exercises.length > 0 ? (
             <div className="mt-2 space-y-1">
               {sessionInfo.exercises.slice(0, 5).map((ex, idx) => (
                 <div key={idx} className="text-sm text-text-secondary flex items-center gap-2">
@@ -306,21 +320,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 </span>
               )}
             </div>
-          )}
+          ) : null}
         </div>
 
         <button
           type="button"
           onClick={() => onNavigate('workout')}
           className={`w-full py-3.5 rounded-xl font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all cursor-pointer ${
-            sessionInfo.status === 'completed'
+            sessionInfo.isRestDay || sessionInfo.status === 'completed'
               ? 'bg-bg-secondary text-text-primary hover:bg-bg-secondary/80 border border-border/50'
               : 'btn-primary shadow-lg shadow-accent/20'
           }`}
         >
           <Play
             className={`w-4 h-4 ${
-              sessionInfo.status === 'completed'
+              sessionInfo.isRestDay || sessionInfo.status === 'completed'
                 ? 'fill-text-primary stroke-text-primary'
                 : 'fill-white stroke-white'
             }`}
@@ -330,6 +344,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               ? 'RESUME WORKOUT'
               : sessionInfo.status === 'completed'
               ? 'VIEW WORKOUT LOG'
+              : sessionInfo.isRestDay
+              ? 'START A WORKOUT ANYWAY'
               : 'START WORKOUT'}
           </span>
         </button>
@@ -341,7 +357,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 3. TOP FOCUS ──────────────────────────────────────────────────── */}
       <section className="space-y-1.5">
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-          TOP FOCUS
+          {sessionInfo.isRestDay ? 'UPCOMING FOCUS' : 'TOP FOCUS'}
         </span>
         <div className="flex items-baseline justify-between">
           <h3 className="text-base font-bold text-text-primary font-sans">

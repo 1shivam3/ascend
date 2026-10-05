@@ -58,6 +58,14 @@ import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/t
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import ShareProgramModal from '@/components/ShareProgramModal';
+import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
+import {
+  DAYS_OF_WEEK,
+  DAY_DISPLAY_INFO,
+  getTodayDayOfWeek,
+  getWorkoutBodyParts,
+  getScheduledWorkoutForDay,
+} from '@/lib/workout-schedule';
 import { plural } from '@/lib/formatters';
 
 interface WorkoutPageProps {
@@ -395,21 +403,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+  const userMode = useStore((state) => state.userMode) || 'beginner';
+  const toggleUserMode = useStore((state) => state.toggleUserMode);
+  const weeklySchedule = useStore((state) => state.weeklySchedule);
+  const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const toast = useToast();
 
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
 
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
   const todaySessionInfo = useMemo(() => {
     return getTodaySessionState(
       todayStr,
       workouts,
       plannedWorkouts,
       activeWorkoutDraft,
-      userUnit
+      userUnit,
+      weeklySchedule
     );
-  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit]);
+  }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
   // Dynamic synergy / goals label
   const goalSynergyLabel = useMemo(() => {
@@ -466,7 +480,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit, 8.0, goals);
   }, [targetExerciseForDecision, workouts, userUnit, goals]);
 
-  // ── Logger modal state ─────────────────────────────────────────────────────
+  const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
@@ -511,6 +525,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
   useEffect(() => {
@@ -1090,7 +1106,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <div className="flex items-center gap-2.5">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Workouts</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Train</h1>
               <button
                 type="button"
                 onClick={() => setIsGoalSelectorOpen(true)}
@@ -1101,18 +1117,33 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 <span>{goalSynergyLabel}</span>
               </button>
             </div>
-            <p className="text-label text-text-muted">Log your sessions &amp; track consistency</p>
+            <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Athlete Mode Toggle (🌱 Beginner vs ⚡ Advanced) */}
           <button
             type="button"
-            onClick={() => setIsPlateModalOpen(true)}
-            className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
-            title="Plate Calculator & Warmup Ramp"
+            onClick={toggleUserMode}
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
+              userMode === 'beginner'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-accent/10 border-accent/30 text-accent'
+            }`}
+            title={`Currently in ${userMode} mode. Tap to switch.`}
           >
-            <Dumbbell className="w-4 h-4 text-accent" />
+            <span>{userMode === 'beginner' ? '🌱 Beginner' : '⚡ Advanced'}</span>
           </button>
+          {userMode === 'advanced' && (
+            <button
+              type="button"
+              onClick={() => setIsPlateModalOpen(true)}
+              className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+              title="Plate Helper"
+            >
+              <Dumbbell className="w-4 h-4 text-accent" />
+            </button>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -1154,186 +1185,314 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── 1. TODAY'S WORKOUT HERO (Single Source of Truth) ── */}
-      <section className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-3.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                todaySessionInfo.status === 'completed'
-                  ? 'bg-emerald-500'
-                  : todaySessionInfo.status === 'in_progress'
-                  ? 'bg-accent animate-pulse'
-                  : todaySessionInfo.status === 'planned'
-                  ? 'bg-accent'
-                  : 'bg-text-muted'
-              }`}
-            />
-            <h2 className="section-title text-[11px] mb-0">
-              {todaySessionInfo.status === 'completed'
-                ? 'TODAY COMPLETED'
-                : todaySessionInfo.status === 'in_progress'
-                ? 'IN PROGRESS'
-                : "TODAY'S WORKOUT"}
-            </h2>
-          </div>
-          <span className="text-label text-text-muted font-medium">
-            {todaySessionInfo.status === 'completed' && todaySessionInfo.totalSets
-              ? plural(todaySessionInfo.totalSets, 'set')
-              : todaySessionInfo.status === 'planned'
-              ? `${plural(todaySessionInfo.exercises.length, 'exercise')} ready`
-              : todaySessionInfo.status === 'in_progress'
-              ? 'Draft active'
-              : `${plural(plannedWorkouts.length, 'plan')} available`}
-          </span>
-        </div>
-
-        <div>
-          <h3 className="text-lg font-bold text-text-primary leading-tight">
-            {todaySessionInfo.title}
-          </h3>
-          <p className="text-body text-text-secondary mt-0.5">
-            {todaySessionInfo.subtitle}
-          </p>
-        </div>
-
-        {/* If completed today, show verified summary metrics */}
-        {todaySessionInfo.status === 'completed' && (
-          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-label tabular-nums">
-            {todaySessionInfo.volumeKg && todaySessionInfo.volumeKg > 0 ? (
-              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
-                {todaySessionInfo.volumeKg.toLocaleString()} kg volume
-              </span>
-            ) : null}
-            {todaySessionInfo.durationMin && todaySessionInfo.durationMin > 0 ? (
-              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                {todaySessionInfo.durationMin} min
-              </span>
-            ) : todaySessionInfo.totalSets && todaySessionInfo.totalSets > 0 ? (
-              <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                {plural(todaySessionInfo.totalSets, 'set')}
-              </span>
-            ) : null}
-          </div>
-        )}
-
-        {/* Load hint for planned workout */}
-        {todaySessionInfo.status === 'planned' && todaySessionInfo.firstExerciseLoadHint && (
-          <div className="pt-0.5">
-            <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-2xs font-mono text-text-secondary">
-              {todaySessionInfo.firstExerciseLoadHint}
+      {/* ── WEEKLY SCHEDULE STRIP (Days & Body Parts) ── */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-accent" />
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+              WEEKLY SCHEDULE &amp; BODY PARTS
             </span>
           </div>
-        )}
-
-        {/* Consolidated Primary & Secondary CTA */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-          {todaySessionInfo.status === 'in_progress' ? (
-            <button
-              type="button"
-              onClick={handleResumeWorkout}
-              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>Resume Session</span>
-            </button>
-          ) : todaySessionInfo.status === 'planned' ? (
-            <button
-              type="button"
-              onClick={() => handleStartPlan(plannedWorkouts[0])}
-              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-white stroke-white" />
-              <span className="truncate">Start: {plannedWorkouts[0].name}</span>
-            </button>
-          ) : todaySessionInfo.status === 'completed' ? (
-            <button
-              type="button"
-              onClick={openBlankLogger}
-              className="btn-secondary py-3 px-4 text-xs font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-            >
-              <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
-              <span>Log Additional Session</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={openBlankLogger}
-              className="btn-primary py-3 px-4 text-xs font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-            >
-              <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>START WORKOUT</span>
-            </button>
-          )}
-
           <button
             type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
-            className="btn-secondary py-3 px-4 text-xs font-semibold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
           >
-            <Sparkles className="w-4 h-4 text-accent" />
-            <span>Suggest Plan / Templates</span>
+            <Edit2 className="w-3 h-3" />
+            <span>Customize Days</span>
           </button>
         </div>
 
-        {/* Quick Split Templates Bar */}
-        <div className="pt-2 border-t border-border/50 space-y-1.5">
-          <div className="flex items-center justify-between text-2xs text-text-muted">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono uppercase font-bold tracking-wider text-accent">Quick Split Templates:</span>
-              <span className="text-3xs font-mono text-accent bg-accent/15 px-1.5 py-0.5 rounded border border-accent/30 font-bold">
-                {goalConfig.label}
-              </span>
-            </div>
-            {workouts.length > 0 && (
+        <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+          {DAYS_OF_WEEK.map((day) => {
+            const info = DAY_DISPLAY_INFO[day];
+            const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
+            const isToday = day === todayDayOfWeek;
+
+            return (
               <button
+                key={day}
                 type="button"
-                onClick={handleRepeatLastWorkout}
-                className="text-text-secondary hover:text-accent font-medium flex items-center gap-1 transition-colors"
+                onClick={() => {
+                  if (sched.plan) {
+                    handleStartPlan(sched.plan);
+                  } else {
+                    setIsScheduleModalOpen(true);
+                  }
+                }}
+                className={`p-1 sm:p-1.5 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[62px] sm:min-h-[70px] cursor-pointer ${
+                  isToday
+                    ? 'border-accent bg-accent/15 shadow-xs ring-1 ring-accent'
+                    : sched.isRest
+                    ? 'border-border/50 bg-bg-secondary/30 text-text-muted hover:border-border'
+                    : 'border-border/80 bg-bg-card hover:border-accent/40'
+                }`}
+                title={
+                  sched.isRest
+                    ? `${info.label}: Rest Day`
+                    : `${info.label}: ${sched.title} (${sched.bodyParts.join(', ') || 'Workout'})`
+                }
               >
-                <FastForward className="w-3 h-3 text-accent" />
-                <span>Repeat last session</span>
-              </button>
-            )}
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {adaptiveSplitTemplates.map((tmpl) => (
-              <button
-                key={tmpl.id}
-                type="button"
-                onClick={() => handleStartPlan(tmpl)}
-                className="py-1.5 px-2.5 rounded-lg bg-bg-secondary/70 border border-border/70 text-2xs font-semibold text-text-primary hover:border-accent/50 hover:bg-accent/10 transition-colors text-left flex items-center justify-between group"
-                title={`${tmpl.description || tmpl.name} (${tmpl.exercises.length} movements)`}
-              >
-                <div className="min-w-0 pr-1">
-                  <span className="truncate block font-bold">{tmpl.name}</span>
-                  {tmpl.goalTag && (
-                    <span className="text-3xs font-mono text-text-muted group-hover:text-accent/80 block truncate">
-                      {tmpl.goalTag}
+                <span
+                  className={`text-3xs font-mono font-black uppercase ${
+                    isToday ? 'text-accent' : 'text-text-muted'
+                  }`}
+                >
+                  {info.short}
+                </span>
+
+                <div className="my-0.5">
+                  {sched.isRest ? (
+                    <span className="text-3xs text-text-muted font-medium block">
+                      Rest
+                    </span>
+                  ) : (
+                    <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight">
+                      {sched.plan?.name.replace('Builtin ', '') || sched.title}
                     </span>
                   )}
                 </div>
-                <Play className="w-2.5 h-2.5 text-accent shrink-0" />
-              </button>
-            ))}
-          </div>
-        </div>
 
-        {/* Quick Exercise Library Link */}
-        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
-          <button
-            type="button"
-            onClick={() => setIsExerciseLibraryOpen(true)}
-            className="text-text-muted hover:text-accent flex items-center gap-1.5 py-1 transition-colors"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-accent" />
-            <span>Browse Exercise Library (History &amp; PRs) &rarr;</span>
-          </button>
+                <span className="text-3xs text-accent font-medium line-clamp-1 block leading-none">
+                  {sched.isRest ? '☕' : sched.bodyParts[0] || 'Train'}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </section>
 
-      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER ── */}
-      {activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
+      {/* ── 1. TODAY'S WORKOUT HERO (One screen, one decision) ── */}
+      {(() => {
+        const scheduledToday = getScheduledWorkoutForDay(weeklySchedule, todayDayOfWeek, plannedWorkouts);
+        const currentPlan =
+          (todaySessionInfo.plannedWorkoutId
+            ? plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId)
+            : scheduledToday.plan) ||
+          (plannedWorkouts.length > 0 ? plannedWorkouts[0] : adaptiveSplitTemplates[0]);
+
+        const workoutTitle =
+          todaySessionInfo.status === 'in_progress'
+            ? (activeWorkoutDraft?.startedFromPlan || 'Workout in Progress')
+            : todaySessionInfo.status === 'completed'
+            ? (todaySessionInfo.title || 'Today Completed')
+            : todaySessionInfo.isRestDay
+            ? 'Rest & Recovery'
+            : currentPlan?.name || "Today's Workout";
+
+        const exerciseList =
+          todaySessionInfo.status === 'in_progress'
+            ? (activeWorkoutDraft?.exercises.map((e) => e.name).filter(Boolean) || [])
+            : todaySessionInfo.status === 'completed'
+            ? todaySessionInfo.exercises
+            : todaySessionInfo.isRestDay
+            ? []
+            : currentPlan?.exercises.map((e) => e.name) || [];
+
+        const bodyParts = todaySessionInfo.bodyParts || (currentPlan ? getWorkoutBodyParts(currentPlan.exercises) : []);
+        const durationEst = Math.max(30, exerciseList.length * 10);
+
+        // If today is a rest day and no workout is in progress / completed
+        if (todaySessionInfo.isRestDay && todaySessionInfo.status !== 'in_progress' && todaySessionInfo.status !== 'completed') {
+          return (
+            <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-2xs font-mono font-bold tracking-wider uppercase text-text-muted">
+                    TODAY&apos;S SCHEDULE • {todayDayOfWeek.toUpperCase()}
+                  </span>
+                </div>
+                <span className="text-2xs text-emerald-400 font-semibold font-mono">
+                  Rest &amp; Recovery
+                </span>
+              </div>
+
+              <div>
+                <h2 className="text-2xl font-black text-text-primary tracking-tight">
+                  Rest &amp; Recovery
+                </h2>
+                <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
+                  Scheduled rest day. Hydrate, hit your protein target, and let muscle tissue adapt.
+                </p>
+              </div>
+
+              <div className="pt-1 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setIsChangeWorkoutOpen(true)}
+                  className="btn-secondary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+                >
+                  <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
+                  <span>START A WORKOUT ANYWAY</span>
+                </button>
+
+                <div className="flex items-center justify-between text-xs pt-1 px-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(true)}
+                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  >
+                    <Calendar className="w-3.5 h-3.5 text-accent" />
+                    <span>Edit weekly schedule</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openBlankLogger}
+                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-accent" />
+                    <span>Start empty workout</span>
+                  </button>
+                </div>
+              </div>
+            </section>
+          );
+        }
+
+        return (
+          <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    todaySessionInfo.status === 'completed'
+                      ? 'bg-emerald-500'
+                      : todaySessionInfo.status === 'in_progress'
+                      ? 'bg-accent animate-pulse'
+                      : 'bg-accent'
+                  }`}
+                />
+                <span className="text-2xs font-mono font-bold tracking-wider uppercase text-text-muted">
+                  {todaySessionInfo.status === 'completed'
+                    ? 'TODAY COMPLETED'
+                    : todaySessionInfo.status === 'in_progress'
+                    ? 'IN PROGRESS'
+                    : `TODAY'S WORKOUT • ${todayDayOfWeek.toUpperCase()}`}
+                </span>
+              </div>
+              <span className="text-2xs text-text-muted font-medium font-mono">
+                ~{durationEst} min • {plural(exerciseList.length, 'movement')}
+              </span>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-2xl font-black text-text-primary tracking-tight">
+                  {workoutTitle}
+                </h2>
+                {bodyParts.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent text-3xs font-mono font-bold">
+                    {bodyParts.join(' • ')}
+                  </span>
+                )}
+              </div>
+              {exerciseList.length > 0 && (
+                <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
+                  {exerciseList.join('  •  ')}
+                </p>
+              )}
+            </div>
+
+            {/* If completed today, show verified summary metrics */}
+            {todaySessionInfo.status === 'completed' && (
+              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-label tabular-nums">
+                {todaySessionInfo.volumeKg && todaySessionInfo.volumeKg > 0 ? (
+                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
+                    {todaySessionInfo.volumeKg.toLocaleString()} kg volume
+                  </span>
+                ) : null}
+                {todaySessionInfo.durationMin && todaySessionInfo.durationMin > 0 ? (
+                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                    {todaySessionInfo.durationMin} min
+                  </span>
+                ) : todaySessionInfo.totalSets && todaySessionInfo.totalSets > 0 ? (
+                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
+                    {plural(todaySessionInfo.totalSets, 'set')}
+                  </span>
+                ) : null}
+              </div>
+            )}
+
+            {/* Load hint for planned workout */}
+            {todaySessionInfo.status === 'planned' && todaySessionInfo.firstExerciseLoadHint && (
+              <div className="pt-0.5">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-2xs font-mono text-text-secondary">
+                  {todaySessionInfo.firstExerciseLoadHint}
+                </span>
+              </div>
+            )}
+
+            {/* Primary CTA & at most two choices */}
+            <div className="pt-1 space-y-3">
+              {todaySessionInfo.status === 'in_progress' ? (
+                <button
+                  type="button"
+                  onClick={handleResumeWorkout}
+                  className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-white stroke-white" />
+                  <span>RESUME WORKOUT</span>
+                </button>
+              ) : todaySessionInfo.status === 'completed' ? (
+                <button
+                  type="button"
+                  onClick={() => currentPlan && handleStartPlan(currentPlan)}
+                  className="btn-secondary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
+                >
+                  <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
+                  <span>LOG ADDITIONAL SESSION</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => currentPlan && handleStartPlan(currentPlan)}
+                  className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-white stroke-white" />
+                  <span>START WORKOUT</span>
+                </button>
+              )}
+
+              {/* Two secondary choices: Change workout & Repeat last workout / Start empty */}
+              <div className="flex items-center justify-between text-xs pt-1 px-1">
+                <button
+                  type="button"
+                  onClick={() => setIsChangeWorkoutOpen(true)}
+                  className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
+                  <span>Change workout</span>
+                </button>
+
+                {workouts.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleRepeatLastWorkout}
+                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-accent" />
+                    <span>Repeat last workout</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openBlankLogger}
+                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-accent" />
+                    <span>Start empty workout</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        );
+      })()}
+
+      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode) ── */}
+      {userMode === 'advanced' && activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -1397,63 +1556,64 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </section>
       )}
 
-      {/* ── 3. WORKOUT PLANS SECTION ────────────────────────────────────────── */}
-      <section className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">WORKOUT PLANS</h2>
-            {plannedWorkouts.length > 0 && (
-              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
-                {plannedWorkouts.length}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={openCreatePlan}
-            className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
-            title="Create new workout plan"
-          >
-            <Plus className="w-3.5 h-3.5 text-accent" />
-            <span>New Plan</span>
-          </button>
-        </div>
-
-        {plannedWorkouts.length === 0 ? (
-          <div className="card p-3.5 flex items-center justify-between border-dashed border-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
-                <BookOpen className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
-                <p className="text-2xs text-text-muted">Build your personalized routine or load a split template above</p>
-              </div>
+      {/* ── 3. WORKOUT PLANS SECTION (Advanced mode) ────────────────────────── */}
+      {userMode === 'advanced' && (
+        <section className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-accent" />
+              <h2 className="section-title text-[11px] mb-0">WORKOUT PLANS</h2>
+              {plannedWorkouts.length > 0 && (
+                <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
+                  {plannedWorkouts.length}
+                </span>
+              )}
             </div>
             <button
               onClick={openCreatePlan}
-              className="btn-secondary py-1 px-3 text-xs font-semibold flex items-center gap-1"
+              className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
+              title="Create new workout plan"
             >
               <Plus className="w-3.5 h-3.5 text-accent" />
-              <span>Create Plan</span>
+              <span>New Plan</span>
             </button>
           </div>
-        ) : (
-          /* Plan cards grid */
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {plannedWorkouts.map(plan => (
-              <PlanCard
-                key={plan.id}
-                plan={plan}
-                onStart={() => handleStartPlan(plan)}
-                onEdit={() => handleEditPlan(plan)}
-                onDelete={() => handleDeletePlan(plan)}
-                onShare={() => setSharingPlan(plan)}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+
+          {plannedWorkouts.length === 0 ? (
+            <div className="card p-3.5 flex items-center justify-between border-dashed border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                  <BookOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
+                  <p className="text-2xs text-text-muted">Build your personalized routine or load a ready-made workout</p>
+                </div>
+              </div>
+              <button
+                onClick={openCreatePlan}
+                className="btn-secondary py-1 px-3 text-xs font-semibold flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5 text-accent" />
+                <span>Create Plan</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {plannedWorkouts.map(plan => (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  onStart={() => handleStartPlan(plan)}
+                  onEdit={() => handleEditPlan(plan)}
+                  onDelete={() => handleDeletePlan(plan)}
+                  onShare={() => setSharingPlan(plan)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── 4. RECENT WORKOUTS HISTORY (Item 27: Action-oriented empty state) ─ */}
       <section className="space-y-2.5">
@@ -1767,6 +1927,211 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         plan={sharingPlan}
         isOpen={Boolean(sharingPlan)}
         onClose={() => setSharingPlan(null)}
+      />
+
+      {/* ── Change Workout Bottom Sheet / Modal ──────────────────────────── */}
+      {isChangeWorkoutOpen && (
+        <div className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
+          <div
+            className="modal-content max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Change Workout</h2>
+                <p className="text-2xs text-text-muted">Choose what you want to train today</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangeWorkoutOpen(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto space-y-4">
+              {/* My Workouts & Weekly Schedule */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
+                    MY WORKOUTS &amp; SCHEDULE
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChangeWorkoutOpen(false);
+                        setIsScheduleModalOpen(true);
+                      }}
+                      className="text-xs font-semibold text-text-muted hover:text-accent flex items-center gap-1 transition-colors"
+                      title="Customize which day you train which workout"
+                    >
+                      <Calendar className="w-3.5 h-3.5 text-accent" />
+                      <span>Schedule Days</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChangeWorkoutOpen(false);
+                        openCreatePlan();
+                      }}
+                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>New Plan</span>
+                    </button>
+                  </div>
+                </div>
+
+                {plannedWorkouts.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    {plannedWorkouts.map((plan) => {
+                      const bodyParts = getWorkoutBodyParts(plan.exercises);
+                      const scheduledDays = Object.entries(weeklySchedule || {})
+                        .filter(([_, d]) => d.workoutPlanId === plan.id)
+                        .map(([day]) => DAY_DISPLAY_INFO[day as keyof typeof DAY_DISPLAY_INFO]?.short || day);
+
+                      return (
+                        <button
+                          key={plan.id}
+                          type="button"
+                          onClick={() => {
+                            setIsChangeWorkoutOpen(false);
+                            handleStartPlan(plan);
+                          }}
+                          className="p-3 rounded-xl bg-bg-secondary border border-border/80 hover:border-accent/50 hover:bg-accent/5 text-left flex items-center justify-between transition-colors group"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-bold text-sm text-text-primary block group-hover:text-accent">
+                                {plan.name}
+                              </span>
+                              {scheduledDays.length > 0 && (
+                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-3xs font-mono font-bold text-text-muted">
+                                  {scheduledDays.join(', ')}
+                                </span>
+                              )}
+                            </div>
+                            {bodyParts.length > 0 ? (
+                              <span className="text-3xs text-accent font-medium block mt-0.5">
+                                {bodyParts.join(' • ')}
+                              </span>
+                            ) : null}
+                            <span className="text-xs text-text-muted line-clamp-1 mt-0.5">
+                              {plan.exercises.map((e) => e.name).join(', ')}
+                            </span>
+                          </div>
+                          <Play className="w-4 h-4 text-accent shrink-0" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted italic py-1">No custom workouts created yet.</p>
+                )}
+              </div>
+
+              {/* Ready-Made Splits & AI Generator - Tucked away in a clean dropdown */}
+              <div className="pt-2 border-t border-border/50">
+                <button
+                  type="button"
+                  onClick={() => setIsTemplateDropdownOpen((prev) => !prev)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary/40 border border-border/60 hover:border-accent/40 text-left flex items-center justify-between transition-colors text-xs font-semibold text-text-muted hover:text-text-primary cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-accent" />
+                    <span>Browse ready-made splits &amp; AI plan generator</span>
+                  </div>
+                  <ChevronDown
+                    className={`w-4 h-4 transition-transform duration-200 ${
+                      isTemplateDropdownOpen ? 'rotate-180 text-accent' : ''
+                    }`}
+                  />
+                </button>
+
+                {isTemplateDropdownOpen && (
+                  <div className="mt-2.5 space-y-3 p-3 rounded-xl bg-bg-secondary/30 border border-border/50 animate-fade-in">
+                    <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                      READY-MADE SPLIT TEMPLATES
+                    </span>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {adaptiveSplitTemplates.map((tmpl) => (
+                        <button
+                          key={tmpl.id}
+                          type="button"
+                          onClick={() => {
+                            setIsChangeWorkoutOpen(false);
+                            handleStartPlan(tmpl);
+                          }}
+                          className="p-2.5 rounded-lg bg-bg-card border border-border/80 hover:border-accent/50 text-left flex items-center justify-between transition-colors group"
+                        >
+                          <div className="min-w-0 pr-2">
+                            <span className="font-bold text-xs text-text-primary block group-hover:text-accent">
+                              {tmpl.name}
+                            </span>
+                            <span className="text-3xs text-text-muted line-clamp-1">
+                              {tmpl.exercises.map((e) => e.name).join(', ')}
+                            </span>
+                          </div>
+                          <Play className="w-3.5 h-3.5 text-accent shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChangeWorkoutOpen(false);
+                        setIsSuggestedModalOpen(true);
+                      }}
+                      className="w-full p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-accent font-semibold text-xs flex items-center justify-center gap-2 hover:bg-accent/20 transition-colors"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Let ASCEND suggest a new plan</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Utility Links */}
+              <div className="pt-2 border-t border-border/50 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangeWorkoutOpen(false);
+                    setIsExerciseLibraryOpen(true);
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 hover:border-accent/40 text-left text-xs font-semibold text-text-primary flex items-center gap-2.5 transition-colors"
+                >
+                  <BookOpen className="w-4 h-4 text-accent" />
+                  <span>Browse Exercise Library</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsChangeWorkoutOpen(false);
+                    openBlankLogger();
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 hover:border-accent/40 text-left text-xs font-semibold text-text-primary flex items-center gap-2.5 transition-colors"
+                >
+                  <Plus className="w-4 h-4 text-text-muted" />
+                  <span>Start empty workout</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Schedule & Body Parts Modal */}
+      <WeeklyScheduleModal
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
+        plannedWorkouts={plannedWorkouts}
       />
     </div>
   );

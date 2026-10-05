@@ -7,7 +7,7 @@
 <p align="center">
   A high-performance, evidence-based training, autoregulation, and nutrition platform built with Next.js 14, Tailwind CSS, TypeScript, and Google Gemini AI.<br/>
   <strong>Engineered for every gym-goer — Bodybuilding & Hypertrophy, Maximum Strength, Fat Loss & Shredding, Stamina & Conditioning, and General Fitness.</strong><br/>
-  <em>100% local-first — zero cloud tracking, zero forced accounts, on-device data vault, and offline-first resilience.</em>
+  <em>100% local-first — zero cloud tracking, zero forced accounts, on-device data vault, offline-first resilience, and Google Play Store / App Store compliance.</em>
 </p>
 
 <p align="center">
@@ -39,15 +39,19 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
 ## 🚀 Key Highlights & Architectural Systems
 
 ### 🏋️ 1. Active Workout Engine & In-Gym Ergonomics
-* **Live Session Tracking:** Clean logging for sets, reps, load (`kg` or `lbs`), and effort (`RPE` 6.0–10.0 and `RIR` 0–4).
+* **One Screen, One Decision:** The Train tab immediately highlights today's workout, target compound lift, and scheduled body parts with a prominent single-action CTA.
+* **Weekly Schedule & Muscle Customizer (Mon–Sun):** Trainees choose which days they train, which are rest days, and target muscle groups (`Chest`, `Back`, `Legs`, `Shoulders`, `Arms`, `Core`). Includes 1-tap presets for 3-Day Full Body, 4-Day Upper/Lower, 5-Day Split, and 6-Day PPL.
+* **Tucked-Away Catalog:** Once a plan is chosen or created, split templates and AI suggestions neatly collapse into an expandable drawer, removing visual clutter.
+* **Dual Athlete Modes (🌱 Beginner vs ⚡ Advanced):**
+  * *Beginner Mode:* Shows weight, reps, and a checkmark. Hides complex RPE, plates, and voice tools for an effortless first-time gym experience.
+  * *Advanced Mode:* Unlocks per-set RPE/RIR autoregulation, bar plate loaders, warm-up sets, and voice dictation.
 * **Session Recovery Auto-Save:** Active drafts persist automatically in local storage on every keystroke. Never lose a session to browser refreshes or dead phone batteries.
-* **Previous Set Context:** Displays what load and reps you achieved last time for that exact exercise (`"Last: 80 kg × 8 @8 RPE"`) to guide progressive overload.
-* **Goal-Adaptive Rest Interval Timers:** Automatic rest timer presets calibrated to your goal:
+* **Goal-Adaptive Rest Timers:** Automatic rest timer presets calibrated to your goal:
   * Strength: 180s–240s
   * Hypertrophy: 90s–120s
   * Fat Loss / Stamina: 60s–75s
   * Includes manual ±15s steppers, background audio chimes, and haptic vibration feedback.
-* **Barbell Plate Calculator & Warmup Ramp:** 1-tap plate breakdown for 20kg/15kg bars with an automated **5-Stage Warm-Up Ramp** (empty bar × 10, 50% × 5, 70% × 3, 85% × 2, working weight).
+* **Barbell Plate Calculator & Warmup Ramp:** 1-tap plate breakdown for 20kg/15kg bars with an automated **5-Stage Warm-Up Ramp**.
 * **Automatic PR Detection:** Computes Epley 1RM across every completed set and instantly flags new personal bests with celebratory badges.
 
 ### 🧠 2. Autoregulation, Fatigue & Progression Analytics
@@ -66,8 +70,8 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
 * **Interactive Progression Modal:** Displays remaining kilograms/pounds required to reach the next level tier (`Foundation` → `Trained` → `Skilled` → `Advanced` → `Elite` → `Master` → `Grandmaster`).
 
 ### 🔄 4. Constraint & Equipment Adaptation Engine
-* **Gym Rush & Crowded Gym Solvers:** Busy gym? 1-tap stimulus-preserving exercise swaps replace occupied equipment while preserving identical biomechanical muscle recruitment (e.g., Barbell Bench Press $\rightarrow$ Dumbbell Flat Press with automatic weight recalibration; Lat Pulldown $\rightarrow$ Bodyweight Pull-ups).
-* **Time Crunch Adaptations:** When you only have 20–30 minutes, ASCEND trims accessory fluff, caps compound working sets to 3, and recalibrates rest intervals to maintain progressive tension.
+* **Gym Rush & Crowded Gym Solvers:** 1-tap stimulus-preserving exercise swaps replace occupied equipment while preserving identical biomechanical muscle recruitment (e.g., Barbell Bench Press $\rightarrow$ Dumbbell Flat Press with automatic weight recalibration; Lat Pulldown $\rightarrow$ Bodyweight Pull-ups).
+* **Time Crunch Adaptations:** When you only have 20–30 minutes, ASCEND trims accessory fluff, caps compound working sets to 3, and recalibrates rest intervals.
 
 ### 🎙️ 5. Hands-Free Hinglish Voice Logger
 * **Natural In-Gym Dictation:** Speak sets hands-free between heavy breaths:
@@ -92,15 +96,46 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
 * **Live Gym Mode Indicator:** Surfaces an ambient status notification whenever the device goes offline:
   > `⚡ Offline Gym Mode Active • All workouts, PRs, and meals are safely saved locally`
 
-### 🔗 8. Shareable Program Links & QR Codes
-* **Coach-to-Athlete Zero-Friction Sharing:** Encode complete multi-week routines or single workout plans into compact, self-contained URL hashes (`#v1_...`).
-* Instant 1-tap import without accounts, databases, or API keys.
+---
+
+## 🏛️ Google Play Store & Apple App Store Compliance
+
+ASCEND is engineered to meet all guidelines for mobile app store publication:
+
+### 1. Google Play Generative AI Policy
+* **In-App Reporting Mechanism:** All AI coaching responses, workout adjustments, and insights include a conspicuous **Flag/Report** button (`ReportAIModal.tsx`) allowing users to report objectionable, unsafe, or inaccurate content without leaving the app.
+* **Medical Advice Prohibition:** Embedded system guardrails in Gemini API routes strictly forbid clinical diagnosis, injury treatment, prescription drugs, or extreme starvation diets.
+* **Explicit Disclosures:** Every AI-generated card carries a clear label: `✨ AI Generated • Not medical advice`.
+
+### 2. Google Play Health Apps Policy
+* **Conspicuous Non-Medical Disclosures:** Clear medical disclaimers (`/disclaimer`) and in-app banners state that ASCEND is for informational/tracking purposes only.
+* **Emergency Medical Notice:** Advises users to cease exercise and contact emergency services (911/112) immediately in case of acute chest pain, dizziness, or shortness of breath.
+* **PAR-Q Readiness:** Includes full Physical Activity Readiness Questionnaire screening prior to heavy lifting.
+
+### 3. Data Safety Form Answers (Google Play Console)
+| Data Category | Data Type | Collected? | Stored Where? | Shared with 3rd Parties? |
+|---|---|---|---|---|
+| **Health & Fitness** | Fitness, workouts, PRs, bodyweight, height | Yes (user-entered) | 100% on-device (`localStorage`) | No |
+| **Photos & Videos** | Food / meal photos | Optional (on-demand) | Ephemeral in-memory | Only to Google Gemini API if user scans meal |
+| **Audio Files** | Voice dictation | Optional (on-demand) | Processed in-memory (Web Speech API) | No |
+| **Identifiers** | Name, email, device ID | No | None stored | No |
+| **App Performance** | Crash logs, analytics | No | Zero telemetry | No |
+
+### 4. Account & User Data Deletion (Play Store Mandatory)
+* **Instant In-App Wiping:** Trainees can erase all profiles, workouts, PRs, and cached keys at any time via **Settings $\rightarrow$ Data Vault $\rightarrow$ "Wipe All Data"**.
+* **Zero Remote Residue:** Because all data is stored on-device, wiping storage leaves zero copies on any server.
+* **Support Email:** Trainees can contact `support@ascendfit.app` for data questions or manual deletion verification.
+
+### 5. Hardware Permissions
+* **Camera:** Used strictly for barcode scanning (Open Food Facts) and meal photo capture. Video streams are analyzed in real-time and never recorded.
+* **Microphone:** Used strictly for speech-to-text workout dictation. Audio is transcribed via browser speech recognition and never recorded or transmitted.
+
+### 6. Age & Child Safety
+* Formally declared as suitable for users aged **13 and older** (COPPA & GDPR-K compliant).
 
 ---
 
 ## 🔒 Privacy, Security & Data Ownership
-
-ASCEND was built on the fundamental principle that health and athletic data belong entirely to the individual.
 
 * **100% Local Storage:** All workouts, PRs, nutrition history, and settings are stored locally in browser `localStorage`.
 * **Zero Third-Party Telemetry:** No Google Analytics, no Meta pixels, no tracking cookies, and no data harvesting.
@@ -184,7 +219,7 @@ npm run start
 
 * **Chrome (Android):** Tap the menu icon $\rightarrow$ **"Install App"** or **"Add to Home Screen"**. Runs fullscreen with zero browser chrome and instant offline launch.
 * **Safari (iOS):** Tap the Share button $\rightarrow$ **"Add to Home Screen"**.
-* **Native APK (Capacitor):**
+* **Native APK / AAB (Capacitor for Google Play Store):**
   ```bash
   npm install @capacitor/core @capacitor/cli @capacitor/android
   npx cap init Ascend com.ascend.app
@@ -192,6 +227,7 @@ npm run start
   npx cap add android
   npx cap open android
   ```
+  In Android Studio: Build $\rightarrow$ Generate Signed Bundle / APK $\rightarrow$ Android App Bundle (`.aab`) for Google Play Console upload.
 
 ---
 

@@ -9,14 +9,16 @@ import {
   FileText,
   Sparkles,
   Camera,
+  Mic,
   Barcode,
-  Key
+  Trash2,
+  Users
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | ASCEND',
-  description: 'ASCEND Powerlifting WebApp Privacy Policy. 100% offline, on-device local storage, transparent AI disclosures, and complete user data ownership.',
+  description: 'ASCEND Powerlifting & Fitness WebApp Privacy Policy. 100% offline, on-device local storage, transparent AI disclosures, Google Play Data Safety compliance, and user data deletion.',
 };
 
 export default function PrivacyPage() {
@@ -53,7 +55,7 @@ export default function PrivacyPage() {
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Last Updated: October 2026 • Version 2.2 • Effective Worldwide
+          Last Updated: October 2026 • Version 2.3 • Global &amp; Google Play Store Compliant
         </p>
       </div>
 
@@ -77,13 +79,13 @@ export default function PrivacyPage() {
             1. Information Stored Locally on Your Device
           </h2>
           <p className="text-2xs">
-            All primary application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key) inside your device browser:
+            All primary application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key) inside your device browser or sandbox container:
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1 pl-2">
             <li><strong>Athlete Profile:</strong> Name/alias, biological sex, baseline bodyweight, height, and unit preferences (kg/lbs).</li>
-            <li><strong>Strength &amp; Workouts:</strong> Personal records (PRs), workout sessions, individual sets, reps, active workout drafts, and custom workout plans.</li>
+            <li><strong>Strength &amp; Workouts:</strong> Personal records (PRs), workout sessions, individual sets, reps, active workout drafts, weekly schedule, and custom workout plans.</li>
             <li><strong>Daily Habits &amp; Nutrition:</strong> Water intake batches, creatine daily logs and container supply, meal entries, daily macro goals, and pinned food staples.</li>
-            <li><strong>UI Preferences:</strong> Theme selection (OLED Dark or Premium Light).</li>
+            <li><strong>UI Preferences:</strong> Theme selection (OLED Dark or Premium Light) and Athlete Mode (Beginner or Advanced).</li>
           </ul>
           <p className="text-2xs text-amber-300/80 pt-1">
             <strong>Important Notice:</strong> Because this information is stored locally on your device, clearing your browser history, site data, or cache without an exported backup file will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
@@ -94,62 +96,96 @@ export default function PrivacyPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent" />
-            2. Generative AI Features &amp; Data Handling (Google Gemini)
+            2. Generative AI Policy &amp; Data Handling (Google Gemini)
           </h2>
           <p className="text-2xs">
-            ASCEND includes optional generative AI capabilities powered by Google Gemini (such as the AI Training Coach, AI Photo Meal Scanner, and Natural Language Meal Logging):
+            ASCEND includes optional generative AI capabilities powered by Google Gemini (such as the AI Training Coach, AI Photo Meal Scanner, Natural Language Voice Logger, and Exercise Substitutions):
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
-            <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature (e.g. asking the AI Coach a question, scanning a meal photo, or requesting natural language meal parsing).</li>
-            <li><strong>No Personal Identifiers:</strong> We never transmit your personal contact details, email addresses, or full workout histories to AI providers. Only the specific prompt, recent athletic context necessary to answer, or food image is sent for processing.</li>
+            <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature. No background automated scraping occurs.</li>
+            <li><strong>Zero Personal Identifiers Transmitted:</strong> We never transmit your personal contact details, email addresses, names, or device identifiers to AI providers. Only the specific anonymized training numbers or meal photo necessary to process your request is sent.</li>
             <li><strong>Custom Gemini API Key Security:</strong> If you supply a custom Google Gemini API Key in Settings, that key is stored strictly on your local device in <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>. It is never transmitted to, collected by, or stored on any ASCEND backend servers.</li>
+            <li><strong>In-App AI Content Reporting:</strong> In strict compliance with Google Play Store AI Policies, ASCEND provides an integrated in-app reporting button (flag icon) next to all AI outputs. Users can immediately report unsafe, inaccurate, or offensive responses, which suppresses the output locally and logs the report for safety reviews.</li>
           </ul>
         </section>
 
-        {/* Section 3: Third-Party Lookups & Hardware Permissions */}
+        {/* Section 3: Hardware Permissions */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <Barcode className="w-4 h-4 text-accent" />
-            3. Barcode Scanning &amp; Device Permissions
+            3. Device Hardware Permissions &amp; Third-Party Lookups
           </h2>
           <div className="space-y-2 text-2xs">
             <p>
-              <strong>Open Food Facts API:</strong> When using the barcode lookup feature, the app queries the public, open-source Open Food Facts database using the numeric barcode to retrieve nutritional information. These requests are anonymous and contain no user identity or telemetry.
+              <strong>Camera Permission:</strong> Camera access is requested strictly when you activate the live barcode scanner or capture a meal photo. Camera video frames are processed in-memory in real time for barcode recognition or meal estimation; video feeds and photos are never recorded, surveilled, or permanently stored on any remote server.
             </p>
             <p>
-              <strong>Camera Permission:</strong> Camera access is requested strictly when you activate the live barcode scanner or capture a meal photo. Camera video streams are analyzed locally in real-time or processed directly for meal recognition; video feeds are never recorded, tracked, or stored.
+              <strong>Microphone &amp; Speech-to-Text:</strong> Microphone access is used strictly for the hands-free voice workout logger. Audio streams are transcribed directly via browser speech recognition (Web Speech API) into text for exercise, reps, and weight. Raw audio recordings are never stored or transmitted to third parties.
             </p>
             <p>
-              <strong>Haptics &amp; Audio:</strong> Vibration and audio alert capabilities are utilized strictly for the rest interval timer and action confirmations.
+              <strong>Open Food Facts API:</strong> When scanning a food barcode, the app queries the public, open-source Open Food Facts database using the numeric barcode to retrieve nutritional information. These requests are anonymous and contain zero user identifiers.
+            </p>
+            <p>
+              <strong>Haptics &amp; Audio:</strong> Vibration and audio chime capabilities are utilized strictly for the rest interval timer and in-app action confirmations.
             </p>
           </div>
         </section>
 
-        {/* Section 4: Data Ownership & Rights */}
+        {/* Section 4: Google Play Data Safety Form Disclosure */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-            <FileText className="w-4 h-4 text-accent" />
-            4. User Rights, GDPR &amp; CCPA Compliance
+            <ShieldCheck className="w-4 h-4 text-accent" />
+            4. Google Play Store &amp; App Store Data Safety Declarations
           </h2>
-          <p className="text-2xs">
-            Under global privacy standards, including the EU General Data Protection Regulation (GDPR) and California Consumer Privacy Act (CCPA):
-          </p>
-          <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
-            <li><strong>Right to Portability:</strong> You can download a complete, unencrypted copy of your full athletic history in standard JSON format at any time using the <em>Data Vault</em>.</li>
-            <li><strong>Right to Erasure:</strong> You can immediately and irreversibly delete all local storage records using the <em>Wipe All Data</em> action in the Data Vault.</li>
-            <li><strong>Zero Tracking / Zero Cookies:</strong> ASCEND uses zero third-party advertising cookies, zero behavioral tracking pixels, and zero telemetry analytics frameworks.</li>
-          </ul>
+          <div className="p-3 rounded-lg bg-bg-secondary border border-border/80 text-2xs space-y-2">
+            <p className="font-semibold text-text-primary">Summary of Data Practices for App Store Reviewers &amp; Trainees:</p>
+            <div className="space-y-1 text-2xs">
+              <p>• <strong>Data Collected:</strong> None transmitted to first-party servers. All athletic, workout, and nutritional records remain 100% on the user&apos;s local device.</p>
+              <p>• <strong>Data Shared:</strong> None with advertisers, data brokers, or marketing networks. Third-party API communication is strictly user-initiated (Google Gemini for AI features, Open Food Facts for barcode lookups).</p>
+              <p>• <strong>Tracking:</strong> Zero advertising tracking, zero cross-app tracking, zero analytics telemetry cookies.</p>
+              <p>• <strong>Data Encryption:</strong> Local device storage is sandboxed by the operating system and browser; external API requests use HTTPS / TLS 1.3 encryption.</p>
+            </div>
+          </div>
         </section>
 
-        {/* Section 5: Medical Notice */}
+        {/* Section 5: Account & Data Deletion (Google Play Mandatory) */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-danger" />
+            5. User Data Deletion &amp; Account Eradication
+          </h2>
+          <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-xs text-text-secondary space-y-2">
+            <p className="text-2xs">
+              Google Play requires clear disclosure of how users can request or execute complete deletion of their data. In ASCEND:
+            </p>
+            <ul className="list-disc list-inside text-2xs space-y-1 pl-1">
+              <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Data Vault &rarr; Wipe All Data</em>. This action immediately and irrevocably deletes your profile, all workout sessions, PRs, nutrition history, and cached AI keys from device storage.</li>
+              <li><strong>No Remote Retention:</strong> Because ASCEND does not store user profiles on cloud databases, wiping your device data leaves zero residual traces on any server.</li>
+              <li><strong>Manual Support Inquiries:</strong> If you have questions regarding data deletion or privacy inquiries, contact our development team directly at <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">support@ascendfit.app</a>.</li>
+            </ul>
+          </div>
+        </section>
+
+        {/* Section 6: Children's Privacy */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <Users className="w-4 h-4 text-accent" />
+            6. Children&apos;s Privacy (COPPA &amp; GDPR-K)
+          </h2>
+          <p className="text-2xs">
+            ASCEND is designed for athletes and gym trainees aged 13 and older (or 16 and older in the European Economic Area). We do not knowingly collect, solicit, or maintain personal information from children under the age of 13. If you believe a child under 13 has provided data through the app, please wipe the device local storage or contact us to assist.
+          </p>
+        </section>
+
+        {/* Section 7: Medical & Safety Notice */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-amber-400 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400" />
-            5. Health, Fitness &amp; Safety Notice
+            7. Health, Fitness &amp; Safety Notice
           </h2>
           <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-2xs space-y-1.5">
             <p>
-              ASCEND is an analytical workout journal and mathematical strength calculator. It is NOT a medical device and does NOT provide medical advice, diagnosis, or treatment. Resistance training carries inherent risks of injury. Always consult a healthcare professional before beginning any physical exercise regimen.
+              ASCEND is an analytical workout journal and mathematical strength calculator. It is NOT a medical device and does NOT provide medical advice, clinical diagnosis, or rehabilitation prescriptions. Resistance training carries inherent risks of injury. Always consult a licensed healthcare professional before beginning any physical exercise regimen.
             </p>
             <p>
               For complete details, please read our dedicated <Link href="/disclaimer" className="text-accent underline font-semibold">Medical &amp; Safety Disclaimer</Link>.

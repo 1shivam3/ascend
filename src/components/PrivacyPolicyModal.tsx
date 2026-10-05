@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { X, ShieldCheck, Lock, HardDrive, AlertTriangle, FileText, Sparkles, Barcode } from 'lucide-react';
+import { X, ShieldCheck, Lock, HardDrive, AlertTriangle, FileText, Sparkles, Barcode, Trash2, Camera, Mic } from 'lucide-react';
+import Link from 'next/link';
 
 interface PrivacyPolicyModalProps {
   isOpen: boolean;
@@ -27,7 +28,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
               <h2 className="font-bold text-base text-text-primary leading-tight">
                 Privacy Policy &amp; Legal Terms
               </h2>
-              <p className="text-2xs text-text-muted font-mono">ASCEND v2.2 • Offline-First Privacy</p>
+              <p className="text-3xs text-text-muted font-mono">ASCEND v2.3 • Global &amp; Play Store Compliant</p>
             </div>
           </div>
           <button
@@ -46,7 +47,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
             <span>100% On-Device Local Privacy Guarantee</span>
           </div>
           <p className="text-2xs opacity-90 leading-relaxed">
-            ASCEND does not transmit, harvest, monetize, or sell your personal fitness records. All calculations, PRs, workouts, and body metrics reside strictly within your device&apos;s browser memory.
+            ASCEND does not harvest, monetize, sell, or sync your personal fitness records. All calculations, PRs, workouts, and body metrics reside strictly within your device&apos;s browser memory.
           </p>
         </div>
 
@@ -59,7 +60,7 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
               1. Information Collection &amp; Local Storage
             </h4>
             <p className="text-2xs">
-              We collect only the information you voluntarily input: your athlete name, biological sex, bodyweight, height, personal records (PRs), workout logs, hydration, creatine, and nutrition macros.
+              We collect only the information you voluntarily input: your athlete name, biological sex, bodyweight, height, personal records (PRs), workout logs, weekly schedule, hydration, creatine, and nutrition macros.
             </p>
             <p className="text-2xs">
               This data is stored solely in your device&apos;s local storage (<code className="text-text-primary">localStorage</code>). We operate no remote cloud user databases, logins, or tracking pixels.
@@ -70,48 +71,66 @@ export default function PrivacyPolicyModal({ isOpen, onClose }: PrivacyPolicyMod
           <div className="space-y-1">
             <h4 className="font-bold text-text-primary flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-accent" />
-              2. Generative AI (Google Gemini) &amp; Barcode Lookups
+              2. Generative AI (Google Gemini) &amp; Safety Reporting
             </h4>
             <p className="text-2xs">
-              Optional AI tools (Coach, Meal Photo Scanner, Natural Language Meal Log) communicate with Google Gemini only when triggered on-demand. Personal identifiers are never sent. If you add a custom Gemini API Key, it is saved exclusively in your device&apos;s local memory. Barcode scans query Open Food Facts anonymously.
+              Optional AI tools (Coach, Meal Photo Scanner, Voice Logger) communicate with Google Gemini on-demand. Personal identifiers are never sent. If you add a custom Gemini API Key, it is saved exclusively in local memory.
+            </p>
+            <p className="text-2xs text-accent">
+              • In-App Reporting: Users can report inappropriate, inaccurate, or unsafe AI outputs directly using the flag button next to any AI advice.
             </p>
           </div>
 
           {/* Section 3 */}
           <div className="space-y-1">
             <h4 className="font-bold text-text-primary flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-              3. Medical &amp; Physical Activity Disclaimer
+              <Camera className="w-3.5 h-3.5 text-accent" />
+              3. Device Permissions (Camera &amp; Microphone)
             </h4>
-            <p className="text-2xs text-amber-200/90 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
-              <strong>CRITICAL NOTICE:</strong> Heavy resistance training and powerlifting involve inherent risks of physical injury. ASCEND is an analytical tracking tool, NOT a licensed medical professional, physical therapist, or personal trainer. Always consult a qualified physician prior to starting or intensifying any strength program.
+            <p className="text-2xs">
+              Camera access is used strictly for in-memory barcode scanning and meal photo analysis. Microphone access is used for hands-free speech-to-text workout dictation. Audio and video streams are never recorded or stored remotely.
             </p>
           </div>
 
           {/* Section 4 */}
           <div className="space-y-1">
             <h4 className="font-bold text-text-primary flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-accent" />
-              4. Data Ownership &amp; Portability (GDPR &amp; CCPA)
+              <Trash2 className="w-3.5 h-3.5 text-danger" />
+              4. Complete User Data Deletion (Play Store Compliant)
             </h4>
             <p className="text-2xs">
-              Under GDPR and CCPA privacy standards, you maintain complete ownership of your fitness data:
+              You maintain 100% control over your data. You can delete all your records, profile, and history anytime by going to <strong>Settings &rarr; Data Vault &rarr; Wipe All Data</strong>. Because data is stored locally, wiping leaves zero residual copies on any server.
             </p>
-            <ul className="list-disc list-inside text-2xs space-y-1 pl-1">
-              <li><strong>Right to Export:</strong> Download a full <code className="text-text-primary">.json</code> copy of your data anytime via the Data Vault.</li>
-              <li><strong>Right to Erasure:</strong> Purge all local data from your device instantly via &quot;Delete WebApp Data&quot;.</li>
-              <li><strong>Zero Tracking:</strong> Zero telemetry or advertising cookies.</li>
-            </ul>
+          </div>
+
+          {/* Section 5 */}
+          <div className="space-y-1">
+            <h4 className="font-bold text-text-primary flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+              5. Medical &amp; Physical Activity Disclaimer
+            </h4>
+            <p className="text-2xs text-amber-200/90 bg-amber-500/10 p-2.5 rounded-lg border border-amber-500/20">
+              <strong>CRITICAL NOTICE:</strong> Heavy resistance training involves inherent risks of physical injury. ASCEND is an analytical tracking tool, NOT a physician, physical therapist, or registered dietitian. Always consult a qualified healthcare professional prior to starting or intensifying any strength program.
+            </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="btn-primary w-full py-2.5 text-xs font-bold text-center"
-        >
-          I Understand &amp; Agree
-        </button>
+        <div className="flex gap-2 pt-2 border-t border-border/60">
+          <Link
+            href="/privacy"
+            target="_blank"
+            className="btn-secondary flex-1 py-2 text-xs font-mono text-center"
+          >
+            Full Legal Document &rarr;
+          </Link>
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn-primary flex-1 py-2 text-xs font-bold text-center"
+          >
+            I Understand &amp; Agree
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -99,7 +99,7 @@ export default function ConstraintAdapterModal({
               </button>
             )}
             <h2 className="text-xl font-black text-text-primary tracking-tight font-sans">
-              {step === 'swap_picker' ? 'SELECT SUBSTITUTE' : 'ADAPT SESSION'}
+              {step === 'swap_picker' ? 'CHOOSE ALTERNATIVE' : "CHANGE TODAY'S WORKOUT"}
             </h2>
           </div>
           <button
@@ -116,7 +116,7 @@ export default function ConstraintAdapterModal({
             {/* 1. Why? Reason selector */}
             <div className="space-y-1.5">
               <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                WHY?
+                WHAT CHANGED TODAY?
               </span>
               <div className="grid grid-cols-3 gap-2">
                 <button
@@ -131,8 +131,8 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <Clock className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'time' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">{selectedMinutes}m time</span>
-                  <span className="text-3xs text-text-muted">Tight schedule</span>
+                  <span className="text-xs font-bold block">{selectedMinutes}m limit</span>
+                  <span className="text-3xs text-text-muted">Short on time</span>
                 </button>
 
                 <button
@@ -147,8 +147,8 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <BatteryLow className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'readiness' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">Low readiness</span>
-                  <span className="text-3xs text-text-muted">Fatigue / sleep</span>
+                  <span className="text-xs font-bold block">Feeling tired</span>
+                  <span className="text-3xs text-text-muted">Low energy</span>
                 </button>
 
                 <button
@@ -164,8 +164,8 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <Dumbbell className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'equipment' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">Equipment</span>
-                  <span className="text-3xs text-text-muted">Station busy</span>
+                  <span className="text-xs font-bold block">Machine busy</span>
+                  <span className="text-3xs text-text-muted">Station occupied</span>
                 </button>
               </div>
 

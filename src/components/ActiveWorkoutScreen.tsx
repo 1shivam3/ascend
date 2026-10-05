@@ -54,6 +54,8 @@ export default function ActiveWorkoutScreen({
   onCancel,
 }: ActiveWorkoutScreenProps) {
   const { profile, workouts, addPR, prs } = useStore();
+  const userMode = useStore((state) => state.userMode) || 'beginner';
+  const toggleUserMode = useStore((state) => state.toggleUserMode);
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
 
@@ -62,6 +64,30 @@ export default function ActiveWorkoutScreen({
     ? (profile.goals[0] as AthleteGoal)
     : 'build_muscle';
   const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
+
+  // Beginner mode: one set at a time & exercise effort prompt
+  const [activeSetIdx, setActiveSetIdx] = useState<number>(0);
+  const [showEffortPrompt, setShowEffortPrompt] = useState<boolean>(false);
+  const [effortChosen, setEffortChosen] = useState<'easy' | 'good' | 'hard' | null>(null);
+  const [showFirstTimeTips, setShowFirstTimeTips] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !localStorage.getItem('ascend_workout_tips_seen') && workouts.length === 0;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
+
+  const dismissFirstTimeTips = () => {
+    setShowFirstTimeTips(false);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('ascend_workout_tips_seen', 'true');
+      } catch {}
+    }
+  };
 
   const defaultTargetReps = useMemo(() => {
     const { min, max } = goalConfig.defaultRepRange;
@@ -183,7 +209,12 @@ export default function ActiveWorkoutScreen({
 
   useEffect(() => {
     setIsEditingName(false);
-  }, [activeExerciseIdx]);
+    const currentSets = exercises[activeExerciseIdx]?.sets || [];
+    const firstIncomplete = currentSets.findIndex((s) => !s.completed);
+    setActiveSetIdx(firstIncomplete !== -1 ? firstIncomplete : 0);
+    setShowEffortPrompt(currentSets.length > 0 && currentSets.every((s) => s.completed));
+    setEffortChosen(null);
+  }, [activeExerciseIdx, exercises]);
 
   // Check if current exercise is a main compound lift (Bench, Squat, Deadlift, OHP)
   const isCurrentMainLift = useMemo(() => {
@@ -505,6 +536,63 @@ export default function ActiveWorkoutScreen({
     );
   };
 
+  const handleCompleteActiveSet = (setIdx: number) => {
+    const isNowCompleted = !currentExercise.sets[setIdx].completed;
+
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted } : s)),
+        };
+      })
+    );
+
+    if (isNowCompleted) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(20);
+      }
+      // Auto start rest timer
+      const restDuration = defaultRestDuration;
+      setRestTotalSeconds(restDuration);
+      setRestSecondsLeft(restDuration);
+      setIsRestRunning(true);
+      setIsRestFinished(false);
+
+      // Check if there is another set to perform in this exercise
+      const remainingSets = currentExercise.sets.filter((s, j) => j !== setIdx && !s.completed);
+      if (remainingSets.length > 0) {
+        const nextIncomplete = currentExercise.sets.findIndex((s, j) => j > setIdx && !s.completed);
+        if (nextIncomplete !== -1) {
+          setActiveSetIdx(nextIncomplete);
+        } else {
+          const anyIncomplete = currentExercise.sets.findIndex((s, j) => j !== setIdx && !s.completed);
+          if (anyIncomplete !== -1) setActiveSetIdx(anyIncomplete);
+        }
+      } else {
+        setShowEffortPrompt(true);
+      }
+    }
+  };
+
+  const handleLogExerciseEffort = (rpe: number, label: 'easy' | 'good' | 'hard') => {
+    setEffortChosen(label);
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s) => ({ ...s, rpe })),
+        };
+      })
+    );
+    toast.success(
+      `Logged effort as ${label.toUpperCase()} (@${rpe} Effort)`,
+      'Exercise Complete'
+    );
+  };
+
   const handleApplyVoiceSet = (result: VoiceWorkoutResult) => {
     let targetExIdx = activeExerciseIdx;
     if (result.exerciseName) {
@@ -803,73 +891,89 @@ export default function ActiveWorkoutScreen({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Secondary ⋯ Tools Menu */}
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="w-9 h-9 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95"
-              title="Workout Tools & Options"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+          {/* Athlete Mode Toggle (🌱 Beginner vs ⚡ Advanced) */}
+          <button
+            type="button"
+            onClick={toggleUserMode}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+              userMode === 'beginner'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-accent/10 border-accent/30 text-accent'
+            }`}
+            title={`Currently in ${userMode} mode. Tap to switch.`}
+          >
+            <span>{userMode === 'beginner' ? '🌱 Beginner' : '⚡ Advanced'}</span>
+          </button>
 
-            {isMoreMenuOpen && (
-              <div
-                className="absolute right-0 top-full mt-1.5 w-48 rounded-xl bg-bg-card border border-border shadow-xl p-1.5 z-50 animate-fade-in space-y-1"
-                onClick={() => setIsMoreMenuOpen(false)}
+          {/* Secondary ⋯ Tools Menu (In advanced mode, or available for quick tools) */}
+          {userMode === 'advanced' && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95"
+                title="Workout Tools & Options"
               >
-                <button
-                  type="button"
-                  onClick={() => setIsAdaptModalOpen(true)}
-                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-accent/15 hover:text-accent transition-colors flex items-center gap-2"
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {isMoreMenuOpen && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-bg-card border border-border shadow-xl p-1.5 z-50 animate-fade-in space-y-1"
+                  onClick={() => setIsMoreMenuOpen(false)}
                 >
-                  <Zap className="w-3.5 h-3.5 text-accent" />
-                  <span>Adapt Routine</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const firstW = parseFloat(String(currentExercise.sets[0]?.weight)) || 60;
-                    openPlateCalculatorForWeight(firstW);
-                  }}
-                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
-                >
-                  <Dumbbell className="w-3.5 h-3.5 text-text-muted" />
-                  <span>Plate Calculator</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsWarmupModalOpen(true)}
-                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
-                >
-                  <Flame className="w-3.5 h-3.5 text-text-muted" />
-                  <span>Warm-up Sets</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsVoiceModalOpen(true)}
-                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
-                >
-                  <Mic className="w-3.5 h-3.5 text-text-muted" />
-                  <span>Voice Dictation</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsAddExerciseModalOpen(true)}
-                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 border-t border-border/40 pt-1.5"
-                >
-                  <Plus className="w-3.5 h-3.5 text-text-muted" />
-                  <span>Add Exercise</span>
-                </button>
-              </div>
-            )}
-          </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAdaptModalOpen(true)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-accent/15 hover:text-accent transition-colors flex items-center gap-2"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-accent" />
+                    <span>Change today&apos;s workout</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const firstW = parseFloat(String(currentExercise.sets[0]?.weight)) || 60;
+                      openPlateCalculatorForWeight(firstW);
+                    }}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
+                  >
+                    <Dumbbell className="w-3.5 h-3.5 text-text-muted" />
+                    <span>Plate helper</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsWarmupModalOpen(true)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
+                  >
+                    <Flame className="w-3.5 h-3.5 text-text-muted" />
+                    <span>Warm-up sets</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsVoiceModalOpen(true)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
+                  >
+                    <Mic className="w-3.5 h-3.5 text-text-muted" />
+                    <span>Voice dictation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddExerciseModalOpen(true)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 border-t border-border/40 pt-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-text-muted" />
+                    <span>Add exercise</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
-            className="bg-accent hover:brightness-105 active:scale-95 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-sm shadow-accent/25 transition-all flex items-center gap-1.5"
+            className="bg-accent hover:brightness-105 active:scale-95 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm shadow-accent/25 transition-all flex items-center gap-1.5"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Finish</span>
@@ -935,8 +1039,32 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-32">
+        {/* First-time guidance tips (Idea 9) */}
+        {showFirstTimeTips && (
+          <div className="mb-4 p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-accent flex items-center gap-1.5">
+                <span>👋</span>
+                <span>Quick gym tips</span>
+              </span>
+              <button
+                type="button"
+                onClick={dismissFirstTimeTips}
+                className="text-2xs text-text-muted hover:text-text-primary px-2 py-0.5 rounded bg-bg-secondary border border-border transition-colors"
+              >
+                Got it
+              </button>
+            </div>
+            <ul className="text-2xs text-text-secondary space-y-1 list-disc list-inside">
+              <li>Weights and reps are pre-filled for you</li>
+              <li>Tap the big Done button after completing each set</li>
+              <li>Your rest timer starts automatically</li>
+            </ul>
+          </div>
+        )}
+
         {/* Exercise Header */}
-        <section className="mb-6 space-y-1.5">
+        <section className="mb-5 space-y-1">
           <div className="flex items-center justify-between">
             <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider font-sans">
               Exercise {activeExerciseIdx + 1} of {exercises.length}
@@ -997,132 +1125,389 @@ export default function ActiveWorkoutScreen({
           )}
 
           {/* Today's Target */}
-          <div className="pt-1 text-xs font-semibold text-accent tracking-wide uppercase">
+          <div className="pt-0.5 text-xs font-semibold text-accent tracking-wide uppercase">
             <span>TODAY: </span>
             <span className="font-mono text-text-primary text-sm font-bold ml-1 normal-case">
-              {currentExercise.sets[0]?.weight ? `${currentExercise.sets[0]?.weight} ${userUnit}` : 'Custom'} × {currentExercise.sets[0]?.reps || 8} @{currentExercise.sets[0]?.rpe || 8}
+              {currentExercise.sets[0]?.weight ? `${currentExercise.sets[0]?.weight} ${userUnit}` : 'Custom'} × {currentExercise.sets[0]?.reps || 8}
+              {userMode === 'advanced' && ` @${currentExercise.sets[0]?.rpe || 8}`}
             </span>
           </div>
         </section>
 
-        {/* ── Set Rows Table (Clean unboxed rows with hairline dividers) ── */}
-        <section className="space-y-1">
-          <div className="divide-y divide-border/40">
-            {currentExercise.sets.map((set, sIdx) => (
-              <div
-                key={sIdx}
-                className="py-3 flex items-center justify-between gap-2"
-              >
-                {/* Set number */}
-                <div className="w-14 shrink-0">
-                  <span className="text-xs font-semibold text-text-muted">
-                    Set {sIdx + 1}
-                  </span>
-                </div>
-
-                {/* Weight & Reps inputs */}
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  {/* Weight Input */}
-                  <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={set.weight ?? ''}
-                      placeholder="0"
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                          handleSetWeightChange(sIdx, val);
-                        }
-                      }}
-                      onBlur={() => {
-                        const parsed = parseFloat(String(set.weight));
-                        handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
-                      }}
-                      className="w-12 sm:w-14 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
-                    />
-                    <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
-                  </div>
-
-                  <span className="text-text-muted font-medium text-xs">×</span>
-
-                  {/* Reps Input */}
-                  <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={set.reps ?? ''}
-                      placeholder="1"
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^\d*$/.test(val)) {
-                          handleSetRepsChange(sIdx, val);
-                        }
-                      }}
-                      onBlur={() => {
-                        const parsed = parseInt(String(set.reps), 10);
-                        handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
-                      }}
-                      className="w-9 sm:w-11 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
-                    />
-                    <span className="text-2xs text-text-muted font-medium ml-0.5">reps</span>
-                  </div>
-
-                  {/* Effort / RPE badge */}
+        {userMode === 'beginner' ? (
+          /* ── BEGINNER MODE: ONE SET AT A TIME (Idea 4 & 5) ── */
+          <section className="space-y-4">
+            {/* Set pills navigator */}
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                SET {activeSetIdx + 1} OF {currentExercise.sets.length}
+              </span>
+              <div className="flex items-center gap-1.5">
+                {currentExercise.sets.map((s, idx) => (
                   <button
+                    key={idx}
                     type="button"
                     onClick={() => {
-                      const cur = set.rpe || 8;
-                      const next = cur >= 10 ? 6 : cur + 0.5;
-                      handleRPESelect(sIdx, next);
+                      setActiveSetIdx(idx);
+                      setShowEffortPrompt(false);
                     }}
-                    className="text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent active:scale-95 transition-all"
-                    title="Tap to adjust effort / RPE"
+                    className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
+                      idx === activeSetIdx && !showEffortPrompt
+                        ? 'bg-accent text-white shadow-xs'
+                        : s.completed
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
+                    }`}
+                    title={`Set ${idx + 1}`}
                   >
-                    @{set.rpe || 8}
+                    {s.completed ? '✓' : idx + 1}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={handleAddSet}
+                  className="w-7 h-7 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1"
+                  title="Add set"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {showEffortPrompt ? (
+              /* Post-exercise effort prompt (Idea 5: Ask effort once per exercise) */
+              <div className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/40 text-center space-y-4 animate-fade-in shadow-md">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
+                  ✓
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-text-primary tracking-tight">
+                    {currentExercise.name} Completed!
+                  </h3>
+                  <p className="text-xs text-text-secondary mt-1">
+                    How hard was that exercise today?
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleLogExerciseEffort(7, 'easy')}
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                      effortChosen === 'easy'
+                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                        : 'bg-bg-secondary border-border/80 hover:border-emerald-500/60'
+                    }`}
+                  >
+                    <span className="text-xl block mb-1">😊</span>
+                    <span className="text-xs font-bold text-text-primary block">Easy</span>
+                    <span className="text-3xs text-text-muted">Could do more</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLogExerciseEffort(8, 'good')}
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                      effortChosen === 'good'
+                        ? 'bg-accent/20 border-accent text-accent'
+                        : 'bg-bg-secondary border-border/80 hover:border-accent/60'
+                    }`}
+                  >
+                    <span className="text-xl block mb-1">👍</span>
+                    <span className="text-xs font-bold text-accent block">Good</span>
+                    <span className="text-3xs text-text-muted">Just right</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLogExerciseEffort(9.5, 'hard')}
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                      effortChosen === 'hard'
+                        ? 'bg-danger/20 border-danger text-danger'
+                        : 'bg-bg-secondary border-border/80 hover:border-danger/60'
+                    }`}
+                  >
+                    <span className="text-xl block mb-1">🥵</span>
+                    <span className="text-xs font-bold text-text-primary block">Hard</span>
+                    <span className="text-3xs text-text-muted">Pushed to limit</span>
                   </button>
                 </div>
 
-                {/* Checkmark Button */}
+                <div className="pt-2">
+                  {activeExerciseIdx < exercises.length - 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEffortPrompt(false);
+                        setActiveExerciseIdx((prev) => prev + 1);
+                      }}
+                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2"
+                    >
+                      <span>NEXT: {exercises[activeExerciseIdx + 1]?.name}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowEffortPrompt(false);
+                        setIsFinishModalOpen(true);
+                      }}
+                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none"
+                    >
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>FINISH WORKOUT</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* The One Set Focus Card */
+              <div className="card p-5 sm:p-6 bg-bg-card border border-border/80 shadow-md space-y-6 animate-fade-in">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Weight Stepper */}
+                  <div className="text-center space-y-2">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                      WEIGHT ({userUnit})
+                    </span>
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleWeightStep(activeSetIdx, -currentWeightStep)}
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={currentExercise.sets[activeSetIdx]?.weight ?? ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            handleSetWeightChange(activeSetIdx, val);
+                          }
+                        }}
+                        className="w-16 sm:w-20 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleWeightStep(activeSetIdx, currentWeightStep)}
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Reps Stepper */}
+                  <div className="text-center space-y-2">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                      REPS
+                    </span>
+                    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRepsStep(activeSetIdx, -1)}
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                      >
+                        -
+                      </button>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={currentExercise.sets[activeSetIdx]?.reps ?? ''}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*$/.test(val)) {
+                            handleSetRepsChange(activeSetIdx, val);
+                          }
+                        }}
+                        className="w-14 sm:w-16 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRepsStep(activeSetIdx, 1)}
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Giant Done Button */}
                 <button
                   type="button"
-                  onClick={() => handleToggleSetComplete(sIdx)}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
-                    set.completed
-                      ? 'bg-emerald-500 text-white shadow-sm'
-                      : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
+                  onClick={() => handleCompleteActiveSet(activeSetIdx)}
+                  className={`w-full py-4 rounded-xl text-base font-black tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${
+                    currentExercise.sets[activeSetIdx]?.completed
+                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
+                      : 'bg-accent hover:brightness-105 text-white shadow-accent/25'
                   }`}
-                  aria-label={set.completed ? "Completed set" : "Mark set complete"}
                 >
-                  <Check className={`w-5 h-5 stroke-[3] ${set.completed ? 'opacity-100' : 'opacity-0'}`} />
+                  <Check className="w-5 h-5 stroke-[3]" />
+                  <span>{currentExercise.sets[activeSetIdx]?.completed ? 'SET DONE ✓' : 'DONE'}</span>
                 </button>
               </div>
-            ))}
-          </div>
+            )}
 
-          {/* Add Set / Remove Set */}
-          <div className="pt-4 flex items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={handleAddSet}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 px-3 rounded-xl hover:bg-accent/10 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add Set</span>
-            </button>
-            {currentExercise.sets.length > 1 && (
+            {/* Quick Exercise Switcher Links */}
+            {!showEffortPrompt && (
+              <div className="flex items-center justify-between text-xs text-text-muted px-1 pt-1">
+                {activeExerciseIdx > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
+                    className="hover:text-text-primary flex items-center gap-1 py-1"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    <span>Previous</span>
+                  </button>
+                ) : <div />}
+
+                {activeExerciseIdx < exercises.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
+                    className="text-text-secondary hover:text-accent font-semibold flex items-center gap-1 py-1"
+                  >
+                    <span>Next: {exercises[activeExerciseIdx + 1]?.name}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsFinishModalOpen(true)}
+                    className="text-accent font-bold flex items-center gap-1 py-1"
+                  >
+                    <span>Finish workout</span>
+                    <Check className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            )}
+          </section>
+        ) : (
+          /* ── ADVANCED MODE: FULL MULTI-SET TABLE (Existing rich view) ── */
+          <section className="space-y-1">
+            <div className="divide-y divide-border/40">
+              {currentExercise.sets.map((set, sIdx) => (
+                <div
+                  key={sIdx}
+                  className="py-3 flex items-center justify-between gap-2"
+                >
+                  {/* Set number */}
+                  <div className="w-14 shrink-0">
+                    <span className="text-xs font-semibold text-text-muted">
+                      Set {sIdx + 1}
+                    </span>
+                  </div>
+
+                  {/* Weight & Reps inputs */}
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    {/* Weight Input */}
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={set.weight ?? ''}
+                        placeholder="0"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            handleSetWeightChange(sIdx, val);
+                          }
+                        }}
+                        onBlur={() => {
+                          const parsed = parseFloat(String(set.weight));
+                          handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
+                        }}
+                        className="w-12 sm:w-14 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
+                      />
+                      <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
+                    </div>
+
+                    <span className="text-text-muted font-medium text-xs">×</span>
+
+                    {/* Reps Input */}
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={set.reps ?? ''}
+                        placeholder="1"
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === '' || /^\d*$/.test(val)) {
+                            handleSetRepsChange(sIdx, val);
+                          }
+                        }}
+                        onBlur={() => {
+                          const parsed = parseInt(String(set.reps), 10);
+                          handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
+                        }}
+                        className="w-9 sm:w-11 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
+                      />
+                      <span className="text-2xs text-text-muted font-medium ml-0.5">reps</span>
+                    </div>
+
+                    {/* Effort / RPE badge */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cur = set.rpe || 8;
+                        const next = cur >= 10 ? 6 : cur + 0.5;
+                        handleRPESelect(sIdx, next);
+                      }}
+                      className="text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent active:scale-95 transition-all"
+                      title="Tap to adjust effort / RPE"
+                    >
+                      @{set.rpe || 8}
+                    </button>
+                  </div>
+
+                  {/* Checkmark Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSetComplete(sIdx)}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                      set.completed
+                        ? 'bg-emerald-500 text-white shadow-sm'
+                        : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
+                    }`}
+                    aria-label={set.completed ? "Completed set" : "Mark set complete"}
+                  >
+                    <Check className={`w-5 h-5 stroke-[3] ${set.completed ? 'opacity-100' : 'opacity-0'}`} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add Set / Remove Set */}
+            <div className="pt-4 flex items-center justify-center gap-4">
               <button
                 type="button"
-                onClick={() => handleRemoveSet(currentExercise.sets.length - 1)}
-                className="text-xs font-medium text-text-muted hover:text-danger py-2 px-3 rounded-xl hover:bg-danger/10 transition-colors"
+                onClick={handleAddSet}
+                className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 px-3 rounded-xl hover:bg-accent/10 transition-colors"
               >
-                Remove Set
+                <Plus className="w-4 h-4" />
+                <span>Add Set</span>
               </button>
-            )}
-          </div>
-        </section>
+              {currentExercise.sets.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleRemoveSet(currentExercise.sets.length - 1)}
+                  className="text-xs font-medium text-text-muted hover:text-danger py-2 px-3 rounded-xl hover:bg-danger/10 transition-colors"
+                >
+                  Remove Set
+                </button>
+              )}
+            </div>
+          </section>
+        )}
       </main>
 
       {/* ── Sticky Bottom Rest Timer (Clean, unboxed & focused) ────────── */}

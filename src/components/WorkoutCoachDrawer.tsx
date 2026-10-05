@@ -15,8 +15,10 @@ import {
   ArrowRight,
   CheckCircle2,
   RefreshCw,
-  Send
+  Send,
+  Flag
 } from 'lucide-react';
+import ReportAIModal from '@/components/ReportAIModal';
 
 interface WorkoutCoachDrawerProps {
   isOpen: boolean;
@@ -48,6 +50,7 @@ export default function WorkoutCoachDrawer({
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<AIWorkoutCommandResult | null>(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -207,9 +210,31 @@ export default function WorkoutCoachDrawer({
                 </button>
               </div>
             )}
+
+            {/* AI Disclosure & Reporting for Google Play compliance */}
+            <div className="flex items-center justify-between pt-1 border-t border-accent/20 text-3xs text-text-muted">
+              <span className="font-mono">✨ AI Generated • Not medical advice</span>
+              <button
+                type="button"
+                onClick={() => setIsReportOpen(true)}
+                className="hover:text-danger flex items-center gap-1 transition-colors cursor-pointer"
+                title="Report inaccurate or objectionable AI response"
+              >
+                <Flag className="w-2.5 h-2.5" />
+                <span>Report</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      <ReportAIModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        aiContentSnippet={response?.coachAdvice || response?.summary || ''}
+        sourceFeature="In-Workout Coach Drawer"
+        onReported={() => setResponse(null)}
+      />
     </div>
   );
 }

@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   Sparkles,
   Droplet,
-  Utensils
+  Utensils,
+  PhoneCall
 } from 'lucide-react';
 import type { Metadata } from 'next';
 
@@ -51,7 +52,7 @@ export default function DisclaimerPage() {
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Physical Activity Readiness &amp; Training Safety Protocols • Please Read Carefully
+          Physical Activity Readiness, Health Policies &amp; Play Store Compliance • Please Read Carefully
         </p>
       </div>
 
@@ -59,11 +60,25 @@ export default function DisclaimerPage() {
       <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs font-mono space-y-2">
         <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-          <span>NOT MEDICAL, CLINICAL OR PROFESSIONAL ATHLETIC ADVICE</span>
+          <span>NOT MEDICAL, CLINICAL OR PROFESSIONAL HEALTHCARE ADVICE</span>
         </div>
         <p className="text-2xs leading-relaxed">
           ASCEND is an analytical workout journal, mathematical strength standards calculator, and habit tracker. The features, 1RM estimations, AI coaching insights, workout plan generators, hydration targets, and nutritional calculations are provided solely for informational and motivational purposes. ASCEND does not provide medical advice, diagnosis, treatment, physical therapy, or individualized clinical prescriptions.
         </p>
+        <p className="text-2xs leading-relaxed font-bold text-amber-300">
+          Always seek the advice of a qualified physician or licensed healthcare provider with any questions you may have regarding a medical condition or before starting any new physical training program.
+        </p>
+      </div>
+
+      {/* Emergency Notice */}
+      <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 text-danger text-xs font-mono flex items-start gap-2.5">
+        <PhoneCall className="w-4 h-4 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <span className="font-bold block">MEDICAL EMERGENCY NOTICE</span>
+          <p className="text-2xs text-text-secondary leading-relaxed">
+            If you experience chest pain, sudden shortness of breath, severe dizziness, lightheadedness, or acute trauma during exercise, STOP IMMEDIATELY and contact your local emergency medical services (such as 911, 112, or your local emergency number) or go to the nearest emergency department.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-6 text-xs font-mono text-text-secondary leading-relaxed">
@@ -106,11 +121,11 @@ export default function DisclaimerPage() {
             </li>
             <li className="flex items-start gap-2 p-2.5 rounded-lg bg-bg-secondary border border-border/60">
               <CheckCircle2 className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
-              <span><strong>Valsalva Maneuver Awareness:</strong> Intra-abdominal pressure bracing temporarily spikes systolic and diastolic blood pressure. Lifters with cardiovascular or vascular conditions must exercise extreme caution.</span>
+              <span><strong>Valsalva Maneuver Awareness:</strong> Intra-abdominal pressure bracing temporarily spikes blood pressure. Lifters with cardiovascular or vascular conditions must exercise extreme caution.</span>
             </li>
             <li className="flex items-start gap-2 p-2.5 rounded-lg bg-bg-secondary border border-border/60">
               <CheckCircle2 className="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5" />
-              <span><strong>Warm-up Progression:</strong> Always ramp up gradually using the built-in Barbell Plate Calculator warm-up stages before handling working weights or attempting PRs.</span>
+              <span><strong>Warm-up Progression:</strong> Always ramp up gradually using warm-up stages before handling heavy working weights or attempting PRs.</span>
             </li>
           </ul>
         </section>
@@ -122,7 +137,7 @@ export default function DisclaimerPage() {
             3. AI Coach &amp; Automated Workout Plans
           </h2>
           <p className="text-2xs">
-            The AI Coach and split generators utilize heuristic algorithms and Google Gemini large language models. AI recommendations are synthetic and may not account for individual biomechanics, past injuries, structural asymmetries, or recovery limitations. Always use common sense and cease any exercise that causes sharp, joint, or neurological pain.
+            The AI Coach and workout split generators utilize heuristic algorithms and Google Gemini large language models. AI recommendations are synthetic and may not account for individual biomechanics, past injuries, structural asymmetries, or recovery limitations. Always use common sense and cease any exercise that causes sharp, joint, or neurological pain.
           </p>
         </section>
 
@@ -144,7 +159,7 @@ export default function DisclaimerPage() {
             5. Nutrition &amp; Macronutrient Estimations
           </h2>
           <p className="text-2xs">
-            Nutritional values retrieved via the barcode scanner, food staple database, and AI photo estimations are mathematical approximations. Variations exist between agricultural batches, restaurant preparations, and food formulations. These figures are not intended to treat metabolic disorders or eating conditions.
+            Nutritional values retrieved via the barcode scanner, food staple database, and AI photo estimations are mathematical approximations. Variations exist between agricultural batches, restaurant preparations, and food formulations. These figures are not intended to treat metabolic disorders, eating disorders, or medical conditions.
           </p>
         </section>
 

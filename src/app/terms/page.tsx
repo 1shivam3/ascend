@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { Dumbbell, ArrowLeft, Scale, Shield, AlertTriangle, FileText, CheckCircle2, Sparkles, HardDrive } from 'lucide-react';
+import { Dumbbell, ArrowLeft, Scale, Shield, AlertTriangle, FileText, CheckCircle2, Sparkles, HardDrive, Flag } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | ASCEND',
-  description: 'ASCEND Powerlifting WebApp Terms of Service and End-User Agreement. Medical disclaimers, local data ownership, AI feature terms, and limitations of liability.',
+  description: 'ASCEND Powerlifting & Fitness WebApp Terms of Service and End-User Agreement. Medical disclaimers, local data ownership, AI feature terms, and limitations of liability.',
 };
 
 export default function TermsPage() {
@@ -41,7 +41,7 @@ export default function TermsPage() {
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Effective Date: October 2026 • Version 2.2 • Global Agreement
+          Effective Date: October 2026 • Version 2.3 • Global &amp; Play Store Agreement
         </p>
       </div>
 
@@ -53,7 +53,7 @@ export default function TermsPage() {
         <ul className="space-y-1.5 text-2xs">
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>ASCEND is an analytical tracking journal, NOT a doctor, physical therapist, or clinical dietitian.</span>
+            <span>ASCEND is an analytical workout journal, NOT a doctor, physical therapist, or clinical dietitian.</span>
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
@@ -65,7 +65,7 @@ export default function TermsPage() {
           </li>
           <li className="flex items-start gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
-            <span>AI features are synthetic assistants; custom Gemini API keys remain strictly on your local device.</span>
+            <span>AI features are synthetic assistants with an integrated in-app reporting button for content review.</span>
           </li>
         </ul>
       </div>
@@ -75,13 +75,13 @@ export default function TermsPage() {
         {/* Section 1 */}
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary">
-            1. Acceptance of Terms &amp; Eligibility
+            1. Acceptance of Terms &amp; Age Eligibility
           </h2>
           <p className="text-2xs">
-            By accessing or using the ASCEND web application (&quot;ASCEND&quot;, &quot;Service&quot;, &quot;App&quot;), you confirm that you have read, understood, and agreed to be bound by these Terms of Service. If you do not agree, you must discontinue use immediately.
+            By accessing or using the ASCEND application (&quot;ASCEND&quot;, &quot;Service&quot;, &quot;App&quot;), you confirm that you have read, understood, and agreed to be bound by these Terms of Service. If you do not agree, you must discontinue use immediately.
           </p>
           <p className="text-2xs">
-            You must be at least 13 years of age (or the minimum age of digital consent in your jurisdiction) to use this Service. If you are under 18, you may use ASCEND only with the involvement and supervision of a parent or legal guardian.
+            You must be at least 13 years of age (or 16 years of age in jurisdictions subject to GDPR-K) to use this Service. If you are under 18, you may use ASCEND only with the active involvement and consent of a parent or legal guardian.
           </p>
         </section>
 
@@ -96,7 +96,7 @@ export default function TermsPage() {
               <strong>WARNING:</strong> Weightlifting, powerlifting, and maximal strength attempts (such as 1-Rep Max squats, bench presses, and deadlifts) involve intrinsic physical hazards, including musculoskeletal strains, tears, joint injuries, drops, and acute cardiovascular strain.
             </p>
             <p>
-              ASCEND provides mathematical estimations (e.g. Epley formula, DOTS coefficients, warm-up plate breakdowns) for informational and entertainment purposes only. ASCEND does not provide professional medical diagnosis, treatment, or individualized coaching.
+              ASCEND provides mathematical estimations (e.g. Epley formula, DOTS coefficients, warm-up plate breakdowns) for informational and entertainment purposes only. ASCEND does not provide professional medical diagnosis, clinical treatment, or individualized medical coaching.
             </p>
             <p>
               You expressly agree that your participation in athletic activities tracked via ASCEND is voluntary, and you assume full responsibility for any risks, injuries, or damages that may arise. Always consult a physician before engaging in strenuous resistance programs.
@@ -122,13 +122,16 @@ export default function TermsPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-1.5">
             <Sparkles className="w-4 h-4 text-accent" />
-            4. Generative AI Features &amp; Third-Party Services
+            4. Generative AI Terms, Reporting &amp; Prohibited Conduct
           </h2>
           <p className="text-2xs">
-            ASCEND provides optional AI-assisted features (AI Coach, Meal Vision Scanning, Natural Language Parsing) powered by Google Gemini. Output generated by AI is synthetic and probabilistic. ASCEND does not warrant the clinical accuracy of AI nutrition estimates or the fitness suitability of AI training splits.
+            ASCEND provides optional AI-assisted features (AI Coach, Meal Vision Scanning, Natural Language Voice Logger) powered by Google Gemini. Output generated by AI is synthetic and probabilistic. ASCEND does not warrant the clinical accuracy of AI nutrition estimates or the fitness suitability of AI training splits.
           </p>
           <p className="text-2xs">
-            Users who configure custom Gemini API keys are responsible for complying with Google&apos;s API Terms of Service and managing their own API quotas.
+            Users agree NOT to use AI features to generate abusive, offensive, defamatory, or harmful content, or to attempt prompt injection attacks against the service.
+          </p>
+          <p className="text-2xs">
+            <strong>In-App Reporting:</strong> If you receive any objectionable, unsafe, or inappropriate AI output, you must report it using the integrated in-app flag button. Flagged content is immediately suppressed and logged for safety review in compliance with Google Play Store AI Policies.
           </p>
         </section>
 
@@ -168,7 +171,7 @@ export default function TermsPage() {
             8. Contact &amp; Updates to Terms
           </h2>
           <p className="text-2xs">
-            We reserve the right to modify these Terms of Service at any time. Continued use of the application following any modifications signifies your acceptance of the updated terms.
+            We reserve the right to modify these Terms of Service at any time. Continued use of the application following any modifications signifies your acceptance of the updated terms. For legal inquiries, contact <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">support@ascendfit.app</a>.
           </p>
         </section>
       </div>

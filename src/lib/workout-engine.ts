@@ -1,5 +1,6 @@
-import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit } from './types';
+import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule } from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax } from './strength-standards';
+import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 
 /**
  * Finds the most recent performance of a given exercise across past workouts.
@@ -531,6 +532,10 @@ export interface TodaySessionInfo {
   volumeKg?: number;
   durationMin?: number;
   prCount?: number;
+  isRestDay?: boolean;
+  scheduledDay?: string;
+  bodyParts?: string[];
+  plannedWorkoutId?: string;
 }
 
 /**
@@ -541,7 +546,8 @@ export function getTodaySessionState(
   workouts: WorkoutEntry[],
   plannedWorkouts: { id: string; name: string; exercises: { name: string }[] }[],
   activeDraft: { exercises: { name: string }[]; startedFromPlan?: string | null; name?: string } | null,
-  userUnit: 'kg' | 'lbs' = 'kg'
+  userUnit: 'kg' | 'lbs' = 'kg',
+  weeklySchedule?: WeeklySchedule
 ): TodaySessionInfo {
   // 1. In-progress draft takes highest priority
   if (activeDraft && activeDraft.exercises && activeDraft.exercises.length > 0) {
@@ -590,7 +596,66 @@ export function getTodaySessionState(
     };
   }
 
-  // 3. User has a planned routine
+  // 3. User has a weekly schedule or planned routine
+  if (weeklySchedule) {
+    const todayDay = getTodayDayOfWeek(todayStr);
+    const dayConfig = weeklySchedule[todayDay];
+
+    if (dayConfig) {
+      if (dayConfig.workoutPlanId === 'rest') {
+        return {
+          status: 'planned',
+          title: dayConfig.customTitle || 'Rest & Recovery',
+          subtitle: 'Scheduled Rest Day • Hydrate, sleep, and hit your protein target',
+          exercises: [],
+          primaryActionLabel: 'Start Workout Anyway',
+          isDraft: false,
+          isDone: false,
+          isRestDay: true,
+          scheduledDay: todayDay,
+          bodyParts: [],
+        };
+      }
+
+      const matchedPlan = plannedWorkouts.find(
+        (p) => p.id === dayConfig.workoutPlanId || p.name.toLowerCase() === dayConfig.workoutPlanId?.toLowerCase()
+      );
+
+      if (matchedPlan) {
+        const exNames = matchedPlan.exercises.map((e) => e.name);
+        const firstEx = matchedPlan.exercises[0];
+        let loadHint: string | undefined = undefined;
+        if (firstEx) {
+          const pastPerf = getLastExercisePerformance(firstEx.name, workouts);
+          if (pastPerf && pastPerf.bestWeight > 0) {
+            loadHint = `Last: ${pastPerf.bestWeight}${userUnit} × ${pastPerf.bestReps}`;
+          }
+        }
+
+        const bodyParts =
+          dayConfig.bodyParts && dayConfig.bodyParts.length > 0
+            ? dayConfig.bodyParts
+            : getWorkoutBodyParts(matchedPlan.exercises);
+
+        return {
+          status: 'planned',
+          title: matchedPlan.name,
+          subtitle: bodyParts.length > 0 ? bodyParts.join(' • ') : exNames.slice(0, 4).join(', '),
+          exercises: exNames,
+          firstExerciseLoadHint: loadHint,
+          primaryActionLabel: `Start: ${matchedPlan.name}`,
+          isDraft: false,
+          isDone: false,
+          isRestDay: false,
+          scheduledDay: todayDay,
+          bodyParts,
+          plannedWorkoutId: matchedPlan.id,
+        };
+      }
+    }
+  }
+
+  // Fallback to first plan if schedule didn't match
   if (plannedWorkouts && plannedWorkouts.length > 0) {
     const plan = plannedWorkouts[0];
     const exNames = plan.exercises.map((e) => e.name);
@@ -603,15 +668,20 @@ export function getTodaySessionState(
       }
     }
 
+    const bodyParts = getWorkoutBodyParts(plan.exercises);
+
     return {
       status: 'planned',
       title: plan.name,
-      subtitle: exNames.slice(0, 4).join(', '),
+      subtitle: bodyParts.length > 0 ? bodyParts.join(' • ') : exNames.slice(0, 4).join(', '),
       exercises: exNames,
       firstExerciseLoadHint: loadHint,
       primaryActionLabel: `Start: ${plan.name}`,
       isDraft: false,
       isDone: false,
+      isRestDay: false,
+      bodyParts,
+      plannedWorkoutId: plan.id,
     };
   }
 

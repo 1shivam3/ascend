@@ -26,9 +26,14 @@ import {
   TrainingDecision,
   LifterTwinProfile,
   AthleteGoal,
+  UserMode,
+  DayOfWeek,
+  DayScheduleConfig,
+  WeeklySchedule,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile } from './lifter-twin';
+import { buildDefaultWeeklySchedule } from './workout-schedule';
 
 export * from './types';
 
@@ -60,6 +65,11 @@ export interface AppState {
   goals: AthleteGoal[];
   setGoals: (goals: AthleteGoal[]) => void;
   toggleGoal: (goal: AthleteGoal) => void;
+
+  // Athlete Experience Mode (Beginner vs Advanced)
+  userMode: UserMode;
+  setUserMode: (mode: UserMode) => void;
+  toggleUserMode: () => void;
 
   // Active workout persistence
   activeWorkoutDraft: ActiveWorkoutDraft | null;
@@ -118,6 +128,11 @@ export interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
+
+  // Weekly Workout Schedule & Body Parts
+  weeklySchedule: WeeklySchedule;
+  setWeeklySchedule: (schedule: WeeklySchedule) => void;
+  setDaySchedule: (day: DayOfWeek, config: DayScheduleConfig) => void;
 
   addFavoriteFood: (food: Omit<FavoriteFood, 'id'>) => void;
   updateFavoriteFood: (id: string, updated: Partial<FavoriteFood>) => void;
@@ -238,6 +253,29 @@ export const useAppStore = create<AppState>()(
           profile: state.profile ? { ...state.profile, goals: next } : null,
         };
       }),
+
+      // Athlete Experience Mode (Beginner vs Advanced)
+      userMode: 'beginner',
+      setUserMode: (userMode) => set({ userMode }),
+      toggleUserMode: () => set((state) => ({ userMode: state.userMode === 'beginner' ? 'advanced' : 'beginner' })),
+
+      // Weekly Workout Schedule & Body Parts
+      weeklySchedule: {
+        monday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        wednesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        friday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+        sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      },
+      setWeeklySchedule: (weeklySchedule) => set({ weeklySchedule }),
+      setDaySchedule: (day, config) => set((state) => ({
+        weeklySchedule: {
+          ...state.weeklySchedule,
+          [day]: config,
+        },
+      })),
 
       // Active workout persistence
       activeWorkoutDraft: null,
@@ -443,16 +481,31 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
-      addPlannedWorkout: (plan) => set((state) => ({
-        plannedWorkouts: [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())]
-      })),
+      addPlannedWorkout: (plan) => set((state) => {
+        const nextPlans = [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())];
+        const currentSched = state.weeklySchedule;
+        const hasAssignedDays = currentSched && Object.values(currentSched).some(d => d.workoutPlanId && d.workoutPlanId !== 'rest');
+        const nextSchedule = hasAssignedDays ? currentSched : buildDefaultWeeklySchedule(nextPlans, state.trainingProfile?.daysPerWeek || 4);
+        return {
+          plannedWorkouts: nextPlans,
+          weeklySchedule: nextSchedule,
+        };
+      }),
       updatePlannedWorkout: (id, plan) => set((state) => ({
         plannedWorkouts: state.plannedWorkouts.map(p => p.id === id ? plan : p)
       })),
       deletePlannedWorkout: (id) => set((state) => ({
         plannedWorkouts: state.plannedWorkouts.filter(p => p.id !== id)
       })),
-      setPlannedWorkouts: (plans) => set({ plannedWorkouts: plans }),
+      setPlannedWorkouts: (plans) => set((state) => {
+        const currentSched = state.weeklySchedule;
+        const hasAssignedDays = currentSched && Object.values(currentSched).some(d => d.workoutPlanId && d.workoutPlanId !== 'rest');
+        const nextSchedule = hasAssignedDays ? currentSched : buildDefaultWeeklySchedule(plans, state.trainingProfile?.daysPerWeek || 4);
+        return {
+          plannedWorkouts: plans,
+          weeklySchedule: nextSchedule,
+        };
+      }),
 
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [
@@ -839,6 +892,8 @@ export const useAppStore = create<AppState>()(
             decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
             lifterProfile: data.lifterProfile || state.lifterProfile,
             goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
+            userMode: data.userMode || state.userMode,
+            weeklySchedule: data.weeklySchedule && typeof data.weeklySchedule === 'object' ? data.weeklySchedule : state.weeklySchedule,
           }));
           return true;
         } catch {
@@ -930,6 +985,8 @@ export const useAppStore = create<AppState>()(
         decisionsLedgerHistory: state.decisionsLedgerHistory,
         lifterProfile: state.lifterProfile,
         goals: state.goals,
+        userMode: state.userMode,
+        weeklySchedule: state.weeklySchedule,
       })
     }
   )

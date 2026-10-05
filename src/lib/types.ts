@@ -1,6 +1,7 @@
 export type Gender = 'male' | 'female';
 export type Unit = 'kg' | 'lbs';
 export type Theme = 'dark' | 'light';
+export type UserMode = 'beginner' | 'advanced';
 
 export type AthleteGoal = 'build_muscle' | 'get_stronger' | 'lose_fat' | 'stamina' | 'general_fitness';
 
@@ -102,6 +103,7 @@ export interface UserProfile {
   unit: Unit;
   createdAt: string;
   goals?: AthleteGoal[];
+  userMode?: UserMode;
 }
 
 export interface PersonalRecord {
@@ -222,6 +224,16 @@ export interface FavoriteFood {
 }
 
 export type DayType = 'training' | 'rest';
+
+export type DayOfWeek = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday';
+
+export interface DayScheduleConfig {
+  workoutPlanId?: string | 'rest'; // ID of PlannedWorkout or 'rest'
+  customTitle?: string;            // e.g. "Chest & Triceps"
+  bodyParts?: string[];            // e.g. ["Chest", "Arms"]
+}
+
+export type WeeklySchedule = Record<DayOfWeek, DayScheduleConfig>;
 
 export interface HydrationConfig {
   baseMl?: number;
