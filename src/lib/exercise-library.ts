@@ -158,3 +158,28 @@ export function searchExercises(
 export function getAllExerciseNames(): string[] {
   return EXERCISE_LIBRARY.map((e) => e.name);
 }
+
+/**
+ * Resolves any exercise name (including custom or partial names) to its target MuscleGroup.
+ */
+export function getExerciseMuscle(name: string): MuscleGroup {
+  if (!name || typeof name !== 'string') return 'Chest';
+  const clean = name.toLowerCase().trim();
+  const direct = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === clean);
+  if (direct) return direct.muscle;
+
+  const partial = EXERCISE_LIBRARY.find(
+    (e) => clean.includes(e.name.toLowerCase()) || e.name.toLowerCase().includes(clean)
+  );
+  if (partial) return partial.muscle;
+
+  // Keyword heuristic matching
+  if (clean.includes('bench') || clean.includes('chest') || clean.includes('fly') || clean.includes('pec') || clean.includes('push-up') || clean.includes('pushup')) return 'Chest';
+  if (clean.includes('pull') || clean.includes('row') || clean.includes('lat') || clean.includes('deadlift') || clean.includes('chin') || clean.includes('shrug')) return 'Back';
+  if (clean.includes('squat') || clean.includes('leg') || clean.includes('lunge') || clean.includes('calf') || clean.includes('calves') || clean.includes('quad') || clean.includes('hamstring') || clean.includes('rdl')) return 'Legs';
+  if (clean.includes('press') || clean.includes('overhead') || clean.includes('shoulder') || clean.includes('lateral raise') || clean.includes('delt') || clean.includes('ohp')) return 'Shoulders';
+  if (clean.includes('curl') || clean.includes('tricep') || clean.includes('bicep') || clean.includes('skull') || clean.includes('dip') || clean.includes('arm')) return 'Arms';
+  if (clean.includes('abs') || clean.includes('crunch') || clean.includes('plank') || clean.includes('core') || clean.includes('twist')) return 'Core';
+
+  return 'Chest';
+}

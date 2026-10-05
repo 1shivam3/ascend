@@ -146,20 +146,40 @@ export default function PostWorkoutTakeModal({
 
         {/* New PR Milestone Banner (if achieved) */}
         {todayPRs.length > 0 && (
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-1.5 animate-scale-in">
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 animate-scale-in">
             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
               <Zap className="w-4 h-4 fill-amber-500" />
               <span>{todayPRs.length} NEW PERSONAL RECORD{todayPRs.length > 1 ? 'S' : ''} DETECTED!</span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {todayPRs.map((pr) => (
-                <span
-                  key={pr.id}
-                  className="px-2 py-0.5 rounded-md bg-bg-card border border-amber-500/40 text-2xs font-mono text-text-primary font-semibold"
-                >
-                  {pr.exercise}: {userUnit === 'lbs' ? pr.weightLbs : pr.weightKg} {userUnit} × {pr.reps}
-                </span>
-              ))}
+            <div className="space-y-1.5">
+              {todayPRs.map((pr) => {
+                const isRepPR = pr.prType === 'reps' || pr.notes?.includes('Rep PR');
+                const displayWeight = userUnit === 'lbs' ? pr.weightLbs : pr.weightKg;
+                return (
+                  <div
+                    key={pr.id}
+                    className="flex items-center justify-between p-2 rounded-xl bg-bg-card/90 border border-amber-500/30 text-xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{isRepPR ? '⚡' : '🥇'}</span>
+                      <div>
+                        <span className="font-bold text-text-primary block">{pr.exercise}</span>
+                        <span className="text-3xs text-text-muted font-mono">
+                          {isRepPR ? (pr.notes || 'Rep Milestone') : `1RM: ${userUnit === 'lbs' ? Math.round(pr.oneRepMax * 2.20462) : pr.oneRepMax} ${userUnit}`}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono">
+                      <span className="font-black text-amber-400 text-xs block">
+                        {displayWeight} {userUnit} × {pr.reps}
+                      </span>
+                      <span className="text-[10px] text-text-muted uppercase font-sans font-semibold">
+                        {isRepPR ? 'Rep PR' : '1RM PR'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

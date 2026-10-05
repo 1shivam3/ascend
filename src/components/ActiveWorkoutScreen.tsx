@@ -48,6 +48,15 @@ interface ActiveWorkoutScreenProps {
   onCancel: () => void;
 }
 
+function getPlateSummary(targetWeight: number, unit: 'kg' | 'lbs' = 'kg'): string | null {
+  const barWeight = unit === 'lbs' ? 45 : 20;
+  if (!targetWeight || targetWeight <= barWeight) return null;
+  const res = calculatePlates(targetWeight, barWeight, unit);
+  if (!res.plates || res.plates.length === 0) return null;
+  const parts = res.plates.map((p) => (p.count > 1 ? `${p.count}×${p.weight}` : `${p.weight}`));
+  return `${parts.join(' + ')} /side`;
+}
+
 export default function ActiveWorkoutScreen({
   initialExercises,
   workoutName = 'Workout Session',
@@ -213,6 +222,10 @@ export default function ActiveWorkoutScreen({
 
   const isCurrentBodyweight = useMemo(() => {
     return isBodyweightExercise(currentExercise?.name || '');
+  }, [currentExercise?.name]);
+
+  const isCurrentBarbell = useMemo(() => {
+    return getEquipmentType(currentExercise?.name || '') === 'barbell';
   }, [currentExercise?.name]);
 
   useEffect(() => {
@@ -859,7 +872,10 @@ export default function ActiveWorkoutScreen({
       const currentBest1RMKg =
         existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
 
+      // PR detection (Both 1RM PRs and Rep PRs at working loads)
       let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
+      let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
+
       for (const s of ex.sets) {
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
@@ -869,6 +885,35 @@ export default function ActiveWorkoutScreen({
           const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
           if (e1rm > topSet.e1RMKg) {
             topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
+          }
+
+          // Scan past workouts to check if this is a Rep PR at this specific working weight
+          let maxPrevRepsAtWeight = 0;
+          for (const pastWk of workouts) {
+            for (const pastEx of pastWk.exercises) {
+              if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
+                for (const pastSet of pastEx.sets) {
+                  const pw = parseFloat(String(pastSet.weight)) || 0;
+                  const pr = parseInt(String(pastSet.reps), 10) || 0;
+                  const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
+                  if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
+                    maxPrevRepsAtWeight = pr;
+                  }
+                }
+              }
+            }
+          }
+
+          if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
+            if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
+              bestRepPR = {
+                weightKg: Math.round(wKg * 10) / 10,
+                weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
+                reps: sReps,
+                prevReps: maxPrevRepsAtWeight,
+                e1RMKg: Math.round(e1rm * 10) / 10,
+              };
+            }
           }
         }
       }
@@ -883,7 +928,22 @@ export default function ActiveWorkoutScreen({
           reps: topSet.reps,
           oneRepMax: topSet.e1RMKg,
           date: today,
-          notes: 'Auto-detected from active workout session',
+          notes: 'All-Time 1RM PR',
+          prType: '1rm',
+        });
+        newPRsCount++;
+      } else if (bestRepPR) {
+        const prId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pr_rep_${Date.now()}`;
+        addPR({
+          id: prId,
+          exercise: ex.name,
+          weightKg: bestRepPR.weightKg,
+          weightLbs: bestRepPR.weightLbs,
+          reps: bestRepPR.reps,
+          oneRepMax: bestRepPR.e1RMKg,
+          date: today,
+          notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
+          prType: 'reps',
         });
         newPRsCount++;
       }
@@ -1349,6 +1409,17 @@ export default function ActiveWorkoutScreen({
                             {(parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0) === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
                           </span>
                         )}
+                        {isCurrentBarbell && (
+                          (() => {
+                            const w = parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0;
+                            const plates = getPlateSummary(w, userUnit);
+                            return plates ? (
+                              <span className="text-[10px] font-mono font-medium text-accent/90 mt-0.5" title={plates}>
+                                [{plates}]
+                              </span>
+                            ) : null;
+                          })()
+                        )}
                       </div>
                       <button
                         type="button"
@@ -1468,26 +1539,39 @@ export default function ActiveWorkoutScreen({
                   {/* Weight & Reps inputs */}
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Weight Input */}
-                    <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={set.weight ?? ''}
-                        placeholder="0"
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            handleSetWeightChange(sIdx, val);
-                          }
-                        }}
-                        onBlur={() => {
-                          const parsed = parseFloat(String(set.weight));
-                          handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
-                        }}
-                        className="w-12 sm:w-14 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
-                      />
-                      <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
+                    <div className="flex flex-col items-center">
+                      <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={set.weight ?? ''}
+                          placeholder="0"
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                              handleSetWeightChange(sIdx, val);
+                            }
+                          }}
+                          onBlur={() => {
+                            const parsed = parseFloat(String(set.weight));
+                            handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
+                          }}
+                          className="w-12 sm:w-14 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
+                        />
+                        <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
+                      </div>
+                      {isCurrentBarbell && (
+                        (() => {
+                          const w = parseFloat(String(set.weight)) || 0;
+                          const plates = getPlateSummary(w, userUnit);
+                          return plates ? (
+                            <span className="text-[9px] font-mono text-accent/80 mt-0.5 truncate max-w-[100px] text-center" title={plates}>
+                              {plates}
+                            </span>
+                          ) : null;
+                        })()
+                      )}
                     </div>
 
                     <span className="text-text-muted font-medium text-xs">×</span>
@@ -1567,6 +1651,44 @@ export default function ActiveWorkoutScreen({
                 </button>
               )}
             </div>
+
+            {/* Exercise Completion Auto-Advance Prompt (Advanced Mode) */}
+            {currentExercise.sets.length > 0 && currentExercise.sets.every((s) => s.completed) && (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-bg-card to-accent/15 border border-emerald-500/40 flex items-center justify-between gap-3 animate-fade-in my-3 shadow-md">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
+                    ✓
+                  </div>
+                  <div>
+                    <p className="text-xs font-black text-text-primary">
+                      {currentExercise.name} Complete!
+                    </p>
+                    <p className="text-3xs text-text-muted">
+                      All {currentExercise.sets.length} sets logged successfully
+                    </p>
+                  </div>
+                </div>
+                {activeExerciseIdx < exercises.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
+                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                  >
+                    <span>Next: {exercises[activeExerciseIdx + 1]?.name}</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsFinishModalOpen(true)}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Finish Workout</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Next Exercise / Finish CTA in Advanced Mode */}
             <div className="pt-4 pb-2 space-y-2">

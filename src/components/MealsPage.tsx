@@ -134,7 +134,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [expandedMeals,        setExpandedMeals]        = useState<Set<string>>(new Set());
   const [showAllStaples,       setShowAllStaples]       = useState(false);
   const [selectedEatPreference, setSelectedEatPreference] = useState<'staples' | 'shake' | 'high_protein' | 'light' | null>(null);
-  const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(false);
+  const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(true);
   const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
 
@@ -1809,9 +1809,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               className="w-full flex items-center justify-between p-3 hover:bg-bg-secondary/40 transition-colors text-left"
             >
               <div className="flex items-center gap-2">
-                <Clock className="w-3.5 h-3.5 text-accent" />
+                <Zap className="w-3.5 h-3.5 text-accent" />
                 <span className="text-[11px] font-bold text-text-primary uppercase tracking-wider font-mono">
-                  RECENT MEALS (1-TAP REPEAT)
+                  QUICK LOG YOUR USUAL (1-TAP)
                 </span>
                 <span className="text-2xs font-mono font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent">
                   {recentUniqueMeals.length}
@@ -1825,7 +1825,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {isRecentMealsOpen && (
               <div className="p-3 pt-0 border-t border-border/40">
-                <div className="flex gap-2 overflow-x-auto pb-1 pt-2 scrollbar-none">
+                <div className="flex gap-2.5 overflow-x-auto pb-1 pt-2 scrollbar-none">
                   {recentUniqueMeals.map((meal) => {
                     const mMacros = calculateMealMacros(meal.foods);
                     const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
@@ -1835,7 +1835,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     return (
                       <div
                         key={meal.id}
-                        className="flex-shrink-0 p-2.5 rounded-xl bg-bg-secondary/70 border border-border min-w-[210px] max-w-[260px] space-y-1.5 shadow-xs flex flex-col justify-between"
+                        className="flex-shrink-0 p-3 rounded-2xl bg-bg-secondary/80 border border-border min-w-[220px] max-w-[270px] space-y-2 shadow-xs flex flex-col justify-between hover:border-accent/40 transition-colors"
                       >
                         <div>
                           <div className="flex items-center justify-between gap-1">
@@ -1847,18 +1847,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           <div className="text-2xs text-text-muted truncate mt-0.5" title={meal.foods.map((f) => f.name).join(', ')}>
                             {meal.foods.map((f) => f.name).join(', ')}
                           </div>
-                          <div className="text-2xs text-text-muted mt-1">
-                            {meal.foods.length} items • <span className="text-accent font-semibold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-500 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
+                          <div className="text-2xs text-text-muted mt-1.5 font-mono">
+                            <span className="text-accent font-bold">~{Math.round(mMacros.calories)} kcal</span> • <span className="text-emerald-500 font-bold">~{Math.round(mMacros.proteinG)}g P</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 pt-1">
                           <button
                             type="button"
                             onClick={() => handleLogFrequentMeal(meal)}
-                            className="btn-primary flex-1 py-1 text-2xs font-semibold flex items-center justify-center gap-1"
+                            className="btn-primary flex-1 py-1.5 text-xs font-bold flex items-center justify-center gap-1 shadow-xs"
                           >
-                            <Plus className="w-3 h-3" />
-                            <span>Repeat Today</span>
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Log for Today</span>
                           </button>
                           <button
                             type="button"

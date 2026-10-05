@@ -135,7 +135,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Today's workout session state (single source of truth)
   const sessionInfo = useMemo(() => {
-    return getTodaySessionState(
+    const raw = getTodaySessionState(
       todayStr,
       workouts,
       plannedWorkouts,
@@ -143,6 +143,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       userUnit,
       weeklySchedule
     );
+    // If the athlete has 0 workouts logged ever, override rest day so they start Day 1 immediately!
+    if (workouts.length === 0 && !activeWorkoutDraft && raw.status !== 'completed') {
+      return {
+        ...raw,
+        isRestDay: false,
+        title: raw.isRestDay ? 'Day 1 — Foundation Workout' : raw.title,
+        status: 'not_started' as const,
+        exercises: (raw.exercises && raw.exercises.length > 0)
+          ? raw.exercises
+          : ['Bench Press', 'Barbell Squat', 'Lat Pulldown', 'Overhead Press'],
+      };
+    }
+    return raw;
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
   // Top focus lift for today
@@ -345,6 +358,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 ? 'TODAY COMPLETED'
                 : sessionInfo.status === 'in_progress'
                 ? 'IN PROGRESS'
+                : workouts.length === 0
+                ? 'DAY 1 STARTS TODAY'
                 : `TODAY'S MISSION`}
             </span>
           </div>
@@ -414,6 +429,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 ? 'RESUME ACTIVE WORKOUT'
                 : sessionInfo.status === 'completed'
                 ? 'VIEW TODAY\'S LOG'
+                : workouts.length === 0
+                ? 'START DAY 1 WORKOUT'
                 : sessionInfo.isRestDay
                 ? 'TRAIN ANYWAY'
                 : 'START WORKOUT'}

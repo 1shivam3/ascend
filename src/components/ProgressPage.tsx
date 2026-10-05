@@ -33,6 +33,7 @@ import LifterProfileView from '@/components/LifterProfileView';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import ProgressChart from '@/components/ProgressChart';
 import BodyweightChart from '@/components/BodyweightChart';
+import MuscleVolumeLandmarks from '@/components/MuscleVolumeLandmarks';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import { plural } from '@/lib/formatters';
@@ -372,6 +373,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
               {/* Interactive e1RM Strength Trend Line per Lift */}
               {!isPowerlifter && <ProgressChart />}
+
+              {/* Weekly Hypertrophy Muscle Volume Landmarks */}
+              <MuscleVolumeLandmarks />
 
               {/* Big 3 Total & Official DOTS Rating Card */}
               <div className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">

@@ -116,6 +116,7 @@ export interface PersonalRecord {
   date: string;
   notes?: string;
   isBaseline?: boolean;
+  prType?: '1rm' | 'reps';
 }
 
 export interface WorkoutSet {
