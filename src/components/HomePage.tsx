@@ -18,7 +18,7 @@ import {
   Target,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { isMainCompoundLift, suggestLoad } from '@/lib/strength-standards';
+import { suggestLoad } from '@/lib/strength-standards';
 import { getDailyQuote } from '@/lib/quotes';
 import SettingsModal from '@/components/SettingsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
@@ -31,7 +31,7 @@ import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
-import { getTodaySessionState, getLastExercisePerformance } from '@/lib/workout-engine';
+import { getTodaySessionState } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO } from '@/lib/workout-schedule';
 import { plural } from '@/lib/formatters';
 
@@ -183,44 +183,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }
     return null;
   }, [weeklySchedule, plannedWorkouts]);
-
-  // Top focus lift for today
-  const topFocus = useMemo(() => {
-    const exercises = sessionInfo.exercises || [];
-    const compoundName = exercises.find((name) => isMainCompoundLift(name)) || exercises[0] || 'Bench Press';
-    const lastPerf = getLastExercisePerformance(compoundName, workouts);
-    const baselinePR = prs.find((p) => p.exercise.toLowerCase() === compoundName.toLowerCase());
-
-    const targetReps = primaryGoal === 'get_stronger' ? 4 : 8;
-    const targetRPE = 8;
-    let targetLoadStr = '';
-
-    if (lastPerf?.bestWeight && lastPerf.bestWeight > 0) {
-      const step = userUnit === 'lbs' ? 5 : 2.5;
-      const targetWeight = lastPerf.bestWeight + step;
-      targetLoadStr = `${targetWeight} ${userUnit} × ${targetReps} @${targetRPE}`;
-    } else if (baselinePR && baselinePR.oneRepMax > 0) {
-      const suggested = suggestLoad(baselinePR.oneRepMax, targetReps, targetRPE, userUnit);
-      targetLoadStr = `${suggested} ${userUnit} × ${targetReps} @${targetRPE}`;
-    } else {
-      const defaultLoad = userUnit === 'lbs' ? 135 : 60;
-      targetLoadStr = `${defaultLoad} ${userUnit} × ${targetReps} @${targetRPE}`;
-    }
-
-    let lastDisplay = 'Last: —';
-    if (lastPerf) {
-      lastDisplay = `Last: ${lastPerf.summary}`;
-    } else if (baselinePR && workouts.length === 0) {
-      const w = userUnit === 'lbs' ? baselinePR.weightLbs : baselinePR.weightKg;
-      lastDisplay = `Base: ${w} × ${baselinePR.reps}`;
-    }
-
-    return {
-      name: compoundName,
-      targetLoadStr,
-      lastDisplay,
-    };
-  }, [sessionInfo.exercises, workouts, prs, primaryGoal, userUnit]);
 
   // Weekly consistency: M T W T F S S
   const weeklyStats = useMemo(() => {
@@ -451,56 +413,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── QUICK ACTIONS STRIP ────────────────────────────────────────────── */}
-      <section className="grid grid-cols-3 gap-2">
-        <button
-          type="button"
-          onClick={() => onNavigate('workout')}
-          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
-        >
-          <div className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
-            <Play className="w-3.5 h-3.5 fill-accent" />
-          </div>
-          <span className="font-black text-xs text-text-primary block font-sans">
-            Train
-          </span>
-          <span className="text-3xs text-text-muted font-mono truncate block">
-            {activeWorkoutDraft ? 'Resume Draft' : 'Log / Plans'}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('meals')}
-          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
-        >
-          <div className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
-            <UtensilsCrossed className="w-3.5 h-3.5" />
-          </div>
-          <span className="font-black text-xs text-text-primary block font-sans">
-            Fuel
-          </span>
-          <span className="text-3xs text-text-muted font-mono truncate block">
-            {fuelStats.calories} / {fuelStats.targetCalories} kcal
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => onNavigate('prs')}
-          className="p-3 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 text-left transition-all active:scale-[0.98] shadow-xs group"
-        >
-          <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-500 flex items-center justify-center mb-1.5 group-hover:scale-105 transition-transform">
-            <Trophy className="w-3.5 h-3.5" />
-          </div>
-          <span className="font-black text-xs text-text-primary block font-sans">
-            Records
-          </span>
-          <span className="text-3xs text-text-muted font-mono truncate block">
-            {prs.length} PRs Logged
-          </span>
-        </button>
-      </section>
 
       {/* Empathetic Missed Workout Catch-Up Prompt */}
       {missedWorkoutCatchUp && (
@@ -722,39 +634,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </section>
 
-      {/* ── 4. STRENGTH OVERLOAD FOCUS ────────────────────────────────────── */}
-      <section className="card p-4 sm:p-5 bg-bg-card border border-border/80 rounded-3xl space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="w-4 h-4 text-accent" />
-            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-              {sessionInfo.isRestDay ? 'UPCOMING FOCUS' : 'KEY LIFT TODAY'}
-            </span>
-          </div>
-          <span className="text-3xs font-mono text-text-muted">
-            {topFocus.lastDisplay}
-          </span>
-        </div>
-
-        <div className="flex items-baseline justify-between pt-0.5">
-          <h3 className="text-base font-bold text-text-primary font-sans">
-            {topFocus.name}
-          </h3>
-          <span className="text-sm sm:text-base font-black text-accent font-mono tracking-tight">
-            {topFocus.targetLoadStr}
-          </span>
-        </div>
-        {(!prs || prs.length === 0) && workouts.length === 0 && (
-          <button
-            type="button"
-            onClick={() => onNavigate('prs')}
-            className="pt-1 text-2xs font-semibold text-accent hover:underline flex items-center gap-1 transition-colors"
-          >
-            <span>Calibrate Your Baseline Lifts</span>
-            <ChevronRight className="w-3 h-3" />
-          </button>
-        )}
-      </section>
 
       {/* ── 5. THIS WEEK CONSISTENCY ──────────────────────────────────────── */}
       <section className="card p-4 bg-bg-card border border-border/80 rounded-3xl space-y-2.5">
