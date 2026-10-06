@@ -20,3 +20,5 @@ next-env.d.ts
 .agent/
 .gemini/
 .gsd/
+.hermes/
+.roo/
