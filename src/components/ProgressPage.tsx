@@ -98,10 +98,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   }, [profile, bigThreeStats.totalKg]);
   const dotsClassification = useMemo(() => getDOTSClassification(dotsScore), [dotsScore]);
 
-  // ── Bodyweight 7-Day Moving Average & Trend ────────────────────────────────
+  // ── Bodyweight 7-Day Moving Average & Trend (Deduplicated per calendar date) ──
   const bodyweightAnalytics = useMemo(() => {
     if (!bodyMetrics || bodyMetrics.length === 0) return null;
-    const sorted = [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Deduplicate by calendar date: pick lowest/fasted weight per day
+    // to prevent diurnal fluid fluctuations or multiple logs in a single day from skewing moving averages
+    const dayMap = new Map<string, (typeof bodyMetrics)[0]>();
+    for (const item of bodyMetrics) {
+      const existing = dayMap.get(item.date);
+      if (!existing || item.weightKg <= existing.weightKg) {
+        dayMap.set(item.date, item);
+      }
+    }
+
+    const dedupedMetrics = Array.from(dayMap.values());
+    const sorted = dedupedMetrics.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     const recent7 = sorted.slice(0, 7);
     const avgKg = recent7.reduce((sum, b) => sum + b.weightKg, 0) / recent7.length;
 
@@ -127,6 +139,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       trendText,
       trendDelta,
       history: sorted,
+      distinctDaysCount: sorted.length,
     };
   }, [bodyMetrics, userUnit]);
 
@@ -577,10 +590,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       7-day moving avg
                     </span>
                     <div className="text-2xl font-black text-purple-400 font-sans tabular-nums mt-0.5">
-                      {bodyweightAnalytics && bodyMetrics.length >= 3 ? displayWeight(bodyweightAnalytics.avgKg) : 'Calibrating'}
+                      {bodyweightAnalytics && bodyweightAnalytics.distinctDaysCount >= 3 ? displayWeight(bodyweightAnalytics.avgKg) : 'Calibrating'}
                     </div>
                     <span className="text-3xs text-text-muted">
-                      Rate: {bodyweightAnalytics && bodyMetrics.length >= 3 ? bodyweightAnalytics.trendText : 'Need 3+ logs'}
+                      Rate: {bodyweightAnalytics && bodyweightAnalytics.distinctDaysCount >= 3 ? bodyweightAnalytics.trendText : 'Need 3+ days'}
                     </span>
                   </div>
                 </div>

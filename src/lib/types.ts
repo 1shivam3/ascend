@@ -126,6 +126,7 @@ export interface WorkoutSet {
   completed?: boolean;
   rpe?: number;
   isPR?: boolean;
+  isWarmup?: boolean;
 }
 
 export interface WorkoutExercise {

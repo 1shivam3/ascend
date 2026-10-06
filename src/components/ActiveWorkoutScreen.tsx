@@ -57,6 +57,21 @@ function getPlateSummary(targetWeight: number, unit: 'kg' | 'lbs' = 'kg'): strin
   return `${parts.join(' + ')} /side`;
 }
 
+function triggerHaptic(type: 'set_complete' | 'rest_done' | 'pr_hit') {
+  if (typeof navigator === 'undefined' || !navigator.vibrate) return;
+  try {
+    if (type === 'set_complete') {
+      navigator.vibrate([45, 35, 45]);
+    } else if (type === 'rest_done') {
+      navigator.vibrate([120, 80, 120, 80, 240]);
+    } else if (type === 'pr_hit') {
+      navigator.vibrate([60, 40, 80, 40, 120]);
+    }
+  } catch {
+    // Ignore unsupported vibration
+  }
+}
+
 export default function ActiveWorkoutScreen({
   initialExercises,
   workoutName = 'Workout Session',
@@ -371,9 +386,7 @@ export default function ActiveWorkoutScreen({
           setIsRestRunning(false);
           setIsRestFinished(true);
           playRestDoneChime();
-          if (typeof navigator !== 'undefined' && navigator.vibrate) {
-            navigator.vibrate([100, 50, 100, 50, 200]);
-          }
+          triggerHaptic('rest_done');
           return 0;
         }
         return prev - 1;
@@ -525,9 +538,7 @@ export default function ActiveWorkoutScreen({
     );
 
     if (isNowCompleted) {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(15);
-      }
+      triggerHaptic('set_complete');
       // Auto start rest timer immediately based on athlete goal & lift type
       const restDuration = defaultRestDuration;
       setRestTotalSeconds(restDuration);
@@ -611,9 +622,7 @@ export default function ActiveWorkoutScreen({
     );
 
     if (isNowCompleted) {
-      if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(20);
-      }
+      triggerHaptic('set_complete');
       // Auto start rest timer
       const restDuration = defaultRestDuration;
       setRestTotalSeconds(restDuration);
@@ -712,18 +721,18 @@ export default function ActiveWorkoutScreen({
     setIsRestFinished(false);
   };
 
-  // Warm-up sets generator
-  const handleGenerateWarmupSets = () => {
-    const firstWorkingSet = currentExercise.sets.find((s) => (parseFloat(String(s.weight)) || 0) > 0) || currentExercise.sets[0];
-    const workingWeight = firstWorkingSet ? (parseFloat(String(firstWorkingSet.weight)) || 0) : 80;
-    const barWeight = 20;
+  // Warm-up sets generator preview
+  const generatedWarmupPreview = useMemo(() => {
+    const firstWorkingSet = currentExercise?.sets.find((s) => (parseFloat(String(s.weight)) || 0) > 0) || currentExercise?.sets[0];
+    const workingWeight = firstWorkingSet ? (parseFloat(String(firstWorkingSet.weight)) || 0) : (userUnit === 'lbs' ? 135 : 60);
+    const barWeight = userUnit === 'lbs' ? 45 : 20;
 
     const roundStep = (w: number) => {
       const step = userUnit === 'lbs' ? 5 : 2.5;
       return Math.round(w / step) * step;
     };
 
-    const warmups: WorkoutSet[] = [];
+    const warmups: (WorkoutSet & { label: string })[] = [];
     const targetReps = currentExercise?.sets[0]?.reps || defaultTargetReps;
 
     // Set 1: Empty Bar / Motor Pattern Prep
@@ -733,9 +742,11 @@ export default function ActiveWorkoutScreen({
       unit: userUnit,
       completed: false,
       rpe: 5,
+      isWarmup: true,
+      label: 'Barbell Prep / Motor Groove',
     });
 
-    // Case 1: Light load (<= 45kg) - 1 ramp set avoids pre-fatigue
+    // Case 1: Light load (<= 45kg / 95lbs) - 1 ramp set avoids pre-fatigue
     if (workingWeight <= barWeight * 2.2) {
       const mid = roundStep(barWeight + (workingWeight - barWeight) * 0.55);
       if (mid > barWeight && mid < workingWeight) {
@@ -745,6 +756,8 @@ export default function ActiveWorkoutScreen({
           unit: userUnit,
           completed: false,
           rpe: 6.5,
+          isWarmup: true,
+          label: 'Light Ramp (~55%)',
         });
       }
     }
@@ -754,53 +767,68 @@ export default function ActiveWorkoutScreen({
       const s2 = roundStep(workingWeight * 0.75);
 
       if (s1 > barWeight) {
-        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6 });
+        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6, isWarmup: true, label: 'Blood Flow (~50%)' });
       }
       if (s2 > s1 && s2 < workingWeight) {
-        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 7 });
+        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 7, isWarmup: true, label: 'Potentiation (~75%)' });
       }
-      // If doing heavy low reps (<= 4 reps), prime CNS with an 88% potentiator single
       if (targetReps <= 4) {
         const s3 = roundStep(workingWeight * 0.88);
         if (s3 > s2 && s3 < workingWeight) {
-          warmups.push({ weight: s3, reps: 1, unit: userUnit, completed: false, rpe: 7.5 });
+          warmups.push({ weight: s3, reps: 1, unit: userUnit, completed: false, rpe: 7.5, isWarmup: true, label: 'Neural Primer (~88%)' });
         }
       }
     }
-    // Case 3: Heavy load (> 85kg) - 3-4 progressive sets to prime nervous system without metabolic fatigue
+    // Case 3: Heavy load (> 85kg) - 3-4 progressive sets
     else {
       const s1 = roundStep(workingWeight * 0.45);
       const s2 = roundStep(workingWeight * 0.65);
       const s3 = roundStep(workingWeight * 0.82);
 
       if (s1 > barWeight) {
-        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6 });
+        warmups.push({ weight: s1, reps: 5, unit: userUnit, completed: false, rpe: 6, isWarmup: true, label: 'Blood Flow (~45%)' });
       }
       if (s2 > s1) {
-        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 6.5 });
+        warmups.push({ weight: s2, reps: 3, unit: userUnit, completed: false, rpe: 6.5, isWarmup: true, label: 'Groove Velocity (~65%)' });
       }
       if (s3 > s2) {
-        warmups.push({ weight: s3, reps: 2, unit: userUnit, completed: false, rpe: 7 });
+        warmups.push({ weight: s3, reps: 2, unit: userUnit, completed: false, rpe: 7, isWarmup: true, label: 'Ramp Weight (~82%)' });
       }
-      // Potentiating single at 91% for high-threshold motor unit recruitment
       const single = roundStep(workingWeight * 0.91);
       if (single > s3 && single < workingWeight) {
-        warmups.push({ weight: single, reps: 1, unit: userUnit, completed: false, rpe: 7.5 });
+        warmups.push({ weight: single, reps: 1, unit: userUnit, completed: false, rpe: 7.5, isWarmup: true, label: 'CNS Activation (~91%)' });
       }
     }
+
+    return {
+      workingWeight,
+      warmups,
+    };
+  }, [currentExercise?.sets, defaultTargetReps, userUnit]);
+
+  // Warm-up sets generator
+  const handleGenerateWarmupSets = () => {
+    const warmupsToInsert: WorkoutSet[] = generatedWarmupPreview.warmups.map((w) => ({
+      weight: w.weight,
+      reps: w.reps,
+      unit: w.unit,
+      completed: false,
+      rpe: w.rpe,
+      isWarmup: true,
+    }));
 
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: [...warmups, ...ex.sets],
+          sets: [...warmupsToInsert, ...ex.sets],
         };
       })
     );
 
     setIsWarmupModalOpen(false);
-    toast.success(`Generated ${warmups.length} progressive warm-up sets!`, 'Warm-Up Added');
+    toast.success(`Prepended ${warmupsToInsert.length} warm-up sets marked [W]!`, 'Warm-Up Added');
   };
 
   // Live Plate Calculator trigger
@@ -1303,11 +1331,13 @@ export default function ActiveWorkoutScreen({
                         ? 'bg-accent text-white shadow-xs'
                         : s.completed
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : s.isWarmup
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                         : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                     }`}
-                    title={`Set ${idx + 1}`}
+                    title={s.isWarmup ? `Warm-up Set ${idx + 1}` : `Set ${idx + 1}`}
                   >
-                    {s.completed ? '✓' : idx + 1}
+                    {s.completed ? '✓' : s.isWarmup ? 'W' : idx + 1}
                   </button>
                 ))}
                 <button
@@ -1569,10 +1599,16 @@ export default function ActiveWorkoutScreen({
                   className="py-3 flex items-center justify-between gap-2"
                 >
                   {/* Set number */}
-                  <div className="w-14 shrink-0">
-                    <span className="text-xs font-semibold text-text-muted">
-                      Set {sIdx + 1}
-                    </span>
+                  <div className="w-14 shrink-0 flex items-center gap-1">
+                    {set.isWarmup ? (
+                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title="Warm-up ramp set">
+                        W{sIdx + 1}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-text-muted">
+                        Set {sIdx + 1}
+                      </span>
+                    )}
                   </div>
 
                   {/* Weight & Reps inputs */}
@@ -1978,15 +2014,31 @@ export default function ActiveWorkoutScreen({
 
             <div className="p-4 space-y-3.5">
               <p className="text-xs text-text-secondary leading-relaxed">
-                Generates a proven powerlifting ramp (Empty Bar &rarr; 40% &rarr; 60% &rarr; 80%) to prime your nervous system and prevent injury before your heavy working sets.
+                Generates a proven powerlifting ramp to prime your nervous system and prevent injury before your working sets.
               </p>
 
-              <div className="p-3 rounded-xl bg-bg-secondary border border-border/80 space-y-1.5 font-mono text-2xs">
-                <div className="text-accent font-bold">Planned Warm-up Progression:</div>
-                <div className="text-text-secondary">• Set 1: 20kg Bar × 10 reps (Groove motor pattern)</div>
-                <div className="text-text-secondary">• Set 2: ~40% × 5 reps (Blood flow)</div>
-                <div className="text-text-secondary">• Set 3: ~60% × 3 reps (Potentiation)</div>
-                <div className="text-text-secondary">• Set 4: ~80% × 1 rep (Neural readiness)</div>
+              <div className="p-3 rounded-xl bg-bg-secondary border border-border/80 space-y-2 font-mono text-2xs">
+                <div className="flex items-center justify-between text-accent font-bold">
+                  <span>Planned Warm-up Progression</span>
+                  <span className="text-text-muted font-normal text-3xs">
+                    Target: {generatedWarmupPreview.workingWeight} {userUnit}
+                  </span>
+                </div>
+                <div className="space-y-1.5 divide-y divide-border/40">
+                  {generatedWarmupPreview.warmups.map((w, idx) => (
+                    <div key={idx} className="pt-1.5 first:pt-0 flex items-center justify-between text-text-secondary">
+                      <div className="flex items-center gap-1.5">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold text-3xs border border-amber-500/20">
+                          W{idx + 1}
+                        </span>
+                        <span className="font-semibold text-text-primary">
+                          {w.weight} {w.unit} × {w.reps} reps
+                        </span>
+                      </div>
+                      <span className="text-3xs text-text-muted truncate max-w-[130px]">{w.label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex gap-2 pt-2">

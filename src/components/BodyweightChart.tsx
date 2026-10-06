@@ -22,10 +22,20 @@ export default function BodyweightChart() {
   const { bodyMetrics, profile } = useStore();
   const userUnit = profile?.unit || 'kg';
 
-  // Sort chronological for chart
+  // Sort chronological and deduplicate per calendar date (keep single entry per day to prevent diurnal fluctuation skew)
   const sortedMetrics = useMemo(() => {
     if (!bodyMetrics || bodyMetrics.length === 0) return [];
-    return [...bodyMetrics].sort(
+
+    // Deduplicate by calendar date: pick lowest/fasted weight per day
+    const dayMap = new Map<string, (typeof bodyMetrics)[0]>();
+    for (const item of bodyMetrics) {
+      const existing = dayMap.get(item.date);
+      if (!existing || item.weightKg <= existing.weightKg) {
+        dayMap.set(item.date, item);
+      }
+    }
+
+    return Array.from(dayMap.values()).sort(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
   }, [bodyMetrics]);
