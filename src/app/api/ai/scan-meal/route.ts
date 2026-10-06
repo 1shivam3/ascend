@@ -53,18 +53,67 @@ interface ScanMealRequestBody {
 export async function POST(req: Request) {
   try {
     const headerKey = req.headers.get('x-gemini-api-key');
-    const body: ScanMealRequestBody = await req.json();
+    const contentType = req.headers.get('content-type') || '';
 
-    const { imageBase64, mimeType = 'image/jpeg', userNotes = '', hiddenIngredients = [] } = body;
+    let cleanBase64 = '';
+    let mimeType = 'image/jpeg';
+    let userNotes = '';
+    let hiddenIngredients: string[] = [];
+    let customApiKey: string | undefined;
 
-    if (!imageBase64) {
-      return NextResponse.json(
-        { error: 'NO_IMAGE', message: 'No image data provided for meal scan.' },
-        { status: 400 }
-      );
+    if (contentType.includes('multipart/form-data')) {
+      const formData = await req.formData();
+      const imageFile = formData.get('image') as Blob | null;
+
+      if (!imageFile || imageFile.size === 0) {
+        return NextResponse.json(
+          { error: 'NO_IMAGE', message: 'No image data provided for meal scan.' },
+          { status: 400 }
+        );
+      }
+
+      // Server-side size guard: 10MB maximum
+      if (imageFile.size > 10 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: 'IMAGE_TOO_LARGE', message: 'Image exceeds maximum allowed size (10MB).' },
+          { status: 413 }
+        );
+      }
+
+      const buffer = Buffer.from(await imageFile.arrayBuffer());
+      cleanBase64 = buffer.toString('base64');
+      mimeType = imageFile.type || 'image/jpeg';
+      userNotes = (formData.get('userNotes') as string) || '';
+
+      const hiddenRaw = formData.get('hiddenIngredients');
+      if (typeof hiddenRaw === 'string') {
+        try {
+          hiddenIngredients = JSON.parse(hiddenRaw);
+        } catch {
+          hiddenIngredients = [];
+        }
+      }
+
+      customApiKey = (formData.get('customApiKey') as string) || undefined;
+    } else {
+      const body: ScanMealRequestBody = await req.json();
+      const { imageBase64, mimeType: bodyMime = 'image/jpeg', userNotes: bodyNotes = '', hiddenIngredients: bodyHidden = [] } = body;
+
+      if (!imageBase64) {
+        return NextResponse.json(
+          { error: 'NO_IMAGE', message: 'No image data provided for meal scan.' },
+          { status: 400 }
+        );
+      }
+
+      cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
+      mimeType = bodyMime;
+      userNotes = bodyNotes;
+      hiddenIngredients = bodyHidden;
+      customApiKey = body.customApiKey;
     }
 
-    const apiKey = getResolvedApiKey(headerKey, body.customApiKey);
+    const apiKey = getResolvedApiKey(headerKey, customApiKey);
 
     if (!apiKey) {
       return NextResponse.json(
@@ -78,9 +127,6 @@ export async function POST(req: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey });
-
-    // Clean base64 string
-    const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
 
     const imagePart = {
       inlineData: {

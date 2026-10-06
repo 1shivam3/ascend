@@ -1,5 +1,10 @@
 import { MealAnalysisResult, ScannedFoodItem } from './types';
 import { estimateMacros } from './macros';
+import {
+  resizeAndCompressImage,
+  MAX_IMAGE_DIMENSION,
+  DEFAULT_IMAGE_QUALITY,
+} from './image-processing';
 
 export interface ScanMealOptions {
   file: File | Blob;
@@ -10,94 +15,31 @@ export interface ScanMealOptions {
 
 /**
  * Resizes and compresses image on the client to avoid uploading huge 10MB+ camera files.
- * Downsamples to max 1024px width/height and 75% JPEG quality (~80-150KB).
+ * Downsamples to max 1280px on the longest side and 75% JPEG quality (~80-150KB).
+ * Returns compact Blob directly to avoid allocating base64 strings in JavaScript heap.
  */
 export async function compressImageFile(
   file: File | Blob,
-  maxWidth = 1024,
-  maxHeight = 1024,
-  quality = 0.75
-): Promise<{ base64: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    // If running server-side or non-DOM environment
-    if (typeof window === 'undefined' || typeof document === 'undefined') {
-      const reader = new FileReader();
-      reader.onload = () => {
-        resolve({
-          base64: reader.result as string,
-          mimeType: file.type || 'image/jpeg',
-        });
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    const img = new Image();
-
-    img.onload = () => {
-      URL.revokeObjectURL(objectUrl);
-      let width = img.naturalWidth || img.width;
-      let height = img.naturalHeight || img.height;
-
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        // Fallback if canvas context cannot be initialized
-        const reader = new FileReader();
-        reader.onload = () =>
-          resolve({
-            base64: reader.result as string,
-            mimeType: file.type || 'image/jpeg',
-          });
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, width, height);
-      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
-      resolve({
-        base64: compressedDataUrl,
-        mimeType: 'image/jpeg',
-      });
-    };
-
-    img.onerror = (err) => {
-      URL.revokeObjectURL(objectUrl);
-      // Fallback to raw FileReader
-      const reader = new FileReader();
-      reader.onload = () =>
-        resolve({
-          base64: reader.result as string,
-          mimeType: file.type || 'image/jpeg',
-        });
-      reader.onerror = () => reject(err);
-      reader.readAsDataURL(file);
-    };
-
-    img.src = objectUrl;
+  maxWidth = MAX_IMAGE_DIMENSION,
+  maxHeight = MAX_IMAGE_DIMENSION,
+  quality = DEFAULT_IMAGE_QUALITY
+): Promise<{ blob: Blob; mimeType: string }> {
+  const maxDim = Math.max(maxWidth, maxHeight);
+  const result = await resizeAndCompressImage(file, {
+    maxDimension: maxDim,
+    quality,
+    format: 'image/jpeg',
   });
+
+  return {
+    blob: result.blob,
+    mimeType: result.mimeType,
+  };
 }
 
 /**
  * Sends compressed meal photo to Gemini AI for identification and macro breakdown.
+ * Uses binary FormData streaming so large base64 strings are never created in client JS memory.
  * Does NOT swallow errors or fake foods if the image or request fails.
  */
 export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAnalysisResult> {
@@ -112,21 +54,32 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
     );
   }
 
-  const { base64, mimeType } = await compressImageFile(options.file);
+  // 1. Ensure file is downsampled (max 1280px) and compressed to ~0.75 JPEG
+  const { blob: compressedBlob } = await resizeAndCompressImage(options.file, {
+    maxDimension: MAX_IMAGE_DIMENSION,
+    quality: DEFAULT_IMAGE_QUALITY,
+    format: 'image/jpeg',
+  });
+
+  // 2. Stream as binary FormData to avoid allocating massive base64 strings in JS memory
+  const formData = new FormData();
+  formData.append('image', compressedBlob, 'meal.jpg');
+  if (options.userNotes) {
+    formData.append('userNotes', options.userNotes);
+  }
+  if (options.hiddenIngredients && options.hiddenIngredients.length > 0) {
+    formData.append('hiddenIngredients', JSON.stringify(options.hiddenIngredients));
+  }
+  if (options.customApiKey) {
+    formData.append('customApiKey', options.customApiKey);
+  }
 
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
       ...(options.customApiKey ? { 'x-gemini-api-key': options.customApiKey } : {}),
     },
-    body: JSON.stringify({
-      imageBase64: base64,
-      mimeType,
-      userNotes: options.userNotes || '',
-      hiddenIngredients: options.hiddenIngredients || [],
-      customApiKey: options.customApiKey,
-    }),
+    body: formData,
   });
 
   if (!response.ok) {
@@ -138,9 +91,10 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   }
 
   const data: MealAnalysisResult = await response.json();
+  // REQUIREMENT 6 & 7: Never store image bytes/base64 in the meal analysis result
   return {
     ...data,
-    imageUrl: base64,
+    imageUrl: undefined,
   };
 }
 
@@ -358,7 +312,7 @@ export function generateOfflineMealEstimate(
       coachingNote:
         'No matching foods found in offline database. Add items manually or connect to internet for Gemini photo scanning.',
       timestamp: new Date().toISOString(),
-      imageUrl,
+      imageUrl: undefined,
     };
   }
 
@@ -379,6 +333,6 @@ export function generateOfflineMealEstimate(
     coachingNote:
       'Estimated nutrition from offline database matching your notes. Review and adjust portions before saving.',
     timestamp: new Date().toISOString(),
-    imageUrl,
+    imageUrl: undefined,
   };
 }

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
+import { validateImageFile, resizeAndCompressImage } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -57,9 +58,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   // Flow states: 'select' | 'analyzing' | 'review'
   const [step, setStep] = useState<'select' | 'analyzing' | 'review'>('select');
 
-  // Input state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Input state: only stores the compact resized/compressed Blob (~80-150KB), NEVER raw 20MB Camera File!
+  const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
+  const previewUrlRef = useRef<string | null>(null);
   const [userNotes, setUserNotes] = useState('');
   const [selectedHiddenIngredients, setSelectedHiddenIngredients] = useState<string[]>([]);
 
@@ -81,12 +84,31 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [newItemName, setNewItemName] = useState('');
   const [newItemGrams, setNewItemGrams] = useState(100);
 
+  // REQUIREMENT 8: Safely revoke object URLs when clearing or unmounting
+  const cleanupPreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+    setPreviewUrl(null);
+    setProcessedBlob(null);
+  }, []);
+
+  // Ensure object URLs are released on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+    };
+  }, []);
+
   if (!isOpen) return null;
 
   const handleReset = () => {
+    cleanupPreview();
     setStep('select');
-    setSelectedFile(null);
-    setPreviewUrl(null);
     setUserNotes('');
     setSelectedHiddenIngredients([]);
     setAnalysis(null);
@@ -103,11 +125,61 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     onClose();
   };
 
-  const handleFileSelected = (file: File) => {
-    setSelectedFile(file);
+  const handleFileSelected = async (file: File) => {
+    if (!file) return;
+
     setScanError(null);
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
+
+    // REQUIREMENT 11: Maximum input size/resolution guard
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      const err = validation.error || 'Invalid image file.';
+      setScanError(err);
+      toast.error(err, 'Image Notice');
+      return;
+    }
+
+    setIsProcessingImage(true);
+
+    try {
+      // REQUIREMENT 2 & 3: Immediately resize to max 1280px on longest side and compress to JPEG 0.75
+      const { blob } = await resizeAndCompressImage(file, {
+        maxDimension: 1280,
+        quality: 0.75,
+        format: 'image/jpeg',
+      });
+
+      // REQUIREMENT 8: Revoke any existing preview URL before allocating a new one
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+
+      // REQUIREMENT 4 & 10: Create URL strictly for the small compressed blob (~80-150KB)
+      const objectUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = objectUrl;
+
+      // Update state with only the small compressed blob and object URL
+      setPreviewUrl(objectUrl);
+      setProcessedBlob(blob);
+    } catch (err: any) {
+      console.error('Image compression failed:', err);
+      // REQUIREMENT 13: Handle low-memory/processing failure gracefully with user-friendly message
+      const isMemError =
+        err?.message?.toLowerCase().includes('memory') ||
+        err?.name === 'QuotaExceededError' ||
+        err?.message?.toLowerCase().includes('quota');
+
+      const message = isMemError
+        ? 'Unable to process photo due to low device memory. Try closing background apps, or estimate with the offline database below.'
+        : err?.message || 'Failed to process camera image. Please try again.';
+
+      setScanError(message);
+      toast.error(message, 'Photo Notice');
+      cleanupPreview();
+    } finally {
+      setIsProcessingImage(false);
+    }
   };
 
   const toggleHiddenIngredient = (item: string) => {
@@ -177,7 +249,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   };
 
   const startAnalysis = async () => {
-    if (!selectedFile) {
+    if (!processedBlob) {
       toast.error('Please take or upload a food photo first.', 'No Image');
       return;
     }
@@ -186,7 +258,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setStep('analyzing');
     try {
       const rawResult = await analyzeMealPhoto({
-        file: selectedFile,
+        file: processedBlob,
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
         customApiKey: store.customGeminiKey,
@@ -316,10 +388,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
 
     // If more complex or re-evaluating with photo, re-run analysis with feedback notes
-    if (selectedFile) {
+    if (processedBlob) {
       try {
         const refinedResult = await analyzeMealPhoto({
-          file: selectedFile,
+          file: processedBlob,
           userNotes: `${userNotes ? userNotes + '. ' : ''}Correction from user: ${refinementInput.trim()}`,
           hiddenIngredients: selectedHiddenIngredients,
           customApiKey: store.customGeminiKey,
@@ -387,9 +459,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         capture="environment"
         className="hidden"
         onChange={(e) => {
-          if (e.target.files && e.target.files[0]) {
-            handleFileSelected(e.target.files[0]);
-          }
+          const file = e.target.files?.[0];
+          // REQUIREMENT 10: Clear input value immediately so user can retry or take another photo cleanly
+          e.target.value = '';
+          // REQUIREMENT 12: Handle camera cancellation separately without triggering error state
+          if (!file) return;
+          handleFileSelected(file);
         }}
       />
       <input
@@ -398,9 +473,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         accept="image/*"
         className="hidden"
         onChange={(e) => {
-          if (e.target.files && e.target.files[0]) {
-            handleFileSelected(e.target.files[0]);
-          }
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          handleFileSelected(file);
         }}
       />
 
@@ -556,8 +632,20 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
               </div>
             )}
 
-            {/* Upload Area / Camera Card */}
-            {!previewUrl ? (
+            {/* Upload Area / Camera Card / Processing State */}
+            {isProcessingImage ? (
+              <div className="border border-border rounded-2xl p-8 text-center bg-bg-secondary/20 space-y-3 animate-fade-in">
+                <RefreshCw className="w-7 h-7 mx-auto animate-spin text-accent" />
+                <div className="space-y-1">
+                  <h4 className="font-bold text-xs sm:text-sm text-text-primary">
+                    Optimizing Photo...
+                  </h4>
+                  <p className="text-2xs text-text-muted">
+                    Resizing &amp; compressing image to protect device memory.
+                  </p>
+                </div>
+              </div>
+            ) : !previewUrl ? (
               <div className="border-2 border-dashed border-border hover:border-accent/60 rounded-2xl p-6 text-center transition-colors bg-bg-secondary/20 space-y-4">
                 <div className="w-14 h-14 mx-auto rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
                   <Camera className="w-7 h-7" />
@@ -602,8 +690,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <button
                     type="button"
                     onClick={() => {
-                      setSelectedFile(null);
-                      setPreviewUrl(null);
+                      cleanupPreview();
                     }}
                     className="absolute top-2.5 right-2.5 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
                     title="Change photo"
@@ -788,7 +875,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       </button>
                       <button
                         type="button"
-                        onClick={() => setStep('select')}
+                        onClick={() => {
+                          cleanupPreview();
+                          setStep('select');
+                        }}
                         className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
                       >
                         <Camera className="w-4 h-4" />
@@ -808,7 +898,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     </button>
                     <button
                       type="button"
-                      onClick={() => setStep('select')}
+                      onClick={() => {
+                        cleanupPreview();
+                        setStep('select');
+                      }}
                       className="btn-primary py-2.5 text-xs font-bold flex-1 flex items-center justify-center gap-1.5"
                     >
                       <Camera className="w-4 h-4" />
@@ -1081,7 +1174,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <div className="flex flex-col sm:flex-row gap-2.5 pt-2 border-t border-border">
                     <button
                       type="button"
-                      onClick={() => setStep('select')}
+                      onClick={() => {
+                        cleanupPreview();
+                        setStep('select');
+                      }}
                       className="btn-secondary py-2.5 text-xs font-semibold order-2 sm:order-1"
                     >
                       Scan Another Photo
