@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
-import { validateImageFile, resizeAndCompressImage } from '@/lib/image-processing';
+import { validateImageFile, resizeAndCompressImage, captureVideoFrame } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -48,7 +48,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const toast = useToast();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // In-app live camera state (bypasses Android OS camera intent to eliminate low-memory crash completely)
+  const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isCapturingFrame, setIsCapturingFrame] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   // Gemini API Key config state
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
@@ -84,29 +90,131 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [newItemName, setNewItemName] = useState('');
   const [newItemGrams, setNewItemGrams] = useState(100);
 
-  // REQUIREMENT 8: Safely revoke object URLs when clearing or unmounting
+  // Stop in-app camera stream and release camera hardware
+  const stopLiveCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsLiveCameraActive(false);
+    setIsCapturingFrame(false);
+  }, []);
+
+  // Start in-app camera viewfinder (bypasses Android camera app to prevent low memory crashes)
+  const startLiveCamera = useCallback(
+    async (facing: 'environment' | 'user' = 'environment') => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+
+      if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        // Fallback: trigger file picker without capture attribute
+        fileInputRef.current?.click();
+        return;
+      }
+
+      setScanError(null);
+      setIsLiveCameraActive(true);
+      setCameraFacingMode(facing);
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play().catch(() => {});
+        }
+      } catch (err: any) {
+        console.warn('Camera stream error:', err);
+        stopLiveCamera();
+        if (err.name === 'NotAllowedError') {
+          toast.info('Camera permission not granted. You can select a photo from your gallery.', 'Camera Notice');
+        } else {
+          toast.info('Direct camera stream unavailable. Please choose an image.', 'Camera Notice');
+        }
+        fileInputRef.current?.click();
+      }
+    },
+    [stopLiveCamera, toast]
+  );
+
+  // Snaps frame from in-app video element directly into compressed 1280px Blob
+  const handleSnapFrame = async () => {
+    if (!videoRef.current || isCapturingFrame) return;
+
+    setIsCapturingFrame(true);
+    try {
+      const { blob } = await captureVideoFrame(videoRef.current, {
+        maxDimension: 1280,
+        quality: 0.75,
+        format: 'image/jpeg',
+      });
+
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
+
+      const objectUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = objectUrl;
+
+      // Stop camera hardware stream immediately
+      stopLiveCamera();
+
+      setPreviewUrl(objectUrl);
+      setProcessedBlob(blob);
+    } catch (err: any) {
+      console.error('Frame capture failed:', err);
+      toast.error('Could not capture frame from camera. Please choose an image.', 'Camera Notice');
+      stopLiveCamera();
+    } finally {
+      setIsCapturingFrame(false);
+    }
+  };
+
+  const handleFlipCamera = () => {
+    const nextFacing = cameraFacingMode === 'environment' ? 'user' : 'environment';
+    startLiveCamera(nextFacing);
+  };
+
+  // REQUIREMENT 8: Safely revoke object URLs and stop camera when clearing or unmounting
   const cleanupPreview = useCallback(() => {
+    stopLiveCamera();
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
       previewUrlRef.current = null;
     }
     setPreviewUrl(null);
     setProcessedBlob(null);
-  }, []);
+  }, [stopLiveCamera]);
 
-  // Ensure object URLs are released on unmount
+  // Ensure object URLs and camera streams are released on unmount
   useEffect(() => {
     return () => {
+      stopLiveCamera();
       if (previewUrlRef.current) {
         URL.revokeObjectURL(previewUrlRef.current);
         previewUrlRef.current = null;
       }
     };
-  }, []);
+  }, [stopLiveCamera]);
 
   if (!isOpen) return null;
 
   const handleReset = () => {
+    stopLiveCamera();
     cleanupPreview();
     setStep('select');
     setUserNotes('');
@@ -121,6 +229,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   };
 
   const handleClose = () => {
+    stopLiveCamera();
     handleReset();
     onClose();
   };
@@ -451,22 +560,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
-      {/* Hidden file inputs for Camera and Gallery */}
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          // REQUIREMENT 10: Clear input value immediately so user can retry or take another photo cleanly
-          e.target.value = '';
-          // REQUIREMENT 12: Handle camera cancellation separately without triggering error state
-          if (!file) return;
-          handleFileSelected(file);
-        }}
-      />
+      {/* Hidden file input for Gallery / Fallback (no capture attribute to prevent OS camera low-memory kills) */}
       <input
         ref={fileInputRef}
         type="file"
@@ -474,6 +568,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
+          // Clear input value immediately so user can retry or select another photo cleanly
           e.target.value = '';
           if (!file) return;
           handleFileSelected(file);
@@ -632,8 +727,76 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
               </div>
             )}
 
-            {/* Upload Area / Camera Card / Processing State */}
-            {isProcessingImage ? (
+            {/* Upload Area / Live In-App Camera Viewfinder / Processing State */}
+            {isLiveCameraActive ? (
+              <div className="space-y-3 animate-fade-in">
+                <div className="relative rounded-2xl overflow-hidden border border-border aspect-video bg-black flex items-center justify-center shadow-inner">
+                  <video
+                    ref={videoRef}
+                    playsInline
+                    autoPlay
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+
+                  {/* Framing viewfinder guide */}
+                  <div className="absolute inset-4 rounded-xl border border-white/20 pointer-events-none flex items-center justify-center">
+                    <div className="w-8 h-8 border-t-2 border-l-2 border-accent absolute top-0 left-0 rounded-tl" />
+                    <div className="w-8 h-8 border-t-2 border-r-2 border-accent absolute top-0 right-0 rounded-tr" />
+                    <div className="w-8 h-8 border-b-2 border-l-2 border-accent absolute bottom-0 left-0 rounded-bl" />
+                    <div className="w-8 h-8 border-b-2 border-r-2 border-accent absolute bottom-0 right-0 rounded-br" />
+                    <span className="text-3xs font-mono font-bold uppercase tracking-wider text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 shadow-xs">
+                      Frame Meal Plate
+                    </span>
+                  </div>
+
+                  {/* Top action controls: Flip Camera & Close Camera */}
+                  <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleFlipCamera}
+                      className="p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors shadow-sm"
+                      title="Flip camera"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={stopLiveCamera}
+                      className="p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors shadow-sm"
+                      title="Close camera"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Shutter Button & Choose File fallback */}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSnapFrame}
+                    disabled={isCapturingFrame}
+                    className="btn-primary flex-1 py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-accent/25"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>{isCapturingFrame ? 'Capturing...' : 'Snap Meal Photo'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopLiveCamera();
+                      fileInputRef.current?.click();
+                    }}
+                    className="btn-secondary py-3 px-3.5 text-xs font-bold flex items-center justify-center gap-1.5"
+                    title="Upload from files instead"
+                  >
+                    <Upload className="w-4 h-4 text-accent" />
+                    <span className="hidden sm:inline">Choose File</span>
+                  </button>
+                </div>
+              </div>
+            ) : isProcessingImage ? (
               <div className="border border-border rounded-2xl p-8 text-center bg-bg-secondary/20 space-y-3 animate-fade-in">
                 <RefreshCw className="w-7 h-7 mx-auto animate-spin text-accent" />
                 <div className="space-y-1">
@@ -662,7 +825,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                 <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
                   <button
                     type="button"
-                    onClick={() => cameraInputRef.current?.click()}
+                    onClick={() => startLiveCamera('environment')}
                     className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-xs"
                   >
                     <Camera className="w-4 h-4" />

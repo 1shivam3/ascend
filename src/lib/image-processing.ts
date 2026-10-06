@@ -282,3 +282,60 @@ export async function resizeAndCompressImage(
     }
   });
 }
+
+/**
+ * Captures and downsamples a frame directly from an HTMLVideoElement stream.
+ * Bypasses the OS camera activity entirely, avoiding all native camera memory spikes
+ * and preventing Android Chrome "Unable to complete previous operation due to low memory" errors.
+ */
+export async function captureVideoFrame(
+  video: HTMLVideoElement,
+  options: ImageProcessOptions = {}
+): Promise<ImageProcessResult> {
+  const maxDim = options.maxDimension || MAX_IMAGE_DIMENSION;
+  const quality = options.quality !== undefined ? options.quality : DEFAULT_IMAGE_QUALITY;
+  const mimeType = options.format || 'image/jpeg';
+
+  const origWidth = video.videoWidth || 1280;
+  const origHeight = video.videoHeight || 720;
+  const { width: targetWidth, height: targetHeight } = calculateTargetDimensions(
+    origWidth,
+    origHeight,
+    maxDim
+  );
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d', { alpha: false });
+
+  if (!ctx) {
+    canvas.width = 0;
+    canvas.height = 0;
+    throw new Error('Canvas 2D context allocation failed.');
+  }
+
+  ctx.drawImage(video, 0, 0, targetWidth, targetHeight);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (b) => {
+        // Free GPU framebuffer immediately
+        canvas.width = 0;
+        canvas.height = 0;
+        if (b) {
+          resolve({
+            blob: b,
+            width: targetWidth,
+            height: targetHeight,
+            mimeType,
+          });
+        } else {
+          reject(new Error('Failed to encode video frame to blob.'));
+        }
+      },
+      mimeType,
+      quality
+    );
+  });
+}
