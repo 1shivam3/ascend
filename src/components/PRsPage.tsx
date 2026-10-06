@@ -31,6 +31,9 @@ import {
   Activity,
   Filter,
   Sliders,
+  Trophy,
+  Zap,
+  Award,
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS } from '@/lib/dots';
 import RankBadge from '@/components/ui/RankBadge';
@@ -599,18 +602,20 @@ function LiftCard({
                       </span>
                       {isAllTimePeak && (
                         <span className="text-[9px] font-sans font-black text-accent bg-accent/20 px-1.5 py-0.5 rounded border border-accent/40 flex items-center gap-1 shadow-2xs">
-                          <span>👑</span>
+                          <Trophy className="w-2.5 h-2.5 text-accent" />
                           <span>All-Time Record</span>
                         </span>
                       )}
                       {p.prType === 'reps' && (
-                        <span className="text-[9px] font-sans font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.2 rounded border border-amber-500/25">
-                          ⚡ Rep PR
+                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
+                          <Zap className="w-2.5 h-2.5 text-accent fill-accent" />
+                          <span>Rep PR</span>
                         </span>
                       )}
                       {(p.prType === '1rm' || (!p.prType && p.reps === 1)) && (
-                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.2 rounded border border-accent/25">
-                          🥇 1RM PR
+                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
+                          <Award className="w-2.5 h-2.5 text-accent" />
+                          <span>1RM PR</span>
                         </span>
                       )}
                       {(p.isBaseline || p.notes?.includes('Baseline')) && (
@@ -1024,21 +1029,34 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="card space-y-3 bg-bg-card border border-border">
           <div className="flex justify-between items-baseline">
             <div>
-              <span className="section-title text-[11px] mb-0 font-sans">POWERLIFTING SCOREBOARD</span>
+              <span className="section-title text-[11px] mb-0 font-sans">
+                {profile?.goals?.includes('get_stronger') ? 'POWERLIFTING SCOREBOARD' : 'KEY COMPOUND LIFTS TOTAL'}
+              </span>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl font-black text-accent font-sans tabular-nums">
                   {displayWeight(bigThreeStats.totalKg)}
                 </span>
                 <span className="text-sm font-semibold text-text-primary">
-                  Big 3 Total
+                  {profile?.goals?.includes('get_stronger') ? 'Big 3 Total' : 'Combined Compound Total'}
                 </span>
               </div>
             </div>
             <div className="text-right">
-              <span className="text-base font-bold text-accent tabular-nums font-mono block">
-                {dotsScore > 0 ? `${Math.round(dotsScore)} DOTS` : '—'}
-              </span>
-              <span className="text-3xs text-text-muted block">Normalized Score</span>
+              {profile?.goals?.includes('get_stronger') && dotsScore > 0 ? (
+                <>
+                  <span className="text-base font-bold text-accent tabular-nums font-mono block">
+                    {Math.round(dotsScore)} DOTS
+                  </span>
+                  <span className="text-3xs text-text-muted block">Normalized Score</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-base font-bold text-accent tabular-nums font-mono block">
+                    {exerciseStats.length} Lifts
+                  </span>
+                  <span className="text-3xs text-text-muted block">Calibrated PRs</span>
+                </>
+              )}
             </div>
           </div>
 

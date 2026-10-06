@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculatePlates } from '@/lib/plate-calculator';
-import { X, Dumbbell, Minus, Plus, RotateCcw } from 'lucide-react';
+import { X, Dumbbell, Minus, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface PlateCalculatorModalProps {
   isOpen: boolean;
@@ -317,8 +317,9 @@ export default function PlateCalculatorModal({
           </div>
 
           {calculation.remainder > 0 && (
-            <p className="text-2xs font-mono text-amber-500 text-center">
-              ⚠️ {calculation.remainder} {unit} cannot be loaded with available standard plates.
+            <p className="text-2xs font-mono text-amber-500 text-center flex items-center justify-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              <span>{calculation.remainder} {unit} cannot be loaded with available standard plates.</span>
             </p>
           )}
         </div>

@@ -161,7 +161,13 @@ export default function PostWorkoutTakeModal({
                     className="flex items-center justify-between p-2 rounded-xl bg-bg-card/90 border border-amber-500/30 text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-sm">{isRepPR ? '⚡' : '🥇'}</span>
+                      <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+                        {isRepPR ? (
+                          <Zap className="w-3.5 h-3.5 text-accent fill-accent" />
+                        ) : (
+                          <Trophy className="w-3.5 h-3.5 text-accent" />
+                        )}
+                      </div>
                       <div>
                         <span className="font-bold text-text-primary block">{pr.exercise}</span>
                         <span className="text-3xs text-text-muted font-mono">

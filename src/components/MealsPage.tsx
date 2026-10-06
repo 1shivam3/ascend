@@ -684,7 +684,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         addMeal(newMeal);
         setNaturalQuery('');
-        const sourceBadge = data.source === 'gemini' ? '✨ Gemini AI' : '📊 Calibrated IFCT';
+        const sourceBadge = data.source === 'gemini' ? 'Gemini AI' : 'Calibrated IFCT';
         toast.success(
           `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
@@ -730,12 +730,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: isDeficitKept,
           badgeText: isDeficitKept
-            ? `✓ Deficit Preserved (${Math.abs(calDelta)} kcal under ceiling)`
-            : `⚠ Over Deficit Limit (+${calDelta} kcal)`,
+            ? `Deficit Preserved (${Math.abs(calDelta)} kcal under ceiling)`
+            : `Over Deficit Limit (+${calDelta} kcal)`,
           subtext: isDeficitKept
             ? 'Maintaining caloric deficit to oxidize fat stores while preserving lean tissue.'
             : 'Exceeded caloric limit for today. Prioritize lean protein and low-density foods.',
-          protStatus: protDelta >= 0 ? '✓ Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
+          protStatus: protDelta >= 0 ? 'Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
         };
       }
       case 'build_muscle': {
@@ -743,12 +743,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: isSurplusMet,
           badgeText: isSurplusMet
-            ? `✓ Growth Surplus Reached (+${calDelta} kcal)`
+            ? `Growth Surplus Reached (+${calDelta} kcal)`
             : `${Math.abs(calDelta)} kcal to reach lean surplus target`,
           subtext: isSurplusMet
             ? 'Lean surplus secured. Muscle protein synthesis and recovery are fully fueled.'
             : 'Consume remaining calories to ensure positive energy balance for muscle hypertrophy.',
-          protStatus: protDelta >= 0 ? '✓ Protein synthesis optimized' : `${Math.abs(protDelta)}g protein needed to hit target`,
+          protStatus: protDelta >= 0 ? 'Protein synthesis optimized' : `${Math.abs(protDelta)}g protein needed to hit target`,
         };
       }
       case 'get_stronger': {
@@ -756,20 +756,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: isFueled,
           badgeText: isFueled
-            ? '✓ Strength Energy Fueled'
+            ? 'Strength Energy Fueled'
             : `${Math.abs(calDelta)} kcal to fuel target`,
           subtext: 'Glycogen and ATP replenishment on target for heavy compound progression.',
-          protStatus: protDelta >= 0 ? '✓ Structural repair protein met' : `${Math.abs(protDelta)}g protein remaining`,
+          protStatus: protDelta >= 0 ? 'Structural repair protein met' : `${Math.abs(protDelta)}g protein remaining`,
         };
       }
       case 'stamina': {
         return {
           isPositive: Math.abs(calDelta) <= 200,
           badgeText: Math.abs(calDelta) <= 200
-            ? '✓ Endurance Energy Balance'
+            ? 'Endurance Energy Balance'
             : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs maintenance`,
           subtext: 'Carbohydrate and hydration balance prioritized for sustained work capacity.',
-          protStatus: protDelta >= 0 ? '✓ Recovery protein met' : `${Math.abs(protDelta)}g protein remaining`,
+          protStatus: protDelta >= 0 ? 'Recovery protein met' : `${Math.abs(protDelta)}g protein remaining`,
         };
       }
       case 'general_fitness':
@@ -777,10 +777,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         return {
           isPositive: Math.abs(calDelta) <= 250,
           badgeText: Math.abs(calDelta) <= 250
-            ? '✓ Balanced Energy Adherence'
+            ? 'Balanced Energy Adherence'
             : `${calDelta > 0 ? `+${calDelta}` : calDelta} kcal vs target`,
           subtext: 'Healthy macro balance supporting overall wellness and joint longevity.',
-          protStatus: protDelta >= 0 ? '✓ Daily protein met' : `${Math.abs(protDelta)}g protein remaining`,
+          protStatus: protDelta >= 0 ? 'Daily protein met' : `${Math.abs(protDelta)}g protein remaining`,
         };
       }
     }
@@ -996,7 +996,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (yesterdayMeals.length === 0) return;
     const copiedCount = copyMealsFromDate(yesterdayDate, todayDate);
     toast.success(
-      `🎉 Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from yesterday (~${Math.round(yesterdayMacros.calories)} kcal)!`,
+      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from yesterday (~${Math.round(yesterdayMacros.calories)} kcal)!`,
       'Yesterday Meals Copied'
     );
   };
@@ -1411,11 +1411,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Water widget */}
           <div
             onClick={() => setIsHydrationModalOpen(true)}
-            className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-sky-500/40 cursor-pointer transition-all space-y-1.5"
+            className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-sky-600 uppercase flex items-center gap-1">
-                <Droplet className="w-3.5 h-3.5 fill-sky-500/20 stroke-sky-500" />
+              <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
+                <Droplet className="w-3.5 h-3.5 text-accent" />
                 WATER
               </span>
               <div className="flex items-center gap-1.5">
@@ -1427,14 +1427,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       resetWater(todayDate);
                       toast.info("Today's water log reset to 0L", 'Hydration Reset');
                     }}
-                    className="text-3xs text-text-muted hover:text-red-400 p-0.5 rounded transition-colors"
+                    className="text-3xs text-text-muted hover:text-danger p-0.5 rounded transition-colors"
                     title="Reset today's water"
                   >
                     Reset
                   </button>
                 )}
-                <span className="text-[10px] text-text-muted font-medium">
-                  {waterRemaining === 0 ? '✓ Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
+                <span className="text-[10px] text-text-muted font-medium font-mono">
+                  {waterRemaining === 0 ? 'Target Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
                 </span>
               </div>
             </div>
@@ -1442,7 +1442,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <span className="text-xl font-black text-text-primary font-sans">
                 {(waterToday / 1000).toFixed(1)}
               </span>
-              <span className="text-xs text-text-muted font-medium">
+              <span className="text-xs text-text-muted font-medium font-mono">
                 / {(waterTargetMl / 1000).toFixed(1)} L
               </span>
             </div>
@@ -1454,7 +1454,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   logWater(250, todayDate);
                   toast.success('+250 ml logged!', 'Hydration');
                 }}
-                className="flex-1 py-1 rounded-lg bg-bg-card border border-border text-[10px] font-bold text-text-primary hover:border-sky-500 active:scale-95 transition-colors"
+                className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
               >
                 +250ml
               </button>
@@ -1465,7 +1465,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   logWater(500, todayDate);
                   toast.success('+500 ml logged!', 'Hydration');
                 }}
-                className="flex-1 py-1 rounded-lg bg-bg-card border border-border text-[10px] font-bold text-text-primary hover:border-sky-500 active:scale-95 transition-colors"
+                className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
               >
                 +500ml
               </button>
@@ -1481,26 +1481,26 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             return (
               <div
                 onClick={() => setIsCreatineModalOpen(true)}
-                className="p-3 rounded-xl bg-bg-secondary/70 border border-border/70 hover:border-amber-500/40 cursor-pointer transition-all space-y-1.5"
+                className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 fill-amber-500/20 stroke-amber-500" />
+                  <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
+                    <Sparkles className="w-3.5 h-3.5 text-accent" />
                     CREATINE
                   </span>
                   <div className="flex items-center gap-1.5">
                     {creatineDaysLeft <= 7 && (
-                      <span className="text-[9px] font-mono font-bold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/25">
+                      <span className="text-[9px] font-mono font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25">
                         ~{creatineDaysLeft}d left
                       </span>
                     )}
-                    <span className="text-[10px] text-text-muted font-medium">
-                      {creatineTaken ? '✓ Taken' : 'Pending'}
+                    <span className="text-[10px] text-text-muted font-medium font-mono">
+                      {creatineTaken ? 'Logged' : 'Pending'}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-baseline gap-1">
-                  <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-600' : 'text-text-primary'}`}>
+                  <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
                     {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
                   </span>
                 </div>
@@ -1515,13 +1515,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       toast.info('Creatine marked as not taken', 'Creatine');
                     }
                   }}
-                  className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 ${
+                  className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 font-mono ${
                     creatineTaken
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600'
-                      : 'bg-bg-card border-border text-text-primary hover:border-amber-500'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-bg-secondary border-border text-text-primary hover:border-accent/40'
                   }`}
                 >
-                  {creatineTaken ? '✓ Taken Today' : '+ Log Creatine'}
+                  {creatineTaken ? 'Taken Today' : '+ Log Creatine'}
                 </button>
               </div>
             );
@@ -2926,7 +2926,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 className="w-full py-1.5 px-3 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 text-xs font-semibold text-accent flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>⚡ Auto-Calculate Macros from Name</span>
+                <span>Auto-Calculate Macros from Name</span>
               </button>
 
               {/* Macros Breakdown */}

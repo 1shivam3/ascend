@@ -983,7 +983,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     </div>
 
                     <div className="text-2xs text-text-secondary bg-bg-secondary/60 p-3 rounded-xl border border-border text-left space-y-1.5">
-                      <span className="font-bold block text-text-primary">💡 Tips for accurate detection:</span>
+                      <span className="font-bold text-text-primary flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-accent" />
+                        <span>Tips for accurate detection:</span>
+                      </span>
                       <ul className="list-disc list-inside space-y-1 text-text-muted">
                         <li>For supplements: ensure the brand and tub label (e.g. Creatine, Whey) are clearly visible and well-lit.</li>
                         <li>For home-cooked meals: frame the entire plate from a top-down angle.</li>

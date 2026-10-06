@@ -121,10 +121,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             <Zap className="w-4 h-4 shrink-0" />
             <span>
               {isPowerbuilding
-                ? '⚡ Powerbuilding Synergy: Heavy compound singles/triples paired with hypertrophy accessory volume.'
+                ? 'Powerbuilding Synergy: Heavy compound singles/triples paired with hypertrophy accessory volume.'
                 : isRecomp
-                ? '🔥 Lean Recomposition: Strength retention in a calibrated deficit with elevated protein intake.'
-                : '🏃 Hybrid Performance: Heavy compound progression with condensed rest intervals.'}
+                ? 'Lean Recomposition: Strength retention in a calibrated deficit with elevated protein intake.'
+                : 'Hybrid Performance: Heavy compound progression with condensed rest intervals.'}
             </span>
           </div>
         )}

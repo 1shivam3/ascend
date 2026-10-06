@@ -94,8 +94,8 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     ctx.fillRect(0, 0, width, height);
 
     const glowGradient = ctx.createRadialGradient(540, 400, 100, 540, 500, 700);
-    glowGradient.addColorStop(0, 'rgba(229, 192, 123, 0.12)');
-    glowGradient.addColorStop(0.6, 'rgba(229, 192, 123, 0.02)');
+    glowGradient.addColorStop(0, 'rgba(249, 115, 22, 0.15)');
+    glowGradient.addColorStop(0.6, 'rgba(249, 115, 22, 0.02)');
     glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = glowGradient;
     ctx.fillRect(0, 0, width, height);
@@ -105,12 +105,12 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     ctx.lineWidth = 3;
     ctx.strokeRect(40, 40, width - 80, height - 80);
 
-    ctx.strokeStyle = 'rgba(229, 192, 123, 0.4)';
+    ctx.strokeStyle = 'rgba(249, 115, 22, 0.45)';
     ctx.lineWidth = 1.5;
     ctx.strokeRect(48, 48, width - 96, height - 96);
 
     // 3. Brand Header
-    ctx.fillStyle = '#e5c07b';
+    ctx.fillStyle = '#f97316';
     ctx.font = '900 48px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('ASCEND', width / 2, 130);
@@ -124,7 +124,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     ctx.fillText(weeklyStats.dateRange.toUpperCase(), width / 2, 210);
 
     // Separator line
-    ctx.strokeStyle = 'rgba(229, 192, 123, 0.3)';
+    ctx.strokeStyle = 'rgba(249, 115, 22, 0.3)';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(140, 240);
@@ -134,10 +134,10 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     // 4. Athlete Name & Bodyweight
     ctx.fillStyle = '#ffffff';
     ctx.font = '800 36px sans-serif';
-    ctx.fillText(profile?.name || 'Iron Athlete', width / 2, 305);
+    ctx.fillText(profile?.name || 'Athlete', width / 2, 305);
 
     if (profile?.bodyweightKg) {
-      ctx.fillStyle = '#e5c07b';
+      ctx.fillStyle = '#f97316';
       ctx.font = 'bold 20px monospace';
       ctx.fillText(`${profile.bodyweightKg} kg Bodyweight • ${weeklyStats.tier}`, width / 2, 345);
     }
@@ -168,7 +168,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       cardH,
       `${weeklyStats.workoutsCount} SESSIONS`,
       'WORKOUTS LOGGED',
-      '#e5c07b'
+      '#f97316'
     );
 
     // Card 3: Total Sets
@@ -192,7 +192,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       cardH,
       weeklyStats.dotsScore > 0 ? `${weeklyStats.dotsScore} DOTS` : `${weeklyStats.totalBig3} kg`,
       weeklyStats.dotsScore > 0 ? 'STRENGTH CLASSIFICATION' : 'BIG 3 TOTAL',
-      '#f59e0b'
+      '#f97316'
     );
 
     // 6. Highlights / PRs Section
@@ -215,7 +215,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
         // PR Pill Background
         ctx.fillStyle = '#18181b';
         ctx.fillRect(90, rowY - 35, width - 180, 60);
-        ctx.strokeStyle = 'rgba(229, 192, 123, 0.3)';
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.35)';
         ctx.strokeRect(90, rowY - 35, width - 180, 60);
 
         ctx.fillStyle = '#ffffff';
@@ -223,7 +223,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
         ctx.textAlign = 'left';
         ctx.fillText(pr.exercise, 120, rowY + 3);
 
-        ctx.fillStyle = '#e5c07b';
+        ctx.fillStyle = '#f97316';
         ctx.font = 'bold 24px monospace';
         ctx.textAlign = 'right';
         ctx.fillText(`${profile?.unit === 'lbs' ? pr.weightLbs : pr.weightKg} ${profile?.unit || 'kg'} × ${pr.reps}`, width - 120, rowY + 3);
@@ -237,9 +237,9 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
     // 7. Footer Brand Seal
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(229, 192, 123, 0.8)';
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.9)';
     ctx.font = 'bold 20px monospace';
-    ctx.fillText('TRACKED WITH ASCEND • 100% OFFLINE POWERLIFTING SANCTUARY', width / 2, 1230);
+    ctx.fillText('TRACKED WITH ASCEND • PRECISION TRAINING SYSTEM', width / 2, 1230);
 
     ctx.fillStyle = '#71717a';
     ctx.font = '16px monospace';
@@ -301,11 +301,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
   const handleShareWhatsApp = async () => {
     const text =
-      `🔥 *My Weekly Powerlifting Recap on ASCEND:*\n` +
+      `*ASCEND — Weekly Training Recap*\n` +
       `• *Total Volume Lifted*: ${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}\n` +
       `• *Workouts Completed*: ${weeklyStats.workoutsCount} sessions (${weeklyStats.totalSets} sets)\n` +
       (weeklyStats.dotsScore > 0 ? `• *DOTS Score*: ${weeklyStats.dotsScore} (${weeklyStats.tier})\n` : '') +
-      `\n📲 Tracked with ASCEND (100% Offline & Free):\nhttps://ascendtonext.vercel.app/`;
+      `\nTracked with ASCEND Precision Training:\nhttps://ascendtonext.vercel.app/`;
 
     // Try Web Share API with image file if supported
     if (typeof navigator !== 'undefined' && (navigator as any).share && canvasRef.current) {

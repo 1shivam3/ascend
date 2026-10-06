@@ -213,7 +213,10 @@ export default function WorkoutCoachDrawer({
 
             {/* AI Disclosure & Reporting for Google Play compliance */}
             <div className="flex items-center justify-between pt-1 border-t border-accent/20 text-3xs text-text-muted">
-              <span className="font-mono">✨ AI Generated • Not medical advice</span>
+              <span className="font-mono flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-accent" />
+                <span>AI Generated • Not medical advice</span>
+              </span>
               <button
                 type="button"
                 onClick={() => setIsReportOpen(true)}

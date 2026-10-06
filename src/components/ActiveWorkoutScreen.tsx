@@ -1331,7 +1331,7 @@ export default function ActiveWorkoutScreen({
           <div className="mb-4 p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2 animate-fade-in">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-accent flex items-center gap-1.5">
-                <span>👋</span>
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
                 <span>Quick gym tips</span>
               </span>
               <button
@@ -1642,7 +1642,9 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-emerald-500/60'
                     }`}
                   >
-                    <span className="text-xl block mb-1">😊</span>
+                    <span className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
+                      @7
+                    </span>
                     <span className="text-xs font-bold text-text-primary block">Easy</span>
                     <span className="text-3xs text-text-muted">Could do more</span>
                   </button>
@@ -1655,8 +1657,10 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-accent/60'
                     }`}
                   >
-                    <span className="text-xl block mb-1">👍</span>
-                    <span className="text-xs font-bold text-accent block">Good</span>
+                    <span className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
+                      @8
+                    </span>
+                    <span className="text-xs font-bold text-accent block">Target</span>
                     <span className="text-3xs text-text-muted">Just right</span>
                   </button>
                   <button
@@ -1668,9 +1672,11 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-danger/60'
                     }`}
                   >
-                    <span className="text-xl block mb-1">🥵</span>
+                    <span className="w-7 h-7 rounded-lg bg-danger/15 text-danger flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
+                      @9.5
+                    </span>
                     <span className="text-xs font-bold text-text-primary block">Hard</span>
-                    <span className="text-3xs text-text-muted">Pushed to limit</span>
+                    <span className="text-3xs text-text-muted">Near limit</span>
                   </button>
                 </div>
 
@@ -1828,7 +1834,7 @@ export default function ActiveWorkoutScreen({
                   }`}
                 >
                   <Check className="w-5 h-5 stroke-[3]" />
-                  <span>{currentExercise.sets[activeSetIdx]?.completed ? 'SET DONE ✓' : 'DONE'}</span>
+                  <span>{currentExercise.sets[activeSetIdx]?.completed ? 'SET COMPLETED' : 'COMPLETE SET'}</span>
                 </button>
               </div>
             )}

@@ -258,7 +258,7 @@ export default function LogPastWorkoutModal({
     if (onSaved) onSaved(entry);
 
     if (newPRsCount > 0) {
-      toast.success(`🎉 Workout logged! ${newPRsCount} new PR${newPRsCount > 1 ? 's' : ''} saved!`, 'Workout Saved');
+      toast.success(`Workout logged! ${newPRsCount} new PR${newPRsCount > 1 ? 's' : ''} saved!`, 'Workout Saved');
     } else {
       toast.success(`Logged ${validExercises.length} exercises from ${date}`, 'Workout Saved');
     }

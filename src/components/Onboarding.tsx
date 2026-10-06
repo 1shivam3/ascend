@@ -559,8 +559,9 @@ export default function OnboardingScreen() {
                       {s.split}
                     </span>
                     {s.badge === 'Recommended' && (
-                      <span className="inline-block mt-2 text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
-                        ★ Recommended
+                      <span className="inline-flex items-center gap-1 mt-2 text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
+                        <Sparkles className="w-2.5 h-2.5" />
+                        <span>Recommended</span>
                       </span>
                     )}
                   </button>

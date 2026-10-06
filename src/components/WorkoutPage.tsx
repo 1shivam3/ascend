@@ -524,9 +524,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const isRecomp = activeGoals.includes('lose_fat') && activeGoals.includes('build_muscle');
     const isAthletic = activeGoals.includes('stamina') && activeGoals.includes('get_stronger');
 
-    if (isPowerbuilding) return '⚡ Powerbuilding';
-    if (isRecomp) return '🔥 Recomp';
-    if (isAthletic) return '🏃 Hybrid';
+    if (isPowerbuilding) return 'Powerbuilding';
+    if (isRecomp) return 'Recomp';
+    if (isAthletic) return 'Hybrid';
     if (activeGoals.length === 1) return ATHLETE_GOAL_CONFIGS[activeGoals[0]]?.label || 'Goal Set';
     return activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
   }, [goals]);
@@ -1089,7 +1089,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
     if (newPRCount > 0) {
       toast.success(
-        `🎉 ${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
+        `${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
         'New PR Milestone'
       );
     } else {
@@ -1236,9 +1236,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
       {/* ── ACTIVE WORKOUT DRAFT RESUME BANNER ── */}
       {activeWorkoutDraft && !isModalOpen && (
-        <div className="card p-3.5 bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between shadow-sm">
+        <div className="card p-3.5 bg-bg-card border border-accent/40 flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
               <FastForward className="w-4 h-4" />
             </div>
             <div>
@@ -1277,7 +1277,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           <div className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-accent" />
             <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-              WEEKLY SCHEDULE &amp; BODY PARTS
+              WEEKLY SCHEDULE &amp; SPLIT
             </span>
           </div>
           <button
@@ -1307,9 +1307,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   setTargetScheduleDay(day);
                   setIsScheduleModalOpen(true);
                 }}
-                className={`py-2 px-1 rounded-2xl border text-center transition-all flex flex-col items-center justify-between min-h-[72px] sm:min-h-[80px] cursor-pointer group active:scale-95 ${
+                className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[68px] sm:min-h-[76px] cursor-pointer group active:scale-95 ${
                   isToday
-                    ? 'border-accent bg-gradient-to-b from-accent/20 via-accent/10 to-transparent shadow-sm ring-1 ring-accent'
+                    ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
                     : sched.isRest
                     ? 'border-border/40 bg-bg-secondary/40 text-text-muted hover:border-border'
                     : 'border-border/70 bg-bg-card hover:border-accent/50 hover:bg-bg-card/80'
@@ -1552,7 +1552,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 </button>
               )}
 
-              {/* Two secondary choices: Change workout & Repeat last workout / Start empty */}
+              {/* Clean secondary choices: at most 2 choices */}
               <div className="flex items-center justify-between text-xs pt-1 px-1">
                 <button
                   type="button"
@@ -1560,7 +1560,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
-                  <span>Change workout</span>
+                  <span>Change Routine / Split</span>
                 </button>
 
                 <button
@@ -1569,28 +1569,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
                 >
                   <Calendar className="w-3.5 h-3.5 text-accent" />
-                  <span>Log completed workout</span>
+                  <span>Log Past Session</span>
                 </button>
-
-                {workouts.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={handleRepeatLastWorkout}
-                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-accent" />
-                    <span>Repeat last</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={openBlankLogger}
-                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-accent" />
-                    <span>Empty workout</span>
-                  </button>
-                )}
               </div>
             </div>
           </section>
@@ -1618,8 +1598,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </section>
       )}
 
-      {/* ── 2. CONTEXTUAL REST TIMER (Only visible during active rest) ── */}
-      {(isRestRunning || isTimerFinished || restSecondsLeft > 0) && (
+      {/* ── 2. CONTEXTUAL REST TIMER (Only visible while rest is actively running) ── */}
+      {isRestRunning && (
         <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <Timer className="w-4 h-4 text-accent shrink-0" />
@@ -1951,7 +1931,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             setStartedFromPlan(null);
             if (newPRsCount > 0) {
               toast.success(
-                `🎉 ${newPRsCount} New PR${newPRsCount > 1 ? 's' : ''} detected & synced to your PRs!`,
+                `${newPRsCount} New PR${newPRsCount > 1 ? 's' : ''} detected & synced to your PRs!`,
                 'New PR Milestone'
               );
             } else {

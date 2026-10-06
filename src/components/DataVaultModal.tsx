@@ -289,8 +289,9 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             <p className="text-2xs text-text-secondary leading-relaxed">
               ASCEND requests access to select and read your <strong className="text-text-primary">.json backup file</strong> from your device storage.
             </p>
-            <p className="text-[11px] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60">
-              🔒 <strong>Privacy Notice:</strong> Your backup file is parsed entirely client-side inside your browser and is NEVER transmitted over the internet.
+            <p className="text-[11px] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60 flex items-center gap-1.5">
+              <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span><strong>Privacy Notice:</strong> Your backup file is parsed entirely client-side inside your browser and is NEVER transmitted over the internet.</span>
             </p>
 
             <div className="flex gap-2 pt-1">
