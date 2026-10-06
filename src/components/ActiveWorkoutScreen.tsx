@@ -25,10 +25,17 @@ import {
   Mic,
   Zap,
   MoreHorizontal,
+  Search,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
+import {
+  EXERCISE_LIBRARY,
+  ExerciseItem,
+  searchExercises,
+  getExerciseMuscle,
+} from '@/lib/exercise-library';
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
@@ -189,6 +196,10 @@ export default function ActiveWorkoutScreen({
   const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
+  const renameContainerRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState<number>(-1);
+  const [isChangeExerciseModalOpen, setIsChangeExerciseModalOpen] = useState<boolean>(false);
 
   // Sticky Rest Timer state (initialized to athlete's goal rest duration)
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);
@@ -259,6 +270,7 @@ export default function ActiveWorkoutScreen({
   useEffect(() => {
     setIsEditingName(false);
     setLocalExerciseName(exercises[activeExerciseIdx]?.name || '');
+    setSelectedSuggestionIdx(-1);
     const currentSets = exercises[activeExerciseIdx]?.sets || [];
     const firstIncomplete = currentSets.findIndex((s) => !s.completed);
     setActiveSetIdx(firstIncomplete !== -1 ? firstIncomplete : 0);
@@ -290,6 +302,139 @@ export default function ActiveWorkoutScreen({
     setExercises((prev) => prev.filter((_, i) => i !== idxToRemove));
     setActiveExerciseIdx((prev) => (prev >= idxToRemove ? Math.max(0, prev - 1) : prev));
     toast.info(`Removed "${removedName}" from workout.`, 'Exercise Removed');
+  };
+
+  // ── Change / Rename Exercise Autocomplete & Selection ─────────────────────
+  const handleSelectNewExerciseName = useCallback(
+    (newName: string, isBW?: boolean) => {
+      const trimmed = newName.trim();
+      if (!trimmed) {
+        setIsEditingName(false);
+        return;
+      }
+
+      const isBodyweight = isBW !== undefined ? isBW : isBodyweightExercise(trimmed);
+      const wasBodyweight = isBodyweightExercise(currentExercise?.name || '');
+
+      setExercises((prev) =>
+        prev.map((ex, i) => {
+          if (i !== activeExerciseIdx) return ex;
+
+          // If switching between bodyweight and weighted exercise on uncompleted sets, adapt default weights
+          let updatedSets = ex.sets;
+          if (isBodyweight && !wasBodyweight) {
+            updatedSets = ex.sets.map((s) => (s.completed ? s : { ...s, weight: 0 }));
+          } else if (!isBodyweight && wasBodyweight) {
+            const defaultWeight = userUnit === 'lbs' ? 115 : 50;
+            updatedSets = ex.sets.map((s) =>
+              s.completed ? s : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
+            );
+          }
+
+          return {
+            ...ex,
+            name: trimmed,
+            sets: updatedSets,
+          };
+        })
+      );
+
+      setIsEditingName(false);
+      setLocalExerciseName(trimmed);
+      setSelectedSuggestionIdx(-1);
+      toast.success(`Exercise changed to "${trimmed}"`, 'Exercise Updated');
+    },
+    [activeExerciseIdx, currentExercise?.name, userUnit, toast]
+  );
+
+  // Autocomplete suggestions when renaming / changing current exercise
+  const renameSuggestions = useMemo(() => {
+    if (!isEditingName) return [];
+    const query = localExerciseName.trim().toLowerCase();
+    const currentNameLower = (currentExercise?.name || '').toLowerCase();
+
+    // If query is empty or unchanged, show smart recommendations from the same muscle group
+    if (!query || query === currentNameLower) {
+      const currentMuscle = getExerciseMuscle(currentExercise?.name || '');
+      const sameMuscle = EXERCISE_LIBRARY.filter(
+        (ex) => ex.muscle === currentMuscle && ex.name.toLowerCase() !== currentNameLower
+      );
+      if (sameMuscle.length >= 6) {
+        return sameMuscle.slice(0, 8);
+      }
+      const others = EXERCISE_LIBRARY.filter(
+        (ex) => ex.muscle !== currentMuscle && ex.name.toLowerCase() !== currentNameLower
+      );
+      return [...sameMuscle, ...others].slice(0, 8);
+    }
+
+    // When typing query, filter and rank matches:
+    const allMatches = searchExercises(query);
+    const sorted = [...allMatches].sort((a, b) => {
+      const aLower = a.name.toLowerCase();
+      const bLower = b.name.toLowerCase();
+      const aStarts = aLower.startsWith(query);
+      const bStarts = bLower.startsWith(query);
+      if (aStarts && !bStarts) return -1;
+      if (!aStarts && bStarts) return 1;
+      const aIdx = aLower.indexOf(query);
+      const bIdx = bLower.indexOf(query);
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      return 0;
+    });
+
+    return sorted.slice(0, 8);
+  }, [isEditingName, localExerciseName, currentExercise?.name]);
+
+  // Close rename dropdown on outside click or save if valid edit
+  useEffect(() => {
+    if (!isEditingName) return;
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      if (renameContainerRef.current && !renameContainerRef.current.contains(e.target as Node)) {
+        const trimmed = localExerciseName.trim();
+        if (trimmed && trimmed !== currentExercise?.name) {
+          handleSelectNewExerciseName(trimmed);
+        } else {
+          setIsEditingName(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [isEditingName, localExerciseName, currentExercise?.name, handleSelectNewExerciseName]);
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSelectedSuggestionIdx((prev) => (prev < renameSuggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSelectedSuggestionIdx((prev) => (prev > 0 ? prev - 1 : renameSuggestions.length - 1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selectedSuggestionIdx >= 0 && selectedSuggestionIdx < renameSuggestions.length) {
+        const chosen = renameSuggestions[selectedSuggestionIdx];
+        handleSelectNewExerciseName(chosen.name, chosen.isBodyweight);
+      } else {
+        const trimmed = localExerciseName.trim();
+        if (trimmed) {
+          handleSelectNewExerciseName(trimmed);
+        } else {
+          setIsEditingName(false);
+        }
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setLocalExerciseName(currentExercise?.name || '');
+      setIsEditingName(false);
+      setSelectedSuggestionIdx(-1);
+    }
   };
 
   // Check if current exercise is a main compound lift (Bench, Squat, Deadlift, OHP)
@@ -1220,50 +1365,172 @@ export default function ActiveWorkoutScreen({
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
               {isEditingName ? (
-                <input
-                  type="text"
-                  autoFocus
-                  value={localExerciseName}
-                  placeholder="Exercise Name"
-                  onBlur={() => {
-                    const trimmed = localExerciseName.trim();
-                    if (trimmed) {
-                      setExercises((prev) =>
-                        prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: trimmed } : ex))
-                      );
-                    }
-                    setIsEditingName(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const trimmed = localExerciseName.trim();
-                      if (trimmed) {
-                        setExercises((prev) =>
-                          prev.map((ex, i) => (i === activeExerciseIdx ? { ...ex, name: trimmed } : ex))
+                <div ref={renameContainerRef} className="relative w-full z-40">
+                  <div className="relative flex items-center">
+                    <input
+                      ref={renameInputRef}
+                      type="text"
+                      autoFocus
+                      value={localExerciseName}
+                      placeholder="Type to search or rename..."
+                      onChange={(e) => {
+                        setLocalExerciseName(e.target.value);
+                        setSelectedSuggestionIdx(-1);
+                      }}
+                      onKeyDown={handleRenameKeyDown}
+                      className="text-lg sm:text-2xl font-black text-text-primary bg-bg-secondary rounded-xl pl-3 pr-9 py-2 border-2 border-accent outline-none w-full tracking-tight font-sans shadow-xl shadow-black/60"
+                    />
+                    {localExerciseName && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocalExerciseName('');
+                          renameInputRef.current?.focus();
+                        }}
+                        className="absolute right-2.5 p-1 rounded-md text-text-muted hover:text-text-primary transition-colors"
+                        title="Clear search"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown Menu for Exercise Suggestions */}
+                  <div className="absolute left-0 right-0 top-full mt-1.5 bg-bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 animate-scale-in">
+                    {/* Suggestions Header */}
+                    <div className="px-3 py-2 bg-bg-secondary/80 border-b border-border/50 flex items-center justify-between text-3xs font-semibold text-text-muted uppercase tracking-wider">
+                      <span className="truncate">
+                        {localExerciseName.trim()
+                          ? `Matches for "${localExerciseName.trim()}"`
+                          : `Similar ${getExerciseMuscle(currentExercise.name)} Exercises`}
+                      </span>
+                      <span className="font-mono text-accent shrink-0">
+                        {renameSuggestions.length} found
+                      </span>
+                    </div>
+
+                    {/* Suggestions List */}
+                    <div className="max-h-60 overflow-y-auto divide-y divide-border/20">
+                      {renameSuggestions.map((item, idx) => {
+                        const isHighlighted = idx === selectedSuggestionIdx;
+                        const isCurrent = item.name.toLowerCase() === (currentExercise.name || '').toLowerCase();
+                        return (
+                          <button
+                            key={item.id || item.name}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSelectNewExerciseName(item.name, item.isBodyweight)}
+                            className={`w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-2 transition-colors ${
+                              isHighlighted
+                                ? 'bg-accent/20 text-accent'
+                                : 'hover:bg-bg-secondary text-text-primary'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold truncate ${isHighlighted ? 'text-accent' : 'text-text-primary'}`}>
+                                  {item.name}
+                                </span>
+                                {isCurrent && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-accent/20 text-accent font-semibold shrink-0">
+                                    Current
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-3xs text-text-muted">
+                                <span className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border/40 font-medium">
+                                  {item.muscle}
+                                </span>
+                                <span className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border/40 font-medium">
+                                  {item.equipment}
+                                </span>
+                                {item.isBodyweight && (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-medium">
+                                    Bodyweight
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <ArrowRightLeft className={`w-3.5 h-3.5 shrink-0 ${isHighlighted ? 'text-accent' : 'text-text-muted'}`} />
+                          </button>
                         );
-                      }
-                      setIsEditingName(false);
-                    } else if (e.key === 'Escape') {
-                      setLocalExerciseName(currentExercise.name);
-                      setIsEditingName(false);
-                    }
-                  }}
-                  onChange={(e) => setLocalExerciseName(e.target.value)}
-                  className="text-2xl sm:text-3xl font-black text-text-primary bg-bg-secondary rounded-xl px-3 py-1 border border-accent outline-none w-full tracking-tight font-sans"
-                />
+                      })}
+
+                      {renameSuggestions.length === 0 && (
+                        <div className="px-4 py-4 text-center text-xs text-text-muted">
+                          No matching exercises in library.
+                        </div>
+                      )}
+
+                      {/* Custom name option when typed name is non-empty and not exact match */}
+                      {localExerciseName.trim() &&
+                        !renameSuggestions.some(
+                          (s) => s.name.toLowerCase() === localExerciseName.trim().toLowerCase()
+                        ) && (
+                          <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleSelectNewExerciseName(localExerciseName.trim())}
+                            className="w-full px-3.5 py-2.5 text-left flex items-center justify-between gap-2 bg-accent/10 hover:bg-accent/20 text-accent transition-colors border-t border-accent/20"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Plus className="w-3.5 h-3.5 shrink-0" />
+                              <span className="text-xs font-bold truncate">
+                                Use custom name: &ldquo;{localExerciseName.trim()}&rdquo;
+                              </span>
+                            </div>
+                            <span className="text-3xs font-mono uppercase text-accent/80 shrink-0">Custom</span>
+                          </button>
+                        )}
+                    </div>
+
+                    {/* Bottom Action: Browse all categories via modal */}
+                    <div className="p-2 bg-bg-secondary/90 border-t border-border/60 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setIsEditingName(false);
+                          setIsChangeExerciseModalOpen(true);
+                        }}
+                        className="flex-1 py-1.5 px-3 rounded-xl bg-bg-tertiary hover:bg-bg-card border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Dumbbell className="w-3.5 h-3.5 text-accent" />
+                        <span>Browse Categories...</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setLocalExerciseName(currentExercise.name);
+                          setIsEditingName(false);
+                        }}
+                        className="py-1.5 px-3 rounded-xl hover:bg-bg-tertiary text-text-muted hover:text-text-primary text-2xs transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div
                   onClick={() => {
                     setLocalExerciseName(currentExercise.name);
+                    setSelectedSuggestionIdx(-1);
                     setIsEditingName(true);
+                    setTimeout(() => renameInputRef.current?.select(), 50);
                   }}
                   className="flex items-center gap-2 cursor-pointer group"
-                  title="Tap to rename exercise"
+                  title="Tap to change or rename exercise"
                 >
                   <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans truncate group-hover:text-accent transition-colors">
                     {currentExercise.name || 'Untitled Exercise'}
                   </h2>
-                  <Edit2 className="w-3.5 h-3.5 text-accent opacity-80 group-hover:opacity-100 transition-opacity shrink-0" />
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
+                    <Edit2 className="w-3 h-3" />
+                    <span className="text-[10px] font-semibold hidden sm:inline">Change</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -2186,6 +2453,18 @@ export default function ActiveWorkoutScreen({
           setActiveExerciseIdx(exercises.length);
           setIsAddExerciseModalOpen(false);
           toast.success(`Added "${selected.name}" to workout`, 'Exercise Added');
+        }}
+      />
+
+      {/* ── Change Exercise Modal (Full Library Browser) ──────────────────── */}
+      <ExerciseSelectorModal
+        isOpen={isChangeExerciseModalOpen}
+        onClose={() => setIsChangeExerciseModalOpen(false)}
+        title="Change Exercise"
+        defaultMuscle={getExerciseMuscle(currentExercise?.name || '')}
+        onSelectExercise={(selected) => {
+          handleSelectNewExerciseName(selected.name, selected.isBodyweight);
+          setIsChangeExerciseModalOpen(false);
         }}
       />
 

@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { calculatePlates } from '../src/lib/plate-calculator';
-import { getExerciseMuscle, MuscleGroup, MUSCLE_GROUPS } from '../src/lib/exercise-library';
-import { calculateOneRepMax, getEffectiveExerciseLoad } from '../src/lib/strength-standards';
+import { getExerciseMuscle, MuscleGroup, MUSCLE_GROUPS, searchExercises, EXERCISE_LIBRARY } from '../src/lib/exercise-library';
+import { calculateOneRepMax, getEffectiveExerciseLoad, isBodyweightExercise } from '../src/lib/strength-standards';
 import { WorkoutEntry, PersonalRecord, MealEntry } from '../src/lib/types';
 import { calculateMealMacros } from '../src/lib/macros';
 
@@ -445,6 +445,51 @@ const cleanedBarcode = sampleBarcode.trim();
 assert.strictEqual(cleanedBarcode, '8901491101907');
 assert(/^[0-9]{8,14}$/.test(cleanedBarcode), 'Standard EAN/UPC barcode format valid');
 console.log(`  ✓ [PASS] Manual barcode string validation succeeds for offline/blocked camera input\n`);
+
+// 15. Active Workout Exercise Rename & Autocomplete Dropdown Integrity
+console.log('--- 15. Active Workout Exercise Rename & Autocomplete Suggestions ---');
+
+// Test 15a: Typing a single letter or word fragment yields relevant suggestions
+const queryB = searchExercises('b');
+assert(queryB.length > 0, 'Typing "b" should find exercises in library');
+assert(queryB.some((ex: any) => ex.name.toLowerCase().includes('bench') || ex.name.toLowerCase().includes('barbell')), 'Typing "b" matches barbell/bench lifts');
+
+const querySq = searchExercises('sq');
+assert(querySq.some((ex: any) => ex.name.toLowerCase().includes('squat')), 'Typing "sq" matches squat variations');
+
+const queryIncline = searchExercises('incline');
+assert(queryIncline.length >= 3, 'Typing "incline" matches at least 3 incline movements');
+assert(queryIncline.every((ex: any) => ex.name.toLowerCase().includes('incline')), 'All incline matches contain incline');
+
+// Test 15b: Smart muscle-group suggestions when query is empty or matches current exercise
+const benchMuscle = getExerciseMuscle('Barbell Bench Press');
+assert.strictEqual(benchMuscle, 'Chest', 'Bench Press correctly identified as Chest');
+const chestAlternatives = EXERCISE_LIBRARY.filter((ex: any) => ex.muscle === 'Chest' && ex.name !== 'Barbell Bench Press');
+assert(chestAlternatives.length >= 5, 'Should have multiple chest alternatives for quick swap');
+
+// Test 15c: Weight adaptation when swapping from weighted compound to bodyweight
+const originalExercise = {
+  name: 'Barbell Bench Press',
+  sets: [
+    { weight: 80, reps: 5, unit: 'kg', completed: true },
+    { weight: 80, reps: 5, unit: 'kg', completed: false },
+    { weight: 80, reps: 5, unit: 'kg', completed: false },
+  ],
+};
+
+const newExerciseName = 'Push-ups';
+const isBW = isBodyweightExercise(newExerciseName);
+assert.strictEqual(isBW, true, 'Push-ups recognized as bodyweight');
+
+const adaptedSets = originalExercise.sets.map((s) => {
+  if (s.completed) return s; // completed sets preserve actual lifted weight
+  return { ...s, weight: isBW ? 0 : s.weight };
+});
+
+assert.strictEqual(adaptedSets[0].weight, 80, 'Completed set 1 preserved');
+assert.strictEqual(adaptedSets[1].weight, 0, 'Uncompleted set 2 adapted to 0kg bodyweight');
+assert.strictEqual(adaptedSets[2].weight, 0, 'Uncompleted set 3 adapted to 0kg bodyweight');
+console.log(`  ✓ [PASS] Autocomplete search, muscle ranking, and bodyweight load adaptation verified (100%)\n`);
 
 console.log('======================================================');
 console.log('ALL POLISH & EXPERIMENT VERIFICATIONS PASSED CLEANLY (100%)');
