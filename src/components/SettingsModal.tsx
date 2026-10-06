@@ -14,15 +14,8 @@ import {
   Scale,
   Droplet,
   Sparkles,
-  FileSpreadsheet,
-  Download,
-  Upload,
-  AlertTriangle,
   ChevronRight,
-  ExternalLink,
   LogOut,
-  Check,
-  Trash2,
 } from 'lucide-react';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
@@ -32,6 +25,10 @@ import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -49,7 +46,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const toast = useToast();
 
-  const [activeSection, setActiveSection] = useState<'main' | 'ai'>('main');
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
@@ -73,9 +69,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   };
 
-  const handleToggleUnit = () => {
+  const handleToggleUnit = (nextUnit: 'kg' | 'lbs') => {
     if (!profile) return;
-    const nextUnit = profile.unit === 'kg' ? 'lbs' : 'kg';
     setProfile({
       ...profile,
       unit: nextUnit,
@@ -101,144 +96,106 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-border">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
-                <Settings className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-text-primary leading-tight">Settings</h2>
-                <p className="text-2xs text-text-muted font-mono">App Preferences &amp; Data Control</p>
-              </div>
+          <div className="flex items-center justify-between pb-2 border-b border-border/80">
+            <div>
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
+                ASCEND SETTINGS
+              </span>
+              <h2 className="text-lg font-black text-text-primary tracking-tight font-display">
+                System Preferences
+              </h2>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          {/* Athlete Profile Card */}
-          <div className="card p-3.5 bg-bg-card border border-border flex items-center justify-between shadow-xs">
+          {/* Athlete Profile Header Tile */}
+          <div className="p-3.5 rounded-2xl bg-bg-secondary/60 border border-border/80 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center font-bold text-accent text-sm select-none">
+              <div className="w-10 h-10 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center font-bold text-accent text-sm font-mono select-none">
                 {profile?.name ? profile.name.charAt(0).toUpperCase() : 'A'}
               </div>
               <div>
-                <span className="text-sm font-bold text-text-primary block leading-tight">{profile?.name || 'Athlete'}</span>
-                <span className="text-2xs text-text-muted font-mono">
+                <span className="text-sm font-bold text-text-primary block leading-tight font-display">
+                  {profile?.name || 'Athlete'}
+                </span>
+                <span className="text-[11px] text-text-muted font-mono">
                   {profile?.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Male'} • {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : ''} • {profile?.unit?.toUpperCase() || 'KG'}
                 </span>
               </div>
             </div>
+            <Badge variant="brand" size="xs">
+              {profile?.unit?.toUpperCase() || 'KG'}
+            </Badge>
           </div>
 
-          {/* Section 1: Profile & Preferences */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              Profile &amp; units
+          {/* Section 1: Profile & Training Experience */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              1. Profile &amp; Experience
             </span>
 
-            <div className="card p-3 divide-y divide-border/60 bg-bg-card border border-border">
+            <Card variant="default" padding="sm" className="divide-y divide-border/60">
               {/* Unit Toggle */}
-              <div className="py-2 flex items-center justify-between">
+              <div className="py-2.5 flex items-center justify-between px-1">
                 <div>
                   <span className="text-xs font-semibold text-text-primary block">Weight Unit</span>
-                  <span className="text-2xs text-text-muted">Display all lifts &amp; bodyweight in {profile?.unit?.toUpperCase()}</span>
+                  <span className="text-2xs text-text-muted">Display all lifts in {profile?.unit?.toUpperCase()}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleToggleUnit}
-                  className="px-3 py-1 rounded-lg bg-bg-secondary border border-border text-xs font-mono font-bold text-accent hover:border-accent transition-all"
-                >
-                  {profile?.unit?.toUpperCase() || 'KG'}
-                </button>
+                <div className="w-28">
+                  <SegmentedControl
+                    value={profile?.unit || 'kg'}
+                    onChange={(val) => handleToggleUnit(val as 'kg' | 'lbs')}
+                    size="sm"
+                    options={[
+                      { value: 'kg', label: 'KG' },
+                      { value: 'lbs', label: 'LBS' },
+                    ]}
+                  />
+                </div>
               </div>
 
-              {/* Training Experience (Beginner vs Advanced) */}
-              <div className="py-2.5 flex items-center justify-between">
+              {/* Training Experience Mode */}
+              <div className="py-2.5 flex items-center justify-between px-1">
                 <div>
-                  <span className="text-xs font-semibold text-text-primary block">Training Experience</span>
+                  <span className="text-xs font-semibold text-text-primary block">Training UI Mode</span>
                   <span className="text-2xs text-text-muted">
-                    {userMode === 'beginner'
-                      ? 'Beginner: 1-tap logging, simple interface'
-                      : 'Advanced: Multi-set tables, RPE & tools'}
+                    {userMode === 'beginner' ? 'Beginner: Focused 1-set logger' : 'Advanced: Multi-set tables & RPE'}
                   </span>
                 </div>
-                <div className="flex bg-bg-secondary rounded-xl border border-border/80 overflow-hidden p-0.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserMode('beginner');
-                      toast.info('Switched to Beginner mode.', 'Mode Updated');
+                <div className="w-40">
+                  <SegmentedControl
+                    value={userMode}
+                    onChange={(val) => {
+                      setUserMode(val as 'beginner' | 'advanced');
+                      toast.info(`Switched to ${val} mode.`);
                     }}
-                    className={`px-2.5 py-1 text-2xs font-semibold rounded-lg transition-all ${
-                      userMode === 'beginner'
-                        ? 'bg-emerald-500 text-white font-bold shadow-xs'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    🌱 Beginner
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserMode('advanced');
-                      toast.info('Switched to Advanced mode.', 'Mode Updated');
-                    }}
-                    className={`px-2.5 py-1 text-2xs font-semibold rounded-lg transition-all ${
-                      userMode === 'advanced'
-                        ? 'bg-accent text-white font-bold shadow-xs'
-                        : 'text-text-muted hover:text-text-primary'
-                    }`}
-                  >
-                    ⚡ Advanced
-                  </button>
+                    size="sm"
+                    options={[
+                      { value: 'beginner', label: 'Beginner' },
+                      { value: 'advanced', label: 'Advanced' },
+                    ]}
+                  />
                 </div>
               </div>
 
-              {/* Bodyweight & Height */}
+              {/* Body Metrics Trigger */}
               <div
                 onClick={() => setIsBodyMetricsOpen(true)}
                 className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
               >
                 <div className="flex items-center gap-2.5">
-                  <Scale className="w-4 h-4 text-purple-400" />
+                  <Scale className="w-4 h-4 text-accent" />
                   <div>
-                    <span className="text-xs font-semibold text-text-primary block">Body Metrics</span>
+                    <span className="text-xs font-semibold text-text-primary block">Body Metrics &amp; Height</span>
                     <span className="text-2xs text-text-muted font-mono">
-                      {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : 'Not set'} • {profile?.gender || 'male'}
+                      {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : 'Unset'} • {profile?.heightCm ? `${profile.heightCm} cm` : 'Height unset'}
                     </span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted" />
-              </div>
-
-              {/* Active Training & Nutrition Goals */}
-              <div
-                onClick={() => setIsGoalSelectorOpen(true)}
-                className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Target className="w-4 h-4 text-accent" />
-                  <div>
-                    <span className="text-xs font-semibold text-text-primary block">Active Goals &amp; Focus</span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {goals && goals.length > 0 ? (
-                        goals.map((g) => (
-                          <span
-                            key={g}
-                            className="text-3xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25"
-                          >
-                            {ATHLETE_GOAL_CONFIGS[g]?.label || g}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-2xs text-text-muted font-mono">Not configured</span>
-                      )}
-                    </div>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -246,19 +203,52 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               {/* Theme Toggle */}
               <div className="py-2.5 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-text-primary">Appearance</span>
+                <span className="text-xs font-semibold text-text-primary">Theme Appearance</span>
                 <ThemeToggle />
               </div>
-            </div>
+            </Card>
           </div>
 
-          {/* Section 2: Habit Targets */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              Habit targets
+          {/* Section 2: Goals & Split Configuration */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              2. Goals &amp; Training Focus
             </span>
 
-            <div className="card p-3 divide-y divide-border/60 bg-bg-card border border-border">
+            <Card
+              variant="interactive"
+              padding="sm"
+              onClick={() => setIsGoalSelectorOpen(true)}
+              className="flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2.5">
+                <Target className="w-4 h-4 text-accent" />
+                <div>
+                  <span className="text-xs font-semibold text-text-primary block">Athlete Goal</span>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {goals && goals.length > 0 ? (
+                      goals.map((g) => (
+                        <Badge key={g} variant="brand" size="xs">
+                          {ATHLETE_GOAL_CONFIGS[g]?.label || g}
+                        </Badge>
+                      ))
+                    ) : (
+                      <span className="text-2xs text-text-muted font-mono">Not configured</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </Card>
+          </div>
+
+          {/* Section 3: Habit Targets */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              3. Habit &amp; Recovery Trackers
+            </span>
+
+            <Card variant="default" padding="sm" className="divide-y divide-border/60">
               <div
                 onClick={() => setIsHydrationOpen(true)}
                 className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
@@ -266,8 +256,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2.5">
                   <Droplet className="w-4 h-4 text-sky-400" />
                   <div>
-                    <span className="text-xs font-semibold text-text-primary block">Daily Hydration</span>
-                    <span className="text-2xs text-text-muted">Target intake &amp; automated formula</span>
+                    <span className="text-xs font-semibold text-text-primary block">Daily Hydration Target</span>
+                    <span className="text-2xs text-text-muted">Target formula based on body mass</span>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -280,166 +270,158 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2.5">
                   <Sparkles className="w-4 h-4 text-amber-400" />
                   <div>
-                    <span className="text-xs font-semibold text-text-primary block">Creatine Tracker</span>
-                    <span className="text-2xs text-text-muted">Daily dosage &amp; tub supply tracker</span>
+                    <span className="text-xs font-semibold text-text-primary block">Creatine Monohydrate Tracker</span>
+                    <span className="text-2xs text-text-muted">Daily intake &amp; tub supply counter</span>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
               </div>
-            </div>
+            </Card>
           </div>
 
-          {/* Section 3: AI Configuration */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              AI intelligence
+          {/* Section 4: AI Configuration */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              4. Intelligence Engine &amp; API Key
             </span>
 
-            <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
+            <Card variant="default" padding="sm" className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Key className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-bold text-text-primary">Google Gemini API Key</span>
+                  <span className="text-xs font-bold text-text-primary">Gemini 2.5 Flash API Key</span>
                 </div>
-                {customGeminiKey ? (
-                  <span className="text-3xs font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                    Active
-                  </span>
-                ) : (
-                  <span className="text-3xs font-mono text-text-muted bg-bg-secondary px-2 py-0.5 rounded-full">
-                    Cloud / Offline
-                  </span>
-                )}
+                <Badge variant={customGeminiKey ? 'success' : 'neutral'} size="xs">
+                  {customGeminiKey ? 'Active' : 'Offline Engine'}
+                </Badge>
               </div>
 
               <p className="text-2xs text-text-secondary leading-relaxed">
-                ASCEND operates completely offline with built-in coach logic. Enter your personal Gemini API key for unlimited AI scans and coaching insights.
+                ASCEND executes 100% of training calculations on-device. An optional Gemini key powers instant multi-image meal scanning and AI coaching.
               </p>
 
               <div className="flex gap-2">
                 <input
                   type="password"
-                  placeholder="AIzaSy... (leave blank for default)"
+                  placeholder="AIzaSy... (leave empty for on-device default)"
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
-                  className="flex-1 bg-bg-secondary border border-border rounded-lg px-2.5 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
+                  className="flex-1 bg-bg-secondary border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={handleSaveApiKey}
-                  className="btn-primary py-1.5 px-3 text-xs font-semibold"
-                >
+                <Button variant="primary" size="sm" onClick={handleSaveApiKey}>
                   Save
-                </button>
+                </Button>
               </div>
 
-              <p className="text-[11px] text-text-muted flex items-center gap-1.5 pt-0.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
                 <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Your API key is stored locally in your browser and used directly when making AI requests.</span>
-              </p>
-            </div>
+                <span>Stored only in your browser local storage. Never transmitted to third parties.</span>
+              </div>
+            </Card>
           </div>
 
-          {/* Section 4: Data & Backups */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              Data vault &amp; backup
+          {/* Section 5: Data Vault & Backup */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              5. Data Vault &amp; Export
             </span>
 
-            <div
+            <Card
+              variant="interactive"
+              padding="sm"
               onClick={() => setIsDataVaultOpen(true)}
-              className="card p-3.5 bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-colors flex items-center justify-between shadow-xs"
+              className="flex items-center justify-between"
             >
               <div className="flex items-center gap-2.5">
                 <HardDrive className="w-4 h-4 text-accent" />
                 <div>
-                  <span className="text-xs font-bold text-text-primary block">Data Vault &amp; History</span>
-                  <span className="text-2xs text-text-muted">Export JSON backup, CSV workout import, reset data</span>
+                  <span className="text-xs font-bold text-text-primary block">Data Vault &amp; Local Backup</span>
+                  <span className="text-2xs text-text-muted">Export complete JSON snapshot, CSV workout history, reset data</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted" />
-            </div>
+            </Card>
           </div>
 
-          {/* Section: Account & Session */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              Account &amp; session
+          {/* Section 6: Legal Hub & Safety */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              6. Safety &amp; Medical Terms
             </span>
 
-            <div className="card p-3.5 bg-bg-card border border-border shadow-xs space-y-3">
+            <Card
+              variant="interactive"
+              padding="sm"
+              onClick={() => setIsLegalHubOpen(true)}
+              className="flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2.5">
+                <Shield className="w-4 h-4 text-emerald-500" />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Legal Hub &amp; Disclaimer</span>
+                  <span className="text-2xs text-text-muted">Offline-first privacy policy &amp; physical safety guidelines</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </Card>
+          </div>
+
+          {/* Account Log Out */}
+          <div className="pt-1">
+            <Card variant="default" padding="sm" className="border-red-500/20">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shrink-0">
                     <LogOut className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-text-primary block">Log Out</span>
-                    <span className="text-2xs text-text-muted">Exit active athlete profile ({profile?.name || 'Athlete'})</span>
+                    <span className="text-xs font-bold text-text-primary block">Profile Session</span>
+                    <span className="text-2xs text-text-muted">Exit active athlete profile</span>
                   </div>
                 </div>
                 {!showLogoutConfirm ? (
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger"
+                    size="sm"
                     onClick={() => setShowLogoutConfirm(true)}
-                    className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/25 text-xs font-bold transition-all active:scale-95 cursor-pointer shrink-0"
                   >
                     Log Out
-                  </button>
+                  </Button>
                 ) : null}
               </div>
 
               {showLogoutConfirm && (
-                <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in">
+                <div className="pt-2.5 mt-2 border-t border-border/60 space-y-2 animate-fade-in">
                   <p className="text-2xs text-text-secondary leading-relaxed">
-                    Are you sure you want to log out of <strong>{profile?.name || 'Athlete'}</strong>? Your workouts and records remain safely stored on this device.
+                    Log out of <strong>{profile?.name || 'Athlete'}</strong>? Your workouts and records remain safely stored on this device.
                   </p>
                   <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      fullWidth
                       onClick={() => setShowLogoutConfirm(false)}
-                      className="btn-secondary flex-1 py-1.5 text-xs font-semibold"
                     >
                       Cancel
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      fullWidth
                       onClick={handleConfirmLogout}
-                      className="flex-1 py-1.5 px-3 rounded-lg bg-red-500 hover:bg-red-600 text-white font-bold text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      leftIcon={<LogOut className="w-3.5 h-3.5" />}
                     >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Confirm Log Out</span>
-                    </button>
+                      Confirm Log Out
+                    </Button>
                   </div>
                 </div>
               )}
-            </div>
+            </Card>
           </div>
 
-          {/* Section 5: Legal & Privacy */}
-          <div className="space-y-2">
-            <span className="text-label font-bold text-text-muted px-1">
-              Safety &amp; privacy
-            </span>
-
-            <div
-              onClick={() => setIsLegalHubOpen(true)}
-              className="card p-3.5 bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-colors flex items-center justify-between shadow-xs"
-            >
-              <div className="flex items-center gap-2.5">
-                <Shield className="w-4 h-4 text-emerald-500" />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Legal Hub &amp; Medical Disclaimer</span>
-                  <span className="text-2xs text-text-muted">100% Private Local Storage • Medical Safety Terms</span>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-text-muted" />
-            </div>
-          </div>
-
-          {/* Version Footer */}
-          <div className="pt-2 text-center text-3xs font-mono text-text-muted">
-            ASCEND v2.0.0 • Offline-First Training Architecture
+          {/* Footer */}
+          <div className="pt-1 text-center text-[10px] font-mono text-text-muted">
+            ASCEND v2.0.0 &bull; Precision Training Instrument
           </div>
         </div>
       </div>

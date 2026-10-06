@@ -213,14 +213,18 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* Header */}
       <header className="flex justify-between items-center mb-1">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Progress</h1>
-          <p className="text-2xs text-text-muted font-mono">Strength, Body &amp; Training Intelligence</p>
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+            TRAINING TRAJECTORY
+          </span>
+          <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-display">
+            Am I Getting Better?
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setIsWeeklyRecapOpen(true)}
-            className="btn-secondary py-1.5 px-2.5 text-xs font-bold flex items-center gap-1.5 text-text-primary hover:text-accent border-border hover:border-accent/40 transition-colors shadow-xs"
+            className="btn-secondary py-1.5 px-2.5 text-xs font-bold flex items-center gap-1.5 text-text-primary hover:text-accent border-border hover:border-accent/40 transition-colors shadow-xs cursor-pointer"
             title="Generate Weekly Training Card (WhatsApp / Instagram)"
           >
             <Share2 className="w-3.5 h-3.5 text-accent" />
@@ -229,23 +233,23 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         </div>
       </header>
 
-      {/* Sub-Navigation Pill Bar (3 clean tabs) */}
-      <nav className="flex items-center gap-2 border-b border-border/60 pb-2">
+      {/* Sub-Navigation (3 clean tabs) */}
+      <div className="flex items-center gap-2 border-b border-border/80 pb-2">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-center ${
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-center cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-accent text-white shadow-xs'
                 : 'bg-bg-secondary text-text-muted hover:text-text-primary'
             }`}
           >
-            {tab.label}
+            {tab.label === 'Strength' ? 'Lifts & Trends' : tab.label === 'Body' ? 'Body & Mass' : 'Consistency'}
           </button>
         ))}
-      </nav>
+      </div>
 
       {/* ── TAB 1: STRENGTH ───────────────────────────────────────────────── */}
       {activeTab === 'strength' && (
@@ -255,18 +259,18 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <button
               type="button"
               onClick={() => setStrengthSubView('overview')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
                 strengthSubView === 'overview'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
-              Overview
+              Lift Trends
             </button>
             <button
               type="button"
               onClick={() => setStrengthSubView('twin')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
                 strengthSubView === 'twin'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
@@ -278,13 +282,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <button
               type="button"
               onClick={() => setStrengthSubView('prs')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center ${
+              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
                 strengthSubView === 'prs'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
-              PRs &amp; Ranks
+              Personal Records
             </button>
           </div>
 

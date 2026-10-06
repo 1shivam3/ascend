@@ -1269,60 +1269,59 @@ export default function ActiveWorkoutScreen({
         </div>
       </header>
 
-      {/* ── Exercise Switcher Bar (Numbered indicators, clean & quiet) ── */}
-      <nav className="bg-bg-primary border-b border-border/50 px-4 py-2 flex items-center justify-between shrink-0 max-w-[480px] mx-auto w-full">
+      {/* ── Exercise Navigation Bar (Focused 1 of N with hairline progress) ── */}
+      <nav className="bg-bg-card border-b border-border/80 px-4 py-2 flex items-center justify-between shrink-0 max-w-[480px] mx-auto w-full">
         <button
           type="button"
           disabled={activeExerciseIdx === 0}
           onClick={() => setActiveExerciseIdx((prev) => Math.max(0, prev - 1))}
-          className="w-8 h-8 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary disabled:opacity-30 flex items-center justify-center transition-colors"
+          className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center gap-1 cursor-pointer"
           aria-label="Previous exercise"
         >
           <ChevronLeft className="w-4 h-4" />
+          <span className="text-xs font-semibold hidden sm:inline">Prev</span>
         </button>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          {exercises.map((ex, idx) => {
-            const isCompleted = ex.sets.length > 0 && ex.sets.every((s) => s.completed);
-            const isCurrent = idx === activeExerciseIdx;
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-mono font-black text-accent">
+              {activeExerciseIdx + 1}
+            </span>
+            <span className="text-xs font-mono text-text-muted">of</span>
+            <span className="text-xs font-mono font-bold text-text-secondary">
+              {exercises.length}
+            </span>
+          </div>
+          {/* Hairline progress track */}
+          <div className="w-24 h-1 bg-bg-secondary rounded-full overflow-hidden mt-1">
+            <div
+              className="h-full bg-accent transition-all duration-300 rounded-full"
+              style={{ width: `${((activeExerciseIdx + 1) / exercises.length) * 100}%` }}
+            />
+          </div>
+        </div>
 
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setActiveExerciseIdx(idx)}
-                className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
-                  isCurrent
-                    ? 'bg-accent text-white shadow-xs'
-                    : isCompleted
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-bg-secondary text-text-muted hover:text-text-primary border border-border/60'
-                }`}
-                title={ex.name}
-              >
-                {isCompleted ? '✓' : idx + 1}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => setIsAddExerciseModalOpen(true)}
-            className="w-7 h-7 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center transition-all ml-1"
+            className="p-1.5 rounded-lg text-text-muted hover:text-accent transition-colors cursor-pointer"
             title="Add Exercise"
+            aria-label="Add Exercise"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            disabled={activeExerciseIdx === exercises.length - 1}
+            onClick={() => setActiveExerciseIdx((prev) => Math.min(exercises.length - 1, prev + 1))}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center gap-1 cursor-pointer"
+            aria-label="Next exercise"
+          >
+            <span className="text-xs font-semibold hidden sm:inline">Next</span>
+            <ChevronRight className="w-4 h-4" />
           </button>
         </div>
-
-        <button
-          type="button"
-          disabled={activeExerciseIdx === exercises.length - 1}
-          onClick={() => setActiveExerciseIdx((prev) => Math.min(exercises.length - 1, prev + 1))}
-          className="w-8 h-8 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary disabled:opacity-30 flex items-center justify-center transition-colors"
-          aria-label="Next exercise"
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
       </nav>
 
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
@@ -1764,6 +1763,20 @@ export default function ActiveWorkoutScreen({
                       >
                         +
                       </button>
+                    </div>
+
+                    {/* Quick increment chips */}
+                    <div className="flex items-center justify-center gap-1 pt-1">
+                      {[-5, -2.5, 2.5, 5].map((delta) => (
+                        <button
+                          key={delta}
+                          type="button"
+                          onClick={() => handleWeightStep(activeSetIdx, delta)}
+                          className="px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                        >
+                          {delta > 0 ? `+${delta}` : delta}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
