@@ -106,21 +106,22 @@ export function recalculateMealResult(
   updatedItems: ScannedFoodItem[]
 ): MealAnalysisResult {
   const verifiedItems = updatedItems.map((item) => {
-    // If grams were adjusted, recalculate based on standard database
-    const dbEst = estimateMacros(item.name, item.estimatedGrams || 100, 'g');
+    // Only fall back to estimateMacros if the item does not have a valid calorie number
+    const hasValidMacros = typeof item.calories === 'number' && !isNaN(item.calories) && item.calories >= 0;
+    const dbEst = !hasValidMacros ? estimateMacros(item.name, item.estimatedGrams || 100, 'g') : null;
+
     return {
       ...item,
-      calories:
-        typeof item.calories === 'number' && !isNaN(item.calories)
-          ? item.calories
-          : dbEst.calories,
-      proteinG:
-        typeof item.proteinG === 'number' && !isNaN(item.proteinG)
-          ? item.proteinG
-          : dbEst.proteinG,
-      carbsG:
-        typeof item.carbsG === 'number' && !isNaN(item.carbsG) ? item.carbsG : dbEst.carbsG,
-      fatG: typeof item.fatG === 'number' && !isNaN(item.fatG) ? item.fatG : dbEst.fatG,
+      calories: hasValidMacros ? Math.max(0, Math.round(item.calories)) : (dbEst?.calories || 0),
+      proteinG: hasValidMacros
+        ? Math.max(0, Math.round((item.proteinG || 0) * 10) / 10)
+        : (dbEst?.proteinG || 0),
+      carbsG: hasValidMacros
+        ? Math.max(0, Math.round((item.carbsG || 0) * 10) / 10)
+        : (dbEst?.carbsG || 0),
+      fatG: hasValidMacros
+        ? Math.max(0, Math.round((item.fatG || 0) * 10) / 10)
+        : (dbEst?.fatG || 0),
     };
   });
 

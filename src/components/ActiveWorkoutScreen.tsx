@@ -1222,70 +1222,88 @@ export default function ActiveWorkoutScreen({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Secondary ⋯ Tools Menu (In advanced mode, or available for quick tools) */}
-          {userMode === 'advanced' && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-                className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95"
-                title="Workout Tools & Options"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
+          {/* Secondary ⋯ Tools Menu (Available for quick tools & helper sheets) */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              title="Workout Tools & Options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
 
-              {isMoreMenuOpen && (
-                <div
-                  className="absolute right-0 top-full mt-1.5 w-52 rounded-xl bg-bg-card border border-border shadow-xl p-1.5 z-50 animate-fade-in space-y-1"
-                  onClick={() => setIsMoreMenuOpen(false)}
+            {isMoreMenuOpen && (
+              <div
+                className="absolute right-0 top-full mt-1.5 w-56 rounded-xl bg-bg-card border border-border shadow-xl p-1.5 z-50 animate-fade-in space-y-1"
+                onClick={() => setIsMoreMenuOpen(false)}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstW = parseFloat(String(currentExercise.sets[activeSetIdx]?.weight || currentExercise.sets[0]?.weight)) || 60;
+                    openPlateCalculatorForWeight(firstW);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
                 >
+                  <Dumbbell className="w-3.5 h-3.5 text-accent" />
+                  <span>Plate helper</span>
+                </button>
+                {formCues.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setIsAdaptModalOpen(true)}
-                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-accent/15 hover:text-accent transition-colors flex items-center gap-2"
+                    onClick={() => setShowFormCues((prev) => !prev)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
                   >
-                    <Zap className="w-3.5 h-3.5 text-accent" />
-                    <span>Change today&apos;s workout</span>
+                    <Sparkles className="w-3.5 h-3.5 text-accent" />
+                    <span>Form execution cues</span>
                   </button>
+                )}
+                {prescription?.whyThisWeight && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const firstW = parseFloat(String(currentExercise.sets[0]?.weight)) || 60;
-                      openPlateCalculatorForWeight(firstW);
-                    }}
-                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
+                    onClick={() => setShowWhyTarget((prev) => !prev)}
+                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
                   >
-                    <Dumbbell className="w-3.5 h-3.5 text-text-muted" />
-                    <span>Plate helper</span>
+                    <Bot className="w-3.5 h-3.5 text-accent" />
+                    <span>Why this target weight?</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsWarmupModalOpen(true)}
-                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-text-muted" />
-                    <span>Warm-up sets</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsVoiceModalOpen(true)}
-                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2"
-                  >
-                    <Mic className="w-3.5 h-3.5 text-text-muted" />
-                    <span>Voice dictation</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddExerciseModalOpen(true)}
-                    className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 border-t border-border/40 pt-1.5"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-text-muted" />
-                    <span>Add exercise</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsWarmupModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Flame className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Warm-up sets</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAdaptModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-accent/15 hover:text-accent transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Zap className="w-3.5 h-3.5 text-accent" />
+                  <span>Change routine / split</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsVoiceModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Mic className="w-3.5 h-3.5 text-text-muted" />
+                  <span>Voice dictation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddExerciseModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 border-t border-border/40 pt-1.5 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5 text-text-muted" />
+                  <span>Add exercise</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
@@ -1596,15 +1614,15 @@ export default function ActiveWorkoutScreen({
             )}
           </div>
 
-          {/* Context & Target Card */}
-          <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 space-y-2 mt-2">
+          {/* Context & Target Card (Clean Minimal Comparison) */}
+          <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 mt-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  TODAY&apos;S TARGET
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                  Today&apos;s Target
                 </span>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-base font-black font-mono text-accent">
+                  <span className="text-base sm:text-lg font-bold font-sans text-accent">
                     {prescription ? `${prescription.targetWeight} ${userUnit} × ${prescription.targetReps} reps` : `${currentExercise.sets[0]?.weight || 0} ${userUnit} × ${currentExercise.sets[0]?.reps || 8}`}
                   </span>
                   {userMode === 'advanced' && (
@@ -1616,10 +1634,10 @@ export default function ActiveWorkoutScreen({
               </div>
 
               <div className="text-right space-y-0.5">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  LAST TIME
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                  Last Time
                 </span>
-                <span className="text-xs font-mono font-bold text-text-secondary block">
+                <span className="text-xs font-semibold text-text-secondary block">
                   {prescription?.lastPerformance
                     ? `${prescription.lastPerformance.weight} ${userUnit} × ${prescription.lastPerformance.reps} reps`
                     : lastPerf
@@ -1630,58 +1648,6 @@ export default function ActiveWorkoutScreen({
                 </span>
               </div>
             </div>
-
-            {/* Quick Helper Drawers (Engine Note & Form Cues) */}
-            <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
-              <button
-                type="button"
-                onClick={() => setShowWhyTarget((p) => !p)}
-                className="text-text-muted hover:text-accent flex items-center gap-1 font-mono transition-colors cursor-pointer"
-              >
-                <Sparkles className="w-3 h-3 text-accent" />
-                <span>{showWhyTarget ? 'Hide engine reason' : 'Why this weight?'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowFormCues((p) => !p)}
-                className="text-text-muted hover:text-text-primary flex items-center gap-1 font-medium transition-colors cursor-pointer"
-              >
-                <span>{showFormCues ? 'Hide form cues' : 'Form cues'}</span>
-                <ChevronRight className={`w-3 h-3 transition-transform ${showFormCues ? 'rotate-90' : ''}`} />
-              </button>
-            </div>
-
-            {/* Engine reasoning accordion */}
-            {showWhyTarget && prescription?.whyThisWeight && (
-              <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 space-y-1 text-2xs animate-fade-in">
-                <p className="text-text-primary leading-relaxed font-sans">
-                  <strong>Prescription:</strong> {prescription.whyThisWeight}
-                </p>
-                {prescription.nextSessionRule && (
-                  <p className="text-text-secondary leading-relaxed font-mono text-[10px]">
-                    <strong>Progression rule:</strong> {prescription.nextSessionRule}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Form cues accordion */}
-            {showFormCues && formCues.length > 0 && (
-              <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5 text-2xs animate-fade-in">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
-                  EXECUTION CUES
-                </span>
-                <ul className="space-y-1 text-text-secondary">
-                  {formCues.map((cue, cIdx) => (
-                    <li key={cIdx} className="flex items-start gap-1.5">
-                      <span className="text-accent font-bold">•</span>
-                      <span className="leading-snug">{cue}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </section>
 
@@ -1690,8 +1656,8 @@ export default function ActiveWorkoutScreen({
           <section className="space-y-4">
             {/* Set pills navigator */}
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                SET {activeSetIdx + 1} OF {currentExercise.sets.length}
+              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                Set {activeSetIdx + 1} of {currentExercise.sets.length}
               </span>
               <div className="flex items-center gap-1.5">
                 {currentExercise.sets.map((s, idx) => (
@@ -1719,7 +1685,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleAddSet}
-                  className="w-7 h-7 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1"
+                  className="w-7 h-7 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
                   title="Add set"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -1746,7 +1712,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => handleLogExerciseEffort(7, 'easy')}
-                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center cursor-pointer ${
                       effortChosen === 'easy'
                         ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
                         : 'bg-bg-secondary border-border/80 hover:border-emerald-500/60'
@@ -1761,7 +1727,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => handleLogExerciseEffort(8, 'good')}
-                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center cursor-pointer ${
                       effortChosen === 'good'
                         ? 'bg-accent/20 border-accent text-accent'
                         : 'bg-bg-secondary border-border/80 hover:border-accent/60'
@@ -1776,7 +1742,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => handleLogExerciseEffort(9.5, 'hard')}
-                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center ${
+                    className={`p-3 rounded-xl border active:scale-95 transition-all text-center cursor-pointer ${
                       effortChosen === 'hard'
                         ? 'bg-danger/20 border-danger text-danger'
                         : 'bg-bg-secondary border-border/80 hover:border-danger/60'
@@ -1798,9 +1764,9 @@ export default function ActiveWorkoutScreen({
                         setShowEffortPrompt(false);
                         setActiveExerciseIdx((prev) => prev + 1);
                       }}
-                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2"
+                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <span>NEXT: {exercises[activeExerciseIdx + 1]?.name}</span>
+                      <span>Next: {exercises[activeExerciseIdx + 1]?.name}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   ) : (
@@ -1810,10 +1776,10 @@ export default function ActiveWorkoutScreen({
                         setShowEffortPrompt(false);
                         setIsFinishModalOpen(true);
                       }}
-                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none"
+                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none cursor-pointer"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
-                      <span>FINISH WORKOUT</span>
+                      <span>Finish Workout</span>
                     </button>
                   )}
                 </div>
@@ -1824,14 +1790,14 @@ export default function ActiveWorkoutScreen({
                 <div className="grid grid-cols-2 gap-4">
                   {/* Weight Stepper */}
                   <div className="text-center space-y-2">
-                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                      {isCurrentBodyweight ? `ADDED WEIGHT (${userUnit})` : isCurrentDumbbell ? `WEIGHT / DB (${userUnit})` : `WEIGHT (${userUnit})`}
+                    <span className="text-xs font-medium text-text-muted">
+                      {isCurrentBodyweight ? `Added Weight (${userUnit})` : isCurrentDumbbell ? `Weight / DB (${userUnit})` : `Weight (${userUnit})`}
                     </span>
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, -currentWeightStep)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         -
                       </button>
@@ -1875,7 +1841,7 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, currentWeightStep)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         +
                       </button>
@@ -1898,14 +1864,14 @@ export default function ActiveWorkoutScreen({
 
                   {/* Reps Stepper */}
                   <div className="text-center space-y-2">
-                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                      REPS
+                    <span className="text-xs font-medium text-text-muted">
+                      Reps
                     </span>
                     <div className="flex items-center justify-center gap-1.5 sm:gap-2">
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, -1)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         -
                       </button>
@@ -1925,7 +1891,7 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, 1)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform"
+                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         +
                       </button>
@@ -1937,14 +1903,14 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => handleCompleteActiveSet(activeSetIdx)}
-                  className={`w-full py-4 rounded-xl text-base font-black tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] ${
+                  className={`w-full py-4 rounded-xl text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
                     currentExercise.sets[activeSetIdx]?.completed
                       ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
                       : 'bg-accent hover:brightness-105 text-white shadow-accent/25'
                   }`}
                 >
                   <Check className="w-5 h-5 stroke-[3]" />
-                  <span>{currentExercise.sets[activeSetIdx]?.completed ? 'SET COMPLETED' : 'COMPLETE SET'}</span>
+                  <span>{currentExercise.sets[activeSetIdx]?.completed ? `Set ${activeSetIdx + 1} Completed` : `Complete Set ${activeSetIdx + 1}`}</span>
                 </button>
               </div>
             )}
@@ -1956,19 +1922,19 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
-                    className="btn-secondary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:border-accent text-text-primary transition-all shadow-xs"
+                    className="btn-secondary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:border-accent text-text-primary transition-all shadow-xs cursor-pointer"
                   >
-                    <span>NEXT EXERCISE: {exercises[activeExerciseIdx + 1]?.name}</span>
+                    <span>Next Exercise: {exercises[activeExerciseIdx + 1]?.name}</span>
                     <ChevronRight className="w-4 h-4 text-accent" />
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsFinishModalOpen(true)}
-                    className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20"
+                    className="btn-primary w-full py-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 border-none text-white shadow-md shadow-emerald-500/20 cursor-pointer"
                   >
                     <Check className="w-4 h-4 stroke-[3]" />
-                    <span>FINISH WORKOUT</span>
+                    <span>Finish Workout</span>
                   </button>
                 )}
 
@@ -1976,7 +1942,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                    className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
+                    className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                     <span>Previous: {exercises[activeExerciseIdx - 1]?.name}</span>

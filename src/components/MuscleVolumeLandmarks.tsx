@@ -28,6 +28,23 @@ const MUSCLE_LANDMARKS: Record<ResistanceMuscleGroup, LandmarkConfig> = {
 
 export default function MuscleVolumeLandmarks() {
   const workouts = useStore((state) => state.workouts || []);
+  const profile = useStore((state) => state.profile);
+  const experience = profile?.userMode === 'beginner' ? 'beginner' : profile?.userMode === 'advanced' ? 'advanced' : 'intermediate';
+
+  // Adapt volume landmarks dynamically by user training experience
+  const landmarks = useMemo(() => {
+    const mult = experience === 'beginner' ? 0.75 : experience === 'advanced' ? 1.2 : 1.0;
+    const res: Record<ResistanceMuscleGroup, LandmarkConfig> = { ...MUSCLE_LANDMARKS };
+    for (const k of Object.keys(res) as ResistanceMuscleGroup[]) {
+      res[k] = {
+        mev: Math.max(4, Math.round(MUSCLE_LANDMARKS[k].mev * mult)),
+        mavMin: Math.max(6, Math.round(MUSCLE_LANDMARKS[k].mavMin * mult)),
+        mavMax: Math.max(10, Math.round(MUSCLE_LANDMARKS[k].mavMax * mult)),
+        mrv: Math.max(12, Math.round(MUSCLE_LANDMARKS[k].mrv * mult)),
+      };
+    }
+    return res;
+  }, [experience]);
 
   // Compute sets logged in the last 7 days (or current training week)
   const weeklyMuscleStats = useMemo(() => {
@@ -75,18 +92,18 @@ export default function MuscleVolumeLandmarks() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-3xs uppercase font-mono font-bold text-accent tracking-wider block">
-            HYPERTROPHY STIMULUS
+          <span className="text-3xs uppercase font-semibold text-accent tracking-wider block">
+            Hypertrophy Volume Guide
           </span>
           <h3 className="text-base font-bold text-text-primary mt-0.5 flex items-center gap-2">
             <span>Weekly Muscle Volume</span>
             <span className="text-2xs font-mono font-normal text-text-muted">
-              ({totalWeeklySets} total sets in last 7d)
+              ({totalWeeklySets} sets in last 7d)
             </span>
           </h3>
         </div>
         <span className="text-3xs font-mono px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent font-semibold">
-          Suggested Weekly Range
+          Suggested Range ({experience})
         </span>
       </div>
 
@@ -94,7 +111,7 @@ export default function MuscleVolumeLandmarks() {
       <div className="space-y-3">
         {RESISTANCE_MUSCLE_GROUPS.map((muscle) => {
           const sets = weeklyMuscleStats[muscle] || 0;
-          const config = MUSCLE_LANDMARKS[muscle];
+          const config = landmarks[muscle];
           const pct = Math.min(100, Math.round((sets / config.mavMax) * 100));
 
           let statusLabel = 'Below Baseline';

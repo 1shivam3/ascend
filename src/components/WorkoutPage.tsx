@@ -1450,34 +1450,41 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                       : 'bg-accent'
                   }`}
                 />
-                <span className="text-2xs font-mono font-bold tracking-wider uppercase text-text-muted">
+                <span className="text-xs font-semibold text-text-secondary">
                   {todaySessionInfo.status === 'completed'
-                    ? 'TODAY COMPLETED'
+                    ? 'Completed Today'
                     : todaySessionInfo.status === 'in_progress'
-                    ? 'IN PROGRESS'
-                    : `TODAY'S WORKOUT • ${todayDayOfWeek.toUpperCase()}`}
+                    ? 'Session in Progress'
+                    : `Today's Workout • ${todayDayOfWeek.charAt(0).toUpperCase() + todayDayOfWeek.slice(1)}`}
                 </span>
               </div>
-              <span className="text-2xs text-text-muted font-medium font-mono">
+              <span className="text-2xs text-text-muted font-medium">
                 ~{durationEst} min • {plural(exerciseList.length, 'movement')}
               </span>
             </div>
 
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-2xl font-black text-text-primary tracking-tight">
+                <h2 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight font-sans">
                   {workoutTitle}
                 </h2>
                 {bodyParts.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-md bg-accent/15 border border-accent/30 text-accent text-3xs font-mono font-bold">
+                  <span className="px-2.5 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent text-3xs font-semibold">
                     {bodyParts.join(' • ')}
                   </span>
                 )}
               </div>
               {exerciseList.length > 0 && (
-                <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
-                  {exerciseList.join('  •  ')}
-                </p>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {exerciseList.map((exName, exIdx) => (
+                    <span
+                      key={exIdx}
+                      className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border/70 text-xs text-text-secondary font-medium"
+                    >
+                      {exName}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -1501,15 +1508,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </div>
             )}
 
-            {/* Load hint for planned workout */}
-            {todaySessionInfo.status === 'planned' && todaySessionInfo.firstExerciseLoadHint && (
-              <div className="pt-0.5">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-2xs font-mono text-text-secondary">
-                  {todaySessionInfo.firstExerciseLoadHint}
-                </span>
-              </div>
-            )}
-
             {/* Primary CTA & at most two choices */}
             <div className="pt-1 space-y-3">
               {todaySessionInfo.status === 'in_progress' ? (
@@ -1519,7 +1517,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                   <Play className="w-4 h-4 fill-white stroke-white" />
-                  <span>RESUME WORKOUT</span>
+                  <span>Resume Workout</span>
                 </button>
               ) : todaySessionInfo.status === 'completed' ? (
                 <button
@@ -1528,7 +1526,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="btn-secondary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
                 >
                   <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
-                  <span>LOG ADDITIONAL SESSION</span>
+                  <span>Log Additional Session</span>
                 </button>
               ) : (
                 <button
@@ -1537,7 +1535,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
                 >
                   <Play className="w-4 h-4 fill-white stroke-white" />
-                  <span>START WORKOUT</span>
+                  <span>Start Workout</span>
                 </button>
               )}
 

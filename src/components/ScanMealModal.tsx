@@ -76,7 +76,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
   const [mealName, setMealName] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
+  const [editName, setEditName] = useState<string>('');
   const [editGrams, setEditGrams] = useState<number>(100);
+  const [editCalories, setEditCalories] = useState<number>(0);
+  const [editProtein, setEditProtein] = useState<number>(0);
+  const [editCarbs, setEditCarbs] = useState<number>(0);
+  const [editFat, setEditFat] = useState<number>(0);
 
   // Error state
   const [scanError, setScanError] = useState<string | null>(null);
@@ -394,32 +399,76 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
   };
 
-  const handleUpdateItemGrams = (index: number) => {
+  const openEditItem = (index: number) => {
+    if (editingItemIndex === index) {
+      setEditingItemIndex(null);
+      return;
+    }
+    const targetItem = analysis?.items[index];
+    if (!targetItem) return;
+
+    setEditingItemIndex(index);
+    setEditName(targetItem.name);
+    setEditGrams(targetItem.estimatedGrams || 100);
+    setEditCalories(targetItem.calories || 0);
+    setEditProtein(targetItem.proteinG || 0);
+    setEditCarbs(targetItem.carbsG || 0);
+    setEditFat(targetItem.fatG || 0);
+  };
+
+  const handleEditGramsChange = (newGrams: number) => {
+    setEditGrams(newGrams);
+    if (!analysis || editingItemIndex === null) return;
+    const targetItem = analysis.items[editingItemIndex];
+    if (!targetItem) return;
+
+    const oldGrams = targetItem.estimatedGrams > 0 ? targetItem.estimatedGrams : 100;
+    if (newGrams > 0 && oldGrams > 0 && targetItem.calories > 0) {
+      const ratio = newGrams / oldGrams;
+      setEditCalories(Math.round(targetItem.calories * ratio));
+      setEditProtein(Math.round(targetItem.proteinG * ratio * 10) / 10);
+      setEditCarbs(Math.round(targetItem.carbsG * ratio * 10) / 10);
+      setEditFat(Math.round(targetItem.fatG * ratio * 10) / 10);
+    } else if (newGrams > 0) {
+      const est = estimateMacros(editName || targetItem.name, newGrams, 'g');
+      setEditCalories(est.calories);
+      setEditProtein(est.proteinG);
+      setEditCarbs(est.carbsG);
+      setEditFat(est.fatG);
+    }
+  };
+
+  const handleSaveItemEdit = (index: number) => {
     if (!analysis) return;
     const itemsCopy = [...analysis.items];
     const targetItem = itemsCopy[index];
     if (!targetItem) return;
 
-    const newGrams = editGrams > 0 ? editGrams : 100;
-    const est = estimateMacros(targetItem.name, newGrams, 'g');
+    const finalName = editName.trim() || targetItem.name;
+    const finalGrams = editGrams > 0 ? editGrams : 100;
+    const finalCalories = Math.max(0, Math.round(Number(editCalories) || 0));
+    const finalProtein = Math.max(0, Math.round((Number(editProtein) || 0) * 10) / 10);
+    const finalCarbs = Math.max(0, Math.round((Number(editCarbs) || 0) * 10) / 10);
+    const finalFat = Math.max(0, Math.round((Number(editFat) || 0) * 10) / 10);
 
     // Save portion preference for future auto-calibration
-    store.savePortionPreference(targetItem.name, newGrams);
+    store.savePortionPreference(finalName, finalGrams);
 
     itemsCopy[index] = {
       ...targetItem,
-      estimatedGrams: newGrams,
-      quantity: `${newGrams}g`,
-      calories: est.calories,
-      proteinG: est.proteinG,
-      carbsG: est.carbsG,
-      fatG: est.fatG,
+      name: finalName,
+      estimatedGrams: finalGrams,
+      quantity: `${finalGrams}g`,
+      calories: finalCalories,
+      proteinG: finalProtein,
+      carbsG: finalCarbs,
+      fatG: finalFat,
     };
 
     const updated = recalculateMealResult(analysis, itemsCopy);
     setAnalysis(updated);
     setEditingItemIndex(null);
-    toast.info(`Updated & remembered portion for ${targetItem.name} (${newGrams}g)`, 'Portion Calibrated');
+    toast.success(`Updated "${finalName}" (${finalGrams}g, ${finalCalories} kcal)`, 'Item Updated');
   };
 
   const handleDeleteItem = (index: number) => {
@@ -1249,12 +1298,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 <div className="flex items-center gap-0.5 border-l border-border pl-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => {
-                                      setEditingItemIndex(isEditing ? null : idx);
-                                      setEditGrams(item.estimatedGrams);
-                                    }}
+                                    onClick={() => openEditItem(idx)}
                                     className="p-1 rounded-md text-text-muted hover:text-accent hover:bg-bg-secondary transition-colors"
-                                    title="Edit Portion"
+                                    title="Edit Portion or Macros"
                                   >
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
@@ -1270,24 +1316,105 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               </div>
                             </div>
 
-                            {/* Inline portion editor */}
+                            {/* Inline food & portion editor */}
                             {isEditing && (
-                              <div className="flex items-center gap-2 pt-1 border-t border-border/60">
-                                <span className="text-2xs text-text-muted font-medium">Adjust weight:</span>
-                                <input
-                                  type="number"
-                                  value={editGrams}
-                                  onChange={(e) => setEditGrams(Number(e.target.value))}
-                                  className="w-20 py-1 px-2 rounded-lg bg-bg-secondary border border-border text-xs text-text-primary outline-none focus:border-accent"
-                                />
-                                <span className="text-xs text-text-muted">grams</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateItemGrams(idx)}
-                                  className="btn-primary py-1 px-2.5 text-2xs font-bold"
-                                >
-                                  Save
-                                </button>
+                              <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in bg-bg-secondary/40 -mx-3 -mb-3 p-3 rounded-b-xl">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">Food Name</label>
+                                  <input
+                                    type="text"
+                                    value={editName}
+                                    onChange={(e) => setEditName(e.target.value)}
+                                    className="w-full py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent"
+                                    placeholder="Food name (e.g. Chicken Biryani)"
+                                  />
+                                </div>
+
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[10px] font-mono uppercase tracking-wider text-text-muted">Portion Weight (grams)</label>
+                                    <span className="text-[10px] text-accent font-mono font-medium">Auto-scales macros</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditGramsChange(Math.max(10, editGrams - 25))}
+                                      className="px-2 py-1 rounded bg-bg-card border border-border text-xs font-mono font-bold text-text-muted hover:text-text-primary cursor-pointer"
+                                    >
+                                      -25g
+                                    </button>
+                                    <input
+                                      type="number"
+                                      value={editGrams}
+                                      onChange={(e) => handleEditGramsChange(Math.max(0, Number(e.target.value)))}
+                                      className="w-24 py-1.5 px-2.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary outline-none focus:border-accent text-center font-mono font-bold"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditGramsChange(editGrams + 25)}
+                                      className="px-2 py-1 rounded bg-bg-card border border-border text-xs font-mono font-bold text-text-muted hover:text-text-primary cursor-pointer"
+                                    >
+                                      +25g
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Direct Macro Adjustments */}
+                                <div className="grid grid-cols-4 gap-1.5 pt-1">
+                                  <div>
+                                    <label className="text-[9px] font-mono uppercase text-text-muted block">Calories</label>
+                                    <input
+                                      type="number"
+                                      value={editCalories}
+                                      onChange={(e) => setEditCalories(Math.max(0, Number(e.target.value)))}
+                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-accent outline-none text-center font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-mono uppercase text-text-muted block">Protein (g)</label>
+                                    <input
+                                      type="number"
+                                      value={editProtein}
+                                      onChange={(e) => setEditProtein(Math.max(0, Number(e.target.value)))}
+                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-emerald-400 outline-none text-center font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-mono uppercase text-text-muted block">Carbs (g)</label>
+                                    <input
+                                      type="number"
+                                      value={editCarbs}
+                                      onChange={(e) => setEditCarbs(Math.max(0, Number(e.target.value)))}
+                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-sky-400 outline-none text-center font-bold"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[9px] font-mono uppercase text-text-muted block">Fat (g)</label>
+                                    <input
+                                      type="number"
+                                      value={editFat}
+                                      onChange={(e) => setEditFat(Math.max(0, Number(e.target.value)))}
+                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-amber-400 outline-none text-center font-bold"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-end gap-2 pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingItemIndex(null)}
+                                    className="px-2.5 py-1 text-2xs text-text-muted hover:text-text-primary cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveItemEdit(idx)}
+                                    className="btn-primary py-1 px-3 text-xs font-bold cursor-pointer"
+                                  >
+                                    Save Changes
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>

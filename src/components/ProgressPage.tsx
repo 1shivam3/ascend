@@ -74,7 +74,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const latestWeeklyReview = useStore((state) => state.latestWeeklyReview);
 
-  const isPowerlifter = (profile?.goals?.[0] === 'get_stronger') || profile?.goals?.includes('get_stronger');
+  const primaryGoal = (profile?.goals?.[0] as string) || 'build_muscle';
+  const isPowerlifter = primaryGoal === 'get_stronger';
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
@@ -201,8 +202,6 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     });
   }, [prs, workouts.length]);
 
-  const primaryGoal = (profile?.goals?.[0] as string) || 'build_muscle';
-
   // ── Streamlined 3 Sub-Tabs ────────────────────────────────────────────────
   const subTabs = [
     {
@@ -310,16 +309,32 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-accent" />
                   <span className="text-label font-bold text-accent">
-                    Strength Intelligence
+                    {primaryGoal === 'build_muscle'
+                      ? 'Hypertrophy Intelligence'
+                      : isPowerlifter
+                      ? 'Strength Intelligence'
+                      : primaryGoal === 'lose_fat'
+                      ? 'Body Composition Intelligence'
+                      : 'Training Intelligence'}
                   </span>
                 </div>
                 <p className="text-xs text-text-primary leading-relaxed font-sans">
                   {latestWeeklyReview?.weekSummary ||
-                    (workouts.length >= 3 && prs.length > 0
-                      ? `Your strength profile is calibrated at ${dotsClassification.tier}. Primary compound lifts are advancing with positive progressive overload.`
-                      : workouts.length > 0
-                      ? `${workouts.length} of 3 baseline workouts logged. Complete 3 workouts to establish verified progressive overload trends.`
-                      : 'Baseline 1RM entered. Log at least 3 workouts to unlock progressive overload trends and DOTS rating progression.')}
+                    (primaryGoal === 'build_muscle'
+                      ? workouts.length >= 3 && prs.length > 0
+                        ? 'Hypertrophy progression verified: weekly muscle volume and progressive overload are tracking well.'
+                        : workouts.length > 0
+                        ? `${workouts.length} of 3 baseline workouts logged. Complete 3 workouts to establish verified muscle progression trends.`
+                        : 'Baseline lifts calibrated. Complete 3 workouts to establish hypertrophy volume and progression trends.'
+                      : isPowerlifter
+                      ? workouts.length >= 3 && prs.length > 0
+                        ? `Your strength profile is calibrated at ${dotsClassification.tier}. Primary compound lifts are advancing with positive progressive overload.`
+                        : workouts.length > 0
+                        ? `${workouts.length} of 3 baseline workouts logged. Complete 3 workouts to establish verified progressive overload trends.`
+                        : 'Baseline 1RM entered. Log at least 3 workouts to unlock progressive overload trends and powerlifting total progression.'
+                      : workouts.length >= 3
+                      ? 'Progress verified: tracking working weights, consistency, and volume trends.'
+                      : `${workouts.length} of 3 baseline workouts logged. Complete 3 workouts to establish verified progression trends.`)}
                 </p>
               </div>
 
@@ -464,6 +479,41 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               {/* 2. GENERAL / HYPERTROPHY / FAT LOSS / STAMINA (Non-Powerlifting Trainees) */}
               {!isPowerlifter && (
                 <>
+                  {/* Hypertrophy Muscle Volume Landmarks for Build Muscle & General Fitness */}
+                  {(primaryGoal === 'build_muscle' || primaryGoal === 'general_fitness') && (
+                    <MuscleVolumeLandmarks />
+                  )}
+
+                  {/* Lean Tissue Preservation for Fat Loss Trainees */}
+                  {primaryGoal === 'lose_fat' && (
+                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="section-title text-[10px] mb-0 font-sans">DEFICIT RETENTION MONITOR</span>
+                        <span className="text-3xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          Lean Mass Preserved
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        In a caloric deficit, your primary indicator of muscle preservation is maintaining compound lift working weights. As long as working sets remain stable, fat loss occurs without lean tissue breakdown.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Work Capacity & Conditioning for Improve Fitness / Stamina Trainees */}
+                  {primaryGoal === 'stamina' && (
+                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="section-title text-[10px] mb-0 font-sans">WORK CAPACITY &amp; ENDURANCE</span>
+                        <span className="text-3xs font-mono text-accent font-bold bg-accent/10 px-2 py-0.5 rounded-full border border-accent/25">
+                          Aerobic Base &amp; Density
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        Tracks training density (short rest efficiency) and aerobic conditioning intervals (Zone 2 cardio and rowing/cycling work capacity).
+                      </p>
+                    </div>
+                  )}
+
                   {/* Compound Lifts Snapshot */}
                   <section className="card p-4 space-y-3 bg-bg-card border border-border">
                     <div className="flex items-center justify-between">
@@ -511,41 +561,6 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </p>
                     )}
                   </section>
-
-                  {/* Hypertrophy Muscle Volume Landmarks for Build Muscle & General Fitness */}
-                  {(primaryGoal === 'build_muscle' || primaryGoal === 'general_fitness') && (
-                    <MuscleVolumeLandmarks />
-                  )}
-
-                  {/* Lean Tissue Preservation for Fat Loss Trainees */}
-                  {primaryGoal === 'lose_fat' && (
-                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="section-title text-[10px] mb-0 font-sans">DEFICIT RETENTION MONITOR</span>
-                        <span className="text-3xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                          Lean Mass Preserved
-                        </span>
-                      </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        In a caloric deficit, your primary indicator of muscle preservation is maintaining compound lift working weights. As long as working sets remain stable, fat loss occurs without lean tissue breakdown.
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Work Capacity & Conditioning for Improve Fitness / Stamina Trainees */}
-                  {primaryGoal === 'stamina' && (
-                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <span className="section-title text-[10px] mb-0 font-sans">WORK CAPACITY &amp; ENDURANCE</span>
-                        <span className="text-3xs font-mono text-accent font-bold bg-accent/10 px-2 py-0.5 rounded-full border border-accent/25">
-                          Aerobic Base &amp; Density
-                        </span>
-                      </div>
-                      <p className="text-xs text-text-secondary leading-relaxed">
-                        Tracks training density (short rest efficiency) and aerobic conditioning intervals (Zone 2 cardio and rowing/cycling work capacity).
-                      </p>
-                    </div>
-                  )}
 
                   {/* Interactive e1RM Strength Trend Line per Lift */}
                   <ProgressChart />

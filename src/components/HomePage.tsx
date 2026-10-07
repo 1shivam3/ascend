@@ -361,19 +361,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     <div className="page animate-fade-in space-y-4 pb-24 max-w-md mx-auto px-4">
       <InstallAppBanner />
 
-      {/* ── 1. CLEAN HEADER (Instrument Identity & Controls) ──────────────── */}
+      {/* ── 1. CLEAN HEADER (Warm & Direct) ──────────────────────────────── */}
       <header className="pt-2 flex justify-between items-center">
         <div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-              ASCEND ATHLETE
-            </span>
-            <span className="text-text-muted text-[10px]">•</span>
-            <Badge variant="brand" size="xs">
-              {goalLabel}
-            </Badge>
-          </div>
-          <h1 className="text-lg font-bold text-text-primary tracking-tight font-sans mt-0.5">
+          <span className="text-2xs text-text-muted font-medium block">
+            {today.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+          </span>
+          <h1 className="text-xl font-bold text-text-primary tracking-tight font-sans mt-0.5">
             {greeting}, {profile?.name ? profile.name.split(' ')[0] : 'Athlete'}
           </h1>
         </div>
@@ -392,35 +386,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </header>
 
-      {/* Active Workout Draft Alert (Persistent Resume HUD) */}
-      {activeWorkoutDraft && (
-        <div className="p-3.5 rounded-2xl bg-accent/15 border border-accent/40 flex items-center justify-between text-xs shadow-sm animate-scale-in">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-            <span className="font-bold text-accent">Active session in progress</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                clearWorkoutDraft();
-                toast.info('Session draft discarded.');
-              }}
-              className="text-text-muted hover:text-danger text-2xs px-2 py-1 cursor-pointer"
-            >
-              Discard
-            </button>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => onNavigate('workout')}
-            >
-              Resume
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* Empathetic Missed Workout Catch-Up Prompt */}
       {missedWorkoutCatchUp && (
         <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs shadow-xs animate-scale-in space-y-2.5">
@@ -429,8 +394,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <Flame className="w-4 h-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-500 block">
-                SCHEDULE RECOVERY
+              <span className="text-3xs font-mono font-bold uppercase tracking-wider text-amber-500 block">
+                Schedule Catch-Up
               </span>
               <p className="font-semibold text-text-primary text-xs mt-0.5 leading-snug">
                 Missed yesterday&apos;s <span className="text-amber-400 font-bold">{missedWorkoutCatchUp.routineName}</span>. Make it up today, or stick to <span className="text-text-primary font-bold">{missedWorkoutCatchUp.todayRoutineName}</span>?
@@ -458,7 +423,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── 2. TODAY'S TRAINING HERO CARD (Visual Centerpiece / Daily Command) ── */}
+      {/* ── 2. TODAY'S TRAINING HERO CARD (Single Source of Reality) ───────── */}
       <Card
         variant="elevated"
         padding="lg"
@@ -468,29 +433,29 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <div className="flex items-center gap-2">
             <span
               className={`w-2 h-2 rounded-full ${
-                sessionInfo.status === 'completed'
-                  ? 'bg-emerald-500'
-                  : sessionInfo.status === 'in_progress'
+                activeWorkoutDraft
                   ? 'bg-accent animate-pulse'
+                  : sessionInfo.status === 'completed'
+                  ? 'bg-emerald-500'
+                  : sessionInfo.isRestDay
+                  ? 'bg-text-muted'
                   : 'bg-accent'
               }`}
             />
-            <span className="text-[10px] font-mono font-bold tracking-wider uppercase text-text-muted">
-              {sessionInfo.status === 'completed'
-                ? 'TODAY COMPLETED'
-                : sessionInfo.status === 'in_progress'
-                ? 'IN PROGRESS'
-                : workouts.length === 0
-                ? 'DAY 1 • FIRST WORKOUT'
+            <span className="text-xs font-semibold text-text-secondary">
+              {activeWorkoutDraft
+                ? 'Session in Progress'
+                : sessionInfo.status === 'completed'
+                ? 'Completed Today'
                 : sessionInfo.isRestDay
-                ? 'REST & RECOVERY'
-                : "TODAY'S WORKOUT"}
+                ? 'Rest & Recovery'
+                : "Today's Workout"}
             </span>
           </div>
           <button
             type="button"
             onClick={() => onNavigate('workout')}
-            className="text-[11px] font-semibold text-accent hover:underline flex items-center gap-0.5 transition-colors cursor-pointer"
+            className="text-xs font-medium text-accent hover:underline flex items-center gap-0.5 transition-colors cursor-pointer"
           >
             <span>Change</span>
             <ChevronRight className="w-3 h-3" />
@@ -500,39 +465,33 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <div>
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
             <h2 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight font-sans">
-              {sessionInfo.title}
+              {activeWorkoutDraft?.startedFromPlan || activeWorkoutDraft?.name || sessionInfo.title}
             </h2>
-            <div className="flex items-center gap-1 text-2xs font-mono text-text-muted">
+            <div className="flex items-center gap-1 text-2xs text-text-muted">
               <Clock className="w-3.5 h-3.5 text-accent" />
               <span>~45 min</span>
             </div>
           </div>
 
-          {sessionInfo.isRestDay ? (
+          {sessionInfo.isRestDay && !activeWorkoutDraft ? (
             <p className="mt-2 text-xs text-text-secondary leading-relaxed">
-              Scheduled rest day. Hit your protein target, stay hydrated, and let neuromuscular adaptations solidify.
+              Scheduled rest day. Hit your protein target, stay hydrated, and let your muscles recover.
             </p>
           ) : sessionInfo.exercises && sessionInfo.exercises.length > 0 ? (
-            <div className="mt-3 space-y-1.5">
-              {sessionInfo.exercises.slice(0, 4).map((ex, idx) => (
-                <div key={idx} className="text-xs text-text-secondary flex items-center justify-between py-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
-                    <span className="font-semibold text-text-primary">{ex}</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-text-muted">3 sets</span>
-                </div>
-              ))}
-              {sessionInfo.exercises.length > 4 && (
-                <span className="text-[10px] text-text-muted font-mono pl-3.5 block pt-0.5">
-                  +{sessionInfo.exercises.length - 4} more exercises
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {sessionInfo.exercises.map((ex, idx) => (
+                <span
+                  key={idx}
+                  className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border/70 text-xs text-text-secondary font-medium"
+                >
+                  {ex}
                 </span>
-              )}
+              ))}
             </div>
           ) : null}
 
           {/* Next Scheduled Session Anchor for Rest Days / Completed Sessions */}
-          {(sessionInfo.status === 'completed' || sessionInfo.isRestDay) && nextScheduledSession && (
+          {(sessionInfo.status === 'completed' || sessionInfo.isRestDay) && !activeWorkoutDraft && nextScheduledSession && (
             <div className="mt-3 p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 flex items-center justify-between text-2xs animate-fade-in">
               <div className="flex items-center gap-2 min-w-0">
                 <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
@@ -542,47 +501,64 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   <span className="text-text-secondary"> — {nextScheduledSession.routineName}</span>
                 </div>
               </div>
-              {nextScheduledSession.bodyParts && (
-                <Badge variant="brand" size="xs">
-                  {nextScheduledSession.bodyParts}
-                </Badge>
-              )}
             </div>
           )}
         </div>
 
         {/* Primary Action Button */}
         <div className="pt-1 space-y-2">
-          <Button
-            variant={sessionInfo.isRestDay || sessionInfo.status === 'completed' ? 'secondary' : 'primary'}
-            size="lg"
-            fullWidth
-            onClick={() => onNavigate('workout')}
-            leftIcon={
-              <Play
-                className={`w-4 h-4 ${
-                  sessionInfo.isRestDay || sessionInfo.status === 'completed'
-                    ? 'fill-text-primary stroke-text-primary'
-                    : 'fill-white stroke-white'
-                }`}
-              />
-            }
-          >
-            {activeWorkoutDraft
-              ? 'Resume Workout'
-              : sessionInfo.status === 'completed'
-              ? "View Today's Log"
-              : workouts.length === 0
-              ? 'Start Day 1 Workout'
-              : sessionInfo.isRestDay
-              ? 'Train Anyway'
-              : 'Start Workout'}
-          </Button>
+          {activeWorkoutDraft ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  clearWorkoutDraft();
+                  toast.info('Session draft discarded.');
+                }}
+                className="px-3 py-3 rounded-xl border border-border/80 text-text-muted hover:text-danger text-xs font-semibold cursor-pointer"
+              >
+                Discard
+              </button>
+              <Button
+                variant="primary"
+                size="lg"
+                className="flex-1"
+                onClick={() => onNavigate('workout')}
+                leftIcon={<Play className="w-4 h-4 fill-white stroke-white" />}
+              >
+                Resume Workout
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant={sessionInfo.isRestDay || sessionInfo.status === 'completed' ? 'secondary' : 'primary'}
+              size="lg"
+              fullWidth
+              onClick={() => onNavigate('workout')}
+              leftIcon={
+                <Play
+                  className={`w-4 h-4 ${
+                    sessionInfo.isRestDay || sessionInfo.status === 'completed'
+                      ? 'fill-text-primary stroke-text-primary'
+                      : 'fill-white stroke-white'
+                  }`}
+                />
+              }
+            >
+              {sessionInfo.status === 'completed'
+                ? "View Today's Log"
+                : workouts.length === 0
+                ? 'Start Day 1 Workout'
+                : sessionInfo.isRestDay
+                ? 'Train Anyway'
+                : 'Start Workout'}
+            </Button>
+          )}
 
           <button
             type="button"
             onClick={() => setIsLogPastModalOpen(true)}
-            className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            className="w-full py-1.5 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
             <Calendar className="w-3 h-3 text-accent" />
             <span>Log past workout manually</span>
@@ -590,58 +566,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </Card>
 
-      {/* ── 3. KEY LIFT SPOTLIGHT (Next Exercise & Target Prescription) ──────── */}
-      {keyLiftSpotlight && (
-        <Card variant="default" padding="md" className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-              KEY COMPOUND LIFT
-            </span>
-            <Badge variant="neutral" size="xs">
-              Today&apos;s Target
-            </Badge>
-          </div>
-
-          <div className="flex items-baseline justify-between pt-0.5">
-            <div>
-              <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary">
-                {keyLiftSpotlight.name}
-              </h3>
-              <p className="text-xs font-semibold text-accent mt-0.5 font-mono">
-                {keyLiftSpotlight.target}
-              </p>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] uppercase font-mono text-text-muted block">PREVIOUS</span>
-              <span className="text-xs font-mono font-medium text-text-secondary">
-                {keyLiftSpotlight.lastPerformance}
-              </span>
-            </div>
-          </div>
-
-          {keyLiftSpotlight.whyThisWeight && (
-            <div className="border-t border-border/50 pt-2 space-y-1">
-              <p className="text-2xs text-text-muted leading-relaxed">
-                <span className="text-text-secondary font-semibold">Engine note:</span> {keyLiftSpotlight.whyThisWeight}
-              </p>
-              {keyLiftSpotlight.nextSessionRule && (
-                <p className="text-[10px] text-text-muted leading-tight font-mono">
-                  <span className="text-accent font-semibold">Progression:</span> {keyLiftSpotlight.nextSessionRule}
-                </p>
-              )}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* ── 4. THIS WEEK CONSISTENCY (7-Day Strip) ─────────────────────────── */}
+      {/* ── 3. THIS WEEK CONSISTENCY (7-Day Strip) ─────────────────────────── */}
       <Card variant="default" padding="md" className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-            THIS WEEK
+          <span className="text-xs font-bold text-text-primary">
+            This Week
           </span>
-          <span className="text-xs font-semibold font-mono text-text-primary">
-            {weeklyStats.completedCount} / {weeklyStats.targetDays} sessions
+          <span className="text-xs font-semibold text-text-muted">
+            {weeklyStats.completedCount} of {weeklyStats.targetDays} sessions
           </span>
         </div>
 
@@ -649,7 +581,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <div className="grid grid-cols-7 gap-1.5 pt-1">
           {weeklyStats.days.map((day, idx) => (
             <div key={idx} className="flex flex-col items-center gap-1">
-              <span className="text-[10px] font-mono text-text-muted">
+              <span className="text-[10px] text-text-muted font-medium">
                 {day.letter}
               </span>
               <div
@@ -664,7 +596,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 {day.isCompleted ? (
                   <Check className="w-3.5 h-3.5 stroke-[3]" />
                 ) : (
-                  <span className="text-[10px] font-mono font-normal">
+                  <span className="text-[10px] font-normal">
                     {day.dateStr.slice(8)}
                   </span>
                 )}
@@ -674,18 +606,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </Card>
 
-      {/* ── 5. NUTRITION FUEL (Secondary Supporting Card) ───────────────────── */}
+      {/* ── 4. DAILY FUEL NUTRITION (Streamlined Progress) ─────────────────── */}
       <Card
         variant="interactive"
         padding="md"
         onClick={() => onNavigate('meals')}
-        className="space-y-3"
+        className="space-y-3 cursor-pointer"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <UtensilsCrossed className="w-4 h-4 text-accent" />
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-              DAILY FUEL
+            <span className="text-xs font-bold text-text-primary">
+              Daily Nutrition
             </span>
           </div>
           <div className="flex items-center gap-1 text-xs font-semibold text-text-muted group-hover:text-accent transition-colors">
@@ -695,39 +627,35 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-3 pt-0.5">
-          {/* Calorie Ring */}
-          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 flex items-center gap-2.5">
-            <CircularRing progress={fuelStats.calPct} strokeColor="#f97316" trackColor="#27272a" size={48}>
-              <span className="text-[10px] font-black font-mono text-accent">
-                {fuelStats.calPct}%
+          {/* Calories Bar */}
+          <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/50 space-y-1.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] text-text-muted uppercase font-semibold">Calories</span>
+              <span className="text-xs font-bold text-text-primary">
+                {fuelStats.calories.toLocaleString()} <span className="text-text-muted text-[10px] font-normal">/ {fuelStats.targetCalories.toLocaleString()}</span>
               </span>
-            </CircularRing>
-            <div className="min-w-0">
-              <span className="text-[9px] uppercase font-mono text-text-muted block">CALORIES</span>
-              <span className="text-xs font-bold font-mono text-text-primary block leading-tight">
-                {fuelStats.calories.toLocaleString()}
-              </span>
-              <span className="text-[9px] text-text-muted font-mono">
-                / {fuelStats.targetCalories.toLocaleString()}
-              </span>
+            </div>
+            <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-accent rounded-full transition-all duration-500"
+                style={{ width: `${fuelStats.calPct}%` }}
+              />
             </div>
           </div>
 
-          {/* Protein Ring */}
-          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 flex items-center gap-2.5">
-            <CircularRing progress={fuelStats.protPct} strokeColor="#10b981" trackColor="#27272a" size={48}>
-              <span className="text-[10px] font-black font-mono text-emerald-400">
-                {fuelStats.protPct}%
+          {/* Protein Bar */}
+          <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/50 space-y-1.5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-[10px] text-text-muted uppercase font-semibold">Protein</span>
+              <span className="text-xs font-bold text-text-primary">
+                {fuelStats.protein}g <span className="text-text-muted text-[10px] font-normal">/ {fuelStats.targetProtein}g</span>
               </span>
-            </CircularRing>
-            <div className="min-w-0">
-              <span className="text-[9px] uppercase font-mono text-text-muted block">PROTEIN</span>
-              <span className="text-xs font-bold font-mono text-text-primary block leading-tight">
-                {fuelStats.protein}g
-              </span>
-              <span className="text-[9px] text-text-muted font-mono">
-                / {fuelStats.targetProtein}g
-              </span>
+            </div>
+            <div className="w-full h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                style={{ width: `${fuelStats.protPct}%` }}
+              />
             </div>
           </div>
         </div>

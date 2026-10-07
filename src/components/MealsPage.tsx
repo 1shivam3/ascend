@@ -245,14 +245,28 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'quantity') {
         const qty = Number(value);
         if (next[index].name.trim().length > 1) {
-          const est = estimateMacros(next[index].name, qty > 0 ? qty : undefined, next[index].unit);
-          next[index] = {
-            ...next[index],
-            calories: est.calories,
-            proteinG: est.proteinG,
-            carbsG:   est.carbsG,
-            fatG:     est.fatG,
-          };
+          const prevItem = next[index];
+          const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
+          if (prevQty && prevItem.calories > 0 && qty > 0) {
+            // Proportional scaling preserves scanned or custom barcode macros!
+            const ratio = qty / prevQty;
+            next[index] = {
+              ...prevItem,
+              calories: Math.max(0, Math.round(prevItem.calories * ratio)),
+              proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
+              carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
+              fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
+            };
+          } else {
+            const est = estimateMacros(next[index].name, qty > 0 ? qty : undefined, next[index].unit);
+            next[index] = {
+              ...next[index],
+              calories: est.calories,
+              proteinG: est.proteinG,
+              carbsG:   est.carbsG,
+              fatG:     est.fatG,
+            };
+          }
         }
       }
 
