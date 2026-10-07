@@ -27,6 +27,7 @@ export const AVAILABLE_BODY_PARTS: string[] = [
   'Shoulders',
   'Arms',
   'Core',
+  'Conditioning',
   'Full Body',
 ];
 
@@ -35,6 +36,19 @@ export const AVAILABLE_BODY_PARTS: string[] = [
  */
 export function getExerciseBodyPart(exerciseName: string): string {
   const name = exerciseName.toLowerCase().trim();
+  if (
+    name.includes('cycle') ||
+    name.includes('bike') ||
+    name.includes('treadmill') ||
+    name.includes('rowing') ||
+    name.includes('stair') ||
+    name.includes('jump rope') ||
+    name.includes('kettlebell') ||
+    name.includes('conditioning') ||
+    name.includes('farmer')
+  ) {
+    return 'Conditioning';
+  }
   if (
     name.includes('bench') ||
     name.includes('chest') ||

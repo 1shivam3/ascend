@@ -201,10 +201,21 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     });
   }, [prs, workouts.length]);
 
+  const primaryGoal = (profile?.goals?.[0] as string) || 'build_muscle';
+
   // ── Streamlined 3 Sub-Tabs ────────────────────────────────────────────────
   const subTabs = [
-    { id: 'strength', label: 'Strength' },
-    { id: 'body', label: 'Body' },
+    {
+      id: 'strength',
+      label: isPowerlifter
+        ? 'Strength & Lifts'
+        : primaryGoal === 'build_muscle'
+        ? 'Hypertrophy & Lifts'
+        : primaryGoal === 'stamina'
+        ? 'Conditioning & Lifts'
+        : 'Lifts & Trends',
+    },
+    { id: 'body', label: 'Bodyweight' },
     { id: 'consistency', label: 'Consistency' },
   ] as const;
 
@@ -246,7 +257,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 : 'bg-bg-secondary text-text-muted hover:text-text-primary'
             }`}
           >
-            {tab.label === 'Strength' ? 'Lifts & Trends' : tab.label === 'Body' ? 'Body & Mass' : 'Consistency'}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -338,124 +349,69 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               </div>
 
-              {/* Big 4 Compound Lifts Snapshot (Leads for Hypertrophy / Build Muscle) */}
-              {!isPowerlifter && (
-                <section className="card p-4 space-y-3 bg-bg-card border border-border">
-                  <div className="flex items-center justify-between">
-                    <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
-                    <span className="text-3xs text-text-muted">
-                      {workouts.length < 3 ? 'Baseline calibration' : 'Progressive overload verified'}
-                    </span>
-                  </div>
+              {/* ── GOAL-SPECIFIC ADAPTIVE METRICS ── */}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    {liftTrends.map((l) => (
-                      <div
-                        key={l.name}
-                        className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-text-primary truncate">{l.name}</span>
-                          {workouts.length >= 3 ? (
-                            l.trend === 'up' ? (
-                              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
-                            ) : (
-                              <Minus className="w-3.5 h-3.5 text-text-muted" />
-                            )
-                          ) : null}
-                        </div>
-
-                        <div className="text-lg font-black text-text-primary font-sans tabular-nums">
-                          {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
-                        </div>
-
-                        <div className="text-3xs text-text-muted font-mono">
-                          {profile?.bodyweightKg && l.best1RM > 0 ? (
-                            <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× BW</span>
-                          ) : (
-                            <span>Uncalibrated</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {liftTrends.some((l) => l.isBaseline) && (
-                    <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
-                      * Values based on baseline 1RM entered during onboarding
-                    </p>
-                  )}
-                </section>
-              )}
-
-              {/* Interactive e1RM Strength Trend Line per Lift */}
-              {!isPowerlifter && <ProgressChart />}
-
-              {/* Weekly Hypertrophy Muscle Volume Landmarks */}
-              <MuscleVolumeLandmarks />
-
-              {/* Big 3 Total & Official DOTS Rating Card */}
-              <div className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="section-title text-[10px] mb-0 font-sans">
-                      {isPowerlifter ? 'POWERLIFTING TOTAL' : 'STRENGTH BENCHMARKS'}
-                    </span>
-                    <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; Strength Score</h3>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsMeetModalOpen(true)}
-                      className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 text-text-secondary hover:text-text-primary"
-                      title="Powerlifting Meet Attempt Planner"
-                    >
-                      <Trophy className="w-3 h-3 text-accent" />
-                      <span>Meet Planner</span>
-                    </button>
-                    <div className="text-right">
-                      <span className="text-2xl font-black text-text-primary font-sans tabular-nums block">
-                        {bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}
-                      </span>
-                      <span className="text-3xs text-text-muted block">Squat + Bench + Deadlift</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Strength Score Banner */}
-                <div
-                  onClick={() => setIsDotsInfoOpen(true)}
-                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-all group"
-                  title="What is DOTS? Tap for explanation"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent font-bold font-mono text-sm group-hover:scale-105 transition-transform">
-                      {dotsScore > 0 ? Math.round(dotsScore) : '—'}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-text-primary block font-sans group-hover:text-accent transition-colors">
-                          Strength Score (DOTS)
-                        </span>
-                        <HelpCircle className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
-                      </div>
-                      <span className="text-2xs text-text-muted">
-                        Bodyweight-normalized strength benchmark (tap to learn)
-                      </span>
-                    </div>
-                  </div>
-                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-accent/10 text-accent font-mono uppercase tracking-wider">
-                    {dotsClassification.tier}
-                  </span>
-                </div>
-              </div>
-
-              {/* Powerlifting layout shows Compound Lifts & Chart below Big 3 */}
+              {/* 1. POWERLIFTING / GET STRONGER: Big 3 & DOTS Score */}
               {isPowerlifter && (
                 <>
+                  <div className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="section-title text-[10px] mb-0 font-sans">
+                          POWERLIFTING TOTAL
+                        </span>
+                        <h3 className="text-lg font-bold text-text-primary mt-0.5">Big 3 &amp; Strength Score</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsMeetModalOpen(true)}
+                          className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 text-text-secondary hover:text-text-primary"
+                          title="Powerlifting Meet Attempt Planner"
+                        >
+                          <Trophy className="w-3 h-3 text-accent" />
+                          <span>Meet Planner</span>
+                        </button>
+                        <div className="text-right">
+                          <span className="text-2xl font-black text-text-primary font-sans tabular-nums block">
+                            {bigThreeStats.totalKg > 0 ? displayWeight(bigThreeStats.totalKg) : '—'}
+                          </span>
+                          <span className="text-3xs text-text-muted block">Squat + Bench + Deadlift</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Strength Score Banner */}
+                    <div
+                      onClick={() => setIsDotsInfoOpen(true)}
+                      className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-center justify-between cursor-pointer hover:border-accent/40 transition-all group"
+                      title="What is DOTS? Tap for explanation"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent font-bold font-mono text-sm group-hover:scale-105 transition-transform">
+                          {dotsScore > 0 ? Math.round(dotsScore) : '—'}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-text-primary block font-sans group-hover:text-accent transition-colors">
+                              Strength Score (DOTS)
+                            </span>
+                            <HelpCircle className="w-3.5 h-3.5 text-text-muted group-hover:text-accent transition-colors" />
+                          </div>
+                          <span className="text-2xs text-text-muted">
+                            Bodyweight-normalized strength benchmark (tap to learn)
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold px-3 py-1 rounded-full bg-accent/10 text-accent font-mono uppercase tracking-wider">
+                        {dotsClassification.tier}
+                      </span>
+                    </div>
+                  </div>
+
                   <ProgressChart />
 
-                  {/* Big 4 Compound Lifts Snapshot (Short Labels: Bench, Squat, Deadlift, OHP) */}
+                  {/* Compound Lifts Snapshot */}
                   <section className="card p-4 space-y-3 bg-bg-card border border-border">
                     <div className="flex items-center justify-between">
                       <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
@@ -498,10 +454,101 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
                     {liftTrends.some((l) => l.isBaseline) && (
                       <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
-                        * Values based on baseline 1RM entered during onboarding
+                        * Baseline lifts entered during onboarding (e.g. 80 kg × 5 reps → Est. 1RM: 93.3 kg via Epley formula)
                       </p>
                     )}
                   </section>
+                </>
+              )}
+
+              {/* 2. GENERAL / HYPERTROPHY / FAT LOSS / STAMINA (Non-Powerlifting Trainees) */}
+              {!isPowerlifter && (
+                <>
+                  {/* Compound Lifts Snapshot */}
+                  <section className="card p-4 space-y-3 bg-bg-card border border-border">
+                    <div className="flex items-center justify-between">
+                      <h4 className="section-title text-[11px] mb-0 font-sans">COMPOUND LIFTS (1RM)</h4>
+                      <span className="text-3xs text-text-muted">
+                        {workouts.length < 3 ? 'Baseline calibration' : 'Progressive overload verified'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      {liftTrends.map((l) => (
+                        <div
+                          key={l.name}
+                          className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-text-primary truncate">{l.name}</span>
+                            {workouts.length >= 3 ? (
+                              l.trend === 'up' ? (
+                                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-500" />
+                              ) : (
+                                <Minus className="w-3.5 h-3.5 text-text-muted" />
+                              )
+                            ) : null}
+                          </div>
+
+                          <div className="text-lg font-black text-text-primary font-sans tabular-nums">
+                            {l.best1RM > 0 ? displayWeight(l.best1RM) : '—'}
+                          </div>
+
+                          <div className="text-3xs text-text-muted font-mono">
+                            {profile?.bodyweightKg && l.best1RM > 0 ? (
+                              <span>{(l.best1RM / profile.bodyweightKg).toFixed(2)}× BW</span>
+                            ) : (
+                              <span>Uncalibrated</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {liftTrends.some((l) => l.isBaseline) && (
+                      <p className="text-2xs text-text-muted pt-1 border-t border-border/50">
+                        * Baseline lifts entered during onboarding (e.g. 80 kg × 5 reps → Est. 1RM: 93.3 kg via standard Epley formula)
+                      </p>
+                    )}
+                  </section>
+
+                  {/* Hypertrophy Muscle Volume Landmarks for Build Muscle & General Fitness */}
+                  {(primaryGoal === 'build_muscle' || primaryGoal === 'general_fitness') && (
+                    <MuscleVolumeLandmarks />
+                  )}
+
+                  {/* Lean Tissue Preservation for Fat Loss Trainees */}
+                  {primaryGoal === 'lose_fat' && (
+                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="section-title text-[10px] mb-0 font-sans">DEFICIT RETENTION MONITOR</span>
+                        <span className="text-3xs font-mono text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          Lean Mass Preserved
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        In a caloric deficit, your primary indicator of muscle preservation is maintaining compound lift working weights. As long as working sets remain stable, fat loss occurs without lean tissue breakdown.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Work Capacity & Conditioning for Improve Fitness / Stamina Trainees */}
+                  {primaryGoal === 'stamina' && (
+                    <div className="card p-4 bg-bg-card border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="section-title text-[10px] mb-0 font-sans">WORK CAPACITY &amp; ENDURANCE</span>
+                        <span className="text-3xs font-mono text-accent font-bold bg-accent/10 px-2 py-0.5 rounded-full border border-accent/25">
+                          Aerobic Base &amp; Density
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary leading-relaxed">
+                        Tracks training density (short rest efficiency) and aerobic conditioning intervals (Zone 2 cardio and rowing/cycling work capacity).
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Interactive e1RM Strength Trend Line per Lift */}
+                  <ProgressChart />
                 </>
               )}
 

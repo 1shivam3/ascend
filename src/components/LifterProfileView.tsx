@@ -217,7 +217,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                 <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 space-y-1">
                   <span className="text-3xs font-mono font-bold text-emerald-400 uppercase">20+ Exposures</span>
                   <p className="text-2xs text-emerald-400 font-bold">High Confidence</p>
-                  <p className="text-3xs text-text-muted">High predictive accuracy on load response.</p>
+                  <p className="text-3xs text-text-muted">High pattern consistency on load response.</p>
                 </div>
               </div>
             </div>
@@ -399,7 +399,7 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
                   No Decisions Recorded Yet
                 </h3>
                 <p className="text-xs text-text-muted leading-relaxed">
-                  As you log workouts where set RPE drifts, targets are exceeded, or volume exceeds recovery tolerance, ASCEND logs auditable prescription decisions and tracks prediction accuracy here.
+                  As you log workouts where set RPE drifts, targets are exceeded, or volume exceeds recovery tolerance, ASCEND logs auditable prescription decisions and tracks training response consistency here.
                 </p>
               </div>
             </div>

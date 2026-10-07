@@ -1,5 +1,5 @@
-import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule } from './types';
-import { getEquipmentType, isMainCompoundLift, calculateOneRepMax } from './strength-standards';
+import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule, PersonalRecord } from './types';
+import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad } from './strength-standards';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 
 /**
@@ -54,6 +54,281 @@ export function getLastExercisePerformance(
   }
 
   return null;
+}
+
+export interface ExercisePrescription {
+  exerciseName: string;
+  targetWeight: number;
+  targetReps: number;
+  targetRpe: number;
+  targetSets: number;
+  repRange: { min: number; max: number };
+  progressionModel: 'double_progression' | 'rpe_autoregulated' | 'conditioning_interval' | 'linear_step';
+  whyThisWeight: string;
+  nextSessionRule: string;
+  lastPerformance?: {
+    date: string;
+    weight: number;
+    reps: number;
+    rpe?: number;
+    summary: string;
+  } | null;
+}
+
+/**
+ * Deterministic Prescription Engine ("Why this weight?").
+ * Single source of truth for target load, rep ranges, progression model,
+ * and auditable training rationale across Home, Train, and Active Workout.
+ */
+export function getExercisePrescription(
+  exerciseName: string,
+  workouts: WorkoutEntry[],
+  prs: PersonalRecord[] = [],
+  userUnit: Unit = 'kg',
+  goal: AthleteGoal = 'build_muscle'
+): ExercisePrescription {
+  const goalConfig = ATHLETE_GOAL_CONFIGS[goal] || ATHLETE_GOAL_CONFIGS.build_muscle;
+  const isStrength = goal === 'get_stronger';
+  const isStamina = goal === 'stamina';
+  const isHypertrophy = goal === 'build_muscle';
+  const isFatLoss = goal === 'lose_fat';
+
+  const defaultSets = isStrength ? 4 : isHypertrophy ? 4 : 3;
+  const repRange = isStrength
+    ? { min: 3, max: 6 }
+    : isStamina
+    ? { min: 12, max: 15 }
+    : isFatLoss
+    ? { min: 6, max: 10 }
+    : { min: 8, max: 12 };
+
+  const targetRpe = isStrength ? 8.5 : isHypertrophy ? 8.0 : isFatLoss ? 7.5 : 7.5;
+  const defaultTargetReps = Math.round((repRange.min + repRange.max) / 2);
+
+  const cleanName = exerciseName.trim();
+  const lowerName = cleanName.toLowerCase();
+
+  // Check if conditioning
+  const isConditioning =
+    lowerName.includes('cycle') ||
+    lowerName.includes('bike') ||
+    lowerName.includes('treadmill') ||
+    lowerName.includes('rowing') ||
+    lowerName.includes('jump rope') ||
+    lowerName.includes('stair') ||
+    lowerName.includes('conditioning');
+
+  if (isConditioning) {
+    return {
+      exerciseName: cleanName,
+      targetWeight: 0,
+      targetReps: defaultTargetReps,
+      targetRpe: 7.0,
+      targetSets: 1,
+      repRange: { min: 10, max: 30 },
+      progressionModel: 'conditioning_interval',
+      whyThisWeight: 'Conditioning work capacity prescription for cardiovascular base and stamina.',
+      nextSessionRule: 'Progress duration by +2 minutes or increase work intervals as conditioning improves.',
+    };
+  }
+
+  // Check past workout performance
+  const past = getLastExercisePerformance(cleanName, workouts);
+  const matchedPr = prs.find((p) => p.exercise.trim().toLowerCase() === lowerName);
+
+  if (past && past.sets.length > 0) {
+    const lastWeight = past.bestWeight;
+    const lastReps = past.bestReps;
+    const lastSet = past.sets[0];
+    const lastRpe = lastSet?.rpe || 8.0;
+
+    // Hypertrophy: Double Progression Model
+    if (isHypertrophy) {
+      const allSetsHitTop = past.sets.every((s) => s.reps >= repRange.max);
+      const step = userUnit === 'lbs' ? 5 : 2.5;
+
+      if (allSetsHitTop) {
+        const nextW = lastWeight + step;
+        return {
+          exerciseName: cleanName,
+          targetWeight: nextW,
+          targetReps: repRange.min,
+          targetRpe: 8.0,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'double_progression',
+          whyThisWeight: `Double progression: completed all sets at ${lastWeight}${userUnit} × ${repRange.max} reps. Overload step +${step}${userUnit} applied.`,
+          nextSessionRule: `Build repetitions from ${repRange.min} back up to ${repRange.max} reps before adding further load.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      } else if (lastRpe >= 9.5 && lastReps < repRange.min) {
+        return {
+          exerciseName: cleanName,
+          targetWeight: lastWeight,
+          targetReps: Math.max(repRange.min, lastReps),
+          targetRpe: 8.0,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'double_progression',
+          whyThisWeight: `Previous effort was high (@${lastRpe}). Holding load at ${lastWeight}${userUnit} to consolidate form within target RPE 8.`,
+          nextSessionRule: `Aim for smooth control. When effort drops to ≤ RPE 8, push for +1 rep.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      } else {
+        const nextReps = Math.min(repRange.max, lastReps + 1);
+        return {
+          exerciseName: cleanName,
+          targetWeight: lastWeight,
+          targetReps: nextReps,
+          targetRpe: 8.0,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'double_progression',
+          whyThisWeight: `Double progression: hold load at ${lastWeight}${userUnit} and aim for +1 rep (${lastReps} → ${nextReps} reps).`,
+          nextSessionRule: `When all sets reach ${repRange.max} reps, advance weight to ${lastWeight + step}${userUnit}.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      }
+    }
+
+    // Strength: RPE Autoregulated
+    if (isStrength) {
+      const step = userUnit === 'lbs' ? 5 : 2.5;
+      if (lastRpe <= 7.5 && lastReps >= repRange.min) {
+        const nextW = lastWeight + step;
+        return {
+          exerciseName: cleanName,
+          targetWeight: nextW,
+          targetReps: repRange.min,
+          targetRpe: 8.5,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'rpe_autoregulated',
+          whyThisWeight: `Previous session moved with fast bar speed (@${lastRpe} ≤ target). Added +${step}${userUnit}.`,
+          nextSessionRule: `If this session lands ≤ RPE 8, continue +${step}${userUnit} step next exposure.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      } else if (lastRpe > 9.0) {
+        const dropW = Math.max(step, lastWeight - step);
+        return {
+          exerciseName: cleanName,
+          targetWeight: dropW,
+          targetReps: repRange.min,
+          targetRpe: 8.0,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'rpe_autoregulated',
+          whyThisWeight: `Previous effort reached RPE ${lastRpe} (exceeded target RPE 8). Adjusted -${step}${userUnit} to restore velocity.`,
+          nextSessionRule: `If this lands cleanly at RPE 8, return to ${lastWeight}${userUnit}.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      } else {
+        return {
+          exerciseName: cleanName,
+          targetWeight: lastWeight,
+          targetReps: lastReps,
+          targetRpe: 8.0,
+          targetSets: defaultSets,
+          repRange,
+          progressionModel: 'rpe_autoregulated',
+          whyThisWeight: `Hold ${lastWeight}${userUnit} at target RPE 8 to consolidate strength adaptation.`,
+          nextSessionRule: `Target RPE 8. If bar moves effortlessly, advance next week.`,
+          lastPerformance: {
+            date: past.date,
+            weight: lastWeight,
+            reps: lastReps,
+            rpe: lastRpe,
+            summary: past.summary,
+          },
+        };
+      }
+    }
+
+    // Default / Fat Loss / General Fitness
+    return {
+      exerciseName: cleanName,
+      targetWeight: lastWeight,
+      targetReps: defaultTargetReps,
+      targetRpe: 7.5,
+      targetSets: defaultSets,
+      repRange,
+      progressionModel: 'linear_step',
+      whyThisWeight: `Preserving training stimulus at ${lastWeight}${userUnit} based on your last logged session.`,
+      nextSessionRule: `Keep form strict and maintain target rep range.`,
+      lastPerformance: {
+        date: past.date,
+        weight: lastWeight,
+        reps: lastReps,
+        rpe: lastRpe,
+        summary: past.summary,
+      },
+    };
+  }
+
+  // No past workout: check PR / baseline calibration
+  if (matchedPr && matchedPr.oneRepMax > 0) {
+    const targetW = suggestLoad(matchedPr.oneRepMax, defaultTargetReps, Math.round(targetRpe), userUnit);
+    const prW = userUnit === 'lbs' ? (matchedPr.weightLbs || Math.round(matchedPr.weightKg * 2.20462)) : matchedPr.weightKg;
+    const e1rmDisplay = userUnit === 'lbs' ? Math.round(matchedPr.oneRepMax * 2.20462) : matchedPr.oneRepMax;
+
+    return {
+      exerciseName: cleanName,
+      targetWeight: targetW,
+      targetReps: defaultTargetReps,
+      targetRpe,
+      targetSets: defaultSets,
+      repRange,
+      progressionModel: isHypertrophy ? 'double_progression' : isStrength ? 'rpe_autoregulated' : 'linear_step',
+      whyThisWeight: `Calibrated from your ${prW}${userUnit} × ${matchedPr.reps} baseline (${e1rmDisplay}${userUnit} e1RM) at target RPE ${targetRpe}.`,
+      nextSessionRule: `Log this first workout to establish your working velocity. If all sets land ≤ RPE 8, progress next session.`,
+    };
+  }
+
+  // Fallback: estimate from standard baseline
+  const isBW = lowerName.includes('pull-up') || lowerName.includes('chin-up') || lowerName.includes('push-up') || lowerName.includes('dip');
+  const fallbackW = isBW ? 0 : userUnit === 'lbs' ? 95 : 40;
+
+  return {
+    exerciseName: cleanName,
+    targetWeight: fallbackW,
+    targetReps: defaultTargetReps,
+    targetRpe: 7.5,
+    targetSets: defaultSets,
+    repRange,
+    progressionModel: isHypertrophy ? 'double_progression' : 'linear_step',
+    whyThisWeight: `Estimated introductory target for ${cleanName}. Adjust freely with stepper buttons.`,
+    nextSessionRule: `Complete sets to calibrate your personal baseline response.`,
+  };
 }
 
 /**
@@ -603,17 +878,20 @@ export function getTodaySessionState(
 
     if (dayConfig) {
       if (dayConfig.workoutPlanId === 'rest') {
+        const nextPlan = plannedWorkouts[0] || null;
         return {
           status: 'planned',
           title: dayConfig.customTitle || 'Rest & Recovery',
-          subtitle: 'Scheduled Rest Day • Hydrate, sleep, and hit your protein target',
-          exercises: [],
-          primaryActionLabel: 'Start Workout Anyway',
+          subtitle: nextPlan ? `Scheduled Rest Day • Next up: ${nextPlan.name}` : 'Scheduled Rest Day • Hydrate, sleep, and hit your protein target',
+          exercises: nextPlan ? nextPlan.exercises.map((e) => e.name) : [],
+          firstExerciseLoadHint: nextPlan ? `Next: ${nextPlan.name}` : undefined,
+          primaryActionLabel: nextPlan ? `Train Today Anyway (${nextPlan.name})` : 'Start Workout Anyway',
           isDraft: false,
           isDone: false,
           isRestDay: true,
           scheduledDay: todayDay,
           bodyParts: [],
+          plannedWorkoutId: nextPlan?.id,
         };
       }
 
@@ -828,57 +1106,58 @@ export function getGoalAdaptiveSplitTemplates(
   if (goal === 'stamina') {
     return [
       {
-        id: 'builtin_upper_a',
-        name: 'Upper A',
+        id: 'builtin_conditioning_a',
+        name: 'Conditioning & Upper Stamina',
         createdAt: '2026-01-01',
-        description: 'High-density upper conditioning with elevated work capacity (12–15 reps)',
-        goalTag: 'Stamina (12–15 reps)',
+        description: 'Aerobic base conditioning paired with high-density upper muscular endurance',
+        goalTag: 'Conditioning (Aerobic Base + 12–15 reps)',
         exercises: [
-          { name: 'Bench Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 120 : 55, targetUnit: unit },
-          { name: 'Barbell Row', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 110 : 50, targetUnit: unit },
-          { name: 'Overhead Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 65 : 30, targetUnit: unit },
-          { name: 'Lat Pulldown', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 100 : 45, targetUnit: unit },
-          { name: 'Dumbbell Curl', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 22 : 10, targetUnit: unit },
+          { name: 'Zone 2 Stationary Cycling', targetSets: 1, targetReps: 20, targetWeight: 0, targetUnit: unit, notes: '20 min steady cadence @ 120–135 bpm aerobic zone' },
+          { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Short 60s rest periods to train lactate clearing' },
+          { name: 'Lat Pulldown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Continuous muscular tension throughout stroke' },
+          { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 18 : 8, targetUnit: unit, notes: 'Full range of motion, strict deltoid burn' },
+          { name: 'Front Plank (Seconds)', targetSets: 3, targetReps: 45, targetWeight: 0, targetUnit: unit, notes: '3 × 45s isometric core bracing' },
         ],
       },
       {
-        id: 'builtin_lower_a',
-        name: 'Lower A',
+        id: 'builtin_conditioning_b',
+        name: 'Conditioning & Lower Stamina',
         createdAt: '2026-01-01',
-        description: 'High-volume leg conditioning and lactate tolerance threshold work',
-        goalTag: 'Stamina (12–15 reps)',
+        description: 'Incline aerobic work paired with posterior chain endurance and knee flexion density',
+        goalTag: 'Conditioning (Incline Walk + 12–15 reps)',
         exercises: [
-          { name: 'Squat', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 165 : 75, targetUnit: unit },
-          { name: 'Romanian Deadlift', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 135 : 60, targetUnit: unit },
-          { name: 'Leg Press', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 265 : 120, targetUnit: unit },
-          { name: 'Calf Raise', targetSets: 4, targetReps: 20, targetWeight: isLbs ? 90 : 40, targetUnit: unit },
+          { name: 'Incline Treadmill Walk', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: '15 min @ 10–12% incline, 4.5–5.0 km/h walking speed' },
+          { name: 'Goblet Squat', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 45 : 20, targetUnit: unit, notes: 'Deep upright hip mobility and quad pump' },
+          { name: 'Romanian Deadlift (RDL)', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 115 : 50, targetUnit: unit, notes: 'Posterior chain stretch and muscular endurance' },
+          { name: 'Dumbbell Walking Lunge', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 25 : 12, targetUnit: unit, notes: '12 steps per leg with short 60s rest' },
+          { name: 'Hanging Knee Raise', targetSets: 3, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: 'Controlled pelvic tuck without swinging' },
         ],
       },
       {
-        id: 'builtin_upper_b',
-        name: 'Upper B',
+        id: 'builtin_conditioning_c',
+        name: 'Work Capacity & Intervals',
         createdAt: '2026-01-01',
-        description: 'Rapid-paced shoulder and back stamina with high-rep contractions',
-        goalTag: 'Stamina (12–15 reps)',
+        description: 'High-intensity interval conditioning engine for cardiovascular peak power',
+        goalTag: 'Intervals & Circuits',
         exercises: [
-          { name: 'Incline Bench', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 110 : 50, targetUnit: unit },
-          { name: 'Pull-ups', targetSets: 3, targetReps: 12, targetWeight: 0, targetUnit: unit },
-          { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 35 : 16, targetUnit: unit },
-          { name: 'Lateral Raise', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 18 : 8, targetUnit: unit },
-          { name: 'Tricep Extension', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 45 : 20, targetUnit: unit },
+          { name: 'Rowing Machine Intervals', targetSets: 8, targetReps: 1, targetWeight: 0, targetUnit: unit, notes: '8 rounds: 1 min hard sprint / 1 min easy paddle' },
+          { name: 'Push-ups', targetSets: 3, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: 'Chest-to-floor functional upper push capacity' },
+          { name: 'Kettlebell Swings', targetSets: 4, targetReps: 20, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Explosive hip hinge endurance' },
+          { name: 'Jump Rope Intervals', targetSets: 5, targetReps: 2, targetWeight: 0, targetUnit: unit, notes: '5 rounds of 2 min active work / 1 min rest' },
         ],
       },
       {
-        id: 'builtin_lower_b',
-        name: 'Lower B',
+        id: 'builtin_conditioning_d',
+        name: 'Total Body Flush & Carries',
         createdAt: '2026-01-01',
-        description: 'Continuous posterior chain conditioning and single-leg endurance',
-        goalTag: 'Stamina (10–15 reps)',
+        description: 'Low-impact aerobic flush paired with grip and full-body loaded carries',
+        goalTag: 'Aerobic Flush & Carries',
         exercises: [
-          { name: 'Deadlift', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 200 : 90, targetUnit: unit },
-          { name: 'Front Squat', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 110 : 50, targetUnit: unit },
-          { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 25 : 12, targetUnit: unit },
-          { name: 'Hamstring Curl', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 75 : 35, targetUnit: unit },
+          { name: 'Zone 2 Stationary Cycling', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: '15 min warm-up flush cadence' },
+          { name: 'Dumbbell Bench Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 40 : 18, targetUnit: unit, notes: 'Moderate load, controlled eccentric' },
+          { name: 'Single-Arm Dumbbell Row', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 45 : 20, targetUnit: unit, notes: 'Full lat stretch and upper back density' },
+          { name: 'Bodyweight Squats', targetSets: 3, targetReps: 20, targetWeight: 0, targetUnit: unit, notes: 'Continuous tempo quad flushing' },
+          { name: "Farmer's Walk", targetSets: 4, targetReps: 4, targetWeight: isLbs ? 50 : 24, targetUnit: unit, notes: '4 × 40m heavy carry for work capacity & grip' },
         ],
       },
     ];
@@ -893,11 +1172,11 @@ export function getGoalAdaptiveSplitTemplates(
         description: 'Balanced athletic upper body routine for strength, mobility, and joint health',
         goalTag: 'Fitness (8–10 reps)',
         exercises: [
-          { name: 'Bench Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: unit },
-          { name: 'Barbell Row', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 120 : 55, targetUnit: unit },
-          { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 75 : 35, targetUnit: unit },
-          { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 110 : 50, targetUnit: unit },
-          { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: unit },
+          { name: 'Bench Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: unit, notes: 'Compound upper push foundation' },
+          { name: 'Barbell Row', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 120 : 55, targetUnit: unit, notes: 'Back posture and scapular control' },
+          { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 75 : 35, targetUnit: unit, notes: 'Vertical pressing and core stability' },
+          { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 110 : 50, targetUnit: unit, notes: 'Vertical pulling lat sweep' },
+          { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: unit, notes: 'Elbow flexion and joint longevity' },
         ],
       },
       {
@@ -907,10 +1186,10 @@ export function getGoalAdaptiveSplitTemplates(
         description: 'Functional lower body strength and hinge fundamentals',
         goalTag: 'Fitness (8–10 reps)',
         exercises: [
-          { name: 'Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 185 : 85, targetUnit: unit },
-          { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: unit },
-          { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 310 : 140, targetUnit: unit },
-          { name: 'Calf Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit },
+          { name: 'Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 185 : 85, targetUnit: unit, notes: 'Lower body foundation' },
+          { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: unit, notes: 'Hamstring & glute hinge' },
+          { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 310 : 140, targetUnit: unit, notes: 'Quad overload with back support' },
+          { name: 'Calf Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Ankle stability and calf strength' },
         ],
       },
       {
@@ -920,11 +1199,11 @@ export function getGoalAdaptiveSplitTemplates(
         description: 'Balanced pressing, pulling, and deltoid stability',
         goalTag: 'Fitness (8–10 reps)',
         exercises: [
-          { name: 'Incline Bench', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 120 : 55, targetUnit: unit },
-          { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: unit },
-          { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 40 : 18, targetUnit: unit },
-          { name: 'Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 18 : 8, targetUnit: unit },
-          { name: 'Tricep Extension', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 50 : 22, targetUnit: unit },
+          { name: 'Incline Bench', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 120 : 55, targetUnit: unit, notes: 'Upper chest pressing angle' },
+          { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: unit, notes: 'Bodyweight vertical pulling' },
+          { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 40 : 18, targetUnit: unit, notes: 'Deltoid symmetry' },
+          { name: 'Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 18 : 8, targetUnit: unit, notes: 'Side delt shoulder caps' },
+          { name: 'Tricep Extension', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 50 : 22, targetUnit: unit, notes: 'Triceps lockout strength' },
         ],
       },
       {
@@ -934,42 +1213,42 @@ export function getGoalAdaptiveSplitTemplates(
         description: 'Core posterior strength and unilateral stability',
         goalTag: 'Fitness (6–10 reps)',
         exercises: [
-          { name: 'Deadlift', targetSets: 3, targetReps: 6, targetWeight: isLbs ? 230 : 105, targetUnit: unit },
-          { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 130 : 60, targetUnit: unit },
-          { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 30 : 14, targetUnit: unit },
-          { name: 'Hamstring Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 90 : 40, targetUnit: unit },
+          { name: 'Deadlift', targetSets: 3, targetReps: 6, targetWeight: isLbs ? 230 : 105, targetUnit: unit, notes: 'Full body pull power' },
+          { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 130 : 60, targetUnit: unit, notes: 'Quad and core integration' },
+          { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 30 : 14, targetUnit: unit, notes: 'Unilateral leg balance' },
+          { name: 'Hamstring Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 90 : 40, targetUnit: unit, notes: 'Isolated knee flexion' },
         ],
       },
     ];
   }
 
-  // Default: 'build_muscle' (Hypertrophy)
+  // Default: 'build_muscle' (Hypertrophy with Double Progression model)
   return [
     {
       id: 'builtin_upper_a',
       name: 'Upper A',
       createdAt: '2026-01-01',
-      description: 'Hypertrophy volume targeting chest, upper back, and biceps (8–12 reps)',
+      description: 'Hypertrophy volume targeting chest, upper back, and arms with double progression',
       goalTag: 'Hypertrophy (8–12 reps)',
       exercises: [
-        { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: unit },
-        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: unit },
-        { name: 'Overhead Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 90 : 40, targetUnit: unit },
-        { name: 'Lat Pulldown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 120 : 55, targetUnit: unit },
-        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 30 : 14, targetUnit: unit },
+        { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: unit, notes: 'Double progression: 8–12 reps. Hit 12 reps on all sets before increasing load.' },
+        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: unit, notes: 'Double progression: 8–12 reps. Strict form, no body heave.' },
+        { name: 'Overhead Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 90 : 40, targetUnit: unit, notes: 'Double progression: 8–12 reps. Tight core and glutes.' },
+        { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 120 : 55, targetUnit: unit, notes: 'Double progression: 10–14 reps. Deep lat stretch at top.' },
+        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 30 : 14, targetUnit: unit, notes: 'Double progression: 10–14 reps. Supinate wrists at peak.' },
       ],
     },
     {
       id: 'builtin_lower_a',
       name: 'Lower A',
       createdAt: '2026-01-01',
-      description: 'Quad and hamstring mass development with progressive volume',
+      description: 'Quad and hamstring mass development with progressive double-progression volume',
       goalTag: 'Hypertrophy (8–12 reps)',
       exercises: [
-        { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 210 : 95, targetUnit: unit },
-        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 175 : 80, targetUnit: unit },
-        { name: 'Leg Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 350 : 160, targetUnit: unit },
-        { name: 'Calf Raise', targetSets: 4, targetReps: 15, targetWeight: isLbs ? 110 : 50, targetUnit: unit },
+        { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 210 : 95, targetUnit: unit, notes: 'Double progression: 8–12 reps. Hit depth before adding weight.' },
+        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 175 : 80, targetUnit: unit, notes: 'Double progression: 8–12 reps. Deep hamstring stretch.' },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: unit, notes: 'Double progression: 10–15 reps. High quad mechanical tension.' },
+        { name: 'Calf Raise', targetSets: 4, targetReps: 12, targetWeight: isLbs ? 110 : 50, targetUnit: unit, notes: 'Double progression: 12–16 reps. Pause at bottom stretch.' },
       ],
     },
     {
@@ -979,11 +1258,11 @@ export function getGoalAdaptiveSplitTemplates(
       description: 'Incline chest and lateral deltoid emphasis with vertical pulling',
       goalTag: 'Hypertrophy (8–12 reps)',
       exercises: [
-        { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: unit },
-        { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: unit },
-        { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 45 : 22, targetUnit: unit },
-        { name: 'Lateral Raise', targetSets: 4, targetReps: 15, targetWeight: isLbs ? 20 : 10, targetUnit: unit },
-        { name: 'Tricep Extension', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 55 : 25, targetUnit: unit },
+        { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: unit, notes: 'Double progression: 8–12 reps. Upper chest focus.' },
+        { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: unit, notes: 'Double progression: aim for 3×10 clean bodyweight reps.' },
+        { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 45 : 22, targetUnit: unit, notes: 'Double progression: 8–12 reps. Smooth vertical drive.' },
+        { name: 'Lateral Raise', targetSets: 4, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: unit, notes: 'Double progression: 12–15 reps. Slight forward lean.' },
+        { name: 'Tricep Extension', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 55 : 25, targetUnit: unit, notes: 'Double progression: 10–14 reps. Lock out long head.' },
       ],
     },
     {
@@ -993,10 +1272,10 @@ export function getGoalAdaptiveSplitTemplates(
       description: 'Posterior chain density with unilateral quad hypertrophy',
       goalTag: 'Hypertrophy (8–12 reps)',
       exercises: [
-        { name: 'Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 255 : 115, targetUnit: unit },
-        { name: 'Front Squat', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 145 : 65, targetUnit: unit },
-        { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 35 : 16, targetUnit: unit },
-        { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit },
+        { name: 'Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 255 : 115, targetUnit: unit, notes: 'Double progression: 6–10 reps. Crisp bar speed.' },
+        { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: unit, notes: 'Double progression: 8–12 reps. Upright torso.' },
+        { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Double progression: 8–12 reps per leg.' },
+        { name: 'Hamstring Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Double progression: 10–14 reps. Control eccentric.' },
       ],
     },
   ];

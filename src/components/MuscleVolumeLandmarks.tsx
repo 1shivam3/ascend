@@ -2,7 +2,12 @@
 
 import React, { useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { getExerciseMuscle, getExerciseSecondaryMuscles, MuscleGroup, MUSCLE_GROUPS } from '@/lib/exercise-library';
+import {
+  getExerciseMuscle,
+  getExerciseSecondaryMuscles,
+  ResistanceMuscleGroup,
+  RESISTANCE_MUSCLE_GROUPS,
+} from '@/lib/exercise-library';
 import { Layers, Flame, CheckCircle2, TrendingUp, Info } from 'lucide-react';
 
 interface LandmarkConfig {
@@ -12,7 +17,7 @@ interface LandmarkConfig {
   mrv: number;      // Maximum Recoverable Volume
 }
 
-const MUSCLE_LANDMARKS: Record<MuscleGroup, LandmarkConfig> = {
+const MUSCLE_LANDMARKS: Record<ResistanceMuscleGroup, LandmarkConfig> = {
   Chest:     { mev: 8,  mavMin: 10, mavMax: 18, mrv: 22 },
   Back:      { mev: 10, mavMin: 12, mavMax: 20, mrv: 25 },
   Legs:      { mev: 10, mavMin: 12, mavMax: 20, mrv: 24 },
@@ -32,7 +37,7 @@ export default function MuscleVolumeLandmarks() {
       return !isNaN(ts) && ts >= sevenDaysAgo;
     });
 
-    const setCounts: Record<MuscleGroup, number> = {
+    const setCounts: Record<ResistanceMuscleGroup, number> = {
       Chest: 0,
       Back: 0,
       Legs: 0,
@@ -46,10 +51,12 @@ export default function MuscleVolumeLandmarks() {
         const primary = getExerciseMuscle(ex.name);
         const secondaries = getExerciseSecondaryMuscles(ex.name);
         const completedCount = ex.sets.filter((s) => s.completed !== false && (s.reps > 0 || (s.weight && s.weight > 0))).length;
-        setCounts[primary] = (setCounts[primary] || 0) + completedCount;
+        if (primary !== 'Conditioning' && primary in setCounts) {
+          setCounts[primary as ResistanceMuscleGroup] = (setCounts[primary as ResistanceMuscleGroup] || 0) + completedCount;
+        }
         secondaries.forEach((sec) => {
-          if (sec !== primary) {
-            setCounts[sec] = (setCounts[sec] || 0) + completedCount * 0.5;
+          if (sec !== primary && sec !== 'Conditioning' && sec in setCounts) {
+            setCounts[sec as ResistanceMuscleGroup] = (setCounts[sec as ResistanceMuscleGroup] || 0) + completedCount * 0.5;
           }
         });
       });
@@ -79,13 +86,13 @@ export default function MuscleVolumeLandmarks() {
           </h3>
         </div>
         <span className="text-3xs font-mono px-2 py-0.5 rounded-full bg-accent/10 border border-accent/25 text-accent font-semibold">
-          Landmarks
+          Suggested Weekly Range
         </span>
       </div>
 
       {/* Grid of Muscle Volumes */}
       <div className="space-y-3">
-        {MUSCLE_GROUPS.map((muscle) => {
+        {RESISTANCE_MUSCLE_GROUPS.map((muscle) => {
           const sets = weeklyMuscleStats[muscle] || 0;
           const config = MUSCLE_LANDMARKS[muscle];
           const pct = Math.min(100, Math.round((sets / config.mavMax) * 100));
@@ -107,7 +114,7 @@ export default function MuscleVolumeLandmarks() {
             statusColor = 'text-sky-400 bg-sky-500/10 border-sky-500/30';
             barColor = 'bg-sky-400';
           } else if (sets >= config.mavMin && sets <= config.mavMax) {
-            statusLabel = 'Optimal Growth';
+            statusLabel = 'Target Range';
             statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
             barColor = 'bg-emerald-500';
           } else {
@@ -127,7 +134,7 @@ export default function MuscleVolumeLandmarks() {
                 </div>
                 <div className="flex items-center gap-1.5 font-mono text-2xs">
                   <span className="font-bold text-text-primary text-xs">{sets % 1 === 0 ? sets : sets.toFixed(1)}</span>
-                  <span className="text-text-muted">/ {config.mavMin}–{config.mavMax} target</span>
+                  <span className="text-text-muted">/ {config.mavMin}–{config.mavMax} suggested range</span>
                 </div>
               </div>
 
@@ -148,7 +155,7 @@ export default function MuscleVolumeLandmarks() {
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Optimal: 10–20 sets/wk</span>
+            <span>Suggested range: 10–20 sets/wk</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />

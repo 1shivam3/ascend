@@ -16,6 +16,7 @@ import {
   Sparkles,
   ChevronRight,
   LogOut,
+  Utensils,
 } from 'lucide-react';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
@@ -24,7 +25,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -125,7 +126,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {profile?.name || 'Athlete'}
                 </span>
                 <span className="text-[11px] text-text-muted font-mono">
-                  {profile?.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Male'} • {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : ''} • {profile?.unit?.toUpperCase() || 'KG'}
+                  {profile?.gender ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1) : 'Male'} • {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : ''} • {profile?.dietPreference ? profile.dietPreference.replace('_', '-').toUpperCase() : 'NON-VEG'} • {profile?.unit?.toUpperCase() || 'KG'}
                 </span>
               </div>
             </div>
@@ -181,6 +182,37 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       { value: 'advanced', label: 'Advanced' },
                     ]}
                   />
+                </div>
+              </div>
+
+              {/* Dietary Preference */}
+              <div className="py-2.5 flex items-center justify-between px-1">
+                <div className="flex items-center gap-2">
+                  <Utensils className="w-3.5 h-3.5 text-accent" />
+                  <div>
+                    <span className="text-xs font-semibold text-text-primary block">Dietary Preference</span>
+                    <span className="text-2xs text-text-muted">Tailors food &amp; protein targets</span>
+                  </div>
+                </div>
+                <div className="w-36">
+                  <select
+                    value={profile?.dietPreference || 'non_vegetarian'}
+                    onChange={(e) => {
+                      if (!profile) return;
+                      const nextDiet = e.target.value as DietPreference;
+                      setProfile({
+                        ...profile,
+                        dietPreference: nextDiet,
+                      });
+                      toast.info(`Diet preference set to ${nextDiet.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}`, 'Diet Updated');
+                    }}
+                    className="w-full bg-bg-secondary border border-border/80 rounded-lg px-2 py-1 text-xs font-medium text-text-primary focus:outline-none focus:border-accent cursor-pointer"
+                  >
+                    <option value="non_vegetarian">Non-Vegetarian</option>
+                    <option value="eggitarian">Eggitarian</option>
+                    <option value="vegetarian">Vegetarian</option>
+                    <option value="vegan">Vegan</option>
+                  </select>
                 </div>
               </div>
 

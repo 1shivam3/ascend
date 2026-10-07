@@ -17,8 +17,9 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
-import { PersonalRecord, AthleteGoal, PlannedWorkout } from '@/lib/types';
+import { PersonalRecord, AthleteGoal, PlannedWorkout, DietPreference } from '@/lib/types';
 import { getGoalAdaptiveSplitTemplates } from '@/lib/workout-engine';
+import { buildDefaultWeeklySchedule } from '@/lib/workout-schedule';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -118,6 +119,7 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+  const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
   const [heightCm, setHeightCm] = useState('');
   const [age, setAge] = useState('24');
 
@@ -131,6 +133,14 @@ export default function OnboardingScreen() {
   const [deadliftReps, setDeadliftReps] = useState('5');
   const [ohpWeight, setOhpWeight] = useState('');
   const [ohpReps, setOhpReps] = useState('5');
+
+  const getEst1RM = (weightStr: string, repsStr: string) => {
+    const w = parseFloat(weightStr);
+    const r = parseInt(repsStr, 10) || 5;
+    if (!w || isNaN(w) || w <= 0) return null;
+    const e1rm = Math.round(calculateOneRepMax(w, r) * 10) / 10;
+    return `${e1rm} ${unit}`;
+  };
 
   // Emergency snapshot detection & restore
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -159,6 +169,7 @@ export default function OnboardingScreen() {
     addBodyMetric,
     importAllData,
     setPlannedWorkouts,
+    setWeeklySchedule,
     setMacroGoals,
   } = useStore();
 
@@ -191,6 +202,7 @@ export default function OnboardingScreen() {
       heightCm: validHeight,
       age: validAge,
       unit,
+      dietPreference,
       createdAt: new Date().toISOString(),
       goals: [primaryGoal],
     };
@@ -220,7 +232,10 @@ export default function OnboardingScreen() {
     // 1. Initialize split routine tailored to athlete's primary goal & weight unit
     setPlannedWorkouts(generatedSplit);
 
-    // 2. Initialize calibrated nutritional baseline with zero Atwater drift
+    // 2. Initialize weekly calendar schedule matching training days
+    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+
+    // 3. Initialize calibrated nutritional baseline with zero Atwater drift
     const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight, validAge);
     setMacroGoals(initialMacros);
 
@@ -235,17 +250,19 @@ export default function OnboardingScreen() {
       notes: 'Initial Onboarding Calibration',
     });
 
-    // Optional lifts
-    if (!skipLifts) {
+    // Optional lifts - process if user entered weights
+    const hasAnyLifts = !!(benchWeight || squatWeight || deadliftWeight || ohpWeight);
+    if (!skipLifts || hasAnyLifts) {
       const initialPRs: PersonalRecord[] = [];
 
       const checkAndAdd = (exercise: string, wStr: string, rStr: string) => {
         const w = parseFloat(wStr);
-        const r = parseInt(rStr, 10) || 1;
+        const r = parseInt(rStr, 10) || 5;
         if (!isNaN(w) && w > 0) {
           const wKg = unit === 'lbs' ? w * 0.453592 : w;
           const wLbs = unit === 'kg' ? w * 2.20462 : w;
           const oneRepMaxKg = calculateOneRepMax(wKg, r);
+          const displayE1rm = Math.round((unit === 'lbs' ? oneRepMaxKg * 2.20462 : oneRepMaxKg) * 10) / 10;
 
           initialPRs.push({
             id: crypto.randomUUID(),
@@ -255,7 +272,7 @@ export default function OnboardingScreen() {
             reps: r,
             oneRepMax: Math.round(oneRepMaxKg * 10) / 10,
             date: today,
-            notes: 'Baseline calibration (entered)',
+            notes: `Baseline: ${w} ${unit} × ${r} reps (Est. 1RM: ${displayE1rm} ${unit})`,
             isBaseline: true,
           });
         }
@@ -742,6 +759,45 @@ export default function OnboardingScreen() {
               </div>
             </div>
 
+            {/* Dietary Preference */}
+            <div className="space-y-1.5">
+              <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
+                Dietary Preference
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'non_vegetarian' as DietPreference, label: 'Non-Vegetarian', desc: 'Chicken, fish, eggs, meat' },
+                  { id: 'eggitarian' as DietPreference, label: 'Eggitarian', desc: 'Vegetarian + eggs' },
+                  { id: 'vegetarian' as DietPreference, label: 'Vegetarian', desc: 'Dairy, lentils, paneer, tofu' },
+                  { id: 'vegan' as DietPreference, label: 'Vegan', desc: '100% plant-based' },
+                ].map((d) => {
+                  const isSel = dietPreference === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDietPreference(d.id)}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                        isSel
+                          ? 'border-accent bg-accent/15 text-text-primary ring-1 ring-accent/30'
+                          : 'border-border/80 bg-bg-card hover:border-border text-text-secondary'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className={`text-xs font-bold ${isSel ? 'text-accent' : 'text-text-primary'}`}>
+                          {d.label}
+                        </span>
+                        {isSel && <Check className="w-3.5 h-3.5 text-accent stroke-[3]" />}
+                      </div>
+                      <span className="text-[10px] text-text-muted block leading-tight mt-0.5">
+                        {d.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Optional known lifts toggle */}
             <div className="pt-1">
               <button
@@ -749,61 +805,100 @@ export default function OnboardingScreen() {
                 onClick={() => setShowOptionalLifts(!showOptionalLifts)}
                 className="w-full py-2 px-3 rounded-xl border border-border/70 bg-bg-secondary/40 text-left flex items-center justify-between text-xs text-text-secondary hover:text-text-primary cursor-pointer"
               >
-                <span>Enter known lift weights (Optional)</span>
+                <span>Enter known lift baselines (Optional)</span>
                 <span className="text-accent font-bold text-xs">{showOptionalLifts ? '− Hide' : '+ Enter'}</span>
               </button>
 
               {showOptionalLifts && (
-                <div className="mt-2 space-y-2 p-3 rounded-2xl bg-bg-card border border-border/80 animate-fade-in">
-                  <p className="text-3xs text-text-muted leading-relaxed">
-                    Leave blank if unsure. ASCEND will suggest weights automatically from Day 1.
-                  </p>
+                <div className="mt-2 space-y-3 p-3.5 rounded-2xl bg-bg-card border border-border/80 animate-fade-in">
+                  <div className="space-y-1">
+                    <p className="text-xs text-text-primary font-bold">
+                      Enter your best recent set (Weight × Reps)
+                    </p>
+                    <p className="text-3xs text-text-muted leading-relaxed">
+                      ASCEND calculates your Estimated 1-Rep Max (e1RM) using the standard Epley formula so your training prescriptions start at an accurate working weight.
+                    </p>
+                  </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-3xs text-text-muted block mb-0.5">Bench Press ({unit})</label>
-                      <input
-                        type="number"
-                        step="2.5"
-                        placeholder={unit === 'kg' ? '70' : '155'}
-                        value={benchWeight}
-                        onChange={(e) => setBenchWeight(e.target.value)}
-                        className="text-xs font-mono py-1.5 px-2.5 rounded-lg bg-bg-secondary border border-border w-full outline-none focus:border-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-3xs text-text-muted block mb-0.5">Squat ({unit})</label>
-                      <input
-                        type="number"
-                        step="2.5"
-                        placeholder={unit === 'kg' ? '90' : '200'}
-                        value={squatWeight}
-                        onChange={(e) => setSquatWeight(e.target.value)}
-                        className="text-xs font-mono py-1.5 px-2.5 rounded-lg bg-bg-secondary border border-border w-full outline-none focus:border-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-3xs text-text-muted block mb-0.5">Deadlift ({unit})</label>
-                      <input
-                        type="number"
-                        step="2.5"
-                        placeholder={unit === 'kg' ? '110' : '245'}
-                        value={deadliftWeight}
-                        onChange={(e) => setDeadliftWeight(e.target.value)}
-                        className="text-xs font-mono py-1.5 px-2.5 rounded-lg bg-bg-secondary border border-border w-full outline-none focus:border-accent"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-3xs text-text-muted block mb-0.5">Overhead Press ({unit})</label>
-                      <input
-                        type="number"
-                        step="2.5"
-                        placeholder={unit === 'kg' ? '40' : '90'}
-                        value={ohpWeight}
-                        onChange={(e) => setOhpWeight(e.target.value)}
-                        className="text-xs font-mono py-1.5 px-2.5 rounded-lg bg-bg-secondary border border-border w-full outline-none focus:border-accent"
-                      />
-                    </div>
+                  <div className="space-y-2.5">
+                    {[
+                      {
+                        name: 'Bench Press',
+                        weight: benchWeight,
+                        setWeight: setBenchWeight,
+                        reps: benchReps,
+                        setReps: setBenchReps,
+                        ph: unit === 'kg' ? '80' : '175',
+                      },
+                      {
+                        name: 'Squat',
+                        weight: squatWeight,
+                        setWeight: setSquatWeight,
+                        reps: squatReps,
+                        setReps: setSquatReps,
+                        ph: unit === 'kg' ? '120' : '265',
+                      },
+                      {
+                        name: 'Deadlift',
+                        weight: deadliftWeight,
+                        setWeight: setDeadliftWeight,
+                        reps: deadliftReps,
+                        setReps: setDeadliftReps,
+                        ph: unit === 'kg' ? '140' : '315',
+                      },
+                      {
+                        name: 'Overhead Press',
+                        weight: ohpWeight,
+                        setWeight: setOhpWeight,
+                        reps: ohpReps,
+                        setReps: setOhpReps,
+                        ph: unit === 'kg' ? '50' : '115',
+                      },
+                    ].map((lift) => {
+                      const est = getEst1RM(lift.weight, lift.reps);
+                      return (
+                        <div key={lift.name} className="p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-text-primary">{lift.name}</span>
+                            {est && (
+                              <span className="text-2xs font-mono font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
+                                Est. 1RM: {est}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-text-muted block mb-0.5">Weight ({unit})</label>
+                              <input
+                                type="number"
+                                step="2.5"
+                                placeholder={lift.ph}
+                                value={lift.weight}
+                                onChange={(e) => lift.setWeight(e.target.value)}
+                                className="text-xs font-mono py-1.5 px-2 rounded-lg bg-bg-card border border-border w-full outline-none focus:border-accent"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-text-muted block mb-0.5">Reps performed</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                placeholder="5"
+                                value={lift.reps}
+                                onChange={(e) => lift.setReps(e.target.value)}
+                                className="text-xs font-mono py-1.5 px-2 rounded-lg bg-bg-card border border-border w-full outline-none focus:border-accent"
+                              />
+                            </div>
+                          </div>
+                          {est && (
+                            <span className="text-[10px] text-text-muted block font-mono">
+                              Based on {lift.weight} {unit} × {lift.reps || 5} reps
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

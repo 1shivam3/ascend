@@ -95,6 +95,7 @@ const counts: Record<MuscleGroup, number> = {
   Shoulders: 0,
   Arms: 0,
   Core: 0,
+  Conditioning: 0,
 };
 
 mockWorkouts.forEach((w) => {

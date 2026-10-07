@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
-import { getDailyQuote } from '@/lib/quotes';
 import SettingsModal from '@/components/SettingsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
@@ -28,7 +27,7 @@ import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
-import { getTodaySessionState } from '@/lib/workout-engine';
+import { getTodaySessionState, getExercisePrescription } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO } from '@/lib/workout-schedule';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -122,12 +121,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const primaryGoal = (goals && goals.length > 0) ? goals[0] : (profile?.goals?.[0] || 'build_muscle');
   const goalLabel = ATHLETE_GOAL_CONFIGS[primaryGoal]?.label || 'Build Muscle';
 
-  // Daily Mindset Quote
-  const dailyQuote = useMemo(() => getDailyQuote(), []);
-
-  // Today's workout session state (single source of truth)
+  // Today's workout session state (single source of truth matching weekly schedule)
   const sessionInfo = useMemo(() => {
-    const raw = getTodaySessionState(
+    return getTodaySessionState(
       todayStr,
       workouts,
       plannedWorkouts,
@@ -135,19 +131,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       userUnit,
       weeklySchedule
     );
-    // If the athlete has 0 workouts logged ever, override rest day so they start Day 1 immediately!
-    if (workouts.length === 0 && !activeWorkoutDraft && raw.status !== 'completed') {
-      return {
-        ...raw,
-        isRestDay: false,
-        title: raw.isRestDay ? 'Day 1 — Foundation Workout' : raw.title,
-        status: 'not_started' as const,
-        exercises: (raw.exercises && raw.exercises.length > 0)
-          ? raw.exercises
-          : ['Bench Press', 'Barbell Squat', 'Lat Pulldown', 'Overhead Press'],
-      };
-    }
-    return raw;
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
   // Next scheduled workout session anchor
@@ -174,7 +157,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return null;
   }, [weeklySchedule, plannedWorkouts]);
 
-  // Key lift / Next exercise spotlight
+  // Key lift / Next exercise spotlight driven by deterministic prescription engine
   const keyLiftSpotlight = useMemo(() => {
     if (sessionInfo.isRestDay || !sessionInfo.exercises || sessionInfo.exercises.length === 0) {
       return null;
@@ -182,37 +165,34 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     const mainExName = sessionInfo.exercises[0];
     const bestPr = prs.find((p) => p.exercise.toLowerCase() === mainExName.toLowerCase());
 
-    // Find previous performance for this exercise across logged workouts
-    let lastPerformance: string | null = null;
-    for (const w of workouts) {
-      const match = w.exercises?.find((e) => e.name.toLowerCase() === mainExName.toLowerCase());
-      if (match && match.sets && match.sets.length > 0) {
-        const validSets = match.sets.filter((s) => s.reps > 0 && parseFloat(String(s.weight)) > 0);
-        if (validSets.length > 0) {
-          const topSet = validSets.reduce((prev, curr) => (parseFloat(String(curr.weight)) > parseFloat(String(prev.weight)) ? curr : prev), validSets[0]);
-          lastPerformance = `${topSet.weight} ${topSet.unit || userUnit} × ${topSet.reps} reps`;
-          break;
-        }
-      }
-    }
+    const presc = getExercisePrescription(
+      mainExName,
+      workouts,
+      prs,
+      userUnit,
+      primaryGoal
+    );
 
-    // Prescription / target
-    let target = '3–4 working sets';
-    if (bestPr && bestPr.oneRepMax > 0) {
-      const suggested = suggestLoad(bestPr.oneRepMax, 8, 8, userUnit);
-      target = `Target ~${suggested} ${userUnit} × 8 reps`;
-    }
+    const lastPerformance = presc.lastPerformance
+      ? `${presc.lastPerformance.weight} ${userUnit} × ${presc.lastPerformance.reps} reps`
+      : (bestPr ? `PR: ${userUnit === 'lbs' ? (bestPr.weightLbs || Math.round(bestPr.weightKg * 2.20462)) : bestPr.weightKg} ${userUnit} × ${bestPr.reps}` : 'First exposure');
 
     return {
       name: mainExName,
-      target,
-      lastPerformance: lastPerformance || (bestPr ? `PR: ${bestPr.weightKg || bestPr.weightLbs} ${userUnit} × ${bestPr.reps}` : 'No previous log'),
+      target: `Target ~${presc.targetWeight} ${userUnit} × ${presc.targetReps} reps`,
+      whyThisWeight: presc.whyThisWeight,
+      nextSessionRule: presc.nextSessionRule,
+      lastPerformance,
     };
-  }, [sessionInfo, prs, workouts, userUnit]);
+  }, [sessionInfo, prs, workouts, userUnit, primaryGoal]);
 
-  // Weekly consistency: M T W T F S S
+  // Weekly consistency: accurately synchronized with scheduled training days
   const weeklyStats = useMemo(() => {
-    const targetDays = trainingProfile?.daysPerWeek || 4;
+    const scheduledDaysCount = weeklySchedule
+      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
+      : 0;
+    const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
+
     const now = new Date();
     const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
     const startOfWeek = new Date(now);
@@ -250,7 +230,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       targetDays,
       days,
     };
-  }, [workouts, trainingProfile?.daysPerWeek, todayStr]);
+  }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek, todayStr]);
 
   // Today's Fuel summary
   const fuelStats = useMemo(() => {
@@ -638,6 +618,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </span>
             </div>
           </div>
+
+          {keyLiftSpotlight.whyThisWeight && (
+            <div className="border-t border-border/50 pt-2 space-y-1">
+              <p className="text-2xs text-text-muted leading-relaxed">
+                <span className="text-text-secondary font-semibold">Engine note:</span> {keyLiftSpotlight.whyThisWeight}
+              </p>
+              {keyLiftSpotlight.nextSessionRule && (
+                <p className="text-[10px] text-text-muted leading-tight font-mono">
+                  <span className="text-accent font-semibold">Progression:</span> {keyLiftSpotlight.nextSessionRule}
+                </p>
+              )}
+            </div>
+          )}
         </Card>
       )}
 
@@ -740,17 +733,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </Card>
 
-      {/* ── 6. DAILY MINDSET CATALYST (Quiet & Focused) ─────────────────────── */}
-      {dailyQuote && (
-        <div className="py-2.5 px-3.5 rounded-xl bg-bg-secondary/40 border-l-2 border-accent space-y-1">
-          <p className="text-xs text-text-secondary italic leading-relaxed">
-            &ldquo;{dailyQuote.text}&rdquo;
-          </p>
-          <span className="text-[10px] text-text-muted font-mono block text-right">
-            — {dailyQuote.author}
-          </span>
-        </div>
-      )}
 
       {/* ── MODALS ── */}
       <GoalSelectorModal

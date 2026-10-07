@@ -2,6 +2,7 @@ export type Gender = 'male' | 'female';
 export type Unit = 'kg' | 'lbs';
 export type Theme = 'dark' | 'light';
 export type UserMode = 'beginner' | 'advanced';
+export type DietPreference = 'vegetarian' | 'eggitarian' | 'non_vegetarian' | 'vegan';
 
 export type AthleteGoal = 'build_muscle' | 'get_stronger' | 'lose_fat' | 'stamina' | 'general_fitness';
 
@@ -20,8 +21,8 @@ export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
     id: 'build_muscle',
     label: 'Build Muscle',
     tagline: 'Hypertrophy volume, exercise selection, progressive overload',
-    trainingEmphasis: 'Moderate-to-high rep brackets (8–12 reps), high set volume, hypertrophy progressive overload',
-    nutritionEmphasis: 'Lean surplus (+250 kcal), optimal protein (1.8g/kg) to fuel muscle protein synthesis',
+    trainingEmphasis: 'Moderate-to-high rep brackets (8–12 reps), high set volume, double-progression model',
+    nutritionEmphasis: 'Lean surplus (+250 kcal), protein target (~1.8g/kg) to support muscle protein synthesis',
     defaultRepRange: { min: 8, max: 12 },
     defaultRestSeconds: 90,
   },
@@ -30,7 +31,7 @@ export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
     label: 'Get Stronger',
     tagline: 'Compound lifts, RPE, strength progression, PRs',
     trainingEmphasis: 'Heavy compound singles/triples (3–6 reps), velocity maintenance, 1RM milestones & DOTS tracking',
-    nutritionEmphasis: 'Maintenance to slight surplus (+150 kcal), high complex carbohydrates for CNS and glycogen stores',
+    nutritionEmphasis: 'Maintenance to slight surplus (+150 kcal), complex carbohydrates for CNS and glycogen stores',
     defaultRepRange: { min: 3, max: 6 },
     defaultRestSeconds: 150,
   },
@@ -39,7 +40,7 @@ export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
     label: 'Lose Fat',
     tagline: 'Calorie target, weight trend, resistance training, activity',
     trainingEmphasis: 'Preserve heavy mechanical tension to spare lean mass while maintaining training density',
-    nutritionEmphasis: 'Moderate deficit (-450 kcal), elevated protein (2.0–2.2g/kg) to prevent muscle breakdown',
+    nutritionEmphasis: 'Moderate deficit (-450 kcal), elevated protein (~2.0g/kg) to protect lean tissue',
     defaultRepRange: { min: 6, max: 10 },
     defaultRestSeconds: 75,
   },
@@ -47,7 +48,7 @@ export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
     id: 'stamina',
     label: 'Improve Fitness / Stamina',
     tagline: 'Conditioning, work capacity, cardio progression',
-    trainingEmphasis: 'High density sets (12–15+ reps), supersets, shorter rest timers to elevate aerobic capacity',
+    trainingEmphasis: 'Work capacity conditioning (Zone 2, intervals, circuits), higher rep sets, shorter rest intervals',
     nutritionEmphasis: 'Maintenance calories, balanced hydration, electrolyte replenishment, and sustained energy carbs',
     defaultRepRange: { min: 12, max: 15 },
     defaultRestSeconds: 60,
@@ -104,6 +105,7 @@ export interface UserProfile {
   createdAt: string;
   goals?: AthleteGoal[];
   userMode?: UserMode;
+  dietPreference?: DietPreference;
 }
 
 export interface PersonalRecord {

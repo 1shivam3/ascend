@@ -1,5 +1,6 @@
-export type MuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core';
-export type EquipmentType = 'Barbell' | 'Dumbbell' | 'Cable' | 'Machine' | 'Bodyweight' | 'Smith Machine';
+export type ResistanceMuscleGroup = 'Chest' | 'Back' | 'Legs' | 'Shoulders' | 'Arms' | 'Core';
+export type MuscleGroup = ResistanceMuscleGroup | 'Conditioning';
+export type EquipmentType = 'Barbell' | 'Dumbbell' | 'Cable' | 'Machine' | 'Bodyweight' | 'Smith Machine' | 'Cardio';
 
 export interface ExerciseItem {
   id: string;
@@ -9,6 +10,7 @@ export interface ExerciseItem {
   isBodyweight?: boolean;
   defaultReps?: number;
   defaultWeightKg?: number;
+  howTo?: string[];
 }
 
 export const EXERCISE_LIBRARY: ExerciseItem[] = [
@@ -120,10 +122,104 @@ export const EXERCISE_LIBRARY: ExerciseItem[] = [
   { id: 'russian_twist', name: 'Russian Twist (Reps per side)', muscle: 'Core', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 20, defaultWeightKg: 0 },
   { id: 'decline_crunch', name: 'Decline Bench Crunch', muscle: 'Core', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 15, defaultWeightKg: 0 },
   { id: 'machine_crunch', name: 'Abdominal Crunch Machine', muscle: 'Core', equipment: 'Machine', defaultReps: 15, defaultWeightKg: 35 },
+
+  // ── CONDITIONING & CARDIO ──────────────────────────────────────────────
+  {
+    id: 'zone2_cycling',
+    name: 'Zone 2 Stationary Cycling',
+    muscle: 'Conditioning',
+    equipment: 'Cardio',
+    defaultReps: 20,
+    defaultWeightKg: 0,
+    howTo: [
+      'Maintain steady cadence (80–90 RPM) with light-to-moderate resistance.',
+      'Heart rate should stay in aerobic zone (120–135 bpm, conversational pace).',
+      'Breathe through nose or maintain steady rhythm without gasping.',
+    ],
+  },
+  {
+    id: 'incline_treadmill_walk',
+    name: 'Incline Treadmill Walk',
+    muscle: 'Conditioning',
+    equipment: 'Cardio',
+    defaultReps: 15,
+    defaultWeightKg: 0,
+    howTo: [
+      'Set treadmill to 10–12% incline at 4.5–5.0 km/h walking speed.',
+      'Do not hold onto handrails; pump arms naturally to maximize caloric burn.',
+      'Maintain upright posture with chest proud and hips engaged.',
+    ],
+  },
+  {
+    id: 'rowing_intervals',
+    name: 'Rowing Machine Intervals',
+    muscle: 'Conditioning',
+    equipment: 'Cardio',
+    defaultReps: 8,
+    defaultWeightKg: 0,
+    howTo: [
+      'Drive powerfully through legs first, lean back slightly, then pull handle to sternum.',
+      'Perform 1 minute hard sprint effort followed by 1 minute easy paddle recovery.',
+      'Keep core braced and spine neutral throughout stroke.',
+    ],
+  },
+  {
+    id: 'jump_rope',
+    name: 'Jump Rope Intervals',
+    muscle: 'Conditioning',
+    equipment: 'Cardio',
+    defaultReps: 5,
+    defaultWeightKg: 0,
+    howTo: [
+      'Bounce lightly on balls of feet, keeping knees softly bent.',
+      'Rotate rope using wrists rather than whole arms.',
+      'Maintain rhythmic breathing through short work intervals.',
+    ],
+  },
+  {
+    id: 'stair_climber',
+    name: 'Stair Climber (Stepmill)',
+    muscle: 'Conditioning',
+    equipment: 'Cardio',
+    defaultReps: 15,
+    defaultWeightKg: 0,
+    howTo: [
+      'Step fully on each tread with flat foot; do not step only on toes.',
+      'Avoid leaning heavily on handrails; keep weight centered over hips.',
+      'Maintain consistent pace between level 5–8.',
+    ],
+  },
+  {
+    id: 'kettlebell_swings',
+    name: 'Kettlebell Swings',
+    muscle: 'Conditioning',
+    equipment: 'Dumbbell',
+    defaultReps: 20,
+    defaultWeightKg: 16,
+    howTo: [
+      'Hinge hips backward with soft knees; do not squat down.',
+      'Snap hips forward violently to project bell to chest height.',
+      'Keep core locked and spine neutral at the top lock-out.',
+    ],
+  },
+  {
+    id: 'farmers_walk',
+    name: "Farmer's Walk",
+    muscle: 'Conditioning',
+    equipment: 'Dumbbell',
+    defaultReps: 4,
+    defaultWeightKg: 24,
+    howTo: [
+      'Deadlift heavy dumbbells or trap bar with flat back.',
+      'Walk forward with short, deliberate, controlled strides.',
+      'Brace core, pull shoulders back and down, resist any torso sway.',
+    ],
+  },
 ];
 
-export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
-export const EQUIPMENT_TYPES: EquipmentType[] = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Smith Machine'];
+export const MUSCLE_GROUPS: MuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Conditioning'];
+export const RESISTANCE_MUSCLE_GROUPS: ResistanceMuscleGroup[] = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core'];
+export const EQUIPMENT_TYPES: EquipmentType[] = ['Barbell', 'Dumbbell', 'Cable', 'Machine', 'Bodyweight', 'Smith Machine', 'Cardio'];
 
 /**
  * Filter exercises by muscle, equipment, and search query.
@@ -218,3 +314,80 @@ export function getExerciseSecondaryMuscles(name: string): MuscleGroup[] {
 
   return [];
 }
+
+/**
+ * Returns beginner execution form cues (3 crisp bullet points) for any exercise.
+ */
+export function getExerciseFormCues(name: string): string[] {
+  if (!name) return [];
+  const clean = name.toLowerCase().trim();
+  const direct = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === clean);
+  if (direct && direct.howTo && direct.howTo.length > 0) {
+    return direct.howTo;
+  }
+
+  // Keyword-based fallback cues
+  if (clean.includes('bench') || clean.includes('chest press')) {
+    return [
+      'Retract scapulae and pin shoulder blades back and down into the bench.',
+      'Touch lower chest with control, elbows tucked at 45–60 degrees.',
+      'Drive feet into the floor and press up to lockout without shrugging shoulders.',
+    ];
+  }
+  if (clean.includes('squat') || clean.includes('leg press')) {
+    return [
+      'Brace 360-degree abdominal pressure before descending.',
+      'Break at hips and knees simultaneously, driving knees out in line with toes.',
+      'Reach full depth with flat feet, then drive floor away through midfoot.',
+    ];
+  }
+  if (clean.includes('deadlift') || clean.includes('rdl')) {
+    return [
+      'Keep bar close to body over midfoot; brace lats and lock spine neutral.',
+      'Hinge deeply at hips, loading hamstrings and glutes rather than rounding lower back.',
+      'Drive hips forward to full lockout without leaning back excessively.',
+    ];
+  }
+  if (clean.includes('overhead') || clean.includes('shoulder press') || clean.includes('ohp')) {
+    return [
+      'Squeeze glutes and brace core tightly to avoid arching lower back.',
+      'Press bar or dumbbells vertically in a clean line directly overhead.',
+      'Lock out with head moving slightly forward through the window at the top.',
+    ];
+  }
+  if (clean.includes('row') || clean.includes('pulldown') || clean.includes('pull-up')) {
+    return [
+      'Initiate pull by depressing and retracting shoulder blades.',
+      'Drive elbows down and back toward hip pockets.',
+      'Pause for a split-second contraction, then resist the eccentric on the return.',
+    ];
+  }
+  if (clean.includes('curl')) {
+    return [
+      'Pin elbows to sides of torso; avoid swinging shoulders or leaning back.',
+      'Supinate wrists and squeeze biceps hard at peak contraction.',
+      'Lower weight under control with a smooth 2-second negative.',
+    ];
+  }
+  if (clean.includes('tricep') || clean.includes('pushdown')) {
+    return [
+      'Lock elbows in position at your sides; isolate forearm extension.',
+      'Push down fully to lock out triceps with a strong contraction.',
+      'Control the return until forearms are just past 90 degrees.',
+    ];
+  }
+  if (clean.includes('cycle') || clean.includes('bike') || clean.includes('treadmill') || clean.includes('rowing') || clean.includes('jump rope')) {
+    return [
+      'Maintain steady rhythmic breathing and controlled exertion.',
+      'Keep posture upright and core lightly braced throughout the duration.',
+      'Monitor cadence and target heart rate zone for continuous conditioning.',
+    ];
+  }
+
+  return [
+    'Control the eccentric (lowering) phase for 2 seconds with clean tension.',
+    'Maintain a neutral spine and brace your core throughout every repetition.',
+    'Focus on smooth mind-muscle connection rather than swinging momentum.',
+  ];
+}
+

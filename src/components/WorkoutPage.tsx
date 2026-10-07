@@ -502,17 +502,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       userUnit,
       weeklySchedule
     );
-    if (workouts.length === 0 && !activeWorkoutDraft && raw.status !== 'completed') {
-      return {
-        ...raw,
-        isRestDay: false,
-        title: raw.isRestDay ? 'Day 1 — Foundation Workout' : raw.title,
-        status: 'planned' as const,
-        exercises: (raw.exercises && raw.exercises.length > 0)
-          ? raw.exercises
-          : ['Bench Press', 'Barbell Squat', 'Lat Pulldown', 'Overhead Press'],
-      };
-    }
     return raw;
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 

@@ -38,7 +38,7 @@ import {
   Zap,
   Leaf,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
@@ -117,6 +117,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     ? (profile.goals[0] as AthleteGoal)
     : (goals && goals.length > 0 ? (goals[0] as AthleteGoal) : 'build_muscle');
   const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
+  const dietPreference: DietPreference = profile?.dietPreference || 'non_vegetarian';
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
@@ -787,9 +788,191 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   }, [macroGoals, todayMacros, primaryGoal, proteinTargetG]);
 
   const dynamicCloseoutSuggestions = useMemo(() => {
+    // Filter helper for user's favorite foods (staples)
+    const isDietCompliant = (foodName: string) => {
+      const lower = foodName.toLowerCase();
+      const nonVegKeys = ['chicken', 'mutton', 'beef', 'pork', 'fish', 'tuna', 'salmon', 'shrimp', 'meat'];
+      const eggKeys = ['egg', 'omelet', 'omelette'];
+      const dairyKeys = ['milk', 'whey', 'curd', 'dahi', 'paneer', 'cheese', 'yogurt', 'butter', 'ghee', 'cream'];
+
+      if (dietPreference === 'vegan') {
+        if (nonVegKeys.some((k) => lower.includes(k))) return false;
+        if (eggKeys.some((k) => lower.includes(k))) return false;
+        if (dairyKeys.some((k) => lower.includes(k))) return false;
+        return true;
+      }
+      if (dietPreference === 'vegetarian') {
+        if (nonVegKeys.some((k) => lower.includes(k))) return false;
+        if (eggKeys.some((k) => lower.includes(k))) return false;
+        return true;
+      }
+      if (dietPreference === 'eggitarian') {
+        if (nonVegKeys.some((k) => lower.includes(k))) return false;
+        return true;
+      }
+      return true;
+    };
+
     if (!selectedEatPreference) {
       // Default: show top 2 high-protein closeout recommendations immediately
-      const stapleCandidate = favoriteFoods.find((f) => (f.proteinG || 0) >= 15);
+      const stapleCandidate = favoriteFoods.find((f) => (f.proteinG || 0) >= 15 && isDietCompliant(f.name));
+
+      if (dietPreference === 'vegan') {
+        return [
+          stapleCandidate
+            ? {
+                tag: 'TOP STAPLE',
+                tagCls: 'bg-accent/10 text-accent',
+                name: stapleCandidate.name,
+                description: `${stapleCandidate.defaultQuantity || 100}${stapleCandidate.unit || 'g'} ${stapleCandidate.name}`,
+                calories: Math.round(stapleCandidate.calories),
+                proteinG: Math.round(stapleCandidate.proteinG),
+                carbsG: Math.round(stapleCandidate.carbsG || 0),
+                foods: [
+                  {
+                    name: stapleCandidate.name,
+                    quantity: stapleCandidate.defaultQuantity || 100,
+                    unit: stapleCandidate.unit || 'g',
+                    calories: stapleCandidate.calories,
+                    proteinG: stapleCandidate.proteinG,
+                    carbsG: stapleCandidate.carbsG || 0,
+                    fatG: stapleCandidate.fatG || 0,
+                  },
+                ],
+              }
+            : {
+                tag: 'PLANT PROTEIN',
+                tagCls: 'bg-emerald-500/10 text-emerald-400',
+                name: 'Soya Chunks Bowl',
+                description: '60g boiled soya chunks with chaat masala',
+                calories: 206,
+                proteinG: 31,
+                carbsG: 20,
+                foods: [
+                  { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+                ],
+              },
+          {
+            tag: 'CLEAN TOFU',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Grilled Tofu & Peanut Toast',
+            description: '100g firm tofu + 15g peanut butter on toast',
+            calories: 309,
+            proteinG: 22,
+            carbsG: 18,
+            foods: [
+              { name: 'Tofu', quantity: 100, unit: 'g', calories: 144, proteinG: 15, carbsG: 3, fatG: 8 },
+              { name: 'Peanut Butter', quantity: 15, unit: 'g', calories: 90, proteinG: 3.8, carbsG: 3, fatG: 7.5 },
+              { name: 'Brown Bread', quantity: 1, unit: 'slice', calories: 75, proteinG: 3, carbsG: 12, fatG: 1 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'vegetarian') {
+        return [
+          stapleCandidate
+            ? {
+                tag: 'TOP STAPLE',
+                tagCls: 'bg-accent/10 text-accent',
+                name: stapleCandidate.name,
+                description: `${stapleCandidate.defaultQuantity || 100}${stapleCandidate.unit || 'g'} ${stapleCandidate.name}`,
+                calories: Math.round(stapleCandidate.calories),
+                proteinG: Math.round(stapleCandidate.proteinG),
+                carbsG: Math.round(stapleCandidate.carbsG || 0),
+                foods: [
+                  {
+                    name: stapleCandidate.name,
+                    quantity: stapleCandidate.defaultQuantity || 100,
+                    unit: stapleCandidate.unit || 'g',
+                    calories: stapleCandidate.calories,
+                    proteinG: stapleCandidate.proteinG,
+                    carbsG: stapleCandidate.carbsG || 0,
+                    fatG: stapleCandidate.fatG || 0,
+                  },
+                ],
+              }
+            : {
+                tag: 'QUICK SHAKE',
+                tagCls: 'bg-accent/10 text-accent',
+                name: 'Whey Protein Shake',
+                description: '1 scoop whey protein + 250ml milk',
+                calories: 200,
+                proteinG: 30,
+                carbsG: 14,
+                foods: [
+                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                  { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+                ],
+              },
+          {
+            tag: 'PANEER PROTEIN',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Fresh Paneer Cubes / Bhurji',
+            description: '100g fresh paneer with herbs and spices',
+            calories: 265,
+            proteinG: 18,
+            carbsG: 5,
+            foods: [
+              { name: 'Paneer', quantity: 100, unit: 'g', calories: 265, proteinG: 18.3, carbsG: 4.5, fatG: 20.8 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'eggitarian') {
+        return [
+          stapleCandidate
+            ? {
+                tag: 'TOP STAPLE',
+                tagCls: 'bg-accent/10 text-accent',
+                name: stapleCandidate.name,
+                description: `${stapleCandidate.defaultQuantity || 100}${stapleCandidate.unit || 'g'} ${stapleCandidate.name}`,
+                calories: Math.round(stapleCandidate.calories),
+                proteinG: Math.round(stapleCandidate.proteinG),
+                carbsG: Math.round(stapleCandidate.carbsG || 0),
+                foods: [
+                  {
+                    name: stapleCandidate.name,
+                    quantity: stapleCandidate.defaultQuantity || 100,
+                    unit: stapleCandidate.unit || 'g',
+                    calories: stapleCandidate.calories,
+                    proteinG: stapleCandidate.proteinG,
+                    carbsG: stapleCandidate.carbsG || 0,
+                    fatG: stapleCandidate.fatG || 0,
+                  },
+                ],
+              }
+            : {
+                tag: 'QUICK SHAKE',
+                tagCls: 'bg-accent/10 text-accent',
+                name: 'Whey Protein Shake',
+                description: '1 scoop whey protein + 250ml milk',
+                calories: 200,
+                proteinG: 30,
+                carbsG: 14,
+                foods: [
+                  { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+                  { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+                ],
+              },
+          {
+            tag: 'CLEAN PROTEIN',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Boiled Eggs (3 Whole + 1 White)',
+            description: 'High bioavailability complete protein',
+            calories: 239,
+            proteinG: 22,
+            carbsG: 2,
+            foods: [
+              { name: 'Whole Egg', quantity: 3, unit: 'piece', calories: 222, proteinG: 18.9, carbsG: 1.8, fatG: 15 },
+              { name: 'Egg White', quantity: 1, unit: 'piece', calories: 17, proteinG: 3.6, carbsG: 0.2, fatG: 0.1 },
+            ],
+          },
+        ];
+      }
+
+      // Non-Vegetarian default
       return [
         stapleCandidate
           ? {
@@ -813,37 +996,70 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               ],
             }
           : {
-              tag: 'QUICK SHAKE',
-              tagCls: 'bg-accent/10 text-accent',
-              name: 'Whey Protein Shake',
-              description: '1 scoop whey protein + 250ml milk',
-              calories: 200,
-              proteinG: 30,
-              carbsG: 14,
+              tag: 'LEAN PROTEIN',
+              tagCls: 'bg-emerald-500/10 text-emerald-400',
+              name: 'Grilled Chicken Breast',
+              description: '120g seasoned tender chicken breast',
+              calories: 198,
+              proteinG: 37,
+              carbsG: 0,
               foods: [
-                { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
-                { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
+                { name: 'Chicken Breast', quantity: 120, unit: 'g', calories: 198, proteinG: 37.2, carbsG: 0, fatG: 4.3 },
               ],
             },
         {
-          tag: 'CLEAN PROTEIN',
-          tagCls: 'bg-emerald-500/10 text-emerald-400',
-          name: 'Boiled Eggs (3 Whole + 1 White)',
-          description: 'High bioavailability complete protein',
-          calories: 239,
-          proteinG: 22,
-          carbsG: 2,
+          tag: 'QUICK SHAKE',
+          tagCls: 'bg-accent/10 text-accent',
+          name: 'Whey Protein Shake',
+          description: '1 scoop whey protein + 250ml milk',
+          calories: 200,
+          proteinG: 30,
+          carbsG: 14,
           foods: [
-            { name: 'Whole Egg', quantity: 3, unit: 'piece', calories: 222, proteinG: 18.9, carbsG: 1.8, fatG: 15 },
-            { name: 'Egg White', quantity: 1, unit: 'piece', calories: 17, proteinG: 3.6, carbsG: 0.2, fatG: 0.1 },
+            { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1.5 },
+            { name: 'Milk', quantity: 250, unit: 'ml', calories: 80, proteinG: 6, carbsG: 12, fatG: 2 },
           ],
         },
       ];
     }
 
     if (selectedEatPreference === 'staples') {
-      const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 4);
+      const candidates = favoriteFoods.filter((f) => (f.proteinG || 0) >= 4 && isDietCompliant(f.name));
       if (candidates.length === 0) {
+        if (dietPreference === 'vegan') {
+          return [
+            {
+              tag: 'STAPLE IDEA',
+              tagCls: 'bg-accent/10 text-accent',
+              name: 'Tofu & Roasted Chana Bowl',
+              description: '100g firm tofu with 40g roasted chana',
+              calories: 289,
+              proteinG: 24,
+              carbsG: 25,
+              foods: [
+                { name: 'Tofu', quantity: 100, unit: 'g', calories: 144, proteinG: 15, carbsG: 3, fatG: 8 },
+                { name: 'Roasted Chana', quantity: 40, unit: 'g', calories: 145, proteinG: 8.8, carbsG: 22, fatG: 2.2 },
+              ],
+            },
+          ];
+        }
+        if (dietPreference === 'non_vegetarian') {
+          return [
+            {
+              tag: 'STAPLE IDEA',
+              tagCls: 'bg-accent/10 text-accent',
+              name: 'Chicken Breast & White Rice',
+              description: '120g grilled chicken breast with 150g rice',
+              calories: 393,
+              proteinG: 41,
+              carbsG: 42,
+              foods: [
+                { name: 'Chicken Breast', quantity: 120, unit: 'g', calories: 198, proteinG: 37.2, carbsG: 0, fatG: 4.3 },
+                { name: 'Cooked Rice', quantity: 150, unit: 'g', calories: 195, proteinG: 3.8, carbsG: 42, fatG: 0.5 },
+              ],
+            },
+          ];
+        }
         return [
           {
             tag: 'STAPLE IDEA',
@@ -883,6 +1099,35 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     if (selectedEatPreference === 'shake') {
+      if (dietPreference === 'vegan') {
+        return [
+          {
+            tag: 'PLANT SHAKE',
+            tagCls: 'bg-accent/10 text-accent',
+            name: 'Plant Protein Shake',
+            description: '1 scoop vegan pea/soy protein + 300ml water',
+            calories: 130,
+            proteinG: 25,
+            carbsG: 3,
+            foods: [
+              { name: 'Plant Protein', quantity: 30, unit: 'g', calories: 130, proteinG: 25, carbsG: 3, fatG: 1.5 },
+            ],
+          },
+          {
+            tag: 'DESI SATTU DRINK',
+            tagCls: 'bg-amber-500/10 text-amber-400',
+            name: 'Sattu Protein Drink',
+            description: '50g sattu in 300ml cold water with lemon & jeera',
+            calories: 206,
+            proteinG: 13,
+            carbsG: 32,
+            foods: [
+              { name: 'Sattu', quantity: 50, unit: 'g', calories: 206, proteinG: 13, carbsG: 32, fatG: 2.5 },
+            ],
+          },
+        ];
+      }
+
       return [
         {
           tag: '1 MIN PREP',
@@ -913,17 +1158,107 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     if (selectedEatPreference === 'high_protein') {
+      if (dietPreference === 'vegan') {
+        return [
+          {
+            tag: 'MAXIMUM PROTEIN',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Soya Chunks Bowl',
+            description: '60g boiled soya chunks with chaat masala',
+            calories: 206,
+            proteinG: 31,
+            carbsG: 20,
+            foods: [
+              { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+            ],
+          },
+          {
+            tag: 'GRILLED TOFU',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Grilled Tofu Platter',
+            description: '150g firm tofu with spices and herbs',
+            calories: 216,
+            proteinG: 23,
+            carbsG: 5,
+            foods: [
+              { name: 'Tofu', quantity: 150, unit: 'g', calories: 216, proteinG: 22.5, carbsG: 4.5, fatG: 12 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'vegetarian') {
+        return [
+          {
+            tag: 'MAXIMUM PROTEIN',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Soya Chunks Bowl',
+            description: '60g boiled soya chunks with chaat masala',
+            calories: 206,
+            proteinG: 31,
+            carbsG: 20,
+            foods: [
+              { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+            ],
+          },
+          {
+            tag: 'PANEER & CURD',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Fresh Paneer & Curd Bowl',
+            description: '100g paneer + 100g curd with roasted spices',
+            calories: 326,
+            proteinG: 22,
+            carbsG: 9,
+            foods: [
+              { name: 'Paneer', quantity: 100, unit: 'g', calories: 265, proteinG: 18.3, carbsG: 4.5, fatG: 20.8 },
+              { name: 'Curd', quantity: 100, unit: 'g', calories: 61, proteinG: 3.5, carbsG: 4.7, fatG: 3.3 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'eggitarian') {
+        return [
+          {
+            tag: '4 BOILED EGGS',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Boiled Eggs (3 Whole + 1 White)',
+            description: 'Complete high-bioavailability protein',
+            calories: 239,
+            proteinG: 22,
+            carbsG: 2,
+            foods: [
+              { name: 'Whole Egg', quantity: 3, unit: 'piece', calories: 222, proteinG: 18.9, carbsG: 1.8, fatG: 15 },
+              { name: 'Egg White', quantity: 1, unit: 'piece', calories: 17, proteinG: 3.6, carbsG: 0.2, fatG: 0.1 },
+            ],
+          },
+          {
+            tag: 'MAXIMUM PROTEIN',
+            tagCls: 'bg-emerald-500/10 text-emerald-400',
+            name: 'Soya Chunks Bowl',
+            description: '60g boiled soya chunks with chaat masala',
+            calories: 206,
+            proteinG: 31,
+            carbsG: 20,
+            foods: [
+              { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+            ],
+          },
+        ];
+      }
+
+      // Non-vegetarian
       return [
         {
-          tag: 'MAXIMUM PROTEIN',
+          tag: 'LEAN CHICKEN',
           tagCls: 'bg-emerald-500/10 text-emerald-400',
-          name: 'Soya Chunks Bowl',
-          description: '60g boiled soya chunks with chaat masala',
-          calories: 206,
-          proteinG: 31,
-          carbsG: 20,
+          name: 'Grilled Chicken Breast',
+          description: '150g grilled chicken breast',
+          calories: 248,
+          proteinG: 47,
+          carbsG: 0,
           foods: [
-            { name: 'Soya Chunks', quantity: 60, unit: 'g', calories: 206, proteinG: 31.2, carbsG: 19.8, fatG: 0.4 },
+            { name: 'Chicken Breast', quantity: 150, unit: 'g', calories: 248, proteinG: 46.5, carbsG: 0, fatG: 5.4 },
           ],
         },
         {
@@ -943,18 +1278,106 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     if (selectedEatPreference === 'light') {
+      if (dietPreference === 'vegan') {
+        return [
+          {
+            tag: 'LOW CALORIE BOOST',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: 'Roasted Chana Bowl',
+            description: '40g roasted chana with chaat masala',
+            calories: 145,
+            proteinG: 9,
+            carbsG: 22,
+            foods: [
+              { name: 'Roasted Chana', quantity: 40, unit: 'g', calories: 145, proteinG: 8.8, carbsG: 22, fatG: 2.2 },
+            ],
+          },
+          {
+            tag: 'PLANT PROTEIN WATER',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: '1 Scoop Plant Protein in Water',
+            description: 'Fast pure plant protein with minimal carbs',
+            calories: 120,
+            proteinG: 24,
+            carbsG: 2,
+            foods: [
+              { name: 'Plant Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2, fatG: 1 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'vegetarian') {
+        return [
+          {
+            tag: 'LOW CALORIE BOOST',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: 'Curd / Dahi Bowl with Roasted Chana',
+            description: '150g curd + 30g roasted chana',
+            calories: 141,
+            proteinG: 8,
+            carbsG: 15,
+            foods: [
+              { name: 'Curd', quantity: 150, unit: 'g', calories: 92, proteinG: 5.3, carbsG: 7, fatG: 5 },
+              { name: 'Roasted Chana', quantity: 30, unit: 'g', calories: 49, proteinG: 2.7, carbsG: 8.2, fatG: 0.8 },
+            ],
+          },
+          {
+            tag: 'WHEY IN WATER',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: '1 Scoop Whey Protein in Water',
+            description: 'Fastest pure protein with minimal calories',
+            calories: 120,
+            proteinG: 24,
+            carbsG: 2,
+            foods: [
+              { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2.2, fatG: 1 },
+            ],
+          },
+        ];
+      }
+
+      if (dietPreference === 'eggitarian') {
+        return [
+          {
+            tag: '3 EGG WHITES',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: 'Boiled Egg Whites (3 Whites)',
+            description: 'Ultra lean protein with black pepper',
+            calories: 51,
+            proteinG: 11,
+            carbsG: 1,
+            foods: [
+              { name: 'Egg White', quantity: 3, unit: 'piece', calories: 51, proteinG: 10.8, carbsG: 0.6, fatG: 0.3 },
+            ],
+          },
+          {
+            tag: 'WHEY IN WATER',
+            tagCls: 'bg-sky-500/10 text-sky-400',
+            name: '1 Scoop Whey Protein in Water',
+            description: 'Fastest pure protein with minimal calories',
+            calories: 120,
+            proteinG: 24,
+            carbsG: 2,
+            foods: [
+              { name: 'Whey Protein', quantity: 30, unit: 'g', calories: 120, proteinG: 24, carbsG: 2.2, fatG: 1 },
+            ],
+          },
+        ];
+      }
+
+      // Non-Vegetarian light
       return [
         {
-          tag: 'LOW CALORIE BOOST',
+          tag: 'TUNA IN WATER',
           tagCls: 'bg-sky-500/10 text-sky-400',
-          name: 'Curd / Dahi Bowl with Roasted Chana',
-          description: '150g curd + 30g roasted chana',
-          calories: 141,
-          proteinG: 8,
-          carbsG: 15,
+          name: 'Canned Tuna in Water',
+          description: '100g drained tuna in water',
+          calories: 116,
+          proteinG: 26,
+          carbsG: 0,
           foods: [
-            { name: 'Curd', quantity: 150, unit: 'g', calories: 92, proteinG: 5.3, carbsG: 7, fatG: 5 },
-            { name: 'Roasted Chana', quantity: 30, unit: 'g', calories: 49, proteinG: 2.7, carbsG: 8.2, fatG: 0.8 },
+            { name: 'Tuna', quantity: 100, unit: 'g', calories: 116, proteinG: 25.5, carbsG: 0, fatG: 1 },
           ],
         },
         {
@@ -973,7 +1396,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     return [];
-  }, [selectedEatPreference, favoriteFoods]);
+  }, [selectedEatPreference, favoriteFoods, dietPreference]);
 
   const waterToday = waterLogs[todayDate] || 0;
   const waterTargetMl = calculateHydrationTarget({
@@ -1539,15 +1962,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 WHAT SHOULD I EAT NEXT?
               </h3>
             </div>
-            <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-              {Math.round(proteinRemaining)}g protein left
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-3xs font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 capitalize font-mono">
+                {dietPreference.replace('_', '-')}
+              </span>
+              <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                {Math.round(proteinRemaining)}g protein left
+              </span>
+            </div>
           </div>
 
           <p className="text-xs text-text-secondary">
             {selectedEatPreference
-              ? 'Tailored high-protein options based on your selection:'
-              : 'Recommended options to close your protein gap today:'}
+              ? `Tailored (${dietPreference.replace('_', ' ')}) high-protein options based on your selection:`
+              : `Recommended options to close your protein gap (${dietPreference.replace('_', ' ')}) today:`}
           </p>
 
           {/* User Choice Selector */}

@@ -35,11 +35,13 @@ import {
   ExerciseItem,
   searchExercises,
   getExerciseMuscle,
+  getExerciseFormCues,
 } from '@/lib/exercise-library';
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
   getQuickSubstitutes,
+  getExercisePrescription,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
@@ -591,6 +593,54 @@ export default function ActiveWorkoutScreen({
     if (!currentExercise?.name) return null;
     return getProgressionRecommendation(currentExercise.name, workouts, userUnit, primaryGoal);
   }, [currentExercise?.name, workouts, userUnit, primaryGoal]);
+
+  const prescription = useMemo(() => {
+    if (!currentExercise?.name) return null;
+    return getExercisePrescription(
+      currentExercise.name,
+      workouts,
+      prs,
+      userUnit,
+      primaryGoal
+    );
+  }, [currentExercise?.name, workouts, prs, userUnit, primaryGoal]);
+
+  const formCues = useMemo(() => {
+    if (!currentExercise?.name) return [];
+    return getExerciseFormCues(currentExercise.name);
+  }, [currentExercise?.name]);
+
+  const [showFormCues, setShowFormCues] = useState(false);
+  const [showWhyTarget, setShowWhyTarget] = useState(false);
+
+  const postWorkoutLedger = useMemo(() => {
+    const improved: string[] = [];
+    const steady: string[] = [];
+    const nextRules: string[] = [];
+
+    for (const ex of exercises) {
+      if (!ex.name.trim()) continue;
+      const validSets = ex.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0));
+      if (validSets.length === 0) continue;
+      const allDone = validSets.every((s) => (s.rpe ?? 8) <= 8 && s.reps >= 8);
+      const pr = prs.find((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
+      const maxW = Math.max(...validSets.map((s) => parseFloat(String(s.weight)) || 0));
+
+      if (allDone || (pr && maxW > (userUnit === 'lbs' ? (pr.weightLbs || pr.weightKg * 2.20462) : pr.weightKg))) {
+        improved.push(`${ex.name}: Solid volume & speed`);
+        nextRules.push(`${ex.name}: +${userUnit === 'lbs' ? 5 : 2.5}${userUnit} next exposure`);
+      } else {
+        steady.push(`${ex.name}: Held load at ${maxW}${userUnit}`);
+        nextRules.push(`${ex.name}: Aim for +1 rep next session`);
+      }
+    }
+
+    return {
+      improved: improved.length > 0 ? improved.slice(0, 2) : ['First session calibration completed'],
+      steady: steady.length > 0 ? steady.slice(0, 2) : ['Movement quality & baseline established'],
+      nextRules: nextRules.length > 0 ? nextRules.slice(0, 2) : ['Follow prescribed target progression'],
+    };
+  }, [exercises, prs, userUnit]);
 
   // Weight & Reps handlers (direct typing + steppers)
   const handleSetWeightChange = (setIdx: number, val: string | number) => {
@@ -1546,32 +1596,92 @@ export default function ActiveWorkoutScreen({
             )}
           </div>
 
-          {/* Context: Last session */}
-          {lastPerf ? (
-            <div className="text-xs text-text-muted">
-              <span>Last time: </span>
-              <span className="font-semibold text-text-secondary">{lastPerf.summary}</span>
-            </div>
-          ) : fallbackPR && workouts.length === 0 ? (
-            <div className="text-xs text-text-muted">
-              <span>Baseline: </span>
-              <span className="font-semibold text-text-secondary">
-                {userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg} {userUnit} × {fallbackPR.reps}
-              </span>
-            </div>
-          ) : (
-            <div className="text-xs text-text-muted">
-              <span>Last time: —</span>
-            </div>
-          )}
+          {/* Context & Target Card */}
+          <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 space-y-2 mt-2">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  TODAY&apos;S TARGET
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-base font-black font-mono text-accent">
+                    {prescription ? `${prescription.targetWeight} ${userUnit} × ${prescription.targetReps} reps` : `${currentExercise.sets[0]?.weight || 0} ${userUnit} × ${currentExercise.sets[0]?.reps || 8}`}
+                  </span>
+                  {userMode === 'advanced' && (
+                    <span className="text-xs font-mono text-text-muted">
+                      @{prescription?.targetRpe || 8}
+                    </span>
+                  )}
+                </div>
+              </div>
 
-          {/* Today's Target */}
-          <div className="pt-0.5 text-xs font-semibold text-accent tracking-wide uppercase">
-            <span>TODAY: </span>
-            <span className="font-mono text-text-primary text-sm font-bold ml-1 normal-case">
-              {currentExercise.sets[0]?.weight ? `${currentExercise.sets[0]?.weight} ${userUnit}` : 'Custom'} × {currentExercise.sets[0]?.reps || 8}
-              {userMode === 'advanced' && ` @${currentExercise.sets[0]?.rpe || 8}`}
-            </span>
+              <div className="text-right space-y-0.5">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  LAST TIME
+                </span>
+                <span className="text-xs font-mono font-bold text-text-secondary block">
+                  {prescription?.lastPerformance
+                    ? `${prescription.lastPerformance.weight} ${userUnit} × ${prescription.lastPerformance.reps} reps`
+                    : lastPerf
+                    ? lastPerf.summary
+                    : fallbackPR
+                    ? `Baseline: ${userUnit === 'lbs' ? fallbackPR.weightLbs : fallbackPR.weightKg} ${userUnit} × ${fallbackPR.reps}`
+                    : 'First exposure'}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Helper Drawers (Engine Note & Form Cues) */}
+            <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
+              <button
+                type="button"
+                onClick={() => setShowWhyTarget((p) => !p)}
+                className="text-text-muted hover:text-accent flex items-center gap-1 font-mono transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3 h-3 text-accent" />
+                <span>{showWhyTarget ? 'Hide engine reason' : 'Why this weight?'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowFormCues((p) => !p)}
+                className="text-text-muted hover:text-text-primary flex items-center gap-1 font-medium transition-colors cursor-pointer"
+              >
+                <span>{showFormCues ? 'Hide form cues' : 'Form cues'}</span>
+                <ChevronRight className={`w-3 h-3 transition-transform ${showFormCues ? 'rotate-90' : ''}`} />
+              </button>
+            </div>
+
+            {/* Engine reasoning accordion */}
+            {showWhyTarget && prescription?.whyThisWeight && (
+              <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/25 space-y-1 text-2xs animate-fade-in">
+                <p className="text-text-primary leading-relaxed font-sans">
+                  <strong>Prescription:</strong> {prescription.whyThisWeight}
+                </p>
+                {prescription.nextSessionRule && (
+                  <p className="text-text-secondary leading-relaxed font-mono text-[10px]">
+                    <strong>Progression rule:</strong> {prescription.nextSessionRule}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Form cues accordion */}
+            {showFormCues && formCues.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5 text-2xs animate-fade-in">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
+                  EXECUTION CUES
+                </span>
+                <ul className="space-y-1 text-text-secondary">
+                  {formCues.map((cue, cIdx) => (
+                    <li key={cIdx} className="flex items-start gap-1.5">
+                      <span className="text-accent font-bold">•</span>
+                      <span className="leading-snug">{cue}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </section>
 
@@ -2556,15 +2666,50 @@ export default function ActiveWorkoutScreen({
                 </div>
               </div>
 
-              {/* Progression Coach Summary */}
-              <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
-                  <Bot className="w-4 h-4" />
-                  <span>SMART PROGRESSION READY</span>
+              {/* Post-Workout Adaptation Ledger */}
+              <div className="space-y-2 pt-1 text-left">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  TRAINING ADAPTATION SUMMARY
+                </span>
+
+                {/* 1. What improved */}
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>What improved</span>
+                  </div>
+                  <ul className="text-2xs text-text-secondary space-y-0.5 list-disc list-inside">
+                    {postWorkoutLedger.improved.map((item, idx) => (
+                      <li key={idx} className="leading-snug">{item}</li>
+                    ))}
+                  </ul>
                 </div>
-                <p className="text-2xs text-text-secondary leading-relaxed">
-                  Next weight recommendations and volume adaptations will be calibrated for your upcoming session based on RPE and target completions.
-                </p>
+
+                {/* 2. What stays the same */}
+                <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/80 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-text-primary">
+                    <Layers className="w-3.5 h-3.5 text-text-muted" />
+                    <span>What stays the same</span>
+                  </div>
+                  <ul className="text-2xs text-text-muted space-y-0.5 list-disc list-inside">
+                    {postWorkoutLedger.steady.map((item, idx) => (
+                      <li key={idx} className="leading-snug">{item}</li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* 3. What changes next time */}
+                <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
+                    <ArrowRight className="w-3.5 h-3.5" />
+                    <span>What changes next time</span>
+                  </div>
+                  <ul className="text-2xs text-text-secondary space-y-0.5 list-disc list-inside">
+                    {postWorkoutLedger.nextRules.map((item, idx) => (
+                      <li key={idx} className="leading-snug">{item}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
               <div className="flex gap-2 pt-1">
