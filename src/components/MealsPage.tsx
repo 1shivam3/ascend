@@ -327,13 +327,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (isModalOpen) {
       // Append to currently editing meal
       setFoods((prev) => [...prev, scannedItem]);
+      toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
     } else {
-      // Open modal with this food
-      setMealName('Scanned Meal');
-      setFoods([scannedItem]);
-      setIsModalOpen(true);
+      // User confirmed in barcode modal: save directly to today's meals
+      const newMeal: MealEntry = {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+        date: todayDate,
+        name: scannedItem.name,
+        foods: [scannedItem],
+      };
+      addMeal(newMeal);
+      toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal) to today's meals!`, 'Scanned Food Logged');
     }
-    toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
   };
 
   /**

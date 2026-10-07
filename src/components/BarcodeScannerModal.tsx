@@ -13,7 +13,8 @@ import {
   Plus,
   Loader2,
   Barcode as BarcodeIcon,
-  Maximize2
+  ChevronRight,
+  Utensils,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
@@ -35,8 +36,8 @@ export default function BarcodeScannerModal({
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const readerRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const controlsRef = useRef<any>(null);
   const isProcessingRef = useRef<boolean>(false);
 
   const [hasCamera, setHasCamera] = useState(true);
@@ -51,13 +52,13 @@ export default function BarcodeScannerModal({
 
   // Manual fallback editable values if not found in DB
   const [manualName, setManualName] = useState('');
-  const [manualCalories, setManualCalories] = useState('0');
-  const [manualProtein, setManualProtein] = useState('0');
-  const [manualCarbs, setManualCarbs] = useState('0');
-  const [manualFat, setManualFat] = useState('0');
+  const [manualCalories, setManualCalories] = useState('100');
+  const [manualProtein, setManualProtein] = useState('5');
+  const [manualCarbs, setManualCarbs] = useState('15');
+  const [manualFat, setManualFat] = useState('2');
   const [isNotFoundInDB, setIsNotFoundInDB] = useState(false);
 
-  // Play scanner success feedback
+  // Play audio/haptic feedback ONCE upon successful scan
   const playScanFeedback = useCallback(() => {
     try {
       if (typeof window !== 'undefined' && 'AudioContext' in window) {
@@ -65,26 +66,27 @@ export default function BarcodeScannerModal({
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(1200, ctx.currentTime);
+        osc.frequency.setValueAtTime(1100, ctx.currentTime);
         gain.gain.setValueAtTime(0.2, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start();
-        osc.stop(ctx.currentTime + 0.15);
+        osc.stop(ctx.currentTime + 0.12);
       }
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate([80, 40, 80]);
+        navigator.vibrate([60]);
       }
     } catch {}
   }, []);
 
+  // Hard stop camera and reader controls
   const stopCamera = useCallback(() => {
-    if (readerRef.current) {
+    if (controlsRef.current) {
       try {
-        readerRef.current.reset();
+        controlsRef.current.stop();
       } catch {}
-      readerRef.current = null;
+      controlsRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -96,7 +98,7 @@ export default function BarcodeScannerModal({
     setIsScanning(false);
   }, []);
 
-  // Handle scanned barcode lookup
+  // Handle scanned barcode lookup (ONE TIME scan trigger)
   const handleBarcodeFound = useCallback(async (code: string) => {
     const clean = code.trim().replace(/\D/g, '');
     if (!clean || clean.length < 5) {
@@ -104,54 +106,63 @@ export default function BarcodeScannerModal({
       return;
     }
 
-    // Guard against multiple simultaneous lookups
+    // Single-scan lock: Stop immediately so camera does NOT scan again
     isProcessingRef.current = true;
     playScanFeedback();
     stopCamera();
     setIsLoadingProduct(true);
     setCameraError(null);
 
-    const product = await fetchProductByBarcode(clean);
-    setIsLoadingProduct(false);
+    try {
+      const product = await fetchProductByBarcode(clean);
+      setIsLoadingProduct(false);
 
-    if (product) {
-      setScannedProduct(product);
-      setIsNotFoundInDB(false);
-      setManualName(product.name);
-      setManualCalories(String(product.per100g.calories));
-      setManualProtein(String(product.per100g.proteinG));
-      setManualCarbs(String(product.per100g.carbsG));
-      setManualFat(String(product.per100g.fatG));
+      if (product) {
+        setScannedProduct(product);
+        setIsNotFoundInDB(false);
+        setManualName(product.name);
+        setManualCalories(String(product.per100g.calories));
+        setManualProtein(String(product.per100g.proteinG));
+        setManualCarbs(String(product.per100g.carbsG));
+        setManualFat(String(product.per100g.fatG));
 
-      if (product.perServing) {
-        setServingMode('serving');
-        setCustomQty(1);
+        if (product.perServing) {
+          setServingMode('serving');
+          setCustomQty(1);
+        } else {
+          setServingMode('100g');
+          setCustomQty(100);
+        }
       } else {
+        // Product not found in open DB: present clean editable card to ask user
+        setIsNotFoundInDB(true);
+        setManualName(`Scanned Item (${clean})`);
+        setManualCalories('120');
+        setManualProtein('6');
+        setManualCarbs('18');
+        setManualFat('3');
         setServingMode('100g');
         setCustomQty(100);
+
+        setScannedProduct({
+          barcode: clean,
+          name: `Scanned Item (${clean})`,
+          per100g: { calories: 120, proteinG: 6, carbsG: 18, fatG: 3 },
+        });
       }
-      toast.success(`Found ${product.name}!`, 'Product Verified');
-    } else {
-      // Product not found in DB - show single polite inline card, NO loop!
+    } catch {
+      setIsLoadingProduct(false);
       setIsNotFoundInDB(true);
       setManualName(`Scanned Item (${clean})`);
-      setManualCalories('100');
-      setManualProtein('5');
-      setManualCarbs('15');
-      setManualFat('2');
-      setServingMode('100g');
-      setCustomQty(100);
-
       setScannedProduct({
         barcode: clean,
         name: `Scanned Item (${clean})`,
         per100g: { calories: 100, proteinG: 5, carbsG: 15, fatG: 2 },
       });
-      toast.info(`Barcode ${clean} scanned. Enter label details below to save.`, 'Item Scanned');
     }
-  }, [playScanFeedback, stopCamera, toast]);
+  }, [playScanFeedback, stopCamera]);
 
-  // Start Camera with ZXing
+  // Start Camera with ZXing and capture scanner controls
   const startCamera = useCallback(async () => {
     if (typeof window === 'undefined') return;
     setCameraError(null);
@@ -176,17 +187,23 @@ export default function BarcodeScannerModal({
       setHasCamera(true);
 
       const codeReader = new BrowserMultiFormatReader();
-      readerRef.current = codeReader;
 
-      codeReader.decodeFromVideoElement(videoRef.current!, (result, err) => {
+      // Store controls for stopping exactly after first read
+      const controls = await codeReader.decodeFromVideoElement(videoRef.current!, (result, err) => {
         if (result && !isProcessingRef.current) {
           const text = result.getText();
           if (text && text.trim().length >= 5) {
             isProcessingRef.current = true;
+            if (controlsRef.current) {
+              try {
+                controlsRef.current.stop();
+              } catch {}
+            }
             handleBarcodeFound(text);
           }
         }
       });
+      controlsRef.current = controls;
     } catch (err: any) {
       console.warn('Camera initialization error:', err);
       setHasCamera(false);
@@ -228,7 +245,8 @@ export default function BarcodeScannerModal({
       : scannedProductToFoodItem(scannedProduct, servingMode, customQty)
     : null;
 
-  const handleAddAndClose = () => {
+  // Explicit user confirmation to add food
+  const handleConfirmAddToMeal = () => {
     if (!currentFoodItem) return;
     onAddFood(currentFoodItem);
 
@@ -243,13 +261,13 @@ export default function BarcodeScannerModal({
         fatG: currentFoodItem.fatG,
         barcode: scannedProduct.barcode,
       });
-      toast.success(`Pinned ${currentFoodItem.name} to Frequent Favorites!`, 'Favorite Saved');
     }
 
     onClose();
   };
 
   const handleScanAgain = () => {
+    stopCamera();
     setScannedProduct(null);
     setIsNotFoundInDB(false);
     setManualBarcode('');
@@ -258,95 +276,126 @@ export default function BarcodeScannerModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay z-50" onClick={onClose}>
       <div
-        className="modal-content max-w-md w-full overflow-hidden p-0 bg-bg-card border border-border"
+        className="modal-content max-w-md w-full overflow-hidden p-0 bg-bg-card border border-border rounded-3xl shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between bg-bg-elevated/70">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center">
-              <BarcodeIcon className="w-4 h-4" />
+        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between bg-bg-card/90 backdrop-blur-md">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-accent/15 border border-accent/25 text-accent flex items-center justify-center">
+              <BarcodeIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-text-primary leading-none">Barcode Scanner</h2>
-              <span className="text-[10px] text-text-muted font-mono">Open Food Facts & Indian Groceries</span>
+              <h2 className="text-base font-bold text-text-primary leading-tight">Barcode Scanner</h2>
+              <span className="text-2xs text-text-muted font-mono">Scan package to log food</span>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
+            className="p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
-          {/* Camera Viewport */}
+        <div className="p-4 sm:p-5 space-y-4 max-h-[78vh] overflow-y-auto">
+          {/* Camera Viewport (Active only when no product is captured yet) */}
           {!scannedProduct && !isLoadingProduct && (
-            <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-border/70 flex items-center justify-center shadow-inner">
-              <video
-                ref={videoRef}
-                className="w-full h-full object-cover"
-                playsInline
-                muted
-              />
+            <div className="space-y-3">
+              <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-border/80 flex items-center justify-center shadow-inner">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                />
 
-              {/* Viewport Reticle Overlay */}
-              {isScanning && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="relative w-64 h-36 border-2 border-accent/70 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(255,107,31,0.3)]">
-                    <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse" />
-                    <span className="absolute top-1 left-1 w-3 h-3 border-t-2 border-l-2 border-accent" />
-                    <span className="absolute top-1 right-1 w-3 h-3 border-t-2 border-r-2 border-accent" />
-                    <span className="absolute bottom-1 left-1 w-3 h-3 border-b-2 border-l-2 border-accent" />
-                    <span className="absolute bottom-1 right-1 w-3 h-3 border-b-2 border-r-2 border-accent" />
+                {/* Viewport Reticle Overlay */}
+                {isScanning && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="relative w-64 h-32 border-2 border-accent rounded-xl overflow-hidden shadow-[0_0_24px_rgba(249,115,22,0.35)]">
+                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse" />
+                      <span className="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-accent" />
+                      <span className="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-accent" />
+                      <span className="absolute bottom-1 left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-accent" />
+                      <span className="absolute bottom-1 right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-accent" />
+                    </div>
+                    <span className="absolute bottom-3 text-center text-3xs font-mono font-semibold text-white/90 bg-black/70 px-3 py-1 rounded-full backdrop-blur-xs">
+                      Align barcode inside frame • Scans once
+                    </span>
                   </div>
-                  <span className="absolute bottom-3 text-center text-2xs font-mono text-white/80 bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-xs">
-                    Align barcode inside frame
-                  </span>
-                </div>
-              )}
+                )}
 
-              {/* Camera Error / Fallback display */}
-              {cameraError && (
-                <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10 overflow-y-auto">
-                  <AlertCircle className="w-7 h-7 text-warning mb-1.5 shrink-0" />
-                  <p className="text-xs text-text-primary font-medium">{cameraError}</p>
-                  <p className="text-3xs text-text-muted mt-0.5 mb-3">
-                    Enter the barcode number manually to lookup nutrition facts:
-                  </p>
-                  <div className="w-full max-w-xs space-y-2">
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 8901491101907"
-                        value={manualBarcode}
-                        onChange={(e) => setManualBarcode(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
-                        }}
-                        className="w-full bg-bg-elevated border border-border rounded-lg px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent text-center"
-                      />
+                {/* Camera Error / Fallback display */}
+                {cameraError && (
+                  <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10 overflow-y-auto">
+                    <AlertCircle className="w-7 h-7 text-amber-500 mb-1.5 shrink-0" />
+                    <p className="text-xs text-text-primary font-medium">{cameraError}</p>
+                    <p className="text-3xs text-text-muted mt-0.5 mb-3">
+                      Enter the barcode number manually to lookup nutrition facts:
+                    </p>
+                    <div className="w-full max-w-xs space-y-2">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="e.g. 8901491101907"
+                          value={manualBarcode}
+                          onChange={(e) => setManualBarcode(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
+                          }}
+                          className="w-full bg-bg-secondary border border-border rounded-xl px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent text-center"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleBarcodeFound(manualBarcode)}
+                          disabled={!manualBarcode.trim()}
+                          className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
+                        >
+                          <Search className="w-3.5 h-3.5" /> Lookup
+                        </button>
+                      </div>
                       <button
                         type="button"
-                        onClick={() => handleBarcodeFound(manualBarcode)}
-                        disabled={!manualBarcode.trim()}
-                        className="btn-primary px-3 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0"
+                        onClick={startCamera}
+                        className="w-full py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
                       >
-                        <Search className="w-3.5 h-3.5" /> Lookup
+                        <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
                       </button>
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Manual Barcode Input Fallback */}
+              {!cameraError && (
+                <div className="p-3 rounded-2xl bg-bg-secondary/40 border border-border/70 space-y-2">
+                  <span className="text-3xs font-mono text-text-muted uppercase font-semibold block">
+                    Or Enter Barcode Manually
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. 8901491101907"
+                      value={manualBarcode}
+                      onChange={(e) => setManualBarcode(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
+                      }}
+                      className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent"
+                    />
                     <button
                       type="button"
-                      onClick={startCamera}
-                      className="w-full py-1.5 rounded-lg bg-bg-elevated border border-border text-xs text-accent font-mono flex items-center justify-center gap-1.5 hover:bg-bg-elevated/80 transition-colors"
+                      onClick={() => handleBarcodeFound(manualBarcode)}
+                      disabled={!manualBarcode.trim()}
+                      className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
                     >
-                      <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
+                      <Search className="w-3.5 h-3.5" /> Lookup
                     </button>
                   </div>
                 </div>
@@ -359,112 +408,74 @@ export default function BarcodeScannerModal({
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
               <Loader2 className="w-8 h-8 text-accent animate-spin" />
               <p className="text-sm font-semibold text-text-primary">Searching nutrition database...</p>
-              <p className="text-2xs text-text-muted font-mono">Verifying nutrition facts & macros</p>
+              <p className="text-2xs text-text-muted font-mono">Verifying nutrition facts &amp; macros</p>
             </div>
           )}
 
-          {/* Scanned Product Card */}
+          {/* Scanned Product Confirmation Card (ASK USER TO ADD TO TODAY'S MEALS) */}
           {scannedProduct && currentFoodItem && (
-            <div className="space-y-3.5 animate-fade-in">
-              <div className="p-3.5 rounded-xl bg-bg-elevated/70 border border-accent/40 space-y-2.5">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 mr-2">
-                    {scannedProduct.brand && (
-                      <span className="text-[10px] font-mono text-accent font-semibold tracking-wider uppercase block">
-                        {scannedProduct.brand}
-                      </span>
-                    )}
-                    {isNotFoundInDB ? (
-                      <div className="space-y-1">
-                        <span className="text-2xs text-amber-500 font-bold flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Not in online DB — Enter package details:
-                        </span>
-                        <input
-                          type="text"
-                          value={manualName}
-                          onChange={(e) => setManualName(e.target.value)}
-                          placeholder="Food name (e.g. Protein Bar)"
-                          className="w-full bg-bg-card border border-border rounded-lg px-2.5 py-1 text-xs text-text-primary font-bold outline-none focus:border-accent"
-                        />
-                      </div>
-                    ) : (
-                      <h3 className="text-base font-bold text-text-primary leading-tight">
-                        {scannedProduct.name}
-                      </h3>
-                    )}
-                    <span className="text-2xs text-text-muted font-mono block mt-0.5">
-                      Barcode: {scannedProduct.barcode}
+            <div className="space-y-4 animate-scale-in">
+              <div className="p-4 rounded-2xl bg-bg-secondary/50 border-2 border-emerald-500/40 space-y-3.5 shadow-sm">
+                {/* Confirmation Prompt Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-emerald-500">
+                      PRODUCT VERIFIED
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleScanAgain}
-                    className="text-xs font-mono text-text-muted hover:text-accent flex items-center gap-1 shrink-0 p-1.5 rounded-lg bg-bg-card border border-border"
+                    className="text-2xs font-mono text-text-muted hover:text-accent flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-card border border-border cursor-pointer transition-colors"
                   >
-                    <RefreshCw className="w-3 h-3" /> Scan Again
+                    <RefreshCw className="w-3 h-3" /> Scan Another
                   </button>
                 </div>
 
-                {/* If Not Found in DB: Editable per-100g fields */}
-                {isNotFoundInDB && (
-                  <div className="p-2.5 rounded-lg bg-bg-card border border-border space-y-1.5">
-                    <span className="text-[10px] font-mono text-text-muted uppercase block">
-                      Nutrition per 100g (from label):
+                {/* Product Name & Brand */}
+                <div>
+                  {scannedProduct.brand && (
+                    <span className="text-3xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
+                      {scannedProduct.brand}
                     </span>
-                    <div className="grid grid-cols-4 gap-1.5 font-mono text-xs">
-                      <div>
-                        <span className="text-[9px] text-text-muted block">Calories</span>
-                        <input
-                          type="number"
-                          value={manualCalories}
-                          onChange={(e) => setManualCalories(e.target.value)}
-                          className="w-full bg-bg-secondary border border-border rounded p-1 text-center font-bold text-accent outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-text-muted block">Protein (g)</span>
-                        <input
-                          type="number"
-                          value={manualProtein}
-                          onChange={(e) => setManualProtein(e.target.value)}
-                          className="w-full bg-bg-secondary border border-border rounded p-1 text-center font-bold text-emerald-500 outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-text-muted block">Carbs (g)</span>
-                        <input
-                          type="number"
-                          value={manualCarbs}
-                          onChange={(e) => setManualCarbs(e.target.value)}
-                          className="w-full bg-bg-secondary border border-border rounded p-1 text-center font-bold text-text-primary outline-none"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] text-text-muted block">Fat (g)</span>
-                        <input
-                          type="number"
-                          value={manualFat}
-                          onChange={(e) => setManualFat(e.target.value)}
-                          className="w-full bg-bg-secondary border border-border rounded p-1 text-center font-bold text-text-primary outline-none"
-                        />
-                      </div>
+                  )}
+                  {isNotFoundInDB ? (
+                    <div className="space-y-1.5">
+                      <span className="text-2xs text-amber-400 font-semibold flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" /> Not in database. Enter food name:
+                      </span>
+                      <input
+                        type="text"
+                        value={manualName}
+                        onChange={(e) => setManualName(e.target.value)}
+                        placeholder="Food name (e.g. Protein Bar)"
+                        className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary font-bold outline-none focus:border-accent"
+                      />
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <h3 className="text-base font-bold text-text-primary leading-snug">
+                      {scannedProduct.name}
+                    </h3>
+                  )}
+                  <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                    Barcode: {scannedProduct.barcode}
+                  </span>
+                </div>
 
                 {/* Serving Mode Switcher if available */}
                 {scannedProduct.perServing && !isNotFoundInDB && (
-                  <div className="flex gap-2 pt-1 font-mono text-xs">
+                  <div className="flex gap-2 pt-0.5 font-mono text-xs">
                     <button
                       type="button"
                       onClick={() => {
                         setServingMode('serving');
                         setCustomQty(1);
                       }}
-                      className={`flex-1 py-1.5 px-2 rounded-lg border text-center transition-colors ${
+                      className={`flex-1 py-1.5 px-2 rounded-xl border text-center transition-colors cursor-pointer ${
                         servingMode === 'serving'
                           ? 'bg-accent/20 border-accent text-accent font-bold'
-                          : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                          : 'bg-bg-card border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
                       Per Serving {scannedProduct.servingSize ? `(${scannedProduct.servingSize})` : ''}
@@ -475,10 +486,10 @@ export default function BarcodeScannerModal({
                         setServingMode('100g');
                         setCustomQty(100);
                       }}
-                      className={`flex-1 py-1.5 px-2 rounded-lg border text-center transition-colors ${
+                      className={`flex-1 py-1.5 px-2 rounded-xl border text-center transition-colors cursor-pointer ${
                         servingMode === '100g'
                           ? 'bg-accent/20 border-accent text-accent font-bold'
-                          : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                          : 'bg-bg-card border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
                       Per 100g
@@ -486,47 +497,49 @@ export default function BarcodeScannerModal({
                   </div>
                 )}
 
-                {/* Quantity Input */}
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-xs font-mono text-text-muted">Portion:</span>
-                  <input
-                    type="number"
-                    min="0.1"
-                    step={servingMode === 'serving' && !isNotFoundInDB ? '1' : '10'}
-                    value={customQty}
-                    onChange={(e) => setCustomQty(Math.max(0.1, Number(e.target.value)))}
-                    className="w-24 bg-bg-card border border-border rounded-lg p-1.5 text-center text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
-                  />
-                  <span className="text-xs font-mono text-text-secondary">
-                    {servingMode === 'serving' && !isNotFoundInDB ? 'serving(s)' : 'grams (g)'}
-                  </span>
+                {/* Portion Quantity Stepper */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-card border border-border/70">
+                  <span className="text-xs font-semibold text-text-secondary">Your Portion:</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0.1"
+                      step={servingMode === 'serving' && !isNotFoundInDB ? '1' : '10'}
+                      value={customQty}
+                      onChange={(e) => setCustomQty(Math.max(0.1, Number(e.target.value)))}
+                      className="w-24 bg-bg-secondary border border-border rounded-lg py-1 px-2 text-center text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                    />
+                    <span className="text-xs font-mono text-text-muted">
+                      {servingMode === 'serving' && !isNotFoundInDB ? 'serving(s)' : 'g'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Calculated Macros Grid */}
-                <div className="grid grid-cols-4 gap-2 pt-1 text-center font-mono">
-                  <div className="p-2 rounded-lg bg-bg-primary border border-border">
+                <div className="grid grid-cols-4 gap-2 text-center font-mono">
+                  <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-accent block">
                       {currentFoodItem.calories}
                     </span>
-                    <span className="text-[10px] text-text-muted uppercase">CAL</span>
+                    <span className="text-3xs text-text-muted uppercase">CAL</span>
                   </div>
-                  <div className="p-2 rounded-lg bg-bg-primary border border-border">
+                  <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-emerald-500 block">
                       {currentFoodItem.proteinG}g
                     </span>
-                    <span className="text-[10px] text-text-muted uppercase">PRO</span>
+                    <span className="text-3xs text-text-muted uppercase">PRO</span>
                   </div>
-                  <div className="p-2 rounded-lg bg-bg-primary border border-border">
+                  <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
                       {currentFoodItem.carbsG}g
                     </span>
-                    <span className="text-[10px] text-text-muted uppercase">CARB</span>
+                    <span className="text-3xs text-text-muted uppercase">CARB</span>
                   </div>
-                  <div className="p-2 rounded-lg bg-bg-primary border border-border">
+                  <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
                       {currentFoodItem.fatG}g
                     </span>
-                    <span className="text-[10px] text-text-muted uppercase">FAT</span>
+                    <span className="text-3xs text-text-muted uppercase">FAT</span>
                   </div>
                 </div>
 
@@ -545,50 +558,32 @@ export default function BarcodeScannerModal({
                 </label>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-2">
+              {/* Question: Add to Today's Meals? */}
+              <div className="p-3 rounded-2xl bg-accent/10 border border-accent/30 text-center space-y-1">
+                <p className="text-xs font-bold text-text-primary">
+                  Add <span className="text-accent">{currentFoodItem.name}</span> to today&apos;s meals?
+                </p>
+                <p className="text-2xs text-text-muted">
+                  Adds ~{currentFoodItem.calories} kcal &amp; {currentFoodItem.proteinG}g protein to your daily macro fuel.
+                </p>
+              </div>
+
+              {/* Action Buttons: Explicit User Confirmation */}
+              <div className="flex gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={handleScanAgain}
-                  className="btn-ghost flex-1 text-xs"
+                  className="btn-secondary flex-1 py-2.5 text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   Scan Another
                 </button>
                 <button
                   type="button"
-                  onClick={handleAddAndClose}
-                  className="btn-primary flex-1 text-xs flex items-center justify-center gap-1.5"
+                  onClick={handleConfirmAddToMeal}
+                  className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-accent/20 cursor-pointer"
                 >
-                  <Plus className="w-4 h-4" /> Add to Meal
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Manual Barcode Input Fallback (shown below when camera is active without error) */}
-          {!scannedProduct && !isLoadingProduct && !cameraError && (
-            <div className="p-3 rounded-xl bg-bg-elevated/40 border border-border/80 space-y-2">
-              <label className="text-2xs font-mono text-text-muted uppercase block">
-                Or Enter Barcode Manually
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="e.g. 8901491101907 (Quaker Oats)"
-                  value={manualBarcode}
-                  onChange={(e) => setManualBarcode(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
-                  }}
-                  className="w-full bg-bg-card border border-border rounded-lg px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleBarcodeFound(manualBarcode)}
-                  disabled={!manualBarcode.trim()}
-                  className="btn-primary px-3 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1"
-                >
-                  <Search className="w-3.5 h-3.5" /> Lookup
+                  <Check className="w-4 h-4 stroke-[3]" />
+                  <span>Add to Today&apos;s Meals</span>
                 </button>
               </div>
             </div>

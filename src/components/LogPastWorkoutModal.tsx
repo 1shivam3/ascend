@@ -9,9 +9,12 @@ import {
   Dumbbell,
   Check,
   Clock,
-  FileText,
-  ChevronDown,
   Copy,
+  Gauge,
+  Sparkles,
+  Info,
+  ChevronRight,
+  Flame,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, PlannedWorkout } from '@/lib/types';
@@ -28,6 +31,18 @@ interface LogPastWorkoutModalProps {
   onSaved?: (workout: WorkoutEntry) => void;
 }
 
+const RPE_PRESETS = [
+  { value: 0, label: 'No RPE', desc: 'Not tracked' },
+  { value: 6, label: '@6', desc: 'Warmup / very easy (4+ reps in reserve)' },
+  { value: 7, label: '@7', desc: 'Easy effort (3 reps in reserve)' },
+  { value: 7.5, label: '@7.5', desc: 'Solid effort (2–3 reps in reserve)' },
+  { value: 8, label: '@8', desc: 'Standard work set (2 reps in reserve)' },
+  { value: 8.5, label: '@8.5', desc: 'Hard work set (1–2 reps in reserve)' },
+  { value: 9, label: '@9', desc: 'Heavy effort (1 rep in reserve)' },
+  { value: 9.5, label: '@9.5', desc: 'Near max (maybe 1 rep left)' },
+  { value: 10, label: '@10', desc: 'Maximum effort (0 reps left)' },
+];
+
 export default function LogPastWorkoutModal({
   isOpen,
   onClose,
@@ -41,6 +56,8 @@ export default function LogPastWorkoutModal({
   const toast = useToast();
 
   const userUnit = profile?.unit || 'kg';
+  const weightStep = userUnit === 'lbs' ? 5 : 2.5;
+
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
   const yesterdayStr = useMemo(() => {
     const d = new Date();
@@ -58,12 +75,34 @@ export default function LogPastWorkoutModal({
     {
       name: 'Bench Press',
       sets: [
-        { weight: userUnit === 'lbs' ? 135 : 60, reps: 10, unit: userUnit, completed: true },
-        { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, completed: true },
-        { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, completed: true },
+        { weight: userUnit === 'lbs' ? 135 : 60, reps: 10, unit: userUnit, rpe: 8, completed: true },
+        { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: true },
+        { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8.5, completed: true },
       ],
     },
   ]);
+
+  // Compute live session stats
+  const sessionStats = useMemo(() => {
+    let totalSets = 0;
+    let totalVolume = 0;
+
+    exercises.forEach((ex) => {
+      ex.sets.forEach((s) => {
+        const w = parseFloat(String(s.weight)) || 0;
+        const r = parseInt(String(s.reps), 10) || 0;
+        if (r > 0) {
+          totalSets += 1;
+          totalVolume += w * r;
+        }
+      });
+    });
+
+    return {
+      totalSets,
+      totalVolume: Math.round(totalVolume),
+    };
+  }, [exercises]);
 
   if (!isOpen) return null;
 
@@ -81,6 +120,7 @@ export default function LogPastWorkoutModal({
           weight: w,
           reps: r,
           unit: userUnit,
+          rpe: 8,
           completed: true,
         });
       }
@@ -105,9 +145,9 @@ export default function LogPastWorkoutModal({
       {
         name: selected.name,
         sets: [
-          { weight: defaultW, reps: defaultR, unit: userUnit, completed: true },
-          { weight: defaultW, reps: defaultR, unit: userUnit, completed: true },
-          { weight: defaultW, reps: defaultR, unit: userUnit, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
         ],
       },
     ]);
@@ -135,6 +175,7 @@ export default function LogPastWorkoutModal({
               weight: lastSet ? lastSet.weight : (userUnit === 'lbs' ? 115 : 50),
               reps: lastSet ? lastSet.reps : 8,
               unit: userUnit,
+              rpe: lastSet?.rpe || 8,
               completed: true,
             },
           ],
@@ -165,6 +206,7 @@ export default function LogPastWorkoutModal({
           weight: targetSet ? targetSet.weight : (userUnit === 'lbs' ? 115 : 50),
           reps: targetSet ? targetSet.reps : 8,
           unit: userUnit,
+          rpe: targetSet?.rpe || 8,
           completed: true,
         };
         const updated = [...ex.sets];
@@ -177,8 +219,8 @@ export default function LogPastWorkoutModal({
     );
   };
 
-  const handleSetChange = (exIdx: number, setIdx: number, field: 'weight' | 'reps', val: string) => {
-    const num = parseFloat(val);
+  const handleSetChange = (exIdx: number, setIdx: number, field: 'weight' | 'reps' | 'rpe', val: string | number) => {
+    const num = typeof val === 'number' ? val : parseFloat(val);
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== exIdx) return ex;
@@ -186,9 +228,55 @@ export default function LogPastWorkoutModal({
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
+            if (field === 'rpe') {
+              return {
+                ...s,
+                rpe: isNaN(num) || num <= 0 ? undefined : num,
+              };
+            }
             return {
               ...s,
               [field]: isNaN(num) ? 0 : num,
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const handleAdjustWeight = (exIdx: number, setIdx: number, delta: number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            const currentW = parseFloat(String(s.weight)) || 0;
+            const nextW = Math.max(0, Math.round((currentW + delta) * 10) / 10);
+            return {
+              ...s,
+              weight: nextW,
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const handleAdjustReps = (exIdx: number, setIdx: number, delta: number) => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            const currentR = parseInt(String(s.reps), 10) || 0;
+            const nextR = Math.max(1, currentR + delta);
+            return {
+              ...s,
+              reps: nextR,
             };
           }),
         };
@@ -203,7 +291,6 @@ export default function LogPastWorkoutModal({
       return;
     }
 
-    const durationNum = parseInt(durationMinutes, 10) || 45;
     const workoutId = crypto.randomUUID();
 
     const entry: WorkoutEntry = {
@@ -246,7 +333,7 @@ export default function LogPastWorkoutModal({
             reps: r,
             oneRepMax: Math.round(current1RM * 10) / 10,
             date: entry.date,
-            notes: `Auto-detected from past workout: ${workoutName}`,
+            notes: `Logged past workout: ${workoutName}${s.rpe ? ` @${s.rpe}` : ''}`,
           };
           addPR(prRecord);
           newPRsCount++;
@@ -270,133 +357,157 @@ export default function LogPastWorkoutModal({
     <>
       <div className="modal-overlay z-50" onClick={onClose}>
         <div
-          className="modal-content max-w-lg w-full max-h-[90vh] flex flex-col p-0 overflow-hidden animate-scale-in"
+          className="modal-content max-w-lg w-full max-h-[92vh] flex flex-col p-0 overflow-hidden animate-scale-in rounded-3xl border border-border shadow-2xl bg-bg-card"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="p-4 border-b border-border/80 flex items-center justify-between shrink-0 bg-bg-card">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
-                <Calendar className="w-5 h-5" />
+          <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between shrink-0 bg-bg-card/90 backdrop-blur-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-accent/15 border border-accent/25 flex items-center justify-center text-accent">
+                <Dumbbell className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-text-primary">Log Completed Workout</h2>
-                <p className="text-2xs text-text-muted">Record a session after finishing at the gym</p>
+                <h2 className="text-base sm:text-lg font-bold text-text-primary tracking-tight">
+                  Log Past Workout
+                </h2>
+                <p className="text-xs text-text-muted">
+                  Record your completed gym session with weights, reps &amp; RPE
+                </p>
               </div>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+              className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
+          {/* Quick Summary Strip */}
+          <div className="px-4 sm:px-5 py-2.5 bg-bg-secondary/60 border-b border-border/50 flex items-center justify-between text-2xs text-text-secondary">
+            <div className="flex items-center gap-3 font-mono">
+              <span>{exercises.length} Exercises</span>
+              <span>•</span>
+              <span>{sessionStats.totalSets} Sets</span>
+              <span>•</span>
+              <span className="text-accent font-semibold">{sessionStats.totalVolume} {userUnit} Volume</span>
+            </div>
+            <span className="text-3xs text-text-muted font-mono uppercase tracking-wider">
+              AUTO PR TRACKING ON
+            </span>
+          </div>
+
           {/* Form Body */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Meta Row: Date, Duration, Name */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-2xs font-mono font-bold uppercase text-text-muted">
-                    DATE
+          <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+            {/* Meta Row: Date, Duration, Session Name */}
+            <div className="p-3.5 rounded-2xl bg-bg-secondary/40 border border-border/60 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Date */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-2xs font-mono font-semibold uppercase text-text-muted">
+                      DATE
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setDate(todayStr)}
+                        className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                          date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
+                        }`}
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDate(yesterdayStr)}
+                        className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                          date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
+                        }`}
+                      >
+                        Yesterday
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="date"
+                    value={date}
+                    max={todayStr}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
+                  />
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <label className="text-2xs font-mono font-semibold uppercase text-text-muted block mb-1">
+                    DURATION (MIN)
                   </label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setDate(todayStr)}
-                      className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
-                        date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-secondary'
-                      }`}
-                    >
-                      Today
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDate(yesterdayStr)}
-                      className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
-                        date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-secondary'
-                      }`}
-                    >
-                      Yesterday
-                    </button>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="1"
+                      max="300"
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(e.target.value)}
+                      placeholder="45"
+                      className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
+                    />
+                    <span className="text-3xs font-mono text-text-muted absolute right-3 top-1/2 -translate-y-1/2">
+                      min
+                    </span>
                   </div>
                 </div>
-                <input
-                  type="date"
-                  value={date}
-                  max={todayStr}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="w-full bg-bg-secondary border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
-                />
-              </div>
 
-              <div>
-                <label className="text-2xs font-mono font-bold uppercase text-text-muted block mb-1">
-                  DURATION (MIN)
-                </label>
-                <div className="relative">
+                {/* Session Name */}
+                <div>
+                  <label className="text-2xs font-mono font-semibold uppercase text-text-muted block mb-1">
+                    SESSION TITLE
+                  </label>
                   <input
-                    type="number"
-                    min="1"
-                    max="300"
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(e.target.value)}
-                    placeholder="45"
-                    className="w-full bg-bg-secondary border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
+                    type="text"
+                    value={workoutName}
+                    onChange={(e) => setWorkoutName(e.target.value)}
+                    placeholder="e.g. Upper Body Focus"
+                    className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-semibold text-text-primary outline-none focus:border-accent"
                   />
-                  <span className="text-3xs font-mono text-text-muted absolute right-3 top-1/2 -translate-y-1/2">
-                    min
-                  </span>
                 </div>
               </div>
 
-              <div>
-                <label className="text-2xs font-mono font-bold uppercase text-text-muted block mb-1">
-                  SESSION NAME
-                </label>
-                <input
-                  type="text"
-                  value={workoutName}
-                  onChange={(e) => setWorkoutName(e.target.value)}
-                  placeholder="e.g. Push Day"
-                  className="w-full bg-bg-secondary border border-border/80 rounded-xl px-3 py-2 text-xs font-bold text-text-primary outline-none focus:border-accent"
-                />
-              </div>
+              {/* Quick Template Selector */}
+              {plannedWorkouts.length > 0 && (
+                <div className="pt-1 border-t border-border/40">
+                  <span className="text-3xs font-mono font-semibold uppercase text-text-muted block mb-1.5">
+                    OR PRE-FILL FROM SAVED WORKOUT:
+                  </span>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
+                    {plannedWorkouts.map((plan) => (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => handleLoadPlan(plan)}
+                        className="px-3 py-1 rounded-full bg-bg-card hover:bg-accent/15 border border-border hover:border-accent/40 text-text-secondary hover:text-accent font-semibold whitespace-nowrap transition-all active:scale-95 cursor-pointer"
+                      >
+                        {plan.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Quick Template Selector */}
-            {plannedWorkouts.length > 0 && (
-              <div className="space-y-1.5">
-                <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
-                  OR PRE-FILL FROM SAVED WORKOUT:
-                </span>
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
-                  {plannedWorkouts.map((plan) => (
-                    <button
-                      key={plan.id}
-                      type="button"
-                      onClick={() => handleLoadPlan(plan)}
-                      className="px-3 py-1 rounded-full bg-bg-secondary hover:bg-accent/15 border border-border/60 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold whitespace-nowrap transition-all"
-                    >
-                      {plan.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Exercises List */}
-            <div className="space-y-3 pt-1">
-              <div className="flex items-center justify-between">
-                <span className="text-2xs font-mono font-bold uppercase text-text-muted">
-                  EXERCISES ({exercises.length})
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between px-1">
+                <span className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <span>Exercises</span>
+                  <span className="text-2xs font-mono text-text-muted">({exercises.length})</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setIsExerciseSelectorOpen(true)}
-                  className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                  className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 rounded-xl border border-accent/30 text-accent hover:border-accent cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Exercise</span>
@@ -408,60 +519,103 @@ export default function LogPastWorkoutModal({
                 return (
                   <div
                     key={exIdx}
-                    className="card p-3.5 bg-bg-card border border-border/80 rounded-2xl space-y-2.5"
+                    className="p-4 bg-bg-secondary/40 border border-border/80 rounded-2xl space-y-3 shadow-xs hover:border-border transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-accent/20 text-accent font-mono text-3xs font-bold flex items-center justify-center">
+                    {/* Exercise Card Header */}
+                    <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-6 h-6 rounded-lg bg-accent/15 text-accent font-mono text-xs font-bold flex items-center justify-center">
                           {exIdx + 1}
                         </span>
-                        <h4 className="text-sm font-bold text-text-primary font-sans">{ex.name}</h4>
-                        {isBW && (
-                          <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 border border-purple-500/30">
-                            BW
+                        <div>
+                          <h4 className="text-sm font-bold text-text-primary leading-tight">{ex.name}</h4>
+                          <span className="text-3xs text-text-muted font-mono">
+                            {isBW ? 'Bodyweight Movement' : `Loaded Exercise (${userUnit})`}
                           </span>
-                        )}
+                        </div>
                       </div>
 
-                      {exercises.length > 1 && (
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => handleRemoveExercise(exIdx)}
-                          className="p-1 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                          title="Remove exercise"
+                          onClick={() => handleAddSet(exIdx)}
+                          className="text-xs font-semibold text-accent hover:bg-accent/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Set</span>
                         </button>
-                      )}
+                        {exercises.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExercise(exIdx)}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                            title="Remove exercise"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Sets Rows */}
-                    <div className="space-y-1.5">
-                      <div className="grid grid-cols-12 text-3xs font-mono text-text-muted px-1">
-                        <span className="col-span-2">SET</span>
-                        <span className="col-span-5">{isBW ? `ADDED WT (${userUnit})` : `WEIGHT (${userUnit})`}</span>
+                    {/* Sets Table */}
+                    <div className="space-y-2">
+                      {/* Table Column Labels */}
+                      <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-semibold uppercase text-text-muted px-1">
+                        <span className="col-span-1 text-center">#</span>
+                        <span className="col-span-4">{isBW ? `ADDED (${userUnit})` : `LOAD (${userUnit})`}</span>
                         <span className="col-span-3">REPS</span>
-                        <span className="col-span-2 text-right">ACTIONS</span>
+                        <span className="col-span-3">RPE (@)</span>
+                        <span className="col-span-1 text-right"></span>
                       </div>
 
+                      {/* Set Rows */}
                       {ex.sets.map((set, sIdx) => (
-                        <div key={sIdx} className="grid grid-cols-12 gap-1.5 items-center">
-                          <span className="col-span-2 text-xs font-mono font-bold text-text-muted pl-1">
+                        <div
+                          key={sIdx}
+                          className="grid grid-cols-12 gap-2 items-center p-1.5 rounded-xl bg-bg-card/70 border border-border/50 hover:border-border transition-colors"
+                        >
+                          {/* Set Number */}
+                          <span className="col-span-1 text-xs font-mono font-bold text-text-muted text-center">
                             {sIdx + 1}
                           </span>
-                          <div className="col-span-5">
+
+                          {/* Weight with mini stepper */}
+                          <div className="col-span-4 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAdjustWeight(exIdx, sIdx, -weightStep)}
+                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
+                            >
+                              -
+                            </button>
                             <input
                               type="number"
                               inputMode="decimal"
-                              step="0.5"
+                              step={weightStep}
                               min="0"
-                              placeholder={isBW ? '0 (BW)' : '60'}
+                              placeholder={isBW ? '0' : '60'}
                               value={set.weight === 0 && isBW ? '' : set.weight}
                               onChange={(e) => handleSetChange(exIdx, sIdx, 'weight', e.target.value)}
-                              className="w-full bg-bg-secondary border border-border/80 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-bold text-text-primary text-center outline-none focus:border-accent"
                             />
+                            <button
+                              type="button"
+                              onClick={() => handleAdjustWeight(exIdx, sIdx, weightStep)}
+                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
+                            >
+                              +
+                            </button>
                           </div>
-                          <div className="col-span-3">
+
+                          {/* Reps with mini stepper */}
+                          <div className="col-span-3 flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleAdjustReps(exIdx, sIdx, -1)}
+                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
+                            >
+                              -
+                            </button>
                             <input
                               type="number"
                               inputMode="numeric"
@@ -470,63 +624,89 @@ export default function LogPastWorkoutModal({
                               placeholder="8"
                               value={set.reps || ''}
                               onChange={(e) => handleSetChange(exIdx, sIdx, 'reps', e.target.value)}
-                              className="w-full bg-bg-secondary border border-border/80 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-bold text-text-primary text-center outline-none focus:border-accent"
                             />
-                          </div>
-                          <div className="col-span-2 flex items-center justify-end gap-1">
                             <button
                               type="button"
-                              onClick={() => handleDuplicateSet(exIdx, sIdx)}
-                              className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
-                              title="Duplicate set"
+                              onClick={() => handleAdjustReps(exIdx, sIdx, 1)}
+                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
                             >
-                              <Copy className="w-3.5 h-3.5" />
+                              +
                             </button>
-                            {ex.sets.length > 1 && (
+                          </div>
+
+                          {/* RPE Selector */}
+                          <div className="col-span-3">
+                            <select
+                              value={set.rpe || 0}
+                              onChange={(e) => handleSetChange(exIdx, sIdx, 'rpe', e.target.value)}
+                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-medium text-text-primary outline-none focus:border-accent cursor-pointer"
+                            >
+                              {RPE_PRESETS.map((p) => (
+                                <option key={p.value} value={p.value}>
+                                  {p.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Actions (Duplicate / Delete) */}
+                          <div className="col-span-1 flex items-center justify-end gap-1">
+                            {ex.sets.length > 1 ? (
                               <button
                                 type="button"
                                 onClick={() => handleRemoveSet(exIdx, sIdx)}
-                                className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                                 title="Remove set"
                               >
                                 <X className="w-3.5 h-3.5" />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleDuplicateSet(exIdx, sIdx)}
+                                className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                title="Duplicate set"
+                              >
+                                <Copy className="w-3 h-3" />
                               </button>
                             )}
                           </div>
                         </div>
                       ))}
                     </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleAddSet(exIdx)}
-                      className="text-3xs font-bold text-accent hover:underline flex items-center gap-1 pt-0.5"
-                    >
-                      <Plus className="w-3 h-3" />
-                      <span>Add Set</span>
-                    </button>
                   </div>
                 );
               })}
             </div>
+
+            {/* Bottom Add Exercise CTA */}
+            <button
+              type="button"
+              onClick={() => setIsExerciseSelectorOpen(true)}
+              className="w-full py-3.5 rounded-2xl border-2 border-dashed border-border/80 hover:border-accent/60 bg-bg-secondary/30 hover:bg-accent/5 text-text-secondary hover:text-accent font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Another Exercise to Workout</span>
+            </button>
           </div>
 
           {/* Footer Save Button */}
-          <div className="p-4 border-t border-border/80 bg-bg-card flex items-center justify-between gap-3 shrink-0">
+          <div className="p-4 sm:p-5 border-t border-border/70 bg-bg-card/90 backdrop-blur-md flex items-center justify-between gap-3 shrink-0">
             <button
               type="button"
               onClick={onClose}
-              className="btn-secondary py-2.5 px-4 text-xs font-semibold"
+              className="btn-secondary py-2.5 px-4 text-xs font-semibold rounded-xl cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="button"
               onClick={handleSavePastWorkout}
-              className="btn-primary py-2.5 px-5 text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/20 flex-1 sm:flex-initial"
+              className="btn-primary py-2.5 px-6 text-xs font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-accent/20 flex-1 sm:flex-initial cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save to Workout History</span>
+              <span>Save {exercises.length} Exercises to History</span>
             </button>
           </div>
         </div>

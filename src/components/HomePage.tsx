@@ -373,7 +373,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               {goalLabel}
             </Badge>
           </div>
-          <h1 className="text-xl font-black text-text-primary tracking-tight font-sans mt-0.5">
+          <h1 className="text-lg font-bold text-text-primary tracking-tight font-sans mt-0.5">
             {greeting}, {profile?.name ? profile.name.split(' ')[0] : 'Athlete'}
           </h1>
         </div>
@@ -481,10 +481,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 : sessionInfo.status === 'in_progress'
                 ? 'IN PROGRESS'
                 : workouts.length === 0
-                ? 'DAY 1 STARTS TODAY'
+                ? 'DAY 1 • FIRST WORKOUT'
                 : sessionInfo.isRestDay
                 ? 'REST & RECOVERY'
-                : `TODAY'S MISSION`}
+                : "TODAY'S WORKOUT"}
             </span>
           </div>
           <button
@@ -499,7 +499,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
         <div>
           <div className="flex items-baseline justify-between gap-2 flex-wrap">
-            <h2 className="text-2xl font-black text-text-primary tracking-tight font-display">
+            <h2 className="text-lg sm:text-xl font-bold text-text-primary tracking-tight font-sans">
               {sessionInfo.title}
             </h2>
             <div className="flex items-center gap-1 text-2xs font-mono text-text-muted">
@@ -569,14 +569,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             }
           >
             {activeWorkoutDraft
-              ? 'RESUME ACTIVE WORKOUT'
+              ? 'Resume Workout'
               : sessionInfo.status === 'completed'
-              ? "VIEW TODAY'S LOG"
+              ? "View Today's Log"
               : workouts.length === 0
-              ? 'START DAY 1 WORKOUT'
+              ? 'Start Day 1 Workout'
               : sessionInfo.isRestDay
-              ? 'TRAIN ANYWAY'
-              : 'START WORKOUT'}
+              ? 'Train Anyway'
+              : 'Start Workout'}
           </Button>
 
           <button
@@ -595,7 +595,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <Card variant="default" padding="md" className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-              PRIMARY COMPOUND LIFT
+              KEY COMPOUND LIFT
             </span>
             <Badge variant="neutral" size="xs">
               Today&apos;s Target
@@ -604,7 +604,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
           <div className="flex items-baseline justify-between pt-0.5">
             <div>
-              <h3 className="text-lg font-black font-display text-text-primary">
+              <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary">
                 {keyLiftSpotlight.name}
               </h3>
               <p className="text-xs font-semibold text-accent mt-0.5 font-mono">
