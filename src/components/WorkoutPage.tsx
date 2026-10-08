@@ -38,6 +38,8 @@ import {
   Target,
   Copy,
   Search,
+  MoreVertical,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -614,7 +616,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
 
+  // ── Progressive Disclosure UI States ──────────────────────────────────────
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const [isScheduleExpanded, setIsScheduleExpanded] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
+  const [isDecisionExpanded, setIsDecisionExpanded] = useState(false);
+
   // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
+  useEffect(() => {
+    if (isToolsMenuOpen) {
+      return registerBackHandler(() => { setIsToolsMenuOpen(false); return true; }, 100);
+    }
+  }, [isToolsMenuOpen, registerBackHandler]);
+
   useEffect(() => {
     if (isChangeWorkoutOpen) {
       return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
@@ -1291,12 +1305,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={() => setIsPlateModalOpen(true)}
-              className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
+              className="p-2 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
               title="Plate Helper"
             >
               <Dumbbell className="w-4 h-4 text-accent" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setIsToolsMenuOpen(true)}
+            className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Training Tools & Actions"
+            aria-label="Training Tools"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-accent" />
+            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Tools</span>
+          </button>
         </div>
       </header>
 
@@ -1337,94 +1361,125 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── WEEKLY SCHEDULE STRIP (Days & Body Parts) ── */}
-      <section className="space-y-2">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="w-3.5 h-3.5 text-accent" />
-            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-              WEEKLY SCHEDULE &amp; SPLIT
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setTargetScheduleDay(todayDayOfWeek);
-              setIsScheduleModalOpen(true);
-            }}
-            className="text-xs font-bold text-accent bg-accent/10 border border-accent/25 px-2.5 py-1 rounded-lg hover:bg-accent/20 flex items-center gap-1 transition-colors shadow-xs"
-          >
-            <Edit2 className="w-3 h-3" />
-            <span>Customize Days</span>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1 sm:gap-2">
-          {DAYS_OF_WEEK.map((day) => {
-            const info = DAY_DISPLAY_INFO[day];
-            const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
-            const isToday = day === todayDayOfWeek;
-
-            return (
-              <button
-                key={day}
-                type="button"
-                onClick={() => {
-                  setTargetScheduleDay(day);
-                  setIsScheduleModalOpen(true);
-                }}
-                className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[68px] sm:min-h-[76px] cursor-pointer group active:scale-95 ${
-                  isToday
-                    ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
-                    : sched.isRest
-                    ? 'border-border/40 bg-bg-secondary/40 text-text-muted hover:border-border'
-                    : 'border-border/70 bg-bg-card hover:border-accent/50 hover:bg-bg-card/80'
-                }`}
-                title={
-                  sched.isRest
-                    ? `${info.label}: Rest Day`
-                    : `${info.label}: ${sched.title} (${sched.bodyParts.join(', ') || 'Workout'})`
-                }
-              >
-                <div className="flex items-center gap-1">
-                  {isToday && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
-                  <span
-                    className={`text-[11px] font-mono font-black uppercase ${
-                      isToday ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'
-                    }`}
-                  >
-                    {info.short}
+      {/* ── WEEKLY SCHEDULE STRIP (Progressive Disclosure) ── */}
+      {(() => {
+        const todaySched = getScheduledWorkoutForDay(weeklySchedule, todayDayOfWeek, plannedWorkouts);
+        return (
+          <section className="space-y-2">
+            <div className="card p-3 bg-bg-card border border-border/80 flex items-center justify-between gap-2 shadow-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`w-2 h-2 rounded-full shrink-0 ${todaySched.isRest ? 'bg-emerald-500' : 'bg-accent animate-pulse'}`} />
+                <div className="truncate">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+                      {DAY_DISPLAY_INFO[todayDayOfWeek]?.label || 'TODAY'}:
+                    </span>
+                    <span className="text-xs font-bold text-text-primary truncate font-sans">
+                      {todaySched.isRest ? 'Rest & Recovery' : (todaySched.plan?.name.replace('Builtin ', '') || todaySched.title)}
+                    </span>
+                  </div>
+                  <span className="text-3xs text-text-muted font-mono block truncate">
+                    {todaySched.isRest ? 'Scheduled recovery day' : (todaySched.bodyParts.join(' • ') || 'Full Training')}
                   </span>
                 </div>
+              </div>
 
-                <div className="my-1 w-full px-0.5">
-                  {sched.isRest ? (
-                    <span className="text-[10px] font-mono font-medium text-text-muted block">
-                      REST
-                    </span>
-                  ) : (
-                    <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight font-sans">
-                      {sched.plan?.name.replace('Builtin ', '') || sched.title}
-                    </span>
-                  )}
-                </div>
-
-                <span
-                  className={`text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full line-clamp-1 block ${
-                    sched.isRest
-                      ? 'bg-bg-secondary text-text-muted'
-                      : isToday
-                      ? 'bg-accent text-white'
-                      : 'bg-accent/15 text-accent border border-accent/20'
-                  }`}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsScheduleExpanded((prev) => !prev)}
+                  className="text-2xs font-bold text-text-secondary hover:text-text-primary px-2.5 py-1 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 transition-colors flex items-center gap-1 cursor-pointer"
+                  title={isScheduleExpanded ? 'Hide weekly schedule' : 'View 7-day schedule'}
                 >
-                  {sched.isRest ? 'OFF' : sched.bodyParts[0] || 'TRAIN'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </section>
+                  <span>{isScheduleExpanded ? 'Collapse' : '7 Days'}</span>
+                  {isScheduleExpanded ? <ChevronUp className="w-3 h-3 text-accent" /> : <ChevronDown className="w-3 h-3 text-accent" />}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTargetScheduleDay(todayDayOfWeek);
+                    setIsScheduleModalOpen(true);
+                  }}
+                  className="text-2xs font-bold text-accent px-2 py-1 rounded-lg bg-accent/10 border border-accent/25 hover:bg-accent/20 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Customize weekly schedule"
+                >
+                  <Edit2 className="w-3 h-3" />
+                  <span className="hidden sm:inline">Customize</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Expandable 7-day columns */}
+            {isScheduleExpanded && (
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 animate-fade-in pt-1">
+                {DAYS_OF_WEEK.map((day) => {
+                  const info = DAY_DISPLAY_INFO[day];
+                  const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
+                  const isToday = day === todayDayOfWeek;
+
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => {
+                        setTargetScheduleDay(day);
+                        setIsScheduleModalOpen(true);
+                      }}
+                      className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[68px] sm:min-h-[76px] cursor-pointer group active:scale-95 ${
+                        isToday
+                          ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
+                          : sched.isRest
+                          ? 'border-border/40 bg-bg-secondary/40 text-text-muted hover:border-border'
+                          : 'border-border/70 bg-bg-card hover:border-accent/50 hover:bg-bg-card/80'
+                      }`}
+                      title={
+                        sched.isRest
+                          ? `${info.label}: Rest Day`
+                          : `${info.label}: ${sched.title} (${sched.bodyParts.join(', ') || 'Workout'})`
+                      }
+                    >
+                      <div className="flex items-center gap-1">
+                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
+                        <span
+                          className={`text-[11px] font-mono font-black uppercase ${
+                            isToday ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'
+                          }`}
+                        >
+                          {info.short}
+                        </span>
+                      </div>
+
+                      <div className="my-1 w-full px-0.5">
+                        {sched.isRest ? (
+                          <span className="text-[10px] font-mono font-medium text-text-muted block">
+                            REST
+                          </span>
+                        ) : (
+                          <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight font-sans">
+                            {sched.plan?.name.replace('Builtin ', '') || sched.title}
+                          </span>
+                        )}
+                      </div>
+
+                      <span
+                        className={`text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full line-clamp-1 block ${
+                          sched.isRest
+                            ? 'bg-bg-secondary text-text-muted'
+                            : isToday
+                            ? 'bg-accent text-white'
+                            : 'bg-accent/15 text-accent border border-accent/20'
+                        }`}
+                      >
+                        {sched.isRest ? 'OFF' : sched.bodyParts[0] || 'TRAIN'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* ── 1. TODAY'S WORKOUT HERO (One screen, one decision) ── */}
       {(() => {
@@ -1641,24 +1696,38 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         );
       })()}
 
-      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode) ── */}
+      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode - Progressive Disclosure) ── */}
       {userMode === 'advanced' && activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
         <section className="space-y-2">
-          <div className="flex items-center justify-between">
+          <div
+            className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-bg-card border border-border/70 hover:border-accent/40 transition-colors shadow-xs"
+            onClick={() => setIsDecisionExpanded((prev) => !prev)}
+          >
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
               <h2 className="section-title text-[11px] mb-0 font-mono">
                 WHY DID MY PRESCRIPTION CHANGE?
               </h2>
             </div>
-            <span className="text-3xs text-text-muted font-mono">
-              Auditable AI Coach
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-3xs text-text-muted font-mono hidden sm:inline">
+                {isDecisionExpanded ? 'Collapse' : 'Inspect Insights'}
+              </span>
+              {isDecisionExpanded ? (
+                <ChevronUp className="w-3.5 h-3.5 text-accent" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5 text-accent" />
+              )}
+            </div>
           </div>
-          <TrainingDecisionCard
-            decision={activeTrainingDecision}
-            userUnit={userUnit}
-          />
+          {isDecisionExpanded && (
+            <div className="animate-fade-in">
+              <TrainingDecisionCard
+                decision={activeTrainingDecision}
+                userUnit={userUnit}
+              />
+            </div>
+          )}
         </section>
       )}
 
@@ -1780,8 +1849,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </div>
 
-        {sortedWorkouts.length > 2 && (
-          <div className="relative">
+        {sortedWorkouts.length > 2 && (showAllHistory || historyFilter.trim()) && (
+          <div className="relative animate-fade-in">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
@@ -1819,8 +1888,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <p>No logged sessions matched &ldquo;{historyFilter}&rdquo;.</p>
           </div>
         ) : (
-          <div className="flex flex-col gap-4">
-            {filteredWorkouts.map(workout => {
+          <div className="flex flex-col gap-3">
+            {((showAllHistory || historyFilter.trim()) ? filteredWorkouts : filteredWorkouts.slice(0, 3)).map(workout => {
               const isExpanded = expandedWorkouts.has(workout.id);
               const totalSets = workout.exercises.reduce((sum, e) => sum + e.sets.length, 0);
 
@@ -1972,6 +2041,28 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 </div>
               );
             })}
+
+            {!showAllHistory && !historyFilter.trim() && filteredWorkouts.length > 3 && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory(true)}
+                className="btn-secondary w-full py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-1.5 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent transition-colors shadow-xs cursor-pointer"
+              >
+                <span>View All ({filteredWorkouts.length}) Workouts</span>
+                <ChevronDown className="w-3.5 h-3.5 text-accent" />
+              </button>
+            )}
+
+            {showAllHistory && !historyFilter.trim() && (
+              <button
+                type="button"
+                onClick={() => setShowAllHistory(false)}
+                className="text-2xs text-text-muted hover:text-accent mx-auto py-1.5 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <span>Show Recent 3 Only</span>
+                <ChevronUp className="w-3 h-3" />
+              </button>
+            )}
           </div>
         )}
       </section>
@@ -2334,6 +2425,153 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   <span>Start empty workout</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Training Tools & Actions Drawer / Sheet ── */}
+      {isToolsMenuOpen && (
+        <div
+          className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+          onClick={() => setIsToolsMenuOpen(false)}
+        >
+          <div
+            className="modal-content w-full sm:max-w-md bg-bg-card border border-border rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-text-primary text-base">Training Tools</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsToolsMenuOpen(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsPlateModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Dumbbell className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Plate Calculator</h4>
+                    <p className="text-2xs text-text-muted">Calculate exact barbell loading plates</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setTargetScheduleDay(todayDayOfWeek);
+                  setIsScheduleModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Weekly Schedule &amp; Split</h4>
+                    <p className="text-2xs text-text-muted">Assign days, target muscle groups &amp; rest days</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsExerciseLibraryOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <BookOpen className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Exercise Library</h4>
+                    <p className="text-2xs text-text-muted">Browse 100+ movements, cues &amp; substitutions</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsLogPastModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Log Past Session</h4>
+                    <p className="text-2xs text-text-muted">Back-fill a workout completed on a previous day</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  openCreatePlan();
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Create Workout Plan</h4>
+                    <p className="text-2xs text-text-muted">Design a reusable custom workout routine</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+
+            {/* Display Mode Switch */}
+            <div className="pt-3 border-t border-border/80 flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-text-primary block">Display Mode</span>
+                <span className="text-2xs text-text-muted">
+                  {userMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleUserMode()}
+                className="px-3 py-1.5 rounded-lg border border-border bg-bg-secondary text-xs font-bold text-accent hover:border-accent/40 transition-colors cursor-pointer"
+              >
+                Switch to {userMode === 'advanced' ? 'Simple' : 'Advanced'}
+              </button>
             </div>
           </div>
         </div>

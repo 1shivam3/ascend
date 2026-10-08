@@ -26,6 +26,7 @@ import {
   Activity,
   HelpCircle,
   X,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
@@ -83,8 +84,16 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
   const [isDotsInfoOpen, setIsDotsInfoOpen] = useState(false);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
 
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+
+  // Modal Back Handlers
+  useEffect(() => {
+    if (isToolsMenuOpen) {
+      return registerBackHandler(() => { setIsToolsMenuOpen(false); return true; }, 100);
+    }
+  }, [isToolsMenuOpen, registerBackHandler]);
 
   // Sub-view Back Handler: If viewing Lifter Twin or PRs, back returns to overview
   useEffect(() => {
@@ -291,6 +300,16 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           >
             <Share2 className="w-3.5 h-3.5 text-accent" />
             <span className="text-2xs font-bold hidden sm:inline">Weekly Card</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsToolsMenuOpen(true)}
+            className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Analytics Tools & Actions"
+            aria-label="Analytics Tools"
+          >
+            <SlidersHorizontal className="w-4 h-4 text-accent" />
+            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Tools</span>
           </button>
         </div>
       </header>
@@ -914,6 +933,159 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             >
               Got it
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Analytics & Progress Tools Drawer / Sheet ── */}
+      {isToolsMenuOpen && (
+        <div
+          className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+          onClick={() => setIsToolsMenuOpen(false)}
+        >
+          <div
+            className="modal-content w-full sm:max-w-md bg-bg-card border border-border rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-text-primary text-base">Progress Tools</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsToolsMenuOpen(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsWeeklyRecapOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Share2 className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Weekly Share Card</h4>
+                    <p className="text-2xs text-text-muted">Export visual progress card for WhatsApp &amp; Instagram</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsWeightModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Scale className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Log Bodyweight</h4>
+                    <p className="text-2xs text-text-muted">Morning weight check-in &amp; 7-day moving averages</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsMeetModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Meet Attempt Planner</h4>
+                    <p className="text-2xs text-text-muted">Plan competition attempts: Opener, 2nd &amp; 3rd lifts</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsDotsInfoOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">DOTS Score &amp; Standards</h4>
+                    <p className="text-2xs text-text-muted">
+                      {dotsScore > 0 ? `Current: ${dotsScore} (${dotsClassification.tier})` : 'Understand normalized strength tiers'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setActiveTab('strength');
+                  setStrengthSubView('twin');
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Lifter Twin Profile</h4>
+                    <p className="text-2xs text-text-muted">Inspect fatigue recovery &amp; progression rate</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setActiveTab('strength');
+                  setStrengthSubView('prs');
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-bg-card text-text-muted flex items-center justify-center shrink-0 border border-border">
+                    <Dumbbell className="w-4 h-4 text-accent" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Personal Records Ledger</h4>
+                    <p className="text-2xs text-text-muted">{prs.length} personal records logged</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
           </div>
         </div>
       )}

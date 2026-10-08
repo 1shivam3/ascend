@@ -143,7 +143,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
 
+  // ── Progressive Disclosure UI States ──────────────────────────────────────
+  const [isToolsMenuOpen,       setIsToolsMenuOpen]       = useState(false);
+  const [isHabitsExpanded,      setIsHabitsExpanded]      = useState(false);
+  const [isPacingExpanded,      setIsPacingExpanded]      = useState(false);
+
   // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
+  useEffect(() => {
+    if (isToolsMenuOpen) {
+      return registerBackHandler(() => { setIsToolsMenuOpen(false); return true; }, 100);
+    }
+  }, [isToolsMenuOpen, registerBackHandler]);
+
   useEffect(() => {
     if (isBarcodeModalOpen) {
       return registerBackHandler(() => { setIsBarcodeModalOpen(false); return true; }, 100);
@@ -1680,6 +1691,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <p className="text-label text-text-muted">Track nutrition &amp; fuel your strength</p>
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsToolsMenuOpen(true)}
+            className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            title="Nutrition Options & Tools"
+            aria-label="Nutrition Options"
+          >
+            <Sliders className="w-4 h-4 text-accent" />
+            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Options</span>
+          </button>
+        </div>
       </header>
 
       {/* ── Today's Nutrition & Goals ── */}
@@ -1911,139 +1934,236 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </section>
 
-      {/* ── Daily Hydration & Supplements Habit Strip (Unified System) ── */}
-      <section className="card p-3.5 bg-bg-card border border-border space-y-2.5">
+      {/* ── Daily Hydration & Supplements Habit Strip (Progressive Disclosure) ── */}
+      <section className="card p-3 bg-bg-card border border-border shadow-xs space-y-2">
         <div className="flex items-center justify-between">
-          <span className="section-title text-[10px] mb-0 font-sans">DAILY HYDRATION &amp; SUPPLEMENTS</span>
-          <button
-            type="button"
-            onClick={() => setIsHydrationModalOpen(true)}
-            className="text-[11px] font-semibold text-accent hover:underline"
-          >
-            Adjust Target
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+            <span className="section-title text-[10px] mb-0 font-sans">DAILY HABITS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsHabitsExpanded((prev) => !prev)}
+              className="text-2xs font-bold text-text-secondary hover:text-text-primary px-2.5 py-1 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 flex items-center gap-1 transition-colors cursor-pointer"
+            >
+              <span>{isHabitsExpanded ? 'Compact' : 'Expand Details'}</span>
+              {isHabitsExpanded ? <ChevronUp className="w-3 h-3 text-accent" /> : <ChevronDown className="w-3 h-3 text-accent" />}
+            </button>
+            {isHabitsExpanded && (
+              <button
+                type="button"
+                onClick={() => setIsHydrationModalOpen(true)}
+                className="text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+              >
+                Adjust Targets
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5">
-          {/* Water widget */}
-          <div
-            onClick={() => setIsHydrationModalOpen(true)}
-            className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
-                <Droplet className="w-3.5 h-3.5 text-accent" />
-                WATER
-              </span>
-              <div className="flex items-center gap-1.5">
-                {waterToday > 0 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      resetWater(todayDate);
-                      toast.info("Today's water log reset to 0L", 'Hydration Reset');
-                    }}
-                    className="text-3xs text-text-muted hover:text-danger p-0.5 rounded transition-colors"
-                    title="Reset today's water"
-                  >
-                    Reset
-                  </button>
-                )}
-                <span className="text-[10px] text-text-muted font-medium font-mono">
-                  {waterRemaining === 0 ? 'Target Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
-                </span>
+        {!isHabitsExpanded ? (
+          /* Sleek 1-line strip with instant 1-tap logging */
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+            {/* Water row */}
+            <div className="flex items-center justify-between p-2 rounded-xl bg-bg-secondary/60 border border-border/70">
+              <div
+                className="flex items-center gap-2 cursor-pointer min-w-0"
+                onClick={() => setIsHydrationModalOpen(true)}
+                title="Click to view hydration details"
+              >
+                <div className="w-6 h-6 rounded-md bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+                  <Droplet className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate">
+                  <span className="text-xs font-bold text-text-primary font-mono block">
+                    {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    logWater(250, todayDate);
+                    toast.success('+250 ml logged!', 'Hydration');
+                  }}
+                  className="px-2 py-1 rounded-lg bg-bg-card border border-border text-3xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                >
+                  +250ml
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    logWater(500, todayDate);
+                    toast.success('+500 ml logged!', 'Hydration');
+                  }}
+                  className="px-2 py-1 rounded-lg bg-bg-card border border-border text-3xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                >
+                  +500ml
+                </button>
               </div>
             </div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-text-primary font-sans">
-                {(waterToday / 1000).toFixed(1)}
-              </span>
-              <span className="text-xs text-text-muted font-medium font-mono">
-                / {(waterTargetMl / 1000).toFixed(1)} L
-              </span>
-            </div>
-            <div className="flex gap-1 pt-0.5">
+
+            {/* Creatine row */}
+            <div className="flex items-center justify-between p-2 rounded-xl bg-bg-secondary/60 border border-border/70">
+              <div
+                className="flex items-center gap-2 cursor-pointer min-w-0"
+                onClick={() => setIsCreatineModalOpen(true)}
+                title="Click to view creatine details"
+              >
+                <div className="w-6 h-6 rounded-md bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </div>
+                <div className="truncate">
+                  <span className={`text-xs font-bold font-mono block ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
+                    {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g Taken` : 'Creatine Pending'}
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  logWater(250, todayDate);
-                  toast.success('+250 ml logged!', 'Hydration');
+                onClick={() => {
+                  toggleCreatine(todayDate);
+                  if (!creatineTaken) {
+                    toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
+                  } else {
+                    toast.info('Creatine marked as not taken', 'Creatine');
+                  }
                 }}
-                className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
+                className={`px-2.5 py-1 rounded-lg border text-3xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 ${
+                  creatineTaken
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
+                }`}
               >
-                +250ml
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  logWater(500, todayDate);
-                  toast.success('+500 ml logged!', 'Hydration');
-                }}
-                className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
-              >
-                +500ml
+                {creatineTaken ? '✓ Taken' : '+ Log'}
               </button>
             </div>
           </div>
-
-          {/* Creatine widget */}
-          {(() => {
-            const creatineDaysLeft = Math.max(
-              0,
-              Math.floor((creatineSupply?.currentAmountG ?? 450) / Math.max(1, creatineConfig?.dailyTargetG || 5))
-            );
-            return (
-              <div
-                onClick={() => setIsCreatineModalOpen(true)}
-                className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
-                    <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    CREATINE
+        ) : (
+          /* Full expanded cards */
+          <div className="grid grid-cols-2 gap-2.5 pt-1 animate-fade-in">
+            {/* Water widget */}
+            <div
+              onClick={() => setIsHydrationModalOpen(true)}
+              className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
+                  <Droplet className="w-3.5 h-3.5 text-accent" />
+                  WATER
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {waterToday > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        resetWater(todayDate);
+                        toast.info("Today's water log reset to 0L", 'Hydration Reset');
+                      }}
+                      className="text-3xs text-text-muted hover:text-danger p-0.5 rounded transition-colors"
+                      title="Reset today's water"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <span className="text-[10px] text-text-muted font-medium font-mono">
+                    {waterRemaining === 0 ? 'Target Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
                   </span>
-                  <div className="flex items-center gap-1.5">
-                    {creatineDaysLeft <= 7 && (
-                      <span className="text-[9px] font-mono font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25">
-                        ~{creatineDaysLeft}d left
-                      </span>
-                    )}
-                    <span className="text-[10px] text-text-muted font-medium font-mono">
-                      {creatineTaken ? 'Logged' : 'Pending'}
-                    </span>
-                  </div>
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
-                    {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
-                  </span>
-                </div>
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-black text-text-primary font-sans">
+                  {(waterToday / 1000).toFixed(1)}
+                </span>
+                <span className="text-xs text-text-muted font-medium font-mono">
+                  / {(waterTargetMl / 1000).toFixed(1)} L
+                </span>
+              </div>
+              <div className="flex gap-1 pt-0.5">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    toggleCreatine(todayDate);
-                    if (!creatineTaken) {
-                      toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
-                    } else {
-                      toast.info('Creatine marked as not taken', 'Creatine');
-                    }
+                    logWater(250, todayDate);
+                    toast.success('+250 ml logged!', 'Hydration');
                   }}
-                  className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 font-mono ${
-                    creatineTaken
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                      : 'bg-bg-secondary border-border text-text-primary hover:border-accent/40'
-                  }`}
+                  className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
                 >
-                  {creatineTaken ? 'Taken Today' : '+ Log Creatine'}
+                  +250ml
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    logWater(500, todayDate);
+                    toast.success('+500 ml logged!', 'Hydration');
+                  }}
+                  className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
+                >
+                  +500ml
                 </button>
               </div>
-            );
-          })()}
-        </div>
+            </div>
+
+            {/* Creatine widget */}
+            {(() => {
+              const creatineDaysLeft = Math.max(
+                0,
+                Math.floor((creatineSupply?.currentAmountG ?? 450) / Math.max(1, creatineConfig?.dailyTargetG || 5))
+              );
+              return (
+                <div
+                  onClick={() => setIsCreatineModalOpen(true)}
+                  className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
+                      <Sparkles className="w-3.5 h-3.5 text-accent" />
+                      CREATINE
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {creatineDaysLeft <= 7 && (
+                        <span className="text-[9px] font-mono font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25">
+                          ~{creatineDaysLeft}d left
+                        </span>
+                      )}
+                      <span className="text-[10px] text-text-muted font-medium font-mono">
+                        {creatineTaken ? 'Logged' : 'Pending'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
+                      {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCreatine(todayDate);
+                      if (!creatineTaken) {
+                        toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
+                      } else {
+                        toast.info('Creatine marked as not taken', 'Creatine');
+                      }
+                    }}
+                    className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 font-mono ${
+                      creatineTaken
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                        : 'bg-bg-secondary border-border text-text-primary hover:border-accent/40'
+                    }`}
+                  >
+                    {creatineTaken ? 'Taken Today' : '+ Log Creatine'}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </section>
 
       {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
@@ -3524,6 +3644,169 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               >
                 {isNewPinned ? 'Pin Food' : 'Save Changes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Nutrition Tools & Options Drawer / Sheet ── */}
+      {isToolsMenuOpen && (
+        <div
+          className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
+          onClick={() => setIsToolsMenuOpen(false)}
+        >
+          <div
+            className="modal-content w-full sm:max-w-md bg-bg-card border border-border rounded-t-2xl sm:rounded-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-border/80 pb-3">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-text-primary text-base">Nutrition Options</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsToolsMenuOpen(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  handleOpenGoalsModal();
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Target className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Macro &amp; Calorie Targets</h4>
+                    <p className="text-2xs text-text-muted">
+                      {macroGoals ? `${macroGoals.calories} kcal • ${macroGoals.proteinG}g P` : 'Auto-calculate for your weight'}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsGoalSelectorOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Athlete Goal &amp; Diet</h4>
+                    <p className="text-2xs text-text-muted">
+                      {goalConfig.label} • {dietPreference.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsHydrationModalOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+                    <Droplet className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration &amp; Supplements</h4>
+                    <p className="text-2xs text-text-muted">
+                      Water target ({(waterTargetMl / 1000).toFixed(1)}L) &amp; daily creatine supply
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsManagePinnedOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                    <Star className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Manage Pinned Staples</h4>
+                    <p className="text-2xs text-text-muted">
+                      {favoriteFoods.length} saved daily food items
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsToolsMenuOpen(false);
+                  setIsMealHistoryOpen(true);
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-bg-card text-text-muted flex items-center justify-center shrink-0 border border-border">
+                    <CalendarCheck className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Past Meal History</h4>
+                    <p className="text-2xs text-text-muted">Browse past dates and copy prior days</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              {yesterdayMeals.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsToolsMenuOpen(false);
+                    handleCopyYesterday();
+                  }}
+                  className="w-full p-3 rounded-xl bg-accent/10 hover:bg-accent/15 border border-accent/25 flex items-center justify-between transition-colors text-left group cursor-pointer"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-accent/20 text-accent flex items-center justify-center shrink-0">
+                      <Copy className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Copy Yesterday&apos;s Meals</h4>
+                      <p className="text-2xs text-text-muted">
+                        {yesterdayMeals.length} meals • ~{Math.round(yesterdayMacros.calories)} kcal
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-3xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
+                    1-Tap
+                  </span>
+                </button>
+              )}
             </div>
           </div>
         </div>
