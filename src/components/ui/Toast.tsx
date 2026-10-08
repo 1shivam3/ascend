@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { safeRandomId } from '@/lib/formatters';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -31,7 +32,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const showToast = useCallback(
     (type: ToastType, message: string, title?: string, durationMs = 3500) => {
-      const id = crypto.randomUUID();
+      const id = safeRandomId('toast');
       setToasts((prev) => [...prev, { id, type, title, message, durationMs }]);
 
       setTimeout(() => {

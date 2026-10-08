@@ -235,8 +235,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Today's Fuel summary
   const fuelStats = useMemo(() => {
-    const todayDate = new Date().toISOString().split('T')[0];
-    const todayMeals = meals.filter((m) => m.date === todayDate);
+    const todayMeals = meals.filter((m) => m.date === todayStr);
     const macros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
 
     const bwKg = profile?.bodyweightKg || 72;
@@ -251,7 +250,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       calPct: Math.min(100, Math.round((macros.calories / Math.max(1, calTarget)) * 100)),
       protPct: Math.min(100, Math.round((macros.proteinG / Math.max(1, protTarget)) * 100)),
     };
-  }, [meals, profile?.bodyweightKg, macroGoals]);
+  }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
   // Modal triggers
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);

@@ -102,7 +102,7 @@ export default function QuickActionSheetModal({
                 Quick Actions
               </h3>
             </div>
-            <button onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
+            <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
               <X className="w-5 h-5" />
             </button>
           </div>

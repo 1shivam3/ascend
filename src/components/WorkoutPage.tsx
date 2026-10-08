@@ -73,7 +73,7 @@ import {
   getWorkoutBodyParts,
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
-import { plural } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 
 interface WorkoutPageProps {
@@ -193,7 +193,7 @@ function PlanModal({
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button onClick={onClose} className="text-text-secondary hover:text-text-primary p-1">
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary p-1">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -244,6 +244,7 @@ function PlanModal({
                   <div className="flex items-center justify-between mb-2.5">
                     <span className="text-xs font-mono text-accent font-semibold">EXERCISE {i + 1}</span>
                     <button
+                      type="button"
                       onClick={() => removeExercise(i)}
                       disabled={planExercises.length === 1}
                       className="text-text-muted hover:text-danger p-1 disabled:opacity-30 disabled:cursor-not-allowed"
@@ -343,8 +344,9 @@ function PlanModal({
 
         {/* Footer */}
         <div className="p-4 border-t border-border flex gap-3">
-          <button onClick={onClose} className="btn-ghost flex-1">Cancel</button>
+          <button type="button" onClick={onClose} className="btn-ghost flex-1">Cancel</button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={!isValid}
             className="btn-primary flex-1 disabled:opacity-40 flex items-center justify-center gap-1.5"
@@ -396,6 +398,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
           <button
+            type="button"
             onClick={onDuplicate}
             title="Duplicate plan"
             className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
@@ -403,6 +406,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
             <Copy className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onClick={onShare}
             title="Share plan via WhatsApp or QR"
             className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
@@ -410,6 +414,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
             <Share2 className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onClick={onEdit}
             title="Edit plan"
             className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
@@ -417,6 +422,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
             <Edit2 className="w-3.5 h-3.5" />
           </button>
           <button
+            type="button"
             onClick={onDelete}
             title="Delete plan"
             className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
@@ -459,6 +465,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
 
       {/* Start button */}
       <button
+        type="button"
         onClick={onStart}
         className="btn-primary w-full flex items-center justify-center gap-2 py-2"
       >
@@ -496,7 +503,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalTodayStr(), []);
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
   const todaySessionInfo = useMemo(() => {
     const raw = getTodaySessionState(
@@ -587,7 +594,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [defaultRestSeconds]);
 
   // ── Workout Logger Form State ──────────────────────────────────────────────
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalTodayStr());
   const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
 
   // ── Quick Substitution & Voice State ───────────────────────────────────────
@@ -730,7 +737,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       })),
     }));
     setExercises(clonedExercises);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalTodayStr());
     setStartedFromPlan(`Repeated (${last.date})`);
     setIsModalOpen(true);
     toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
@@ -975,7 +982,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       };
     });
     setExercises(preFilledExercises);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalTodayStr());
     setStartedFromPlan(plan.name);
     setIsModalOpen(true);
   };
@@ -1176,7 +1183,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     clearWorkoutDraft();
     setIsModalOpen(false);
     setStartedFromPlan(null);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalTodayStr());
     setExercises([]);
   };
 
@@ -1192,9 +1199,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
     } else {
       const newPlan: PlannedWorkout = {
-        id: typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `plan_${Date.now()}`,
+        id: safeRandomId('plan'),
         createdAt: new Date().toISOString(),
         name: planData.name,
         exercises: planData.exercises,
@@ -1217,7 +1222,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleDuplicatePlan = (plan: PlannedWorkout) => {
     const duplicatedPlan: PlannedWorkout = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
+      id: safeRandomId('plan'),
       createdAt: new Date().toISOString(),
       name: `${plan.name} (Copy)`,
       exercises: plan.exercises.map(e => ({ ...e })),
@@ -1244,7 +1249,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       })),
     }));
     setExercises(preFilled);
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalTodayStr());
     setStartedFromPlan(workoutName);
     setIsModalOpen(true);
   };
@@ -1789,6 +1794,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               )}
             </div>
             <button
+              type="button"
               onClick={openCreatePlan}
               className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
               title="Create new workout plan"
@@ -1810,6 +1816,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 </div>
               </div>
               <button
+                type="button"
                 onClick={openCreatePlan}
                 className="btn-secondary py-1 px-3 text-xs font-semibold flex items-center gap-1"
               >

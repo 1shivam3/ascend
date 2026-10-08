@@ -103,6 +103,7 @@ export default function WorkoutCoachDrawer({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
           >

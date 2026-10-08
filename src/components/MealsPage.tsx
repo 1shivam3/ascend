@@ -48,6 +48,7 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
+import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -588,7 +589,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleLogFrequentMeal = (meal: MealEntry, multiplier: number = 1) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayStr();
     const scaledFoods = meal.foods.map((f) => {
       const q = f.quantity ? Math.round(f.quantity * multiplier * 10) / 10 : undefined;
       return {
@@ -601,7 +602,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       };
     });
     const newMeal: MealEntry = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+      id: safeRandomId('meal'),
       date: today,
       name: multiplier !== 1 ? `${meal.name} (${multiplier}x)` : meal.name,
       foods: scaledFoods,
@@ -637,9 +638,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayStr();
     const newMeal: MealEntry = {
-      id: crypto.randomUUID(),
+      id: safeRandomId('meal'),
       date: today,
       name: mealName.trim(),
       foods: validFoods,
@@ -769,9 +770,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getLocalTodayStr();
         const newMeal: MealEntry = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+          id: safeRandomId('meal'),
           date: today,
           name: data.mealName || 'Quick Meal',
           foods: data.foods,
@@ -797,7 +798,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Derived data ──────────────────────────────────────────────────────────
 
-  const todayDate   = new Date().toISOString().split('T')[0];
+  const todayDate   = getLocalTodayStr();
   const todayMeals  = meals.filter((m) => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
   const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
@@ -1505,7 +1506,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // Yesterday's meals for Quick Copy feature
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayDate = yesterday.toISOString().split('T')[0];
+  const yesterdayDate = getLocalTodayStr(yesterday);
   const yesterdayMeals = meals.filter((m) => m.date === yesterdayDate);
   const yesterdayMacros = calculateMealMacros(yesterdayMeals.flatMap((m) => m.foods));
 
@@ -2250,7 +2251,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     type="button"
                     onClick={() => {
                       const newMeal: MealEntry = {
-                        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                        id: safeRandomId('meal'),
                         date: todayDate,
                         name: sug.name,
                         foods: sug.foods,
@@ -2757,9 +2758,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         type="button"
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          const today = new Date().toISOString().split('T')[0];
+                                          const today = getLocalTodayStr();
                                           const repeatedMeal: MealEntry = {
-                                            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+                                            id: safeRandomId('meal'),
                                             date: today,
                                             name: meal.name,
                                             foods: meal.foods.map((f) => ({ ...f })),
@@ -2819,7 +2820,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <BarcodeIcon className="w-3.5 h-3.5" />
                   <span>Scan</span>
                 </button>
-                <button onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
                   <X className="w-5 h-5" />
                 </button>
               </div>

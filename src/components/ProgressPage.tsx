@@ -69,7 +69,22 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   }, [initialTab]);
 
   const [activeTab, setActiveTab] = useState<'strength' | 'body' | 'consistency'>(resolvedInitialTab);
-  const [strengthSubView, setStrengthSubView] = useState<'overview' | 'twin' | 'prs'>('overview');
+  const [strengthSubView, setStrengthSubView] = useState<'overview' | 'twin' | 'prs'>(
+    initialTab === 'prs' ? 'prs' : 'overview'
+  );
+
+  useEffect(() => {
+    if (initialTab === 'bodyweight' || initialTab === 'body') {
+      setActiveTab('body');
+    } else if (initialTab === 'training' || initialTab === 'consistency') {
+      setActiveTab('consistency');
+    } else if (initialTab === 'prs') {
+      setActiveTab('strength');
+      setStrengthSubView('prs');
+    } else if (initialTab === 'strength' || initialTab === 'overview') {
+      setActiveTab('strength');
+    }
+  }, [initialTab]);
 
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs || []);

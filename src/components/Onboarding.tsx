@@ -21,6 +21,7 @@ import { PersonalRecord, AthleteGoal, PlannedWorkout, DietPreference } from '@/l
 import { getGoalAdaptiveSplitTemplates } from '@/lib/workout-engine';
 import { buildDefaultWeeklySchedule } from '@/lib/workout-schedule';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
+import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -234,7 +235,7 @@ export default function OnboardingScreen() {
     const validAge = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 90 ? parsedAge : 24;
 
     const profileData = {
-      id: crypto.randomUUID(),
+      id: safeRandomId('user'),
       name: athleteName,
       gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
@@ -279,11 +280,11 @@ export default function OnboardingScreen() {
     const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight, validAge);
     setMacroGoals(initialMacros);
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayStr();
 
     // Log initial body metric entry
     addBodyMetric({
-      id: crypto.randomUUID(),
+      id: safeRandomId('bm'),
       date: today,
       weightKg: Math.round(bodyweightKg * 10) / 10,
       heightCm: validHeight,
@@ -305,7 +306,7 @@ export default function OnboardingScreen() {
           const displayE1rm = Math.round((unit === 'lbs' ? oneRepMaxKg * 2.20462 : oneRepMaxKg) * 10) / 10;
 
           initialPRs.push({
-            id: crypto.randomUUID(),
+            id: safeRandomId('pr'),
             exercise,
             weightKg: Math.round(wKg * 10) / 10,
             weightLbs: Math.round(wLbs * 10) / 10,

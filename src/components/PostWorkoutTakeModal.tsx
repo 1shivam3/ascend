@@ -109,6 +109,7 @@ export default function PostWorkoutTakeModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
           >
@@ -237,6 +238,7 @@ export default function PostWorkoutTakeModal({
         ) : null}
 
         <button
+          type="button"
           onClick={onClose}
           className="w-full py-3 rounded-xl bg-accent text-white font-bold text-xs hover:bg-accent-hover transition-colors shadow-sm"
         >

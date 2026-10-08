@@ -44,6 +44,7 @@ import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
 import { ExerciseRank, EquipmentType } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
+import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,7 +301,7 @@ function LevelProgressionModal({
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
             <p className="text-2xs text-text-muted font-mono mt-0.5">Level Progression</p>
           </div>
-          <button onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded">
+          <button type="button" onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded">
             <X size={18} />
           </button>
         </div>
@@ -631,7 +632,7 @@ function LiftCard({
                         e1RM: {Math.round(single1RM * 10) / 10} {userUnit}
                       </span>
                       <span>•</span>
-                      <span>{new Date(p.date).toLocaleDateString()}</span>
+                      <span>{formatLocalDate(p.date)}</span>
                     </div>
                     {p.notes && (
                       <p className="text-2xs text-text-secondary italic mt-0.5">
@@ -640,6 +641,7 @@ function LiftCard({
                     )}
                   </div>
                   <button
+                    type="button"
                     onClick={() => onDeletePR(p.id, p.date, p.exercise)}
                     className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
                     title="Delete record"
@@ -730,7 +732,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const [weight, setWeight] = useState('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>(userUnit);
   const [reps, setReps] = useState('1');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getLocalTodayStr());
   const [notes, setNotes] = useState('');
 
   const availableExercises = getExerciseList();
@@ -783,7 +785,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       const oneRepMaxKg = calculateOneRepMax(totalFormulaKg, repsNum);
 
       addPR({
-        id: crypto.randomUUID(),
+        id: safeRandomId('pr'),
         exercise: finalExercise,
         weightKg: Math.round(addedKg * 10) / 10,
         weightLbs: Math.round(addedLbs * 10) / 10,
@@ -826,7 +828,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       const oneRepMaxKg = calculateOneRepMax(weightKg, repsNum);
 
       addPR({
-        id: crypto.randomUUID(),
+        id: safeRandomId('pr'),
         exercise: finalExercise,
         weightKg: Math.round(weightKg * 10) / 10,
         weightLbs: Math.round(weightLbs * 10) / 10,
@@ -848,7 +850,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     setWeight('');
     setReps('1');
     setNotes('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(getLocalTodayStr());
   };
 
   // ─── handleSaveTarget ─────────────────────────────────────────────────────────
@@ -909,7 +911,9 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       const g = groups.get(ex)!;
       g.prs.push(pr);
 
-      const pr1RMKg = calculateOneRepMax(pr.weightKg, pr.reps);
+      const isBW = isBodyweightExercise(ex);
+      const effectiveWeight = isBW ? (bodyweightKg + (pr.weightKg || 0)) : pr.weightKg;
+      const pr1RMKg = (pr.oneRepMax && pr.oneRepMax > 0) ? pr.oneRepMax : calculateOneRepMax(effectiveWeight, pr.reps);
       if (pr1RMKg > g.best1RMKg) {
         g.best1RMKg = pr1RMKg;
         g.bestPR = pr;
@@ -1056,6 +1060,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
           <button
+            type="button"
             className="btn-primary flex items-center gap-1.5"
             onClick={() => setShowAddModal(true)}
           >
@@ -1485,7 +1490,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-bold text-text-primary text-base">Set Target Milestone</h3>
-              <button onClick={() => setTargetModalExercise(null)} className="text-text-muted p-1">
+              <button type="button" onClick={() => setTargetModalExercise(null)} className="text-text-muted p-1">
                 <X size={18} />
               </button>
             </div>
@@ -1512,12 +1517,13 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
             <div className="flex gap-3 pt-2">
               <button
+                type="button"
                 onClick={() => setTargetModalExercise(null)}
                 className="btn-ghost flex-1 text-xs"
               >
                 Cancel
               </button>
-              <button onClick={handleSaveTarget} className="btn-primary flex-1 text-xs">
+              <button type="button" onClick={handleSaveTarget} className="btn-primary flex-1 text-xs">
                 Save Target
               </button>
             </div>
@@ -1531,7 +1537,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-base font-bold text-text-primary">Record Personal Best</h2>
-              <button onClick={() => setShowAddModal(false)} className="text-text-muted p-1">
+              <button type="button" onClick={() => setShowAddModal(false)} className="text-text-muted p-1">
                 <X size={18} />
               </button>
             </div>
@@ -1641,12 +1647,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               {/* Actions */}
               <div className="flex gap-3 pt-2">
                 <button
+                  type="button"
                   onClick={() => setShowAddModal(false)}
                   className="btn-ghost flex-1 text-xs"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleSavePR}
                   disabled={
                     !reps ||

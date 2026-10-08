@@ -50,6 +50,7 @@ import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 import { useAppNavigation } from '@/lib/navigation';
+import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -357,7 +358,7 @@ export default function ActiveWorkoutScreen({
   useEffect(() => {
     if (exercises.some((e) => e.name.trim() || e.sets.some((s) => s.completed || (parseFloat(String(s.weight)) || 0) > 0))) {
       saveWorkoutDraft({
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalTodayStr(),
         name: workoutName,
         exercises,
         startedFromPlan: workoutName,
@@ -1143,7 +1144,7 @@ export default function ActiveWorkoutScreen({
 
   // Finish Workout & detect PRs
   const handleConfirmFinish = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayStr();
     const validExercises = exercises
       .map((e, idx) => {
         const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`);
@@ -1229,7 +1230,7 @@ export default function ActiveWorkoutScreen({
       }
 
       if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
-        const prId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pr_${Date.now()}`;
+        const prId = safeRandomId('pr');
         addPR({
           id: prId,
           exercise: ex.name,
@@ -1243,7 +1244,7 @@ export default function ActiveWorkoutScreen({
         });
         newPRsCount++;
       } else if (bestRepPR) {
-        const prId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `pr_rep_${Date.now()}`;
+        const prId = safeRandomId('pr_rep');
         addPR({
           id: prId,
           exercise: ex.name,
@@ -1260,7 +1261,7 @@ export default function ActiveWorkoutScreen({
     }
 
     const workoutEntry: WorkoutEntry = {
-      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `wk_${Date.now()}`,
+      id: safeRandomId('wk'),
       date: today,
       exercises: validExercises,
     };
@@ -1383,7 +1384,7 @@ export default function ActiveWorkoutScreen({
             type="button"
             onClick={() => {
               saveWorkoutDraft({
-                date: new Date().toISOString().split('T')[0],
+                date: getLocalTodayStr(),
                 name: workoutName,
                 exercises,
                 startedFromPlan: workoutName,
@@ -2464,7 +2465,7 @@ export default function ActiveWorkoutScreen({
                 <Flame className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Warm-up Sets Generator</h3>
               </div>
-              <button onClick={() => setIsWarmupModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setIsWarmupModalOpen(false)} className="text-text-muted hover:text-text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2528,7 +2529,7 @@ export default function ActiveWorkoutScreen({
                 <Dumbbell className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Plate Calculator</h3>
               </div>
-              <button onClick={() => setIsPlateModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setIsPlateModalOpen(false)} className="text-text-muted hover:text-text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2726,7 +2727,7 @@ export default function ActiveWorkoutScreen({
                 <Trophy className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Workout Summary</h3>
               </div>
-              <button onClick={() => setIsFinishModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button type="button" onClick={() => setIsFinishModalOpen(false)} className="text-text-muted hover:text-text-primary">
                 <X className="w-5 h-5" />
               </button>
             </div>

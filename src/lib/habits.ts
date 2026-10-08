@@ -263,7 +263,7 @@ export function getDailyObjectives(params: {
 
   const completedCount = objectives.filter((o) => o.done).length;
   const totalCount = objectives.length;
-  const pct = Math.round((completedCount / totalCount) * 100);
+  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const allDone = completedCount === totalCount;
 
   let statusMessage = `${completedCount}/${totalCount} DAILY OBJECTIVES COMPLETE`;

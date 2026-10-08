@@ -34,6 +34,7 @@ import {
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile } from './lifter-twin';
 import { buildDefaultWeeklySchedule } from './workout-schedule';
+import { safeRandomId } from './formatters';
 
 export * from './types';
 
@@ -464,7 +465,7 @@ export const useAppStore = create<AppState>()(
       updateBodyMetrics: (weightKg, heightCm) => set((state) => {
         const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
-          id: crypto.randomUUID(),
+          id: safeRandomId('bm'),
           date: todayDate,
           weightKg: Math.round(weightKg * 10) / 10,
           heightCm: heightCm ? Math.round(heightCm) : undefined,
@@ -932,9 +933,13 @@ export const useAppStore = create<AppState>()(
               if (!currentProfile) {
                 const rawProfile = localStorage.getItem('ascend_profile');
                 if (rawProfile) {
-                  const parsedProfile = JSON.parse(rawProfile);
-                  if (parsedProfile?.name) {
-                    useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                  try {
+                    const parsedProfile = JSON.parse(rawProfile);
+                    if (parsedProfile?.name) {
+                      useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                    }
+                  } catch {
+                    // Ignore malformed profile backup
                   }
                 }
               }
@@ -943,9 +948,13 @@ export const useAppStore = create<AppState>()(
               if (!currentWorkouts || currentWorkouts.length === 0) {
                 const rawW = localStorage.getItem('ascend_workouts');
                 if (rawW) {
-                  const parsedW = JSON.parse(rawW);
-                  if (Array.isArray(parsedW) && parsedW.length > 0) {
-                    useAppStore.setState({ workouts: parsedW });
+                  try {
+                    const parsedW = JSON.parse(rawW);
+                    if (Array.isArray(parsedW) && parsedW.length > 0) {
+                      useAppStore.setState({ workouts: parsedW });
+                    }
+                  } catch {
+                    // Ignore malformed workouts backup
                   }
                 }
               }
@@ -954,9 +963,13 @@ export const useAppStore = create<AppState>()(
               if (!currentPRs || currentPRs.length === 0) {
                 const rawPRs = localStorage.getItem('ascend_prs');
                 if (rawPRs) {
-                  const parsedPRs = JSON.parse(rawPRs);
-                  if (Array.isArray(parsedPRs) && parsedPRs.length > 0) {
-                    useAppStore.setState({ prs: parsedPRs });
+                  try {
+                    const parsedPRs = JSON.parse(rawPRs);
+                    if (Array.isArray(parsedPRs) && parsedPRs.length > 0) {
+                      useAppStore.setState({ prs: parsedPRs });
+                    }
+                  } catch {
+                    // Ignore malformed PRs backup
                   }
                 }
               }
@@ -965,9 +978,13 @@ export const useAppStore = create<AppState>()(
               if (!currentMeals || currentMeals.length === 0) {
                 const rawMeals = localStorage.getItem('ascend_meals');
                 if (rawMeals) {
-                  const parsedMeals = JSON.parse(rawMeals);
-                  if (Array.isArray(parsedMeals) && parsedMeals.length > 0) {
-                    useAppStore.setState({ meals: parsedMeals });
+                  try {
+                    const parsedMeals = JSON.parse(rawMeals);
+                    if (Array.isArray(parsedMeals) && parsedMeals.length > 0) {
+                      useAppStore.setState({ meals: parsedMeals });
+                    }
+                  } catch {
+                    // Ignore malformed meals backup
                   }
                 }
               }

@@ -369,7 +369,16 @@ export function getLiftLevel(
   const normExercise = normalizeExerciseName(exercise);
   const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
-  const ratio = oneRepMaxKg / safeBW;
+  
+  // For bodyweight exercises (Pull-ups, Dips, etc.), the standard ratios are based on added weight / bodyweight.
+  // Callers may pass either total effective mass (bodyweight + added load) or added load directly.
+  let ratio: number;
+  if (isBodyweightExercise(normExercise)) {
+    const addedLoad1RM = oneRepMaxKg >= safeBW ? (oneRepMaxKg - safeBW) : Math.max(0, oneRepMaxKg);
+    ratio = addedLoad1RM / safeBW;
+  } else {
+    ratio = oneRepMaxKg / safeBW;
+  }
   const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
 
   let level = 1;
@@ -377,7 +386,7 @@ export function getLiftLevel(
   let lowerBoundRatio = standards[1] * genderMultiplier;
 
   if (ratio <= lowerBoundRatio) {
-    level = Math.max(1, Math.round((ratio / lowerBoundRatio) * 1));
+    level = 1;
   } else {
     let matched = false;
     for (let i = 1; i < LEVELS.length; i++) {

@@ -24,6 +24,7 @@ import {
 } from '@/lib/strength-standards';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { useToast } from '@/components/ui/Toast';
+import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 
 interface LogPastWorkoutModalProps {
   isOpen: boolean;
@@ -58,11 +59,11 @@ export default function LogPastWorkoutModal({
   const userUnit = profile?.unit || 'kg';
   const weightStep = userUnit === 'lbs' ? 5 : 2.5;
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  const todayStr = useMemo(() => getLocalTodayStr(), []);
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return getLocalTodayStr(d);
   }, []);
 
   const [date, setDate] = useState(todayStr);
@@ -322,7 +323,7 @@ export default function LogPastWorkoutModal({
       return;
     }
 
-    const workoutId = crypto.randomUUID();
+    const workoutId = safeRandomId('wk');
 
     const entry: WorkoutEntry = {
       id: workoutId,
@@ -357,7 +358,7 @@ export default function LogPastWorkoutModal({
           const wKg = userUnit === 'lbs' ? w * 0.453592 : w;
           const wLbs = userUnit === 'kg' ? w * 2.20462 : w;
           const prRecord: PersonalRecord = {
-            id: crypto.randomUUID(),
+            id: safeRandomId('pr'),
             exercise: ex.name,
             weightKg: Math.round(wKg * 10) / 10,
             weightLbs: Math.round(wLbs * 10) / 10,
