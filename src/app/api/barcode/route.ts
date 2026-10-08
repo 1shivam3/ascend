@@ -255,6 +255,54 @@ const COMMON_BARCODES: Record<string, {
     servingSize: '1 pack (70g)',
     servingQuantity: 70,
   },
+  // Fortune Soya Chunks
+  '8906007281433': {
+    name: 'Soya Chunks (52% Protein)',
+    brand: 'Fortune',
+    per100g: { calories: 345, proteinG: 52.0, carbsG: 33.0, fatG: 0.5 },
+    servingSize: '50g',
+    servingQuantity: 50,
+  },
+  // MuscleBlaze Creatine Monohydrate
+  '8906067023301': {
+    name: 'Creatine Monohydrate Unflavored',
+    brand: 'MuscleBlaze',
+    per100g: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+    servingSize: '1 scoop (3g)',
+    servingQuantity: 3,
+  },
+  // Nutrabay Pure 100% Whey Protein Isolate
+  '8908012674018': {
+    name: 'Pure 100% Whey Protein Isolate Unflavored',
+    brand: 'Nutrabay',
+    per100g: { calories: 390, proteinG: 90.0, carbsG: 1.0, fatG: 1.0 },
+    servingSize: '1 scoop (30g)',
+    servingQuantity: 30,
+  },
+  // Alpino Peanut Butter Super Crunch
+  '8908008882014': {
+    name: 'Natural Peanut Butter Super Crunch',
+    brand: 'Alpino',
+    per100g: { calories: 635, proteinG: 30.0, carbsG: 18.0, fatG: 50.0 },
+    servingSize: '2 tbsp (32g)',
+    servingQuantity: 32,
+  },
+  // Amul High Protein Lassi Mango
+  '8901262084554': {
+    name: 'High Protein Mango Lassi (15g Protein)',
+    brand: 'Amul',
+    per100g: { calories: 65, proteinG: 7.5, carbsG: 6.5, fatG: 1.0 },
+    servingSize: '1 pack (200ml)',
+    servingQuantity: 200,
+  },
+  // True Elements Rolled Oats
+  '8906079930017': {
+    name: 'Rolled Oats Whole Grain',
+    brand: 'True Elements',
+    per100g: { calories: 395, proteinG: 13.0, carbsG: 66.0, fatG: 7.5 },
+    servingSize: '1 bowl (40g)',
+    servingQuantity: 40,
+  },
 };
 
 

@@ -43,7 +43,7 @@ import {
   getQuickSubstitutes,
   getExercisePrescription,
 } from '@/lib/workout-engine';
-import { calculatePlates, PlateInfo } from '@/lib/plate-calculator';
+import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
@@ -1098,6 +1098,8 @@ export default function ActiveWorkoutScreen({
     toast.success(`Prepended ${warmupsToInsert.length} warm-up sets marked [W]!`, 'Warm-Up Added');
   };
 
+  const [plateBarWeight, setPlateBarWeight] = useState<number>(() => (userUnit === 'lbs' ? 45 : 20));
+
   // Live Plate Calculator trigger
   const openPlateCalculatorForWeight = (weight: number) => {
     setPlateTargetWeight(weight);
@@ -1106,8 +1108,8 @@ export default function ActiveWorkoutScreen({
 
   // Plate calculation result
   const plateResult = useMemo(() => {
-    return calculatePlates(plateTargetWeight, 20, userUnit);
-  }, [plateTargetWeight, userUnit]);
+    return calculatePlates(plateTargetWeight, plateBarWeight, userUnit);
+  }, [plateTargetWeight, plateBarWeight, userUnit]);
 
   // Total volume and completed metrics
   const sessionStats = useMemo(() => {
@@ -2046,26 +2048,27 @@ export default function ActiveWorkoutScreen({
               {currentExercise.sets.map((set, sIdx) => (
                 <div
                   key={sIdx}
-                  className="py-3 flex items-center justify-between gap-2"
+                  className="py-3 flex items-center justify-between gap-1.5 sm:gap-2"
                 >
                   {/* Set number */}
-                  <div className="w-14 shrink-0 flex items-center gap-1">
+                  <div className="w-8 sm:w-12 shrink-0 flex items-center gap-1">
                     {set.isWarmup ? (
                       <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title="Warm-up ramp set">
                         W{sIdx + 1}
                       </span>
                     ) : (
-                      <span className="text-xs font-semibold text-text-muted">
-                        Set {sIdx + 1}
+                      <span className="text-xs font-semibold text-text-muted font-mono">
+                        <span className="sm:hidden">{sIdx + 1}</span>
+                        <span className="hidden sm:inline">Set {sIdx + 1}</span>
                       </span>
                     )}
                   </div>
 
                   {/* Weight & Reps inputs */}
-                  <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     {/* Weight Input */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center bg-bg-secondary rounded-xl px-2 py-1.5 border border-border/60 focus-within:border-accent min-w-[76px] sm:min-w-[88px] shrink-0">
+                      <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
                         <input
                           type="text"
                           inputMode="decimal"
@@ -2082,13 +2085,13 @@ export default function ActiveWorkoutScreen({
                             const parsed = parseFloat(String(set.weight));
                             handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
                           }}
-                          className="w-14 sm:w-16 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
+                          className="w-full min-w-0 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
-                        <span className="text-2xs text-text-muted font-medium ml-1 shrink-0">{userUnit}</span>
+                        <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
                       </div>
                       {isCurrentDumbbell && (
-                        <span className="text-[9px] font-mono text-amber-500/90 mt-0.5 truncate max-w-[100px] text-center" title="Weight per dumbbell">
-                          / dumbbell
+                        <span className="text-[9px] font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
+                          / db
                         </span>
                       )}
                       {isCurrentBarbell && (
@@ -2096,7 +2099,7 @@ export default function ActiveWorkoutScreen({
                           const w = parseFloat(String(set.weight)) || 0;
                           const plates = getPlateSummary(w, userUnit);
                           return plates ? (
-                            <span className="text-[9px] font-mono text-accent/80 mt-0.5 truncate max-w-[100px] text-center" title={plates}>
+                            <span className="text-[9px] font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
                               {plates}
                             </span>
                           ) : null;
@@ -2104,10 +2107,10 @@ export default function ActiveWorkoutScreen({
                       )}
                     </div>
 
-                    <span className="text-text-muted font-medium text-xs">×</span>
+                    <span className="text-text-muted font-medium text-xs shrink-0">×</span>
 
                     {/* Reps Input */}
-                    <div className="flex items-center bg-bg-secondary rounded-xl px-2 py-1.5 border border-border/60 focus-within:border-accent min-w-[62px] sm:min-w-[72px] shrink-0">
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 border border-border/60 focus-within:border-accent w-[60px] sm:w-[74px] shrink-0">
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2124,16 +2127,19 @@ export default function ActiveWorkoutScreen({
                           const parsed = parseInt(String(set.reps), 10);
                           handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
                         }}
-                        className="w-10 sm:w-12 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
+                        className="w-full min-w-0 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
                       />
-                      <span className="text-2xs text-text-muted font-medium ml-1 shrink-0">reps</span>
+                      <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
+                        <span className="sm:hidden">r</span>
+                        <span className="hidden sm:inline">reps</span>
+                      </span>
                     </div>
 
                     {/* Effort / RPE badge */}
                     <button
                       type="button"
                       onClick={() => setActiveRpePickerSetIdx(sIdx)}
-                      className="min-w-[44px] text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
+                      className="min-w-[34px] sm:min-w-[42px] px-1 sm:px-2 py-1.5 text-2xs sm:text-xs font-mono font-bold rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
                       title="Tap to select effort (RPE)"
                     >
                       @{set.rpe || 8}
@@ -2145,14 +2151,14 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => handleToggleSetComplete(sIdx)}
-                    className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                    className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
                       set.completed
                         ? 'bg-emerald-500 text-white shadow-sm'
                         : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
                     }`}
                     aria-label={set.completed ? "Completed set" : "Mark set complete"}
                   >
-                    <Check className={`w-5 h-5 stroke-[3] ${set.completed ? 'opacity-100' : 'opacity-0'}`} />
+                    <Check className={`w-4 h-4 sm:w-5 sm:h-5 stroke-[3] ${set.completed ? 'opacity-100' : 'opacity-0'}`} />
                   </button>
                 </div>
               ))}
@@ -2568,16 +2574,42 @@ export default function ActiveWorkoutScreen({
                   </button>
                 </div>
                 <span className="text-2xs font-mono text-text-secondary block">
-                  {plateResult.barWeight}kg Bar +{' '}
-                  <strong className="text-text-primary">{plateResult.weightPerSide}kg per side</strong>
+                  {plateResult.barWeight} {userUnit} Bar +{' '}
+                  <strong className="text-text-primary">{plateResult.weightPerSide} {userUnit} per side</strong>
                 </span>
+              </div>
+
+              {/* Barbell Type Selection */}
+              <div className="space-y-1.5">
+                <span className="text-3xs uppercase font-mono text-text-muted block">BARBELL TYPE:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {BARBELL_PRESETS.map((preset) => {
+                    const presetWeight = userUnit === 'kg' ? preset.weightKg : preset.weightLbs;
+                    const isSelected = plateBarWeight === presetWeight;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setPlateBarWeight(presetWeight)}
+                        className={`px-2 py-1 rounded-lg text-2xs font-mono transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-accent text-bg-primary font-bold shadow-xs'
+                            : 'bg-bg-secondary hover:bg-bg-card text-text-secondary border border-border/70'
+                        }`}
+                        title={preset.description}
+                      >
+                        {preset.shortName} ({presetWeight} {userUnit})
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Plate List Breakdown */}
               <div className="space-y-1.5">
                 <span className="text-3xs uppercase font-mono text-text-muted block">PLATES PER SIDE:</span>
                 {plateResult.plates.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-2">Empty barbell (20kg)</p>
+                  <p className="text-xs text-text-muted text-center py-2">Empty barbell ({plateResult.barWeight} {userUnit})</p>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     {plateResult.plates.map((p, idx) => (
@@ -2592,9 +2624,9 @@ export default function ActiveWorkoutScreen({
                         />
                         <div>
                           <span className="text-xs font-black font-mono text-text-primary block">
-                            {p.count}× {p.weight}kg
+                            {p.count}× {p.weight} {userUnit}
                           </span>
-                          <span className="text-3xs text-text-muted font-mono">{p.count * p.weight}kg total</span>
+                          <span className="text-3xs text-text-muted font-mono">{p.count * p.weight} {userUnit} total</span>
                         </div>
                       </div>
                     ))}

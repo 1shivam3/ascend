@@ -20,6 +20,7 @@ import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
 import { saveCustomBarcode } from '@/lib/storage';
+import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 
@@ -36,17 +37,20 @@ export default function BarcodeScannerModal({
 }: BarcodeScannerModalProps) {
   const toast = useToast();
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
+  const customGeminiKey = useStore((state) => state.customGeminiKey);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const controlsRef = useRef<any>(null);
   const isProcessingRef = useRef<boolean>(false);
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   const [hasCamera, setHasCamera] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
+  const [isScanningLabel, setIsScanningLabel] = useState(false);
   const [scannedProduct, setScannedProduct] = useState<ScannedProduct | null>(null);
   const [servingMode, setServingMode] = useState<'100g' | 'serving'>('100g');
   const [customQty, setCustomQty] = useState<number>(100);
@@ -55,10 +59,10 @@ export default function BarcodeScannerModal({
   // Manual fallback editable values if not found in DB
   const [manualName, setManualName] = useState('');
   const [manualBrand, setManualBrand] = useState('');
-  const [manualCalories, setManualCalories] = useState('120');
-  const [manualProtein, setManualProtein] = useState('10');
-  const [manualCarbs, setManualCarbs] = useState('15');
-  const [manualFat, setManualFat] = useState('3');
+  const [manualCalories, setManualCalories] = useState('');
+  const [manualProtein, setManualProtein] = useState('');
+  const [manualCarbs, setManualCarbs] = useState('');
+  const [manualFat, setManualFat] = useState('');
   const [isNotFoundInDB, setIsNotFoundInDB] = useState(false);
   const [foodSuggestions, setFoodSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -145,17 +149,17 @@ export default function BarcodeScannerModal({
         setIsNotFoundInDB(true);
         setManualName('');
         setManualBrand('');
-        setManualCalories('120');
-        setManualProtein('10');
-        setManualCarbs('15');
-        setManualFat('3');
+        setManualCalories('');
+        setManualProtein('');
+        setManualCarbs('');
+        setManualFat('');
         setServingMode('100g');
         setCustomQty(100);
 
         setScannedProduct({
           barcode: clean,
           name: '',
-          per100g: { calories: 120, proteinG: 10, carbsG: 15, fatG: 3 },
+          per100g: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
         });
       }
     } catch {
@@ -163,14 +167,14 @@ export default function BarcodeScannerModal({
       setIsNotFoundInDB(true);
       setManualName('');
       setManualBrand('');
-      setManualCalories('120');
-      setManualProtein('10');
-      setManualCarbs('15');
-      setManualFat('3');
+      setManualCalories('');
+      setManualProtein('');
+      setManualCarbs('');
+      setManualFat('');
       setScannedProduct({
         barcode: clean,
         name: '',
-        per100g: { calories: 120, proteinG: 10, carbsG: 15, fatG: 3 },
+        per100g: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
       });
     }
   }, [playScanFeedback, stopCamera]);
@@ -342,6 +346,43 @@ export default function BarcodeScannerModal({
     onClose();
   };
 
+  const handleLabelImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsScanningLabel(true);
+    try {
+      const result = await analyzeMealPhoto({
+        file,
+        userNotes: 'Nutrition facts label or ingredients list on product packaging. Extract food name, brand, calories per 100g, protein in grams, carbs in grams, fat in grams.',
+        customApiKey: customGeminiKey,
+      });
+
+      if (result && result.items && result.items.length > 0) {
+        const item = result.items[0];
+        if (item.name) setManualName(item.name);
+        if (item.calories !== undefined) setManualCalories(String(Math.round(item.calories)));
+        if (item.proteinG !== undefined) setManualProtein(String(item.proteinG));
+        if (item.carbsG !== undefined) setManualCarbs(String(item.carbsG));
+        if (item.fatG !== undefined) setManualFat(String(item.fatG));
+        toast.success(`Extracted: ${item.name || 'Product'} (${Math.round(item.calories)} kcal, ${item.proteinG}g protein)`, 'Label Scanned');
+      } else if (result && result.totalCalories !== undefined) {
+        if (result.mealName) setManualName(result.mealName);
+        setManualCalories(String(Math.round(result.totalCalories)));
+        setManualProtein(String(result.totalProtein));
+        setManualCarbs(String(result.totalCarbs));
+        setManualFat(String(result.totalFat));
+        toast.success('Extracted nutrition facts from packaging label!', 'Label Scanned');
+      } else {
+        toast.info('Could not identify table clearly. Please adjust macros manually.', 'Label Scan');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not scan label. Please enter macros manually.', 'Label Scan Failed');
+    } finally {
+      setIsScanningLabel(false);
+      if (labelInputRef.current) labelInputRef.current.value = '';
+    }
+  };
+
   const handleScanAgain = () => {
     stopCamera();
     setScannedProduct(null);
@@ -349,6 +390,11 @@ export default function BarcodeScannerModal({
     setManualBarcode('');
     setManualName('');
     setManualBrand('');
+    setManualCalories('');
+    setManualProtein('');
+    setManualCarbs('');
+    setManualFat('');
+    setIsScanningLabel(false);
     setShowSuggestions(false);
     isProcessingRef.current = false;
     startCamera();
@@ -519,14 +565,44 @@ export default function BarcodeScannerModal({
                 {/* If Not in DB: Friendly Info and Search/Edit UI */}
                 {isNotFoundInDB ? (
                   <div className="space-y-3">
-                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-0.5">
-                      <p className="font-semibold text-amber-300 flex items-center gap-1.5 text-xs">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        Package not in global database yet
-                      </p>
-                      <p className="text-3xs text-text-muted leading-relaxed">
-                        Enter food name to auto-fill nutrition, or adjust macros below. ASCEND will remember this barcode for all future scans!
-                      </p>
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-2">
+                      <div>
+                        <p className="font-semibold text-amber-300 flex items-center gap-1.5 text-xs">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          Barcode not in global database yet
+                        </p>
+                        <p className="text-3xs text-text-muted leading-relaxed mt-0.5">
+                          Snap the nutrition table with camera, or enter macros manually. ASCEND will remember this barcode for all future scans!
+                        </p>
+                      </div>
+
+                      {/* 1-Tap AI Nutrition Label Scanner Button */}
+                      <button
+                        type="button"
+                        onClick={() => labelInputRef.current?.click()}
+                        disabled={isScanningLabel}
+                        className="w-full py-2 px-3 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {isScanningLabel ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                            <span>Reading nutrition label via Gemini...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="w-4 h-4 text-accent" />
+                            <span>Scan Nutrition Label with Camera</span>
+                          </>
+                        )}
+                      </button>
+                      <input
+                        ref={labelInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleLabelImageSelected}
+                      />
                     </div>
 
                     {/* Food Name input with autocomplete */}
@@ -587,6 +663,7 @@ export default function BarcodeScannerModal({
                           <input
                             type="text"
                             inputMode="decimal"
+                            placeholder="0"
                             value={manualCalories}
                             onChange={(e) => setManualCalories(e.target.value)}
                             className="w-full text-center font-mono font-bold text-xs text-accent bg-transparent outline-none tabular-nums p-0"
@@ -597,6 +674,7 @@ export default function BarcodeScannerModal({
                           <input
                             type="text"
                             inputMode="decimal"
+                            placeholder="0"
                             value={manualProtein}
                             onChange={(e) => setManualProtein(e.target.value)}
                             className="w-full text-center font-mono font-bold text-xs text-emerald-500 bg-transparent outline-none tabular-nums p-0"
@@ -607,6 +685,7 @@ export default function BarcodeScannerModal({
                           <input
                             type="text"
                             inputMode="decimal"
+                            placeholder="0"
                             value={manualCarbs}
                             onChange={(e) => setManualCarbs(e.target.value)}
                             className="w-full text-center font-mono font-bold text-xs text-text-primary bg-transparent outline-none tabular-nums p-0"
@@ -617,6 +696,7 @@ export default function BarcodeScannerModal({
                           <input
                             type="text"
                             inputMode="decimal"
+                            placeholder="0"
                             value={manualFat}
                             onChange={(e) => setManualFat(e.target.value)}
                             className="w-full text-center font-mono font-bold text-xs text-text-primary bg-transparent outline-none tabular-nums p-0"

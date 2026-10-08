@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { calculatePlates } from '@/lib/plate-calculator';
+import { calculatePlates, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { X, Dumbbell, Minus, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface PlateCalculatorModalProps {
@@ -207,60 +207,31 @@ export default function PlateCalculatorModal({
           </div>
 
           {/* Barbell Weight Selection */}
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-bg-secondary border border-border text-xs font-mono">
-            <span className="text-text-muted">Barbell:</span>
-            <div className="flex items-center gap-1.5">
-              {unit === 'kg' ? (
-                <>
+          <div className="p-2.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted font-bold text-2xs uppercase">Barbell Type:</span>
+              <span className="text-accent text-2xs font-bold">{barWeight} {unit} bar</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {BARBELL_PRESETS.map((preset) => {
+                const presetWeight = unit === 'kg' ? preset.weightKg : preset.weightLbs;
+                const isSelected = barWeight === presetWeight;
+                return (
                   <button
+                    key={preset.id}
                     type="button"
-                    onClick={() => setBarWeight(20)}
-                    className={`px-2.5 py-1 rounded text-2xs font-semibold transition-colors ${
-                      barWeight === 20
-                        ? 'bg-accent text-bg-primary'
-                        : 'bg-bg-card text-text-secondary border border-border'
+                    onClick={() => setBarWeight(presetWeight)}
+                    className={`px-2 py-1 rounded-lg text-2xs font-medium transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-accent text-bg-primary font-bold shadow-xs'
+                        : 'bg-bg-card hover:bg-bg-elevated text-text-secondary border border-border/80'
                     }`}
+                    title={preset.description}
                   >
-                    20 kg (Men)
+                    {preset.shortName} ({presetWeight} {unit})
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setBarWeight(15)}
-                    className={`px-2.5 py-1 rounded text-2xs font-semibold transition-colors ${
-                      barWeight === 15
-                        ? 'bg-accent text-bg-primary'
-                        : 'bg-bg-card text-text-secondary border border-border'
-                    }`}
-                  >
-                    15 kg (Women)
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setBarWeight(45)}
-                    className={`px-2.5 py-1 rounded text-2xs font-semibold transition-colors ${
-                      barWeight === 45
-                        ? 'bg-accent text-bg-primary'
-                        : 'bg-bg-card text-text-secondary border border-border'
-                    }`}
-                  >
-                    45 lbs
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBarWeight(35)}
-                    className={`px-2.5 py-1 rounded text-2xs font-semibold transition-colors ${
-                      barWeight === 35
-                        ? 'bg-accent text-bg-primary'
-                        : 'bg-bg-card text-text-secondary border border-border'
-                    }`}
-                  >
-                    35 lbs
-                  </button>
-                </>
-              )}
+                );
+              })}
             </div>
           </div>
         </div>

@@ -16,6 +16,58 @@ export interface PlateCalculationResult {
   unit: 'kg' | 'lbs';
 }
 
+export interface BarbellPreset {
+  id: string;
+  name: string;
+  shortName: string;
+  weightKg: number;
+  weightLbs: number;
+  description: string;
+}
+
+export const BARBELL_PRESETS: BarbellPreset[] = [
+  {
+    id: 'olympic_standard',
+    name: "Olympic Standard Barbell",
+    shortName: "Olympic",
+    weightKg: 20,
+    weightLbs: 45,
+    description: "Standard Men's 20kg / 45lb barbell",
+  },
+  {
+    id: 'olympic_womens',
+    name: "Women's Olympic Barbell",
+    shortName: "Women's",
+    weightKg: 15,
+    weightLbs: 35,
+    description: "Standard Women's 15kg / 35lb bar",
+  },
+  {
+    id: 'trap_bar',
+    name: "Trap / Hex Bar",
+    shortName: "Trap Bar",
+    weightKg: 25,
+    weightLbs: 55,
+    description: "Hex deadlift bar (25kg / 55lb)",
+  },
+  {
+    id: 'smith_machine',
+    name: "Smith Machine Bar",
+    shortName: "Smith Bar",
+    weightKg: 11,
+    weightLbs: 25,
+    description: "Counterbalanced bar (11kg / 25lb)",
+  },
+  {
+    id: 'ez_curl',
+    name: "EZ-Curl Bar",
+    shortName: "EZ-Curl",
+    weightKg: 10,
+    weightLbs: 22,
+    description: "Cambered bar (10kg / 22lb)",
+  },
+];
+
 // Standard IPF Olympic plate colors & specs
 const METRIC_PLATES = [
   { weight: 25, color: '#ef4444', textColor: '#ffffff', heightRatio: 1.0 }, // Red

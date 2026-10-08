@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -17,7 +17,10 @@ import {
   ChevronRight,
   LogOut,
   Utensils,
+  Download,
+  Upload,
 } from 'lucide-react';
+import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
@@ -45,10 +48,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const customGeminiKey = useStore((state) => state.customGeminiKey);
   const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
+  const importAllData = useStore((state) => state.importAllData);
   const toast = useToast();
 
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sub-modal states
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -59,6 +64,49 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isCreatineOpen, setIsCreatineOpen] = useState(false);
 
   if (!isOpen) return null;
+
+  const handleDirectExport = () => {
+    try {
+      const jsonStr = exportFullBackupJSON();
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `ascend_backup_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Downloaded full JSON backup! Keep it safe on iCloud or Google Drive.', 'Backup Saved');
+    } catch {
+      toast.error('Failed to export backup file.', 'Export Error');
+    }
+  };
+
+  const handleDirectRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const parsed = JSON.parse(content);
+        const success = importAllData(parsed);
+        importFullBackupJSON(content);
+        if (success) {
+          toast.success('Restored all PRs, workouts, meals & settings successfully!', 'Data Restored');
+        } else {
+          toast.error('Invalid backup file structure.', 'Restore Failed');
+        }
+      } catch {
+        toast.error('Could not read or parse backup JSON file.', 'Parse Failure');
+      } finally {
+        if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
 
   const handleSaveApiKey = () => {
     const trimmed = apiKeyInput.trim();
@@ -355,23 +403,57 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* Section 5: Data Vault & Backup */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Data Vault &amp; Export
+              5. Data Immortality &amp; Backup
             </span>
 
-            <Card
-              variant="interactive"
-              padding="sm"
-              onClick={() => setIsDataVaultOpen(true)}
-              className="flex items-center justify-between"
-            >
-              <div className="flex items-center gap-2.5">
-                <HardDrive className="w-4 h-4 text-accent" />
-                <div>
-                  <span className="text-xs font-bold text-text-primary block">Data Vault &amp; Local Backup</span>
-                  <span className="text-2xs text-text-muted">Export complete JSON snapshot, CSV workout history, reset data</span>
+            <Card variant="default" padding="sm" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <HardDrive className="w-4 h-4 text-accent" />
+                  <div>
+                    <span className="text-xs font-bold text-text-primary block">Device Data Vault</span>
+                    <span className="text-2xs text-text-muted">100% On-device storage • Prevent iOS Safari eviction</span>
+                  </div>
                 </div>
+                <Badge variant="brand" size="xs">OFFLINE VAULT</Badge>
               </div>
-              <ChevronRight className="w-4 h-4 text-text-muted" />
+
+              {/* 1-Tap Quick Action Buttons */}
+              <div className="grid grid-cols-2 gap-2 pt-0.5">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleDirectExport}
+                  leftIcon={<Download className="w-3.5 h-3.5" />}
+                  fullWidth
+                >
+                  Export (.json)
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => backupFileInputRef.current?.click()}
+                  leftIcon={<Upload className="w-3.5 h-3.5" />}
+                  fullWidth
+                >
+                  Restore Backup
+                </Button>
+                <input
+                  ref={backupFileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={handleDirectRestoreFile}
+                />
+              </div>
+
+              <div
+                onClick={() => setIsDataVaultOpen(true)}
+                className="pt-2 border-t border-border/50 flex items-center justify-between cursor-pointer hover:text-accent transition-colors text-2xs text-text-muted"
+              >
+                <span>Advanced Vault (CSV Importer, Factory Reset)</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </div>
             </Card>
           </div>
 
