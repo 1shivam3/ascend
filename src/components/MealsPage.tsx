@@ -3337,11 +3337,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       />
 
       {/* ══════════════════ BARCODE SCANNER MODAL ══════════════════ */}
-      <BarcodeScannerModal
-        isOpen={isBarcodeModalOpen}
-        onClose={() => setIsBarcodeModalOpen(false)}
-        onAddFood={handleAddScannedFood}
-      />
+      {isBarcodeModalOpen && (
+        <BarcodeScannerModal
+          isOpen={isBarcodeModalOpen}
+          onClose={() => setIsBarcodeModalOpen(false)}
+          onAddFood={handleAddScannedFood}
+        />
+      )}
 
       {/* Goal Selector Modal */}
       <GoalSelectorModal

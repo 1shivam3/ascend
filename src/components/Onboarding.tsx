@@ -149,11 +149,51 @@ export default function OnboardingScreen() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
+        // 1. Check emergency snapshot
         const snap = localStorage.getItem('ascend_emergency_snapshot');
         if (snap) {
           const parsed = JSON.parse(snap);
-          if (parsed?.profile?.name || (Array.isArray(parsed?.prs) && parsed.prs.length > 0)) {
-            setBackupSnapshot(parsed);
+          const stateData = parsed?.state || parsed;
+          if (
+            stateData?.profile?.name ||
+            (Array.isArray(stateData?.prs) && stateData.prs.length > 0) ||
+            (Array.isArray(stateData?.workouts) && stateData.workouts.length > 0)
+          ) {
+            setBackupSnapshot(stateData);
+            return;
+          }
+        }
+
+        // 2. Check main ascend_store in case state wasn't picked up
+        const rawStore = localStorage.getItem('ascend_store');
+        if (rawStore) {
+          const parsed = JSON.parse(rawStore);
+          const stateData = parsed?.state || parsed;
+          if (
+            stateData?.profile?.name ||
+            (Array.isArray(stateData?.workouts) && stateData.workouts.length > 0)
+          ) {
+            setBackupSnapshot(stateData);
+            return;
+          }
+        }
+
+        // 3. Check discrete legacy keys
+        const rawProf = localStorage.getItem('ascend_profile');
+        if (rawProf) {
+          const prof = JSON.parse(rawProf);
+          if (prof?.name) {
+            const rawW = localStorage.getItem('ascend_workouts');
+            const rawP = localStorage.getItem('ascend_prs');
+            const rawM = localStorage.getItem('ascend_meals');
+            setBackupSnapshot({
+              profile: prof,
+              workouts: rawW ? JSON.parse(rawW) : [],
+              prs: rawP ? JSON.parse(rawP) : [],
+              meals: rawM ? JSON.parse(rawM) : [],
+              hasCompletedOnboarding: true,
+            });
+            return;
           }
         }
       } catch {}
@@ -310,10 +350,10 @@ export default function OnboardingScreen() {
           <Card variant="default" padding="sm" className="border-accent/40 bg-accent/10 space-y-2">
             <div className="flex items-center gap-1.5 text-accent font-bold text-xs">
               <RotateCcw className="w-4 h-4" />
-              <span>Previous Profile Detected</span>
+              <span>Existing Training Data Detected</span>
             </div>
             <p className="text-2xs text-text-secondary leading-snug">
-              Found profile for <strong className="text-text-primary">{backupSnapshot.profile?.name || 'Athlete'}</strong> ({backupSnapshot.workouts?.length || 0} workouts logged).
+              Found data for <strong className="text-text-primary">{backupSnapshot.profile?.name || 'Athlete'}</strong> ({backupSnapshot.workouts?.length || 0} workouts, {backupSnapshot.prs?.length || 0} PRs saved on this device).
             </p>
             <div className="flex gap-2 pt-1">
               <Button

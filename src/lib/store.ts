@@ -872,7 +872,7 @@ export const useAppStore = create<AppState>()(
             hasCompletedOnboarding:
               data.hasCompletedOnboarding !== undefined
                 ? data.hasCompletedOnboarding
-                : state.hasCompletedOnboarding,
+                : (data.profile ? true : state.hasCompletedOnboarding),
             plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
             favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
             waterLogs: data.waterLogs && typeof data.waterLogs === 'object' ? data.waterLogs : state.waterLogs,
@@ -907,6 +907,74 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
+
+          // Disaster Recovery: If profile is missing or PRs/workouts are empty, check fallbacks
+          if (typeof window !== 'undefined') {
+            try {
+              // 1. Check emergency snapshot
+              const rawSnap = localStorage.getItem('ascend_emergency_snapshot');
+              if (rawSnap) {
+                const snap = JSON.parse(rawSnap);
+                const snapState = snap.state || snap;
+                if (
+                  snapState?.profile?.name ||
+                  (Array.isArray(snapState?.workouts) && snapState.workouts.length > 0) ||
+                  (Array.isArray(snapState?.prs) && snapState.prs.length > 0)
+                ) {
+                  if (!state.profile || (!state.workouts?.length && snapState.workouts?.length)) {
+                    state.importAllData(snapState);
+                  }
+                }
+              }
+
+              // 2. Check discrete legacy keys if profile is still missing
+              const currentProfile = useAppStore.getState().profile;
+              if (!currentProfile) {
+                const rawProfile = localStorage.getItem('ascend_profile');
+                if (rawProfile) {
+                  const parsedProfile = JSON.parse(rawProfile);
+                  if (parsedProfile?.name) {
+                    useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                  }
+                }
+              }
+
+              const currentWorkouts = useAppStore.getState().workouts;
+              if (!currentWorkouts || currentWorkouts.length === 0) {
+                const rawW = localStorage.getItem('ascend_workouts');
+                if (rawW) {
+                  const parsedW = JSON.parse(rawW);
+                  if (Array.isArray(parsedW) && parsedW.length > 0) {
+                    useAppStore.setState({ workouts: parsedW });
+                  }
+                }
+              }
+
+              const currentPRs = useAppStore.getState().prs;
+              if (!currentPRs || currentPRs.length === 0) {
+                const rawPRs = localStorage.getItem('ascend_prs');
+                if (rawPRs) {
+                  const parsedPRs = JSON.parse(rawPRs);
+                  if (Array.isArray(parsedPRs) && parsedPRs.length > 0) {
+                    useAppStore.setState({ prs: parsedPRs });
+                  }
+                }
+              }
+
+              const currentMeals = useAppStore.getState().meals;
+              if (!currentMeals || currentMeals.length === 0) {
+                const rawMeals = localStorage.getItem('ascend_meals');
+                if (rawMeals) {
+                  const parsedMeals = JSON.parse(rawMeals);
+                  if (Array.isArray(parsedMeals) && parsedMeals.length > 0) {
+                    useAppStore.setState({ meals: parsedMeals });
+                  }
+                }
+              }
+            } catch (recoveryErr) {
+              console.warn('Disaster recovery check error:', recoveryErr);
+            }
+          }
 
           // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
           if (state.profile?.bodyweightKg && (!state.bodyMetrics || state.bodyMetrics.length === 0)) {
@@ -993,3 +1061,45 @@ export const useAppStore = create<AppState>()(
 );
 
 export const useStore = useAppStore;
+
+// Continuous redundancy mirror: keep an emergency snapshot and legacy keys updated
+if (typeof window !== 'undefined') {
+  let syncTimer: any = null;
+  useAppStore.subscribe((state) => {
+    if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
+      clearTimeout(syncTimer);
+      syncTimer = setTimeout(() => {
+        try {
+          const snapshot = {
+            profile: state.profile,
+            prs: state.prs,
+            workouts: state.workouts,
+            meals: state.meals,
+            bodyMetrics: state.bodyMetrics,
+            macroGoals: state.macroGoals,
+            plannedWorkouts: state.plannedWorkouts,
+            favoriteFoods: state.favoriteFoods,
+            goals: state.goals,
+            userMode: state.userMode,
+            theme: state.theme,
+            hasCompletedOnboarding: state.hasCompletedOnboarding,
+            savedAt: new Date().toISOString(),
+          };
+          localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(snapshot));
+          if (state.profile) {
+            localStorage.setItem('ascend_profile', JSON.stringify(state.profile));
+          }
+          if (state.prs && state.prs.length > 0) {
+            localStorage.setItem('ascend_prs', JSON.stringify(state.prs));
+          }
+          if (state.workouts && state.workouts.length > 0) {
+            localStorage.setItem('ascend_workouts', JSON.stringify(state.workouts));
+          }
+          if (state.meals && state.meals.length > 0) {
+            localStorage.setItem('ascend_meals', JSON.stringify(state.meals));
+          }
+        } catch {}
+      }, 500);
+    }
+  });
+}

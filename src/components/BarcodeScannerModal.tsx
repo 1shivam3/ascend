@@ -343,7 +343,7 @@ export default function BarcodeScannerModal({
       });
     }
 
-    onClose();
+    handleClose();
   };
 
   const handleLabelImageSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -383,6 +383,11 @@ export default function BarcodeScannerModal({
     }
   };
 
+  const handleClose = () => {
+    stopCamera();
+    onClose();
+  };
+
   const handleScanAgain = () => {
     stopCamera();
     setScannedProduct(null);
@@ -400,8 +405,10 @@ export default function BarcodeScannerModal({
     startCamera();
   };
 
+  if (!isOpen) return null;
+
   return (
-    <div className="modal-overlay z-50" onClick={onClose}>
+    <div className="modal-overlay z-50" onClick={handleClose}>
       <div
         className="modal-content max-w-md w-full overflow-hidden p-0 bg-bg-card border border-border rounded-3xl shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
@@ -419,7 +426,7 @@ export default function BarcodeScannerModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             className="p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />

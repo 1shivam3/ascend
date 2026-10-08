@@ -112,17 +112,23 @@ export default function AppPage() {
 
   useEffect(() => {
     setMounted(true);
-    if (!_hasHydrated) {
-      useStore.getState().setHasHydrated(true);
-    }
-  }, [_hasHydrated]);
+    // Safety fallback: if Zustand storage rehydration takes longer than 600ms, unlock
+    const timer = setTimeout(() => {
+      if (!useStore.getState()._hasHydrated) {
+        useStore.getState().setHasHydrated(true);
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!_hasHydrated && !mounted) {
+  // Hydration barrier: Never render OnboardingScreen or app until mounted AND Zustand has rehydrated
+  if (!mounted || !_hasHydrated) {
     return (
-      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
-        <div className="text-text-muted text-sm tracking-widest uppercase font-mono animate-pulse">
+      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center gap-3">
+        <div className="text-accent text-lg tracking-widest uppercase font-mono font-bold animate-pulse">
           ASCEND
         </div>
+        <span className="text-2xs text-text-muted font-mono">Restoring athlete data &amp; records...</span>
       </div>
     );
   }
