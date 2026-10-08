@@ -21,6 +21,7 @@ import {
   Sparkles,
   Edit3,
   Search,
+  ChevronLeft,
   ChevronRight,
   Barcode as BarcodeIcon,
   Star,
@@ -46,6 +47,7 @@ import CreatineModal from '@/components/CreatineModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
+import { useAppNavigation } from '@/lib/navigation';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -99,6 +101,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFavoriteFood    = useStore((state) => state.deleteFavoriteFood);
   const clearAllFavoriteFoods = useStore((state) => state.clearAllFavoriteFoods);
   const toast              = useToast();
+  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
   // Habit store state
   const waterLogs          = useStore((state) => state.waterLogs || {});
@@ -139,6 +142,67 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
+
+  // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
+  useEffect(() => {
+    if (isBarcodeModalOpen) {
+      return registerBackHandler(() => { setIsBarcodeModalOpen(false); return true; }, 100);
+    }
+  }, [isBarcodeModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isScanModalOpen) {
+      return registerBackHandler(() => { setIsScanModalOpen(false); return true; }, 100);
+    }
+  }, [isScanModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      return registerBackHandler(() => { setIsModalOpen(false); return true; }, 100);
+    }
+  }, [isModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isGoalsModalOpen) {
+      return registerBackHandler(() => { setIsGoalsModalOpen(false); return true; }, 100);
+    }
+  }, [isGoalsModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isGoalSelectorOpen) {
+      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
+    }
+  }, [isGoalSelectorOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isHydrationModalOpen) {
+      return registerBackHandler(() => { setIsHydrationModalOpen(false); return true; }, 100);
+    }
+  }, [isHydrationModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isCreatineModalOpen) {
+      return registerBackHandler(() => { setIsCreatineModalOpen(false); return true; }, 100);
+    }
+  }, [isCreatineModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isManagePinnedOpen) {
+      return registerBackHandler(() => { setIsManagePinnedOpen(false); return true; }, 100);
+    }
+  }, [isManagePinnedOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isEditPinnedOpen) {
+      return registerBackHandler(() => { setIsEditPinnedOpen(false); setEditingPinnedFood(null); return true; }, 100);
+    }
+  }, [isEditPinnedOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (selectedHistoryDate) {
+      return registerBackHandler(() => { setSelectedHistoryDate(null); return true; }, 80);
+    }
+  }, [selectedHistoryDate, registerBackHandler]);
 
   // ── Pinned food edit / add form ───────────────────────────────────────────
   const [pinnedName,     setPinnedName]     = useState('');
@@ -1599,7 +1663,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     <div className="page animate-fade-in space-y-5">
       {/* ── Header ── */}
       <header className="flex justify-between items-center mb-1">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label="Go back to previous page"
+              title="Go back"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Meals &amp; Macros</h1>
             <p className="text-label text-text-muted">Track nutrition &amp; fuel your strength</p>

@@ -10,6 +10,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   ChevronRight,
   Calendar,
   Trash2,
@@ -71,6 +72,7 @@ import {
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
 import { plural } from '@/lib/formatters';
+import { useAppNavigation } from '@/lib/navigation';
 
 interface WorkoutPageProps {
   onNavigate?: (tab: 'home' | 'prs' | 'workout' | 'meals') => void;
@@ -487,6 +489,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const toast = useToast();
+  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
@@ -610,6 +613,67 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
+
+  // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
+  useEffect(() => {
+    if (isChangeWorkoutOpen) {
+      return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
+    }
+  }, [isChangeWorkoutOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isPlateModalOpen) {
+      return registerBackHandler(() => { setIsPlateModalOpen(false); return true; }, 100);
+    }
+  }, [isPlateModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isExerciseLibraryOpen) {
+      return registerBackHandler(() => { setIsExerciseLibraryOpen(false); return true; }, 100);
+    }
+  }, [isExerciseLibraryOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isPlanModalOpen) {
+      return registerBackHandler(() => { setIsPlanModalOpen(false); setEditingPlan(null); return true; }, 100);
+    }
+  }, [isPlanModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isSuggestedModalOpen) {
+      return registerBackHandler(() => { setIsSuggestedModalOpen(false); return true; }, 100);
+    }
+  }, [isSuggestedModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isScheduleModalOpen) {
+      return registerBackHandler(() => { setIsScheduleModalOpen(false); return true; }, 100);
+    }
+  }, [isScheduleModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isLogPastModalOpen) {
+      return registerBackHandler(() => { setIsLogPastModalOpen(false); return true; }, 100);
+    }
+  }, [isLogPastModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isGoalSelectorOpen) {
+      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
+    }
+  }, [isGoalSelectorOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (postWorkoutSummary) {
+      return registerBackHandler(() => { setPostWorkoutSummary(null); return true; }, 100);
+    }
+  }, [postWorkoutSummary, registerBackHandler]);
+
+  useEffect(() => {
+    if (sharingPlan) {
+      return registerBackHandler(() => { setSharingPlan(null); return true; }, 100);
+    }
+  }, [sharingPlan, registerBackHandler]);
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
   useEffect(() => {
@@ -1205,9 +1269,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     <div className="page animate-fade-in space-y-4">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <header className="flex justify-between items-center mb-2">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">Train</h1>
-          <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
+        <div className="flex items-center gap-2">
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label="Go back to previous page"
+              title="Go back"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">Train</h1>
+            <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {userMode === 'advanced' && (

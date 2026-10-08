@@ -49,6 +49,7 @@ import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
+import { useAppNavigation } from '@/lib/navigation';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -202,6 +203,77 @@ export default function ActiveWorkoutScreen({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState<number>(-1);
   const [isChangeExerciseModalOpen, setIsChangeExerciseModalOpen] = useState<boolean>(false);
+
+  const { registerBackHandler } = useAppNavigation();
+
+  // Sub-sheet back handlers
+  useEffect(() => {
+    if (isDiscardConfirmOpen) {
+      return registerBackHandler(() => { setIsDiscardConfirmOpen(false); return true; }, 120);
+    }
+  }, [isDiscardConfirmOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isFinishModalOpen) {
+      return registerBackHandler(() => { setIsFinishModalOpen(false); return true; }, 110);
+    }
+  }, [isFinishModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isPlateModalOpen) {
+      return registerBackHandler(() => { setIsPlateModalOpen(false); return true; }, 110);
+    }
+  }, [isPlateModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isWarmupModalOpen) {
+      return registerBackHandler(() => { setIsWarmupModalOpen(false); return true; }, 110);
+    }
+  }, [isWarmupModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isAddExerciseModalOpen) {
+      return registerBackHandler(() => { setIsAddExerciseModalOpen(false); return true; }, 110);
+    }
+  }, [isAddExerciseModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isVoiceModalOpen) {
+      return registerBackHandler(() => { setIsVoiceModalOpen(false); return true; }, 110);
+    }
+  }, [isVoiceModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isAdaptModalOpen) {
+      return registerBackHandler(() => { setIsAdaptModalOpen(false); return true; }, 110);
+    }
+  }, [isAdaptModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isMoreMenuOpen) {
+      return registerBackHandler(() => { setIsMoreMenuOpen(false); return true; }, 110);
+    }
+  }, [isMoreMenuOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isExerciseJumpOpen) {
+      return registerBackHandler(() => { setIsExerciseJumpOpen(false); return true; }, 110);
+    }
+  }, [isExerciseJumpOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isChangeExerciseModalOpen) {
+      return registerBackHandler(() => { setIsChangeExerciseModalOpen(false); return true; }, 110);
+    }
+  }, [isChangeExerciseModalOpen, registerBackHandler]);
+
+  // Main Active Workout back interceptor (prevents accidental screen dismissal)
+  useEffect(() => {
+    return registerBackHandler(() => {
+      setIsDiscardConfirmOpen(true);
+      return true;
+    }, 95);
+  }, [registerBackHandler]);
 
   // Sticky Rest Timer state (initialized to athlete's goal rest duration)
   const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);

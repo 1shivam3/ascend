@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter, Barlow_Condensed } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
+import { NavigationProvider } from '@/lib/navigation';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const barlowCondensed = Barlow_Condensed({
@@ -93,7 +94,9 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${barlowCondensed.variable} ${inter.className} font-sans`}>
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <NavigationProvider>{children}</NavigationProvider>
+        </ToastProvider>
       </body>
     </html>
   );

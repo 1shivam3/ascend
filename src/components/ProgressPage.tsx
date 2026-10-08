@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import {
   TrendingUp,
@@ -17,6 +17,7 @@ import {
   Flame,
   CheckCircle2,
   Droplet,
+  ChevronLeft,
   ChevronRight,
   Bot,
   Layers,
@@ -37,6 +38,7 @@ import MuscleVolumeLandmarks from '@/components/MuscleVolumeLandmarks';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import { plural } from '@/lib/formatters';
+import { useAppNavigation } from '@/lib/navigation';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -81,6 +83,43 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
   const [isDotsInfoOpen, setIsDotsInfoOpen] = useState(false);
+
+  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+
+  // Sub-view Back Handler: If viewing Lifter Twin or PRs, back returns to overview
+  useEffect(() => {
+    if (activeTab === 'strength' && strengthSubView !== 'overview') {
+      return registerBackHandler(() => {
+        setStrengthSubView('overview');
+        return true;
+      }, 50);
+    }
+  }, [activeTab, strengthSubView, registerBackHandler]);
+
+  // Modal Back Handlers
+  useEffect(() => {
+    if (isWeightModalOpen) {
+      return registerBackHandler(() => { setIsWeightModalOpen(false); return true; }, 100);
+    }
+  }, [isWeightModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isMeetModalOpen) {
+      return registerBackHandler(() => { setIsMeetModalOpen(false); return true; }, 100);
+    }
+  }, [isMeetModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isWeeklyRecapOpen) {
+      return registerBackHandler(() => { setIsWeeklyRecapOpen(false); return true; }, 100);
+    }
+  }, [isWeeklyRecapOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isDotsInfoOpen) {
+      return registerBackHandler(() => { setIsDotsInfoOpen(false); return true; }, 100);
+    }
+  }, [isDotsInfoOpen, registerBackHandler]);
 
   const userUnit = profile?.unit || 'kg';
 
@@ -222,13 +261,26 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     <div className="page animate-fade-in space-y-4">
       {/* Header */}
       <header className="flex justify-between items-center mb-1">
-        <div>
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-            TRAINING TRAJECTORY
-          </span>
-          <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-display">
-            Am I Getting Better?
-          </h1>
+        <div className="flex items-center gap-2">
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label="Go back to previous page"
+              title="Go back"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
+          <div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+              TRAINING TRAJECTORY
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-display">
+              Am I Getting Better?
+            </h1>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <button

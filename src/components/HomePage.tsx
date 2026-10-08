@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useAppNavigation } from '@/lib/navigation';
 import {
   Play,
   Settings,
@@ -258,6 +259,39 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
+
+  const { registerBackHandler } = useAppNavigation();
+
+  // Register Modal Back Handlers (Interconnected Navigation)
+  useEffect(() => {
+    if (isGoalSelectorOpen) {
+      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
+    }
+  }, [isGoalSelectorOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isSettingsOpen) {
+      return registerBackHandler(() => { setIsSettingsOpen(false); return true; }, 100);
+    }
+  }, [isSettingsOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isBodyMetricsModalOpen) {
+      return registerBackHandler(() => { setIsBodyMetricsModalOpen(false); return true; }, 100);
+    }
+  }, [isBodyMetricsModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isSuggestedModalOpen) {
+      return registerBackHandler(() => { setIsSuggestedModalOpen(false); return true; }, 100);
+    }
+  }, [isSuggestedModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isLogPastModalOpen) {
+      return registerBackHandler(() => { setIsLogPastModalOpen(false); return true; }, 100);
+    }
+  }, [isLogPastModalOpen, registerBackHandler]);
 
   // Missed workout catch-up
   const [dismissedMissedWorkout, setDismissedMissedWorkout] = useState(false);

@@ -12,6 +12,7 @@ import QuickActionSheetModal from '@/components/QuickActionSheetModal';
 import ImportProgramModal from '@/components/ImportProgramModal';
 import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
 import { PlannedWorkout } from '@/lib/types';
+import { useAppNavigation, TabId } from '@/lib/navigation';
 
 const tabs = [
   { id: 'home', label: 'Today', icon: Home },
@@ -20,11 +21,14 @@ const tabs = [
   { id: 'meals', label: 'Fuel', icon: UtensilsCrossed },
 ] as const;
 
-type TabId = (typeof tabs)[number]['id'] | 'prs';
-
 export default function AppPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [progressInitialTab, setProgressInitialTab] = useState<'overview' | 'strength' | 'prs' | 'bodyweight' | 'training'>('overview');
+  const {
+    activeTab,
+    progressInitialTab,
+    navigate,
+    registerBackHandler,
+  } = useAppNavigation();
+
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -54,7 +58,7 @@ export default function AppPage() {
 
   const handleStartSharedWorkout = (plan: PlannedWorkout) => {
     setPendingStartPlan(plan);
-    setActiveTab('workout');
+    navigate('workout');
     setTimeout(() => setPendingStartPlan(null), 800);
   };
 
@@ -71,27 +75,22 @@ export default function AppPage() {
     }
   }, [theme, _hasHydrated]);
 
-  // Android/Browser back button: navigate to Home instead of exiting
+  // Dismiss root modals when Back is pressed
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!isQuickActionOpen) return;
+    return registerBackHandler(() => {
+      setIsQuickActionOpen(false);
+      return true;
+    }, 100);
+  }, [isQuickActionOpen, registerBackHandler]);
 
-    const handlePopState = () => {
-      if (activeTab !== 'home') {
-        setActiveTab('home');
-        // Re-push state so subsequent back presses also work
-        window.history.pushState({ tab: 'home' }, '');
-      }
-      // If already on home, do nothing — let the OS handle exit naturally
-    };
-
-    // Push an initial state entry so we have something to pop to
-    window.history.pushState({ tab: activeTab }, '');
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  useEffect(() => {
+    if (!isImportModalOpen) return;
+    return registerBackHandler(() => {
+      setIsImportModalOpen(false);
+      return true;
+    }, 100);
+  }, [isImportModalOpen, registerBackHandler]);
 
   const [mounted, setMounted] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
@@ -148,12 +147,7 @@ export default function AppPage() {
         {activeTab === 'home' && (
           <HomePage
             onNavigate={(tab) => {
-              if (tab === 'prs') {
-                setProgressInitialTab('prs');
-                setActiveTab('progress');
-              } else {
-                setActiveTab(tab as TabId);
-              }
+              navigate(tab as TabId);
             }}
           />
         )}
@@ -161,12 +155,7 @@ export default function AppPage() {
           <WorkoutPage
             startPlanOnMount={pendingStartPlan}
             onNavigate={(tab) => {
-              if (tab === 'prs') {
-                setProgressInitialTab('prs');
-                setActiveTab('progress');
-              } else {
-                setActiveTab(tab as TabId);
-              }
+              navigate(tab as TabId);
             }}
           />
         )}
@@ -174,24 +163,14 @@ export default function AppPage() {
           <ProgressPage
             initialTab={progressInitialTab}
             onNavigate={(tab) => {
-              if (tab === 'prs') {
-                setProgressInitialTab('prs');
-                setActiveTab('progress');
-              } else {
-                setActiveTab(tab as TabId);
-              }
+              navigate(tab as TabId);
             }}
           />
         )}
         {activeTab === 'meals' && (
           <MealsPage
             onNavigate={(tab) => {
-              if (tab === 'prs') {
-                setProgressInitialTab('prs');
-                setActiveTab('progress');
-              } else {
-                setActiveTab(tab as TabId);
-              }
+              navigate(tab as TabId);
             }}
           />
         )}
@@ -213,8 +192,7 @@ export default function AppPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => {
-                  if (tab.id === 'progress') setProgressInitialTab('overview');
-                  setActiveTab(tab.id);
+                  navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined });
                 }}
                 className={`native-tab-item ${
                   isActive ? 'active text-accent' : 'text-text-muted hover:text-text-primary'
@@ -235,12 +213,8 @@ export default function AppPage() {
         isOpen={isQuickActionOpen}
         onClose={() => setIsQuickActionOpen(false)}
         onNavigate={(tab) => {
-          if (tab === 'prs') {
-            setProgressInitialTab('prs');
-            setActiveTab('progress');
-          } else {
-            setActiveTab(tab as TabId);
-          }
+          setIsQuickActionOpen(false);
+          navigate(tab as TabId);
         }}
       />
 

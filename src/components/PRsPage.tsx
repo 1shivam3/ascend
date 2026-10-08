@@ -23,6 +23,7 @@ import {
   Edit3,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Dumbbell,
   Search,
   TrendingUp,
@@ -42,6 +43,7 @@ import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
 import { ExerciseRank, EquipmentType } from '@/lib/types';
+import { useAppNavigation } from '@/lib/navigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -662,6 +664,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const bodyweightKg = profile?.bodyweightKg || 75;
   const gender = profile?.gender || 'male';
   const toast = useToast();
+  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
   const dotsScore = useMemo(() => {
@@ -690,6 +693,31 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   // ── New: level modal state ──
   const [levelModalExercise, setLevelModalExercise] = useState<string | null>(null);
+
+  // ── Modal Back Handlers (Interconnected Navigation) ──
+  useEffect(() => {
+    if (showAddModal) {
+      return registerBackHandler(() => { setShowAddModal(false); return true; }, 100);
+    }
+  }, [showAddModal, registerBackHandler]);
+
+  useEffect(() => {
+    if (levelModalExercise) {
+      return registerBackHandler(() => { setLevelModalExercise(null); return true; }, 100);
+    }
+  }, [levelModalExercise, registerBackHandler]);
+
+  useEffect(() => {
+    if (plateModalWeight !== null) {
+      return registerBackHandler(() => { setPlateModalWeight(null); setPlateModalMeta(null); return true; }, 100);
+    }
+  }, [plateModalWeight, registerBackHandler]);
+
+  useEffect(() => {
+    if (targetModalExercise) {
+      return registerBackHandler(() => { setTargetModalExercise(null); return true; }, 100);
+    }
+  }, [targetModalExercise, registerBackHandler]);
 
   // ── Equipment filter and show-more state ──
   const [selectedEquipmentFilter, setSelectedEquipmentFilter] = useState<'all' | EquipmentType>('all');
@@ -996,11 +1024,24 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     <div className="page animate-fade-in space-y-6">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
-            Personal Records
-          </h1>
-          <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
+        <div className="flex items-center gap-2">
+          {canGoBack && (
+            <button
+              type="button"
+              onClick={goBack}
+              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              aria-label="Go back to previous page"
+              title="Go back"
+            >
+              <ChevronLeft className="w-5 h-5 text-accent" />
+            </button>
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
+              Personal Records
+            </h1>
+            <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
+          </div>
         </div>
         <div className="flex items-center gap-1.5">
           <button
