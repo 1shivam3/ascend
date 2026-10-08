@@ -19,6 +19,13 @@ const COMMON_BARCODES: Record<string, {
     servingSize: '1 scoop (36g)',
     servingQuantity: 36,
   },
+  '8906067022144': {
+    name: 'Raw Whey Isolate 90%',
+    brand: 'MuscleBlaze',
+    per100g: { calories: 387, proteinG: 90, carbsG: 2, fatG: 1.5 },
+    servingSize: '1 scoop (30g)',
+    servingQuantity: 30,
+  },
   // Optimum Nutrition Gold Standard 100% Whey
   '748927028669': {
     name: 'Gold Standard 100% Whey Double Rich Chocolate',
@@ -26,6 +33,29 @@ const COMMON_BARCODES: Record<string, {
     per100g: { calories: 375, proteinG: 77.4, carbsG: 9.7, fatG: 3.2 },
     servingSize: '1 scoop (31g)',
     servingQuantity: 31,
+  },
+  '748927056341': {
+    name: 'Gold Standard 100% Whey Vanilla Ice Cream',
+    brand: 'Optimum Nutrition',
+    per100g: { calories: 374, proteinG: 77, carbsG: 10, fatG: 3.1 },
+    servingSize: '1 scoop (31g)',
+    servingQuantity: 31,
+  },
+  // Dymatize ISO 100
+  '705016110328': {
+    name: 'ISO 100 Hydrolyzed Whey Gourmet Chocolate',
+    brand: 'Dymatize',
+    per100g: { calories: 373, proteinG: 83.3, carbsG: 3.3, fatG: 1.7 },
+    servingSize: '1 scoop (30g)',
+    servingQuantity: 30,
+  },
+  // MyProtein Impact Whey
+  '5055534356788': {
+    name: 'Impact Whey Protein Chocolate Smooth',
+    brand: 'MyProtein',
+    per100g: { calories: 412, proteinG: 75, carbsG: 8, fatG: 7.5 },
+    servingSize: '1 scoop (25g)',
+    servingQuantity: 25,
   },
   // Quaker Rolled Oats
   '8901491101907': {
@@ -51,11 +81,26 @@ const COMMON_BARCODES: Record<string, {
     servingSize: '1 cup (90g)',
     servingQuantity: 90,
   },
+  '8906074490158': {
+    name: 'High Protein Milkshake Chocolate',
+    brand: 'Epigamia',
+    per100g: { calories: 95, proteinG: 8.3, carbsG: 10, fatG: 2.2 },
+    servingSize: '1 bottle (180ml)',
+    servingQuantity: 180,
+  },
   // Amul Taaza Milk
   '8901262010058': {
     name: 'Taaza Homogenised Toned Milk',
     brand: 'Amul',
     per100g: { calories: 58, proteinG: 3.0, carbsG: 4.7, fatG: 3.0 },
+    servingSize: '1 glass (200ml)',
+    servingQuantity: 200,
+  },
+  // Amul Gold Milk
+  '8901262010065': {
+    name: 'Amul Gold Full Cream Milk',
+    brand: 'Amul',
+    per100g: { calories: 87, proteinG: 3.5, carbsG: 5.0, fatG: 6.0 },
     servingSize: '1 glass (200ml)',
     servingQuantity: 200,
   },
@@ -75,6 +120,70 @@ const COMMON_BARCODES: Record<string, {
     servingSize: '100g',
     servingQuantity: 100,
   },
+  // Amul High Protein Lassi
+  '8901262084561': {
+    name: 'High Protein Rose Lassi (15g Protein)',
+    brand: 'Amul',
+    per100g: { calories: 65, proteinG: 7.5, carbsG: 6.5, fatG: 1.0 },
+    servingSize: '1 pack (200ml)',
+    servingQuantity: 200,
+  },
+  // Amul High Protein Buttermilk
+  '8901262084578': {
+    name: 'High Protein Buttermilk (15g Protein)',
+    brand: 'Amul',
+    per100g: { calories: 43, proteinG: 7.5, carbsG: 2.5, fatG: 0.3 },
+    servingSize: '1 pack (200ml)',
+    servingQuantity: 200,
+  },
+  // Amul Cheese Slices
+  '8901262020026': {
+    name: 'Processed Cheese Slices',
+    brand: 'Amul',
+    per100g: { calories: 310, proteinG: 20, carbsG: 2.5, fatG: 25 },
+    servingSize: '1 slice (20g)',
+    servingQuantity: 20,
+  },
+  // Mother Dairy Classic Curd / Dahi
+  '8901648007014': {
+    name: 'Classic Dahi / Curd',
+    brand: 'Mother Dairy',
+    per100g: { calories: 60, proteinG: 3.7, carbsG: 4.8, fatG: 3.0 },
+    servingSize: '1 katori (100g)',
+    servingQuantity: 100,
+  },
+  // Mother Dairy Paneer
+  '8901648012018': {
+    name: 'Fresh Paneer',
+    brand: 'Mother Dairy',
+    per100g: { calories: 285, proteinG: 18.0, carbsG: 3.0, fatG: 22 },
+    servingSize: '100g',
+    servingQuantity: 100,
+  },
+  // Pintola Peanut Butter
+  '8906109960014': {
+    name: 'All Natural Peanut Butter Crunchy',
+    brand: 'Pintola',
+    per100g: { calories: 625, proteinG: 30, carbsG: 19, fatG: 49 },
+    servingSize: '2 tbsp (32g)',
+    servingQuantity: 32,
+  },
+  // MyFitness Peanut Butter
+  '8906114170040': {
+    name: 'Original Dark Chocolate Peanut Butter',
+    brand: 'MyFitness',
+    per100g: { calories: 580, proteinG: 26, carbsG: 28, fatG: 42 },
+    servingSize: '2 tbsp (32g)',
+    servingQuantity: 32,
+  },
+  // Britannia Whole Wheat Bread
+  '8901063012031': {
+    name: '100% Whole Wheat Bread',
+    brand: 'Britannia',
+    per100g: { calories: 245, proteinG: 9.5, carbsG: 46, fatG: 2.5 },
+    servingSize: '2 slices (50g)',
+    servingQuantity: 50,
+  },
   // Parle-G Biscuits
   '8901719101038': {
     name: 'Original Gluco Biscuits',
@@ -91,7 +200,63 @@ const COMMON_BARCODES: Record<string, {
     servingSize: '1 katori (50g raw)',
     servingQuantity: 50,
   },
+  // Tata Sampann Chana Dal
+  '8901058852314': {
+    name: 'Unpolished Chana Dal',
+    brand: 'Tata Sampann',
+    per100g: { calories: 372, proteinG: 21.5, carbsG: 59.8, fatG: 5.6 },
+    servingSize: '1 katori (50g raw)',
+    servingQuantity: 50,
+  },
+  // Kellogg's Corn Flakes
+  '8901499008017': {
+    name: 'Original Corn Flakes',
+    brand: "Kellogg's",
+    per100g: { calories: 378, proteinG: 7.5, carbsG: 84, fatG: 0.8 },
+    servingSize: '1 bowl (30g)',
+    servingQuantity: 30,
+  },
+  // Yakult Probiotic Drink
+  '8906038740015': {
+    name: 'Probiotic Fermented Milk Drink',
+    brand: 'Yakult',
+    per100g: { calories: 75, proteinG: 1.2, carbsG: 17.5, fatG: 0.1 },
+    servingSize: '1 bottle (65ml)',
+    servingQuantity: 65,
+  },
+  // Red Bull Energy Drink
+  '9002490100070': {
+    name: 'Energy Drink Original',
+    brand: 'Red Bull',
+    per100g: { calories: 45, proteinG: 0, carbsG: 11, fatG: 0 },
+    servingSize: '1 can (250ml)',
+    servingQuantity: 250,
+  },
+  '90162602': {
+    name: 'Energy Drink Original',
+    brand: 'Red Bull',
+    per100g: { calories: 45, proteinG: 0, carbsG: 11, fatG: 0 },
+    servingSize: '1 can (250ml)',
+    servingQuantity: 250,
+  },
+  // Farm Fresh Eggs
+  '8908006321010': {
+    name: 'Farm Fresh Brown Eggs (Pack of 6)',
+    brand: 'Eggoz',
+    per100g: { calories: 143, proteinG: 12.6, carbsG: 0.7, fatG: 9.5 },
+    servingSize: '1 egg (50g)',
+    servingQuantity: 50,
+  },
+  // Maggi Noodles
+  '8901058859016': {
+    name: '2-Minute Masala Noodles',
+    brand: 'Maggi',
+    per100g: { calories: 427, proteinG: 8.0, carbsG: 63.5, fatG: 15.7 },
+    servingSize: '1 pack (70g)',
+    servingQuantity: 70,
+  },
 };
+
 
 export async function GET(req: Request) {
   try {

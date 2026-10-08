@@ -1814,7 +1814,7 @@ export default function ActiveWorkoutScreen({
                               handleSetWeightChange(activeSetIdx, val);
                             }
                           }}
-                          className="w-16 sm:w-20 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
+                          className="w-28 sm:w-32 px-1 py-0.5 text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent tabular-nums tracking-tight"
                         />
                         {isCurrentBodyweight && (
                           <span className="text-3xs text-accent font-semibold mt-0.5">
@@ -1886,7 +1886,7 @@ export default function ActiveWorkoutScreen({
                             handleSetRepsChange(activeSetIdx, val);
                           }
                         }}
-                        className="w-14 sm:w-16 text-center font-mono font-black text-2xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent"
+                        className="w-24 sm:w-28 px-1 py-0.5 text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent tabular-nums tracking-tight"
                       />
                       <button
                         type="button"
@@ -1897,6 +1897,21 @@ export default function ActiveWorkoutScreen({
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* Beginner Mode Effort (RPE) Picker Button */}
+                <div className="flex items-center justify-center pt-0.5 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => setActiveRpePickerSetIdx(activeSetIdx)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
+                    title="Tap to select target effort / RPE"
+                  >
+                    <span className="text-accent font-black text-xs sm:text-sm">@{currentExercise.sets[activeSetIdx]?.rpe || 8}</span>
+                    <span className="text-text-muted text-2xs font-sans">
+                      Effort (RPE) • Tap to adjust
+                    </span>
+                  </button>
                 </div>
 
                 {/* Giant Done Button */}
@@ -1913,6 +1928,7 @@ export default function ActiveWorkoutScreen({
                   <span>{currentExercise.sets[activeSetIdx]?.completed ? `Set ${activeSetIdx + 1} Completed` : `Complete Set ${activeSetIdx + 1}`}</span>
                 </button>
               </div>
+
             )}
 
             {/* Exercise Switcher Navigation CTA */}
@@ -1977,7 +1993,7 @@ export default function ActiveWorkoutScreen({
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     {/* Weight Input */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
+                      <div className="flex items-center bg-bg-secondary rounded-xl px-2 py-1.5 border border-border/60 focus-within:border-accent min-w-[76px] sm:min-w-[88px] shrink-0">
                         <input
                           type="text"
                           inputMode="decimal"
@@ -1994,9 +2010,9 @@ export default function ActiveWorkoutScreen({
                             const parsed = parseFloat(String(set.weight));
                             handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
                           }}
-                          className="w-12 sm:w-14 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
+                          className="w-14 sm:w-16 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
-                        <span className="text-2xs text-text-muted font-medium ml-0.5">{userUnit}</span>
+                        <span className="text-2xs text-text-muted font-medium ml-1 shrink-0">{userUnit}</span>
                       </div>
                       {isCurrentDumbbell && (
                         <span className="text-[9px] font-mono text-amber-500/90 mt-0.5 truncate max-w-[100px] text-center" title="Weight per dumbbell">
@@ -2019,7 +2035,7 @@ export default function ActiveWorkoutScreen({
                     <span className="text-text-muted font-medium text-xs">×</span>
 
                     {/* Reps Input */}
-                    <div className="flex items-center bg-bg-secondary rounded-xl px-2.5 py-1.5 border border-border/60 focus-within:border-accent">
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-2 py-1.5 border border-border/60 focus-within:border-accent min-w-[62px] sm:min-w-[72px] shrink-0">
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2036,21 +2052,22 @@ export default function ActiveWorkoutScreen({
                           const parsed = parseInt(String(set.reps), 10);
                           handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
                         }}
-                        className="w-9 sm:w-11 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none"
+                        className="w-10 sm:w-12 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
                       />
-                      <span className="text-2xs text-text-muted font-medium ml-0.5">reps</span>
+                      <span className="text-2xs text-text-muted font-medium ml-1 shrink-0">reps</span>
                     </div>
 
                     {/* Effort / RPE badge */}
                     <button
                       type="button"
                       onClick={() => setActiveRpePickerSetIdx(sIdx)}
-                      className="text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all"
+                      className="min-w-[44px] text-xs font-mono font-bold px-2 py-1.5 rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
                       title="Tap to select effort (RPE)"
                     >
                       @{set.rpe || 8}
                     </button>
                   </div>
+
 
                   {/* Checkmark Button */}
                   <button

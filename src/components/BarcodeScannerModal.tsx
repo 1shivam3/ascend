@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
+import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
+import { saveCustomBarcode } from '@/lib/storage';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 
@@ -52,11 +54,14 @@ export default function BarcodeScannerModal({
 
   // Manual fallback editable values if not found in DB
   const [manualName, setManualName] = useState('');
-  const [manualCalories, setManualCalories] = useState('100');
-  const [manualProtein, setManualProtein] = useState('5');
+  const [manualBrand, setManualBrand] = useState('');
+  const [manualCalories, setManualCalories] = useState('120');
+  const [manualProtein, setManualProtein] = useState('10');
   const [manualCarbs, setManualCarbs] = useState('15');
-  const [manualFat, setManualFat] = useState('2');
+  const [manualFat, setManualFat] = useState('3');
   const [isNotFoundInDB, setIsNotFoundInDB] = useState(false);
+  const [foodSuggestions, setFoodSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   // Play audio/haptic feedback ONCE upon successful scan
   const playScanFeedback = useCallback(() => {
@@ -112,6 +117,7 @@ export default function BarcodeScannerModal({
     stopCamera();
     setIsLoadingProduct(true);
     setCameraError(null);
+    setShowSuggestions(false);
 
     try {
       const product = await fetchProductByBarcode(clean);
@@ -121,6 +127,7 @@ export default function BarcodeScannerModal({
         setScannedProduct(product);
         setIsNotFoundInDB(false);
         setManualName(product.name);
+        setManualBrand(product.brand || '');
         setManualCalories(String(product.per100g.calories));
         setManualProtein(String(product.per100g.proteinG));
         setManualCarbs(String(product.per100g.carbsG));
@@ -136,31 +143,38 @@ export default function BarcodeScannerModal({
       } else {
         // Product not found in open DB: present clean editable card to ask user
         setIsNotFoundInDB(true);
-        setManualName(`Scanned Item (${clean})`);
+        setManualName('');
+        setManualBrand('');
         setManualCalories('120');
-        setManualProtein('6');
-        setManualCarbs('18');
+        setManualProtein('10');
+        setManualCarbs('15');
         setManualFat('3');
         setServingMode('100g');
         setCustomQty(100);
 
         setScannedProduct({
           barcode: clean,
-          name: `Scanned Item (${clean})`,
-          per100g: { calories: 120, proteinG: 6, carbsG: 18, fatG: 3 },
+          name: '',
+          per100g: { calories: 120, proteinG: 10, carbsG: 15, fatG: 3 },
         });
       }
     } catch {
       setIsLoadingProduct(false);
       setIsNotFoundInDB(true);
-      setManualName(`Scanned Item (${clean})`);
+      setManualName('');
+      setManualBrand('');
+      setManualCalories('120');
+      setManualProtein('10');
+      setManualCarbs('15');
+      setManualFat('3');
       setScannedProduct({
         barcode: clean,
-        name: `Scanned Item (${clean})`,
-        per100g: { calories: 100, proteinG: 5, carbsG: 15, fatG: 2 },
+        name: '',
+        per100g: { calories: 120, proteinG: 10, carbsG: 15, fatG: 3 },
       });
     }
   }, [playScanFeedback, stopCamera]);
+
 
   // Start Camera with ZXing and capture scanner controls
   const startCamera = useCallback(async () => {
@@ -229,18 +243,57 @@ export default function BarcodeScannerModal({
     };
   }, [isOpen, startCamera, stopCamera]);
 
-  if (!isOpen) return null;
+  const handleManualNameChange = (val: string) => {
+    setManualName(val);
+    if (val.trim().length >= 2) {
+      const suggestions = getFoodSuggestions(val);
+      setFoodSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+
+      // Auto estimate if matched
+      const est = estimateMacros(val, 100, 'g');
+      if (est && est.calories > 0) {
+        setManualCalories(String(est.calories));
+        setManualProtein(String(est.proteinG));
+        setManualCarbs(String(est.carbsG));
+        setManualFat(String(est.fatG));
+      }
+    } else {
+      setFoodSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectSuggestion = (s: string) => {
+    setManualName(s);
+    setShowSuggestions(false);
+    const est = estimateMacros(s, 100, 'g');
+    if (est && est.calories > 0) {
+      setManualCalories(String(est.calories));
+      setManualProtein(String(est.proteinG));
+      setManualCarbs(String(est.carbsG));
+      setManualFat(String(est.fatG));
+    }
+  };
+
+  const calPer100 = parseFloat(manualCalories) || 0;
+  const proPer100 = parseFloat(manualProtein) || 0;
+  const carbPer100 = parseFloat(manualCarbs) || 0;
+  const fatPer100 = parseFloat(manualFat) || 0;
+  const factor = customQty / 100;
 
   const currentFoodItem: FoodItem | null = scannedProduct
     ? isNotFoundInDB
       ? {
-          name: manualName.trim() || `Item ${scannedProduct.barcode}`,
+          name: manualBrand.trim()
+            ? `${manualName.trim() || 'Scanned Food'} (${manualBrand.trim()})`
+            : manualName.trim() || `Scanned Item (${scannedProduct.barcode})`,
           quantity: customQty,
           unit: 'g',
-          calories: Math.round((parseFloat(manualCalories) || 0) * (customQty / 100)),
-          proteinG: Number(((parseFloat(manualProtein) || 0) * (customQty / 100)).toFixed(1)),
-          carbsG: Number(((parseFloat(manualCarbs) || 0) * (customQty / 100)).toFixed(1)),
-          fatG: Number(((parseFloat(manualFat) || 0) * (customQty / 100)).toFixed(1)),
+          calories: Math.round(calPer100 * factor),
+          proteinG: Number((proPer100 * factor).toFixed(1)),
+          carbsG: Number((carbPer100 * factor).toFixed(1)),
+          fatG: Number((fatPer100 * factor).toFixed(1)),
         }
       : scannedProductToFoodItem(scannedProduct, servingMode, customQty)
     : null;
@@ -249,6 +302,29 @@ export default function BarcodeScannerModal({
   const handleConfirmAddToMeal = () => {
     if (!currentFoodItem) return;
     onAddFood(currentFoodItem);
+
+    if (isNotFoundInDB && scannedProduct) {
+      saveCustomBarcode({
+        barcode: scannedProduct.barcode,
+        name: manualName.trim() || currentFoodItem.name,
+        brand: manualBrand.trim() || undefined,
+        per100g: {
+          calories: Math.round(calPer100),
+          proteinG: Number(proPer100.toFixed(1)),
+          carbsG: Number(carbPer100.toFixed(1)),
+          fatG: Number(fatPer100.toFixed(1)),
+        },
+        servingSize: `${customQty}g`,
+        servingQuantity: customQty,
+        updatedAt: Date.now(),
+      });
+      toast.success(
+        `Added "${currentFoodItem.name}" & saved barcode for future scans!`,
+        'Barcode Remembered'
+      );
+    } else {
+      toast.success(`Added "${currentFoodItem.name}" to today's meals!`, 'Meal Logged');
+    }
 
     if (isFavorite && scannedProduct) {
       addFavoriteFood({
@@ -271,6 +347,9 @@ export default function BarcodeScannerModal({
     setScannedProduct(null);
     setIsNotFoundInDB(false);
     setManualBarcode('');
+    setManualName('');
+    setManualBrand('');
+    setShowSuggestions(false);
     isProcessingRef.current = false;
     startCamera();
   };
@@ -415,13 +494,17 @@ export default function BarcodeScannerModal({
           {/* Scanned Product Confirmation Card (ASK USER TO ADD TO TODAY'S MEALS) */}
           {scannedProduct && currentFoodItem && (
             <div className="space-y-4 animate-scale-in">
-              <div className="p-4 rounded-2xl bg-bg-secondary/50 border-2 border-emerald-500/40 space-y-3.5 shadow-sm">
+              <div className={`p-4 rounded-2xl bg-bg-secondary/50 border-2 space-y-3.5 shadow-sm ${
+                isNotFoundInDB ? 'border-amber-500/40' : 'border-emerald-500/40'
+              }`}>
                 {/* Confirmation Prompt Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-emerald-500">
-                      PRODUCT VERIFIED
+                    <span className={`w-2 h-2 rounded-full ${isNotFoundInDB ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`} />
+                    <span className={`text-2xs font-mono font-bold uppercase tracking-wider ${
+                      isNotFoundInDB ? 'text-amber-400' : 'text-emerald-500'
+                    }`}>
+                      {isNotFoundInDB ? 'NEW / CUSTOM BARCODE' : 'PRODUCT VERIFIED'}
                     </span>
                   </div>
                   <button
@@ -433,37 +516,133 @@ export default function BarcodeScannerModal({
                   </button>
                 </div>
 
-                {/* Product Name & Brand */}
-                <div>
-                  {scannedProduct.brand && (
-                    <span className="text-3xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
-                      {scannedProduct.brand}
-                    </span>
-                  )}
-                  {isNotFoundInDB ? (
-                    <div className="space-y-1.5">
-                      <span className="text-2xs text-amber-400 font-semibold flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> Not in database. Enter food name:
-                      </span>
+                {/* If Not in DB: Friendly Info and Search/Edit UI */}
+                {isNotFoundInDB ? (
+                  <div className="space-y-3">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/90 space-y-0.5">
+                      <p className="font-semibold text-amber-300 flex items-center gap-1.5 text-xs">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                        Package not in global database yet
+                      </p>
+                      <p className="text-3xs text-text-muted leading-relaxed">
+                        Enter food name to auto-fill nutrition, or adjust macros below. ASCEND will remember this barcode for all future scans!
+                      </p>
+                    </div>
+
+                    {/* Food Name input with autocomplete */}
+                    <div className="relative">
+                      <label className="text-2xs font-mono font-semibold text-text-muted uppercase block mb-1">
+                        Food Name <span className="text-accent">*</span>
+                      </label>
                       <input
                         type="text"
                         value={manualName}
-                        onChange={(e) => setManualName(e.target.value)}
-                        placeholder="Food name (e.g. Protein Bar)"
-                        className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary font-bold outline-none focus:border-accent"
+                        onChange={(e) => handleManualNameChange(e.target.value)}
+                        placeholder="e.g. Paneer, Peanut Butter, Oats, Chicken..."
+                        className="w-full bg-bg-card border border-border rounded-xl px-3 py-2 text-sm text-text-primary font-bold outline-none focus:border-accent"
+                        autoFocus
+                      />
+                      {showSuggestions && foodSuggestions.length > 0 && (
+                        <div className="absolute left-0 right-0 top-full mt-1 bg-bg-card border border-border rounded-xl shadow-2xl z-20 overflow-hidden divide-y divide-border/40 max-h-48 overflow-y-auto">
+                          {foodSuggestions.map((s) => (
+                            <button
+                              key={s}
+                              type="button"
+                              onClick={() => handleSelectSuggestion(s)}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-secondary flex items-center justify-between cursor-pointer"
+                            >
+                              <span>{s}</span>
+                              <span className="text-3xs font-mono text-accent">Auto-fill macros</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Brand input (optional) */}
+                    <div>
+                      <label className="text-2xs font-mono font-semibold text-text-muted uppercase block mb-1">
+                        Brand (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={manualBrand}
+                        onChange={(e) => setManualBrand(e.target.value)}
+                        placeholder="e.g. Amul, MuscleBlaze, Britannia, Local Dairy"
+                        className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary outline-none focus:border-accent"
                       />
                     </div>
-                  ) : (
+
+                    {/* Editable Macros per 100g */}
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-2xs font-mono font-semibold text-text-muted uppercase">
+                          Nutrition per 100g
+                        </label>
+                        <span className="text-3xs font-mono text-accent">Editable</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2">
+                        <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Calories</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={manualCalories}
+                            onChange={(e) => setManualCalories(e.target.value)}
+                            className="w-full text-center font-mono font-bold text-xs text-accent bg-transparent outline-none tabular-nums p-0"
+                          />
+                        </div>
+                        <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Protein</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={manualProtein}
+                            onChange={(e) => setManualProtein(e.target.value)}
+                            className="w-full text-center font-mono font-bold text-xs text-emerald-500 bg-transparent outline-none tabular-nums p-0"
+                          />
+                        </div>
+                        <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Carbs</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={manualCarbs}
+                            onChange={(e) => setManualCarbs(e.target.value)}
+                            className="w-full text-center font-mono font-bold text-xs text-text-primary bg-transparent outline-none tabular-nums p-0"
+                          />
+                        </div>
+                        <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Fat</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={manualFat}
+                            onChange={(e) => setManualFat(e.target.value)}
+                            className="w-full text-center font-mono font-bold text-xs text-text-primary bg-transparent outline-none tabular-nums p-0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Verified Product Display */
+                  <div>
+                    {scannedProduct.brand && (
+                      <span className="text-3xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
+                        {scannedProduct.brand}
+                      </span>
+                    )}
                     <h3 className="text-base font-bold text-text-primary leading-snug">
                       {scannedProduct.name}
                     </h3>
-                  )}
-                  <span className="text-3xs text-text-muted font-mono block mt-0.5">
-                    Barcode: {scannedProduct.barcode}
-                  </span>
-                </div>
+                    <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                      Barcode: {scannedProduct.barcode}
+                    </span>
+                  </div>
+                )}
 
-                {/* Serving Mode Switcher if available */}
+                {/* Serving Mode Switcher if available for verified product */}
                 {scannedProduct.perServing && !isNotFoundInDB && (
                   <div className="flex gap-2 pt-0.5 font-mono text-xs">
                     <button
@@ -503,11 +682,11 @@ export default function BarcodeScannerModal({
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
-                      min="0.1"
+                      min="1"
                       step={servingMode === 'serving' && !isNotFoundInDB ? '1' : '10'}
                       value={customQty}
-                      onChange={(e) => setCustomQty(Math.max(0.1, Number(e.target.value)))}
-                      className="w-24 bg-bg-secondary border border-border rounded-lg py-1 px-2 text-center text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
+                      onChange={(e) => setCustomQty(Math.max(1, Number(e.target.value) || 1))}
+                      className="w-24 bg-bg-secondary border border-border rounded-lg py-1 px-2 text-center text-xs font-mono font-bold text-text-primary outline-none focus:border-accent tabular-nums"
                     />
                     <span className="text-xs font-mono text-text-muted">
                       {servingMode === 'serving' && !isNotFoundInDB ? 'serving(s)' : 'g'}
@@ -515,7 +694,7 @@ export default function BarcodeScannerModal({
                   </div>
                 </div>
 
-                {/* Calculated Macros Grid */}
+                {/* Calculated Portion Macros Grid */}
                 <div className="grid grid-cols-4 gap-2 text-center font-mono">
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-accent block">

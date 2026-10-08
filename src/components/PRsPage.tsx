@@ -1461,7 +1461,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 value={targetWeightInput}
                 onChange={(e) => setTargetWeightInput(e.target.value)}
                 placeholder="Target Weight"
-                className="w-full text-base"
+                className="w-full text-base font-mono font-bold tabular-nums"
                 autoFocus
               />
               <span className="flex items-center px-4 rounded-lg bg-bg-secondary border border-border font-mono text-sm text-text-muted">
@@ -1541,7 +1541,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                       onChange={(e) => setWeight(e.target.value)}
                       placeholder={selectedIsBodyweight ? '0 (bodyweight)' : '0'}
                       required={!selectedIsBodyweight}
-                      className="w-full rounded-r-none"
+                      className="w-full rounded-r-none font-mono font-bold text-base tabular-nums"
                     />
                     <select
                       value={unit}
@@ -1570,7 +1570,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                     value={reps}
                     onChange={(e) => setReps(e.target.value)}
                     placeholder="1"
-                    className="w-full"
+                    className="w-full font-mono font-bold text-base tabular-nums"
                   />
                 </div>
               </div>

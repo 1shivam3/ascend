@@ -220,7 +220,6 @@ export default function LogPastWorkoutModal({
   };
 
   const handleSetChange = (exIdx: number, setIdx: number, field: 'weight' | 'reps' | 'rpe', val: string | number) => {
-    const num = typeof val === 'number' ? val : parseFloat(val);
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== exIdx) return ex;
@@ -229,20 +228,52 @@ export default function LogPastWorkoutModal({
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
             if (field === 'rpe') {
+              const num = typeof val === 'number' ? val : parseFloat(val);
               return {
                 ...s,
                 rpe: isNaN(num) || num <= 0 ? undefined : num,
               };
             }
+            if (val === '') {
+              return {
+                ...s,
+                [field]: '' as any,
+              };
+            }
+            const num = typeof val === 'number' ? val : (field === 'reps' ? parseInt(val, 10) : parseFloat(val));
             return {
               ...s,
-              [field]: isNaN(num) ? 0 : num,
+              [field]: isNaN(num) ? (field === 'reps' ? 1 : 0) : num,
             };
           }),
         };
       })
     );
   };
+
+  const handleSetBlur = (exIdx: number, setIdx: number, field: 'weight' | 'reps') => {
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== exIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            const current = s[field];
+            if ((current as any) === '' || current === undefined || isNaN(Number(current))) {
+              return {
+                ...s,
+                [field]: field === 'reps' ? 1 : 0,
+              };
+            }
+
+            return s;
+          }),
+        };
+      })
+    );
+  };
+
 
   const handleAdjustWeight = (exIdx: number, setIdx: number, delta: number) => {
     setExercises((prev) =>
@@ -562,9 +593,9 @@ export default function LogPastWorkoutModal({
                       {/* Table Column Labels */}
                       <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-semibold uppercase text-text-muted px-1">
                         <span className="col-span-1 text-center">#</span>
-                        <span className="col-span-4">{isBW ? `ADDED (${userUnit})` : `LOAD (${userUnit})`}</span>
-                        <span className="col-span-3">REPS</span>
-                        <span className="col-span-3">RPE (@)</span>
+                        <span className="col-span-5 text-center">{isBW ? `ADDED (${userUnit})` : `LOAD (${userUnit})`}</span>
+                        <span className="col-span-3 text-center">REPS</span>
+                        <span className="col-span-2 text-center">RPE</span>
                         <span className="col-span-1 text-right"></span>
                       </div>
 
@@ -572,79 +603,64 @@ export default function LogPastWorkoutModal({
                       {ex.sets.map((set, sIdx) => (
                         <div
                           key={sIdx}
-                          className="grid grid-cols-12 gap-2 items-center p-1.5 rounded-xl bg-bg-card/70 border border-border/50 hover:border-border transition-colors"
+                          className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-bg-card/70 border border-border/50 hover:border-border transition-colors"
                         >
                           {/* Set Number */}
                           <span className="col-span-1 text-xs font-mono font-bold text-text-muted text-center">
                             {sIdx + 1}
                           </span>
 
-                          {/* Weight with mini stepper */}
-                          <div className="col-span-4 flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustWeight(exIdx, sIdx, -weightStep)}
-                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
-                            >
-                              -
-                            </button>
+                          {/* Weight Input Box */}
+                          <div className="col-span-5 flex items-center bg-bg-secondary border border-border/60 rounded-xl px-2.5 py-1.5 focus-within:border-accent">
                             <input
-                              type="number"
+                              type="text"
                               inputMode="decimal"
-                              step={weightStep}
-                              min="0"
-                              placeholder={isBW ? '0' : '60'}
-                              value={set.weight === 0 && isBW ? '' : set.weight}
-                              onChange={(e) => handleSetChange(exIdx, sIdx, 'weight', e.target.value)}
-                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-bold text-text-primary text-center outline-none focus:border-accent"
+                              placeholder={isBW ? '0 (BW)' : '60'}
+                              value={set.weight === 0 && isBW ? '' : (set.weight ?? '')}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                  handleSetChange(exIdx, sIdx, 'weight', val);
+                                }
+                              }}
+                              onBlur={() => handleSetBlur(exIdx, sIdx, 'weight')}
+                              className="w-full text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-transparent outline-none p-0 tabular-nums"
                             />
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustWeight(exIdx, sIdx, weightStep)}
-                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
-                            >
-                              +
-                            </button>
+                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">{userUnit}</span>
                           </div>
 
-                          {/* Reps with mini stepper */}
-                          <div className="col-span-3 flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustReps(exIdx, sIdx, -1)}
-                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
-                            >
-                              -
-                            </button>
+                          {/* Reps Input Box */}
+                          <div className="col-span-3 flex items-center bg-bg-secondary border border-border/60 rounded-xl px-2 py-1.5 focus-within:border-accent">
                             <input
-                              type="number"
+                              type="text"
                               inputMode="numeric"
-                              min="1"
-                              max="100"
                               placeholder="8"
-                              value={set.reps || ''}
-                              onChange={(e) => handleSetChange(exIdx, sIdx, 'reps', e.target.value)}
-                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-bold text-text-primary text-center outline-none focus:border-accent"
+                              value={set.reps ?? ''}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (val === '' || /^\d*$/.test(val)) {
+                                  handleSetChange(exIdx, sIdx, 'reps', val);
+                                }
+                              }}
+                              onBlur={() => handleSetBlur(exIdx, sIdx, 'reps')}
+                              className="w-full text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-transparent outline-none p-0 tabular-nums"
                             />
-                            <button
-                              type="button"
-                              onClick={() => handleAdjustReps(exIdx, sIdx, 1)}
-                              className="w-5 h-7 rounded bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono flex items-center justify-center shrink-0 cursor-pointer"
-                            >
-                              +
-                            </button>
+                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">reps</span>
                           </div>
 
                           {/* RPE Selector */}
-                          <div className="col-span-3">
+                          <div className="col-span-2">
                             <select
                               value={set.rpe || 0}
                               onChange={(e) => handleSetChange(exIdx, sIdx, 'rpe', e.target.value)}
-                              className="w-full bg-bg-secondary border border-border/60 rounded-lg py-1 px-1.5 text-xs font-mono font-medium text-text-primary outline-none focus:border-accent cursor-pointer"
+                              className="w-full bg-bg-secondary border border-border/60 rounded-xl px-1.5 py-1.5 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent cursor-pointer text-center truncate"
+                              title="Rate of Perceived Exertion (RPE)"
                             >
                               {RPE_PRESETS.map((p) => (
                                 <option key={p.value} value={p.value}>
-                                  {p.label}
+                                  {p.value === 0 ? '-' : p.label}
                                 </option>
                               ))}
                             </select>
@@ -674,7 +690,27 @@ export default function LogPastWorkoutModal({
                           </div>
                         </div>
                       ))}
+
+                      {/* Quick Weight Adjust Chips for Active Set */}
+                      <div className="flex items-center justify-between pt-1 px-1">
+                        <span className="text-3xs font-mono text-text-muted">
+                          Quick step ({userUnit}):
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {[-weightStep * 2, -weightStep, weightStep, weightStep * 2].map((delta) => (
+                            <button
+                              key={delta}
+                              type="button"
+                              onClick={() => handleAdjustWeight(exIdx, ex.sets.length - 1, delta)}
+                              className="px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/60 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                            >
+                              {delta > 0 ? `+${delta}` : delta}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
+
                   </div>
                 );
               })}

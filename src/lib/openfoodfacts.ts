@@ -1,4 +1,5 @@
 import { FoodItem } from './types';
+import { getCustomBarcode } from './storage';
 
 export interface ScannedProduct {
   barcode: string;
@@ -28,6 +29,19 @@ export interface ScannedProduct {
 export async function fetchProductByBarcode(barcode: string): Promise<ScannedProduct | null> {
   const cleanBarcode = barcode.trim().replace(/\D/g, '');
   if (!cleanBarcode || cleanBarcode.length < 5) return null;
+
+  // 1. Check local user custom database first
+  const custom = getCustomBarcode(cleanBarcode);
+  if (custom) {
+    return {
+      barcode: custom.barcode,
+      name: custom.name,
+      brand: custom.brand,
+      servingSize: custom.servingSize,
+      servingQuantity: custom.servingQuantity,
+      per100g: custom.per100g,
+    };
+  }
 
   try {
     const controller = new AbortController();

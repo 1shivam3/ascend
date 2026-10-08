@@ -59,3 +59,42 @@ export function saveMeals(meals: MealEntry[]): void {
 export function getMeals(): MealEntry[] {
   return load<MealEntry[]>('meals', []);
 }
+
+export interface CustomBarcodeItem {
+  barcode: string;
+  name: string;
+  brand?: string;
+  per100g: {
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+  };
+  servingSize?: string;
+  servingQuantity?: number;
+  updatedAt: number;
+}
+
+export function getCustomBarcodes(): Record<string, CustomBarcodeItem> {
+  return load<Record<string, CustomBarcodeItem>>('custom_barcodes', {});
+}
+
+export function getCustomBarcode(barcode: string): CustomBarcodeItem | null {
+  const clean = barcode.trim().replace(/\D/g, '');
+  if (!clean) return null;
+  const barcodes = getCustomBarcodes();
+  return barcodes[clean] || null;
+}
+
+export function saveCustomBarcode(item: CustomBarcodeItem): void {
+  const clean = item.barcode.trim().replace(/\D/g, '');
+  if (!clean) return;
+  const current = getCustomBarcodes();
+  current[clean] = {
+    ...item,
+    barcode: clean,
+    updatedAt: Date.now(),
+  };
+  save('custom_barcodes', current);
+}
+
