@@ -132,54 +132,65 @@ ALTER TABLE public.custom_barcodes ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own profile" ON public.profiles;
   CREATE POLICY "Users can manage own profile" ON public.profiles
-    FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+    FOR ALL TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 END $$;
 
 -- Personal Records Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own PRs" ON public.personal_records;
   CREATE POLICY "Users can manage own PRs" ON public.personal_records
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Workouts Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own workouts" ON public.workouts;
   CREATE POLICY "Users can manage own workouts" ON public.workouts
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Meals Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own meals" ON public.meals;
   CREATE POLICY "Users can manage own meals" ON public.meals
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Body Metrics Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own body metrics" ON public.body_metrics;
   CREATE POLICY "Users can manage own body metrics" ON public.body_metrics
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Daily Habits Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own daily habits" ON public.daily_habits;
   CREATE POLICY "Users can manage own daily habits" ON public.daily_habits
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Planned Workouts Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own planned workouts" ON public.planned_workouts;
   CREATE POLICY "Users can manage own planned workouts" ON public.planned_workouts
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
 -- Custom Barcodes Policy
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Users can manage own custom barcodes" ON public.custom_barcodes;
   CREATE POLICY "Users can manage own custom barcodes" ON public.custom_barcodes
-    FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+END $$;
+
+-- ==============================================================================
+-- SECURITY HARDENING & LINTER RESOLUTIONS
+-- ==============================================================================
+-- Revoke execution of any administrative SECURITY DEFINER functions from anon/authenticated
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rls_auto_enable' AND pronamespace = 'public'::regnamespace) THEN
+    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM public, anon, authenticated;
+    DROP FUNCTION IF EXISTS public.rls_auto_enable();
+  END IF;
 END $$;
