@@ -1,156 +1,118 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import {
-  ChevronRight,
-  ChevronLeft,
   Dumbbell,
   ArrowRight,
+  ChevronLeft,
+  Check,
   RotateCcw,
   Upload,
-  Check,
-  Shield,
+  AlertTriangle,
+  Loader2,
   Zap,
-  Target,
-  Clock,
-  Sparkles,
+  Shield,
+  Flame,
+  User,
 } from 'lucide-react';
-import { calculateOneRepMax } from '@/lib/strength-standards';
-import { PersonalRecord, AthleteGoal, PlannedWorkout, DietPreference } from '@/lib/types';
+import { AthleteGoal, DietPreference } from '@/lib/types';
 import { getGoalAdaptiveSplitTemplates } from '@/lib/workout-engine';
 import { buildDefaultWeeklySchedule } from '@/lib/workout-schedule';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { importFullBackupJSON } from '@/lib/storage';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+
+function GoogleIcon({ className = 'w-4 h-4' }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  );
+}
 
 interface GoalOption {
   id: AthleteGoal;
   title: string;
+  icon: React.ReactNode;
   tagline: string;
-  focus: string;
 }
 
-const GOAL_OPTIONS: GoalOption[] = [
+const GOALS: GoalOption[] = [
   {
     id: 'build_muscle',
     title: 'Build Muscle',
-    tagline: 'Hypertrophy volume & progressive overload',
-    focus: '8–12 rep hypertrophy, muscular tension, structural volume',
+    icon: <Zap className="w-4 h-4 text-accent" />,
+    tagline: 'Hypertrophy & progressive overload',
   },
   {
     id: 'get_stronger',
     title: 'Get Stronger',
-    tagline: 'Heavy compound strength & RPE autoregulation',
-    focus: '4–6 rep heavy compounds, neurological adaptations, PR progression',
+    icon: <Shield className="w-4 h-4 text-emerald-400" />,
+    tagline: 'Heavy compound lifts & raw strength',
   },
   {
     id: 'lose_fat',
     title: 'Lose Fat',
-    tagline: 'Preserve muscle & optimize lean body mass',
-    focus: 'Lean tissue retention, energy balance, steady progression',
-  },
-  {
-    id: 'stamina',
-    title: 'Improve Fitness',
-    tagline: 'Work capacity, stamina & cardiovascular base',
-    focus: 'Higher work capacity, short rests, muscular endurance',
-  },
-  {
-    id: 'general_fitness',
-    title: 'General Fitness',
-    tagline: 'Balanced functional strength, joint health & longevity',
-    focus: 'Total-body balance, functional movement patterns, joint resilience',
-  },
-];
-
-type EquipmentChoice = 'full_gym' | 'barbell_only' | 'home_dumbbells' | 'bodyweight_only';
-
-interface EquipmentOption {
-  id: EquipmentChoice;
-  title: string;
-  desc: string;
-}
-
-const EQUIPMENT_OPTIONS: EquipmentOption[] = [
-  {
-    id: 'full_gym',
-    title: 'Commercial Gym',
-    desc: 'Barbells, dumbbells, cables, selectorized machines, leg press',
-  },
-  {
-    id: 'barbell_only',
-    title: 'Home Gym / Barbell',
-    desc: 'Power rack, Olympic barbell, weight plates, flat/incline bench',
-  },
-  {
-    id: 'home_dumbbells',
-    title: 'Dumbbells & Bench',
-    desc: 'Adjustable dumbbells, flat bench, pull-up bar',
-  },
-  {
-    id: 'bodyweight_only',
-    title: 'Bodyweight & Calisthenics',
-    desc: 'Pull-up bar, dip bars, resistance bands, floor work',
+    icon: <Flame className="w-4 h-4 text-rose-400" />,
+    tagline: 'Muscle retention & calorie deficit',
   },
 ];
 
 export default function OnboardingScreen() {
   const toast = useToast();
-  // Step 0: Goal & Name
-  // Step 1: Experience
-  // Step 2: Training Days
-  // Step 3: Equipment
-  // Step 4: Optional Bio Profile (Sex, BW, Height, Age, optional lifts)
-  // Step 5: Ready to Train (Day 1 Preview & Launch)
-  const [step, setStep] = useState<number>(0);
+  const { user, signInWithGoogle } = useSupabaseSync();
 
-  // Profile fields
+  // Step 0: Auth choice (Google vs Guest)
+  // Step 1: Quick basic details (Name, Goal, Sex, Bodyweight)
+  const [step, setStep] = useState<0 | 1>(0);
+  const [showGuestWarning, setShowGuestWarning] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  // Quick Calibration Fields
   const [name, setName] = useState('');
   const [primaryGoal, setPrimaryGoal] = useState<AthleteGoal>('build_muscle');
-  const [experienceLevel, setExperienceLevel] = useState<'beginner' | 'intermediate' | 'advanced'>('beginner');
-  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
-  const [equipment, setEquipment] = useState<EquipmentChoice>('full_gym');
-
-  // Bio fields
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [bodyweight, setBodyweight] = useState('');
+  const [bodyweight, setBodyweight] = useState('70');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
-  const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
-  const [heightCm, setHeightCm] = useState('');
-  const [age, setAge] = useState('24');
-
-  // Optional baseline lifts (only shown for advanced / experienced or upon request)
-  const [showOptionalLifts, setShowOptionalLifts] = useState(false);
-  const [benchWeight, setBenchWeight] = useState('');
-  const [benchReps, setBenchReps] = useState('5');
-  const [squatWeight, setSquatWeight] = useState('');
-  const [squatReps, setSquatReps] = useState('5');
-  const [deadliftWeight, setDeadliftWeight] = useState('');
-  const [deadliftReps, setDeadliftReps] = useState('5');
-  const [ohpWeight, setOhpWeight] = useState('');
-  const [ohpReps, setOhpReps] = useState('5');
-
-  const getEst1RM = (weightStr: string, repsStr: string) => {
-    const w = parseFloat(weightStr);
-    const r = parseInt(repsStr, 10) || 5;
-    if (!w || isNaN(w) || w <= 0) return null;
-    const e1rm = Math.round(calculateOneRepMax(w, r) * 10) / 10;
-    return `${e1rm} ${unit}`;
-  };
 
   // Emergency snapshot detection & restore
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Detect Google auth session or local snapshots
+  useEffect(() => {
+    if (user && !user.isAnonymous) {
+      if (user.name) {
+        setName((prev) => prev || user.name || '');
+      }
+      setStep(1);
+    }
+  }, [user]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        // 1. Check emergency snapshot
         const snap = localStorage.getItem('ascend_emergency_snapshot');
         if (snap) {
           const parsed = JSON.parse(snap);
@@ -161,40 +123,6 @@ export default function OnboardingScreen() {
             (Array.isArray(stateData?.workouts) && stateData.workouts.length > 0)
           ) {
             setBackupSnapshot(stateData);
-            return;
-          }
-        }
-
-        // 2. Check main ascend_store in case state wasn't picked up
-        const rawStore = localStorage.getItem('ascend_store');
-        if (rawStore) {
-          const parsed = JSON.parse(rawStore);
-          const stateData = parsed?.state || parsed;
-          if (
-            stateData?.profile?.name ||
-            (Array.isArray(stateData?.workouts) && stateData.workouts.length > 0)
-          ) {
-            setBackupSnapshot(stateData);
-            return;
-          }
-        }
-
-        // 3. Check discrete legacy keys
-        const rawProf = localStorage.getItem('ascend_profile');
-        if (rawProf) {
-          const prof = JSON.parse(rawProf);
-          if (prof?.name) {
-            const rawW = localStorage.getItem('ascend_workouts');
-            const rawP = localStorage.getItem('ascend_prs');
-            const rawM = localStorage.getItem('ascend_meals');
-            setBackupSnapshot({
-              profile: prof,
-              workouts: rawW ? JSON.parse(rawW) : [],
-              prs: rawP ? JSON.parse(rawP) : [],
-              meals: rawM ? JSON.parse(rawM) : [],
-              hasCompletedOnboarding: true,
-            });
-            return;
           }
         }
       } catch {}
@@ -206,7 +134,6 @@ export default function OnboardingScreen() {
     setGoals,
     setUserMode,
     setTrainingProfile,
-    addMultiplePRs,
     addBodyMetric,
     importAllData,
     setPlannedWorkouts,
@@ -214,43 +141,54 @@ export default function OnboardingScreen() {
     setMacroGoals,
   } = useStore();
 
-  // Generated split based on selected goal and unit
-  const generatedSplit = useMemo<PlannedWorkout[]>(() => {
-    return getGoalAdaptiveSplitTemplates(primaryGoal, unit);
-  }, [primaryGoal, unit]);
+  const handleGoogleSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        toast.error(error, 'Sign-In Failed');
+        setIsSigningIn(false);
+      }
+    } catch {
+      toast.error('Could not initiate Google Sign-In', 'Sign-In Error');
+      setIsSigningIn(false);
+    }
+  };
 
-  const dayOneWorkout = useMemo(() => {
-    return generatedSplit[0] || null;
-  }, [generatedSplit]);
+  const handleGuestSelect = () => {
+    setShowGuestWarning(true);
+  };
 
-  const handleFinish = (skipLifts = true) => {
-    const bw = parseFloat(bodyweight) || (unit === 'lbs' ? 160 : 72);
-    const athleteName = name.trim() || 'Athlete';
+  const handleConfirmGuest = () => {
+    setShowGuestWarning(false);
+    setStep(1);
+  };
+
+  const handleFinish = () => {
+    const bw = parseFloat(bodyweight) || (unit === 'lbs' ? 154 : 70);
+    const athleteName = name.trim() || (user?.name || 'Athlete');
 
     const bodyweightKg = unit === 'lbs' ? bw * 0.453592 : bw;
     const bodyweightLbs = unit === 'kg' ? bw * 2.20462 : bw;
-    const parsedHeight = parseFloat(heightCm);
-    const validHeight = !isNaN(parsedHeight) && parsedHeight > 50 && parsedHeight < 260 ? parsedHeight : undefined;
-    const parsedAge = parseInt(age, 10);
-    const validAge = !isNaN(parsedAge) && parsedAge >= 14 && parsedAge <= 90 ? parsedAge : 24;
 
     const profileData = {
-      id: safeRandomId('user'),
+      id: user?.id || safeRandomId('user'),
       name: athleteName,
       gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
-      heightCm: validHeight,
-      age: validAge,
       unit,
-      dietPreference,
+      dietPreference: 'non_vegetarian' as DietPreference,
       createdAt: new Date().toISOString(),
       goals: [primaryGoal],
     };
 
     setProfile(profileData);
     setGoals([primaryGoal]);
-    setUserMode(experienceLevel === 'beginner' ? 'beginner' : 'advanced');
+    setUserMode('beginner');
+
+    const daysPerWeek = 4;
+    const generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
 
     setTrainingProfile({
       goal: primaryGoal === 'get_stronger'
@@ -260,101 +198,79 @@ export default function OnboardingScreen() {
         : primaryGoal === 'lose_fat'
         ? 'fat_loss'
         : 'general_fitness',
-      experience: experienceLevel,
+      experience: 'beginner',
       daysPerWeek,
       preferredDurationMin: 45,
-      equipment,
-      preferredSplit: daysPerWeek >= 5 ? 'push_pull_legs' : daysPerWeek === 4 ? 'upper_lower' : 'full_body',
+      equipment: 'full_gym',
+      preferredSplit: 'upper_lower',
       dislikedExercises: [],
       injuriesOrLimitations: [],
       coachingStyle: 'balanced',
     });
 
-    // 1. Initialize split routine tailored to athlete's primary goal & weight unit
     setPlannedWorkouts(generatedSplit);
-
-    // 2. Initialize weekly calendar schedule matching training days
     setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
 
-    // 3. Initialize calibrated nutritional baseline with zero Atwater drift
-    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender, validHeight, validAge);
+    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender);
     setMacroGoals(initialMacros);
 
     const today = getLocalTodayStr();
-
-    // Log initial body metric entry
     addBodyMetric({
       id: safeRandomId('bm'),
       date: today,
       weightKg: Math.round(bodyweightKg * 10) / 10,
-      heightCm: validHeight,
-      notes: 'Initial Onboarding Calibration',
+      notes: 'Initial Calibration',
     });
 
-    // Optional lifts - process if user entered weights
-    const hasAnyLifts = !!(benchWeight || squatWeight || deadliftWeight || ohpWeight);
-    if (!skipLifts || hasAnyLifts) {
-      const initialPRs: PersonalRecord[] = [];
+    toast.success(`Welcome to ASCEND, ${athleteName.split(' ')[0]}!`, 'Training Calibrated');
+  };
 
-      const checkAndAdd = (exercise: string, wStr: string, rStr: string) => {
-        const w = parseFloat(wStr);
-        const r = parseInt(rStr, 10) || 5;
-        if (!isNaN(w) && w > 0) {
-          const wKg = unit === 'lbs' ? w * 0.453592 : w;
-          const wLbs = unit === 'kg' ? w * 2.20462 : w;
-          const oneRepMaxKg = calculateOneRepMax(wKg, r);
-          const displayE1rm = Math.round((unit === 'lbs' ? oneRepMaxKg * 2.20462 : oneRepMaxKg) * 10) / 10;
-
-          initialPRs.push({
-            id: safeRandomId('pr'),
-            exercise,
-            weightKg: Math.round(wKg * 10) / 10,
-            weightLbs: Math.round(wLbs * 10) / 10,
-            reps: r,
-            oneRepMax: Math.round(oneRepMaxKg * 10) / 10,
-            date: today,
-            notes: `Baseline: ${w} ${unit} × ${r} reps (Est. 1RM: ${displayE1rm} ${unit})`,
-            isBaseline: true,
-          });
+  const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result as string;
+        const success = importFullBackupJSON(text);
+        if (success) {
+          toast.success('Successfully restored your profile and data!', 'Backup Restored');
+          window.location.reload();
+        } else {
+          toast.error('The file does not appear to be a valid ASCEND backup.', 'Restore Error');
         }
-      };
-
-      checkAndAdd('Bench Press', benchWeight, benchReps);
-      checkAndAdd('Squat', squatWeight, squatReps);
-      checkAndAdd('Deadlift', deadliftWeight, deadliftReps);
-      checkAndAdd('Overhead Press', ohpWeight, ohpReps);
-
-      if (initialPRs.length > 0) {
-        addMultiplePRs(initialPRs);
+      } catch {
+        toast.error('Could not parse the backup file.', 'File Error');
       }
-    }
+    };
+    reader.readAsText(file);
   };
 
   return (
     <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-4 py-8 text-text-primary">
-      <div className="w-full max-w-sm space-y-5">
-        {/* Brand Instrument Header */}
-        <div className="text-center space-y-1">
-          <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-bg-secondary border border-border/80 text-accent mb-1 shadow-xs">
-            <Dumbbell className="w-5 h-5" />
+      <div className="w-full max-w-sm space-y-6">
+        {/* Brand Header */}
+        <div className="text-center space-y-1.5">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-bg-secondary border border-border/80 text-accent mb-1 shadow-sm">
+            <Dumbbell className="w-6 h-6" />
           </div>
           <h1 className="text-2xl font-black tracking-tight font-sans text-text-primary">
             ASCEND
           </h1>
-          <p className="text-text-muted text-xs">
-            Precision training that adapts to you.
+          <p className="text-text-muted text-xs font-medium">
+            Evidence-Based Training &amp; Nutrition System
           </p>
         </div>
 
-        {/* Auto-detected Backup Notification */}
-        {backupSnapshot && (
+        {/* Existing Backup Detected Card */}
+        {backupSnapshot && step === 0 && (
           <Card variant="default" padding="sm" className="border-accent/40 bg-accent/10 space-y-2">
             <div className="flex items-center gap-1.5 text-accent font-bold text-xs">
               <RotateCcw className="w-4 h-4" />
-              <span>Existing Training Data Detected</span>
+              <span>Previous Data Found on Device</span>
             </div>
             <p className="text-2xs text-text-secondary leading-snug">
-              Found data for <strong className="text-text-primary">{backupSnapshot.profile?.name || 'Athlete'}</strong> ({backupSnapshot.workouts?.length || 0} workouts, {backupSnapshot.prs?.length || 0} PRs saved on this device).
+              Found data for <strong className="text-text-primary">{backupSnapshot.profile?.name || 'Athlete'}</strong> ({backupSnapshot.workouts?.length || 0} workouts saved).
             </p>
             <div className="flex gap-2 pt-1">
               <Button
@@ -364,7 +280,7 @@ export default function OnboardingScreen() {
                 onClick={() => {
                   const ok = importAllData(backupSnapshot);
                   if (ok) {
-                    toast.success('Restored athlete profile and records!', 'Restored');
+                    toast.success('Restored profile and data!', 'Restored');
                   }
                 }}
               >
@@ -380,673 +296,277 @@ export default function OnboardingScreen() {
                   setBackupSnapshot(null);
                 }}
               >
-                Start Fresh
+                Dismiss
               </Button>
             </div>
           </Card>
         )}
 
-        {/* ── STEP 0: WELCOME & PRIMARY GOAL ── */}
+        {/* ── STEP 0: SIGN-IN CHOICES (Google or Guest) ────────────────────── */}
         {step === 0 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="space-y-1.5">
-              <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                WHAT IS YOUR MAIN TRAINING GOAL?
-              </label>
-              <div className="space-y-2">
-                {GOAL_OPTIONS.map((g) => {
-                  const isSelected = primaryGoal === g.id;
-                  return (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setPrimaryGoal(g.id)}
-                      className={`w-full p-3.5 rounded-2xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
-                        isSelected
-                          ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
-                          : 'border-border/80 bg-bg-card hover:border-border hover:bg-bg-secondary/40'
-                      }`}
-                    >
-                      <div
-                        className={`w-4 h-4 rounded-full border mt-0.5 flex items-center justify-center shrink-0 ${
-                          isSelected ? 'border-accent bg-accent text-white' : 'border-border bg-bg-secondary'
-                        }`}
-                      >
-                        {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <span className={`text-sm font-bold block ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
-                          {g.title}
-                        </span>
-                        <p className="text-2xs text-text-muted mt-0.5 leading-snug">{g.tagline}</p>
-                      </div>
-                    </button>
-                  );
-                })}
+            <Card variant="default" padding="md" className="space-y-4">
+              <div className="text-center space-y-1">
+                <h2 className="text-sm font-bold text-text-primary">Get Started</h2>
+                <p className="text-2xs text-text-muted">Choose how you want to use the app</p>
               </div>
-            </div>
 
-            <div className="space-y-1.5 pt-1">
-              <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                WHAT SHOULD WE CALL YOU?
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Athlete name"
-                className="w-full text-sm font-semibold py-2.5 px-3.5 rounded-xl bg-bg-card border border-border/80 outline-none focus:border-accent text-text-primary placeholder:text-text-muted/60"
-                maxLength={24}
-              />
-            </div>
+              {/* Primary Option: Google OAuth */}
+              <div className="space-y-2">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleGoogleSignIn}
+                  disabled={isSigningIn}
+                  leftIcon={isSigningIn ? <Loader2 className="w-4 h-4 animate-spin" /> : <GoogleIcon className="w-4 h-4" />}
+                  className="h-12 text-sm font-bold shadow-sm cursor-pointer"
+                >
+                  {isSigningIn ? 'Connecting to Google...' : 'Continue with Google'}
+                </Button>
+                <p className="text-3xs text-center text-text-muted">
+                  Recommended &bull; Automatic cloud backup across all your devices
+                </p>
+              </div>
 
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(1)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Continue
-            </Button>
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-border/70" />
+                <span className="flex-shrink mx-3 text-3xs font-mono text-text-muted uppercase">or</span>
+                <div className="flex-grow border-t border-border/70" />
+              </div>
 
-            {/* Restore from JSON */}
-            <div className="text-center pt-1">
+              {/* Secondary Option: Guest Mode */}
+              <div className="space-y-1.5">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  fullWidth
+                  onClick={handleGuestSelect}
+                  leftIcon={<User className="w-4 h-4 text-text-muted" />}
+                  className="h-11 text-xs font-semibold cursor-pointer"
+                >
+                  Continue as Guest
+                </Button>
+                <p className="text-3xs text-center text-text-muted">
+                  No account required &bull; 100% offline &bull; Data stays on this device
+                </p>
+              </div>
+            </Card>
+
+            {/* Offline JSON Restore link */}
+            <div className="text-center">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-2xs text-text-muted hover:text-accent inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="text-2xs text-text-muted hover:text-accent transition-colors underline cursor-pointer"
               >
-                <Upload className="w-3 h-3" />
-                <span>Restore from backup JSON</span>
+                Have a backup file? Restore JSON backup
               </button>
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".json,application/json"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = (event) => {
-                    try {
-                      const content = event.target?.result as string;
-                      const parsed = JSON.parse(content);
-                      const ok = importAllData(parsed);
-                      if (ok) {
-                        toast.success('Backup file restored successfully!', 'Restored');
-                      }
-                    } catch {
-                      toast.error('Could not parse JSON backup file.', 'Invalid file');
-                    }
-                  };
-                  reader.readAsText(file);
-                }}
                 className="hidden"
+                onChange={handleRestoreFile}
               />
             </div>
           </div>
         )}
 
-        {/* ── STEP 1: EXPERIENCE LEVEL ── */}
+        {/* ── GUEST MODE WARNING MODAL ────────────────────────────────────── */}
+        {showGuestWarning && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-fade-in">
+            <div className="w-full max-w-sm rounded-2xl bg-bg-card border border-amber-500/40 p-5 shadow-2xl space-y-4 animate-scale-in">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-text-primary">Guest Mode Notice</h3>
+                  <p className="text-xs text-amber-200/90 font-medium">
+                    Your data will NOT be saved to the cloud.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 text-2xs text-text-secondary leading-relaxed space-y-2">
+                <p>
+                  In Guest Mode, your workout logs, personal records, and meal history are saved <strong>only inside this device&apos;s browser memory</strong>.
+                </p>
+                <p className="text-amber-300/80">
+                  ⚠️ If you clear your browser cookies/cache, use Private/Incognito browsing, or switch to a different phone, <strong>your data will be permanently lost</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <Button
+                  variant="primary"
+                  size="md"
+                  fullWidth
+                  onClick={handleGoogleSignIn}
+                  leftIcon={<GoogleIcon className="w-4 h-4" />}
+                  className="text-xs font-semibold cursor-pointer"
+                >
+                  Use Google Instead (Safe Cloud Backup)
+                </Button>
+
+                <Button
+                  variant="secondary"
+                  size="md"
+                  fullWidth
+                  onClick={handleConfirmGuest}
+                  className="text-xs text-text-muted hover:text-text-primary cursor-pointer border-border"
+                >
+                  I Understand, Proceed as Guest
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 1: QUICK CALIBRATION (Frictionless, 4 Basic Details) ───── */}
         {step === 1 && (
           <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                EXPERIENCE LEVEL
-              </span>
+            {/* Top Navigation */}
+            <div className="flex items-center justify-between pb-1">
               <button
                 type="button"
                 onClick={() => setStep(0)}
-                className="text-2xs text-text-muted hover:text-text-primary flex items-center gap-1 cursor-pointer"
+                className="flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
               >
-                <ChevronLeft className="w-3 h-3" />
+                <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
               </button>
-            </div>
-
-            <p className="text-xs text-text-secondary leading-snug">
-              ASCEND adapts its interface and metrics to your background.
-            </p>
-
-            <div className="space-y-2.5">
-              {[
-                {
-                  id: 'beginner' as const,
-                  title: 'Beginner / Casual Gym-Goer',
-                  badge: 'Guided & Clear',
-                  desc: 'Simple 1-tap logging, guided weights, and plain-language effort prompts. No technical formulas or clutter.',
-                },
-                {
-                  id: 'intermediate' as const,
-                  title: 'Intermediate Trainee',
-                  badge: 'Balanced',
-                  desc: 'Consistent lifter. Multi-set progress, progressive overload suggestions, and recovery awareness.',
-                },
-                {
-                  id: 'advanced' as const,
-                  title: 'Advanced / Strength Trainee',
-                  badge: 'Full Precision',
-                  desc: 'Experienced lifter. Full RPE/RIR tracking, e1RM curves, fatigue ledger, plate loader, and warm-up ramp.',
-                },
-              ].map((exp) => {
-                const isSelected = experienceLevel === exp.id;
-                return (
-                  <button
-                    key={exp.id}
-                    type="button"
-                    onClick={() => setExperienceLevel(exp.id)}
-                    className={`w-full p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
-                        : 'border-border/80 bg-bg-card hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-bold ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
-                        {exp.title}
-                      </span>
-                      <Badge variant={isSelected ? 'brand' : 'neutral'} size="xs">
-                        {exp.badge}
-                      </Badge>
-                    </div>
-                    <p className="text-2xs text-text-muted leading-relaxed">{exp.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(2)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Continue to Schedule
-            </Button>
-          </div>
-        )}
-
-        {/* ── STEP 2: TRAINING DAYS ── */}
-        {step === 2 && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                TRAINING SCHEDULE
+              <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
+                {user && !user.isAnonymous ? 'Google Account Connected' : 'Guest Profile'}
               </span>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="text-2xs text-text-muted hover:text-text-primary flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-3 h-3" />
-                <span>Back</span>
-              </button>
             </div>
 
-            <p className="text-xs text-text-secondary leading-snug">
-              How many days per week can you realistically commit to training?
-            </p>
+            <Card variant="default" padding="md" className="space-y-4">
+              <div>
+                <h2 className="text-sm font-bold text-text-primary tracking-tight">Quick Calibration</h2>
+                <p className="text-2xs text-text-muted mt-0.5">
+                  Calibrate your strength standards &amp; recommended macros
+                </p>
+              </div>
 
-            <div className="grid grid-cols-2 gap-2.5">
-              {[
-                { days: 3, label: '3 Days / wk', split: 'Full Body (3×)', badge: 'Time Efficient' },
-                { days: 4, label: '4 Days / wk', split: 'Upper / Lower (2×)', badge: 'Recommended' },
-                { days: 5, label: '5 Days / wk', split: 'PPL + Upper / Lower', badge: 'High Frequency' },
-                { days: 6, label: '6 Days / wk', split: 'Push / Pull / Legs (2×)', badge: 'Dedicated' },
-              ].map((s) => {
-                const isSelected = daysPerWeek === s.days;
-                return (
-                  <button
-                    key={s.days}
-                    type="button"
-                    onClick={() => setDaysPerWeek(s.days)}
-                    className={`p-3 rounded-2xl text-left border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-accent bg-accent/15 text-text-primary shadow-xs ring-1 ring-accent/30'
-                        : 'border-border/80 bg-bg-card hover:border-border text-text-secondary'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-base font-black font-display tracking-tight ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
-                        {s.label}
-                      </span>
-                    </div>
-                    <span className="text-3xs text-text-muted font-mono block leading-snug">
-                      {s.split}
-                    </span>
-                    {s.badge === 'Recommended' && (
-                      <span className="inline-flex items-center gap-1 mt-2 text-[9px] font-mono font-bold text-accent uppercase tracking-wider">
-                        <Sparkles className="w-2.5 h-2.5" />
-                        <span>Recommended</span>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+              {/* 1. Name */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  1. Your Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Alex"
+                  className="w-full text-xs font-semibold py-2.5 px-3.5 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary placeholder:text-text-muted/60"
+                  maxLength={24}
+                />
+              </div>
 
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(3)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Continue to Equipment
-            </Button>
-          </div>
-        )}
+              {/* 2. Primary Goal */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  2. Primary Focus
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {GOALS.map((g) => {
+                    const isSelected = primaryGoal === g.id;
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setPrimaryGoal(g.id)}
+                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                          isSelected
+                            ? 'border-accent bg-accent/15 ring-1 ring-accent text-text-primary'
+                            : 'border-border/80 bg-bg-secondary hover:border-border text-text-muted hover:text-text-primary'
+                        }`}
+                      >
+                        {g.icon}
+                        <span className="text-2xs font-bold block leading-tight">{g.title}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
 
-        {/* ── STEP 3: EQUIPMENT ── */}
-        {step === 3 && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                EQUIPMENT ACCESS
-              </span>
-              <button
-                type="button"
-                onClick={() => setStep(2)}
-                className="text-2xs text-text-muted hover:text-text-primary flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-3 h-3" />
-                <span>Back</span>
-              </button>
-            </div>
-
-            <p className="text-xs text-text-secondary leading-snug">
-              What equipment will you be using for workouts?
-            </p>
-
-            <div className="space-y-2">
-              {EQUIPMENT_OPTIONS.map((eq) => {
-                const isSelected = equipment === eq.id;
-                return (
-                  <button
-                    key={eq.id}
-                    type="button"
-                    onClick={() => setEquipment(eq.id)}
-                    className={`w-full p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
-                        : 'border-border/80 bg-bg-card hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-sm font-bold ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
-                        {eq.title}
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 text-accent stroke-[3]" />}
-                    </div>
-                    <p className="text-2xs text-text-muted leading-relaxed">{eq.desc}</p>
-                  </button>
-                );
-              })}
-            </div>
-
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(4)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Continue to Profile
-            </Button>
-          </div>
-        )}
-
-        {/* ── STEP 4: OPTIONAL PROFILE & BODY METRICS ── */}
-        {step === 4 && (
-          <div className="space-y-4 animate-fade-in max-h-[78vh] overflow-y-auto pr-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                PROFILE &amp; METRICS (OPTIONAL)
-              </span>
-              <button
-                type="button"
-                onClick={() => setStep(3)}
-                className="text-2xs text-text-muted hover:text-text-primary flex items-center gap-1 cursor-pointer"
-              >
-                <ChevronLeft className="w-3 h-3" />
-                <span>Back</span>
-              </button>
-            </div>
-
-            <p className="text-xs text-text-secondary leading-snug">
-              Helps calibrate nutrition targets and strength ratios. You can change these anytime in Settings.
-            </p>
-
-            {/* Sex & Unit Selector */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">Sex</label>
+              {/* 3. Biological Sex */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  3. Biological Sex
+                </label>
                 <SegmentedControl
                   value={gender}
-                  onChange={(v) => setGender(v as 'male' | 'female')}
-                  size="sm"
+                  onChange={(val) => setGender(val as 'male' | 'female')}
                   options={[
                     { value: 'male', label: 'Male' },
                     { value: 'female', label: 'Female' },
                   ]}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">Weight Unit</label>
-                <SegmentedControl
-                  value={unit}
-                  onChange={(v) => setUnit(v as 'kg' | 'lbs')}
                   size="sm"
-                  options={[
-                    { value: 'kg', label: 'KG' },
-                    { value: 'lbs', label: 'LBS' },
-                  ]}
+                  fullWidth
                 />
               </div>
-            </div>
 
-            {/* Bodyweight */}
-            <div className="space-y-1">
-              <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
-                Current Bodyweight
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  step="0.5"
-                  value={bodyweight}
-                  onChange={(e) => setBodyweight(e.target.value)}
-                  placeholder={unit === 'kg' ? '72' : '160'}
-                  className="w-full text-base font-bold font-mono py-2.5 px-3.5 rounded-xl bg-bg-card border border-border/80 outline-none focus:border-accent"
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono font-bold text-text-muted">
-                  {unit}
-                </span>
-              </div>
-            </div>
-
-            {/* Height & Age in one row */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="space-y-1">
-                <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
-                  Height (cm)
+              {/* 4. Current Bodyweight */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  4. Current Bodyweight
                 </label>
-                <input
-                  type="number"
-                  min="100"
-                  max="240"
-                  value={heightCm}
-                  onChange={(e) => setHeightCm(e.target.value)}
-                  placeholder="175"
-                  className="w-full text-sm font-mono py-2 px-3 rounded-xl bg-bg-card border border-border/80 outline-none focus:border-accent"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
-                  Age
-                </label>
-                <input
-                  type="number"
-                  min="14"
-                  max="90"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  placeholder="24"
-                  className="w-full text-sm font-mono py-2 px-3 rounded-xl bg-bg-card border border-border/80 outline-none focus:border-accent"
-                />
-              </div>
-            </div>
-
-            {/* Dietary Preference */}
-            <div className="space-y-1.5">
-              <label className="text-3xs text-text-muted font-mono uppercase tracking-wider block">
-                Dietary Preference
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: 'non_vegetarian' as DietPreference, label: 'Non-Vegetarian', desc: 'Chicken, fish, eggs, meat' },
-                  { id: 'eggitarian' as DietPreference, label: 'Eggitarian', desc: 'Vegetarian + eggs' },
-                  { id: 'vegetarian' as DietPreference, label: 'Vegetarian', desc: 'Dairy, lentils, paneer, tofu' },
-                  { id: 'vegan' as DietPreference, label: 'Vegan', desc: '100% plant-based' },
-                ].map((d) => {
-                  const isSel = dietPreference === d.id;
-                  return (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => setDietPreference(d.id)}
-                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
-                        isSel
-                          ? 'border-accent bg-accent/15 text-text-primary ring-1 ring-accent/30'
-                          : 'border-border/80 bg-bg-card hover:border-border text-text-secondary'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold ${isSel ? 'text-accent' : 'text-text-primary'}`}>
-                          {d.label}
-                        </span>
-                        {isSel && <Check className="w-3.5 h-3.5 text-accent stroke-[3]" />}
-                      </div>
-                      <span className="text-[10px] text-text-muted block leading-tight mt-0.5">
-                        {d.desc}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Optional known lifts toggle */}
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setShowOptionalLifts(!showOptionalLifts)}
-                className="w-full py-2 px-3 rounded-xl border border-border/70 bg-bg-secondary/40 text-left flex items-center justify-between text-xs text-text-secondary hover:text-text-primary cursor-pointer"
-              >
-                <span>Enter known lift baselines (Optional)</span>
-                <span className="text-accent font-bold text-xs">{showOptionalLifts ? '− Hide' : '+ Enter'}</span>
-              </button>
-
-              {showOptionalLifts && (
-                <div className="mt-2 space-y-3 p-3.5 rounded-2xl bg-bg-card border border-border/80 animate-fade-in">
-                  <div className="space-y-1">
-                    <p className="text-xs text-text-primary font-bold">
-                      Enter your best recent set (Weight × Reps)
-                    </p>
-                    <p className="text-3xs text-text-muted leading-relaxed">
-                      ASCEND calculates your Estimated 1-Rep Max (e1RM) using the standard Epley formula so your training prescriptions start at an accurate working weight.
-                    </p>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {[
-                      {
-                        name: 'Bench Press',
-                        weight: benchWeight,
-                        setWeight: setBenchWeight,
-                        reps: benchReps,
-                        setReps: setBenchReps,
-                        ph: unit === 'kg' ? '80' : '175',
-                      },
-                      {
-                        name: 'Squat',
-                        weight: squatWeight,
-                        setWeight: setSquatWeight,
-                        reps: squatReps,
-                        setReps: setSquatReps,
-                        ph: unit === 'kg' ? '120' : '265',
-                      },
-                      {
-                        name: 'Deadlift',
-                        weight: deadliftWeight,
-                        setWeight: setDeadliftWeight,
-                        reps: deadliftReps,
-                        setReps: setDeadliftReps,
-                        ph: unit === 'kg' ? '140' : '315',
-                      },
-                      {
-                        name: 'Overhead Press',
-                        weight: ohpWeight,
-                        setWeight: setOhpWeight,
-                        reps: ohpReps,
-                        setReps: setOhpReps,
-                        ph: unit === 'kg' ? '50' : '115',
-                      },
-                    ].map((lift) => {
-                      const est = getEst1RM(lift.weight, lift.reps);
-                      return (
-                        <div key={lift.name} className="p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-text-primary">{lift.name}</span>
-                            {est && (
-                              <span className="text-2xs font-mono font-bold text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/20">
-                                Est. 1RM: {est}
-                              </span>
-                            )}
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-[10px] text-text-muted block mb-0.5">Weight ({unit})</label>
-                              <input
-                                type="number"
-                                step="2.5"
-                                placeholder={lift.ph}
-                                value={lift.weight}
-                                onChange={(e) => lift.setWeight(e.target.value)}
-                                className="text-xs font-mono py-1.5 px-2 rounded-lg bg-bg-card border border-border w-full outline-none focus:border-accent"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[10px] text-text-muted block mb-0.5">Reps performed</label>
-                              <input
-                                type="number"
-                                min="1"
-                                max="20"
-                                placeholder="5"
-                                value={lift.reps}
-                                onChange={(e) => lift.setReps(e.target.value)}
-                                className="text-xs font-mono py-1.5 px-2 rounded-lg bg-bg-card border border-border w-full outline-none focus:border-accent"
-                              />
-                            </div>
-                          </div>
-                          {est && (
-                            <span className="text-[10px] text-text-muted block font-mono">
-                              Based on {lift.weight} {unit} × {lift.reps || 5} reps
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={bodyweight}
+                    onChange={(e) => setBodyweight(e.target.value)}
+                    placeholder={unit === 'kg' ? '70' : '154'}
+                    className="flex-1 text-sm font-semibold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary"
+                  />
+                  <div className="w-24 shrink-0">
+                    <SegmentedControl
+                      value={unit}
+                      onChange={(val) => {
+                        const nextUnit = val as 'kg' | 'lbs';
+                        const currentVal = parseFloat(bodyweight);
+                        if (!isNaN(currentVal) && currentVal > 0) {
+                          if (nextUnit === 'lbs' && unit === 'kg') {
+                            setBodyweight(String(Math.round(currentVal * 2.20462 * 10) / 10));
+                          } else if (nextUnit === 'kg' && unit === 'lbs') {
+                            setBodyweight(String(Math.round(currentVal * 0.453592 * 10) / 10));
+                          }
+                        } else {
+                          setBodyweight(nextUnit === 'kg' ? '70' : '154');
+                        }
+                        setUnit(nextUnit);
+                      }}
+                      options={[
+                        { value: 'kg', label: 'kg' },
+                        { value: 'lbs', label: 'lbs' },
+                      ]}
+                      size="sm"
+                      fullWidth
+                    />
                   </div>
                 </div>
-              )}
-            </div>
-
-            <Button
-              variant="primary"
-              size="lg"
-              fullWidth
-              onClick={() => setStep(5)}
-              rightIcon={<ChevronRight className="w-4 h-4" />}
-            >
-              Generate My Routine
-            </Button>
-          </div>
-        )}
-
-        {/* ── STEP 5: READY TO TRAIN (Day 1 Preview) ── */}
-        {step === 5 && (
-          <div className="space-y-4 animate-fade-in">
-            <div className="text-center space-y-1">
-              <Badge variant="brand" size="sm">
-                PROGRAM CREATED
-              </Badge>
-              <h2 className="text-xl font-black font-sans text-text-primary">
-                Your Day 1 Workout Is Ready
-              </h2>
-              <p className="text-xs text-text-secondary">
-                Calibrated for {GOAL_OPTIONS.find((g) => g.id === primaryGoal)?.title} &bull; {daysPerWeek} days/week
-              </p>
-            </div>
-
-            {/* Day 1 Workout Card */}
-            <Card variant="default" padding="md" className="space-y-3 border-accent/40">
-              <div className="flex items-center justify-between border-b border-border/60 pb-2.5">
-                <div>
-                  <span className="text-3xs font-mono uppercase text-accent font-bold block">
-                    SESSION 1 OF {daysPerWeek}
-                  </span>
-                  <span className="text-base font-bold text-text-primary block font-display">
-                    {dayOneWorkout?.name || 'Foundation Workout'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-2xs text-text-muted font-mono">
-                  <Clock className="w-3.5 h-3.5 text-accent" />
-                  <span>~45 min</span>
-                </div>
               </div>
 
-              {/* Planned Exercises */}
-              <div className="space-y-2 pt-1">
-                {dayOneWorkout?.exercises.slice(0, 4).map((ex, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-bg-secondary/60"
-                  >
-                    <span className="font-semibold text-text-primary">{ex.name}</span>
-                    <span className="font-mono text-3xs text-text-muted font-medium">
-                      {ex.targetSets} sets × {ex.targetReps} reps
-                    </span>
-                  </div>
-                ))}
-                {(dayOneWorkout?.exercises.length || 0) > 4 && (
-                  <span className="text-3xs text-text-muted font-mono block text-center">
-                    + {(dayOneWorkout?.exercises.length || 0) - 4} more accessory movements
-                  </span>
-                )}
+              {/* Launch CTA */}
+              <div className="pt-2">
+                <Button
+                  variant="primary"
+                  size="lg"
+                  fullWidth
+                  onClick={handleFinish}
+                  rightIcon={<ArrowRight className="w-4 h-4" />}
+                  className="h-12 text-sm font-bold shadow-md cursor-pointer"
+                >
+                  Start Training
+                </Button>
               </div>
             </Card>
-
-            <div className="pt-1 space-y-2">
-              <Button
-                variant="primary"
-                size="lg"
-                fullWidth
-                onClick={() => handleFinish(!showOptionalLifts)}
-                rightIcon={<ArrowRight className="w-4 h-4" />}
-              >
-                Start Training
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                fullWidth
-                onClick={() => setStep(4)}
-              >
-                Adjust Profile Settings
-              </Button>
-            </div>
           </div>
         )}
-
-        {/* 6 Step Progress Indicators */}
-        <div className="flex justify-center gap-1.5 pt-1">
-          {[0, 1, 2, 3, 4, 5].map((s) => (
-            <div
-              key={s}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                s === step
-                  ? 'w-6 bg-accent'
-                  : s < step
-                  ? 'w-2 bg-accent/40'
-                  : 'w-2 bg-border'
-              }`}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
