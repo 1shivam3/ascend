@@ -11,14 +11,20 @@ export default function ThemeToggle() {
     <button
       type="button"
       onClick={toggleTheme}
-      className="p-2 rounded-lg bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-semibold text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-all active:scale-95 cursor-pointer shadow-xs"
       title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} mode`}
       aria-label="Toggle theme"
     >
       {theme === 'dark' ? (
-        <Sun size={18} className="text-accent" />
+        <>
+          <Moon size={14} className="text-accent" />
+          <span>Dark</span>
+        </>
       ) : (
-        <Moon size={18} className="text-accent" />
+        <>
+          <Sun size={14} className="text-amber-500" />
+          <span>Light</span>
+        </>
       )}
     </button>
   );

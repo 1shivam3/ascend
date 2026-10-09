@@ -12,8 +12,6 @@ import {
   Key,
   Target,
   Scale,
-  Droplet,
-  Sparkles,
   ChevronRight,
   LogOut,
   Utensils,
@@ -30,8 +28,6 @@ import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
-import HydrationModal from '@/components/HydrationModal';
-import CreatineModal from '@/components/CreatineModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import AuthModal from '@/components/AuthModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
@@ -55,6 +51,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const importAllData = useStore((state) => state.importAllData);
   const toast = useToast();
 
+  const theme = useStore((state) => state.theme);
+  const hasCustomTheme = useStore((state) => state.hasCustomTheme);
+
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -67,8 +66,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   const [isLegalHubOpen, setIsLegalHubOpen] = useState(false);
   const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
-  const [isHydrationOpen, setIsHydrationOpen] = useState(false);
-  const [isCreatineOpen, setIsCreatineOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -280,7 +277,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
               {/* Theme Toggle */}
               <div className="py-2.5 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-text-primary">Theme Appearance</span>
+                <div>
+                  <span className="text-xs font-semibold text-text-primary block">Theme Appearance</span>
+                  <span className="text-2xs text-text-muted block">
+                    {hasCustomTheme
+                      ? `${theme === 'dark' ? 'Dark' : 'Light'} Mode (manual)`
+                      : `Synced with device (${theme === 'dark' ? 'Dark' : 'Light'})`}
+                  </span>
+                </div>
                 <ThemeToggle />
               </div>
             </Card>
@@ -319,47 +323,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 3: Habit Targets */}
+          {/* Section 3: Cloud Immortality & Sync */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              3. Habit &amp; Recovery Trackers
-            </span>
-
-            <Card variant="default" padding="sm" className="divide-y divide-border/60">
-              <div
-                onClick={() => setIsHydrationOpen(true)}
-                className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Droplet className="w-4 h-4 text-sky-400" />
-                  <div>
-                    <span className="text-xs font-semibold text-text-primary block">Daily Hydration Target</span>
-                    <span className="text-2xs text-text-muted">Target formula based on body mass</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted" />
-              </div>
-
-              <div
-                onClick={() => setIsCreatineOpen(true)}
-                className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
-              >
-                <div className="flex items-center gap-2.5">
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <div>
-                    <span className="text-xs font-semibold text-text-primary block">Creatine Monohydrate Tracker</span>
-                    <span className="text-2xs text-text-muted">Daily intake &amp; tub supply counter</span>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted" />
-              </div>
-            </Card>
-          </div>
-
-          {/* Section 4: Cloud Immortality & Sync */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              4. Cloud Backup &amp; Sync
+              3. Cloud Backup &amp; Sync
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -434,10 +401,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 5: Data Vault & Manual Backup */}
+          {/* Section 4: Data Vault & Manual Backup */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Device Data Vault &amp; Manual JSON
+              4. Device Data Vault &amp; Manual JSON
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -491,10 +458,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 6: Legal Hub & Safety */}
+          {/* Section 5: Legal Hub & Safety */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              6. Safety &amp; Medical Terms
+              5. Safety &amp; Medical Terms
             </span>
 
             <Card
@@ -579,8 +546,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <DataVaultModal isOpen={isDataVaultOpen} onClose={() => setIsDataVaultOpen(false)} />
       <LegalHubModal isOpen={isLegalHubOpen} onClose={() => setIsLegalHubOpen(false)} />
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />
-      <HydrationModal isOpen={isHydrationOpen} onClose={() => setIsHydrationOpen(false)} />
-      <CreatineModal isOpen={isCreatineOpen} onClose={() => setIsCreatineOpen(false)} />
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </>
   );

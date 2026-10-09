@@ -82,6 +82,30 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              try {
+                var stored = localStorage.getItem('ascend_store');
+                var theme = null;
+                var hasCustom = false;
+                if (stored) {
+                  var parsed = JSON.parse(stored);
+                  var s = parsed.state || parsed;
+                  if (s && s.hasCustomTheme) {
+                    theme = s.theme;
+                    hasCustom = true;
+                  }
+                }
+                if (!hasCustom && window.matchMedia) {
+                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+                if (theme === 'light') {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.classList.add('light');
+                } else if (theme === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.classList.remove('light');
+                }
+              } catch (e) {}
+
               if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
                 window.addEventListener('load', function() {
                   navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(err) {

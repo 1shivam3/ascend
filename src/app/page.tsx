@@ -33,7 +33,32 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, _hasHydrated, activeWorkoutDraft } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft } = useStore();
+
+  // Dynamic device theme synchronization (when not manually overridden in Settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+    // Initial check if user has not set a custom theme
+    if (!hasCustomTheme) {
+      const deviceTheme = mediaQuery.matches ? 'dark' : 'light';
+      if (theme !== deviceTheme) {
+        setTheme(deviceTheme, false);
+      }
+    }
+
+    const handleDeviceChange = (e: MediaQueryListEvent) => {
+      const storeState = useStore.getState();
+      if (!storeState.hasCustomTheme) {
+        storeState.setTheme(e.matches ? 'dark' : 'light', false);
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleDeviceChange);
+    return () => mediaQuery.removeEventListener('change', handleDeviceChange);
+  }, [hasCustomTheme, theme, setTheme]);
 
   // Listen for shared program links (#plan=...) in URL
   useEffect(() => {
@@ -64,7 +89,7 @@ export default function AppPage() {
 
   useEffect(() => {
     if (typeof document !== 'undefined') {
-      const activeTheme = theme || 'light';
+      const activeTheme = theme || 'dark';
       if (activeTheme === 'dark') {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');

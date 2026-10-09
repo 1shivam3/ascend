@@ -55,6 +55,7 @@ export interface AppState {
   meals: MealEntry[];
   bodyMetrics: BodyMetricEntry[];
   theme: Theme;
+  hasCustomTheme?: boolean;
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
@@ -101,7 +102,7 @@ export interface AppState {
   
   setHasHydrated: (state: boolean) => void;
   setProfile: (profile: UserProfile) => void;
-  setTheme: (theme: Theme) => void;
+  setTheme: (theme: Theme, isCustom?: boolean) => void;
   toggleTheme: () => void;
   
   addPR: (pr: PersonalRecord) => void;
@@ -223,7 +224,8 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       meals: [],
       bodyMetrics: [],
-      theme: 'light',
+      theme: 'dark',
+      hasCustomTheme: false,
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
@@ -334,7 +336,7 @@ export const useAppStore = create<AppState>()(
         };
       }),
       
-      setTheme: (theme) => {
+      setTheme: (theme, isCustom = true) => {
         if (typeof document !== 'undefined') {
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
@@ -344,7 +346,7 @@ export const useAppStore = create<AppState>()(
             document.documentElement.classList.add('light');
           }
         }
-        set({ theme });
+        set({ theme, hasCustomTheme: isCustom });
       },
 
       toggleTheme: () => set((state) => {
@@ -358,7 +360,7 @@ export const useAppStore = create<AppState>()(
             document.documentElement.classList.add('light');
           }
         }
-        return { theme: nextTheme };
+        return { theme: nextTheme, hasCustomTheme: true };
       }),
       
       addPR: (pr) => set((state) => ({ prs: [...state.prs, pr] })),
@@ -870,6 +872,7 @@ export const useAppStore = create<AppState>()(
             prTargets: data.prTargets || state.prTargets,
             macroGoals: data.macroGoals !== undefined ? data.macroGoals : state.macroGoals,
             theme: data.theme || state.theme,
+            hasCustomTheme: data.hasCustomTheme !== undefined ? data.hasCustomTheme : state.hasCustomTheme,
             hasCompletedOnboarding:
               data.hasCompletedOnboarding !== undefined
                 ? data.hasCompletedOnboarding
@@ -1028,15 +1031,20 @@ export const useAppStore = create<AppState>()(
             state.refreshLifterProfile();
           }
 
-          // Apply active theme to DOM immediately upon hydration
-          if (typeof document !== 'undefined') {
-            const currentTheme = state.theme || 'light';
-            if (currentTheme === 'dark') {
-              document.documentElement.classList.add('dark');
-              document.documentElement.classList.remove('light');
+          // Auto-sync with device theme if not manually customized by athlete
+          if (typeof window !== 'undefined') {
+            if (!state.hasCustomTheme && window.matchMedia) {
+              const deviceTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+              state.setTheme(deviceTheme, false);
             } else {
-              document.documentElement.classList.remove('dark');
-              document.documentElement.classList.add('light');
+              const currentTheme = state.theme || 'dark';
+              if (currentTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.documentElement.classList.remove('light');
+              } else {
+                document.documentElement.classList.remove('dark');
+                document.documentElement.classList.add('light');
+              }
             }
           }
         }
@@ -1048,6 +1056,7 @@ export const useAppStore = create<AppState>()(
         meals: state.meals,
         bodyMetrics: state.bodyMetrics,
         theme: state.theme,
+        hasCustomTheme: state.hasCustomTheme,
         prTargets: state.prTargets,
         macroGoals: state.macroGoals,
         plannedWorkouts: state.plannedWorkouts,
@@ -1099,6 +1108,7 @@ if (typeof window !== 'undefined') {
             goals: state.goals,
             userMode: state.userMode,
             theme: state.theme,
+            hasCustomTheme: state.hasCustomTheme,
             hasCompletedOnboarding: state.hasCompletedOnboarding,
             savedAt: new Date().toISOString(),
           };
