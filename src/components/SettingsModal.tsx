@@ -19,8 +19,15 @@ import {
   Utensils,
   Download,
   Upload,
+  Cloud,
+  RefreshCw,
+  Database,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
+import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { getSupabaseCredentials, saveCustomSupabaseCredentials } from '@/lib/supabase/config';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
@@ -54,6 +61,18 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cloud Sync (Supabase)
+  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSupabaseSync();
+  const [showCloudConfig, setShowCloudConfig] = useState(false);
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => getSupabaseCredentials().url);
+  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => getSupabaseCredentials().anonKey);
+
+  const handleSaveSupabaseCredentials = () => {
+    saveCustomSupabaseCredentials(supabaseUrlInput, supabaseKeyInput);
+    toast.success('Saved Supabase configuration! Initiating cloud sync...', 'Cloud Backup');
+    syncNow();
+  };
 
   // Sub-modal states
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -400,10 +419,111 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 5: Data Vault & Backup */}
+          {/* Section 5: Supabase Cloud Immortality */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Data Immortality &amp; Backup
+              5. Cloud Immortality (Supabase Sync)
+            </span>
+
+            <Card variant="default" padding="sm" className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  <div>
+                    <span className="text-xs font-bold text-text-primary block">Supabase Cloud Backup</span>
+                    <span className="text-2xs text-text-muted">
+                      {syncStatus === 'synced' && `✓ Synced ${lastSyncedAt ? `at ${lastSyncedAt}` : ''}`}
+                      {syncStatus === 'syncing' && 'Syncing changes to cloud...'}
+                      {syncStatus === 'offline' && 'Offline Gym Mode • Changes queued'}
+                      {syncStatus === 'error' && (syncError ? `Issue: ${syncError}` : 'Sync issue')}
+                      {syncStatus === 'unconfigured' && 'Local only • Connect Supabase to prevent data loss'}
+                    </span>
+                  </div>
+                </div>
+                <Badge
+                  variant={
+                    syncStatus === 'synced'
+                      ? 'success'
+                      : syncStatus === 'syncing'
+                      ? 'warning'
+                      : syncStatus === 'error'
+                      ? 'danger'
+                      : 'neutral'
+                  }
+                  size="xs"
+                >
+                  {syncStatus === 'synced' ? 'SYNCED' : syncStatus === 'syncing' ? 'SYNCING' : syncStatus === 'offline' ? 'OFFLINE' : syncStatus === 'error' ? 'ERROR' : 'LOCAL ONLY'}
+                </Badge>
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex items-center gap-2 pt-0.5">
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => {
+                    syncNow();
+                    toast.info('Starting cloud sync...');
+                  }}
+                  disabled={syncStatus === 'syncing'}
+                  leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />}
+                  className="flex-1"
+                >
+                  {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowCloudConfig(!showCloudConfig)}
+                  className="flex-1 text-2xs"
+                >
+                  {showCloudConfig ? 'Hide Config' : 'Configure Cloud'}
+                </Button>
+              </div>
+
+              {/* Expandable Configuration */}
+              {showCloudConfig && (
+                <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-text-muted uppercase">Project URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://xyzcompany.supabase.co"
+                      value={supabaseUrlInput}
+                      onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border rounded-xl px-2.5 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-mono text-text-muted uppercase">Anon Public Key</label>
+                    <input
+                      type="password"
+                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                      value={supabaseKeyInput}
+                      onChange={(e) => setSupabaseKeyInput(e.target.value)}
+                      className="w-full bg-bg-secondary border border-border rounded-xl px-2.5 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
+                    />
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    fullWidth
+                    onClick={handleSaveSupabaseCredentials}
+                  >
+                    Save &amp; Connect Cloud
+                  </Button>
+                  <p className="text-[10px] text-text-muted leading-relaxed">
+                    Tables created via <code className="text-accent bg-bg-secondary px-1 py-0.5 rounded">supabase/schema.sql</code>. All queries protected with Row-Level Security (RLS).
+                  </p>
+                </div>
+              )}
+            </Card>
+          </div>
+
+          {/* Section 6: Data Vault & Manual Backup */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              6. Device Data Vault &amp; Manual JSON
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -411,11 +531,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2.5">
                   <HardDrive className="w-4 h-4 text-accent" />
                   <div>
-                    <span className="text-xs font-bold text-text-primary block">Device Data Vault</span>
-                    <span className="text-2xs text-text-muted">100% On-device storage • Prevent iOS Safari eviction</span>
+                    <span className="text-xs font-bold text-text-primary block">Device Storage Snapshot</span>
+                    <span className="text-2xs text-text-muted">Export offline JSON backup anytime</span>
                   </div>
                 </div>
-                <Badge variant="brand" size="xs">OFFLINE VAULT</Badge>
+                <Badge variant="neutral" size="xs">DEVICE FILE</Badge>
               </div>
 
               {/* 1-Tap Quick Action Buttons */}
@@ -457,10 +577,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 6: Legal Hub & Safety */}
+          {/* Section 7: Legal Hub & Safety */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              6. Safety &amp; Medical Terms
+              7. Safety &amp; Medical Terms
             </span>
 
             <Card

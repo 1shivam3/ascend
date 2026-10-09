@@ -15,8 +15,10 @@ import {
   Check,
   TrendingUp,
   Camera,
+  Database,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
 import SettingsModal from '@/components/SettingsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
@@ -107,6 +109,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     weeklySchedule,
   } = useStore();
 
+  const { status: syncStatus, syncNow } = useSupabaseSync();
   const toast = useToast();
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toLocalDateString(today), [today]);
@@ -414,7 +417,37 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {syncStatus !== 'unconfigured' && (
+            <button
+              type="button"
+              onClick={() => {
+                syncNow();
+                toast.info('Syncing data with Supabase Cloud...');
+              }}
+              className={`w-9 h-9 rounded-xl bg-bg-card border border-border/80 flex items-center justify-center transition-all shadow-xs cursor-pointer active:scale-95 ${
+                syncStatus === 'synced'
+                  ? 'text-emerald-400 hover:text-emerald-300'
+                  : syncStatus === 'syncing'
+                  ? 'text-amber-400'
+                  : syncStatus === 'offline'
+                  ? 'text-yellow-500'
+                  : 'text-rose-400'
+              }`}
+              title={
+                syncStatus === 'synced'
+                  ? 'Cloud Synced (Tap to refresh)'
+                  : syncStatus === 'syncing'
+                  ? 'Syncing to Supabase...'
+                  : syncStatus === 'offline'
+                  ? 'Offline Gym Mode (Changes queued)'
+                  : 'Sync Error'
+              }
+              aria-label="Cloud Sync Status"
+            >
+              <Database className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-pulse' : ''}`} />
+            </button>
+          )}
           <ThemeToggle />
           <button
             type="button"

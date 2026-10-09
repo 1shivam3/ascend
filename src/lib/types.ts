@@ -142,6 +142,7 @@ export interface WorkoutEntry {
   date: string; // YYYY-MM-DD
   name?: string;
   durationMinutes?: number;
+  notes?: string;
   exercises: WorkoutExercise[];
 }
 
