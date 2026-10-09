@@ -33,6 +33,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
+import AuthModal from '@/components/AuthModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -58,7 +59,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud Sync (Supabase)
-  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSupabaseSync();
+  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow, user } = useSupabaseSync();
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Sub-modal states
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -391,10 +393,32 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </Badge>
               </div>
 
+              {/* Account Link or Status */}
+              <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70 flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <span className="text-2xs font-semibold text-text-primary block truncate">
+                    {user && !user.isAnonymous && user.email ? user.email : 'Guest / Device Session'}
+                  </span>
+                  <span className="text-3xs text-text-muted block">
+                    {user && !user.isAnonymous
+                      ? 'Cloud sync connected across devices'
+                      : 'Link Google or Email to backup forever'}
+                  </span>
+                </div>
+                <Button
+                  variant={user && !user.isAnonymous ? 'secondary' : 'primary'}
+                  size="sm"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  className="shrink-0 text-2xs px-2.5 py-1"
+                >
+                  {user && !user.isAnonymous ? 'Account' : 'Link Account'}
+                </Button>
+              </div>
+
               {/* 1-Tap Sync Action Button */}
               <div className="pt-0.5">
                 <Button
-                  variant="primary"
+                  variant="secondary"
                   size="sm"
                   onClick={() => {
                     syncNow();
@@ -557,6 +581,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />
       <HydrationModal isOpen={isHydrationOpen} onClose={() => setIsHydrationOpen(false)} />
       <CreatineModal isOpen={isCreatineOpen} onClose={() => setIsCreatineOpen(false)} />
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
     </>
   );
 }

@@ -4,25 +4,40 @@ import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, 
 
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
+export interface AuthUser {
+  id: string;
+  email?: string;
+  name?: string;
+  isAnonymous: boolean;
+}
+
+type SyncListener = (
+  status: SyncStatus,
+  lastSyncedAt: string | null,
+  error: string | null,
+  user: AuthUser | null
+) => void;
+
 class SupabaseSyncEngine {
   private status: SyncStatus = 'unconfigured';
   private lastSyncedAt: string | null = null;
   private errorMessage: string | null = null;
-  private listeners: Set<(status: SyncStatus, lastSyncedAt: string | null, error: string | null) => void> = new Set();
+  private currentUser: AuthUser | null = null;
+  private listeners: Set<SyncListener> = new Set();
   private debounceTimer: any = null;
   private isSyncing = false;
   private initialized = false;
 
-  public subscribe(cb: (status: SyncStatus, lastSyncedAt: string | null, error: string | null) => void) {
+  public subscribe(cb: SyncListener) {
     this.listeners.add(cb);
-    cb(this.status, this.lastSyncedAt, this.errorMessage);
+    cb(this.status, this.lastSyncedAt, this.errorMessage, this.currentUser);
     return () => {
       this.listeners.delete(cb);
     };
   }
 
   private notify() {
-    this.listeners.forEach((cb) => cb(this.status, this.lastSyncedAt, this.errorMessage));
+    this.listeners.forEach((cb) => cb(this.status, this.lastSyncedAt, this.errorMessage, this.currentUser));
   }
 
   public getStatus() {
@@ -30,6 +45,7 @@ class SupabaseSyncEngine {
       status: this.status,
       lastSyncedAt: this.lastSyncedAt,
       error: this.errorMessage,
+      user: this.currentUser,
     };
   }
 
@@ -59,12 +75,28 @@ class SupabaseSyncEngine {
       this.notify();
     });
 
+    // Listen to Supabase auth state changes (OAuth callbacks, token refresh, magic link)
+    supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        this.currentUser = {
+          id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+          isAnonymous: Boolean(session.user.is_anonymous),
+        };
+        this.notify();
+        this.triggerSyncNow();
+      } else {
+        this.currentUser = null;
+        this.notify();
+      }
+    });
+
     // Listen to local store changes for debounced push
     useStore.subscribe((state, prevState) => {
       if (!this.initialized || this.isSyncing) return;
       if (!navigator.onLine) return;
 
-      // Check if critical records changed
       const hasChanged =
         state.profile !== prevState.profile ||
         state.prs.length !== prevState.prs.length ||
@@ -81,7 +113,85 @@ class SupabaseSyncEngine {
     // Run initial sync on launch
     setTimeout(() => {
       this.triggerSyncNow();
-    }, 1000);
+    }, 800);
+  }
+
+  public async signInWithGoogle(): Promise<{ error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { error: 'Supabase is not configured' };
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
+      if (error) return { error: error.message };
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Google sign-in failed' };
+    }
+  }
+
+  public async sendEmailOtp(email: string): Promise<{ error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { error: 'Supabase is not configured' };
+
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
+      if (error) return { error: error.message };
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Failed to send login code' };
+    }
+  }
+
+  public async verifyEmailOtp(email: string, token: string): Promise<{ error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { error: 'Supabase is not configured' };
+
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: token.trim(),
+        type: 'email',
+      });
+      if (error) return { error: error.message };
+      if (data.user) {
+        this.currentUser = {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.full_name || data.user.user_metadata?.name,
+          isAnonymous: Boolean(data.user.is_anonymous),
+        };
+        this.notify();
+        await this.triggerSyncNow();
+      }
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Failed to verify code' };
+    }
+  }
+
+  public async signOut(): Promise<{ error?: string }> {
+    const supabase = getSupabase();
+    if (!supabase) return { error: 'Supabase is not configured' };
+
+    try {
+      const { error } = await supabase.auth.signOut();
+      this.currentUser = null;
+      this.status = 'unconfigured';
+      this.notify();
+      return error ? { error: error.message } : {};
+    } catch (err: any) {
+      return { error: err?.message || 'Sign out failed' };
+    }
   }
 
   private scheduleDebouncedPush() {
@@ -119,14 +229,20 @@ class SupabaseSyncEngine {
         // Attempt anonymous sign in so user does not need to enter credentials
         const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously();
         if (anonErr) {
-          // If anonymous sign-in is disabled in Supabase dashboard, notify gently
-          console.warn('Supabase anonymous sign-in disabled or failed:', anonErr.message);
+          console.warn('Supabase anonymous sign-in failed:', anonErr.message);
         } else {
           user = anonData.user;
         }
       }
 
-      if (!user) {
+      if (user) {
+        this.currentUser = {
+          id: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name || user.user_metadata?.name,
+          isAnonymous: Boolean(user.is_anonymous),
+        };
+      } else {
         this.status = 'unconfigured';
         this.errorMessage = 'Sign in or enable Anonymous Auth in Supabase';
         this.isSyncing = false;
