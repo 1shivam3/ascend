@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Mail, Shield, ArrowRight, Loader2, CheckCircle2, RefreshCw } from 'lucide-react';
+import { X, Shield, Loader2, CheckCircle2, Cloud } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -13,13 +13,9 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const { user, signInWithGoogle, sendEmailOtp, verifyEmailOtp, signOut } = useSupabaseSync();
+  const { user, signInWithGoogle, signOut } = useSupabaseSync();
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
-
-  const [email, setEmail] = useState('');
-  const [token, setToken] = useState('');
-  const [step, setStep] = useState<'email' | 'otp'>('email');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -40,48 +36,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         toast.error(error, 'Google Sign-In Failed');
         setLoading(false);
       }
-      // On success, browser redirects to Google OAuth flow
+      // On success, browser will redirect to Google's official OAuth consent
     } catch {
       toast.error('Could not initiate Google sign in.', 'Sign-In Error');
       setLoading(false);
-    }
-  };
-
-  const handleSendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !email.includes('@')) {
-      toast.error('Please enter a valid email address.');
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await sendEmailOtp(email.trim());
-    setLoading(false);
-
-    if (error) {
-      toast.error(error, 'Email Failed');
-    } else {
-      setStep('otp');
-      toast.success(`Login code and magic link sent to ${email}`, 'Check Your Inbox');
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token.trim()) {
-      toast.error('Please enter the code from your email.');
-      return;
-    }
-
-    setLoading(true);
-    const { error } = await verifyEmailOtp(email, token);
-    setLoading(false);
-
-    if (error) {
-      toast.error(error, 'Verification Failed');
-    } else {
-      toast.success('Successfully signed in! Your workouts are synced.', 'Welcome Back');
-      onClose();
     }
   };
 
@@ -94,14 +52,14 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         <div className="flex items-center justify-between pb-2 border-b border-border/70">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-              <Shield className="w-4 h-4" />
+              <Cloud className="w-4 h-4" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary tracking-tight font-sans">
-                {isPermanentUser ? 'Cloud Account' : 'Connect Cloud Account'}
+                {isPermanentUser ? 'Cloud Account' : 'Link Google Account'}
               </h2>
               <p className="text-3xs text-text-muted font-mono">
-                {isPermanentUser ? 'Permanent Backup Active' : 'Never lose your workouts'}
+                {isPermanentUser ? 'Cloud Backup Active' : 'Never lose your workouts'}
               </p>
             </div>
           </div>
@@ -120,13 +78,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center gap-2 text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span className="text-xs font-bold">Cloud Sync Connected</span>
+                <span className="text-xs font-bold">Google Account Connected</span>
               </div>
               <p className="text-2xs text-text-primary font-mono truncate">
                 {user.email}
               </p>
-              <p className="text-3xs text-text-muted">
-                All your PRs, workouts, meals, and body metrics are safely saved to PostgreSQL.
+              <p className="text-3xs text-text-muted leading-relaxed">
+                All your PRs, workouts, meals, and body metrics are safely synced with PostgreSQL.
               </p>
             </div>
 
@@ -144,18 +102,33 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </Button>
           </div>
         ) : (
-          /* Sign-In Options */
+          /* Sign-In With Google */
           <div className="space-y-4 pt-1">
             <p className="text-2xs text-text-secondary leading-relaxed">
-              Lock in your training history forever. Access your workouts from your phone, laptop, or any new device.
+              Link your Google account in 1 tap to save all your PRs, workouts, and meals permanently.
             </p>
 
-            {/* 1. Continue with Google */}
+            <div className="space-y-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/60 text-2xs text-text-muted">
+              <div className="flex items-center gap-2 text-text-primary">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span>Instant cross-device sync (phone &amp; laptop)</span>
+              </div>
+              <div className="flex items-center gap-2 text-text-primary">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span>Zero data loss when clearing browser cache</span>
+              </div>
+              <div className="flex items-center gap-2 text-text-primary">
+                <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span>Existing workouts are linked automatically</span>
+              </div>
+            </div>
+
+            {/* Continue with Google Button */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 font-semibold text-xs transition-all shadow-sm active:scale-98 cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white hover:bg-zinc-100 active:scale-98 text-zinc-900 font-semibold text-xs sm:text-sm transition-all shadow-md cursor-pointer disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-zinc-900" />
@@ -182,87 +155,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <span>Continue with Google</span>
             </button>
 
-            {/* Divider */}
-            <div className="relative flex items-center justify-center">
-              <div className="border-t border-border w-full" />
-              <span className="bg-bg-card px-2.5 text-3xs font-mono uppercase text-text-muted absolute">
-                or with email
-              </span>
+            <div className="flex items-center justify-center gap-1.5 text-3xs text-text-muted pt-1">
+              <Shield className="w-3 h-3 text-emerald-500 shrink-0" />
+              <span>Protected by PostgreSQL Row-Level Security</span>
             </div>
-
-            {/* 2. Email Sign-In */}
-            {step === 'email' ? (
-              <form onSubmit={handleSendCode} className="space-y-2.5">
-                <div className="space-y-1">
-                  <label className="text-3xs font-mono uppercase text-text-muted">Email Address</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      required
-                      placeholder="athlete@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full bg-bg-secondary border border-border rounded-xl px-3 py-2 pl-8 text-xs text-text-primary font-mono focus:border-accent outline-none"
-                    />
-                    <Mail className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-2.5" />
-                  </div>
-                </div>
-
-                <Button
-                  variant="primary"
-                  size="sm"
-                  fullWidth
-                  type="submit"
-                  disabled={loading}
-                  leftIcon={loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
-                >
-                  {loading ? 'Sending...' : 'Send Login Code'}
-                </Button>
-              </form>
-            ) : (
-              <form onSubmit={handleVerifyOtp} className="space-y-2.5 animate-fade-in">
-                <div className="space-y-1">
-                  <label className="text-3xs font-mono uppercase text-text-muted">Enter 6-Digit Code</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={10}
-                    placeholder="123456"
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    className="w-full text-center tracking-widest bg-bg-secondary border border-border rounded-xl px-3 py-2 text-sm text-text-primary font-mono focus:border-accent outline-none font-bold"
-                  />
-                  <p className="text-3xs text-text-muted text-center pt-0.5">
-                    Sent to <span className="text-text-primary">{email}</span>
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="flex-1"
-                    type="submit"
-                    disabled={loading}
-                    leftIcon={loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : undefined}
-                  >
-                    {loading ? 'Verifying...' : 'Verify & Sign In'}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    type="button"
-                    onClick={() => setStep('email')}
-                  >
-                    Change
-                  </Button>
-                </div>
-              </form>
-            )}
-
-            <p className="text-3xs text-text-muted text-center pt-1 leading-relaxed">
-              Protected by PostgreSQL Row-Level Security. We will never sell your data or send spam.
-            </p>
           </div>
         )}
       </div>

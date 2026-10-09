@@ -402,7 +402,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   <span className="text-3xs text-text-muted block">
                     {user && !user.isAnonymous
                       ? 'Cloud sync connected across devices'
-                      : 'Link Google or Email to backup forever'}
+                      : 'Link Google account to backup forever'}
                   </span>
                 </div>
                 <Button
@@ -411,7 +411,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   onClick={() => setIsAuthModalOpen(true)}
                   className="shrink-0 text-2xs px-2.5 py-1"
                 >
-                  {user && !user.isAnonymous ? 'Account' : 'Link Account'}
+                  {user && !user.isAnonymous ? 'Account' : 'Link Google'}
                 </Button>
               </div>
 
