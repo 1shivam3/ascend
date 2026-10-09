@@ -223,32 +223,22 @@ class SupabaseSyncEngine {
 
     try {
       // 1. Ensure active session
-      let { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        // Attempt anonymous sign in so user does not need to enter credentials
-        const { data: anonData, error: anonErr } = await supabase.auth.signInAnonymously();
-        if (anonErr) {
-          console.warn('Supabase anonymous sign-in failed:', anonErr.message);
-        } else {
-          user = anonData.user;
-        }
-      }
-
-      if (user) {
-        this.currentUser = {
-          id: user.id,
-          email: user.email,
-          name: user.user_metadata?.full_name || user.user_metadata?.name,
-          isAnonymous: Boolean(user.is_anonymous),
-        };
-      } else {
+        this.currentUser = null;
         this.status = 'unconfigured';
-        this.errorMessage = 'Sign in or enable Anonymous Auth in Supabase';
         this.isSyncing = false;
         this.notify();
         return;
       }
+
+      this.currentUser = {
+        id: user.id,
+        email: user.email,
+        name: user.user_metadata?.full_name || user.user_metadata?.name,
+        isAnonymous: Boolean(user.is_anonymous),
+      };
 
       // 2. Pull remote records
       const [remoteProfile, remotePRs, remoteWorkouts, remoteMeals, remoteMetrics, remotePlans] = await Promise.all([

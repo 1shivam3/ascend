@@ -326,7 +326,14 @@ export const useAppStore = create<AppState>()(
         if (!nextFavorites || nextFavorites.length === 0) {
           nextFavorites = DEFAULT_FAVORITE_FOODS;
         }
-        const nextGoals = profile.goals && profile.goals.length > 0 ? profile.goals : (state.goals || ['get_stronger', 'build_muscle']);
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('ascend_logged_out');
+          } catch {}
+        }
+        const nextGoals = (profile.goals && profile.goals.length > 0)
+          ? profile.goals
+          : (state.goals && state.goals.length > 0 ? state.goals : ['build_muscle' as AthleteGoal]);
         return {
           profile: { ...profile, goals: nextGoals },
           goals: nextGoals,
@@ -814,6 +821,14 @@ export const useAppStore = create<AppState>()(
       },
 
       logout: (options) => {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('ascend_logged_out', 'true');
+            localStorage.removeItem('ascend_emergency_snapshot');
+            localStorage.removeItem('ascend_profile');
+          } catch {}
+        }
+
         if (options?.clearLocalData) {
           set({
             profile: null,
@@ -863,6 +878,11 @@ export const useAppStore = create<AppState>()(
       importAllData: (data) => {
         try {
           if (!data || typeof data !== 'object') return false;
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.removeItem('ascend_logged_out');
+            } catch {}
+          }
           set((state) => ({
             profile: data.profile || state.profile,
             prs: Array.isArray(data.prs) ? data.prs : state.prs,
@@ -915,6 +935,11 @@ export const useAppStore = create<AppState>()(
           // Disaster Recovery: If profile is missing or PRs/workouts are empty, check fallbacks
           if (typeof window !== 'undefined') {
             try {
+              if (localStorage.getItem('ascend_logged_out') === 'true') {
+                // Athlete explicitly logged out. Do not resurrect old profile session.
+                return;
+              }
+
               // 1. Check emergency snapshot
               const rawSnap = localStorage.getItem('ascend_emergency_snapshot');
               if (rawSnap) {

@@ -15,7 +15,6 @@ import {
   HardDrive,
   AlertTriangle,
   FolderOpen,
-  Key,
   FileSpreadsheet,
 } from 'lucide-react';
 
@@ -35,8 +34,6 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const favoriteFoods = useStore((state) => state.favoriteFoods || []);
   const theme = useStore((state) => state.theme);
-  const customGeminiKey = useStore((state) => state.customGeminiKey);
-  const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const importAllData = useStore((state) => state.importAllData);
   const clearAllData = useStore((state) => state.clearAllData);
   const addWorkout = useStore((state) => state.addWorkout);
@@ -48,8 +45,6 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
-  const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
-  const [keySaved, setKeySaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -430,56 +425,6 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             <div className="flex items-center gap-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/40 text-2xs text-text-muted font-mono">
               <Shield className="w-4 h-4 text-emerald-500 flex-shrink-0" />
               <span>Your data stays 100% on your device. Backups are saved directly to your phone files.</span>
-            </div>
-
-            {/* Google Gemini AI Configuration */}
-            <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Key className="w-4 h-4 text-accent" />
-                  <span className="text-2xs font-mono uppercase font-bold text-text-primary">
-                    Google Gemini AI Key (Optional)
-                  </span>
-                </div>
-                {customGeminiKey ? (
-                  <span className="text-3xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 font-semibold">
-                    Custom Key Active
-                  </span>
-                ) : (
-                  <span className="text-3xs px-2 py-0.5 rounded-full bg-bg-elevated text-text-muted">
-                    Default Cloud / Offline
-                  </span>
-                )}
-              </div>
-
-              <p className="text-2xs text-text-secondary leading-relaxed">
-                ASCEND works completely offline with built-in coach intelligence. When online, provide your own Gemini API key to use your personal quota.
-              </p>
-
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  placeholder="AIzaSy... (leave blank for default)"
-                  className="flex-1 px-3 py-1.5 rounded-lg border border-border bg-bg-primary text-text-primary text-xs focus:outline-none focus:border-accent font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomGeminiKey(apiKeyInput);
-                    setKeySaved(true);
-                    toast.success(
-                      apiKeyInput.trim() ? 'Personal Gemini key saved!' : 'Switched to default server AI.',
-                      'AI Settings'
-                    );
-                    setTimeout(() => setKeySaved(false), 2000);
-                  }}
-                  className="btn-secondary py-1.5 px-3 text-xs font-semibold"
-                >
-                  {keySaved ? 'Saved!' : 'Save'}
-                </button>
-              </div>
             </div>
 
             {/* Reset / Delete Danger Area */}

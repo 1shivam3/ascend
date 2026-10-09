@@ -26,7 +26,6 @@ import {
   ArrowRight,
   Send,
   Zap,
-  Key,
   Check,
 } from 'lucide-react';
 
@@ -55,11 +54,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [isCapturingFrame, setIsCapturingFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-
-  // Gemini API Key config state
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState(store.customGeminiKey || '');
-  const [isKeySaved, setIsKeySaved] = useState(false);
 
   // Flow states: 'select' | 'analyzing' | 'review'
   const [step, setStep] = useState<'select' | 'analyzing' | 'review'>('select');
@@ -230,7 +224,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setRefinementInput('');
     setShowAddItem(false);
     setScanError(null);
-    setShowApiKeyInput(false);
   };
 
   const handleClose = () => {
@@ -302,20 +295,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     );
   };
 
-  const handleSaveApiKey = () => {
-    const trimmed = apiKeyInput.trim();
-    store.setCustomGeminiKey(trimmed);
-    if (trimmed) {
-      toast.success('Custom Gemini API key saved!', 'API Key Saved');
-      setIsKeySaved(true);
-      setTimeout(() => setIsKeySaved(false), 2000);
-      setScanError(null);
-    } else {
-      toast.info('Custom Gemini API key cleared. Using server default.', 'Key Cleared');
-      setScanError(null);
-    }
-  };
-
   const applyLearnedPortionPreferences = (result: MealAnalysisResult): MealAnalysisResult => {
     const preferences = store.userPortionPreferences || {};
     if (Object.keys(preferences).length === 0) return result;
@@ -384,18 +363,18 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setStep('review');
     } catch (err: any) {
       console.error('Meal scan failed:', err);
-      const errorMsg =
-        err?.message || 'Failed to analyze meal photo with Gemini. Please try again.';
+      const rawErrorMsg =
+        err?.message || 'Failed to analyze meal photo. Please try again.';
+      const isKeyErr =
+        rawErrorMsg.toLowerCase().includes('api key') ||
+        rawErrorMsg.toLowerCase().includes('key configured') ||
+        rawErrorMsg.toLowerCase().includes('no_api_key');
+      const errorMsg = isKeyErr
+        ? 'Cloud meal recognition is temporarily unavailable. You can use instant offline food estimation below.'
+        : rawErrorMsg;
       setScanError(errorMsg);
       toast.error(errorMsg, 'Analysis Notice');
       setStep('select');
-      if (
-        errorMsg.toLowerCase().includes('api key') ||
-        errorMsg.toLowerCase().includes('key configured') ||
-        errorMsg.toLowerCase().includes('no_api_key')
-      ) {
-        setShowApiKeyInput(true);
-      }
     }
   };
 
@@ -641,108 +620,18 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowApiKeyInput((prev) => !prev)}
-              className={`p-1.5 rounded-lg border transition-colors flex items-center gap-1 text-2xs font-mono ${
-                store.customGeminiKey
-                  ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
-                  : 'border-border text-text-muted hover:text-text-primary hover:bg-bg-secondary'
-              }`}
-              title={store.customGeminiKey ? 'Custom Gemini API Key Active' : 'Configure Gemini API Key'}
-            >
-              <Key className="w-4 h-4 text-accent" />
-              {store.customGeminiKey && (
-                <span className="hidden sm:inline text-3xs font-bold text-emerald-400">KEY ACTIVE</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleClose}
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* ── STEP 1: SELECT / CAPTURE PHOTO ───────────────────────────────── */}
         {step === 'select' && (
           <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
-            {/* Inline Gemini API Key Setup Card */}
-            {(showApiKeyInput ||
-              (scanError &&
-                (scanError.toLowerCase().includes('api key') ||
-                  scanError.toLowerCase().includes('key configured') ||
-                  scanError.toLowerCase().includes('no_api_key')))) && (
-              <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2.5 animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
-                    <Key className="w-3.5 h-3.5" />
-                    <span>Gemini API Key Configuration</span>
-                  </div>
-                  {store.customGeminiKey ? (
-                    <span className="text-3xs font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1.5 py-0.5 rounded">
-                      ACTIVE KEY
-                    </span>
-                  ) : (
-                    <span className="text-3xs font-mono font-bold bg-bg-card text-text-muted border border-border px-1.5 py-0.5 rounded">
-                      DEFAULT (.env.local)
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-2xs text-text-muted leading-relaxed">
-                  Enter your Google Gemini API key to enable instant photo meal recognition. Your key is stored securely in your browser&apos;s local storage.
-                </p>
-
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={apiKeyInput}
-                    onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="Paste Gemini API key (e.g. AIzaSy...)"
-                    className="flex-1 py-1.5 px-3 rounded-lg bg-bg-card border border-border text-xs text-text-primary focus:border-accent outline-none font-mono placeholder:text-text-muted"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleSaveApiKey}
-                    className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 flex items-center gap-1"
-                  >
-                    {isKeySaved ? <Check className="w-3.5 h-3.5 text-white" /> : null}
-                    <span>{isKeySaved ? 'Saved' : 'Save Key'}</span>
-                  </button>
-                  {store.customGeminiKey && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setApiKeyInput('');
-                        store.setCustomGeminiKey('');
-                        toast.info('Custom API key removed.', 'Cleared');
-                      }}
-                      className="btn-secondary py-1.5 px-2.5 text-xs font-bold shrink-0 text-text-muted hover:text-red-400"
-                      title="Clear key"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between text-3xs text-text-muted pt-0.5">
-                  <span>Free key available at Google AI Studio</span>
-                  <a
-                    href="https://aistudio.google.com/apikey"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent underline font-semibold hover:text-accent-hover"
-                  >
-                    Get Free Key &rarr;
-                  </a>
-                </div>
-              </div>
-            )}
-
             {scanError && (
               <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/25 text-xs text-red-600 dark:text-red-400 space-y-2 animate-fade-in">
                 <div className="flex items-start gap-2.5">
@@ -757,17 +646,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                 <div className="flex items-center gap-2 pt-1 border-t border-red-500/20">
                   <button
                     type="button"
-                    onClick={() => setShowApiKeyInput(true)}
-                    className="text-2xs font-semibold text-accent underline flex items-center gap-1"
-                  >
-                    <Key className="w-3 h-3" />
-                    <span>Enter Gemini Key</span>
-                  </button>
-                  <span className="text-border">•</span>
-                  <button
-                    type="button"
                     onClick={handleOfflineEstimate}
-                    className="text-2xs font-semibold text-text-secondary hover:text-text-primary underline flex items-center gap-1"
+                    className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
                   >
                     <Zap className="w-3 h-3 text-amber-400" />
                     <span>Estimate with Offline DB</span>

@@ -113,6 +113,9 @@ export default function OnboardingScreen() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
+        if (localStorage.getItem('ascend_logged_out') === 'true') {
+          return;
+        }
         const snap = localStorage.getItem('ascend_emergency_snapshot');
         if (snap) {
           const parsed = JSON.parse(snap);
@@ -221,6 +224,12 @@ export default function OnboardingScreen() {
       weightKg: Math.round(bodyweightKg * 10) / 10,
       notes: 'Initial Calibration',
     });
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
 
     toast.success(`Welcome to ASCEND, ${athleteName.split(' ')[0]}!`, 'Training Calibrated');
   };

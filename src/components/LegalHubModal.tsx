@@ -141,6 +141,7 @@ export default function LegalHubModal({
               <Link
                 href="/privacy"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="text-accent hover:underline flex items-center gap-1"
               >
                 <span>Read Full Privacy Policy</span>
@@ -179,6 +180,7 @@ export default function LegalHubModal({
               <Link
                 href="/terms"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="text-accent hover:underline flex items-center gap-1"
               >
                 <span>Read Full Terms of Service</span>
@@ -222,6 +224,7 @@ export default function LegalHubModal({
               <Link
                 href="/disclaimer"
                 target="_blank"
+                rel="noopener noreferrer"
                 className="text-accent hover:underline flex items-center gap-1"
               >
                 <span>Read Medical Disclaimer</span>

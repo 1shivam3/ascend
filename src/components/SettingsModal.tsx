@@ -58,7 +58,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud Sync (Supabase)
-  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow, user } = useSupabaseSync();
+  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow, user, signOut } = useSupabaseSync();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Sub-modal states
@@ -121,14 +121,16 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     toast.info(`Preferred unit switched to ${nextUnit.toUpperCase()}`, 'Unit Updated');
   };
 
-  const handleConfirmLogout = () => {
+  const handleConfirmLogout = async () => {
     setShowLogoutConfirm(false);
     onClose();
+    try {
+      await signOut();
+    } catch (err) {
+      console.warn('Sign out warning:', err);
+    }
     logout({ clearLocalData: false });
     toast.info('Logged out. Switched to welcome screen.', 'Logged Out');
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
-    }
   };
 
   return (
