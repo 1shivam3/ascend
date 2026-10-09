@@ -19,7 +19,6 @@ import {
   Utensils,
   Download,
   Upload,
-  Cloud,
   RefreshCw,
   Database,
   CheckCircle2,
@@ -27,7 +26,6 @@ import {
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
-import { getSupabaseCredentials, saveCustomSupabaseCredentials } from '@/lib/supabase/config';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import DataVaultModal from '@/components/DataVaultModal';
 import LegalHubModal from '@/components/LegalHubModal';
@@ -53,26 +51,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const setUserMode = useStore((state) => state.setUserMode);
   const logout = useStore((state) => state.logout);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
-  const customGeminiKey = useStore((state) => state.customGeminiKey);
-  const setCustomGeminiKey = useStore((state) => state.setCustomGeminiKey);
   const importAllData = useStore((state) => state.importAllData);
   const toast = useToast();
 
-  const [apiKeyInput, setApiKeyInput] = useState(customGeminiKey || '');
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud Sync (Supabase)
   const { status: syncStatus, lastSyncedAt, error: syncError, syncNow } = useSupabaseSync();
-  const [showCloudConfig, setShowCloudConfig] = useState(false);
-  const [supabaseUrlInput, setSupabaseUrlInput] = useState(() => getSupabaseCredentials().url);
-  const [supabaseKeyInput, setSupabaseKeyInput] = useState(() => getSupabaseCredentials().anonKey);
-
-  const handleSaveSupabaseCredentials = () => {
-    saveCustomSupabaseCredentials(supabaseUrlInput, supabaseKeyInput);
-    toast.success('Saved Supabase configuration! Initiating cloud sync...', 'Cloud Backup');
-    syncNow();
-  };
 
   // Sub-modal states
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -125,16 +111,6 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       }
     };
     reader.readAsText(file);
-  };
-
-  const handleSaveApiKey = () => {
-    const trimmed = apiKeyInput.trim();
-    setCustomGeminiKey(trimmed);
-    if (trimmed) {
-      toast.success('Custom Gemini API key saved!', 'API Key Configured');
-    } else {
-      toast.info('Cleared custom Gemini API key. App uses offline fallback.', 'Key Cleared');
-    }
   };
 
   const handleToggleUnit = (nextUnit: 'kg' | 'lbs') => {
@@ -378,51 +354,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 4: AI Configuration */}
+          {/* Section 4: Cloud Immortality & Sync */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              4. Intelligence Engine &amp; API Key
-            </span>
-
-            <Card variant="default" padding="sm" className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Key className="w-4 h-4 text-accent" />
-                  <span className="text-xs font-bold text-text-primary">Gemini 2.5 Flash API Key</span>
-                </div>
-                <Badge variant={customGeminiKey ? 'success' : 'neutral'} size="xs">
-                  {customGeminiKey ? 'Active' : 'Offline Engine'}
-                </Badge>
-              </div>
-
-              <p className="text-2xs text-text-secondary leading-relaxed">
-                ASCEND executes 100% of training calculations on-device. An optional Gemini key powers instant multi-image meal scanning and AI coaching.
-              </p>
-
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  placeholder="AIzaSy... (leave empty for on-device default)"
-                  value={apiKeyInput}
-                  onChange={(e) => setApiKeyInput(e.target.value)}
-                  className="flex-1 bg-bg-secondary border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
-                />
-                <Button variant="primary" size="sm" onClick={handleSaveApiKey}>
-                  Save
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-1.5 text-[10px] text-text-muted">
-                <Shield className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Stored only in your browser local storage. Never transmitted to third parties.</span>
-              </div>
-            </Card>
-          </div>
-
-          {/* Section 5: Supabase Cloud Immortality */}
-          <div className="space-y-1.5">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Cloud Immortality (Supabase Sync)
+              4. Cloud Backup &amp; Sync
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -430,13 +365,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2.5">
                   <Database className="w-4 h-4 text-emerald-400" />
                   <div>
-                    <span className="text-xs font-bold text-text-primary block">Supabase Cloud Backup</span>
+                    <span className="text-xs font-bold text-text-primary block">Automatic Cloud Backup</span>
                     <span className="text-2xs text-text-muted">
-                      {syncStatus === 'synced' && `✓ Synced ${lastSyncedAt ? `at ${lastSyncedAt}` : ''}`}
-                      {syncStatus === 'syncing' && 'Syncing changes to cloud...'}
+                      {syncStatus === 'synced' && `✓ Synced with Cloud ${lastSyncedAt ? `(${lastSyncedAt})` : ''}`}
+                      {syncStatus === 'syncing' && 'Syncing changes with cloud...'}
                       {syncStatus === 'offline' && 'Offline Gym Mode • Changes queued'}
                       {syncStatus === 'error' && (syncError ? `Issue: ${syncError}` : 'Sync issue')}
-                      {syncStatus === 'unconfigured' && 'Local only • Connect Supabase to prevent data loss'}
+                      {syncStatus === 'unconfigured' && 'Local only • Changes saved on this device'}
                     </span>
                   </div>
                 </div>
@@ -456,74 +391,29 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </Badge>
               </div>
 
-              {/* Action Bar */}
-              <div className="flex items-center gap-2 pt-0.5">
+              {/* 1-Tap Sync Action Button */}
+              <div className="pt-0.5">
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={() => {
                     syncNow();
-                    toast.info('Starting cloud sync...');
+                    toast.info('Syncing data with cloud...');
                   }}
                   disabled={syncStatus === 'syncing'}
                   leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />}
-                  className="flex-1"
+                  fullWidth
                 >
                   {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
                 </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => setShowCloudConfig(!showCloudConfig)}
-                  className="flex-1 text-2xs"
-                >
-                  {showCloudConfig ? 'Hide Config' : 'Configure Cloud'}
-                </Button>
               </div>
-
-              {/* Expandable Configuration */}
-              {showCloudConfig && (
-                <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-text-muted uppercase">Project URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://xyzcompany.supabase.co"
-                      value={supabaseUrlInput}
-                      onChange={(e) => setSupabaseUrlInput(e.target.value)}
-                      className="w-full bg-bg-secondary border border-border rounded-xl px-2.5 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-mono text-text-muted uppercase">Anon Public Key</label>
-                    <input
-                      type="password"
-                      placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
-                      value={supabaseKeyInput}
-                      onChange={(e) => setSupabaseKeyInput(e.target.value)}
-                      className="w-full bg-bg-secondary border border-border rounded-xl px-2.5 py-1.5 text-xs text-text-primary font-mono focus:border-accent outline-none"
-                    />
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    fullWidth
-                    onClick={handleSaveSupabaseCredentials}
-                  >
-                    Save &amp; Connect Cloud
-                  </Button>
-                  <p className="text-[10px] text-text-muted leading-relaxed">
-                    Tables created via <code className="text-accent bg-bg-secondary px-1 py-0.5 rounded">supabase/schema.sql</code>. All queries protected with Row-Level Security (RLS).
-                  </p>
-                </div>
-              )}
             </Card>
           </div>
 
-          {/* Section 6: Data Vault & Manual Backup */}
+          {/* Section 5: Data Vault & Manual Backup */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              6. Device Data Vault &amp; Manual JSON
+              5. Device Data Vault &amp; Manual JSON
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -577,10 +467,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 7: Legal Hub & Safety */}
+          {/* Section 6: Legal Hub & Safety */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              7. Safety &amp; Medical Terms
+              6. Safety &amp; Medical Terms
             </span>
 
             <Card
