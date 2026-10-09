@@ -136,17 +136,36 @@ export async function POST(req: Request) {
     };
 
     const prompt = `You are ASCEND's precision AI Sports Nutritionist, Supplement Analyst, and Computer Vision Food Classifier.
-Analyze the attached photograph with high clinical and athletic precision.
+Analyze the attached photograph with clinical precision.
 
-CATEGORY INSTRUCTIONS:
-1. FITNESS SUPPLEMENTS (VERY IMPORTANT):
-   - If the photo shows a fitness supplement container, tub, box, bag, or shaker (e.g., Creatine, Whey Protein, Casein, Pre-Workout, BCAA, Mass Gainer, Multivitamin, Fish Oil, Protein Bar, Electrolytes):
-     - Carefully read visible branding and labels (e.g., "Optimum Nutrition Creatine", "MuscleBlaze Whey", "Wellcore Creatine", "Creatine Monohydrate").
+STRICT ANTI-HALLUCINATION & ANTI-EXTRA-FOOD RULES:
+1. ONLY IDENTIFY WHAT IS DIRECTLY & CLEARLY VISIBLE:
+   - Identify ONLY the primary food or supplement item(s) undeniably visible in the photo.
+   - NEVER guess or add invisible ingredients (e.g. do NOT add cooking oil, ghee, butter, salt, sugar, spices, water, garnish, coriander, or onions as separate food items unless clearly served in a distinct separate cup/container or explicitly asked by the user).
+   - NEVER hallucinate unseen side dishes (e.g. do NOT invent bread, roti, rice, salad, raita, chutney, or drinks if they are not in the picture).
+
+2. DO NOT OVER-DECONSTRUCT PREPARED DISHES:
+   - A single mixed or cooked preparation MUST be returned as ONE single item with its realistic composite nutritional values.
+   - For example:
+     * "Chicken Curry" -> 1 item: "Chicken Curry" (with realistic composite meat + gravy macros), NOT 5 separate items for chicken, gravy, onions, oil, spices.
+     * "Dal / Lentils" -> 1 item: "Dal", NOT separate items for lentils, ghee, cumin.
+     * "Chicken Fried Rice" / "Biryani" -> 1 item: "Chicken Biryani", NOT separate rice, chicken, oil.
+     * "Chicken Sandwich" -> 1 item: "Chicken Sandwich", NOT separate bread, chicken, mayo, lettuce.
+     * "Oatmeal Bowl" -> 1 item: "Oatmeal with Milk" (or 2 items if fruit is visibly on top).
+   - Only separate items if they are physically distinct standalone items on the plate (e.g., 2 Roti and 1 bowl of Paneer Curry = 2 distinct items).
+
+3. MINIMALIST ITEM COUNT:
+   - Keep the items array minimal (typically 1 to 3 items max per plate).
+   - If only 1 dish or 1 container is photographed, the items array MUST contain EXACTLY 1 item.
+
+4. FITNESS SUPPLEMENTS (VERY IMPORTANT):
+   - If the photo shows a fitness supplement container, tub, box, bag, or shaker (e.g., Creatine, Whey Protein, Casein, Pre-Workout, BCAA, Mass Gainer, Protein Bar):
+     - Read visible branding and labels (e.g., "Optimum Nutrition Creatine", "Wellcore Creatine", "Whey Protein").
      - For CREATINE MONOHYDRATE:
        * Name: "[Brand] Creatine Monohydrate" (or "Creatine Monohydrate")
        * Portion: "1 scoop (3-5g)"
        * Estimated grams: 5
-       * Calories: 0 kcal, Protein: 0g, Carbs: 0g, Fat: 0g (Creatine is an amino acid derivative with zero caloric macronutrient content)
+       * Calories: 0 kcal, Protein: 0g, Carbs: 0g, Fat: 0g (Creatine has zero caloric macronutrient content)
        * Coaching note: "Creatine monohydrate detected. 0 calories, essential for muscular ATP resynthesis and strength output."
      - For WHEY PROTEIN / POWDER:
        * Portion: "1 scoop (30g)"
@@ -155,29 +174,28 @@ CATEGORY INSTRUCTIONS:
        * Portion: "1 bar (~60g)"
        * Calories: ~200-240 kcal, Protein: ~20g, Carbs: ~22g, Fat: ~7g
 
-2. REAL MEALS & COOKED FOOD:
-   - Deconstruct visible plates into individual food items (e.g. separate Roti, Rice, Dal, Paneer, Salad, Chicken).
+5. REAL MEALS & COOKED FOOD PORTIONS:
    - Accurately estimate gram weights based on standard portion sizes.
-   - Distinguish Indian specialties: Roti/Chapati (35-40g each), Paratha, Naan, Dal Tadka vs Makhani, Rajma, Chole, Paneer curries, Biryani, Poha, Idli, Dosa, Curd, etc.
-   - Distinguish Global fitness foods: Chicken breast, eggs, salmon, oats, sweet potato, Greek yogurt, etc.
+   - Calibrate Indian specialties: Roti/Chapati (~35-40g each), Paratha (~80g), Dal (~180-200g bowl), Paneer curries (~150g), Rice (~150-200g bowl), Biryani (~250g).
+   - Calibrate Global fitness foods: Chicken breast (120-150g), whole egg (50g), oats (40-60g dry), Greek yogurt (150g).
 
-3. NON-FOOD OR UNRELATED IMAGES:
+6. NON-FOOD OR UNRELATED IMAGES:
    - If the photo is clearly NOT food, drink, or nutritional supplements (e.g., gym weights, dumbbells, barbell, shoes, floor, wall, face, clothing, electronics):
      - mealName: "No Food or Supplement Detected"
      - items: [] (empty array)
      - totalCalories: 0, totalProtein: 0, totalCarbs: 0, totalFat: 0
      - coachingNote: "No food or fitness supplement was recognized in this photo. Please take a clear picture of a meal, snack, or supplement container."
 
-4. USER OBSERVATIONS / NOTES: "${userNotes || 'None'}"
+7. USER CONTEXT: "${userNotes || 'None'}"
    If the user specified context (e.g. "3 rotis, 1 bowl dal", "taking my creatine scoop"), prioritize the user's explicit quantities.
 
-5. HIDDEN INGREDIENTS: ${hiddenIngredients.length > 0 ? hiddenIngredients.join(', ') : 'None'}
-   If 'Extra Oil / Ghee' is indicated, include an item for Ghee/Oil (10-15g, 90-135 kcal, 100% fat).
+8. HIDDEN INGREDIENTS: ${hiddenIngredients.length > 0 ? hiddenIngredients.join(', ') : 'None'}
+   Only add if explicitly specified by user notes or hidden ingredients flag.
 
 OUTPUT FORMAT:
 Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or conversational text:
 {
-  "mealName": "Descriptive meal name e.g. Creatine Monohydrate Supplement OR Indian Lunch (Roti, Dal & Rice)",
+  "mealName": "Descriptive meal name e.g. Creatine Monohydrate Supplement OR Grilled Chicken Bowl",
   "items": [
     {
       "name": "Food or supplement name e.g. Creatine Monohydrate",
@@ -188,7 +206,7 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
       "carbsG": 0,
       "fatG": 0,
       "confidence": "high",
-      "preparation": "Micronized powder"
+      "preparation": "Prepared style"
     }
   ],
   "totalCalories": 0,
@@ -201,10 +219,8 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 }`;
 
     const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-3.8-flash',
       'gemini-2.5-flash',
+      'gemini-2.0-flash',
       'gemini-1.5-flash',
     ];
 

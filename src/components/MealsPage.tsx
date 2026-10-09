@@ -38,6 +38,7 @@ import {
   AlertTriangle,
   Zap,
   Leaf,
+  Calendar,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
@@ -145,6 +146,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
+  const [showMacroDetails,      setShowMacroDetails]      = useState(false);
+  const [isMoreToolsOpen,       setIsMoreToolsOpen]       = useState(false);
   const [isToolsMenuOpen,       setIsToolsMenuOpen]       = useState(false);
   const [isHabitsExpanded,      setIsHabitsExpanded]      = useState(false);
   const [isPacingExpanded,      setIsPacingExpanded]      = useState(false);
@@ -1734,7 +1737,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </button>
         </div>
 
-        {/* All 4 Macro Progress Boxes */}
+        {/* Focused Dual Metric: Calories & Protein */}
         <div className="grid grid-cols-2 gap-3">
           {/* Calories Box */}
           <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
@@ -1743,7 +1746,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               CALORIES
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-accent font-sans">
+              <span className="text-2xl sm:text-3xl font-black text-accent font-sans">
                 {Math.round(todayMacros.calories)}
               </span>
               {macroGoals && (
@@ -1767,7 +1770,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               PROTEIN (KEY)
             </span>
             <div className="flex items-baseline gap-1">
-              <span className="text-2xl font-black text-[#22C55E] font-sans">
+              <span className="text-2xl sm:text-3xl font-black text-[#22C55E] font-sans">
                 {Math.round(todayMacros.proteinG)}g
               </span>
               {macroGoals && (
@@ -1783,1016 +1786,425 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             )}
           </div>
-
-          {/* Carbs Box */}
-          <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-[#38BDF8] tracking-wider block flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
-              CARBS
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-text-primary font-sans">
-                {Math.round(todayMacros.carbsG)}g
-              </span>
-              {macroGoals?.carbsG && (
-                <span className="text-xs text-text-muted font-medium">/ {macroGoals.carbsG}g</span>
-              )}
-            </div>
-            {macroGoals?.carbsG && (
-              <div className="level-bar h-1 mt-1">
-                <div
-                  className="level-bar-fill bg-[#38BDF8]"
-                  style={{ width: `${Math.min(100, Math.round((todayMacros.carbsG / macroGoals.carbsG) * 100))}%` }}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* Fat Box */}
-          <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-[#F5B301] tracking-wider block flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F5B301]" />
-              FAT
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-xl font-black text-text-primary font-sans">
-                {Math.round(todayMacros.fatG)}g
-              </span>
-              {macroGoals?.fatG && (
-                <span className="text-xs text-text-muted font-medium">/ {macroGoals.fatG}g</span>
-              )}
-            </div>
-            {macroGoals?.fatG && (
-              <div className="level-bar h-1 mt-1">
-                <div
-                  className="level-bar-fill bg-[#F5B301]"
-                  style={{ width: `${Math.min(100, Math.round((todayMacros.fatG / macroGoals.fatG) * 100))}%` }}
-                />
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Goal Pacing & Calorie Drift Indicator */}
-        <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-2 text-2xs font-mono">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span className="font-bold text-text-primary">
-                {goalConfig.label.toUpperCase()} PACING:
-              </span>
-              {goalNutritionStatus && (
-                <span
-                  className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
-                    goalNutritionStatus.isPositive
-                      ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                      : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  }`}
-                >
-                  {goalNutritionStatus.badgeText}
-                </span>
-              )}
-            </div>
-
-            {/* Energy Reconciliation Indicator if variance exists */}
-            {Math.abs(todayAtwaterDrift) > 15 && (
-              <div className="flex items-center gap-1 text-3xs text-text-muted">
-                <span
-                  className="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20"
-                  title="Difference between reported food calories and macro sum values"
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>{todayAtwaterDrift > 0 ? `+${todayAtwaterDrift}` : todayAtwaterDrift} kcal macro variance</span>
-                </span>
-              </div>
-            )}
+        {/* Dropdown Toggle for Carbs, Fat & Pacing Details */}
+        <div className="pt-0.5">
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowMacroDetails(!showMacroDetails)}
+              className="text-3xs font-mono font-bold text-text-muted hover:text-text-primary px-3 py-1 rounded-full bg-bg-secondary/80 border border-border flex items-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <span>{showMacroDetails ? 'Hide Carbs & Fat' : '+ Show Carbs & Fat'}</span>
+              <ChevronDown className={`w-3 h-3 text-accent transition-transform ${showMacroDetails ? 'rotate-180' : ''}`} />
+            </button>
           </div>
 
-          {goalNutritionStatus && (
-            <div className="flex items-center justify-between text-3xs text-text-secondary pt-1 border-t border-border/50 gap-2">
-              <span className="truncate pr-2">{goalNutritionStatus.subtext}</span>
-              <span className="shrink-0 text-text-muted font-bold">{goalNutritionStatus.protStatus}</span>
+          {showMacroDetails && (
+            <div className="space-y-3 pt-3 animate-fade-in">
+              <div className="grid grid-cols-2 gap-3">
+                {/* Carbs Box */}
+                <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-[#38BDF8] tracking-wider block flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
+                    CARBS
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-black text-text-primary font-sans">
+                      {Math.round(todayMacros.carbsG)}g
+                    </span>
+                    {macroGoals?.carbsG && (
+                      <span className="text-xs text-text-muted font-medium">/ {macroGoals.carbsG}g</span>
+                    )}
+                  </div>
+                  {macroGoals?.carbsG && (
+                    <div className="level-bar h-1 mt-1">
+                      <div
+                        className="level-bar-fill bg-[#38BDF8]"
+                        style={{ width: `${Math.min(100, Math.round((todayMacros.carbsG / macroGoals.carbsG) * 100))}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Fat Box */}
+                <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-[#F5B301] tracking-wider block flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#F5B301]" />
+                    FAT
+                  </span>
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-xl font-black text-text-primary font-sans">
+                      {Math.round(todayMacros.fatG)}g
+                    </span>
+                    {macroGoals?.fatG && (
+                      <span className="text-xs text-text-muted font-medium">/ {macroGoals.fatG}g</span>
+                    )}
+                  </div>
+                  {macroGoals?.fatG && (
+                    <div className="level-bar h-1 mt-1">
+                      <div
+                        className="level-bar-fill bg-[#F5B301]"
+                        style={{ width: `${Math.min(100, Math.round((todayMacros.fatG / macroGoals.fatG) * 100))}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pacing status badge */}
+              {goalNutritionStatus && (
+                <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 text-2xs font-mono space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-text-primary">{goalConfig.label.toUpperCase()} PACING:</span>
+                    <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                      goalNutritionStatus.isPositive
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    }`}>
+                      {goalNutritionStatus.badgeText}
+                    </span>
+                  </div>
+                  <p className="text-3xs text-text-muted">{goalNutritionStatus.subtext}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Consolidated 1-Input Food Logger Bar (Natural, Camera & Barcode) */}
-        <div className="pt-2 border-t border-border/60 space-y-2">
-          <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
-            <input
-              type="text"
-              placeholder='Log meal (e.g. "2 eggs, 100g oats")...'
-              value={naturalQuery}
-              onChange={(e) => setNaturalQuery(e.target.value)}
-              disabled={isNaturalParsing}
-              className="w-full bg-bg-secondary border border-border/80 rounded-xl py-2.5 pl-3.5 pr-28 text-body text-text-primary outline-none focus:border-accent transition-colors placeholder:text-text-muted"
-            />
-            <div className="absolute right-1.5 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setIsScanModalOpen(true)}
-                className="p-1.5 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-accent hover:border-accent transition-colors"
-                title="Scan meal with camera"
-              >
-                <Camera className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsBarcodeModalOpen(true)}
-                className="p-1.5 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-accent hover:border-accent transition-colors"
-                title="Scan food barcode"
-              >
-                <BarcodeIcon className="w-4 h-4" />
-              </button>
-              <button
-                type="submit"
-                disabled={!naturalQuery.trim() || isNaturalParsing}
-                className="px-2.5 py-1.5 rounded-lg bg-accent text-white font-bold text-label flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs"
-              >
-                {isNaturalParsing ? (
-                  <span className="animate-pulse text-2xs">...</span>
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-          </form>
+        {/* ── Primary Action Buttons: Scan Meal & Add Manually ── */}
+        <div className="pt-2 border-t border-border/60 space-y-2.5">
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsScanModalOpen(true)}
+              className="btn-primary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+            >
+              <Camera className="w-4 h-4 stroke-[2.5]" />
+              <span>Scan Meal</span>
+            </button>
 
-          <div className="flex items-center justify-between text-label text-text-muted px-0.5">
-            <span>Indian food list</span>
             <button
               type="button"
               onClick={() => {
                 if (foods.length === 0) handleAddFood();
                 setIsModalOpen(true);
               }}
-              className="text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1"
+              className="btn-secondary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-border hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
             >
-              <Plus className="w-3 h-3 text-accent" />
-              <span>Manual item</span>
+              <Plus className="w-4 h-4 stroke-[2.5] text-accent" />
+              <span>Add Manually</span>
             </button>
           </div>
-        </div>
-      </section>
 
-      {/* ── Daily Hydration & Supplements Habit Strip (Progressive Disclosure) ── */}
-      <section className="card p-3 bg-bg-card border border-border shadow-xs space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            <span className="section-title text-[10px] mb-0 font-sans">DAILY HABITS</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsHabitsExpanded((prev) => !prev)}
-              className="text-2xs font-bold text-text-secondary hover:text-text-primary px-2.5 py-1 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <span>{isHabitsExpanded ? 'Compact' : 'Expand Details'}</span>
-              {isHabitsExpanded ? <ChevronUp className="w-3 h-3 text-accent" /> : <ChevronDown className="w-3 h-3 text-accent" />}
-            </button>
-            {isHabitsExpanded && (
+          {/* Natural Language Meal Logger Input */}
+          <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
+            <input
+              type="text"
+              placeholder='Log meal (e.g. "2 eggs, 100g oats, 1 scoop whey")...'
+              value={naturalQuery}
+              onChange={(e) => setNaturalQuery(e.target.value)}
+              disabled={isNaturalParsing}
+              className="w-full bg-bg-secondary border border-border/80 rounded-xl py-2.5 pl-3.5 pr-20 text-xs sm:text-sm text-text-primary outline-none focus:border-accent transition-colors placeholder:text-text-muted"
+            />
+            <div className="absolute right-1.5 flex items-center gap-1">
               <button
-                type="button"
-                onClick={() => setIsHydrationModalOpen(true)}
-                className="text-[11px] font-semibold text-accent hover:underline cursor-pointer"
+                type="submit"
+                disabled={!naturalQuery.trim() || isNaturalParsing}
+                className="px-3 py-1.5 rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
-                Adjust Targets
-              </button>
-            )}
-          </div>
-        </div>
-
-        {!isHabitsExpanded ? (
-          /* Sleek 1-line strip with instant 1-tap logging */
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-            {/* Water row */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-bg-secondary/60 border border-border/70">
-              <div
-                className="flex items-center gap-2 cursor-pointer min-w-0"
-                onClick={() => setIsHydrationModalOpen(true)}
-                title="Click to view hydration details"
-              >
-                <div className="w-6 h-6 rounded-md bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
-                  <Droplet className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate">
-                  <span className="text-xs font-bold text-text-primary font-mono block">
-                    {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    logWater(250, todayDate);
-                    toast.success('+250 ml logged!', 'Hydration');
-                  }}
-                  className="px-2 py-1 rounded-lg bg-bg-card border border-border text-3xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
-                >
-                  +250ml
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    logWater(500, todayDate);
-                    toast.success('+500 ml logged!', 'Hydration');
-                  }}
-                  className="px-2 py-1 rounded-lg bg-bg-card border border-border text-3xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
-                >
-                  +500ml
-                </button>
-              </div>
-            </div>
-
-            {/* Creatine row */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-bg-secondary/60 border border-border/70">
-              <div
-                className="flex items-center gap-2 cursor-pointer min-w-0"
-                onClick={() => setIsCreatineModalOpen(true)}
-                title="Click to view creatine details"
-              >
-                <div className="w-6 h-6 rounded-md bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                <div className="truncate">
-                  <span className={`text-xs font-bold font-mono block ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
-                    {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g Taken` : 'Creatine Pending'}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  toggleCreatine(todayDate);
-                  if (!creatineTaken) {
-                    toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
-                  } else {
-                    toast.info('Creatine marked as not taken', 'Creatine');
-                  }
-                }}
-                className={`px-2.5 py-1 rounded-lg border text-3xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 ${
-                  creatineTaken
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                    : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
-                }`}
-              >
-                {creatineTaken ? '✓ Taken' : '+ Log'}
+                {isNaturalParsing ? (
+                  <span className="animate-pulse text-2xs">...</span>
+                ) : (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Log</span>
+                  </>
+                )}
               </button>
             </div>
-          </div>
-        ) : (
-          /* Full expanded cards */
-          <div className="grid grid-cols-2 gap-2.5 pt-1 animate-fade-in">
-            {/* Water widget */}
-            <div
-              onClick={() => setIsHydrationModalOpen(true)}
-              className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
-                  <Droplet className="w-3.5 h-3.5 text-accent" />
-                  WATER
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {waterToday > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        resetWater(todayDate);
-                        toast.info("Today's water log reset to 0L", 'Hydration Reset');
-                      }}
-                      className="text-3xs text-text-muted hover:text-danger p-0.5 rounded transition-colors"
-                      title="Reset today's water"
-                    >
-                      Reset
-                    </button>
-                  )}
-                  <span className="text-[10px] text-text-muted font-medium font-mono">
-                    {waterRemaining === 0 ? 'Target Hit' : `${(waterRemaining / 1000).toFixed(1)}L left`}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-baseline gap-1">
-                <span className="text-xl font-black text-text-primary font-sans">
-                  {(waterToday / 1000).toFixed(1)}
-                </span>
-                <span className="text-xs text-text-muted font-medium font-mono">
-                  / {(waterTargetMl / 1000).toFixed(1)} L
-                </span>
-              </div>
-              <div className="flex gap-1 pt-0.5">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logWater(250, todayDate);
-                    toast.success('+250 ml logged!', 'Hydration');
-                  }}
-                  className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
-                >
-                  +250ml
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    logWater(500, todayDate);
-                    toast.success('+500 ml logged!', 'Hydration');
-                  }}
-                  className="flex-1 py-1 rounded-lg bg-bg-secondary border border-border text-[10px] font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-colors font-mono"
-                >
-                  +500ml
-                </button>
-              </div>
-            </div>
+          </form>
 
-            {/* Creatine widget */}
-            {(() => {
-              const creatineDaysLeft = Math.max(
-                0,
-                Math.floor((creatineSupply?.currentAmountG ?? 450) / Math.max(1, creatineConfig?.dailyTargetG || 5))
-              );
-              return (
-                <div
-                  onClick={() => setIsCreatineModalOpen(true)}
-                  className="p-3 rounded-xl bg-bg-card border border-border hover:border-accent/40 cursor-pointer transition-all space-y-1.5 shadow-xs"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-accent uppercase flex items-center gap-1 font-mono">
-                      <Sparkles className="w-3.5 h-3.5 text-accent" />
-                      CREATINE
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {creatineDaysLeft <= 7 && (
-                        <span className="text-[9px] font-mono font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25">
-                          ~{creatineDaysLeft}d left
-                        </span>
-                      )}
-                      <span className="text-[10px] text-text-muted font-medium font-mono">
-                        {creatineTaken ? 'Logged' : 'Pending'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-xl font-black font-sans ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
-                      {creatineTaken ? `${creatineConfig?.dailyTargetG || 5}g` : 'Not Taken'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleCreatine(todayDate);
-                      if (!creatineTaken) {
-                        toast.success(`${creatineConfig?.dailyTargetG || 5}g creatine logged!`, 'Creatine');
-                      } else {
-                        toast.info('Creatine marked as not taken', 'Creatine');
-                      }
-                    }}
-                    className={`w-full py-1 rounded-lg border text-[10px] font-bold transition-all active:scale-95 font-mono ${
-                      creatineTaken
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                        : 'bg-bg-secondary border-border text-text-primary hover:border-accent/40'
-                    }`}
-                  >
-                    {creatineTaken ? 'Taken Today' : '+ Log Creatine'}
-                  </button>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-      </section>
-
-      {/* ── WHAT SHOULD I EAT NEXT? (Protein Close-out Suggestions) ── */}
-      {proteinRemaining > 10 && (
-        <section className="card p-4 bg-gradient-to-br from-bg-card via-bg-card to-emerald-500/5 border border-emerald-500/30 space-y-3 shadow-xs">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h3 className="section-title text-[10px] mb-0 text-emerald-500 font-sans">
-                WHAT SHOULD I EAT NEXT?
-              </h3>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-3xs font-medium px-2 py-0.5 rounded-full bg-accent/10 text-accent border border-accent/20 capitalize font-mono">
-                {dietPreference.replace('_', '-')}
-              </span>
-              <span className="text-2xs font-mono font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                {Math.round(proteinRemaining)}g protein left
-              </span>
-            </div>
-          </div>
-
-          <p className="text-xs text-text-secondary">
-            {selectedEatPreference
-              ? `Tailored (${dietPreference.replace('_', ' ')}) high-protein options based on your selection:`
-              : `Recommended options to close your protein gap (${dietPreference.replace('_', ' ')}) today:`}
-          </p>
-
-          {/* User Choice Selector */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[
-              { id: 'staples', label: 'Pinned Staples', sub: 'Your daily foods', icon: Star },
-              { id: 'shake', label: 'Quick Shake', sub: 'Under 2 min', icon: Zap },
-              { id: 'high_protein', label: 'High Protein (25g+)', sub: 'Hit goal fast', icon: Flame },
-              { id: 'light', label: 'Light Snack', sub: 'Low calorie', icon: Leaf },
-            ].map((opt) => {
-              const IconComp = opt.icon;
-              const isSelected = selectedEatPreference === opt.id;
-              return (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setSelectedEatPreference(isSelected ? null : (opt.id as any))}
-                  className={`p-2.5 rounded-xl border text-left transition-all active:scale-[0.98] ${
-                    isSelected
-                      ? 'border-emerald-500 bg-emerald-500/15 shadow-xs'
-                      : 'border-border/80 bg-bg-secondary/60 hover:border-emerald-500/40'
-                  }`}
-                >
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <IconComp className={`w-3.5 h-3.5 ${isSelected ? 'text-emerald-400' : 'text-text-secondary'}`} />
-                    <span className={`text-xs font-bold block ${isSelected ? 'text-emerald-400' : 'text-text-primary'}`}>
-                      {opt.label}
-                    </span>
-                  </div>
-                  <span className="text-3xs text-text-muted block leading-tight">{opt.sub}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Display suggestions: always show default recommendations or tailored filtered options */}
-          <div className="space-y-2 pt-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {dynamicCloseoutSuggestions.map((sug, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 flex flex-col justify-between hover:border-emerald-500/40 transition-colors space-y-2"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-3xs font-mono uppercase font-bold px-1.5 py-0.5 rounded ${sug.tagCls}`}>
-                        {sug.tag}
-                      </span>
-                      <span className="text-xs font-bold text-[#22C55E] font-mono">+{sug.proteinG}g P</span>
-                    </div>
-                    <h4 className="text-xs font-bold text-text-primary">{sug.name}</h4>
-                    <p className="text-3xs text-text-muted mt-0.5">{sug.description}</p>
-                    <p className="text-3xs text-text-secondary mt-1 font-mono">
-                      ~{sug.calories} kcal • {sug.proteinG}g protein • {sug.carbsG}g carbs
-                    </p>
-                  </div>
+          {/* Secondary Tools Dropdown ("More") */}
+          <div className="flex items-center justify-between text-2xs text-text-muted px-1 pt-0.5">
+            <span className="font-mono text-3xs">AI Vision • Natural Language • Indian IFCT</span>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsMoreToolsOpen(!isMoreToolsOpen)}
+                className="text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+              >
+                <span>More options</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${isMoreToolsOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isMoreToolsOpen && (
+                <div className="absolute right-0 bottom-full mb-2 w-48 rounded-xl bg-bg-card border border-border p-1.5 shadow-xl z-30 space-y-1 animate-scale-in">
                   <button
                     type="button"
                     onClick={() => {
-                      const newMeal: MealEntry = {
-                        id: safeRandomId('meal'),
-                        date: todayDate,
-                        name: sug.name,
-                        foods: sug.foods,
-                      };
-                      addMeal(newMeal);
-                      toast.success(`Logged ${sug.name} (+${sug.proteinG}g protein)!`, 'Protein Logged');
+                      setIsMoreToolsOpen(false);
+                      setIsBarcodeModalOpen(true);
                     }}
-                    className="btn-primary py-1.5 text-2xs font-semibold w-full flex items-center justify-center gap-1 shadow-xs"
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
                   >
-                    <Plus className="w-3 h-3" />
-                    <span>Log 1-Tap</span>
+                    <BarcodeIcon className="w-4 h-4 text-accent" />
+                    <span>Scan Barcode</span>
                   </button>
-                </div>
-              ))}
-            </div>
-
-            {selectedEatPreference && (
-              <div className="flex justify-center pt-1">
-                <button
-                  type="button"
-                  onClick={() => setSelectedEatPreference(null)}
-                  className="text-3xs text-text-muted hover:text-accent underline font-medium"
-                >
-                  Reset to default recommendations
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* ── Feature: Copy Yesterday's Meals (High Consistency) ── */}
-      {yesterdayMeals.length > 0 && todayMeals.length === 0 && (
-        <section className="card p-3.5 bg-gradient-to-r from-bg-card via-bg-elevated/40 to-bg-card border border-accent/35 flex items-center justify-between shadow-xs animate-fade-in">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center text-accent flex-shrink-0">
-              <Copy className="w-4 h-4" />
-            </div>
-            <div>
-              <span className="text-xs font-bold text-text-primary block font-sans">
-                REPEAT YESTERDAY&apos;S DIET
-              </span>
-              <span className="text-[11px] text-text-muted font-sans">
-                {yesterdayMeals.length} meals • ~{Math.round(yesterdayMacros.calories)} kcal • ~{Math.round(yesterdayMacros.proteinG)}g protein
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleCopyYesterday}
-            className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 active:scale-95 transition-transform"
-          >
-            <Copy className="w-3.5 h-3.5" />
-            <span>Copy All</span>
-          </button>
-        </section>
-      )}
-
-      {/* ── Feature: Staples & Frequent Foods (Unified, Zero Duplication) ── */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-1.5">
-            <Star className="w-3.5 h-3.5 text-accent fill-accent" />
-            <h2 className="section-title text-[11px] mb-0 font-sans">STAPLES &amp; FREQUENT FOODS</h2>
-            {unifiedStaples.length > 0 && (
-              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
-                {unifiedStaples.length}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openAddPinned}
-              className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
-              title="Add a custom pinned food"
-            >
-              <Plus className="w-3 h-3" />
-              <span>Add</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsManagePinnedOpen(true)}
-              className="text-2xs font-semibold text-text-secondary hover:text-text-primary flex items-center gap-1 px-2 py-0.5 rounded-md bg-bg-card border border-border hover:border-accent/40 transition-colors"
-              title="Manage and edit pinned foods"
-            >
-              <Settings2 className="w-3 h-3 text-accent" />
-              <span>Manage</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Clean responsive grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {(showAllStaples ? unifiedStaples : unifiedStaples.slice(0, 4)).map((staple) => {
-            const favMatch = staple.isPinned ? favoriteFoods.find((f) => f.id === staple.id) : undefined;
-            return (
-              <div
-                key={staple.id}
-                onClick={() => handleAddFoodFromHistory(staple.rawFood)}
-                className="p-2.5 rounded-xl bg-bg-card border border-border hover:border-accent/60 transition-all text-left group active:scale-[0.99] shadow-xs cursor-pointer relative flex flex-col justify-between"
-                title={`Tap to log ${staple.name} in 1 tap`}
-              >
-                <div className="flex items-start justify-between gap-1">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-bold text-xs text-text-primary group-hover:text-accent truncate">
-                        {staple.name}
-                      </span>
-                      {staple.count && staple.count >= 2 && !staple.isPinned && (
-                        <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-accent/15 text-accent shrink-0">
-                          {staple.count}×
-                        </span>
-                      )}
-                      {staple.isPinned && (
-                        <span className="text-[9px] font-mono font-medium px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 shrink-0">
-                          STAPLE
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {favMatch ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => openEditPinned(favMatch)}
-                          className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
-                          title={`Edit ${staple.name}`}
-                        >
-                          <Edit2 className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeletePinned(favMatch.id, favMatch.name)}
-                          className="p-1 text-text-muted hover:text-danger rounded hover:bg-danger/10 transition-colors"
-                          title={`Unpin ${staple.name}`}
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleToggleFavorite(staple.rawFood)}
-                        className="p-1 text-text-muted hover:text-accent rounded hover:bg-bg-secondary transition-colors"
-                        title="Pin this food to your staples"
-                      >
-                        <Star className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-border/40">
-                  <div className="flex items-center gap-1 text-2xs text-text-muted truncate">
-                    <span>{staple.quantity ? `${staple.quantity} ${staple.unit}` : staple.unit}</span>
-                    <span>•</span>
-                    <span className="text-accent font-semibold">~{Math.round(staple.calories)} kcal</span>
-                    <span>•</span>
-                    <span className="text-emerald-400 font-semibold">~{Math.round(staple.proteinG)}g P</span>
-                  </div>
-                  <span className="text-[10px] font-medium text-accent flex items-center gap-0.5 shrink-0 ml-1">
-                    <Plus className="w-2.5 h-2.5" /> Log
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-
-          {unifiedStaples.length === 0 && (
-            <div className="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center space-y-1.5">
-              <p className="text-xs text-text-secondary font-medium">No pinned staples or frequent foods yet.</p>
-              <p className="text-2xs text-text-muted">
-                Log meals or tap &quot;Add&quot; above to pin your daily staples (e.g. Roti, Dal, Paneer, Whey) for 1-tap quick logging.
-              </p>
-              <button
-                type="button"
-                onClick={openAddPinned}
-                className="btn-secondary py-1 px-3 text-xs mx-auto flex items-center gap-1 mt-1"
-              >
-                <Plus className="w-3 h-3 text-accent" />
-                <span>Add Pinned Food</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* See all / Show less toggle */}
-        {unifiedStaples.length > 4 && (
-          <div className="flex justify-center pt-1">
-            <button
-              type="button"
-              onClick={() => setShowAllStaples((prev) => !prev)}
-              className="text-2xs font-semibold text-text-muted hover:text-accent flex items-center gap-1 px-3 py-1 rounded-full bg-bg-secondary/60 border border-border/80 transition-colors"
-            >
-              <span>{showAllStaples ? 'Show less' : `See all ${unifiedStaples.length} foods`}</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${showAllStaples ? 'rotate-180' : ''}`} />
-            </button>
-          </div>
-        )}
-      </section>
-
-        {/* ── Recent Meals (Collapsible Dropdown) ── */}
-        {recentUniqueMeals.length > 0 && (
-          <section className="rounded-xl border border-border/70 bg-bg-card/70 overflow-hidden shadow-xs">
-            <button
-              type="button"
-              onClick={() => setIsRecentMealsOpen((prev) => !prev)}
-              className="w-full flex items-center justify-between p-3 hover:bg-bg-secondary/40 transition-colors text-left"
-            >
-              <div className="flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 text-accent" />
-                <span className="text-[11px] font-bold text-text-primary uppercase tracking-wider font-mono">
-                  QUICK LOG YOUR USUAL (1-TAP)
-                </span>
-                <span className="text-2xs font-mono font-bold px-1.5 py-0.2 rounded bg-accent/15 text-accent">
-                  {recentUniqueMeals.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-text-muted text-2xs font-semibold">
-                <span>{isRecentMealsOpen ? 'Hide' : 'Show'}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isRecentMealsOpen ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
-
-            {isRecentMealsOpen && (
-              <div className="p-3 pt-0 border-t border-border/40">
-                <div className="flex gap-2.5 overflow-x-auto pb-1 pt-2 scrollbar-none">
-                  {recentUniqueMeals.map((meal) => {
-                    const mMacros = calculateMealMacros(meal.foods);
-                    const multiplier = mealPortionMultipliers[meal.id] ?? 1;
-                    const scaledCalories = Math.round(mMacros.calories * multiplier);
-                    const scaledProtein = Math.round(mMacros.proteinG * multiplier);
-                    const mealDate = new Date(meal.date).toLocaleDateString(undefined, {
-                      month: 'short',
-                      day: 'numeric',
-                    });
-                    return (
-                      <div
-                        key={meal.id}
-                        className="flex-shrink-0 p-3 rounded-2xl bg-bg-secondary/80 border border-border min-w-[220px] max-w-[270px] space-y-2 shadow-xs flex flex-col justify-between hover:border-accent/40 transition-colors"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="text-xs font-bold text-text-primary truncate">{meal.name}</span>
-                            <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-bg-card text-text-muted shrink-0">
-                              {mealDate}
-                            </span>
-                          </div>
-                          <div className="text-2xs text-text-muted truncate mt-0.5" title={meal.foods.map((f) => f.name).join(', ')}>
-                            {meal.foods.map((f) => f.name).join(', ')}
-                          </div>
-                          <div className="text-2xs text-text-muted mt-1.5 font-mono">
-                            <span className="text-accent font-bold">~{scaledCalories} kcal</span> • <span className="text-emerald-500 font-bold">~{scaledProtein}g P</span>
-                          </div>
-
-                          {/* Portion Scaling Chips */}
-                          <div className="flex items-center justify-between pt-1.5 border-t border-border/40 mt-1.5">
-                            <span className="text-[10px] text-text-muted font-mono font-medium">Scale:</span>
-                            <div className="flex items-center gap-1">
-                              {[0.5, 1, 1.5].map((m) => (
-                                <button
-                                  key={m}
-                                  type="button"
-                                  onClick={() => setMealPortionMultipliers((prev) => ({ ...prev, [meal.id]: m }))}
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                                    multiplier === m
-                                      ? 'bg-accent text-bg-primary font-black shadow-xs'
-                                      : 'bg-bg-card hover:bg-bg-tertiary text-text-muted border border-border/60'
-                                  }`}
-                                >
-                                  {m}x
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => handleLogFrequentMeal(meal, multiplier)}
-                            className="btn-primary flex-1 py-1.5 text-xs font-bold flex items-center justify-center gap-1 shadow-xs"
-                          >
-                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Log {multiplier !== 1 ? `(${multiplier}x)` : 'Today'}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handlePinMealFoods(meal)}
-                            className="p-1 rounded-lg border border-border text-accent hover:border-accent hover:bg-accent/10 transition-colors"
-                            title="Pin all foods from this meal"
-                          >
-                            <Star className="w-3 h-3 fill-accent/20" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
-      {/* ── Meal History (Hidden by Default, Day-by-Day View) ── */}
-      <section className="rounded-xl border border-border/70 bg-bg-card/70 overflow-hidden shadow-xs">
-        <button
-          type="button"
-          onClick={() => setIsMealHistoryOpen((prev) => !prev)}
-          className="w-full flex items-center justify-between p-3.5 hover:bg-bg-secondary/40 transition-colors text-left"
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-accent/15 flex items-center justify-center text-accent shrink-0">
-              <Utensils className="w-3.5 h-3.5" />
-            </div>
-            <div>
-              <h2 className="section-title text-[11px] mb-0 font-sans">
-                MEAL HISTORY (BY DATE)
-              </h2>
-              <p className="text-3xs text-text-muted">
-                {meals.length} meals logged across {groupedMeals.length} days
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1.5 text-text-secondary text-xs font-semibold px-2.5 py-1 rounded-lg bg-bg-secondary border border-border">
-            <span>{isMealHistoryOpen ? 'Hide History' : 'View by Date'}</span>
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isMealHistoryOpen ? 'rotate-180' : ''}`} />
-          </div>
-        </button>
-
-        {isMealHistoryOpen && (
-          <div className="p-3.5 pt-0 border-t border-border/40 space-y-3">
-            {groupedMeals.length === 0 ? (
-              <div className="text-center py-6 px-4 space-y-2">
-                <p className="text-xs font-bold text-text-primary">No meals logged yet</p>
-                <p className="text-2xs text-text-muted">
-                  Log your first meal above or via Natural Food Logging.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 pt-2">
-                {/* Date Filter Pills */}
-                <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                   <button
                     type="button"
-                    onClick={() => setSelectedHistoryDate(null)}
-                    className={`px-2.5 py-1 rounded-lg text-2xs font-semibold whitespace-nowrap transition-colors ${
-                      selectedHistoryDate === null
-                        ? 'bg-accent text-white font-bold'
-                        : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
-                    }`}
+                    onClick={() => {
+                      setIsMoreToolsOpen(false);
+                      handleCopyYesterday();
+                    }}
+                    disabled={yesterdayMeals.length === 0}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left disabled:opacity-40 cursor-pointer"
                   >
-                    All Days ({groupedMeals.length})
+                    <Copy className="w-4 h-4 text-accent" />
+                    <span>Copy Yesterday</span>
                   </button>
-                  {groupedMeals.map(([date]) => {
-                    const isToday = date === todayDate;
-                    const dateLabel = isToday
-                      ? 'Today'
-                      : new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                    const isSelected = selectedHistoryDate === date;
-                    return (
-                      <button
-                        key={date}
-                        type="button"
-                        onClick={() => setSelectedHistoryDate(date)}
-                        className={`px-2.5 py-1 rounded-lg text-2xs font-semibold whitespace-nowrap transition-colors ${
-                          isSelected
-                            ? 'bg-accent text-white font-bold'
-                            : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
-                        }`}
-                      >
-                        {dateLabel}
-                      </button>
-                    );
-                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreToolsOpen(false);
+                      setIsManagePinnedOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
+                  >
+                    <Star className="w-4 h-4 text-accent" />
+                    <span>Pinned Staples</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsMoreToolsOpen(false);
+                      handleOpenGoalsModal();
+                    }}
+                    className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
+                  >
+                    <Target className="w-4 h-4 text-accent" />
+                    <span>Macro Goals</span>
+                  </button>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
 
-                {/* Day-by-Day Meals */}
-                {groupedMeals
-                  .filter(([date]) => selectedHistoryDate === null || selectedHistoryDate === date)
-                  .map(([date, dayMeals]) => {
-                    const isToday = date === todayDate;
-                    const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
-                    const dayDelta = macroGoals ? Math.round(dayMacros.calories - macroGoals.calories) : null;
-                    const isGoalMet =
-                      dayDelta !== null
-                        ? primaryGoal === 'lose_fat'
-                          ? dayDelta <= 0
-                          : primaryGoal === 'build_muscle'
-                          ? dayDelta >= 0
-                          : Math.abs(dayDelta) <= 200
-                        : null;
+      {/* ── Daily Habits: Water & Creatine Only ── */}
+      <section className="card p-3 bg-bg-card border border-border shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {/* Water row */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
+            <div
+              className="flex items-center gap-2 min-w-0 cursor-pointer"
+              onClick={() => setIsHydrationModalOpen(true)}
+              title="Click to view hydration details"
+            >
+              <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+                <Droplet className="w-4 h-4" />
+              </div>
+              <div className="truncate">
+                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">WATER</span>
+                <span className="text-xs font-bold text-text-primary font-mono block">
+                  {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  logWater(250, todayDate);
+                  toast.success('+250 ml logged!', 'Hydration');
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+              >
+                +250ml
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logWater(500, todayDate);
+                  toast.success('+500 ml logged!', 'Hydration');
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+              >
+                +500ml
+              </button>
+            </div>
+          </div>
 
-                    return (
-                      <div key={date} className="rounded-xl border border-border/70 bg-bg-secondary/40 p-3 space-y-2.5">
-                        <div className="flex justify-between items-center pb-2 border-b border-border/50">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-xs font-bold text-text-primary">
-                                {isToday
-                                  ? 'Today'
-                                  : new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                              </h3>
-                              {isGoalMet !== null && (
-                                <span
-                                  className={`text-[9px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                                    isGoalMet
-                                      ? 'bg-emerald-500/15 text-emerald-400'
-                                      : 'bg-amber-500/15 text-amber-400'
-                                  }`}
-                                >
-                                  {primaryGoal === 'lose_fat'
-                                    ? isGoalMet ? 'Deficit Preserved' : `+${dayDelta} kcal`
-                                    : primaryGoal === 'build_muscle'
-                                    ? isGoalMet ? 'Surplus Met' : `${dayDelta} kcal`
-                                    : isGoalMet ? 'Target Met' : `${dayDelta && dayDelta > 0 ? `+${dayDelta}` : dayDelta} kcal`}
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-3xs text-text-muted font-mono">
-                              {dayMeals.length} meals • ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
-                              {macroGoals && ` (Target: ${macroGoals.calories} kcal)`}
+          {/* Creatine row */}
+          <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
+            <div
+              className="flex items-center gap-2 min-w-0 cursor-pointer"
+              onClick={() => setIsCreatineModalOpen(true)}
+              title="Click to view creatine details"
+            >
+              <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                <Sparkles className="w-4 h-4" />
+              </div>
+              <div className="truncate">
+                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">CREATINE</span>
+                <span className={`text-xs font-bold font-mono block ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
+                  {creatineTaken ? '5g Taken Today' : '5g Daily Target'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                toggleCreatine(todayDate);
+                if (!creatineTaken) {
+                  toast.success('5g creatine logged!', 'Creatine');
+                } else {
+                  toast.info('Creatine marked as not taken', 'Creatine');
+                }
+              }}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 ${
+                creatineTaken
+                  ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                  : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
+              }`}
+            >
+              {creatineTaken ? '✓ Taken' : '+ Log 5g'}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── 3. WHAT YOU ATE TODAY (Prominent & Clear at End of Page) ── */}
+      <section className="card p-4 bg-bg-card border border-border shadow-xs space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <Utensils className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-xs mb-0 font-sans tracking-wider">
+              WHAT YOU ATE TODAY ({todayMeals.length})
+            </h2>
+          </div>
+          <div className="text-2xs font-mono font-bold">
+            <span className="text-accent">~{Math.round(todayMacros.calories)} kcal</span>
+            <span className="text-text-muted mx-1">•</span>
+            <span className="text-emerald-400">~{Math.round(todayMacros.proteinG)}g P</span>
+          </div>
+        </div>
+
+        {todayMeals.length === 0 ? (
+          <div className="p-6 text-center rounded-xl bg-bg-secondary/40 border border-dashed border-border/80 space-y-1.5">
+            <p className="text-xs font-bold text-text-primary">No meals logged yet today</p>
+            <p className="text-2xs text-text-muted max-w-xs mx-auto">
+              Tap &quot;Scan Meal&quot; above, type what you ate in natural language, or tap &quot;Add Manually&quot;.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {todayMeals.map((meal) => {
+              const mMacros = calculateMealMacros(meal.foods);
+              const isExpanded = expandedMeals.has(meal.id);
+              return (
+                <div key={meal.id} className="p-3 rounded-xl bg-bg-secondary/60 border border-border/70 space-y-2">
+                  <div
+                    className="flex items-start justify-between cursor-pointer gap-2"
+                    onClick={() => toggleExpand(meal.id)}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="font-bold text-xs sm:text-sm text-text-primary truncate">
+                          {meal.name}
+                        </h3>
+                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                          ~{Math.round(mMacros.calories)} kcal
+                        </span>
+                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                          ~{Math.round(mMacros.proteinG)}g P
+                        </span>
+                      </div>
+                      <p className="text-2xs text-text-muted truncate mt-1">
+                        {meal.foods.map((f) => f.name).join(", ")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteMeal(meal.id);
+                          toast.info(`Deleted ${meal.name}`);
+                        }}
+                        className="p-1 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                        title="Delete this meal"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div className="p-1 text-text-muted">
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Food Items Detail */}
+                  {isExpanded && (
+                    <div className="pt-2 border-t border-border/50 space-y-1.5 animate-fade-in">
+                      {meal.foods.map((food, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="text-text-primary font-medium truncate">{food.name}</span>
+                            <span className="text-text-muted text-3xs">
+                              ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
                           </div>
-                          {!isToday && (
-                            <button
-                              type="button"
-                              onClick={() => handleCopySpecificDay(date)}
-                              className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
-                              title="Copy all meals from this day to Today"
-                            >
-                              <Copy className="w-3 h-3" />
-                              <span>Copy Day</span>
-                            </button>
-                          )}
+                          <div className="text-3xs font-mono text-text-muted shrink-0 ml-2">
+                            <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
+                            <span className="mx-1">•</span>
+                            <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                          </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-                        {/* Meals on this day */}
-                        <div className="flex flex-col gap-2">
-                          {dayMeals.map((meal) => {
-                            const isExpanded = expandedMeals.has(meal.id);
-                            const mMacros = calculateMealMacros(meal.foods);
-                            return (
-                              <div key={meal.id} className="rounded-lg bg-bg-card border border-border p-2.5 space-y-2">
-                                <div
-                                  className="flex justify-between items-center cursor-pointer"
-                                  onClick={() => toggleExpand(meal.id)}
-                                >
-                                  <div>
-                                    <div className="flex items-center gap-1.5">
-                                      <h4 className="font-bold text-xs text-text-primary">{meal.name}</h4>
-                                      <span className="text-[10px] text-accent font-mono font-semibold">
-                                        ~{Math.round(mMacros.calories)} kcal
-                                      </span>
-                                    </div>
-                                    <div className="flex gap-2 text-3xs text-text-muted font-mono mt-0.5">
-                                      <span className="text-emerald-400 font-semibold">~{Math.round(mMacros.proteinG)}g P</span>
-                                      <span>•</span>
-                                      <span>~{Math.round(mMacros.carbsG)}g C</span>
-                                      <span>•</span>
-                                      <span>~{Math.round(mMacros.fatG)}g F</span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-3xs text-text-muted">
-                                      {meal.foods.length} items
-                                    </span>
-                                    {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-text-muted" /> : <ChevronDown className="w-3.5 h-3.5 text-text-muted" />}
-                                  </div>
-                                </div>
+        {/* Previous Days History (Collapsed by Default) */}
+        {groupedMeals.filter(([d]) => d !== todayDate).length > 0 && (
+          <div className="pt-2 border-t border-border/50">
+            <button
+              type="button"
+              onClick={() => setIsMealHistoryOpen(!isMealHistoryOpen)}
+              className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-bg-secondary/40 hover:bg-bg-secondary/70 border border-border/60 transition-colors text-left cursor-pointer"
+            >
+              <span className="text-2xs font-semibold text-text-muted flex items-center gap-1.5">
+                <Calendar className="w-3 h-3 text-accent" />
+                <span>Previous Days&apos; Meal History ({groupedMeals.filter(([d]) => d !== todayDate).length} days)</span>
+              </span>
+              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${isMealHistoryOpen ? "rotate-180" : ""}`} />
+            </button>
 
-                                {isExpanded && (
-                                  <div className="pt-2 border-t border-border/50 space-y-1.5">
-                                    {meal.foods.map((food, i) => (
-                                      <div key={i} className="flex justify-between items-center text-2xs py-1 px-2 rounded bg-bg-secondary/60">
-                                        <div className="flex items-center gap-1.5 truncate">
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              handleToggleFavorite(food);
-                                            }}
-                                            className="text-text-muted hover:text-accent p-0.5"
-                                          >
-                                            <Star
-                                              className={`w-3 h-3 ${
-                                                isItemFavorited(food.name) ? 'text-accent fill-accent' : 'text-text-muted'
-                                              }`}
-                                            />
-                                          </button>
-                                          <span className="text-text-primary font-medium truncate">{food.name}</span>
-                                          <span className="text-text-muted text-3xs">
-                                            ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
-                                          </span>
-                                        </div>
-                                        <div className="text-3xs text-text-muted font-mono shrink-0 ml-2">
-                                          <span className="text-accent">~{Math.round(food.calories)} kcal</span> • <span className="text-emerald-400">P:~{Math.round(food.proteinG)}g</span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    <div className="flex justify-between items-center pt-1">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const today = getLocalTodayStr();
-                                          const repeatedMeal: MealEntry = {
-                                            id: safeRandomId('meal'),
-                                            date: today,
-                                            name: meal.name,
-                                            foods: meal.foods.map((f) => ({ ...f })),
-                                          };
-                                          addMeal(repeatedMeal);
-                                          toast.success(`Repeated "${meal.name}" for Today!`, 'Meal Logged');
-                                        }}
-                                        className="text-2xs text-accent hover:underline flex items-center gap-1 font-semibold"
-                                      >
-                                        <Plus className="w-3 h-3" />
-                                        <span>Repeat Today</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          deleteMeal(meal.id);
-                                          toast.info(`Deleted ${meal.name}`);
-                                        }}
-                                        className="text-2xs text-text-muted hover:text-danger flex items-center gap-0.5"
-                                        title="Delete this meal"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        <span>Delete</span>
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+            {isMealHistoryOpen && (
+              <div className="pt-2.5 space-y-2 animate-fade-in">
+                {groupedMeals
+                  .filter(([d]) => d !== todayDate)
+                  .slice(0, 7)
+                  .map(([date, dayMeals]) => {
+                    const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
+                    return (
+                      <div key={date} className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/50 text-2xs space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-text-primary">
+                            {new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                          </span>
+                          <span className="font-mono text-text-muted">
+                            ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
+                          </span>
                         </div>
+                        <p className="text-3xs text-text-muted truncate">
+                          {dayMeals.map((m) => m.name).join(" • ")}
+                        </p>
                       </div>
                     );
                   })}

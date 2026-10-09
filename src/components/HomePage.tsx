@@ -14,6 +14,7 @@ import {
   UtensilsCrossed,
   Check,
   TrendingUp,
+  Camera,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
@@ -22,6 +23,7 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
+import ScanMealModal from '@/components/ScanMealModal';
 import InstallAppBanner from '@/components/InstallAppBanner';
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
@@ -258,6 +260,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
+  const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -291,6 +294,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsLogPastModalOpen(false); return true; }, 100);
     }
   }, [isLogPastModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isScanMealModalOpen) {
+      return registerBackHandler(() => { setIsScanMealModalOpen(false); return true; }, 100);
+    }
+  }, [isScanMealModalOpen, registerBackHandler]);
 
   // Missed workout catch-up
   const [dismissedMissedWorkout, setDismissedMissedWorkout] = useState(false);
@@ -653,9 +662,23 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               Daily Nutrition
             </span>
           </div>
-          <div className="flex items-center gap-1 text-xs font-semibold text-text-muted group-hover:text-accent transition-colors">
-            <span>Log Food</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsScanMealModalOpen(true);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-accent text-white text-xs font-bold flex items-center gap-1.5 shadow-xs hover:brightness-105 active:scale-95 transition-all cursor-pointer"
+              title="Scan meal with camera"
+            >
+              <Camera className="w-3.5 h-3.5" />
+              <span>Scan Meal</span>
+            </button>
+            <div className="flex items-center gap-0.5 text-xs font-semibold text-text-muted group-hover:text-accent transition-colors">
+              <span>View</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </div>
           </div>
         </div>
 
@@ -732,6 +755,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           };
           addPlannedWorkout(newPlan);
           toast.success(`Saved "${plan.name}" to Workout Plans`, 'Plan Created');
+        }}
+      />
+
+      <ScanMealModal
+        isOpen={isScanMealModalOpen}
+        onClose={() => setIsScanMealModalOpen(false)}
+        onMealSaved={() => {
+          toast.success('Meal scanned and logged!', 'Nutrition Updated');
         }}
       />
     </div>

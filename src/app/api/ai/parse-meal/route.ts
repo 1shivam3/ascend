@@ -80,11 +80,9 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
     const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.5-flash',
-      'gemini-3.8-flash',
-      'gemini-flash-latest',
+      'gemini-2.5-flash',
       'gemini-2.0-flash',
+      'gemini-1.5-flash',
     ];
 
     const systemPrompt = `You are ASCEND's precision Sports Nutritionist and Indian Food Database parser.
