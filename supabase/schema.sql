@@ -190,7 +190,6 @@ END $$;
 -- Revoke execution of any administrative SECURITY DEFINER functions from anon/authenticated
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'rls_auto_enable' AND pronamespace = 'public'::regnamespace) THEN
-    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM public, anon, authenticated;
-    DROP FUNCTION IF EXISTS public.rls_auto_enable();
+    REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
   END IF;
 END $$;
