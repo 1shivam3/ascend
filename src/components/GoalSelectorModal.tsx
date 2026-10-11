@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useStore } from '@/lib/store';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import {
   X,
   Target,
@@ -33,10 +34,14 @@ const GOAL_ICONS: Record<AthleteGoal, React.ElementType> = {
 export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModalProps) {
   const currentGoals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const setGoals = useStore((state) => state.setGoals);
+  const profile = useStore((state) => state.profile);
+  const setProfile = useStore((state) => state.setProfile);
+  const setMacroGoals = useStore((state) => state.setMacroGoals);
   const setTrainingProfile = useStore((state) => state.setTrainingProfile);
   const toast = useToast();
 
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(currentGoals);
+  const [recalcMacros, setRecalcMacros] = useState(true);
 
   if (!isOpen) return null;
 
@@ -57,6 +62,12 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
   const handleSave = () => {
     setGoals(selectedGoals);
     const primaryGoal = selectedGoals[0] || 'build_muscle';
+    if (profile) {
+      setProfile({
+        ...profile,
+        goals: selectedGoals,
+      });
+    }
     setTrainingProfile({
       goal: primaryGoal === 'get_stronger'
         ? 'strength'
@@ -67,13 +78,27 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
         : 'general_fitness',
     });
 
-    const count = selectedGoals.length;
-    toast.success(
-      `Updated active goal${count > 1 ? 's' : ''} to: ${selectedGoals
-        .map((g) => ATHLETE_GOAL_CONFIGS[g].label)
-        .join(' + ')}`,
-      'Goals Calibrated'
-    );
+    if (recalcMacros && profile?.bodyweightKg) {
+      const newMacros = calculateRecommendedMacroGoals(
+        profile.bodyweightKg,
+        primaryGoal,
+        profile.gender || 'male',
+        profile.heightCm
+      );
+      setMacroGoals(newMacros);
+      toast.success(
+        `Calibrated nutrition targets (${newMacros.calories} kcal, ${newMacros.proteinG}g P) to match ${ATHLETE_GOAL_CONFIGS[primaryGoal].label}.`,
+        'Nutrition Recalibrated'
+      );
+    } else {
+      const count = selectedGoals.length;
+      toast.success(
+        `Updated active goal${count > 1 ? 's' : ''} to: ${selectedGoals
+          .map((g) => ATHLETE_GOAL_CONFIGS[g].label)
+          .join(' + ')}`,
+        'Goals Calibrated'
+      );
+    }
     onClose();
   };
 
@@ -207,6 +232,26 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             <li><strong>Dashboard Focus:</strong> Highlights 1RM PRs &amp; DOTS vs. Volume Tonnage vs. Deficit &amp; Weight Velocity.</li>
           </ul>
         </div>
+
+        {/* Recalculate Nutrition Option */}
+        {profile?.bodyweightKg && (
+          <label className="flex items-center gap-2.5 p-3 rounded-xl bg-bg-card border border-border cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={recalcMacros}
+              onChange={(e) => setRecalcMacros(e.target.checked)}
+              className="w-4 h-4 rounded text-accent bg-bg-elevated border-border focus:ring-accent accent-accent"
+            />
+            <div className="text-left text-xs leading-tight">
+              <span className="font-semibold text-text-primary block">
+                Auto-recalculate daily nutrition targets
+              </span>
+              <span className="text-3xs text-text-muted">
+                Calibrates calories &amp; protein to your new primary goal
+              </span>
+            </div>
+          </label>
+        )}
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-2 pt-1">

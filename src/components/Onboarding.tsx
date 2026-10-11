@@ -95,6 +95,8 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('70');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
+  const [equipment, setEquipment] = useState<'full_gym' | 'home_dumbbells' | 'bodyweight_only'>('full_gym');
 
   // Emergency snapshot detection & restore
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -116,7 +118,16 @@ export default function OnboardingScreen() {
         if (localStorage.getItem('ascend_logged_out') === 'true') {
           return;
         }
-        const snap = localStorage.getItem('ascend_emergency_snapshot');
+        let snap = localStorage.getItem('ascend_emergency_snapshot');
+        if (!snap) {
+          snap = localStorage.getItem('ascend_store');
+        }
+        if (!snap && localStorage.getItem('ascend_profile')) {
+          const profileStr = localStorage.getItem('ascend_profile');
+          if (profileStr) {
+            snap = JSON.stringify({ profile: JSON.parse(profileStr) });
+          }
+        }
         if (snap) {
           const parsed = JSON.parse(snap);
           const stateData = parsed?.state || parsed;
@@ -190,7 +201,6 @@ export default function OnboardingScreen() {
     setGoals([primaryGoal]);
     setUserMode('beginner');
 
-    const daysPerWeek = 4;
     const generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
 
     setTrainingProfile({
@@ -204,8 +214,8 @@ export default function OnboardingScreen() {
       experience: 'beginner',
       daysPerWeek,
       preferredDurationMin: 45,
-      equipment: 'full_gym',
-      preferredSplit: 'upper_lower',
+      equipment,
+      preferredSplit: daysPerWeek === 3 ? 'full_body' : 'upper_lower',
       dislikedExercises: [],
       injuriesOrLimitations: [],
       coachingStyle: 'balanced',
@@ -558,6 +568,42 @@ export default function OnboardingScreen() {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* 5. Weekly Frequency */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  5. Training Frequency
+                </label>
+                <SegmentedControl
+                  value={String(daysPerWeek)}
+                  onChange={(val) => setDaysPerWeek(Number(val))}
+                  options={[
+                    { value: '3', label: '3 Days' },
+                    { value: '4', label: '4 Days' },
+                    { value: '5', label: '5 Days' },
+                  ]}
+                  size="sm"
+                  fullWidth
+                />
+              </div>
+
+              {/* 6. Available Equipment */}
+              <div className="space-y-1.5">
+                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  6. Available Equipment
+                </label>
+                <SegmentedControl
+                  value={equipment}
+                  onChange={(val) => setEquipment(val as 'full_gym' | 'home_dumbbells' | 'bodyweight_only')}
+                  options={[
+                    { value: 'full_gym', label: 'Full Gym' },
+                    { value: 'home_dumbbells', label: 'Dumbbells' },
+                    { value: 'bodyweight_only', label: 'Bodyweight' },
+                  ]}
+                  size="sm"
+                  fullWidth
+                />
               </div>
 
               {/* Launch CTA */}

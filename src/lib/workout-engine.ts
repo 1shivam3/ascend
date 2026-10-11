@@ -1,13 +1,15 @@
-import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule, PersonalRecord } from './types';
+import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule, PersonalRecord, TrainingDecision } from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad } from './strength-standards';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
+import { calculateSetEffortDrift } from './lifter-twin';
 
 /**
  * Finds the most recent performance of a given exercise across past workouts.
  */
 export function getLastExercisePerformance(
   exerciseName: string,
-  workouts: WorkoutEntry[]
+  workouts: WorkoutEntry[],
+  userUnit: Unit = 'kg'
 ): {
   date: string;
   sets: WorkoutSet[];
@@ -20,14 +22,38 @@ export function getLastExercisePerformance(
 
   const targetLower = exerciseName.trim().toLowerCase();
 
-  // Search through workouts newest first
-  for (const w of workouts) {
-    const match = w.exercises.find((e) => e.name.trim().toLowerCase() === targetLower);
+  // Search through workouts sorted newest first by date
+  const sortedWorkouts = [...workouts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  for (const w of sortedWorkouts) {
+    const match = w.exercises.find((e) => {
+      const n = e.name.trim().toLowerCase();
+      return n === targetLower || n.includes(targetLower) || targetLower.includes(n);
+    });
     if (match && match.sets.length > 0) {
-      const validSets = match.sets.filter((s) => s.reps > 0);
+      const validSets = match.sets
+        .filter((s) => s.reps > 0 && s.completed !== false)
+        .map((s) => {
+          let normalizedWeight = s.weight;
+          if (s.unit && s.unit !== userUnit) {
+            if (userUnit === 'lbs' && s.unit === 'kg') {
+              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+            } else if (userUnit === 'kg' && s.unit === 'lbs') {
+              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+            }
+          }
+          return {
+            ...s,
+            weight: normalizedWeight,
+            unit: userUnit,
+          };
+        });
+
       if (validSets.length === 0) continue;
 
-      const summary = validSets.map((s) => `${s.weight > 0 ? `${s.weight}kg × ` : ''}${s.reps}`).join(', ');
+      const summary = validSets.map((s) => `${s.weight > 0 ? `${s.weight}${userUnit} × ` : ''}${s.reps}`).join(', ');
 
       let bestWeight = 0;
       let bestReps = 0;
@@ -85,7 +111,8 @@ export function getExercisePrescription(
   workouts: WorkoutEntry[],
   prs: PersonalRecord[] = [],
   userUnit: Unit = 'kg',
-  goal: AthleteGoal = 'build_muscle'
+  goal: AthleteGoal = 'build_muscle',
+  trainingDecisions?: Record<string, TrainingDecision>
 ): ExercisePrescription {
   const goalConfig = ATHLETE_GOAL_CONFIGS[goal] || ATHLETE_GOAL_CONFIGS.build_muscle;
   const isStrength = goal === 'get_stronger';
@@ -132,20 +159,109 @@ export function getExercisePrescription(
     };
   }
 
-  // Check past workout performance
-  const past = getLastExercisePerformance(cleanName, workouts);
+  // 1. Check for committed (accepted or overridden) Decision Ledger entries
+  const cleanTarget = cleanName.toLowerCase();
+  const decisionKey = Object.keys(trainingDecisions || {}).find(
+    (k) => k.trim().toLowerCase() === cleanTarget
+  );
+  const committedDecision = decisionKey ? trainingDecisions![decisionKey] : undefined;
+
+  const past = getLastExercisePerformance(cleanName, workouts, userUnit);
+
+  if (committedDecision && (committedDecision.status === 'accepted' || committedDecision.status === 'overridden')) {
+    const isOverride = committedDecision.status === 'overridden';
+    const prescribedW = isOverride && committedDecision.userOverrideWeight !== undefined
+      ? committedDecision.userOverrideWeight
+      : committedDecision.nextPrescription.weight;
+    const prescribedReps = committedDecision.nextPrescription.reps;
+    const prescribedSets = committedDecision.nextPrescription.sets;
+    const prescribedRpe = committedDecision.nextPrescription.targetRpe;
+
+    return {
+      exerciseName: cleanName,
+      targetWeight: prescribedW,
+      targetReps: prescribedReps,
+      targetRpe: prescribedRpe,
+      targetSets: prescribedSets,
+      repRange: { min: Math.max(1, prescribedReps - 2), max: prescribedReps + 2 },
+      progressionModel: committedDecision.programIntent === 'strength' ? 'rpe_autoregulated' : 'double_progression',
+      whyThisWeight: isOverride
+        ? `Athlete override active: personalized to ${prescribedW}${userUnit} × ${prescribedReps} reps.`
+        : `Accepted Lifter Twin adaptation: ${committedDecision.headline}. ${committedDecision.explanation}`,
+      nextSessionRule: committedDecision.reasonType === 'exceeded_rpe'
+        ? `Consolidate at ${prescribedW}${userUnit} until RPE stabilizes at ≤ 8.0.`
+        : committedDecision.reasonType === 'missed_reps'
+        ? `Hold ${prescribedW}${userUnit} and aim for full rep consistency across all sets.`
+        : `Advance load next session if all sets land with reserve.`,
+      lastPerformance: past ? {
+        date: past.date,
+        weight: past.bestWeight,
+        reps: past.bestReps,
+        rpe: past.sets[0]?.rpe,
+        summary: past.summary,
+      } : null,
+    };
+  }
+
+  // 2. Closed-Loop Lifter Twin Adaptation from Past Workout Performance
   const matchedPr = prs.find((p) => p.exercise.trim().toLowerCase() === lowerName);
 
   if (past && past.sets.length > 0) {
     const lastWeight = past.bestWeight;
     const lastReps = past.bestReps;
-    const lastSet = past.sets[0];
-    const lastRpe = lastSet?.rpe || 8.0;
+    const effort = calculateSetEffortDrift(past.sets);
+    const step = userUnit === 'lbs' ? 5 : 2.5;
 
-    // Hypertrophy: Double Progression Model
+    // A. Severe Effort Spike or Elevated RPE (Fatigue accumulation)
+    if (effort.hasEffortSpike || effort.averageRpe >= 9.2) {
+      const reduction = Math.max(step, Math.round((lastWeight * 0.035) / step) * step);
+      const minBar = userUnit === 'lbs' ? 45 : 20;
+      const safeW = Math.max(minBar, lastWeight - reduction);
+      return {
+        exerciseName: cleanName,
+        targetWeight: safeW,
+        targetReps: repRange.min,
+        targetRpe: 8.0,
+        targetSets: Math.min(3, defaultSets),
+        repRange,
+        progressionModel: isStrength ? 'rpe_autoregulated' : 'double_progression',
+        whyThisWeight: `Previous effort spiked to RPE ${effort.averageRpe} (within-session drift +${effort.rpeDriftPerSet} RPE/set). Adjusted -${reduction}${userUnit} to restore velocity at target RPE 8.0.`,
+        nextSessionRule: `Consolidate at ${safeW}${userUnit}. When effort stabilizes at ≤ RPE 8, return to progressive overload.`,
+        lastPerformance: {
+          date: past.date,
+          weight: lastWeight,
+          reps: lastReps,
+          rpe: effort.averageRpe,
+          summary: past.summary,
+        },
+      };
+    }
+
+    // B. Rep drop-off across working sets (>= 2 reps drop) -> Volume Consolidation
+    if (effort.repDrop >= 2) {
+      return {
+        exerciseName: cleanName,
+        targetWeight: lastWeight,
+        targetReps: lastReps,
+        targetRpe: 8.0,
+        targetSets: defaultSets,
+        repRange,
+        progressionModel: 'double_progression',
+        whyThisWeight: `Rep drop-off of ${effort.repDrop} reps detected across working sets. Volume consolidation: hold load at ${lastWeight}${userUnit} to build stamina across all sets before adding weight.`,
+        nextSessionRule: `Hit ${repRange.max} reps across all sets before advancing weight.`,
+        lastPerformance: {
+          date: past.date,
+          weight: lastWeight,
+          reps: lastReps,
+          rpe: effort.averageRpe,
+          summary: past.summary,
+        },
+      };
+    }
+
+    // C. Hypertrophy: Double Progression Model
     if (isHypertrophy) {
       const allSetsHitTop = past.sets.every((s) => s.reps >= repRange.max);
-      const step = userUnit === 'lbs' ? 5 : 2.5;
 
       if (allSetsHitTop) {
         const nextW = lastWeight + step;
@@ -157,32 +273,13 @@ export function getExercisePrescription(
           targetSets: defaultSets,
           repRange,
           progressionModel: 'double_progression',
-          whyThisWeight: `Double progression: completed all sets at ${lastWeight}${userUnit} × ${repRange.max} reps. Overload step +${step}${userUnit} applied.`,
+          whyThisWeight: `Double progression: completed all sets at ${lastWeight}${userUnit} × ${repRange.max} reps with reserve. Overload step +${step}${userUnit} applied.`,
           nextSessionRule: `Build repetitions from ${repRange.min} back up to ${repRange.max} reps before adding further load.`,
           lastPerformance: {
             date: past.date,
             weight: lastWeight,
             reps: lastReps,
-            rpe: lastRpe,
-            summary: past.summary,
-          },
-        };
-      } else if (lastRpe >= 9.5 && lastReps < repRange.min) {
-        return {
-          exerciseName: cleanName,
-          targetWeight: lastWeight,
-          targetReps: Math.max(repRange.min, lastReps),
-          targetRpe: 8.0,
-          targetSets: defaultSets,
-          repRange,
-          progressionModel: 'double_progression',
-          whyThisWeight: `Previous effort was high (@${lastRpe}). Holding load at ${lastWeight}${userUnit} to consolidate form within target RPE 8.`,
-          nextSessionRule: `Aim for smooth control. When effort drops to ≤ RPE 8, push for +1 rep.`,
-          lastPerformance: {
-            date: past.date,
-            weight: lastWeight,
-            reps: lastReps,
-            rpe: lastRpe,
+            rpe: effort.averageRpe,
             summary: past.summary,
           },
         };
@@ -202,17 +299,16 @@ export function getExercisePrescription(
             date: past.date,
             weight: lastWeight,
             reps: lastReps,
-            rpe: lastRpe,
+            rpe: effort.averageRpe,
             summary: past.summary,
           },
         };
       }
     }
 
-    // Strength: RPE Autoregulated
+    // D. Strength: RPE Autoregulated
     if (isStrength) {
-      const step = userUnit === 'lbs' ? 5 : 2.5;
-      if (lastRpe <= 7.5 && lastReps >= repRange.min) {
+      if (effort.averageRpe <= 8.0 && lastReps >= repRange.min) {
         const nextW = lastWeight + step;
         return {
           exerciseName: cleanName,
@@ -222,33 +318,13 @@ export function getExercisePrescription(
           targetSets: defaultSets,
           repRange,
           progressionModel: 'rpe_autoregulated',
-          whyThisWeight: `Previous session moved with fast bar speed (@${lastRpe} ≤ target). Added +${step}${userUnit}.`,
+          whyThisWeight: `Previous session moved with fast bar speed (@${effort.averageRpe} ≤ target). Added +${step}${userUnit}.`,
           nextSessionRule: `If this session lands ≤ RPE 8, continue +${step}${userUnit} step next exposure.`,
           lastPerformance: {
             date: past.date,
             weight: lastWeight,
             reps: lastReps,
-            rpe: lastRpe,
-            summary: past.summary,
-          },
-        };
-      } else if (lastRpe > 9.0) {
-        const dropW = Math.max(step, lastWeight - step);
-        return {
-          exerciseName: cleanName,
-          targetWeight: dropW,
-          targetReps: repRange.min,
-          targetRpe: 8.0,
-          targetSets: defaultSets,
-          repRange,
-          progressionModel: 'rpe_autoregulated',
-          whyThisWeight: `Previous effort reached RPE ${lastRpe} (exceeded target RPE 8). Adjusted -${step}${userUnit} to restore velocity.`,
-          nextSessionRule: `If this lands cleanly at RPE 8, return to ${lastWeight}${userUnit}.`,
-          lastPerformance: {
-            date: past.date,
-            weight: lastWeight,
-            reps: lastReps,
-            rpe: lastRpe,
+            rpe: effort.averageRpe,
             summary: past.summary,
           },
         };
@@ -267,14 +343,37 @@ export function getExercisePrescription(
             date: past.date,
             weight: lastWeight,
             reps: lastReps,
-            rpe: lastRpe,
+            rpe: effort.averageRpe,
             summary: past.summary,
           },
         };
       }
     }
 
-    // Default / Fat Loss / General Fitness
+    // E. Default / Fat Loss / General Fitness / Stamina
+    const allSetsClean = effort.averageRpe <= 8.0 && past.sets.every((s) => s.reps >= repRange.min);
+    if (allSetsClean) {
+      const nextW = lastWeight + step;
+      return {
+        exerciseName: cleanName,
+        targetWeight: nextW,
+        targetReps: defaultTargetReps,
+        targetRpe: 7.5,
+        targetSets: defaultSets,
+        repRange,
+        progressionModel: 'linear_step',
+        whyThisWeight: `Clean execution across all sets (avg RPE ${effort.averageRpe} ≤ 8.0). Progressive overload step +${step}${userUnit} applied.`,
+        nextSessionRule: `Keep form strict and maintain target rep range.`,
+        lastPerformance: {
+          date: past.date,
+          weight: lastWeight,
+          reps: lastReps,
+          rpe: effort.averageRpe,
+          summary: past.summary,
+        },
+      };
+    }
+
     return {
       exerciseName: cleanName,
       targetWeight: lastWeight,
@@ -289,7 +388,7 @@ export function getExercisePrescription(
         date: past.date,
         weight: lastWeight,
         reps: lastReps,
-        rpe: lastRpe,
+        rpe: effort.averageRpe,
         summary: past.summary,
       },
     };
@@ -356,10 +455,33 @@ export function getProgressionRecommendation(
   const targetLower = exerciseName.trim().toLowerCase();
   const sessions: { date: string; sets: WorkoutSet[]; bestE1RM: number }[] = [];
 
-  for (const w of workouts) {
-    const match = w.exercises.find((e) => e.name.trim().toLowerCase() === targetLower);
+  const sortedWorkouts = [...workouts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  for (const w of sortedWorkouts) {
+    const match = w.exercises.find((e) => {
+      const n = e.name.trim().toLowerCase();
+      return n === targetLower || n.includes(targetLower) || targetLower.includes(n);
+    });
     if (match && match.sets.length > 0) {
-      const validSets = match.sets.filter((s) => s.reps > 0);
+      const validSets = match.sets
+        .filter((s) => s.reps > 0 && s.completed !== false)
+        .map((s) => {
+          let normalizedWeight = s.weight;
+          if (s.unit && s.unit !== userUnit) {
+            if (userUnit === 'lbs' && s.unit === 'kg') {
+              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+            } else if (userUnit === 'kg' && s.unit === 'lbs') {
+              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+            }
+          }
+          return {
+            ...s,
+            weight: normalizedWeight,
+            unit: userUnit,
+          };
+        });
       if (validSets.length > 0) {
         const bestE1RM = Math.max(...validSets.map((s) => calculateOneRepMax(s.weight, s.reps)));
         sessions.push({ date: w.date, sets: validSets, bestE1RM });
@@ -371,9 +493,19 @@ export function getProgressionRecommendation(
   if (sessions.length === 0) return null;
 
   const lastSession = sessions[0];
-  const lastSets = lastSession.sets;
-  const lastWeight = lastSets[0]?.weight || 0;
-  const lastReps = lastSets[0]?.reps || 8;
+  // Filter out explicit warmups and unperformed sets
+  const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && s.completed !== false);
+  const candidateSets = explicitWorkSets.length > 0 ? explicitWorkSets : lastSession.sets.filter((s) => s.reps > 0);
+
+  // Isolate true working sets from unflagged preparatory warmups (e.g. empty bar 20kg before 100kg work sets)
+  const maxLoad = Math.max(...candidateSets.map((s) => s.weight));
+  const thresholdLoad = maxLoad > 30 ? maxLoad * 0.70 : maxLoad;
+  const trueWorkSets = candidateSets.filter((s) => s.weight >= thresholdLoad);
+  const lastSets = trueWorkSets.length > 0 ? trueWorkSets : candidateSets;
+
+  // Working load: peak working set load
+  const lastWeight = lastSets.reduce((prev, curr) => (curr.weight >= prev.weight ? curr : prev), lastSets[0])?.weight || 0;
+  const lastReps = Math.round(lastSets.reduce((sum, s) => sum + s.reps, 0) / lastSets.length) || 8;
   const lastSetsCount = lastSets.length;
 
   const isStrength = goal === 'get_stronger';
@@ -383,6 +515,8 @@ export function getProgressionRecommendation(
   const isFitness = goal === 'general_fitness';
 
   const minTargetReps = isStrength ? 4 : isStamina ? 12 : isFatLoss ? 6 : 8;
+  const step = userUnit === 'lbs' ? 5 : 2.5;
+  const minBar = userUnit === 'lbs' ? 45 : 20;
 
   // 1. Two consecutive misses in a row -> Suggest a 10% deload
   if (sessions.length >= 2) {
@@ -397,7 +531,7 @@ export function getProgressionRecommendation(
     const s1Missed = s1.sets.some((s) => (s.rpe && s.rpe >= 10 && s.reps < minTargetReps) || s.reps < missThreshold) || s0TotalReps < s1TotalReps;
 
     if (s0Missed && s1Missed) {
-      const deloadWeight = Math.max(userUnit === 'lbs' ? 45 : 20, Math.round((lastWeight * 0.90) / 2.5) * 2.5);
+      const deloadWeight = Math.max(minBar, Math.round((lastWeight * 0.90) / step) * step);
       const deloadReps = isStrength ? 5 : isStamina ? 12 : Math.min(10, lastReps + 2);
       const dropAmount = Math.round(lastWeight - deloadWeight);
 
@@ -433,7 +567,7 @@ export function getProgressionRecommendation(
     const variation = maxE1RM > 0 ? (maxE1RM - minE1RM) / maxE1RM : 0;
 
     if (variation < 0.02) {
-      const deloadWeight = Math.round((lastWeight * 0.90) / 2.5) * 2.5;
+      const deloadWeight = Math.max(minBar, Math.round((lastWeight * 0.90) / step) * step);
       const targetPlateauReps = isStrength ? 5 : isStamina ? 15 : Math.min(12, lastReps + 2);
 
       let plateauRationale = `Plateau detected: your performance has stalled at ~${Math.round(lastSession.bestE1RM)}${userUnit} across ${sessions.length} sessions.`;
@@ -1106,12 +1240,13 @@ export function getGoalAdaptiveSplitTemplates(
   if (goal === 'stamina') {
     return [
       {
-        id: 'builtin_conditioning_a',
+        id: 'builtin_upper_a',
         name: 'Conditioning & Upper Stamina',
         createdAt: '2026-01-01',
         description: 'Aerobic base conditioning paired with high-density upper muscular endurance',
         goalTag: 'Conditioning (Aerobic Base + 12–15 reps)',
         exercises: [
+          { name: 'Bench Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 95 : 40, targetUnit: unit, notes: 'Continuous muscular endurance, 12–15 reps' },
           { name: 'Zone 2 Stationary Cycling', targetSets: 1, targetReps: 20, targetWeight: 0, targetUnit: unit, notes: '20 min steady cadence @ 120–135 bpm aerobic zone' },
           { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Short 60s rest periods to train lactate clearing' },
           { name: 'Lat Pulldown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Continuous muscular tension throughout stroke' },
@@ -1120,7 +1255,7 @@ export function getGoalAdaptiveSplitTemplates(
         ],
       },
       {
-        id: 'builtin_conditioning_b',
+        id: 'builtin_lower_a',
         name: 'Conditioning & Lower Stamina',
         createdAt: '2026-01-01',
         description: 'Incline aerobic work paired with posterior chain endurance and knee flexion density',
@@ -1134,7 +1269,7 @@ export function getGoalAdaptiveSplitTemplates(
         ],
       },
       {
-        id: 'builtin_conditioning_c',
+        id: 'builtin_upper_b',
         name: 'Work Capacity & Intervals',
         createdAt: '2026-01-01',
         description: 'High-intensity interval conditioning engine for cardiovascular peak power',
@@ -1147,7 +1282,7 @@ export function getGoalAdaptiveSplitTemplates(
         ],
       },
       {
-        id: 'builtin_conditioning_d',
+        id: 'builtin_lower_b',
         name: 'Total Body Flush & Carries',
         createdAt: '2026-01-01',
         description: 'Low-impact aerobic flush paired with grip and full-body loaded carries',

@@ -154,6 +154,7 @@ export interface FoodItem {
   fatG: number;
   quantity?: number;
   unit?: string;
+  isUnmatched?: boolean;
 }
 
 export interface MealEntry {

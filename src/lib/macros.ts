@@ -249,6 +249,8 @@ const PIECE_WEIGHTS: Record<string, number> = {
 };
 
 function findBestMatch(normalizedName: string): string {
+  if (normalizedName.length < 2) return '';
+
   // 1) Exact match
   if (FOOD_DB[normalizedName]) return normalizedName;
 
@@ -263,33 +265,33 @@ function findBestMatch(normalizedName: string): string {
       if (score > bestScore) { bestScore = score; bestKey = key; }
     }
     // Key includes the input (e.g. input "rice" → "white rice")
-    if (key.includes(normalizedName)) {
+    if (normalizedName.length >= 3 && key.includes(normalizedName)) {
       const score = normalizedName.length / key.length;
       if (score > bestScore + 0.05) { bestScore = score + 0.05; bestKey = key; }
     }
   }
 
-  if (bestKey) return bestKey;
+  if (bestKey && bestScore >= 0.25) return bestKey;
 
   // 3) Word overlap fallback
-  const inputWords = normalizedName.split(/\s+/);
+  const inputWords = normalizedName.split(/\s+/).filter(w => w.length >= 3);
   for (const key of Object.keys(FOOD_DB)) {
-    const keyWords = key.split(/\s+/);
+    const keyWords = key.split(/\s+/).filter(w => w.length >= 3);
     const overlap = inputWords.filter(w => keyWords.includes(w)).length;
     if (overlap > 0) {
       const score = overlap / Math.max(inputWords.length, keyWords.length);
-      if (score > bestScore) { bestScore = score; bestKey = key; }
+      if (score > bestScore && score >= 0.3) { bestScore = score; bestKey = key; }
     }
   }
 
-  return bestKey;
+  return bestScore >= 0.25 ? bestKey : '';
 }
 
 export function estimateMacros(foodName: string, quantity?: number, unit: string = 'g'): FoodItem {
   let normalizedName = foodName.toLowerCase().trim();
 
   if (!normalizedName) {
-    return { name: foodName, calories: 0, proteinG: 0, carbsG: 0, fatG: 0, quantity, unit };
+    return { name: foodName, calories: 0, proteinG: 0, carbsG: 0, fatG: 0, quantity, unit, isUnmatched: true };
   }
 
   // Strip common conversational filler words: "about", "around", "approx", "of", "having", "some"
@@ -332,7 +334,8 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
   }
 
   const matchedKey = findBestMatch(cleanFoodName);
-  const baseMacros = matchedKey ? FOOD_DB[matchedKey] : EMPTY_MACROS;
+  const isUnmatched = !matchedKey || !FOOD_DB[matchedKey];
+  const baseMacros = !isUnmatched ? FOOD_DB[matchedKey] : EMPTY_MACROS;
 
   // If still no quantity provided, return raw per-100g data without scaling
   if (effectiveQty === undefined || effectiveQty === null || effectiveQty === 0) {
@@ -344,6 +347,7 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
       fatG: Number(baseMacros.fatG.toFixed(1)),
       quantity: undefined,
       unit: effectiveUnit,
+      isUnmatched,
     };
   }
 
@@ -369,7 +373,7 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
   } else if (u === 'slice' || u === 'slices') {
     grams = safeQty * 35; // 1 slice ~35g
   } else if (u === 'piece' || u === 'pieces' || u === 'pcs' || u === 'pc') {
-    const pieceWeight = PIECE_WEIGHTS[cleanFoodName] || PIECE_WEIGHTS[matchedKey] || 100;
+    const pieceWeight = PIECE_WEIGHTS[cleanFoodName] || (matchedKey ? PIECE_WEIGHTS[matchedKey] : undefined) || 100;
     grams = safeQty * pieceWeight;
   } else if (u === 'cup' || u === 'cups') {
     grams = safeQty * 240;
@@ -391,6 +395,7 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     fatG: Number((baseMacros.fatG * multiplier).toFixed(1)),
     quantity: safeQty,
     unit: effectiveUnit,
+    isUnmatched,
   };
 }
 

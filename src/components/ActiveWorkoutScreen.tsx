@@ -89,7 +89,7 @@ export default function ActiveWorkoutScreen({
   onFinish,
   onCancel,
 }: ActiveWorkoutScreenProps) {
-  const { profile, workouts, addPR, prs, saveWorkoutDraft } = useStore();
+  const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions } = useStore();
   const userMode = useStore((state) => state.userMode) || 'beginner';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const toast = useToast();
@@ -589,6 +589,9 @@ export default function ActiveWorkoutScreen({
     }
   }, []);
 
+  // Timestamp-based drift-free rest timer reference
+  const restTargetEndTimeRef = useRef<number | null>(null);
+
   // Elapsed workout timer
   useEffect(() => {
     const timer = setInterval(() => {
@@ -597,28 +600,46 @@ export default function ActiveWorkoutScreen({
     return () => clearInterval(timer);
   }, [sessionStartTime]);
 
-  // Countdown Rest Timer - runs smoothly when isRestRunning is active
+  // Countdown Rest Timer - timestamp based to eliminate mobile background/tab sleep drift
   useEffect(() => {
     if (!isRestRunning) return;
-    const interval = setInterval(() => {
-      setRestSecondsLeft((prev) => {
-        if (prev <= 1) {
-          setIsRestRunning(false);
-          setIsRestFinished(true);
-          playRestDoneChime();
-          triggerHaptic('rest_done');
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
+    const updateTick = () => {
+      const endTime = restTargetEndTimeRef.current;
+      if (!endTime) return;
+      const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+      if (remaining <= 0) {
+        setIsRestRunning(false);
+        setIsRestFinished(true);
+        setRestSecondsLeft(0);
+        restTargetEndTimeRef.current = null;
+        playRestDoneChime();
+        triggerHaptic('rest_done');
+      } else {
+        setRestSecondsLeft(remaining);
+      }
+    };
+
+    updateTick();
+    const interval = setInterval(updateTick, 500);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        updateTick();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [isRestRunning, playRestDoneChime]);
 
   // Start rest timer
   const startTimer = useCallback(
     (seconds?: number) => {
       const targetSec = seconds || defaultRestDuration;
+      restTargetEndTimeRef.current = Date.now() + targetSec * 1000;
       setRestTotalSeconds(targetSec);
       setRestSecondsLeft(targetSec);
       setIsRestRunning(true);
@@ -630,16 +651,27 @@ export default function ActiveWorkoutScreen({
   const togglePauseTimer = () => {
     if (restSecondsLeft === 0) {
       startTimer();
+    } else if (isRestRunning) {
+      restTargetEndTimeRef.current = null;
+      setIsRestRunning(false);
     } else {
-      setIsRestRunning((prev) => !prev);
+      restTargetEndTimeRef.current = Date.now() + restSecondsLeft * 1000;
+      setIsRestRunning(true);
     }
   };
 
   const adjustTimer = (delta: number) => {
-    setRestSecondsLeft((prev) => Math.max(0, prev + delta));
+    setRestSecondsLeft((prev) => {
+      const next = Math.max(0, prev + delta);
+      if (restTargetEndTimeRef.current) {
+        restTargetEndTimeRef.current += delta * 1000;
+      }
+      return next;
+    });
   };
 
   const skipTimer = () => {
+    restTargetEndTimeRef.current = null;
     setRestSecondsLeft(0);
     setIsRestRunning(false);
     setIsRestFinished(false);
@@ -674,9 +706,10 @@ export default function ActiveWorkoutScreen({
       workouts,
       prs,
       userUnit,
-      primaryGoal
+      primaryGoal,
+      trainingDecisions
     );
-  }, [currentExercise?.name, workouts, prs, userUnit, primaryGoal]);
+  }, [currentExercise?.name, workouts, prs, userUnit, primaryGoal, trainingDecisions]);
 
   const formCues = useMemo(() => {
     if (!currentExercise?.name) return [];
@@ -1147,19 +1180,21 @@ export default function ActiveWorkoutScreen({
     const today = getLocalTodayStr();
     const validExercises = exercises
       .map((e, idx) => {
-        const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`);
+        const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : `Exercise ${idx + 1}`;
+        const isBW = isBodyweightExercise(cleanName);
         const validSets = e.sets
           .map((s) => {
             const w = parseFloat(String(s.weight)) || 0;
-            const r = parseInt(String(s.reps), 10) || (w > 0 ? 1 : 8);
+            const r = parseInt(String(s.reps), 10) || 0;
+            const isCompleted = s.completed === true;
             return {
               ...s,
-              completed: true,
+              completed: isCompleted,
               weight: w,
               reps: r,
             };
           })
-          .filter((s) => s.reps > 0);
+          .filter((s) => s.reps > 0 && s.completed);
 
         return {
           name: cleanName,
@@ -1170,7 +1205,7 @@ export default function ActiveWorkoutScreen({
       .filter((e) => e.sets.length > 0);
 
     if (validExercises.length === 0) {
-      toast.error('Please record at least 1 set with reps before finishing.', 'Cannot Finish');
+      toast.error('Please record at least 1 completed set with reps before finishing.', 'Cannot Finish');
       return;
     }
 
@@ -1188,6 +1223,7 @@ export default function ActiveWorkoutScreen({
       let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
 
       for (const s of ex.sets) {
+        if (s.isWarmup) continue;
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
         if (sReps > 0 && (sWeight > 0 || isBW)) {
@@ -1204,6 +1240,7 @@ export default function ActiveWorkoutScreen({
             for (const pastEx of pastWk.exercises) {
               if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
                 for (const pastSet of pastEx.sets) {
+                  if (pastSet.isWarmup) continue;
                   const pw = parseFloat(String(pastSet.weight)) || 0;
                   const pr = parseInt(String(pastSet.reps), 10) || 0;
                   const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;

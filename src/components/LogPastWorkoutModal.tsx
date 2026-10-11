@@ -21,6 +21,7 @@ import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, PlannedWorko
 import {
   isBodyweightExercise,
   calculateOneRepMax,
+  getEffectiveExerciseLoad,
 } from '@/lib/strength-standards';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { useToast } from '@/components/ui/Toast';
@@ -317,7 +318,28 @@ export default function LogPastWorkoutModal({
   };
 
   const handleSavePastWorkout = () => {
-    const validExercises = exercises.filter((ex) => ex.name.trim() && ex.sets.length > 0);
+    const validExercises = exercises
+      .map((ex) => {
+        const isBW = isBodyweightExercise(ex.name);
+        const validSets = ex.sets
+          .filter((s) => {
+            const r = parseInt(String(s.reps), 10) || 0;
+            const w = parseFloat(String(s.weight)) || 0;
+            return r > 0 && (w > 0 || isBW || s.isWarmup);
+          })
+          .map((s) => ({
+            ...s,
+            completed: true,
+            reps: parseInt(String(s.reps), 10) || 0,
+            weight: parseFloat(String(s.weight)) || 0,
+          }));
+        return {
+          ...ex,
+          sets: validSets,
+        };
+      })
+      .filter((ex) => ex.name.trim() && ex.sets.length > 0);
+
     if (validExercises.length === 0) {
       toast.error('Please enter at least one exercise with sets.', 'Empty Workout');
       return;
@@ -328,34 +350,30 @@ export default function LogPastWorkoutModal({
     const entry: WorkoutEntry = {
       id: workoutId,
       date: new Date(`${date}T12:00:00`).toISOString(),
-      exercises: validExercises.map((ex) => ({
-        ...ex,
-        sets: ex.sets.map((s) => ({
-          ...s,
-          completed: true,
-        })),
-      })),
+      exercises: validExercises,
     };
 
     // Auto-detect PRs
     let newPRsCount = 0;
+    const userBW = profile?.bodyweightKg || 75;
     validExercises.forEach((ex) => {
       const isBW = isBodyweightExercise(ex.name);
       ex.sets.forEach((s) => {
+        if (s.isWarmup) return;
         const w = parseFloat(String(s.weight)) || 0;
         const r = parseInt(String(s.reps), 10) || 0;
         if (r <= 0) return;
         if (!isBW && w <= 0) return;
 
-        const effectiveW = isBW ? (w > 0 ? (profile?.bodyweightKg || 70) + w : (profile?.bodyweightKg || 70)) : w;
-        const current1RM = calculateOneRepMax(effectiveW, r);
+        const wKg = userUnit === 'lbs' ? w * 0.453592 : w;
+        const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
+        const current1RM = calculateOneRepMax(effectiveLoadKg, r);
 
         const existingBest = prs
           .filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase())
           .reduce((max, p) => Math.max(max, p.oneRepMax), 0);
 
         if (current1RM > existingBest && current1RM > 0) {
-          const wKg = userUnit === 'lbs' ? w * 0.453592 : w;
           const wLbs = userUnit === 'kg' ? w * 2.20462 : w;
           const prRecord: PersonalRecord = {
             id: safeRandomId('pr'),

@@ -493,6 +493,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+  const trainingDecisions = useStore((state) => state.trainingDecisions);
   const userMode = useStore((state) => state.userMode) || 'beginner';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
@@ -569,8 +570,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const activeTrainingDecision = useMemo(() => {
     if (!targetExerciseForDecision || workouts.length === 0) return null;
+    const cleanTarget = targetExerciseForDecision.trim().toLowerCase();
+    const storedKey = Object.keys(trainingDecisions || {}).find(
+      (k) => k.trim().toLowerCase() === cleanTarget
+    );
+    if (storedKey && trainingDecisions[storedKey]) {
+      return trainingDecisions[storedKey];
+    }
     return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit, 8.0, goals);
-  }, [targetExerciseForDecision, workouts, userUnit, goals]);
+  }, [targetExerciseForDecision, workouts, userUnit, goals, trainingDecisions]);
 
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1098,7 +1106,23 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // ─── Save Workout ─────────────────────────────────────────────────────────
 
   const handleSaveWorkout = () => {
-    const validExercises = exercises.filter(e => e.name.trim() && e.sets.length > 0);
+    const validExercises = exercises
+      .map(e => {
+        const cleanName = e.name.trim();
+        const isBW = isBodyweightExercise(cleanName);
+        const validSets = e.sets.filter(s => {
+          const r = parseInt(String(s.reps), 10) || 0;
+          const w = parseFloat(String(s.weight)) || 0;
+          return r > 0 && (w > 0 || isBW || s.isWarmup) && s.completed !== false;
+        });
+        return {
+          ...e,
+          name: cleanName,
+          sets: validSets,
+        };
+      })
+      .filter(e => e.name.length > 0 && e.sets.length > 0);
+
     if (validExercises.length === 0) {
       toast.error('Please add at least one exercise with sets.', 'Empty Workout');
       return;
@@ -1123,6 +1147,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       let topSet = { weightKg: 0, weightLbs: 0, reps: 0, e1RMKg: 0, rawWeight: 0, unit: userUnit as 'kg' | 'lbs' };
 
       for (const s of ex.sets) {
+        if (s.isWarmup) continue;
         const wNum = s.weight;
         const rNum = s.reps;
         if (rNum > 0 && (wNum > 0 || isBW)) {

@@ -32,7 +32,7 @@ import {
   WeeklySchedule,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
-import { generateLifterTwinProfile } from './lifter-twin';
+import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule } from './workout-schedule';
 import { safeRandomId } from './formatters';
 
@@ -164,8 +164,8 @@ export interface AppState {
   trainingDecisions: Record<string, TrainingDecision>;
   decisionsLedgerHistory: TrainingDecision[];
   lifterProfile: LifterTwinProfile | null;
-  acceptTrainingDecision: (exerciseName: string) => void;
-  overrideTrainingDecision: (exerciseName: string, customWeight?: number) => void;
+  acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
+  overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => void;
   recordTrainingDecision: (decision: TrainingDecision) => void;
   refreshLifterProfile: () => void;
 
@@ -395,34 +395,53 @@ export const useAppStore = create<AppState>()(
         let updatedLedger = [...state.decisionsLedgerHistory];
 
         for (const ex of workout.exercises) {
-          const decision = updatedDecisions[ex.name];
-          if (decision && ex.sets.length > 0) {
-            const validSets = ex.sets.filter((s) => s.reps > 0);
-            if (validSets.length > 0) {
-              const topSet = validSets.reduce((prev, curr) => curr.weight >= prev.weight ? curr : prev, validSets[0]);
-              const rpes = validSets.map((s) => s.rpe ?? 8);
-              const actualRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
-              const expectedRpe = decision.expectedRpe || decision.nextPrescription.targetRpe || 8.0;
-              const predictionError = Math.round((actualRpe - expectedRpe) * 10) / 10;
+          const cleanExName = ex.name.trim().toLowerCase();
+          const decisionKey = Object.keys(updatedDecisions).find(
+            (k) => k.trim().toLowerCase() === cleanExName
+          );
+          const decision = decisionKey ? updatedDecisions[decisionKey] : undefined;
+          const validSets = ex.sets.filter((s) => s.reps > 0 && !s.isWarmup && s.completed !== false);
 
-              const evaluatedDecision: TrainingDecision = {
-                ...decision,
-                actualExecution: {
-                  weight: topSet.weight,
-                  reps: topSet.reps,
-                  actualRpe,
-                  completedSets: validSets.length,
-                },
-                predictionError,
-                timestamp: new Date().toISOString(),
-              };
+          if (decision && validSets.length > 0) {
+            const topSet = validSets.reduce((prev, curr) => curr.weight >= prev.weight ? curr : prev, validSets[0]);
+            const rpes = validSets.map((s) => s.rpe ?? 8);
+            const actualRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
+            const expectedRpe = decision.expectedRpe || decision.nextPrescription.targetRpe || 8.0;
+            const predictionError = Math.round((actualRpe - expectedRpe) * 10) / 10;
 
-              updatedDecisions[ex.name] = evaluatedDecision;
-              updatedLedger = [
-                evaluatedDecision,
-                ...updatedLedger.filter((d) => d.id !== evaluatedDecision.id),
-              ].slice(0, 50);
-            }
+            const evaluatedDecision: TrainingDecision = {
+              ...decision,
+              actualExecution: {
+                weight: topSet.weight,
+                reps: topSet.reps,
+                actualRpe,
+                completedSets: validSets.length,
+              },
+              predictionError,
+              timestamp: new Date().toISOString(),
+            };
+
+            updatedDecisions[decisionKey || ex.name] = evaluatedDecision;
+            updatedLedger = [
+              evaluatedDecision,
+              ...updatedLedger.filter((d) => d.id !== evaluatedDecision.id),
+            ].slice(0, 50);
+          }
+
+          // Generate next pending training decision with updated history
+          const nextDecision = generateTrainingDecision(
+            ex.name,
+            nextWorkouts,
+            state.profile?.unit || 'kg',
+            8.0,
+            state.goals
+          );
+          if (nextDecision) {
+            updatedDecisions[ex.name] = nextDecision;
+            updatedLedger = [
+              nextDecision,
+              ...updatedLedger.filter((d) => d.id !== nextDecision.id),
+            ].slice(0, 50);
           }
         }
 
@@ -730,9 +749,9 @@ export const useAppStore = create<AppState>()(
       saveWeeklyReview: (review) => set({ latestWeeklyReview: review }),
 
       // Lifter Twin & Decisions Ledger Handlers
-      acceptTrainingDecision: (exerciseName: string) => {
+      acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => {
         set((state) => {
-          const existing = state.trainingDecisions[exerciseName];
+          const existing = state.trainingDecisions[exerciseName] || decision;
           if (!existing) return state;
           const updated: TrainingDecision = {
             ...existing,
@@ -749,9 +768,9 @@ export const useAppStore = create<AppState>()(
         });
       },
 
-      overrideTrainingDecision: (exerciseName: string, customWeight?: number) => {
+      overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => {
         set((state) => {
-          const existing = state.trainingDecisions[exerciseName];
+          const existing = state.trainingDecisions[exerciseName] || decision;
           if (!existing) return state;
           const updated: TrainingDecision = {
             ...existing,

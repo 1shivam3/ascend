@@ -316,6 +316,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             proteinG: est.proteinG,
             carbsG:   est.carbsG,
             fatG:     est.fatG,
+            isUnmatched: est.isUnmatched,
           };
         }
       }
@@ -343,6 +344,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               proteinG: est.proteinG,
               carbsG:   est.carbsG,
               fatG:     est.fatG,
+              isUnmatched: est.isUnmatched,
             };
           }
         }
@@ -358,6 +360,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             proteinG: est.proteinG,
             carbsG:   est.carbsG,
             fatG:     est.fatG,
+            isUnmatched: est.isUnmatched,
           };
         }
       }
@@ -371,6 +374,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ...next[index],
           [field]: val,
           calories: Math.round(4 * p + 4 * c + 9 * f),
+          isUnmatched: false,
         };
       }
 
@@ -378,6 +382,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         next[index] = {
           ...next[index],
           calories: Math.max(0, Math.round(Number(value) || 0)),
+          isUnmatched: false,
         };
       }
 
@@ -404,6 +409,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         proteinG: est.proteinG,
         carbsG:   est.carbsG,
         fatG:     est.fatG,
+        isUnmatched: est.isUnmatched,
       };
       return next;
     });
@@ -2439,14 +2445,22 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   Enter quantity above to calculate macros automatically.
                                 </p>
                               ) : (
-                                <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
-                                  <span className="flex items-center gap-1 text-accent font-semibold">
-                                    <Sparkles className="w-3 h-3" />
-                                    ~{Math.round(food.calories)} kcal
-                                  </span>
-                                  <span>
-                                    P:~{food.proteinG}g • C:~{food.carbsG}g • F:~{food.fatG}g
-                                  </span>
+                                <div className="space-y-1.5">
+                                  {food.isUnmatched && (
+                                    <div className="flex items-center gap-1.5 text-2xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
+                                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
+                                      <span>Not found in offline database — enter custom macros below</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
+                                    <span className="flex items-center gap-1 text-accent font-semibold">
+                                      <Sparkles className="w-3 h-3" />
+                                      ~{Math.round(food.calories)} kcal
+                                    </span>
+                                    <span>
+                                      P:~{food.proteinG}g • C:~{food.carbsG}g • F:~{food.fatG}g
+                                    </span>
+                                  </div>
                                 </div>
                               )}
 

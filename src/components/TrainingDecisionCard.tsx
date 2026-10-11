@@ -41,13 +41,13 @@ export default function TrainingDecisionCard({
   const isOverridden = decision.status === 'overridden';
 
   const handleAccept = () => {
-    acceptTrainingDecision(decision.exerciseName);
+    acceptTrainingDecision(decision.exerciseName, decision);
     toast.success(`Accepted ${decision.nextPrescription.weight}${userUnit} target for ${decision.exerciseName}`, 'Target Accepted');
-    if (onAccepted) onAccepted(decision);
+    if (onAccepted) onAccepted({ ...decision, status: 'accepted' });
   };
 
   const handleOverride = () => {
-    overrideTrainingDecision(decision.exerciseName, customWeight);
+    overrideTrainingDecision(decision.exerciseName, customWeight, decision);
     toast.info(`Set ${decision.exerciseName} prescription to ${customWeight}${userUnit}`, 'Target Overridden');
     setIsOverriding(false);
     if (onOverridden) onOverridden({ ...decision, userOverrideWeight: customWeight, status: 'overridden' });

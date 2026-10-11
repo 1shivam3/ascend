@@ -15,20 +15,23 @@ export function calculateOneRepMax(weight: number, reps: number): number {
 }
 
 /**
- * Suggests working load based on estimated 1RM, target reps, and target RPE.
- * Rounds to nearest standard plate step (2.5 kg or 5 lbs).
- * e.g. suggestLoad(75, 4, 8) → 62.5
+/**
+ * Suggests working load based on estimated 1RM (in kg), target reps, and target RPE.
+ * Automatically converts to lbs if unit is 'lbs' and rounds to nearest standard plate step (2.5 kg or 5 lbs).
+ * e.g. suggestLoad(75, 4, 8, 'kg') → 62.5 kg
+ * e.g. suggestLoad(100, 5, 8, 'lbs') → 100kg (=220.5 lbs) @ 5 reps RPE 8 → 180 lbs
  */
 export function suggestLoad(
-  e1rm: number,
+  e1rmKg: number,
   reps: number,
   rpe: number = 8,
   unit: 'kg' | 'lbs' = 'kg'
 ): number {
-  if (!e1rm || e1rm <= 0) return 0;
+  if (!e1rmKg || e1rmKg <= 0) return 0;
   const safeReps = Math.max(1, reps);
   const safeRpe = Math.min(10, Math.max(5, rpe));
-  const load = e1rm / (1 + (safeReps + (10 - safeRpe)) / 30);
+  const base1RM = unit === 'lbs' ? e1rmKg * 2.20462 : e1rmKg;
+  const load = base1RM / (1 + (safeReps + (10 - safeRpe)) / 30);
   const step = unit === 'lbs' ? 5 : 2.5;
   return Math.round(load / step) * step;
 }
@@ -82,6 +85,7 @@ const MALE_STANDARDS: Record<string, { [key: number]: number }> = {
   'Dumbbell Lunge':         { 1: 0.15, 20: 0.28, 35: 0.40, 50: 0.52, 70: 0.65, 85: 0.78, 100: 0.92 },
   'Arnold Press':           { 1: 0.10, 20: 0.20, 35: 0.30, 50: 0.40, 70: 0.52, 85: 0.65, 100: 0.78 },
   'Preacher Curl':          { 1: 0.12, 20: 0.22, 35: 0.33, 50: 0.45, 70: 0.58, 85: 0.72, 100: 0.88 },
+  'Calf Raise':             { 1: 0.35, 20: 0.65, 35: 0.95, 50: 1.30, 70: 1.65, 85: 2.00, 100: 2.40 },
 };
 
 const LEVELS = [1, 20, 35, 50, 70, 85, 100];
@@ -272,6 +276,15 @@ export function normalizeExerciseName(exercise: string): string {
   if (lower === 'pushup' || lower === 'pushups' || lower === 'push up') return 'Push-ups';
   if (lower === 'lat pull' || lower === 'lat pulldowns') return 'Lat Pulldown';
   if (lower === 'seated cable row') return 'Cable Row';
+  if (lower === 'bicep curl' || lower === 'biceps curl' || lower === 'db curl' || lower === 'dumbbell bicep curl' || lower === 'standing bicep curl' || lower === 'barbell curl' || lower === 'curls' || lower === 'curl') return 'Dumbbell Curl';
+  if (lower === 'lateral raise' || lower === 'side lateral raise' || lower === 'side raise' || lower === 'db lateral raise' || lower === 'lateral raises' || lower === 'side raises') return 'Dumbbell Lateral Raise';
+  if (lower === 'tricep extension' || lower === 'triceps extension' || lower === 'tricep pushdown' || lower === 'triceps pushdown' || lower === 'rope pushdown' || lower === 'cable tricep extension') return 'Tricep Pushdown';
+  if (lower === 'dumbbell shoulder press' || lower === 'db shoulder press' || lower === 'seated dumbbell press' || lower === 'seated dumbbell shoulder press') return 'Dumbbell Shoulder Press';
+  if (lower === 'incline dumbbell press' || lower === 'incline db press' || lower === 'incline db bench') return 'Incline Dumbbell Press';
+  if (lower === 'dumbbell bench press' || lower === 'dumbbell bench' || lower === 'flat db bench' || lower === 'db bench') return 'Dumbbell Press';
+  if (lower === 'seated leg curl' || lower === 'lying leg curl' || lower === 'hamstring curl' || lower === 'hamstring curls') return 'Leg Curl';
+  if (lower === 'quad extension' || lower === 'leg extensions') return 'Leg Extension';
+  if (lower === 'calf raise' || lower === 'calf raises' || lower === 'standing calf raise' || lower === 'seated calf raise') return 'Calf Raise';
 
   // Return matching standard key if case differs
   const stdKeys = Object.keys(MALE_STANDARDS);
@@ -367,7 +380,15 @@ export function getLiftLevel(
   gender: Gender
 ): LiftLevel {
   const normExercise = normalizeExerciseName(exercise);
-  const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
+  const explicitStandard = MALE_STANDARDS[normExercise];
+  const equipment = getExerciseEquipment(normExercise);
+  const standards = explicitStandard || (
+    equipment === 'dumbbell' ? MALE_STANDARDS['Dumbbell Press'] :
+    equipment === 'cable' ? MALE_STANDARDS['Cable Row'] :
+    equipment === 'machine' ? MALE_STANDARDS['Leg Press'] :
+    equipment === 'bodyweight' ? MALE_STANDARDS['Push-ups'] :
+    MALE_STANDARDS['Barbell Row']
+  );
   const safeBW = Math.max(20, bodyweightKg || 75);
   
   // For bodyweight exercises (Pull-ups, Dips, etc.), the standard ratios are based on added weight / bodyweight.
@@ -423,7 +444,6 @@ export function getLiftLevel(
 
   level = Math.max(1, level);
   const rank = getExerciseRank(level);
-  const equipment = getExerciseEquipment(exercise);
 
   return {
     exercise,

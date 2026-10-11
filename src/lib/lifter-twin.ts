@@ -55,7 +55,7 @@ export function calculateSetEffortDrift(sets: WorkoutSet[]): {
   const repDrop = Math.max(0, firstReps - lastReps);
 
   const avgRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
-  const hasEffortSpike = lastRpe >= 9.5 || rpeDriftTotal >= 1.5 || repDrop >= 2;
+  const hasEffortSpike = lastRpe >= 9.5 || rpeDriftTotal >= 1.5;
 
   const withinSessionEffortTrend: 'low' | 'moderate' | 'high' =
     rpeDriftPerSet > 0.4 ? 'high' : rpeDriftPerSet > 0.15 ? 'moderate' : 'low';
@@ -78,7 +78,8 @@ export const calculateSetFatigueSlope = calculateSetEffortDrift;
  */
 export function getExerciseHistorySessions(
   exerciseName: string,
-  workouts: WorkoutEntry[]
+  workouts: WorkoutEntry[],
+  userUnit: 'kg' | 'lbs' = 'kg'
 ): {
   date: string;
   sets: WorkoutSet[];
@@ -113,7 +114,24 @@ export function getExerciseHistorySessions(
     });
 
     if (match && match.sets.length > 0) {
-      const validSets = match.sets.filter((s) => s.reps > 0);
+      const validSets = match.sets
+        .filter((s) => s.reps > 0)
+        .map((s) => {
+          let normalizedWeight = s.weight;
+          if (s.unit && s.unit !== userUnit) {
+            if (userUnit === 'lbs' && s.unit === 'kg') {
+              normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
+            } else if (userUnit === 'kg' && s.unit === 'lbs') {
+              normalizedWeight = Math.round(s.weight * 0.453592 * 10) / 10;
+            }
+          }
+          return {
+            ...s,
+            weight: normalizedWeight,
+            unit: userUnit,
+          };
+        });
+
       if (validSets.length === 0) continue;
 
       let bestWeight = 0;
@@ -122,12 +140,12 @@ export function getExerciseHistorySessions(
       let totalVolume = 0;
 
       for (const s of validSets) {
-        const wKg = s.weight;
-        const e1rm = calculateOneRepMax(wKg, s.reps);
-        totalVolume += wKg * s.reps;
+        const wNorm = s.weight;
+        const e1rm = calculateOneRepMax(wNorm, s.reps);
+        totalVolume += wNorm * s.reps;
         if (e1rm > bestE1RM) {
           bestE1RM = Math.round(e1rm * 10) / 10;
-          bestWeight = s.weight;
+          bestWeight = wNorm;
           bestReps = s.reps;
         }
       }
@@ -167,7 +185,7 @@ export function generateTrainingDecision(
   targetRpe: number = 8.0,
   goals?: AthleteGoal[]
 ): TrainingDecision | null {
-  const history = getExerciseHistorySessions(exerciseName, workouts);
+  const history = getExerciseHistorySessions(exerciseName, workouts, userUnit);
   if (history.length === 0) return null;
 
   const activeGoals: AthleteGoal[] = goals && goals.length > 0 ? goals : ['get_stronger', 'build_muscle'];
@@ -434,7 +452,7 @@ export function generateLifterTwinProfile(
   let totalExposuresCount = 0;
 
   for (const name of exerciseNames) {
-    const history = getExerciseHistorySessions(name, workouts);
+    const history = getExerciseHistorySessions(name, workouts, userUnit);
     if (history.length === 0) continue;
 
     totalExposuresCount += history.length;

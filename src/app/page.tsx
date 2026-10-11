@@ -239,6 +239,19 @@ export default function AppPage() {
         </nav>
       )}
 
+      {/* Floating Action Button for Quick Actions */}
+      {!activeWorkoutDraft && (
+        <button
+          type="button"
+          onClick={() => setIsQuickActionOpen(true)}
+          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-full bg-accent text-white shadow-lg hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40"
+          title="Quick Actions"
+          aria-label="Quick Actions"
+        >
+          <Plus className="w-5 h-5 stroke-[2.5]" />
+        </button>
+      )}
+
       {/* Quick Action Sheet Modal */}
       <QuickActionSheetModal
         isOpen={isQuickActionOpen}

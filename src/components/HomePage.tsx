@@ -15,6 +15,8 @@ import {
   Check,
   TrendingUp,
   Camera,
+  Scale,
+  Sparkles,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
@@ -104,6 +106,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     clearWorkoutDraft,
     goals,
     weeklySchedule,
+    trainingDecisions,
   } = useStore();
 
   const toast = useToast();
@@ -172,7 +175,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       workouts,
       prs,
       userUnit,
-      primaryGoal
+      primaryGoal,
+      trainingDecisions
     );
 
     const lastPerformance = presc.lastPerformance
@@ -186,7 +190,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       nextSessionRule: presc.nextSessionRule,
       lastPerformance,
     };
-  }, [sessionInfo, prs, workouts, userUnit, primaryGoal]);
+  }, [sessionInfo, prs, workouts, userUnit, primaryGoal, trainingDecisions]);
 
   // Weekly consistency: accurately synchronized with scheduled training days
   const weeklyStats = useMemo(() => {
@@ -416,6 +420,27 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
+            onClick={() => setIsGoalSelectorOpen(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-bg-card border border-border/80 flex items-center gap-1.5 text-text-secondary hover:text-text-primary active:scale-95 transition-all shadow-xs cursor-pointer text-xs font-semibold"
+            title="Calibrate athlete goals"
+            aria-label="Calibrate athlete goals"
+          >
+            <Target className="w-3.5 h-3.5 text-accent" />
+            <span className="capitalize">{primaryGoal.replace(/_/g, ' ')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsBodyMetricsModalOpen(true)}
+            className="w-9 h-9 rounded-xl bg-bg-card border border-border/80 flex items-center justify-center text-text-muted hover:text-accent active:scale-95 transition-all shadow-xs cursor-pointer"
+            title="Log Bodyweight & Metrics"
+            aria-label="Log Bodyweight"
+          >
+            <Scale className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsSettingsOpen(true)}
             className="w-9 h-9 rounded-xl bg-bg-card border border-border/80 flex items-center justify-center text-text-muted hover:text-text-primary active:scale-95 transition-all shadow-xs cursor-pointer"
             title="Settings"
@@ -492,14 +517,26 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 : "Today's Workout"}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('workout')}
-            className="text-xs font-medium text-accent hover:underline flex items-center gap-0.5 transition-colors cursor-pointer"
-          >
-            <span>Change</span>
-            <ChevronRight className="w-3 h-3" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="text-xs font-medium text-accent hover:underline flex items-center gap-1 transition-colors cursor-pointer"
+              title="Generate a custom AI workout session"
+            >
+              <Sparkles className="w-3 h-3" />
+              <span>AI Routine</span>
+            </button>
+            <span className="text-border">•</span>
+            <button
+              type="button"
+              onClick={() => onNavigate('workout')}
+              className="text-xs font-medium text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
+            >
+              <span>Change</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
+          </div>
         </div>
 
         <div>

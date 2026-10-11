@@ -28,8 +28,8 @@ const MUSCLE_LANDMARKS: Record<ResistanceMuscleGroup, LandmarkConfig> = {
 
 export default function MuscleVolumeLandmarks() {
   const workouts = useStore((state) => state.workouts || []);
-  const profile = useStore((state) => state.profile);
-  const experience = profile?.userMode === 'beginner' ? 'beginner' : profile?.userMode === 'advanced' ? 'advanced' : 'intermediate';
+  const userMode = useStore((state) => state.userMode);
+  const experience = userMode === 'beginner' ? 'beginner' : userMode === 'advanced' ? 'advanced' : 'intermediate';
 
   // Adapt volume landmarks dynamically by user training experience
   const landmarks = useMemo(() => {
