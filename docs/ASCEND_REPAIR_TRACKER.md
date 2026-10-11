@@ -36,6 +36,11 @@ Status Taxonomy:
 | **F1-FOOD-MATCH-ZERO** | Nutrition | Unmatched foods silently return 0 calories without warning or fallback | P2 | VERIFIED | `src/lib/macros.ts`, `src/components/MealsPage.tsx` |
 | **G1-ZOOM-A11Y** | Accessibility | `userScalable: false` and `maximumScale: 1` in `layout.tsx` violates WCAG 1.4.4 | P1 | VERIFIED | `src/app/layout.tsx` |
 | **G3-REST-TIMER-DRIFT** | Mobile UX | Rest timer counts down on `setInterval` intervals, drifting during background/lock | P2 | VERIFIED | `src/components/ActiveWorkoutScreen.tsx` |
+| **H1-CREATINE-DOSE-SYNC**| Nutrition | Hardcoded 5g text ignores custom creatineConfig target (e.g. 3g) | P1 | VERIFIED | `src/components/MealsPage.tsx`, `src/components/CreatineModal.tsx` |
+| **H2-GOAL-DECOUPLING**   | Architecture | Athlete goals cluttered Nutrition & Home header; decoupled to Settings | P2 | VERIFIED | `src/components/MealsPage.tsx`, `src/components/HomePage.tsx` |
+| **H3-HYDRATION-SUPP-SEPARATION**| Navigation | Single menu option only opened hydration; split into dedicated options | P2 | VERIFIED | `src/components/MealsPage.tsx` |
+| **H4-BODYWEIGHT-STREAMLINE**| UX / Logging | Daily weigh-in unnecessarily forced height input; streamlined to weight-only | P1 | VERIFIED | `src/components/BodyMetricsModal.tsx`, `src/components/SettingsModal.tsx` |
+| **H5-PROGRESS-HEADING-POLISH**| UI / Typography | "Am I Getting Better?" header was overly bold & unreadable; polished typography | P2 | VERIFIED | `src/components/ProgressPage.tsx` |
 
 ---
 
@@ -150,3 +155,28 @@ Status Taxonomy:
 - **Defect**: Rest timer used simple interval decrement which freezes or drifts when mobile browsers background the tab or lock the screen.
 - **Fix**: Replaced countdown with `restTargetEndTimeRef` timestamp comparison (`Date.now()`) with a `visibilitychange` listener that recalculates remaining seconds on tab resume.
 - **Verification**: Verified in `src/components/ActiveWorkoutScreen.tsx`.
+
+### H1-CREATINE-DOSE-SYNC: Dynamic Creatine Dose Configuration & Display
+- **Defect**: When an athlete configured their daily creatine target (e.g. 3g), `MealsPage.tsx` remained hardcoded to display "5g Daily Target" / "5g Taken Today" and "+ Log 5g". Furthermore, `CreatineModal.tsx` lacked an effect to resync form input states with `creatineConfig` on modal open.
+- **Fix**: Replaced hardcoded text with dynamic `dailyCreatineTarget` (`creatineConfig?.dailyTargetG || 5`) and `creatineAmountG` (`creatineToday?.amountG || dailyCreatineTarget`). Updated button and toast to log the exact configured target. Added `useEffect` in `CreatineModal.tsx` to synchronize inputs on modal open.
+- **Verification**: Verified via `tests/nutrition-habits-and-ui-qa.ts` (Assertions 1, 3).
+
+### H2-GOAL-DECOUPLING: Centralizing Athlete Goal Configuration Exclusively in Settings
+- **Defect**: Athlete goals were cluttering both the Nutrition page (`MealsPage.tsx` header badge, goal nutrition emphasis, pacing banners, and tools menu) and Home page header, creating redundant, distracting controls across the app.
+- **Fix**: Removed athlete goal badge and pacing banner from `MealsPage.tsx` (keeping pure macro breakdown) and removed goal modal trigger from Tools menu. Removed the Goal button and Bodyweight/Scale button from `HomePage.tsx` header. Preserved full Goal and Bodyweight management inside `SettingsModal.tsx`.
+- **Verification**: Verified through component prop tree and clean production build.
+
+### H3-HYDRATION-SUPP-SEPARATION: Dedicated Options for Hydration and Supplements
+- **Defect**: In `MealsPage.tsx` tools menu, the option titled "Hydration & Supplements" only navigated to `HydrationModal`, leaving athletes with no way to configure supplement doses or container tubs from the menu.
+- **Fix**: Split the option into two dedicated, distinct menu buttons: "Hydration Tracker" (water drop icon, opens `HydrationModal`) and "Supplements & Creatine" (sparkles icon, opens `CreatineModal` with daily dose & tub supply).
+- **Verification**: Verified in `MealsPage.tsx` tools menu.
+
+### H4-BODYWEIGHT-STREAMLINE: Frictionless Bodyweight Logging without Height Requirement
+- **Defect**: `BodyMetricsModal.tsx` required users to view and re-enter height (with unit toggles for CM vs FT/IN) every time they logged daily or weekly bodyweight, adding friction to simple scale weigh-ins.
+- **Fix**: Streamlined modal into a clean, dedicated "Log Bodyweight" modal. Removed all height inputs and toggles while preserving existing profile height in `store.ts:updateBodyMetrics(finalWeightKg, profile?.heightCm)`.
+- **Verification**: Verified via `tests/nutrition-habits-and-ui-qa.ts` (Assertion 2).
+
+### H5-PROGRESS-HEADING-POLISH: Typography and Legibility Polish on "Am I Getting Better?"
+- **Defect**: In `ProgressPage.tsx`, "Am I Getting Better?" used `font-black text-xl sm:text-2xl tracking-tight font-display`, creating an overly thick, heavy, low-legibility header.
+- **Fix**: Refined styling to `text-lg sm:text-xl font-semibold text-text-primary tracking-tight font-sans` paired with a clean `text-[10px] font-mono font-semibold uppercase tracking-widest text-accent/90` trajectory eyebrow.
+- **Verification**: Verified visual hierarchy and clean production compilation.

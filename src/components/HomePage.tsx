@@ -15,14 +15,11 @@ import {
   Check,
   TrendingUp,
   Camera,
-  Scale,
   Sparkles,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
 import SettingsModal from '@/components/SettingsModal';
-import GoalSelectorModal from '@/components/GoalSelectorModal';
-import BodyMetricsModal from '@/components/BodyMetricsModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import ScanMealModal from '@/components/ScanMealModal';
@@ -258,9 +255,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
   // Modal triggers
-  const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isBodyMetricsModalOpen, setIsBodyMetricsModalOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
@@ -269,22 +264,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Register Modal Back Handlers (Interconnected Navigation)
   useEffect(() => {
-    if (isGoalSelectorOpen) {
-      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
-    }
-  }, [isGoalSelectorOpen, registerBackHandler]);
-
-  useEffect(() => {
     if (isSettingsOpen) {
       return registerBackHandler(() => { setIsSettingsOpen(false); return true; }, 100);
     }
   }, [isSettingsOpen, registerBackHandler]);
-
-  useEffect(() => {
-    if (isBodyMetricsModalOpen) {
-      return registerBackHandler(() => { setIsBodyMetricsModalOpen(false); return true; }, 100);
-    }
-  }, [isBodyMetricsModalOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isSuggestedModalOpen) {
@@ -418,27 +401,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
-          <button
-            type="button"
-            onClick={() => setIsGoalSelectorOpen(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-bg-card border border-border/80 flex items-center gap-1.5 text-text-secondary hover:text-text-primary active:scale-95 transition-all shadow-xs cursor-pointer text-xs font-semibold"
-            title="Calibrate athlete goals"
-            aria-label="Calibrate athlete goals"
-          >
-            <Target className="w-3.5 h-3.5 text-accent" />
-            <span className="capitalize">{primaryGoal.replace(/_/g, ' ')}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsBodyMetricsModalOpen(true)}
-            className="w-9 h-9 rounded-xl bg-bg-card border border-border/80 flex items-center justify-center text-text-muted hover:text-accent active:scale-95 transition-all shadow-xs cursor-pointer"
-            title="Log Bodyweight & Metrics"
-            aria-label="Log Bodyweight"
-          >
-            <Scale className="w-4 h-4" />
-          </button>
-
           <button
             type="button"
             onClick={() => setIsSettingsOpen(true)}
@@ -754,16 +716,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
 
       {/* ── MODALS ── */}
-      <GoalSelectorModal
-        isOpen={isGoalSelectorOpen}
-        onClose={() => setIsGoalSelectorOpen(false)}
-      />
-
-      <BodyMetricsModal
-        isOpen={isBodyMetricsModalOpen}
-        onClose={() => setIsBodyMetricsModalOpen(false)}
-      />
-
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}

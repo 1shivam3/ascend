@@ -45,7 +45,6 @@ import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
-import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
@@ -127,7 +126,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isModalOpen,          setIsModalOpen]          = useState(false);
   const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
-  const [isGoalSelectorOpen,   setIsGoalSelectorOpen]   = useState(false);
   const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen,  setIsCreatineModalOpen]  = useState(false);
@@ -181,12 +179,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return registerBackHandler(() => { setIsGoalsModalOpen(false); return true; }, 100);
     }
   }, [isGoalsModalOpen, registerBackHandler]);
-
-  useEffect(() => {
-    if (isGoalSelectorOpen) {
-      return registerBackHandler(() => { setIsGoalSelectorOpen(false); return true; }, 100);
-    }
-  }, [isGoalSelectorOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isHydrationModalOpen) {
@@ -1507,6 +1499,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const waterRemaining = Math.max(0, waterTargetMl - waterToday);
   const creatineToday = creatineLogs[todayDate];
   const creatineTaken = !!creatineToday?.taken;
+  const dailyCreatineTarget = creatineConfig?.dailyTargetG || 5;
+  const creatineAmountG = creatineToday?.amountG || dailyCreatineTarget;
 
   // Yesterday's meals for Quick Copy feature
   const yesterday = new Date();
@@ -1711,28 +1705,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </header>
 
-      {/* ── Today's Nutrition & Goals ── */}
+      {/* ── Today's Nutrition ── */}
       <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
-              <button
-                type="button"
-                onClick={() => setIsGoalSelectorOpen(true)}
-                className="px-2 py-0.5 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-accent/15 text-accent border border-accent/30 hover:bg-accent/25 transition-colors flex items-center gap-1"
-                title="Tap to change athlete goal"
-              >
-                <span>{goalConfig.label}</span>
-                <span className="text-[9px] opacity-70">⇄</span>
-              </button>
-            </div>
-            <p className="text-2xs text-text-muted mt-0.5">{goalConfig.nutritionEmphasis}</p>
+            <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
+            <p className="text-2xs text-text-muted mt-0.5">Daily caloric intake &amp; macronutrient breakdown</p>
           </div>
           <button
             type="button"
             onClick={handleOpenGoalsModal}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 shrink-0"
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
           >
             <Target className="w-3.5 h-3.5" />
             <span>{macroGoals ? 'Edit Targets' : 'Set Targets'}</span>
@@ -1854,23 +1837,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   )}
                 </div>
               </div>
-
-              {/* Pacing status badge */}
-              {goalNutritionStatus && (
-                <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 text-2xs font-mono space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-text-primary">{goalConfig.label.toUpperCase()} PACING:</span>
-                    <span className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
-                      goalNutritionStatus.isPositive
-                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                    }`}>
-                      {goalNutritionStatus.badgeText}
-                    </span>
-                  </div>
-                  <p className="text-3xs text-text-muted">{goalNutritionStatus.subtext}</p>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -2051,16 +2017,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">CREATINE</span>
                 <span className={`text-xs font-bold font-mono block ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
-                  {creatineTaken ? '5g Taken Today' : '5g Daily Target'}
+                  {creatineTaken ? `${creatineAmountG}g Taken Today` : `${dailyCreatineTarget}g Daily Target`}
                 </span>
               </div>
             </div>
             <button
               type="button"
               onClick={() => {
-                toggleCreatine(todayDate);
+                toggleCreatine(todayDate, dailyCreatineTarget);
                 if (!creatineTaken) {
-                  toast.success('5g creatine logged!', 'Creatine');
+                  toast.success(`${dailyCreatineTarget}g creatine logged!`, 'Creatine');
                 } else {
                   toast.info('Creatine marked as not taken', 'Creatine');
                 }
@@ -2071,7 +2037,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
               }`}
             >
-              {creatineTaken ? '✓ Taken' : '+ Log 5g'}
+              {creatineTaken ? '✓ Taken' : `+ Log ${dailyCreatineTarget}g`}
             </button>
           </div>
         </div>
@@ -2606,31 +2572,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <button
                   type="button"
                   onClick={handleAutoCalculateGoals}
-                  className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors font-bold"
+                  className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors font-bold cursor-pointer"
                 >
                   Apply
-                </button>
-              </div>
-
-              {/* Active Goals Tagline & Change button */}
-              <div className="flex items-center justify-between pt-1 border-t border-border/50 text-2xs">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-text-muted">Focus:</span>
-                  {(goals || ['get_stronger', 'build_muscle']).map((g) => (
-                    <span
-                      key={g}
-                      className="px-1.5 py-0.5 rounded bg-accent/15 text-accent text-3xs font-mono font-semibold"
-                    >
-                      {ATHLETE_GOAL_CONFIGS[g]?.label || g}
-                    </span>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGoalSelectorOpen(true)}
-                  className="text-text-muted hover:text-accent underline text-3xs font-mono shrink-0 ml-2 cursor-pointer"
-                >
-                  Change
                 </button>
               </div>
             </div>
@@ -2767,12 +2711,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           onAddFood={handleAddScannedFood}
         />
       )}
-
-      {/* Goal Selector Modal */}
-      <GoalSelectorModal
-        isOpen={isGoalSelectorOpen}
-        onClose={() => setIsGoalSelectorOpen(false)}
-      />
 
       {/* Hydration Target Modal */}
       <HydrationModal
@@ -3125,18 +3063,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="button"
                 onClick={() => {
                   setIsToolsMenuOpen(false);
-                  setIsGoalSelectorOpen(true);
+                  setIsHydrationModalOpen(true);
                 }}
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4" />
+                  <div className="w-9 h-9 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+                    <Droplet className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Athlete Goal &amp; Diet</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration Tracker</h4>
                     <p className="text-2xs text-text-muted">
-                      {goalConfig.label} • {dietPreference.replace('_', ' ')}
+                      Water target ({(waterTargetMl / 1000).toFixed(1)}L) &amp; daily water logs
                     </p>
                   </div>
                 </div>
@@ -3147,18 +3085,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="button"
                 onClick={() => {
                   setIsToolsMenuOpen(false);
-                  setIsHydrationModalOpen(true);
+                  setIsCreatineModalOpen(true);
                 }}
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
-                    <Droplet className="w-4 h-4" />
+                  <div className="w-9 h-9 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration &amp; Supplements</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Supplements &amp; Creatine</h4>
                     <p className="text-2xs text-text-muted">
-                      Water target ({(waterTargetMl / 1000).toFixed(1)}L) &amp; daily creatine supply
+                      Daily target ({dailyCreatineTarget}g), reminder &amp; supply tub
                     </p>
                   </div>
                 </div>

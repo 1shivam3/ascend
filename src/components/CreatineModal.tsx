@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Sparkles,
@@ -49,6 +49,15 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
   const [reminderTimeInput, setReminderTimeInput] = useState(creatineConfig?.reminderTime || '08:00');
   const [containerInput, setContainerInput] = useState(String(containerSizeG));
   const [currentAmountInput, setCurrentAmountInput] = useState(String(currentAmountG));
+
+  useEffect(() => {
+    if (isOpen) {
+      setDoseInput(String(creatineConfig?.dailyTargetG || 5));
+      setReminderTimeInput(creatineConfig?.reminderTime || '08:00');
+      setContainerInput(String(creatineSupply?.containerG || 500));
+      setCurrentAmountInput(String(creatineSupply?.currentAmountG ?? 450));
+    }
+  }, [isOpen, creatineConfig, creatineSupply]);
 
   if (!isOpen) return null;
 

@@ -2,8 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { X, Scale, Ruler, History, Trash2, Plus, Calendar, CheckCircle2 } from 'lucide-react';
-import { BodyMetricEntry } from '@/lib/types';
+import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -18,16 +17,10 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
   const preferredUnit = profile?.unit || 'kg';
   const currentWeightKg = profile?.bodyweightKg || 75;
-  const currentHeightCm = profile?.heightCm || 175;
 
   const [weightInput, setWeightInput] = useState<string>('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>(preferredUnit);
-  const [heightMode, setHeightMode] = useState<'cm' | 'ft'>('cm');
-  const [heightCmInput, setHeightCmInput] = useState<string>('');
-  const [heightFeetInput, setHeightFeetInput] = useState<string>('');
-  const [heightInchesInput, setHeightInchesInput] = useState<string>('');
   const [dateInput, setDateInput] = useState<string>('');
-  const [notesInput, setNotesInput] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
 
   useEffect(() => {
@@ -37,25 +30,10 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           ? (currentWeightKg * 2.20462).toFixed(1)
           : currentWeightKg.toFixed(1);
       setWeightInput(displayWeight);
-
-      if (currentHeightCm) {
-        setHeightCmInput(Math.round(currentHeightCm).toString());
-        const totalInches = currentHeightCm / 2.54;
-        const feet = Math.floor(totalInches / 12);
-        const inches = Math.round(totalInches % 12);
-        setHeightFeetInput(feet.toString());
-        setHeightInchesInput(inches.toString());
-      } else {
-        setHeightCmInput('175');
-        setHeightFeetInput('5');
-        setHeightInchesInput('9');
-      }
-
       setDateInput(new Date().toISOString().split('T')[0]);
-      setNotesInput('');
       setSuccessMsg('');
     }
-  }, [isOpen, currentWeightKg, currentHeightCm, unit]);
+  }, [isOpen, currentWeightKg, unit]);
 
   if (!isOpen) return null;
 
@@ -79,25 +57,12 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
     const finalWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
 
-    let finalHeightCm: number | undefined;
-    if (heightMode === 'cm') {
-      const cm = parseFloat(heightCmInput);
-      if (!isNaN(cm) && cm > 50 && cm < 300) finalHeightCm = cm;
-    } else {
-      const feet = parseFloat(heightFeetInput) || 0;
-      const inches = parseFloat(heightInchesInput) || 0;
-      const totalInches = feet * 12 + inches;
-      if (totalInches > 20 && totalInches < 120) {
-        finalHeightCm = totalInches * 2.54;
-      }
-    }
-
-    updateBodyMetrics(finalWeightKg, finalHeightCm);
-    setSuccessMsg('Body metrics saved successfully!');
+    updateBodyMetrics(finalWeightKg, profile?.heightCm);
+    setSuccessMsg('Bodyweight saved successfully!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
-    }, 1000);
+    }, 700);
   };
 
   // Sort history newest first
@@ -119,15 +84,15 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
             <div>
               <h2 className="font-bold text-base text-text-primary leading-tight">
-                Update Bodyweight & Height
+                Log Bodyweight
               </h2>
-              <p className="text-2xs text-text-muted font-mono">Calibrate Strength Standard Ratios</p>
+              <p className="text-2xs text-text-muted font-mono">Calibrate Strength Standard Ratios &amp; Track Progress</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -153,7 +118,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 <button
                   type="button"
                   onClick={() => handleUnitToggle('kg')}
-                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all ${
+                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                     unit === 'kg'
                       ? 'bg-accent text-bg-primary shadow-xs'
                       : 'text-text-muted hover:text-text-primary'
@@ -164,7 +129,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 <button
                   type="button"
                   onClick={() => handleUnitToggle('lbs')}
-                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all ${
+                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                     unit === 'lbs'
                       ? 'bg-accent text-bg-primary shadow-xs'
                       : 'text-text-muted hover:text-text-primary'
@@ -183,98 +148,14 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 value={weightInput}
                 onChange={(e) => setWeightInput(e.target.value)}
                 placeholder={unit === 'kg' ? '75.0' : '165.0'}
-                className="w-full text-lg font-mono font-bold pl-3 pr-12 py-2.5"
+                className="w-full text-lg font-mono font-bold pl-3 pr-12 py-2.5 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 required
+                autoFocus
               />
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted uppercase">
                 {unit}
               </span>
             </div>
-          </div>
-
-          {/* Height Field */}
-          <div>
-            <div className="flex justify-between items-center mb-1.5">
-              <label className="section-title text-2xs font-mono uppercase text-text-muted flex items-center gap-1">
-                <Ruler className="w-3 h-3 text-accent" />
-                HEIGHT
-              </label>
-              <div className="flex rounded-md bg-bg-secondary p-0.5 border border-border/80">
-                <button
-                  type="button"
-                  onClick={() => setHeightMode('cm')}
-                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all ${
-                    heightMode === 'cm'
-                      ? 'bg-accent text-bg-primary shadow-xs'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  CM
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHeightMode('ft')}
-                  className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all ${
-                    heightMode === 'ft'
-                      ? 'bg-accent text-bg-primary shadow-xs'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  FT / IN
-                </button>
-              </div>
-            </div>
-
-            {heightMode === 'cm' ? (
-              <div className="relative">
-                <input
-                  type="number"
-                  step="1"
-                  min="60"
-                  max="260"
-                  value={heightCmInput}
-                  onChange={(e) => setHeightCmInput(e.target.value)}
-                  placeholder="175"
-                  className="w-full text-base font-mono font-bold pl-3 pr-12 py-2"
-                />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted">
-                  cm
-                </span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="1"
-                    min="2"
-                    max="8"
-                    value={heightFeetInput}
-                    onChange={(e) => setHeightFeetInput(e.target.value)}
-                    placeholder="5"
-                    className="w-full text-base font-mono font-bold pl-3 pr-10 py-2"
-                  />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted">
-                    ft
-                  </span>
-                </div>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="1"
-                    min="0"
-                    max="11"
-                    value={heightInchesInput}
-                    onChange={(e) => setHeightInchesInput(e.target.value)}
-                    placeholder="9"
-                    className="w-full text-base font-mono font-bold pl-3 pr-10 py-2"
-                  />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted">
-                    in
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Date Field */}
@@ -287,17 +168,17 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 type="date"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
-                className="w-full text-sm font-mono py-2 pl-3"
+                className="w-full text-sm font-mono py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
               />
             </div>
           </div>
 
           <button
             type="submit"
-            className="btn-primary w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2"
+            className="btn-primary w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Save & Update Profile</span>
+            <span>Save Bodyweight</span>
           </button>
         </form>
 
@@ -306,7 +187,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           <div className="flex items-center justify-between">
             <span className="text-2xs font-mono uppercase font-bold text-text-muted flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-accent" />
-              WEIGHT & HEIGHT LOG HISTORY
+              WEIGHT LOG HISTORY
             </span>
             <span className="text-2xs font-mono text-text-muted">
               {sortedMetrics.length} entries
@@ -315,7 +196,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
           {sortedMetrics.length === 0 ? (
             <p className="text-2xs text-text-muted font-mono italic text-center py-3 bg-bg-secondary/40 rounded-xl">
-              No historical entries recorded yet. Today&apos;s calibration will be logged.
+              No historical entries recorded yet. Today&apos;s weigh-in will be logged.
             </p>
           ) : (
             <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
@@ -355,11 +236,6 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                             {diffFormatted} {preferredUnit}
                           </span>
                         )}
-                        {entry.heightCm && (
-                          <span className="text-2xs font-mono text-text-muted">
-                            {Math.round(entry.heightCm)} cm
-                          </span>
-                        )}
                       </div>
                       <span className="text-2xs font-mono text-text-muted block mt-0.5">
                         {entry.date}
@@ -369,7 +245,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                     <button
                       type="button"
                       onClick={() => deleteBodyMetric(entry.id)}
-                      className="p-1 text-text-muted hover:text-rose-400 transition-colors"
+                      className="p-1 text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
                       title="Delete record"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

@@ -268,9 +268,9 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 <div className="flex items-center gap-2.5">
                   <Scale className="w-4 h-4 text-accent" />
                   <div>
-                    <span className="text-xs font-semibold text-text-primary block">Body Metrics &amp; Height</span>
+                    <span className="text-xs font-semibold text-text-primary block">Log Bodyweight &amp; Scale</span>
                     <span className="text-2xs text-text-muted font-mono">
-                      {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : 'Unset'} • {profile?.heightCm ? `${profile.heightCm} cm` : 'Height unset'}
+                      {profile?.bodyweightKg ? `${Math.round(profile.bodyweightKg)} kg` : 'Unset'}{profile?.heightCm ? ` • ${profile.heightCm} cm` : ''}
                     </span>
                   </div>
                 </div>

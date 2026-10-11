@@ -298,10 +298,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </button>
           )}
           <div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+            <span className="text-[10px] font-mono font-semibold uppercase tracking-widest text-accent/90 block mb-0.5">
               TRAINING TRAJECTORY
             </span>
-            <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-display">
+            <h1 className="text-lg sm:text-xl font-semibold text-text-primary tracking-tight font-sans">
               Am I Getting Better?
             </h1>
           </div>
