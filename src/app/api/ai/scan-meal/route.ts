@@ -236,9 +236,10 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 }`;
 
     const candidateModels = [
-      'gemini-3.8-flash',
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-3.8-flash',
     ];
 
     let lastError: any = null;

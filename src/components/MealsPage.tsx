@@ -54,6 +54,15 @@ import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatter
 
 const MEAL_TEMPLATES = ['Breakfast', 'Lunch', 'Dinner', 'Pre-Workout', 'Post-Workout'] as const;
 
+function getDefaultMealName(): string {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 11) return 'Breakfast';
+  if (hour >= 11 && hour < 15) return 'Lunch';
+  if (hour >= 15 && hour < 18) return 'Snack';
+  if (hour >= 18 && hour < 22) return 'Dinner';
+  return 'Late Meal';
+}
+
 const UNIT_OPTIONS: { value: string; label: string }[] = [
   { value: 'g',        label: 'g (grams)' },
   { value: 'ml',       label: 'ml' },
@@ -314,24 +323,32 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       }
 
       if (field === 'quantity') {
-        const qty = Number(value);
+        const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
           const prevItem = next[index];
           const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
-          if (prevQty && prevItem.calories > 0 && qty > 0) {
+          if (prevQty && prevItem.calories > 0 && rawQty) {
             // Proportional scaling preserves scanned or custom barcode macros!
-            const ratio = qty / prevQty;
+            const ratio = rawQty / prevQty;
             next[index] = {
               ...prevItem,
+              quantity: rawQty,
               calories: Math.max(0, Math.round(prevItem.calories * ratio)),
               proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
               carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
               fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
             };
+          } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
+            // User entered custom macros for an unmatched food; do not wipe them out!
+            next[index] = {
+              ...prevItem,
+              quantity: rawQty,
+            };
           } else {
-            const est = estimateMacros(next[index].name, qty > 0 ? qty : undefined, next[index].unit);
+            const est = estimateMacros(next[index].name, rawQty, next[index].unit);
             next[index] = {
               ...next[index],
+              quantity: rawQty,
               calories: est.calories,
               proteinG: est.proteinG,
               carbsG:   est.carbsG,
@@ -629,28 +646,45 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const handleSaveMeal = () => {
     const validFoods = foods.filter((f) => f.name.trim());
-    if (!mealName.trim()) {
-      toast.error('Please enter a meal name (e.g. Breakfast, Post-Workout).', 'Missing Name');
-      return;
-    }
     if (validFoods.length === 0) {
       toast.error('Please add at least one food item with a name.', 'No Food Items');
       return;
     }
 
+    const defaultName = getDefaultMealName();
+    const finalMealName = mealName.trim() || defaultName;
+
+    const cleanedFoods: FoodItem[] = validFoods.map((f) => {
+      const q = typeof f.quantity === 'number' && !isNaN(f.quantity) && f.quantity > 0 ? f.quantity : 1;
+      const cal = Math.max(0, Math.round(Number(f.calories) || 0));
+      const p = Math.max(0, Math.round((Number(f.proteinG) || 0) * 10) / 10);
+      const c = Math.max(0, Math.round((Number(f.carbsG) || 0) * 10) / 10);
+      const fat = Math.max(0, Math.round((Number(f.fatG) || 0) * 10) / 10);
+      return {
+        ...f,
+        name: f.name.trim(),
+        quantity: q,
+        unit: f.unit || 'g',
+        calories: cal,
+        proteinG: p,
+        carbsG: c,
+        fatG: fat,
+      };
+    });
+
     const today = getLocalTodayStr();
     const newMeal: MealEntry = {
       id: safeRandomId('meal'),
       date: today,
-      name: mealName.trim(),
-      foods: validFoods,
+      name: finalMealName,
+      foods: cleanedFoods,
     };
 
-    const mealMacros = calculateMealMacros(validFoods);
+    const mealMacros = calculateMealMacros(cleanedFoods);
 
     addMeal(newMeal);
     toast.success(
-      `Added ${mealName.trim()} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
+      `Added ${finalMealName} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
       'Meal Logged'
     );
     setIsModalOpen(false);
@@ -2232,7 +2266,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
                 <input
                   type="text"
-                  placeholder="e.g. Breakfast, Lunch, Post-Workout Shake"
+                  placeholder={`e.g. ${getDefaultMealName()}, Post-Workout Shake`}
                   value={mealName}
                   onChange={(e) => setMealName(e.target.value)}
                   className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary text-sm focus:border-accent outline-none"
@@ -2518,7 +2552,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <button
                   type="button"
                   onClick={handleSaveMeal}
-                  disabled={!mealName.trim() || foods.length === 0 || !foods.some((f) => f.name.trim())}
+                  disabled={foods.length === 0 || !foods.some((f) => f.name.trim())}
                   className="btn-primary flex-1 disabled:opacity-40 text-xs"
                 >
                   Save Meal

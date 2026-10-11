@@ -41,6 +41,7 @@ Status Taxonomy:
 | **H3-HYDRATION-SUPP-SEPARATION**| Navigation | Single menu option only opened hydration; split into dedicated options | P2 | VERIFIED | `src/components/MealsPage.tsx` |
 | **H4-BODYWEIGHT-STREAMLINE**| UX / Logging | Daily weigh-in unnecessarily forced height input; streamlined to weight-only | P1 | VERIFIED | `src/components/BodyMetricsModal.tsx`, `src/components/SettingsModal.tsx` |
 | **H5-PROGRESS-HEADING-POLISH**| UI / Typography | "Am I Getting Better?" header was overly bold & unreadable; polished typography | P2 | VERIFIED | `src/components/ProgressPage.tsx` |
+| **I1-SCAN-LOG-REGRESSION** | Nutrition / Scanner | Scan Meal saved to UTC date causing timezone mismatch; manual Log Meal blocked by mandatory mealName requirement; 503 spike on Gemini model chain | P0 | VERIFIED | `src/components/ScanMealModal.tsx`, `src/components/MealsPage.tsx`, `src/app/api/ai/scan-meal/route.ts`, `src/app/api/ai/parse-meal/route.ts`, `src/app/api/ai/coach/route.ts`, `src/app/api/ai/parse-voice/route.ts` |
 
 ---
 
@@ -180,3 +181,16 @@ Status Taxonomy:
 - **Defect**: In `ProgressPage.tsx`, "Am I Getting Better?" used `font-black text-xl sm:text-2xl tracking-tight font-display`, creating an overly thick, heavy, low-legibility header.
 - **Fix**: Refined styling to `text-lg sm:text-xl font-semibold text-text-primary tracking-tight font-sans` paired with a clean `text-[10px] font-mono font-semibold uppercase tracking-widest text-accent/90` trajectory eyebrow.
 - **Verification**: Verified visual hierarchy and clean production compilation.
+
+### I1-SCAN-LOG-REGRESSION: Scan Meal & Manual Log Meal Restoration
+- **Defects**:
+  1. **Date Timezone Desync**: In `ScanMealModal.tsx`, `handleSaveToNutrition` derived today via UTC: `new Date().toISOString().split('T')[0]`. In contrast, `MealsPage.tsx` filtered today's meals with local calendar time `getLocalTodayStr()`. In positive UTC offsets (e.g. IST UTC+5:30) or late at night/early morning, scanned meals saved under yesterday's UTC date, causing them to immediately disappear from today's macro cards and meal list.
+  2. **Manual Log Form Lock**: In `MealsPage.tsx`, the "Save Meal" button was hard-disabled with `!mealName.trim() || foods.length === 0 || !foods.some(f => f.name.trim())`. Athletes adding foods without explicitly typing a meal name were prevented from saving.
+  3. **Custom Macro Overwriting**: In `MealsPage.tsx:handleFoodChange`, clearing quantity produced `NaN`, and entering quantity on an unmatched food after typing custom macros called `estimateMacros` and wiped custom user values back to 0.
+  4. **Gemini Model Demand Spike**: Primary candidate model in API routes was `gemini-3.8-flash`, which experienced intermittent 503 HTTP `UNAVAILABLE` demand spikes, causing the frontend error handler to display temporary cloud meal notices.
+- **Fixes**:
+  1. Updated `ScanMealModal.tsx` lines 555 and 895 to use `getLocalTodayStr()` from `@/lib/formatters`. Scanned meals now land on the exact local calendar date used by `MealsPage.tsx`. Passed `onMealSaved` callback in `MealsPage.tsx`.
+  2. Removed `!mealName.trim()` from the disabled condition on "Save Meal". Added `getDefaultMealName()` (`Breakfast`, `Lunch`, `Snack`, `Dinner`, `Late Meal`) to seamlessly auto-populate meal names when left blank.
+  3. Guarded `handleFoodChange` to sanitize `quantity` against `NaN` and preserved custom user-entered calories and protein on unmatched food items.
+  4. Updated candidate model order across all AI routes (`/api/ai/scan-meal`, `/api/ai/parse-meal`, `/api/ai/coach`, `/api/ai/parse-voice`) to prioritize `gemini-3.5-flash` followed by `gemini-3.5-flash-lite`, `gemini-flash-latest`, and `gemini-3.8-flash`.
+- **Verification**: Verified via `tests/meal-logging-regression-qa.ts` (19/19 assertions passing), `tests/meal-scanner-low-mem-qa.ts` (9/9 suites passing), and production build `npm run build` (exit code 0).

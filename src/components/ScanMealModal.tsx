@@ -6,6 +6,7 @@ import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
+import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import {
   Camera,
@@ -552,7 +553,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const handleSaveToNutrition = () => {
     if (!analysis || analysis.items.length === 0) return;
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = getLocalTodayStr();
     const validFoods: FoodItem[] = analysis.items.map((it) => ({
       name: it.name,
       quantity: it.estimatedGrams,
@@ -892,7 +893,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           const hasCreatine = analysis.items.some((item) =>
             item.name.toLowerCase().includes('creatine')
           );
-          const todayStr = new Date().toISOString().split('T')[0];
+          const todayStr = getLocalTodayStr();
           const isCreatineLoggedToday = !!store.creatineLogs?.[todayStr]?.taken;
 
           return (
