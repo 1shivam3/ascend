@@ -33,16 +33,21 @@ export async function POST(req: Request) {
 
     const apiKey = getServerGeminiApiKey();
     if (!apiKey) {
-      return NextResponse.json({ error: 'NO_API_KEY', message: 'Gemini API Key missing on server' }, { status: 503 });
+      return NextResponse.json(
+        {
+          error: 'NO_API_KEY',
+          message: 'Voice recognition is temporarily unavailable. Please enter workout details manually.',
+        },
+        { status: 503 }
+      );
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
     const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
-      'gemini-flash-latest',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
     ];
 
     const systemPrompt = `You are a powerlifting and strength training voice assistant specializing in Hinglish and Indian gym slang.

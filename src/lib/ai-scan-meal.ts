@@ -70,17 +70,25 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   if (options.hiddenIngredients && options.hiddenIngredients.length > 0) {
     formData.append('hiddenIngredients', JSON.stringify(options.hiddenIngredients));
   }
+  const headers: Record<string, string> = {};
+  if (options.customApiKey && options.customApiKey.trim()) {
+    headers['x-gemini-api-key'] = options.customApiKey.trim();
+  }
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
+    headers,
     body: formData,
   });
 
   if (!response.ok) {
     const errData = await response.json().catch(() => ({}));
-    throw new Error(
+    const scanError: any = new Error(
       errData.message ||
-        `Food scan failed (${response.status}). Please check your internet connection or Gemini API key.`
+        `Food scan failed (${response.status}). Please check your internet connection or try again later.`
     );
+    scanError.code = errData.error || `HTTP_${response.status}`;
+    scanError.status = response.status;
+    throw scanError;
   }
 
   const data: MealAnalysisResult = await response.json();

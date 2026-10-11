@@ -354,6 +354,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         file: processedBlob,
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
+        customApiKey: store.customGeminiKey,
       });
 
       const result = applyLearnedPortionPreferences(rawResult);
@@ -365,14 +366,19 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       const rawErrorMsg =
         err?.message || 'Failed to analyze meal photo. Please try again.';
       const isKeyErr =
+        err?.code === 'NO_API_KEY' ||
+        err?.status === 503 ||
         rawErrorMsg.toLowerCase().includes('api key') ||
+        rawErrorMsg.toLowerCase().includes('gemini_api_key') ||
+        rawErrorMsg.toLowerCase().includes('api_key') ||
+        rawErrorMsg.toLowerCase().includes('unconfigured') ||
         rawErrorMsg.toLowerCase().includes('key configured') ||
         rawErrorMsg.toLowerCase().includes('no_api_key');
       const errorMsg = isKeyErr
         ? 'Cloud meal recognition is temporarily unavailable. You can use instant offline food estimation below.'
         : rawErrorMsg;
       setScanError(errorMsg);
-      toast.error(errorMsg, 'Analysis Notice');
+      toast.error(errorMsg, 'Notice');
       setStep('select');
     }
   };
@@ -530,6 +536,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           file: processedBlob,
           userNotes: `${userNotes ? userNotes + '. ' : ''}Correction from user: ${refinementInput.trim()}`,
           hiddenIngredients: selectedHiddenIngredients,
+          customApiKey: store.customGeminiKey,
         });
         setAnalysis(refinedResult);
         toast.success('Meal re-analyzed with updated directives.', 'AI Refined');

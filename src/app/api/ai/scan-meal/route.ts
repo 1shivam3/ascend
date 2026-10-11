@@ -127,14 +127,17 @@ export async function POST(req: Request) {
       }
     }
 
-    const apiKey = getServerGeminiApiKey();
+    const customHeaderKey = req.headers.get('x-gemini-api-key')?.trim();
+    const apiKey =
+      getServerGeminiApiKey() ||
+      (customHeaderKey && customHeaderKey.length > 5 ? customHeaderKey : undefined);
 
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'NO_API_KEY',
           message:
-            'Server meal AI recognition is currently unconfigured. Set GEMINI_API_KEY in server environment.',
+            'Meal recognition service is temporarily unavailable. Please try again later or use offline estimation.',
         },
         { status: 503 }
       );
@@ -233,9 +236,9 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 }`;
 
     const candidateModels = [
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-flash',
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
     ];
 
     let lastError: any = null;
