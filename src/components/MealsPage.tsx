@@ -114,7 +114,6 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const hydrationConfig    = useStore((state) => state.hydrationConfig);
   const creatineConfig     = useStore((state) => state.creatineConfig);
   const creatineSupply     = useStore((state) => state.creatineSupply);
-  const customGeminiKey    = useStore((state) => state.customGeminiKey);
   const goals              = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
 
   // Athlete goal personalization
@@ -758,16 +757,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     setIsNaturalParsing(true);
     try {
-      const customKey = customGeminiKey;
       const res = await fetch('/api/ai/parse-meal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(customKey ? { 'x-gemini-api-key': customKey } : {}),
         },
         body: JSON.stringify({
           query: q,
-          customApiKey: customKey,
         }),
       });
 

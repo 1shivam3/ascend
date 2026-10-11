@@ -44,8 +44,14 @@ export function parseWorkoutCSV(csvText: string): ImportWorkoutResult {
     if (parts.length <= Math.max(dateIdx, exerciseIdx)) continue;
 
     const rawDate = parts[dateIdx];
-    const exercise = parts[exerciseIdx];
-    if (!rawDate || !exercise) continue;
+    const rawExercise = parts[exerciseIdx];
+    if (!rawDate || !rawExercise) continue;
+
+    // Sanitize exercise against CSV formula injection and prototype pollution
+    const exercise = rawExercise.replace(/^[\t\r=+\-@]+/, '').trim().slice(0, 100);
+    if (!exercise || exercise === '__proto__' || exercise === 'constructor' || exercise === 'prototype') {
+      continue;
+    }
 
     // Normalize date to YYYY-MM-DD
     let normalizedDate = '';
@@ -64,24 +70,26 @@ export function parseWorkoutCSV(csvText: string): ImportWorkoutResult {
       }
     }
 
-    if (!normalizedDate) continue;
+    if (!normalizedDate || normalizedDate === '__proto__' || normalizedDate === 'constructor' || normalizedDate === 'prototype') {
+      continue;
+    }
 
     const weightVal = weightIdx !== -1 && parts[weightIdx] ? parseFloat(parts[weightIdx].replace(/[^0-9.]/g, '')) : 0;
     const repsVal = repsIdx !== -1 && parts[repsIdx] ? parseInt(parts[repsIdx].replace(/[^0-9]/g, ''), 10) : 0;
 
-    const weight = isNaN(weightVal) ? 0 : weightVal;
-    const reps = isNaN(repsVal) ? 0 : repsVal;
+    const weight = isNaN(weightVal) ? 0 : Math.min(1000, Math.max(0, weightVal));
+    const reps = isNaN(repsVal) ? 1 : Math.min(500, Math.max(1, repsVal));
 
-    if (!workoutsMap[normalizedDate]) {
-      workoutsMap[normalizedDate] = {};
+    if (!Object.prototype.hasOwnProperty.call(workoutsMap, normalizedDate)) {
+      workoutsMap[normalizedDate] = Object.create(null);
     }
-    if (!workoutsMap[normalizedDate][exercise]) {
+    if (!Object.prototype.hasOwnProperty.call(workoutsMap[normalizedDate], exercise)) {
       workoutsMap[normalizedDate][exercise] = [];
     }
 
     workoutsMap[normalizedDate][exercise].push({
       weight,
-      reps: reps > 0 ? reps : 1,
+      reps,
       unit: 'kg',
     });
   }

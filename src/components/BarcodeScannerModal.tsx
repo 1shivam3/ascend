@@ -37,7 +37,6 @@ export default function BarcodeScannerModal({
 }: BarcodeScannerModalProps) {
   const toast = useToast();
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
-  const customGeminiKey = useStore((state) => state.customGeminiKey);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -354,7 +353,6 @@ export default function BarcodeScannerModal({
       const result = await analyzeMealPhoto({
         file,
         userNotes: 'Nutrition facts label or ingredients list on product packaging. Extract food name, brand, calories per 100g, protein in grams, carbs in grams, fat in grams.',
-        customApiKey: customGeminiKey,
       });
 
       if (result && result.items && result.items.length > 0) {

@@ -86,59 +86,46 @@ interface CoachRequestBody {
   };
 }
 
-import fs from 'fs';
-import path from 'path';
-
-function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
-  if (headerKey && headerKey.trim()) return headerKey.trim();
-  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
-
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    return process.env.GEMINI_API_KEY.trim();
-  }
-  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
-    return process.env.GOOGLE_API_KEY.trim();
-  }
-
-  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
-  for (const envFile of envFiles) {
-    try {
-      const filePath = path.resolve(process.cwd(), envFile);
-      if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const lines = fileContent.split(/\r?\n/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
-            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
-            if (val) return val;
-          }
-        }
-      }
-    } catch {
-      // Ignore filesystem errors
-    }
-  }
-
-  return undefined;
-}
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
 export async function POST(req: Request) {
+  // 1. Rate limiting: 25 requests per minute per client IP
+  const rateLimit = checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 25,
+    keyPrefix: 'ai-coach',
+  });
+
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
-    const headerKey = req.headers.get('x-gemini-api-key');
     const body: CoachRequestBody = await req.json();
     const task = body.task || 'COACH_INSIGHT';
 
-    const apiKey = getResolvedApiKey(headerKey, body.customApiKey);
+    // 2. Input size limits and sanitization
+    if (body.userContext && body.userContext.length > 10000) {
+      body.userContext = body.userContext.slice(0, 10000);
+    }
+    if (body.command?.instruction && body.command.instruction.length > 1000) {
+      body.command.instruction = body.command.instruction.slice(0, 1000);
+    }
+    if (body.substitution?.exerciseToReplace && body.substitution.exerciseToReplace.length > 150) {
+      body.substitution.exerciseToReplace = body.substitution.exerciseToReplace.slice(0, 150);
+    }
+
+    const apiKey = getServerGeminiApiKey();
 
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'NO_API_KEY',
           message:
-            'No Gemini API key provided. Please configure GEMINI_API_KEY in your environment or enter your personal key in Settings.',
+            'Server AI intelligence is currently unconfigured. Set GEMINI_API_KEY in server environment.',
         },
-        { status: 400 }
+        { status: 503 }
       );
     }
 
@@ -317,11 +304,12 @@ Schema:
       data: parsed,
     });
   } catch (error: any) {
-    console.error('Gemini Coach API Error:', error);
+    const rawMsg = error?.message || 'Failed to process AI Coach request.';
+    console.error('Gemini Coach API Error:', redactSecrets(rawMsg));
     return NextResponse.json(
       {
         error: 'GEMINI_ERROR',
-        message: error?.message || 'Failed to process AI Coach request.',
+        message: redactSecrets(rawMsg),
       },
       { status: 500 }
     );

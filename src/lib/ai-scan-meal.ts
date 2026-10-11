@@ -70,15 +70,8 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   if (options.hiddenIngredients && options.hiddenIngredients.length > 0) {
     formData.append('hiddenIngredients', JSON.stringify(options.hiddenIngredients));
   }
-  if (options.customApiKey) {
-    formData.append('customApiKey', options.customApiKey);
-  }
-
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
-    headers: {
-      ...(options.customApiKey ? { 'x-gemini-api-key': options.customApiKey } : {}),
-    },
     body: formData,
   });
 

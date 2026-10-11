@@ -1,69 +1,46 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import fs from 'fs';
-import path from 'path';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { FoodItem } from '@/lib/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
-  if (headerKey && headerKey.trim()) return headerKey.trim();
-  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
-
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    return process.env.GEMINI_API_KEY.trim();
-  }
-  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
-    return process.env.GOOGLE_API_KEY.trim();
-  }
-
-  // Fallback: Read directly from local env files if process.env wasn't populated yet
-  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
-  for (const envFile of envFiles) {
-    try {
-      const filePath = path.resolve(process.cwd(), envFile);
-      if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const lines = fileContent.split(/\r?\n/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
-            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
-            if (val) return val;
-          }
-        }
-      }
-    } catch {
-      // Ignore filesystem errors
-    }
-  }
-
-  return undefined;
-}
-
 interface ParseMealRequestBody {
   query: string;
-  customApiKey?: string;
 }
 
 export async function POST(req: Request) {
-  try {
-    const headerKey = req.headers.get('x-gemini-api-key');
-    const body: ParseMealRequestBody = await req.json();
-    const query = body?.query?.trim();
+  // 1. Rate limiting: 25 requests per minute per client IP
+  const rateLimit = checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 25,
+    keyPrefix: 'ai-parse-meal',
+  });
 
-    if (!query) {
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
+  try {
+    const body: ParseMealRequestBody = await req.json();
+    const rawQuery = body?.query?.trim();
+
+    if (!rawQuery) {
       return NextResponse.json(
         { error: 'NO_QUERY', message: 'No food text query provided.' },
         { status: 400 }
       );
     }
 
-    const apiKey = getResolvedApiKey(headerKey, body.customApiKey);
+    // 2. Bound query length to 500 characters
+    const query = rawQuery.slice(0, 500);
 
-    // If no API key, use calibrated offline parser
+    const apiKey = getServerGeminiApiKey();
+
+    // If no API key configured on server, seamlessly fallback to calibrated offline database
     if (!apiKey) {
       const offlineFoods = parseNaturalMealOffline(query);
       const totals = calculateMealMacros(offlineFoods);
@@ -184,9 +161,10 @@ RULES FOR PRECISION:
       totalFatG: totals.fatG,
     });
   } catch (err: any) {
-    console.error('Parse meal API error:', err);
+    const rawMsg = err?.message || 'Failed to parse meal.';
+    console.error('Parse meal API error:', redactSecrets(rawMsg));
     return NextResponse.json(
-      { error: 'SERVER_ERROR', message: err.message || 'Failed to parse meal.' },
+      { error: 'SERVER_ERROR', message: redactSecrets(rawMsg) },
       { status: 500 }
     );
   }

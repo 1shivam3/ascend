@@ -117,6 +117,11 @@ class SupabaseSyncEngine {
   }
 
   public async signInWithGoogle(): Promise<{ error?: string }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
     const supabase = getSupabase();
     if (!supabase) return { error: 'Supabase is not configured' };
 
@@ -180,14 +185,23 @@ class SupabaseSyncEngine {
   }
 
   public async signOut(): Promise<{ error?: string }> {
+    clearTimeout(this.debounceTimer);
+    this.isSyncing = false;
+    this.currentUser = null;
+    this.status = 'unconfigured';
+    this.notify();
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('ascend_logged_out', 'true');
+      } catch {}
+    }
+
     const supabase = getSupabase();
-    if (!supabase) return { error: 'Supabase is not configured' };
+    if (!supabase) return {};
 
     try {
       const { error } = await supabase.auth.signOut();
-      this.currentUser = null;
-      this.status = 'unconfigured';
-      this.notify();
       return error ? { error: error.message } : {};
     } catch (err: any) {
       return { error: err?.message || 'Sign out failed' };
@@ -203,6 +217,15 @@ class SupabaseSyncEngine {
 
   public async triggerSyncNow() {
     if (this.isSyncing) return;
+
+    if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
+      this.currentUser = null;
+      this.status = 'unconfigured';
+      this.isSyncing = false;
+      this.notify();
+      return;
+    }
+
     const supabase = getSupabase();
     if (!supabase) {
       this.status = 'unconfigured';

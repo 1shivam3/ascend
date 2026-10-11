@@ -1,60 +1,39 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import fs from 'fs';
-import path from 'path';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
-  if (headerKey && headerKey.trim()) return headerKey.trim();
-  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
-
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    return process.env.GEMINI_API_KEY.trim();
-  }
-  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
-    return process.env.GOOGLE_API_KEY.trim();
-  }
-
-  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
-  for (const envFile of envFiles) {
-    try {
-      const filePath = path.resolve(process.cwd(), envFile);
-      if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const lines = fileContent.split(/\r?\n/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
-            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
-            if (val) return val;
-          }
-        }
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  return undefined;
-}
-
 export async function POST(req: Request) {
-  try {
-    const headerKey = req.headers.get('x-gemini-api-key');
-    const body = await req.json();
-    const transcript = body?.transcript?.trim();
-    const fallbackExercise = body?.currentExercise || 'Unknown';
-    const userUnit = body?.userUnit || 'kg';
+  // 1. Rate limiting: 25 requests per minute per client IP
+  const rateLimit = checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 25,
+    keyPrefix: 'ai-parse-voice',
+  });
 
-    if (!transcript) {
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
+  try {
+    const body = await req.json();
+    const rawTranscript = body?.transcript?.trim();
+    const fallbackExercise = String(body?.currentExercise || 'Unknown').slice(0, 100);
+    const userUnit = body?.userUnit === 'lbs' ? 'lbs' : 'kg';
+
+    if (!rawTranscript) {
       return NextResponse.json({ error: 'NO_TRANSCRIPT', message: 'No voice transcript provided' }, { status: 400 });
     }
 
-    const apiKey = getResolvedApiKey(headerKey, body?.customApiKey);
+    // 2. Bound transcript length to 1000 characters
+    const transcript = rawTranscript.slice(0, 1000);
+
+    const apiKey = getServerGeminiApiKey();
     if (!apiKey) {
-      return NextResponse.json({ error: 'NO_API_KEY', message: 'Gemini API Key missing' }, { status: 401 });
+      return NextResponse.json({ error: 'NO_API_KEY', message: 'Gemini API Key missing on server' }, { status: 503 });
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -132,6 +111,7 @@ Respond with ONLY raw JSON matching this schema:
       },
     });
   } catch (err: any) {
-    return NextResponse.json({ error: 'AI_PARSE_FAILED', message: err?.message || 'Failed to parse voice' }, { status: 500 });
+    const rawMsg = err?.message || 'Failed to parse voice';
+    return NextResponse.json({ error: 'AI_PARSE_FAILED', message: redactSecrets(rawMsg) }, { status: 500 });
   }
 }

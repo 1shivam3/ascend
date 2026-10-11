@@ -306,14 +306,28 @@ const COMMON_BARCODES: Record<string, {
 };
 
 
+import { checkRateLimit } from '@/lib/rate-limit';
+import { rateLimitResponse } from '@/lib/server-security';
+
 export async function GET(req: Request) {
+  // 1. Rate limiting: 60 barcode lookups per minute per client IP
+  const rateLimit = checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 60,
+    keyPrefix: 'barcode',
+  });
+
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
     const { searchParams } = new URL(req.url);
     const code = searchParams.get('code')?.trim().replace(/\D/g, '');
 
-    if (!code || code.length < 5) {
+    if (!code || code.length < 5 || code.length > 30) {
       return NextResponse.json(
-        { error: 'INVALID_CODE', message: 'Valid barcode required (digits only).' },
+        { error: 'INVALID_CODE', message: 'Valid barcode required (digits only, between 5 and 30 digits).' },
         { status: 400 }
       );
     }

@@ -2,45 +2,22 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { MealAnalysisResult } from '@/lib/types';
 
-import fs from 'fs';
-import path from 'path';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 
-function getResolvedApiKey(headerKey?: string | null, bodyKey?: string | null): string | undefined {
-  if (headerKey && headerKey.trim()) return headerKey.trim();
-  if (bodyKey && bodyKey.trim()) return bodyKey.trim();
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]);
 
-  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) {
-    return process.env.GEMINI_API_KEY.trim();
-  }
-  if (process.env.GOOGLE_API_KEY && process.env.GOOGLE_API_KEY.trim()) {
-    return process.env.GOOGLE_API_KEY.trim();
-  }
-
-  // Fallback: Read directly from local env files if process.env wasn't populated yet
-  const envFiles = ['.env.local', '.env', '.env.production.local', '.env.development.local'];
-  for (const envFile of envFiles) {
-    try {
-      const filePath = path.resolve(process.cwd(), envFile);
-      if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        const lines = fileContent.split(/\r?\n/);
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith('GEMINI_API_KEY=') || trimmed.startsWith('GOOGLE_API_KEY=')) {
-            const val = trimmed.split('=')[1]?.trim().replace(/^['"]|['"]$/g, '');
-            if (val) return val;
-          }
-        }
-      }
-    } catch {
-      // Ignore filesystem errors
-    }
-  }
-
-  return undefined;
-}
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_BASE64_LENGTH = 14 * 1024 * 1024; // ~10.5MB decoded
 
 interface ScanMealRequestBody {
   imageBase64: string;
@@ -51,15 +28,24 @@ interface ScanMealRequestBody {
 }
 
 export async function POST(req: Request) {
+  // 1. Rate limiting: 20 meal scans per minute per client IP
+  const rateLimit = checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 20,
+    keyPrefix: 'ai-scan-meal',
+  });
+
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
-    const headerKey = req.headers.get('x-gemini-api-key');
     const contentType = req.headers.get('content-type') || '';
 
     let cleanBase64 = '';
     let mimeType = 'image/jpeg';
     let userNotes = '';
     let hiddenIngredients: string[] = [];
-    let customApiKey: string | undefined;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
@@ -72,29 +58,39 @@ export async function POST(req: Request) {
         );
       }
 
-      // Server-side size guard: 10MB maximum
-      if (imageFile.size > 10 * 1024 * 1024) {
+      if (imageFile.size > MAX_IMAGE_BYTES) {
         return NextResponse.json(
           { error: 'IMAGE_TOO_LARGE', message: 'Image exceeds maximum allowed size (10MB).' },
           { status: 413 }
         );
       }
 
+      mimeType = (imageFile.type || 'image/jpeg').toLowerCase();
+      if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+        return NextResponse.json(
+          {
+            error: 'UNSUPPORTED_MEDIA_TYPE',
+            message: `Unsupported image format (${mimeType}). Please upload JPEG, PNG, or WebP.`,
+          },
+          { status: 415 }
+        );
+      }
+
       const buffer = Buffer.from(await imageFile.arrayBuffer());
       cleanBase64 = buffer.toString('base64');
-      mimeType = imageFile.type || 'image/jpeg';
-      userNotes = (formData.get('userNotes') as string) || '';
+      userNotes = String(formData.get('userNotes') || '').slice(0, 1000);
 
       const hiddenRaw = formData.get('hiddenIngredients');
       if (typeof hiddenRaw === 'string') {
         try {
-          hiddenIngredients = JSON.parse(hiddenRaw);
+          const parsedHidden = JSON.parse(hiddenRaw);
+          if (Array.isArray(parsedHidden)) {
+            hiddenIngredients = parsedHidden.slice(0, 30).map((h) => String(h).slice(0, 100));
+          }
         } catch {
           hiddenIngredients = [];
         }
       }
-
-      customApiKey = (formData.get('customApiKey') as string) || undefined;
     } else {
       const body: ScanMealRequestBody = await req.json();
       const { imageBase64, mimeType: bodyMime = 'image/jpeg', userNotes: bodyNotes = '', hiddenIngredients: bodyHidden = [] } = body;
@@ -106,23 +102,41 @@ export async function POST(req: Request) {
         );
       }
 
+      mimeType = bodyMime.toLowerCase();
+      if (!ALLOWED_MIME_TYPES.has(mimeType)) {
+        return NextResponse.json(
+          {
+            error: 'UNSUPPORTED_MEDIA_TYPE',
+            message: `Unsupported image format (${mimeType}). Please upload JPEG, PNG, or WebP.`,
+          },
+          { status: 415 }
+        );
+      }
+
       cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
-      mimeType = bodyMime;
-      userNotes = bodyNotes;
-      hiddenIngredients = bodyHidden;
-      customApiKey = body.customApiKey;
+      if (cleanBase64.length > MAX_BASE64_LENGTH) {
+        return NextResponse.json(
+          { error: 'IMAGE_TOO_LARGE', message: 'Image payload exceeds maximum allowed size (10MB).' },
+          { status: 413 }
+        );
+      }
+
+      userNotes = String(bodyNotes || '').slice(0, 1000);
+      if (Array.isArray(bodyHidden)) {
+        hiddenIngredients = bodyHidden.slice(0, 30).map((h) => String(h).slice(0, 100));
+      }
     }
 
-    const apiKey = getResolvedApiKey(headerKey, customApiKey);
+    const apiKey = getServerGeminiApiKey();
 
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'NO_API_KEY',
           message:
-            'No Gemini API key configured. Please enter your API key in the Scan Meal modal or add GEMINI_API_KEY in .env.local.',
+            'Server meal AI recognition is currently unconfigured. Set GEMINI_API_KEY in server environment.',
         },
-        { status: 400 }
+        { status: 503 }
       );
     }
 
@@ -309,13 +323,12 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 
     return NextResponse.json(resultJson);
   } catch (error: any) {
-    console.error('Scan Meal API Route Error:', error);
+    const rawMsg = error?.message || 'Failed to analyze food image with Gemini.';
+    console.error('Scan Meal API Route Error:', redactSecrets(rawMsg));
     return NextResponse.json(
       {
         error: 'SCAN_FAILED',
-        message:
-          error?.message ||
-          'Failed to analyze food image with Gemini. Check your network connection or try a clearer photo.',
+        message: redactSecrets(rawMsg),
       },
       { status: 500 }
     );

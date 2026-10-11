@@ -591,16 +591,12 @@ async function executeAIRequest<T>(
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
-    if (state.customGeminiKey) {
-      headers['x-gemini-api-key'] = state.customGeminiKey;
-    }
 
     const res = await fetch('/api/coach', {
       method: 'POST',
       headers,
       body: JSON.stringify({
         ...payload,
-        customApiKey: state.customGeminiKey,
         userContext: buildCompactUserContext(state),
       }),
       signal: controller.signal,

@@ -20,8 +20,18 @@ export function getSupabaseCredentials() {
   const url = envUrl || localUrl;
   const anonKey = envKey || localKey;
 
-  const isValidUrl = Boolean(url && url.startsWith('http') && url.includes('supabase.co'));
-  const isValidKey = Boolean(anonKey && anonKey.length > 20);
+  let isValidUrl = false;
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      isValidUrl =
+        (parsed.protocol === 'https:' && (parsed.hostname.endsWith('.supabase.co') || parsed.hostname === 'supabase.co')) ||
+        (process.env.NODE_ENV !== 'production' && (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'));
+    } catch {
+      isValidUrl = false;
+    }
+  }
+  const isValidKey = Boolean(anonKey && anonKey.length > 20 && !anonKey.includes('\n'));
 
   return {
     url,

@@ -78,6 +78,9 @@ export function decodeProgramFromHash(hashString: string): DecodedProgram | null
     if (clean.startsWith('plan=')) clean = clean.slice(5);
     if (clean.startsWith('v1_')) clean = clean.slice(3);
 
+    // Max raw hash length check to prevent memory exhaustion
+    if (clean.length > 50000) return null;
+
     // Revert URL-safe replacements
     let b64 = clean.replace(/-/g, '+').replace(/_/g, '/');
     while (b64.length % 4 !== 0) {
@@ -87,23 +90,39 @@ export function decodeProgramFromHash(hashString: string): DecodedProgram | null
     const jsonStr = fromBase64Unicode(b64);
     const parsed = JSON.parse(jsonStr);
 
-    if (!parsed || !parsed.n || !Array.isArray(parsed.ex)) {
+    if (
+      !parsed ||
+      typeof parsed !== 'object' ||
+      Array.isArray(parsed) ||
+      !parsed.n ||
+      !Array.isArray(parsed.ex) ||
+      Object.prototype.hasOwnProperty.call(parsed, '__proto__')
+    ) {
       return null;
     }
 
-    const exercises: PlannedExercise[] = parsed.ex.map((item: any) => ({
-      name: String(item.n || 'Exercise'),
-      targetSets: parseInt(String(item.s), 10) || 3,
-      targetReps: parseInt(String(item.r), 10) || 8,
-      targetWeight: typeof item.w === 'number' && !isNaN(item.w) ? item.w : undefined,
-      targetUnit: item.u === 'lbs' ? 'lbs' : 'kg',
-      notes: item.nt ? String(item.nt) : undefined,
-    }));
+    // Bound exercises array to maximum 50 items
+    const rawExercises = parsed.ex.slice(0, 50);
+
+    const exercises: PlannedExercise[] = rawExercises.map((item: any) => {
+      const sets = parseInt(String(item?.s), 10);
+      const reps = parseInt(String(item?.r), 10);
+      const weight = typeof item?.w === 'number' && !isNaN(item.w) ? Math.min(1000, Math.max(0, item.w)) : undefined;
+
+      return {
+        name: String(item?.n || 'Exercise').slice(0, 100).trim(),
+        targetSets: !isNaN(sets) ? Math.min(30, Math.max(1, sets)) : 3,
+        targetReps: !isNaN(reps) ? Math.min(200, Math.max(1, reps)) : 8,
+        targetWeight: weight,
+        targetUnit: item?.u === 'lbs' ? 'lbs' : 'kg',
+        notes: item?.nt ? String(item.nt).slice(0, 200).trim() : undefined,
+      };
+    });
 
     return {
-      name: String(parsed.n),
-      coachName: parsed.c ? String(parsed.c) : undefined,
-      notes: parsed.nt ? String(parsed.nt) : undefined,
+      name: String(parsed.n).slice(0, 100).trim(),
+      coachName: parsed.c ? String(parsed.c).slice(0, 100).trim() : undefined,
+      notes: parsed.nt ? String(parsed.nt).slice(0, 500).trim() : undefined,
       exercises,
     };
   } catch (err) {
