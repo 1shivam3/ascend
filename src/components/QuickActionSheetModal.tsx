@@ -10,10 +10,12 @@ import {
   Scale,
   Sparkles,
   Check,
+  MessageSquare,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
+import FeedbackModal from '@/components/FeedbackModal';
 import { MealEntry } from '@/lib/types';
 
 interface QuickActionSheetModalProps {
@@ -31,6 +33,7 @@ export default function QuickActionSheetModal({
   const toast = useToast();
 
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [quickFoodQuery, setQuickFoodQuery] = useState('');
   const [isParsingFood, setIsParsingFood] = useState(false);
 
@@ -217,11 +220,24 @@ export default function QuickActionSheetModal({
                 <span className="text-[10px] text-text-secondary leading-tight mt-0.5 block">Log body</span>
               </button>
             </div>
+
+            {/* 4. Feedback, Review & Bug Report Pill */}
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setIsFeedbackModalOpen(true)}
+                className="w-full py-2 px-3 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border/80 hover:border-accent/40 text-text-muted hover:text-accent flex items-center justify-center gap-2 text-2xs font-medium transition-colors"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-accent" />
+                <span>Leave Feedback &bull; Report a Bug</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <BodyMetricsModal isOpen={isWeightModalOpen} onClose={() => setIsWeightModalOpen(false)} />
+      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
     </>
   );
 }

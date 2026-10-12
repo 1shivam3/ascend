@@ -21,6 +21,7 @@ import {
   Database,
   CheckCircle2,
   AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -30,6 +31,7 @@ import LegalHubModal from '@/components/LegalHubModal';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import AuthModal from '@/components/AuthModal';
+import FeedbackModal from '@/components/FeedbackModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -66,6 +68,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   const [isLegalHubOpen, setIsLegalHubOpen] = useState(false);
   const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
+  const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -483,6 +486,29 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
+          {/* Section 6: Community & Support */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              6. Reviews &amp; Bug Reports
+            </span>
+
+            <Card
+              variant="interactive"
+              padding="sm"
+              onClick={() => setIsFeedbackModalOpen(true)}
+              className="flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2.5">
+                <MessageSquare className="w-4 h-4 text-accent" />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Feedback, Reviews &amp; Bug Reports</span>
+                  <span className="text-2xs text-text-muted">Report bugs, suggest features, or leave a review</span>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </Card>
+          </div>
+
           {/* Account Log Out */}
           <div className="pt-1">
             <Card variant="default" padding="sm" className="border-red-500/20">
@@ -549,6 +575,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <LegalHubModal isOpen={isLegalHubOpen} onClose={() => setIsLegalHubOpen(false)} />
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
     </>
   );
 }
