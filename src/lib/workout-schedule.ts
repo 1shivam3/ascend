@@ -146,6 +146,275 @@ export function getTodayDayOfWeek(dateStr?: string): DayOfWeek {
   return map[dayIndex] || 'monday';
 }
 
+export interface SplitGenerationResult {
+  plans: PlannedWorkout[];
+  schedule: WeeklySchedule;
+  daysPerWeek: number;
+  splitName: string;
+}
+
+/**
+ * Deterministically generates both the planned workouts and the weekly schedule
+ * for any training split (PPL, Upper/Lower, Arnold, Bro Split, Full Body).
+ */
+export function generateSplitWeeklySchedule(
+  splitType: 'ppl' | 'upper_lower' | 'arnold' | 'bro_split' | 'full_body' | string,
+  userUnit: 'kg' | 'lbs' = 'kg'
+): SplitGenerationResult {
+  const isLbs = userUnit === 'lbs';
+
+  if (splitType === 'ppl' || splitType === 'push_pull_legs') {
+    const pushDay: PlannedWorkout = {
+      id: 'plan_push_day',
+      name: 'Push Day (Chest, Shoulders & Triceps)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: userUnit },
+        { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 95 : 42.5, targetUnit: userUnit },
+        { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 45 : 20, targetUnit: userUnit },
+        { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: userUnit },
+        { name: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 50 : 25, targetUnit: userUnit },
+      ],
+    };
+
+    const pullDay: PlannedWorkout = {
+      id: 'plan_pull_day',
+      name: 'Pull Day (Back, Biceps & Rear Delts)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: isLbs ? 245 : 110, targetUnit: userUnit },
+        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 120 : 55, targetUnit: userUnit },
+        { name: 'Face Pull', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 35 : 16, targetUnit: userUnit },
+        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: userUnit },
+      ],
+    };
+
+    const legDay: PlannedWorkout = {
+      id: 'plan_leg_day',
+      name: 'Leg Day (Quads, Hamstrings & Core)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 205 : 92.5, targetUnit: userUnit },
+        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 165 : 75, targetUnit: userUnit },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: userUnit },
+        { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: userUnit },
+        { name: 'Calf Raise', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 110 : 50, targetUnit: userUnit },
+      ],
+    };
+
+    const plans = [pushDay, pullDay, legDay];
+    const schedule: WeeklySchedule = {
+      monday: { workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
+      tuesday: { workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
+      wednesday: { workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
+      thursday: { workoutPlanId: pushDay.id, customTitle: pushDay.name, bodyParts: getWorkoutBodyParts(pushDay.exercises) },
+      friday: { workoutPlanId: pullDay.id, customTitle: pullDay.name, bodyParts: getWorkoutBodyParts(pullDay.exercises) },
+      saturday: { workoutPlanId: legDay.id, customTitle: legDay.name, bodyParts: getWorkoutBodyParts(legDay.exercises) },
+      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    };
+
+    return {
+      plans,
+      schedule,
+      daysPerWeek: 6,
+      splitName: 'Push / Pull / Legs (PPL)',
+    };
+  }
+
+  if (splitType === 'arnold') {
+    const chestBack: PlannedWorkout = {
+      id: 'plan_arnold_chest_back',
+      name: 'Chest & Back (Antagonist)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: userUnit },
+        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Incline Bench', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
+      ],
+    };
+
+    const shouldersArms: PlannedWorkout = {
+      id: 'plan_arnold_shoulders_arms',
+      name: 'Shoulders & Arms',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Overhead Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 95 : 42.5, targetUnit: userUnit },
+        { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: userUnit },
+        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: userUnit },
+        { name: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 50 : 25, targetUnit: userUnit },
+      ],
+    };
+
+    const legsAbs: PlannedWorkout = {
+      id: 'plan_arnold_legs_abs',
+      name: 'Legs & Core',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 205 : 92.5, targetUnit: userUnit },
+        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 165 : 75, targetUnit: userUnit },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: userUnit },
+        { name: 'Calf Raise', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 110 : 50, targetUnit: userUnit },
+      ],
+    };
+
+    const plans = [chestBack, shouldersArms, legsAbs];
+    const schedule: WeeklySchedule = {
+      monday: { workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
+      tuesday: { workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
+      wednesday: { workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
+      thursday: { workoutPlanId: chestBack.id, customTitle: chestBack.name, bodyParts: getWorkoutBodyParts(chestBack.exercises) },
+      friday: { workoutPlanId: shouldersArms.id, customTitle: shouldersArms.name, bodyParts: getWorkoutBodyParts(shouldersArms.exercises) },
+      saturday: { workoutPlanId: legsAbs.id, customTitle: legsAbs.name, bodyParts: getWorkoutBodyParts(legsAbs.exercises) },
+      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    };
+
+    return {
+      plans,
+      schedule,
+      daysPerWeek: 6,
+      splitName: 'Arnold Split',
+    };
+  }
+
+  if (splitType === 'bro_split') {
+    const chest: PlannedWorkout = {
+      id: 'plan_bro_chest',
+      name: 'Chest Day',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: userUnit },
+        { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 45 : 20, targetUnit: userUnit },
+        { name: 'Chest Fly', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 30 : 14, targetUnit: userUnit },
+      ],
+    };
+    const back: PlannedWorkout = {
+      id: 'plan_bro_back',
+      name: 'Back Day',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: isLbs ? 245 : 110, targetUnit: userUnit },
+        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 120 : 55, targetUnit: userUnit },
+      ],
+    };
+    const shoulders: PlannedWorkout = {
+      id: 'plan_bro_shoulders',
+      name: 'Shoulders Day',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Overhead Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 95 : 42.5, targetUnit: userUnit },
+        { name: 'Dumbbell Lateral Raise', targetSets: 4, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: userUnit },
+        { name: 'Face Pull', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 35 : 16, targetUnit: userUnit },
+      ],
+    };
+    const arms: PlannedWorkout = {
+      id: 'plan_bro_arms',
+      name: 'Arms Day',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Close Grip Bench', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: userUnit },
+        { name: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 50 : 25, targetUnit: userUnit },
+      ],
+    };
+    const legs: PlannedWorkout = {
+      id: 'plan_bro_legs',
+      name: 'Legs Day',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 205 : 92.5, targetUnit: userUnit },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: userUnit },
+        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 165 : 75, targetUnit: userUnit },
+      ],
+    };
+
+    const plans = [chest, back, shoulders, arms, legs];
+    const schedule: WeeklySchedule = {
+      monday: { workoutPlanId: chest.id, customTitle: chest.name, bodyParts: getWorkoutBodyParts(chest.exercises) },
+      tuesday: { workoutPlanId: back.id, customTitle: back.name, bodyParts: getWorkoutBodyParts(back.exercises) },
+      wednesday: { workoutPlanId: shoulders.id, customTitle: shoulders.name, bodyParts: getWorkoutBodyParts(shoulders.exercises) },
+      thursday: { workoutPlanId: arms.id, customTitle: arms.name, bodyParts: getWorkoutBodyParts(arms.exercises) },
+      friday: { workoutPlanId: legs.id, customTitle: legs.name, bodyParts: getWorkoutBodyParts(legs.exercises) },
+      saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    };
+
+    return {
+      plans,
+      schedule,
+      daysPerWeek: 5,
+      splitName: 'Targeted Bodypart Split',
+    };
+  }
+
+  // Default: Upper / Lower (4-Day)
+  const upperA: PlannedWorkout = {
+    id: 'plan_upper_a',
+    name: 'Upper A (Bench & Row)',
+    createdAt: new Date().toISOString(),
+    exercises: [
+      { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: userUnit },
+      { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+      { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 95 : 42.5, targetUnit: userUnit },
+      { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 120 : 55, targetUnit: userUnit },
+      { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: userUnit },
+    ],
+  };
+  const lowerA: PlannedWorkout = {
+    id: 'plan_lower_a',
+    name: 'Lower A (Squat & Quads)',
+    createdAt: new Date().toISOString(),
+    exercises: [
+      { name: 'Squat', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 205 : 92.5, targetUnit: userUnit },
+      { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 165 : 75, targetUnit: userUnit },
+      { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: userUnit },
+      { name: 'Calf Raise', targetSets: 3, targetReps: 15, targetWeight: isLbs ? 110 : 50, targetUnit: userUnit },
+    ],
+  };
+  const upperB: PlannedWorkout = {
+    id: 'plan_upper_b',
+    name: 'Upper B (Incline & Shoulders)',
+    createdAt: new Date().toISOString(),
+    exercises: [
+      { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+      { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
+      { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 45 : 20, targetUnit: userUnit },
+      { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: userUnit },
+      { name: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 50 : 25, targetUnit: userUnit },
+    ],
+  };
+  const lowerB: PlannedWorkout = {
+    id: 'plan_lower_b',
+    name: 'Lower B (Deadlift & Posterior)',
+    createdAt: new Date().toISOString(),
+    exercises: [
+      { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: isLbs ? 245 : 110, targetUnit: userUnit },
+      { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: userUnit },
+      { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: userUnit },
+    ],
+  };
+
+  const plans = [upperA, lowerA, upperB, lowerB];
+  const schedule: WeeklySchedule = {
+    monday: { workoutPlanId: upperA.id, customTitle: upperA.name, bodyParts: getWorkoutBodyParts(upperA.exercises) },
+    tuesday: { workoutPlanId: lowerA.id, customTitle: lowerA.name, bodyParts: getWorkoutBodyParts(lowerA.exercises) },
+    wednesday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    thursday: { workoutPlanId: upperB.id, customTitle: upperB.name, bodyParts: getWorkoutBodyParts(upperB.exercises) },
+    friday: { workoutPlanId: lowerB.id, customTitle: lowerB.name, bodyParts: getWorkoutBodyParts(lowerB.exercises) },
+    saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+    sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+  };
+
+  return {
+    plans,
+    schedule,
+    daysPerWeek: 4,
+    splitName: 'Upper / Lower',
+  };
+}
+
 /**
  * Constructs an intelligent default weekly schedule based on available planned workouts and days per week.
  */
@@ -153,6 +422,11 @@ export function buildDefaultWeeklySchedule(
   plans: PlannedWorkout[],
   daysPerWeek: number = 4
 ): WeeklySchedule {
+  if (!plans || plans.length === 0) {
+    const fallback = generateSplitWeeklySchedule(daysPerWeek === 6 ? 'ppl' : daysPerWeek === 5 ? 'bro_split' : 'upper_lower');
+    return fallback.schedule;
+  }
+
   const schedule: WeeklySchedule = {
     monday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
     tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
@@ -162,10 +436,6 @@ export function buildDefaultWeeklySchedule(
     saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
     sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
   };
-
-  if (!plans || plans.length === 0) {
-    return schedule;
-  }
 
   const getPlanConfig = (plan: PlannedWorkout): DayScheduleConfig => ({
     workoutPlanId: plan.id,

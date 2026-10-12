@@ -22,18 +22,15 @@ function it(name: string, fn: () => void) {
   }
 }
 
-// --- TEST SUITE 1: ONBOARDING NO LONGER ASKS FOR DAYS PER WEEK ---
+// --- TEST SUITE 1: ONBOARDING NO LONGER ASKS FOR DAYS PER WEEK OR EQUIPMENT ---
 console.log('--- TEST 1: Onboarding Friction Elimination ---');
-it('Onboarding.tsx does NOT render Training Frequency / days per week question', () => {
+it('Onboarding.tsx does NOT render Training Frequency or Equipment questions', () => {
   const onboardingContent = fs.readFileSync(path.join(process.cwd(), 'src/components/Onboarding.tsx'), 'utf-8');
   assert(!onboardingContent.includes('Training Frequency'), 'Onboarding should not contain Training Frequency prompt');
   assert(!onboardingContent.includes('5. Training Frequency'), 'Step 5 should not be Training Frequency');
-  assert(onboardingContent.includes('5. Available Equipment'), 'Step 5 should now be Available Equipment');
-});
-
-it('Onboarding.tsx defaults daysPerWeek intelligently without user prompt', () => {
-  const onboardingContent = fs.readFileSync(path.join(process.cwd(), 'src/components/Onboarding.tsx'), 'utf-8');
-  assert(onboardingContent.includes('const [daysPerWeek, setDaysPerWeek] = useState<number>(4)'), 'Should default daysPerWeek to 4 in state');
+  assert(!onboardingContent.includes('Available Equipment'), 'Onboarding should not contain Available Equipment question');
+  assert(onboardingContent.includes('daysPerWeek: 4'), 'Should default daysPerWeek to 4 in profile');
+  assert(onboardingContent.includes("equipment: 'full_gym'"), 'Should default equipment to full_gym in profile');
 });
 
 // --- TEST SUITE 2: PLAN CREATION AUTOMATICALLY SYNCS TO WEEKLY SCHEDULE ---

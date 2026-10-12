@@ -95,8 +95,6 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('70');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
-  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
-  const [equipment, setEquipment] = useState<'full_gym' | 'home_dumbbells' | 'bodyweight_only'>('full_gym');
 
   // Emergency snapshot detection & restore
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -212,17 +210,17 @@ export default function OnboardingScreen() {
         ? 'fat_loss'
         : 'general_fitness',
       experience: 'beginner',
-      daysPerWeek,
+      daysPerWeek: 4,
       preferredDurationMin: 45,
-      equipment,
-      preferredSplit: daysPerWeek === 3 ? 'full_body' : 'upper_lower',
+      equipment: 'full_gym',
+      preferredSplit: 'upper_lower',
       dislikedExercises: [],
       injuriesOrLimitations: [],
       coachingStyle: 'balanced',
     });
 
     setPlannedWorkouts(generatedSplit);
-    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, 4));
 
     const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender);
     setMacroGoals(initialMacros);
@@ -568,24 +566,6 @@ export default function OnboardingScreen() {
                     />
                   </div>
                 </div>
-              </div>
-
-              {/* 5. Available Equipment */}
-              <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  5. Available Equipment
-                </label>
-                <SegmentedControl
-                  value={equipment}
-                  onChange={(val) => setEquipment(val as 'full_gym' | 'home_dumbbells' | 'bodyweight_only')}
-                  options={[
-                    { value: 'full_gym', label: 'Full Gym' },
-                    { value: 'home_dumbbells', label: 'Dumbbells' },
-                    { value: 'bodyweight_only', label: 'Bodyweight' },
-                  ]}
-                  size="sm"
-                  fullWidth
-                />
               </div>
 
               {/* Launch CTA */}

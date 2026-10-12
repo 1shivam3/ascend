@@ -118,6 +118,8 @@ export interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+  updateMeal: (id: string, updated: Partial<MealEntry>) => void;
+  deleteFoodFromMeal: (mealId: string, foodIndex: number) => void;
   copyMealsFromDate: (sourceDate: string, targetDate?: string) => number;
 
   setMacroGoals: (goals: MacroGoals | null) => void;
@@ -463,6 +465,22 @@ export const useAppStore = create<AppState>()(
       
       addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
+      updateMeal: (id, updated) => set((state) => ({
+        meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
+      })),
+      deleteFoodFromMeal: (mealId, foodIndex) => set((state) => {
+        const nextMeals = state.meals
+          .map((meal) => {
+            if (meal.id !== mealId) return meal;
+            const nextFoods = meal.foods.filter((_, idx) => idx !== foodIndex);
+            return {
+              ...meal,
+              foods: nextFoods,
+            };
+          })
+          .filter((meal) => meal.foods.length > 0);
+        return { meals: nextMeals };
+      }),
 
       copyMealsFromDate: (sourceDate, targetDate) => {
         const tgt = targetDate || new Date().toISOString().split('T')[0];

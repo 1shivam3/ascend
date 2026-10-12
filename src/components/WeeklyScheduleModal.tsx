@@ -23,6 +23,7 @@ import {
   AVAILABLE_BODY_PARTS,
   getWorkoutBodyParts,
   buildDefaultWeeklySchedule,
+  generateSplitWeeklySchedule,
   getTodayDayOfWeek,
 } from '@/lib/workout-schedule';
 import { useStore } from '@/lib/store';
@@ -122,9 +123,20 @@ export default function WeeklyScheduleModal({
   };
 
   const applyPreset = (daysCount: number) => {
-    const newSched = buildDefaultWeeklySchedule(plannedWorkouts, daysCount);
-    setDraft(newSched);
-    toast.info(`Applied ${daysCount}-day schedule preset!`, 'Preset Loaded');
+    let splitKey = 'upper_lower';
+    if (daysCount === 6) splitKey = 'ppl';
+    else if (daysCount === 5) splitKey = 'bro_split';
+    else if (daysCount === 3) splitKey = 'full_body';
+    else splitKey = 'upper_lower';
+
+    const result = generateSplitWeeklySchedule(splitKey, 'kg');
+    const existing = plannedWorkouts || [];
+    const missing = result.plans.filter((p) => !existing.some((ep) => ep.id === p.id));
+    if (missing.length > 0) {
+      useStore.getState().setPlannedWorkouts([...existing, ...missing]);
+    }
+    setDraft(result.schedule);
+    toast.success(`Applied ${result.daysPerWeek}-day ${result.splitName} schedule!`, 'Preset Loaded');
   };
 
   const handleSave = () => {

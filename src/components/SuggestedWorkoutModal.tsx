@@ -23,9 +23,11 @@ import {
   Box,
   Crown,
   Activity,
+  Calendar,
 } from 'lucide-react';
 import { getExerciseList, getExerciseEquipment } from '@/lib/strength-standards';
-import { PlannedExercise, PlannedWorkout } from '@/lib/store';
+import { PlannedExercise, PlannedWorkout, useStore } from '@/lib/store';
+import { generateSplitWeeklySchedule } from '@/lib/workout-schedule';
 import { EquipmentType } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
@@ -337,6 +339,10 @@ export default function SuggestedWorkoutModal({
   onSavePlan,
 }: SuggestedWorkoutModalProps) {
   const toast = useToast();
+  const setPlannedWorkouts = useStore((state) => state.setPlannedWorkouts);
+  const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
+  const trainingProfile = useStore((state) => state.trainingProfile);
+  const setTrainingProfile = useStore((state) => state.setTrainingProfile);
 
   // Mode: 'bodyparts' | 'split'
   const [activeTab, setActiveTab] = useState<'bodyparts' | 'split'>('bodyparts');
@@ -477,6 +483,23 @@ export default function SuggestedWorkoutModal({
       name: planTitle || 'Suggested Routine',
       exercises: valid,
     });
+    onClose();
+  };
+
+  const handleApplySplitSchedule = () => {
+    const result = generateSplitWeeklySchedule(selectedSplitId, userUnit);
+    const existing = useStore.getState().plannedWorkouts || [];
+    const nonSplit = existing.filter((p) => !result.plans.some((rp) => rp.id === p.id));
+    setPlannedWorkouts([...result.plans, ...nonSplit]);
+    setWeeklySchedule(result.schedule);
+    if (trainingProfile) {
+      setTrainingProfile({
+        ...trainingProfile,
+        preferredSplit: (selectedSplitId === 'ppl' ? 'push_pull_legs' : (selectedSplitId as any)),
+        daysPerWeek: result.daysPerWeek,
+      });
+    }
+    toast.success(`Generated ${result.daysPerWeek}-day ${result.splitName} weekly workout plan!`, 'Schedule Generated');
     onClose();
   };
 
@@ -651,6 +674,28 @@ export default function SuggestedWorkoutModal({
                   })}
                 </div>
               </div>
+
+              {/* Generate full weekly plan CTA */}
+              <div className="pt-2 p-3 rounded-xl bg-accent/10 border border-accent/30 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <span className="text-xs font-bold text-text-primary block">
+                      Generate Full Weekly Workout Plan
+                    </span>
+                    <span className="text-3xs text-text-secondary block mt-0.5">
+                      Sets up all {currentSplit.name} routines and populates your 7-day schedule
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplySplitSchedule}
+                    className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer shrink-0"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Apply to Weekly Schedule</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -821,23 +866,35 @@ export default function SuggestedWorkoutModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 border-t border-border bg-bg-card flex gap-2.5 shrink-0">
-          <button
-            type="button"
-            onClick={handleSaveToPlans}
-            className="btn-secondary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5"
-          >
-            <BookmarkPlus className="w-4 h-4 text-accent" />
-            <span>Save to Plans</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleStartNow}
-            className="btn-primary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5"
-          >
-            <Play className="w-4 h-4 fill-white stroke-white" />
-            <span>Start Workout</span>
-          </button>
+        <div className="p-3.5 border-t border-border bg-bg-card flex flex-col sm:flex-row gap-2 shrink-0">
+          {activeTab === 'split' && (
+            <button
+              type="button"
+              onClick={handleApplySplitSchedule}
+              className="btn-primary py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Apply Full Weekly Schedule</span>
+            </button>
+          )}
+          <div className="flex gap-2 flex-1">
+            <button
+              type="button"
+              onClick={handleSaveToPlans}
+              className="btn-secondary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <BookmarkPlus className="w-4 h-4 text-accent" />
+              <span>Save Day to Plans</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleStartNow}
+              className="btn-primary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <Play className="w-4 h-4 fill-white stroke-white" />
+              <span>Start Workout</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

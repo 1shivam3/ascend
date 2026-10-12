@@ -54,16 +54,21 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
     );
   }
 
-  // 1. Ensure file is downsampled (max 1280px) and compressed to ~0.75 JPEG
-  const { blob: compressedBlob } = await resizeAndCompressImage(options.file, {
-    maxDimension: MAX_IMAGE_DIMENSION,
-    quality: DEFAULT_IMAGE_QUALITY,
-    format: 'image/jpeg',
-  });
+  // 1. Ensure file is downsampled (max 800px) and compressed to ~0.70 JPEG
+  // Skip redundant re-compression if already a small compressed JPEG blob (< 300KB)
+  let finalBlob: Blob = options.file;
+  if (!(options.file instanceof Blob) || options.file.size > 300 * 1024 || (options.file.type && options.file.type !== 'image/jpeg')) {
+    const { blob } = await resizeAndCompressImage(options.file, {
+      maxDimension: MAX_IMAGE_DIMENSION,
+      quality: DEFAULT_IMAGE_QUALITY,
+      format: 'image/jpeg',
+    });
+    finalBlob = blob;
+  }
 
   // 2. Stream as binary FormData to avoid allocating massive base64 strings in JS memory
   const formData = new FormData();
-  formData.append('image', compressedBlob, 'meal.jpg');
+  formData.append('image', finalBlob, 'meal.jpg');
   if (options.userNotes) {
     formData.append('userNotes', options.userNotes);
   }

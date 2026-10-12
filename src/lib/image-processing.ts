@@ -10,8 +10,8 @@
  * - Provides safe Object URL management with explicit revocation.
  */
 
-export const MAX_IMAGE_DIMENSION = 1280;
-export const DEFAULT_IMAGE_QUALITY = 0.75;
+export const MAX_IMAGE_DIMENSION = 800;
+export const DEFAULT_IMAGE_QUALITY = 0.70;
 export const MAX_INPUT_FILE_SIZE = 35 * 1024 * 1024; // 35MB maximum input guard
 
 export interface ImageProcessOptions {

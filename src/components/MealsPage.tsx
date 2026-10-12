@@ -104,6 +104,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const favoriteFoods      = useStore((state) => state.favoriteFoods || []);
   const addMeal            = useStore((state) => state.addMeal);
   const deleteMeal         = useStore((state) => state.deleteMeal);
+  const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
   const toggleFavoriteFood    = useStore((state) => state.toggleFavoriteFood);
@@ -149,6 +150,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isRecentMealsOpen,     setIsRecentMealsOpen]     = useState(true);
   const [isMealHistoryOpen,     setIsMealHistoryOpen]     = useState(false);
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
+  const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
@@ -279,15 +281,23 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     });
   };
 
+  const toggleHistoryDay = (dateStr: string) => {
+    setExpandedHistoryDays((prev) => {
+      const next = new Set(prev);
+      next.has(dateStr) ? next.delete(dateStr) : next.add(dateStr);
+      return next;
+    });
+  };
+
   const handleAddFood = () => {
     setFoods((prev) => [...prev, EMPTY_FOOD()]);
   };
 
   const handleRemoveFood = (index: number) => {
     setFoods((prev) => prev.filter((_, i) => i !== index));
-    setFoodSuggestions((prev) => { const n = { ...prev }; delete n[index]; return n; });
-    setShowSuggestions((prev) => { const n = { ...prev }; delete n[index]; return n; });
-    setActiveSuggestionIndex((prev) => { const n = { ...prev }; delete n[index]; return n; });
+    setFoodSuggestions({});
+    setShowSuggestions({});
+    setActiveSuggestionIndex({});
   };
 
   /**
@@ -2157,10 +2167,24 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
                           </div>
-                          <div className="text-3xs font-mono text-text-muted shrink-0 ml-2">
-                            <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
-                            <span className="mx-1">•</span>
-                            <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <div className="text-3xs font-mono text-text-muted shrink-0">
+                              <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
+                              <span className="mx-1">•</span>
+                              <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                deleteFoodFromMeal(meal.id, idx);
+                                toast.info(`Deleted ${food.name}`);
+                              }}
+                              className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                              title="Delete this food item"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -2191,22 +2215,139 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="pt-2.5 space-y-2 animate-fade-in">
                 {groupedMeals
                   .filter(([d]) => d !== todayDate)
-                  .slice(0, 7)
+                  .slice(0, 14)
                   .map(([date, dayMeals]) => {
                     const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
+                    const isDayExpanded = expandedHistoryDays.has(date);
                     return (
-                      <div key={date} className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/50 text-2xs space-y-1.5">
-                        <div className="flex justify-between items-center">
-                          <span className="font-bold text-text-primary">
-                            {new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
-                          </span>
-                          <span className="font-mono text-text-muted">
-                            ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
-                          </span>
+                      <div key={date} className="rounded-xl bg-bg-secondary/30 border border-border/50 overflow-hidden text-2xs transition-all">
+                        {/* Day summary row */}
+                        <div
+                          onClick={() => toggleHistoryDay(date)}
+                          className="p-2.5 flex justify-between items-center cursor-pointer hover:bg-bg-secondary/50 transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-text-primary">
+                                {new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                              </span>
+                              <span className="text-3xs px-1.5 py-0.2 rounded bg-bg-card border border-border/60 text-text-muted">
+                                {dayMeals.length} {dayMeals.length === 1 ? 'meal' : 'meals'}
+                              </span>
+                            </div>
+                            <p className="text-3xs text-text-muted truncate mt-0.5">
+                              {dayMeals.map((m) => m.name).join(" • ")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <span className="font-mono text-text-muted text-3xs">
+                              ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
+                            </span>
+                            <div className="p-0.5 text-text-muted">
+                              {isDayExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </div>
+                          </div>
                         </div>
-                        <p className="text-3xs text-text-muted truncate">
-                          {dayMeals.map((m) => m.name).join(" • ")}
-                        </p>
+
+                        {/* Expanded Day Details (Meals list) */}
+                        {isDayExpanded && (
+                          <div className="p-2.5 pt-0 border-t border-border/40 space-y-2 animate-fade-in bg-bg-secondary/20">
+                            <div className="flex items-center justify-between pt-2 pb-1 text-3xs text-text-muted">
+                              <span>Logged Meals on {new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const count = copyMealsFromDate(date);
+                                  toast.success(`Copied ${count} meals to today!`);
+                                }}
+                                className="text-accent hover:underline flex items-center gap-1 font-semibold cursor-pointer"
+                              >
+                                <Copy className="w-3 h-3" />
+                                <span>Copy to Today</span>
+                              </button>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              {dayMeals.map((m) => {
+                                const mMacros = calculateMealMacros(m.foods);
+                                const isMExpanded = expandedMeals.has(m.id);
+                                return (
+                                  <div key={m.id} className="p-2 rounded-lg bg-bg-card/70 border border-border/50 space-y-1.5">
+                                    <div
+                                      onClick={() => toggleExpand(m.id)}
+                                      className="flex items-center justify-between cursor-pointer"
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <span className="font-semibold text-text-primary text-2xs truncate">{m.name}</span>
+                                          <span className="text-3xs font-mono px-1 py-0.2 rounded bg-accent/10 text-accent">
+                                            ~{Math.round(mMacros.calories)} kcal
+                                          </span>
+                                          <span className="text-3xs font-mono px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400">
+                                            ~{Math.round(mMacros.proteinG)}g P
+                                          </span>
+                                        </div>
+                                        <p className="text-3xs text-text-muted truncate mt-0.5">
+                                          {m.foods.map((f) => f.name).join(", ")}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteMeal(m.id);
+                                            toast.info(`Deleted ${m.name} from history`);
+                                          }}
+                                          className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                          title="Delete meal from history"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                        <div className="p-0.5 text-text-muted">
+                                          {isMExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Expanded food items inside past meal */}
+                                    {isMExpanded && (
+                                      <div className="pt-1.5 border-t border-border/40 space-y-1">
+                                        {m.foods.map((food, fIdx) => (
+                                          <div key={fIdx} className="flex justify-between items-center text-3xs py-0.5 px-1.5 rounded bg-bg-secondary/40">
+                                            <div className="truncate flex-1">
+                                              <span className="text-text-primary font-medium">{food.name}</span>
+                                              <span className="text-text-muted ml-1">
+                                                ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+                                              <span className="font-mono text-accent">~{Math.round(food.calories)} kcal</span>
+                                              <span className="font-mono text-emerald-400">P:~{Math.round(food.proteinG)}g</span>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  deleteFoodFromMeal(m.id, fIdx);
+                                                  toast.info(`Deleted ${food.name}`);
+                                                }}
+                                                className="p-0.5 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                                title="Delete food item"
+                                              >
+                                                <Trash2 className="w-2.5 h-2.5" />
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
