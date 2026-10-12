@@ -194,3 +194,12 @@ Status Taxonomy:
   3. Guarded `handleFoodChange` to sanitize `quantity` against `NaN` and preserved custom user-entered calories and protein on unmatched food items.
   4. Updated candidate model order across all AI routes (`/api/ai/scan-meal`, `/api/ai/parse-meal`, `/api/ai/coach`, `/api/ai/parse-voice`) to prioritize `gemini-3.5-flash` followed by `gemini-3.5-flash-lite`, `gemini-flash-latest`, and `gemini-3.8-flash`.
 - **Verification**: Verified via `tests/meal-logging-regression-qa.ts` (19/19 assertions passing), `tests/meal-scanner-low-mem-qa.ts` (9/9 suites passing), and production build `npm run build` (exit code 0).
+
+### J1-TELEMETRY-FEEDBACK: Production Analytics, Monitoring & User Feedback System
+- **Implementation**:
+  1. **Google Analytics 4**: Integrated official `gtag.js` with Measurement ID `G-DV7VT2H5LP` in `src/app/layout.tsx`.
+  2. **Microsoft Clarity**: Integrated session replay and heatmap tracking with Project ID `ywdt5rqnzv` in `src/app/layout.tsx`.
+  3. **Sentry Error Tracking**: Integrated zero-bundle-overhead Sentry browser CDN loader in `src/app/layout.tsx` connecting to DSN `https://5943361d29069b1cc12e20ca7d6e2f90@o4512241272422400.ingest.us.sentry.io/4512241281204224`.
+  4. **Google Site Verification**: Configured verification token `DOQWeBS380XVv0mtya1LH8zKaVyjKrSuR_hE6bTVw9M` in `metadata.verification.google`.
+  5. **In-App Feedback & Bug Reports**: Built `src/components/FeedbackModal.tsx` and backend `/api/feedback/route.ts` with Resend email forwarding to `1shivamkrsingh3@gmail.com` with auto-attached client system diagnostics (OS, browser, screen resolution).
+- **Verification**: Verified via `tests/analytics-and-feedback-qa.ts` (16/16 assertions passing) and production build `npm run build` (exit code 0).
