@@ -255,13 +255,20 @@ export function getScheduledWorkoutForDay(
     };
   }
 
-  const foundPlan = plans.find((p) => p.id === dayConfig.workoutPlanId);
-  const title = dayConfig.customTitle || foundPlan?.name || 'Workout';
+  let foundPlan = plans.find((p) => p.id === dayConfig.workoutPlanId || p.name.toLowerCase() === dayConfig.workoutPlanId?.toLowerCase());
+
+  // If schedule references a builtin template but the user has created custom plans, prioritize user's custom plan
+  const userCustomPlans = plans.filter((p) => !p.id.startsWith('builtin_'));
+  if ((!foundPlan || dayConfig.workoutPlanId?.startsWith('builtin_')) && userCustomPlans.length > 0) {
+    foundPlan = userCustomPlans[0];
+  }
+
+  const title = foundPlan?.name || dayConfig.customTitle || 'Workout';
   const bodyParts =
-    dayConfig.bodyParts && dayConfig.bodyParts.length > 0
-      ? dayConfig.bodyParts
-      : foundPlan
+    foundPlan
       ? getWorkoutBodyParts(foundPlan.exercises)
+      : dayConfig.bodyParts && dayConfig.bodyParts.length > 0
+      ? dayConfig.bodyParts
       : [];
 
   return {

@@ -16,6 +16,7 @@ import {
   TrendingUp,
   Camera,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
@@ -29,7 +30,7 @@ import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
 import { getTodaySessionState, getExercisePrescription } from '@/lib/workout-engine';
-import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO } from '@/lib/workout-schedule';
+import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -103,12 +104,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     clearWorkoutDraft,
     goals,
     weeklySchedule,
+    setDaySchedule,
     trainingDecisions,
   } = useStore();
 
   const toast = useToast();
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => toLocalDateString(today), [today]);
+  const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
 
   const greeting = useMemo(() => {
     const h = today.getHours();
@@ -259,6 +262,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
+  const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -268,6 +272,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsSettingsOpen(false); return true; }, 100);
     }
   }, [isSettingsOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isChangeWorkoutOpen) {
+      return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
+    }
+  }, [isChangeWorkoutOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isSuggestedModalOpen) {
@@ -372,6 +382,58 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     toast.info(`Sticking to today's schedule: ${sessionInfo.title}.`, 'On Schedule');
   };
 
+  const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
+    setDaySchedule(todayDayOfWeek, {
+      workoutPlanId: plan.id,
+      customTitle: plan.name,
+      bodyParts: getWorkoutBodyParts(plan.exercises),
+    });
+    setIsChangeWorkoutOpen(false);
+    toast.success(`Set "${plan.name}" as today's workout!`, 'Routine Updated');
+  };
+
+  const handleStartWorkoutFromHome = (targetPlan?: PlannedWorkout | null) => {
+    if (sessionInfo.status === 'completed' && !targetPlan) {
+      onNavigate('workout');
+      return;
+    }
+
+    const planToStart = targetPlan || (sessionInfo.plannedWorkoutId
+      ? plannedWorkouts.find((p) => p.id === sessionInfo.plannedWorkoutId)
+      : null) || plannedWorkouts[0];
+
+    if (planToStart && planToStart.exercises && planToStart.exercises.length > 0) {
+      const draftExercises: WorkoutExercise[] = planToStart.exercises.map((pe) => {
+        const pr = prs.find((p) => p.exercise.toLowerCase() === pe.name.toLowerCase());
+        let assignedWeight: number = pe.targetWeight ?? 0;
+        if (!assignedWeight || assignedWeight === 0) {
+          if (pr && pr.oneRepMax > 0) {
+            assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
+          }
+        }
+        return {
+          name: pe.name,
+          sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
+            weight: assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60),
+            reps: pe.targetReps,
+            unit: pe.targetUnit ?? userUnit,
+            rpe: 8,
+          })),
+        };
+      });
+
+      saveWorkoutDraft({
+        date: todayStr,
+        exercises: draftExercises,
+        startedFromPlan: planToStart.name,
+        sessionStartTime: Date.now(),
+        savedAt: new Date().toISOString(),
+      });
+      toast.success(`Loaded "${planToStart.name}" with ${draftExercises.length} movements. Let's lift!`, 'Session Started');
+    }
+    onNavigate('workout');
+  };
+
   const handleStartSuggestedWorkout = (workoutName: string, exercises: PlannedExercise[]) => {
     const newPlanId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`;
     const plannedWorkout: PlannedWorkout = {
@@ -381,8 +443,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       exercises,
     };
     addPlannedWorkout(plannedWorkout);
-    toast.success(`Loaded "${workoutName}" into Workout Plans`, 'Workout Ready');
-    onNavigate('workout');
+    handleStartWorkoutFromHome(plannedWorkout);
   };
 
   return (
@@ -492,7 +553,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-border">•</span>
             <button
               type="button"
-              onClick={() => onNavigate('workout')}
+              onClick={() => setIsChangeWorkoutOpen(true)}
               className="text-xs font-medium text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
             >
               <span>Change</span>
@@ -573,7 +634,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               variant={sessionInfo.isRestDay || sessionInfo.status === 'completed' ? 'secondary' : 'primary'}
               size="lg"
               fullWidth
-              onClick={() => onNavigate('workout')}
+              onClick={() => handleStartWorkoutFromHome()}
               leftIcon={
                 <Play
                   className={`w-4 h-4 ${
@@ -752,6 +813,142 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           toast.success('Meal scanned and logged!', 'Nutrition Updated');
         }}
       />
+
+      {/* ── Change Workout Modal on HomePage ───────────────────────────── */}
+      {isChangeWorkoutOpen && (
+        <div className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
+          <div
+            className="modal-content max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-4 border-b border-border flex items-center justify-between shrink-0 bg-bg-card">
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Change Today&apos;s Workout</h2>
+                <p className="text-2xs text-text-muted">Choose which plan to display and train today</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangeWorkoutOpen(false)}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 overflow-y-auto space-y-4 flex-1">
+              {/* My Plans */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
+                    AVAILABLE ROUTINES
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsChangeWorkoutOpen(false);
+                      onNavigate('workout');
+                    }}
+                    className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>Manage Plans</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {plannedWorkouts.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2">
+                    {plannedWorkouts.map((plan) => {
+                      const isSelected = sessionInfo.plannedWorkoutId === plan.id || sessionInfo.title === plan.name;
+                      const bodyParts = getWorkoutBodyParts(plan.exercises);
+
+                      return (
+                        <div
+                          key={plan.id}
+                          className={`p-3 rounded-xl border transition-all text-left flex flex-col gap-2 ${
+                            isSelected
+                              ? 'bg-accent/10 border-accent shadow-xs'
+                              : 'bg-bg-secondary border-border/80 hover:border-accent/50'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-text-primary">
+                                  {plan.name}
+                                </span>
+                                {isSelected && (
+                                  <span className="px-1.5 py-0.5 rounded bg-accent text-white text-3xs font-mono font-bold">
+                                    TODAY&apos;S PLAN
+                                  </span>
+                                )}
+                              </div>
+                              {bodyParts.length > 0 && (
+                                <span className="text-3xs text-accent font-medium block mt-0.5">
+                                  {bodyParts.join(' • ')}
+                                </span>
+                              )}
+                              <span className="text-xs text-text-muted line-clamp-1 mt-0.5">
+                                {plan.exercises.map((e) => e.name).join(', ')}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectWorkoutForToday(plan)}
+                              className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex-1 text-center cursor-pointer ${
+                                isSelected
+                                  ? 'bg-accent/20 text-accent border border-accent/40'
+                                  : 'bg-bg-elevated hover:bg-bg-secondary text-text-primary border border-border'
+                              }`}
+                            >
+                              {isSelected ? 'Selected for Today' : "Set as Today's Workout"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsChangeWorkoutOpen(false);
+                                handleStartWorkoutFromHome(plan);
+                              }}
+                              className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+                            >
+                              <Play className="w-3 h-3 fill-white" />
+                              <span>Start</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-text-muted italic py-1">No workout plans available.</p>
+                )}
+              </div>
+
+              {/* Rest Day Option */}
+              <button
+                type="button"
+                onClick={() => {
+                  setDaySchedule(todayDayOfWeek, {
+                    workoutPlanId: 'rest',
+                    customTitle: 'Rest & Recovery',
+                    bodyParts: [],
+                  });
+                  setIsChangeWorkoutOpen(false);
+                  toast.info("Set today as Rest & Recovery.", "Rest Day Set");
+                }}
+                className="w-full p-3 rounded-xl bg-bg-secondary/60 border border-border/80 hover:border-accent/40 flex items-center justify-between text-left text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+              >
+                <span>Set today as Rest Day (Recovery)</span>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

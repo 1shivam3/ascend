@@ -1012,7 +1012,38 @@ export function getTodaySessionState(
 
     if (dayConfig) {
       if (dayConfig.workoutPlanId === 'rest') {
-        const nextPlan = plannedWorkouts[0] || null;
+        const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
+        const nextPlan = userCustomPlans[0] || plannedWorkouts[0] || null;
+
+        // Brand-new athlete on Day 1 is never put on a rest day
+        if (workouts.length === 0 && nextPlan) {
+          const exNames = nextPlan.exercises.map((e) => e.name);
+          const firstEx = nextPlan.exercises[0];
+          let loadHint: string | undefined = undefined;
+          if (firstEx) {
+            const pastPerf = getLastExercisePerformance(firstEx.name, workouts);
+            if (pastPerf && pastPerf.bestWeight > 0) {
+              loadHint = `Last: ${pastPerf.bestWeight}${userUnit} × ${pastPerf.bestReps}`;
+            }
+          }
+          const bodyParts = getWorkoutBodyParts(nextPlan.exercises);
+
+          return {
+            status: 'planned',
+            title: nextPlan.name,
+            subtitle: bodyParts.length > 0 ? bodyParts.join(' • ') : exNames.slice(0, 4).join(', '),
+            exercises: exNames,
+            firstExerciseLoadHint: loadHint,
+            primaryActionLabel: `Start Day 1: ${nextPlan.name}`,
+            isDraft: false,
+            isDone: false,
+            isRestDay: false,
+            scheduledDay: todayDay,
+            bodyParts,
+            plannedWorkoutId: nextPlan.id,
+          };
+        }
+
         return {
           status: 'planned',
           title: dayConfig.customTitle || 'Rest & Recovery',
@@ -1029,9 +1060,15 @@ export function getTodaySessionState(
         };
       }
 
-      const matchedPlan = plannedWorkouts.find(
+      let matchedPlan = plannedWorkouts.find(
         (p) => p.id === dayConfig.workoutPlanId || p.name.toLowerCase() === dayConfig.workoutPlanId?.toLowerCase()
       );
+
+      // If schedule references a builtin template but the user has created custom plans, prioritize user's plan
+      const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
+      if ((!matchedPlan || dayConfig.workoutPlanId?.startsWith('builtin_')) && userCustomPlans.length > 0) {
+        matchedPlan = userCustomPlans[0];
+      }
 
       if (matchedPlan) {
         const exNames = matchedPlan.exercises.map((e) => e.name);
@@ -1067,9 +1104,10 @@ export function getTodaySessionState(
     }
   }
 
-  // Fallback to first plan if schedule didn't match
+  // Fallback to first plan if schedule didn't match (prefer user-created plan)
   if (plannedWorkouts && plannedWorkouts.length > 0) {
-    const plan = plannedWorkouts[0];
+    const userCustomPlans = plannedWorkouts.filter((p) => !p.id.startsWith('builtin_'));
+    const plan = userCustomPlans[0] || plannedWorkouts[0];
     const exNames = plan.exercises.map((e) => e.name);
     const firstEx = plan.exercises[0];
     let loadHint: string | undefined = undefined;

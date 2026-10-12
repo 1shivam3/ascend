@@ -570,28 +570,10 @@ export default function OnboardingScreen() {
                 </div>
               </div>
 
-              {/* 5. Weekly Frequency */}
+              {/* 5. Available Equipment */}
               <div className="space-y-1.5">
                 <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  5. Training Frequency
-                </label>
-                <SegmentedControl
-                  value={String(daysPerWeek)}
-                  onChange={(val) => setDaysPerWeek(Number(val))}
-                  options={[
-                    { value: '3', label: '3 Days' },
-                    { value: '4', label: '4 Days' },
-                    { value: '5', label: '5 Days' },
-                  ]}
-                  size="sm"
-                  fullWidth
-                />
-              </div>
-
-              {/* 6. Available Equipment */}
-              <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  6. Available Equipment
+                  5. Available Equipment
                 </label>
                 <SegmentedControl
                   value={equipment}

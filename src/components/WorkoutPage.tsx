@@ -992,6 +992,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setExercises(preFilledExercises);
     setDate(getLocalTodayStr());
     setStartedFromPlan(plan.name);
+    try {
+      const setDaySchedule = useStore.getState().setDaySchedule;
+      if (setDaySchedule) {
+        setDaySchedule(todayDayOfWeek, {
+          workoutPlanId: plan.id,
+          customTitle: plan.name,
+          bodyParts: getWorkoutBodyParts(plan.exercises),
+        });
+      }
+    } catch {}
     setIsModalOpen(true);
   };
 

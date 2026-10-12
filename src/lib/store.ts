@@ -33,7 +33,7 @@ import {
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
-import { buildDefaultWeeklySchedule } from './workout-schedule';
+import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
 
 export * from './types';
@@ -513,23 +513,99 @@ export const useAppStore = create<AppState>()(
       addPlannedWorkout: (plan) => set((state) => {
         const nextPlans = [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())];
         const currentSched = state.weeklySchedule;
-        const hasAssignedDays = currentSched && Object.values(currentSched).some(d => d.workoutPlanId && d.workoutPlanId !== 'rest');
-        const nextSchedule = hasAssignedDays ? currentSched : buildDefaultWeeklySchedule(nextPlans, state.trainingProfile?.daysPerWeek || 4);
+        const todayDay = getTodayDayOfWeek();
+        
+        // Base schedule or default
+        const baseSchedule: WeeklySchedule = currentSched && Object.keys(currentSched).length > 0
+          ? { ...currentSched }
+          : buildDefaultWeeklySchedule(nextPlans, state.trainingProfile?.daysPerWeek || 4);
+
+        // Always set today's day to the newly created/added plan so the user immediately sees their plan on Home & Train!
+        baseSchedule[todayDay] = {
+          workoutPlanId: plan.id,
+          customTitle: plan.name,
+          bodyParts: getWorkoutBodyParts(plan.exercises),
+        };
+
+        // If the user has custom plans (non-builtin), replace any stale builtin_ templates in the weekly schedule
+        const userCustomPlans = nextPlans.filter(p => !p.id.startsWith('builtin_'));
+        if (userCustomPlans.length > 0) {
+          const freshCustomSched = buildDefaultWeeklySchedule(userCustomPlans, state.trainingProfile?.daysPerWeek || 4);
+          for (const day of DAYS_OF_WEEK) {
+            if (day !== todayDay && baseSchedule[day]?.workoutPlanId?.startsWith('builtin_')) {
+              baseSchedule[day] = freshCustomSched[day] || baseSchedule[day];
+            }
+          }
+        }
+
+        return {
+          plannedWorkouts: nextPlans,
+          weeklySchedule: baseSchedule,
+        };
+      }),
+
+      updatePlannedWorkout: (id, plan) => set((state) => {
+        const nextPlans = state.plannedWorkouts.map(p => p.id === id ? plan : p);
+        let nextSchedule = state.weeklySchedule;
+        if (nextSchedule) {
+          const updatedSched = { ...nextSchedule };
+          let changed = false;
+          for (const day of DAYS_OF_WEEK) {
+            if (updatedSched[day]?.workoutPlanId === id) {
+              updatedSched[day] = {
+                ...updatedSched[day],
+                customTitle: plan.name,
+                bodyParts: getWorkoutBodyParts(plan.exercises),
+              };
+              changed = true;
+            }
+          }
+          if (changed) nextSchedule = updatedSched;
+        }
         return {
           plannedWorkouts: nextPlans,
           weeklySchedule: nextSchedule,
         };
       }),
-      updatePlannedWorkout: (id, plan) => set((state) => ({
-        plannedWorkouts: state.plannedWorkouts.map(p => p.id === id ? plan : p)
-      })),
-      deletePlannedWorkout: (id) => set((state) => ({
-        plannedWorkouts: state.plannedWorkouts.filter(p => p.id !== id)
-      })),
+
+      deletePlannedWorkout: (id) => set((state) => {
+        const nextPlans = state.plannedWorkouts.filter(p => p.id !== id);
+        let nextSchedule = state.weeklySchedule;
+        if (nextSchedule) {
+          const updatedSched = { ...nextSchedule };
+          let changed = false;
+          for (const day of DAYS_OF_WEEK) {
+            if (updatedSched[day]?.workoutPlanId === id) {
+              const fallbackPlan = nextPlans[0];
+              updatedSched[day] = fallbackPlan
+                ? {
+                    workoutPlanId: fallbackPlan.id,
+                    customTitle: fallbackPlan.name,
+                    bodyParts: getWorkoutBodyParts(fallbackPlan.exercises),
+                  }
+                : {
+                    workoutPlanId: 'rest',
+                    customTitle: 'Rest Day',
+                    bodyParts: [],
+                  };
+              changed = true;
+            }
+          }
+          if (changed) nextSchedule = updatedSched;
+        }
+        return {
+          plannedWorkouts: nextPlans,
+          weeklySchedule: nextSchedule,
+        };
+      }),
+
       setPlannedWorkouts: (plans) => set((state) => {
         const currentSched = state.weeklySchedule;
-        const hasAssignedDays = currentSched && Object.values(currentSched).some(d => d.workoutPlanId && d.workoutPlanId !== 'rest');
-        const nextSchedule = hasAssignedDays ? currentSched : buildDefaultWeeklySchedule(plans, state.trainingProfile?.daysPerWeek || 4);
+        const validPlanIds = new Set(plans.map(p => p.id));
+        const hasValidSchedule = currentSched && Object.values(currentSched).some(
+          d => d.workoutPlanId && d.workoutPlanId !== 'rest' && validPlanIds.has(d.workoutPlanId)
+        );
+        const nextSchedule = hasValidSchedule ? currentSched : buildDefaultWeeklySchedule(plans, state.trainingProfile?.daysPerWeek || 4);
         return {
           plannedWorkouts: plans,
           weeklySchedule: nextSchedule,
