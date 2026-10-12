@@ -33,6 +33,7 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import AuthModal from '@/components/AuthModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
+import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -69,6 +70,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isLegalHubOpen, setIsLegalHubOpen] = useState(false);
   const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
+
+  React.useEffect(() => {
+    setTelemetryConsentState(getTelemetryConsent());
+    const handler = () => setTelemetryConsentState(getTelemetryConsent());
+    window.addEventListener(TELEMETRY_CONSENT_EVENT, handler);
+    return () => window.removeEventListener(TELEMETRY_CONSENT_EVENT, handler);
+  }, []);
 
   if (!isOpen) return null;
 
@@ -466,7 +475,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* Section 5: Legal Hub & Safety */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Safety &amp; Medical Terms
+              5. Safety, Privacy &amp; Medical Terms
             </span>
 
             <Card
@@ -483,6 +492,37 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted" />
+            </Card>
+
+            {/* Telemetry Consent Toggle */}
+            <Card variant="default" padding="sm" className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Shield className={`w-4 h-4 ${telemetryConsent === 'accepted' ? 'text-accent' : 'text-text-muted'}`} />
+                <div>
+                  <span className="text-xs font-bold text-text-primary block">Anonymous Telemetry</span>
+                  <span className="text-2xs text-text-muted">
+                    {telemetryConsent === 'accepted'
+                      ? 'Enabled • Crash & performance reports'
+                      : 'Disabled • 100% offline privacy mode'}
+                  </span>
+                </div>
+              </div>
+              <Button
+                variant={telemetryConsent === 'accepted' ? 'secondary' : 'primary'}
+                size="sm"
+                onClick={() => {
+                  const next = telemetryConsent === 'accepted' ? 'declined' : 'accepted';
+                  setTelemetryConsent(next);
+                  if (next === 'accepted') {
+                    toast.success('Telemetry enabled. Thank you for helping keep ASCEND stable!');
+                  } else {
+                    toast.info('Telemetry disabled. Pure offline privacy mode active.');
+                  }
+                }}
+                className="shrink-0 text-2xs px-2.5 py-1"
+              >
+                {telemetryConsent === 'accepted' ? 'Disable' : 'Enable'}
+              </Button>
             </Card>
           </div>
 

@@ -184,6 +184,31 @@ DO $$ BEGIN
     FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 END $$;
 
+-- 10. Private User Feedback & Bug Reports Table
+CREATE TABLE IF NOT EXISTS public.user_feedback (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category TEXT NOT NULL CHECK (category IN ('bug', 'feature', 'review', 'general')),
+  rating INTEGER CHECK (rating IS NULL OR (rating >= 1 AND rating <= 5)),
+  title TEXT,
+  message TEXT NOT NULL,
+  user_name TEXT,
+  user_email TEXT,
+  diagnostics JSONB DEFAULT '{}'::JSONB,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reviewed', 'in_progress', 'resolved', 'closed')),
+  email_delivered BOOLEAN DEFAULT false,
+  email_id TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow public feedback submissions" ON public.user_feedback;
+  CREATE POLICY "Allow public feedback submissions" ON public.user_feedback
+    FOR INSERT TO anon, authenticated WITH CHECK (true);
+END $$;
+
+
 -- ==============================================================================
 -- SECURITY HARDENING & LINTER RESOLUTIONS
 -- ==============================================================================

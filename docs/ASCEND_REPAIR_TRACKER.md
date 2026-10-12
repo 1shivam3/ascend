@@ -203,3 +203,25 @@ Status Taxonomy:
   4. **Google Site Verification**: Configured verification token `DOQWeBS380XVv0mtya1LH8zKaVyjKrSuR_hE6bTVw9M` in `metadata.verification.google`.
   5. **In-App Feedback & Bug Reports**: Built `src/components/FeedbackModal.tsx` and backend `/api/feedback/route.ts` with Resend email forwarding to `1shivamkrsingh3@gmail.com` with auto-attached client system diagnostics (OS, browser, screen resolution).
 - **Verification**: Verified via `tests/analytics-and-feedback-qa.ts` (16/16 assertions passing) and production build `npm run build` (exit code 0).
+
+### K1-AUDIT-REMEDIATION: Production CSP Allowlist, Consent-Gated Telemetry, and Zero-Data-Loss Feedback Persistence
+- **Audit Findings Remediated**:
+  1. **Stale Production Version Root Cause**: Identified that GitHub remote `origin` has `HEAD branch: master`, while recent updates were committed to `main` and `experiment`. Vercel deployed the pre-fix state from `master`.
+  2. **Strict Content Security Policy (CSP)**: `next.config.js` was blocking all external third-party scripts. Added specific, non-wildcard host allowlists for `googletagmanager.com`, `google-analytics.com`, `clarity.ms`, `js.sentry-cdn.com`, and `*.ingest.sentry.io` across `script-src`, `connect-src`, and `img-src` while strictly maintaining `'self'`, `frame-ancestors 'none'`, and `base-uri 'self'`.
+  3. **Decoupled Telemetry & GDPR/ePrivacy Consent Control**:
+     - Extracted hardcoded identifiers into environment-driven variables (`NEXT_PUBLIC_GA_ID`, `NEXT_PUBLIC_CLARITY_ID`, `NEXT_PUBLIC_SENTRY_DSN`) with fallback handling in `src/lib/telemetry.ts`.
+     - Built `TelemetryConsentBanner.tsx` and `TelemetryProvider.tsx` to strictly prevent loading analytics or replay scripts until athlete provides explicit consent (`telemetry_consent === 'accepted'`).
+     - Added an "Anonymous Telemetry" toggle in `SettingsModal.tsx` (Data & Privacy section) allowing athletes to revoke or grant consent at any time.
+     - Implemented `trackSafeEvent` sanitizer that blocks workout weights, reps, calories, notes, and PII from reaching external telemetry.
+  4. **Zero-Data-Loss User Feedback Architecture**:
+     - Created `supabase/migrations/20261012_create_user_feedback.sql` and updated `supabase/schema.sql` adding `public.user_feedback` table with append-only RLS policies.
+     - Rewrote `src/app/api/feedback/route.ts` to persist directly to Supabase first and attempt Resend email forwarding second.
+     - Replaced hardcoded recipient with `FEEDBACK_RECIPIENT_EMAIL` env variable with safe fallback.
+     - Guaranteed honest error reporting: returns HTTP 503 (`PERSISTENCE_UNAVAILABLE`) instead of false-positive HTTP 200 when backend storage fails.
+- **Verification**:
+  - `tests/analytics-and-feedback-qa.ts`: 30/30 assertions passing.
+  - `tests/plan-sync-and-onboarding-qa.ts`: 9/9 passing.
+  - `tests/meal-logging-regression-qa.ts`: 19/19 passing.
+  - `tests/meal-scanner-low-mem-qa.ts`: 9/9 suites passing.
+  - `npm run build`: Exit code 0 (TypeScript & Next.js production build verified).
+

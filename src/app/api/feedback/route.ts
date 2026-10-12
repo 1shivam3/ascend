@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
@@ -23,6 +24,15 @@ interface FeedbackRequestBody {
   };
 }
 
+function getSupabaseServerClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) return null;
+  return createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export async function POST(req: Request) {
   // 1. Rate limiting: 10 feedback requests per 10 minutes per IP
   const rateLimit = checkRateLimit(req, {
@@ -43,9 +53,9 @@ export async function POST(req: Request) {
       : 'general';
 
     const message = (body.message || '').trim().slice(0, 3000);
-    if (!message) {
+    if (!message || message.length < 3) {
       return NextResponse.json(
-        { error: 'MISSING_MESSAGE', message: 'Please provide feedback or bug details.' },
+        { error: 'INVALID_MESSAGE', message: 'Please provide feedback or bug details (minimum 3 characters).' },
         { status: 400 }
       );
     }
@@ -59,22 +69,57 @@ export async function POST(req: Request) {
 
     const diag = body.diagnostics || {};
 
+    // 2. Step 1: Durable Database Persistence in Supabase (if configured)
+    let dbRecordId: string | null = null;
+    const supabase = getSupabaseServerClient();
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('user_feedback')
+          .insert({
+            category,
+            rating: rating || null,
+            title: title || null,
+            message,
+            user_name: userName || null,
+            user_email: userEmail || null,
+            diagnostics: diag,
+            status: 'new',
+            email_delivered: false,
+          })
+          .select('id')
+          .single();
+
+        if (!error && data?.id) {
+          dbRecordId = data.id;
+        } else if (error) {
+          console.warn('Database feedback insert notice:', redactSecrets(error.message));
+        }
+      } catch (dbErr: any) {
+        console.warn('Database feedback insert error:', redactSecrets(dbErr?.message || ''));
+      }
+    }
+
+    // 3. Step 2: Email Forwarding via Resend (only if explicitly configured)
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
-    const recipientEmail = process.env.FEEDBACK_RECIPIENT_EMAIL?.trim() || '1shivamkrsingh3@gmail.com';
+    const recipientEmail = process.env.FEEDBACK_RECIPIENT_EMAIL?.trim();
 
-    // Format badge and rating text
-    const categoryBadge = {
-      bug: '🐛 BUG REPORT',
-      feature: '💡 FEATURE REQUEST',
-      review: '⭐ USER REVIEW',
-      general: '💬 FEEDBACK',
-    }[category];
+    let emailSent = false;
+    let emailId = null;
 
-    const starsDisplay = rating ? '⭐'.repeat(rating) : 'No rating given';
+    if (resendApiKey && recipientEmail) {
+      const categoryBadge = {
+        bug: '🐛 BUG REPORT',
+        feature: '💡 FEATURE REQUEST',
+        review: '⭐ USER REVIEW',
+        general: '💬 FEEDBACK',
+      }[category];
 
-    const emailSubject = `[ASCEND] ${categoryBadge} ${rating ? `(${rating}/5)` : ''}: ${title || message.slice(0, 50)}`;
+      const starsDisplay = rating ? '⭐'.repeat(rating) : 'No rating given';
+      const emailSubject = `[ASCEND] ${categoryBadge} ${rating ? `(${rating}/5)` : ''}: ${title || message.slice(0, 50)}`;
 
-    const htmlBody = `
+      const htmlBody = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -104,6 +149,7 @@ export async function POST(req: Request) {
     <div class="meta">
       From: <strong>${escapeHtml(userName || 'Anonymous Athlete')}</strong>
       ${userEmail ? `&bull; Email: <a href="mailto:${escapeHtml(userEmail)}" style="color: #e5c07b;">${escapeHtml(userEmail)}</a>` : ''}
+      ${dbRecordId ? `&bull; Record ID: <code>${escapeHtml(dbRecordId)}</code>` : ''}
     </div>
 
     <div class="content">${escapeHtml(message)}</div>
@@ -127,13 +173,8 @@ export async function POST(req: Request) {
   </div>
 </body>
 </html>
-    `.trim();
+      `.trim();
 
-    // Send email via Resend
-    let emailSent = false;
-    let emailId = null;
-
-    if (resendApiKey) {
       try {
         const resendRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
@@ -154,20 +195,46 @@ export async function POST(req: Request) {
           const resData = await resendRes.json();
           emailSent = true;
           emailId = resData.id;
+
+          // If db record was created, update email delivery state
+          if (supabase && dbRecordId) {
+            try {
+              await supabase
+                .from('user_feedback')
+                .update({ email_delivered: true, email_id: emailId })
+                .eq('id', dbRecordId);
+            } catch {
+              // Non-blocking update failure
+            }
+          }
         } else {
           const errData = await resendRes.json().catch(() => ({}));
-          console.warn('Resend feedback delivery note:', redactSecrets(JSON.stringify(errData)));
+          console.warn('Resend feedback delivery notice:', redactSecrets(JSON.stringify(errData)));
         }
       } catch (err: any) {
         console.warn('Resend email fetch error:', redactSecrets(err?.message || ''));
       }
     }
 
+    // 4. Verification Guard: Prevent Silent Feedback Loss
+    // If neither database persistence was accomplished nor email was sent, report failure honestly
+    if (!dbRecordId && !emailSent) {
+      return NextResponse.json(
+        {
+          error: 'PERSISTENCE_UNAVAILABLE',
+          message:
+            'Feedback submission service is currently offline or unconfigured. Please try again later or configure database storage.',
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Thank you for helping improve ASCEND! Your feedback has been safely submitted.',
+      persisted: Boolean(dbRecordId),
       emailDelivered: emailSent,
-      referenceId: emailId || `fb_${Date.now()}`,
+      referenceId: dbRecordId || emailId || `fb_${Date.now()}`,
     });
   } catch (error: any) {
     console.error('Feedback API error:', redactSecrets(error?.message || ''));

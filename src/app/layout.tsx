@@ -1,9 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Barlow_Condensed } from 'next/font/google';
 import './globals.css';
-import Script from 'next/script';
 import { ToastProvider } from '@/components/ui/Toast';
 import { NavigationProvider } from '@/lib/navigation';
+import TelemetryProvider from '@/components/TelemetryProvider';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 const barlowCondensed = Barlow_Condensed({
@@ -120,39 +120,8 @@ export default function RootLayout({
         />
       </head>
       <body className={`${inter.variable} ${barlowCondensed.variable} ${inter.className} font-sans`}>
-        {/* Google Analytics 4 */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-DV7VT2H5LP"
-          strategy="afterInteractive"
-        />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-DV7VT2H5LP', {
-              page_path: window.location.pathname,
-            });
-          `}
-        </Script>
-
-        {/* Microsoft Clarity Session Replay */}
-        <Script id="microsoft-clarity" strategy="afterInteractive">
-          {`
-            (function(c,l,a,r,i,t,y){
-              c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
-              t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
-              y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
-            })(window, document, "clarity", "script", "ywdt5rqnzv");
-          `}
-        </Script>
-
-        {/* Sentry Crash & Error Tracking */}
-        <Script
-          src="https://js.sentry-cdn.com/5943361d29069b1cc12e20ca7d6e2f90.min.js"
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
+        {/* Environment-driven & consent-gated telemetry */}
+        <TelemetryProvider />
 
         <ToastProvider>
           <NavigationProvider>{children}</NavigationProvider>
