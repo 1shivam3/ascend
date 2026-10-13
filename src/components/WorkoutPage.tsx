@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
+import PolicyDecisionCard from '@/components/PolicyDecisionCard';
 import {
   Plus,
   X,
@@ -40,6 +41,7 @@ import {
   Search,
   MoreVertical,
   SlidersHorizontal,
+  Info,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -497,6 +499,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
   const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
   const trainingDecisions = useStore((state) => state.trainingDecisions);
+  const policyDecisionRecords = useStore((state) => state.policyDecisionRecords);
   const userMode = useStore((state) => state.userMode) || 'beginner';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
@@ -556,8 +559,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return goalConfig.defaultRestSeconds;
   }, [goalConfig.defaultRestSeconds]);
 
+  // ── Workout Logger Form State ──────────────────────────────────────────────
+  const [date, setDate] = useState(getLocalTodayStr());
+  const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
+
   // ── Training Decision Ledger (Auditable prescription) ──────────────────────
   const targetExerciseForDecision = useMemo(() => {
+    if (exercises.length > 0) {
+      const compound = exercises.find((e) => isMainCompoundLift(e.name));
+      if (compound && compound.name.trim()) return compound.name;
+      const firstValid = exercises.find((e) => e.name && e.name.trim());
+      if (firstValid) return firstValid.name;
+    }
+    if (activeWorkoutDraft && activeWorkoutDraft.exercises && activeWorkoutDraft.exercises.length > 0) {
+      const compound = activeWorkoutDraft.exercises.find((e) => isMainCompoundLift(e.name));
+      if (compound && compound.name.trim()) return compound.name;
+      const firstValid = activeWorkoutDraft.exercises.find((e) => e.name && e.name.trim());
+      if (firstValid) return firstValid.name;
+    }
     if (plannedWorkouts.length > 0 && plannedWorkouts[0].exercises.length > 0) {
       const compound = plannedWorkouts[0].exercises.find((e) => isMainCompoundLift(e.name));
       if (compound) return compound.name;
@@ -569,7 +588,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       return workouts[0].exercises[0].name;
     }
     return null;
-  }, [plannedWorkouts, workouts]);
+  }, [exercises, activeWorkoutDraft, plannedWorkouts, workouts]);
 
   const activeTrainingDecision = useMemo(() => {
     if (!targetExerciseForDecision || workouts.length === 0) return null;
@@ -582,6 +601,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
     return generateTrainingDecision(targetExerciseForDecision, workouts, userUnit, 8.0, goals);
   }, [targetExerciseForDecision, workouts, userUnit, goals, trainingDecisions]);
+
+  const activePolicyDecision = useMemo(() => {
+    if (!targetExerciseForDecision) return null;
+    const cleanTarget = targetExerciseForDecision.trim().toLowerCase();
+    const stored = Object.values(policyDecisionRecords || {}).find(
+      (d) =>
+        d.exerciseName.trim().toLowerCase() === cleanTarget ||
+        d.canonicalExerciseKey === cleanTarget
+    );
+    return stored || null;
+  }, [targetExerciseForDecision, policyDecisionRecords]);
 
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -603,10 +633,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   useEffect(() => {
     setRestTotalSeconds(defaultRestSeconds);
   }, [defaultRestSeconds]);
-
-  // ── Workout Logger Form State ──────────────────────────────────────────────
-  const [date, setDate] = useState(getLocalTodayStr());
-  const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
 
   // ── Quick Substitution & Voice State ───────────────────────────────────────
   const [quickSubstituteIndex, setQuickSubstituteIndex] = useState<number | null>(null);
@@ -1824,16 +1850,28 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       })()}
 
       {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode - Progressive Disclosure) ── */}
-      {userMode === 'advanced' && activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1 && (
-        <section className="space-y-2">
+      {userMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
+        <section className="space-y-2" aria-label="Progression Policy Recommendation">
           <div
-            className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-bg-card border border-border/70 hover:border-accent/40 transition-colors shadow-xs"
+            className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-bg-card border border-border/70 hover:border-accent/40 transition-colors shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-accent"
             onClick={() => setIsDecisionExpanded((prev) => !prev)}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsDecisionExpanded((prev) => !prev);
+              }
+            }}
+            aria-expanded={isDecisionExpanded}
+            aria-label="Toggle progression policy recommendation"
           >
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
               <h2 className="section-title text-[11px] mb-0 font-mono">
-                WHY DID MY PRESCRIPTION CHANGE?
+                {activePolicyDecision
+                  ? 'TRAINING DECISION POLICY RECOMMENDATION'
+                  : 'WHY DID MY PRESCRIPTION CHANGE?'}
               </h2>
             </div>
             <div className="flex items-center gap-1.5">
@@ -1848,11 +1886,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </div>
           </div>
           {isDecisionExpanded && (
-            <div className="animate-fade-in">
-              <TrainingDecisionCard
-                decision={activeTrainingDecision}
-                userUnit={userUnit}
-              />
+            <div className="animate-fade-in space-y-2">
+              {activePolicyDecision && (
+                <div className="p-2.5 rounded-lg bg-bg-secondary/60 border border-border/60 text-2xs text-text-muted flex items-start gap-1.5">
+                  <Info className="w-3.5 h-3.5 text-accent shrink-0 mt-0.5" />
+                  <span>
+                    Audit Note: Decisions in this ledger record candidate progression. Accepting or overriding stores your decision in the ledger; it does not alter current workout draft targets or automatically rewrite future workout plans.
+                  </span>
+                </div>
+              )}
+              {activePolicyDecision ? (
+                <PolicyDecisionCard
+                  decision={activePolicyDecision}
+                  userUnit={userUnit}
+                />
+              ) : activeTrainingDecision ? (
+                <TrainingDecisionCard
+                  decision={activeTrainingDecision}
+                  userUnit={userUnit}
+                />
+              ) : null}
             </div>
           )}
         </section>

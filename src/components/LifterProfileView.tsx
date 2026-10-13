@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { LifterTwinProfile, LifterExerciseProfile, TrainingDecision } from '@/lib/types';
 import { generateLifterTwinProfile } from '@/lib/lifter-twin';
 import TrainingDecisionCard from './TrainingDecisionCard';
+import PolicyDecisionLedger from '@/components/PolicyDecisionLedger';
 import {
   Activity,
   TrendingUp,
@@ -378,40 +379,23 @@ export default function LifterProfileView({ onStartWorkoutForExercise }: LifterP
       {/* ── TAB 2: TRAINING DECISIONS LEDGER (Auditable Memory) ─────────────── */}
       {activeSubTab === 'ledger' && (
         <div className="space-y-4">
-          {/* Explanation Banner */}
-          <div className="card p-3.5 bg-bg-secondary/50 border border-border text-xs text-text-secondary space-y-1">
-            <div className="flex items-center gap-1.5 text-text-primary font-bold">
-              <ShieldCheck className="w-4 h-4 text-accent" />
-              <span>Lifter Twin Decision History</span>
-            </div>
-            <p className="leading-relaxed text-2xs text-text-muted">
-              Every automated change explains why it changed, predicted effort vs actual outcome, and you can override anytime.
-            </p>
-          </div>
+          <PolicyDecisionLedger userUnit={userUnit} />
 
-          {allDecisions.length === 0 ? (
-            <div className="card p-8 bg-bg-card border border-border text-center space-y-3 shadow-xs">
-              <div className="w-10 h-10 rounded-xl bg-bg-secondary text-text-muted mx-auto flex items-center justify-center">
-                <Layers className="w-5 h-5" />
+          {/* Legacy Lifter Twin Predictions (if present) */}
+          {allDecisions.length > 0 && (
+            <div className="pt-4 border-t border-border/70 space-y-3">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                Legacy Engine Predictions ({allDecisions.length})
+              </span>
+              <div className="space-y-3">
+                {allDecisions.map((decision) => (
+                  <TrainingDecisionCard
+                    key={decision.id}
+                    decision={decision}
+                    userUnit={userUnit}
+                  />
+                ))}
               </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-sm font-bold text-text-primary font-mono">
-                  No Decisions Recorded Yet
-                </h3>
-                <p className="text-xs text-text-muted leading-relaxed">
-                  As you log workouts where set RPE drifts, targets are exceeded, or volume exceeds recovery tolerance, ASCEND logs auditable prescription decisions and tracks training response consistency here.
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {allDecisions.map((decision) => (
-                <TrainingDecisionCard
-                  key={decision.id}
-                  decision={decision}
-                  userUnit={userUnit}
-                />
-              ))}
             </div>
           )}
         </div>
