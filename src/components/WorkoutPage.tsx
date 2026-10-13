@@ -68,6 +68,7 @@ import ShareProgramModal from '@/components/ShareProgramModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
+import PlanVsActualReview from '@/components/PlanVsActualReview';
 import {
   DAYS_OF_WEEK,
   DAY_DISPLAY_INFO,
@@ -2155,6 +2156,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                           </div>
                         );
                       })}
+
+                      {/* ── Plan vs Actual Workout Review ── */}
+                      <PlanVsActualReview workout={workout} />
 
                       <div className="flex justify-end pt-2">
                         {confirmDeleteId === workout.id ? (
