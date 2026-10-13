@@ -7,6 +7,7 @@ import {
   formatRpeComparison,
   getSetStatusBadge,
   formatSetCompletionSummary,
+  formatSetCount,
 } from '@/lib/workout-adherence-presentation';
 import { ChevronDown, ChevronUp, Target } from 'lucide-react';
 
@@ -97,28 +98,28 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
             <span className="text-3xs uppercase font-mono text-text-muted block">Prescribed</span>
             <span className="text-xs font-bold font-mono text-text-primary block mt-0.5 tabular-nums">
-              {adherence.totalPrescribedSets} sets
+              {formatSetCount(adherence.totalPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
             <span className="text-3xs uppercase font-mono text-text-muted block">Completed</span>
             <span className="text-xs font-bold font-mono text-emerald-400 block mt-0.5 tabular-nums">
-              {adherence.completedPrescribedSets} sets
+              {formatSetCount(adherence.completedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
             <span className="text-3xs uppercase font-mono text-text-muted block">Skipped</span>
             <span className="text-xs font-bold font-mono text-rose-400 block mt-0.5 tabular-nums">
-              {adherence.skippedPrescribedSets} sets
+              {formatSetCount(adherence.skippedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
             <span className="text-3xs uppercase font-mono text-text-muted block">Not Attempted</span>
             <span className="text-xs font-bold font-mono text-text-muted block mt-0.5 tabular-nums">
-              {adherence.notAttemptedPrescribedSets} sets
+              {formatSetCount(adherence.notAttemptedPrescribedSets)}
             </span>
           </div>
 
@@ -126,7 +127,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
             <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center col-span-2 sm:col-span-1">
               <span className="text-3xs uppercase font-mono text-text-muted block">Extra Sets</span>
               <span className="text-xs font-bold font-mono text-amber-400 block mt-0.5 tabular-nums">
-                {adherence.extraCompletedSets} sets
+                {formatSetCount(adherence.extraCompletedSets)}
               </span>
             </div>
           )}

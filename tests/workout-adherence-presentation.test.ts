@@ -9,6 +9,7 @@ import {
   formatRpeComparison,
   getSetStatusBadge,
   formatSetCompletionSummary,
+  formatSetCount,
 } from '@/lib/workout-adherence-presentation';
 import { WorkoutEntry, WorkoutSet } from '@/lib/types';
 
@@ -58,7 +59,7 @@ describe('Workout Adherence Presentation & Review Formatting (workout-adherence-
       const completionSummary = formatSetCompletionSummary(summary);
       expect(completionSummary.hasPrescription).toBe(true);
       expect(completionSummary.completionRateFormatted).toBe('100%');
-      expect(completionSummary.detailText).toBe('1 of 1 prescribed sets completed');
+      expect(completionSummary.detailText).toBe('1 of 1 prescribed set completed');
     });
   });
 
@@ -451,6 +452,33 @@ describe('Workout Adherence Presentation & Review Formatting (workout-adherence-
       expect(comp.isWarmup).toBe(true);
       expect(comp.isCompleted).toBe(true);
       expect(formatRepComparison(comp)).toBe('10 planned → 10 actual (0 difference)');
+    });
+  });
+
+  // ─── Set Count Grammatical Pluralization ──────────────────────────────────
+  describe('Grammatical Pluralization (formatSetCount)', () => {
+    it('formats singular and plural labels correctly without producing "1 sets"', () => {
+      expect(formatSetCount(0)).toBe('0 sets');
+      expect(formatSetCount(1)).toBe('1 set');
+      expect(formatSetCount(2)).toBe('2 sets');
+      expect(formatSetCount(5)).toBe('5 sets');
+    });
+
+    it('formats completion summary detail text with proper singular/plural set word', () => {
+      const singleSetSummary = {
+        hasPrescriptionData: true,
+        totalPrescribedSets: 1,
+        completedPrescribedSets: 1,
+        skippedPrescribedSets: 0,
+        notAttemptedPrescribedSets: 0,
+        extraCompletedSets: 0,
+        setCompletionRate: 1,
+        setCompletionPercentage: 100,
+        exercises: [],
+        setComparisons: [],
+      };
+      const formatted = formatSetCompletionSummary(singleSetSummary);
+      expect(formatted.detailText).toBe('1 of 1 prescribed set completed');
     });
   });
 });

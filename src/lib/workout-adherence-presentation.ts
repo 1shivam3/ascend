@@ -233,6 +233,17 @@ export function getSetStatusBadge(comp: SetAdherenceComparison): {
 }
 
 /**
+ * Formats a set count with proper grammatical pluralization.
+ * Examples:
+ * - 0 sets
+ * - 1 set
+ * - 2 sets
+ */
+export function formatSetCount(count: number): string {
+  return `${count} ${count === 1 ? 'set' : 'sets'}`;
+}
+
+/**
  * Formats the summary text for prescribed set completion rate.
  *
  * Rules:
@@ -259,10 +270,12 @@ export function formatSetCompletionSummary(summary: WorkoutAdherenceSummary): {
       ? `${summary.setCompletionPercentage}%`
       : '—';
 
+  const setWord = summary.totalPrescribedSets === 1 ? 'set' : 'sets';
+
   return {
     label: 'Set completion',
     hasPrescription: true,
     completionRateFormatted: rate,
-    detailText: `${summary.completedPrescribedSets} of ${summary.totalPrescribedSets} prescribed sets completed`,
+    detailText: `${summary.completedPrescribedSets} of ${summary.totalPrescribedSets} prescribed ${setWord} completed`,
   };
 }
