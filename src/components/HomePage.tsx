@@ -342,13 +342,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
           }
         }
+        const finalAssignedW = assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60);
+        const targetUnit = pe.targetUnit ?? userUnit;
         return {
           name: pe.name,
           sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-            weight: assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60),
+            weight: finalAssignedW,
             reps: pe.targetReps,
-            unit: pe.targetUnit ?? userUnit,
+            unit: targetUnit,
             rpe: 8,
+            completed: false,
+            status: 'pending' as const,
+            prescribedWeight: finalAssignedW,
+            prescribedReps: pe.targetReps,
+            prescribedRpe: 8,
+            prescribedUnit: targetUnit,
           })),
         };
       });
@@ -357,9 +365,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         {
           name: 'Bench Press',
           sets: [
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8 },
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
+            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
           ],
         },
       ];
@@ -411,13 +419,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
           }
         }
+        const finalAssignedW = assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60);
+        const targetUnit = pe.targetUnit ?? userUnit;
         return {
           name: pe.name,
           sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-            weight: assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60),
+            weight: finalAssignedW,
             reps: pe.targetReps,
-            unit: pe.targetUnit ?? userUnit,
+            unit: targetUnit,
             rpe: 8,
+            completed: false,
+            status: 'pending' as const,
+            prescribedWeight: finalAssignedW,
+            prescribedReps: pe.targetReps,
+            prescribedRpe: 8,
+            prescribedUnit: targetUnit,
           })),
         };
       });

@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
+import { isSetCompleted } from '@/lib/types';
 import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
@@ -36,6 +37,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     for (const w of pastWeekWorkouts) {
       for (const ex of w.exercises) {
         for (const set of ex.sets) {
+          if (!isSetCompleted(set)) continue;
           totalSets += 1;
           const weight = typeof set.weight === 'number' ? set.weight : parseFloat(String(set.weight)) || 0;
           const reps = typeof set.reps === 'number' ? set.reps : parseInt(String(set.reps), 10) || 0;

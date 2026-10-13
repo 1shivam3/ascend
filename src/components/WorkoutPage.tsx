@@ -51,6 +51,8 @@ import {
   getTodaySessionState,
   ExerciseSubstitute,
   getGoalAdaptiveSplitTemplates,
+  isSetCompleted,
+  finalizeWorkoutExercises,
 } from '@/lib/workout-engine';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
@@ -59,7 +61,7 @@ import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import ShareProgramModal from '@/components/ShareProgramModal';
@@ -742,6 +744,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         weight: s.weight,
         reps: s.reps,
         unit: s.unit || userUnit,
+        completed: false,
+        status: 'pending' as const,
+        rpe: s.rpe || 8,
+        prescribedWeight: s.weight,
+        prescribedReps: s.reps,
+        prescribedRpe: s.rpe || 8,
+        prescribedUnit: s.unit || userUnit,
       })),
     }));
     setExercises(clonedExercises);
@@ -872,14 +881,51 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleAddExercise = (exerciseName = '') => {
     const finalName = exerciseName.trim() || (exercises.length === 0 ? 'Bench Press' : `Exercise ${exercises.length + 1}`);
-    setExercises(prev => [...prev, { name: finalName, sets: [{ reps: 8, weight: userUnit === 'kg' ? 60 : 135, unit: userUnit }] }]);
+    const defaultW = userUnit === 'kg' ? 60 : 135;
+    setExercises(prev => [
+      ...prev,
+      {
+        name: finalName,
+        sets: [
+          {
+            reps: 8,
+            weight: defaultW,
+            unit: userUnit,
+            completed: false,
+            status: 'pending' as const,
+            rpe: 8,
+            prescribedWeight: defaultW,
+            prescribedReps: 8,
+            prescribedRpe: 8,
+            prescribedUnit: userUnit,
+          },
+        ],
+      },
+    ]);
   };
 
   const handleSelectFromLibrary = (exerciseName: string) => {
     if (!isModalOpen) {
       setStartedFromPlan(null);
       setSessionStartTime(Date.now());
-      setExercises([{ name: exerciseName, sets: [{ reps: 8, weight: 0, unit: userUnit }] }]);
+      setExercises([
+        {
+          name: exerciseName,
+          sets: [
+            {
+              reps: 8,
+              weight: 0,
+              unit: userUnit,
+              completed: false,
+              status: 'pending' as const,
+              rpe: 8,
+              prescribedReps: 8,
+              prescribedRpe: 8,
+              prescribedUnit: userUnit,
+            },
+          ],
+        },
+      ]);
       setIsModalOpen(true);
     } else {
       handleAddExercise(exerciseName);
@@ -903,14 +949,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setExercises(prev => {
       const updated = [...prev];
       const prevSet = updated[exerciseIndex].sets[updated[exerciseIndex].sets.length - 1];
+      const prevW = prevSet?.weight ?? 0;
+      const prevR = prevSet?.reps ?? 8;
+      const prevU = prevSet?.unit ?? userUnit;
       updated[exerciseIndex] = {
         ...updated[exerciseIndex],
         sets: [
           ...updated[exerciseIndex].sets,
           {
-            reps: prevSet?.reps ?? 8,
-            weight: prevSet?.weight ?? 0,
-            unit: prevSet?.unit ?? userUnit,
+            reps: prevR,
+            weight: prevW,
+            unit: prevU,
+            completed: false,
+            status: 'pending' as const,
+            rpe: prevSet?.rpe ?? 8,
+            prescribedWeight: prevSet?.prescribedWeight ?? (prevW > 0 ? prevW : undefined),
+            prescribedReps: prevSet?.prescribedReps ?? prevR,
+            prescribedRpe: prevSet?.prescribedRpe ?? 8,
+            prescribedUnit: prevSet?.prescribedUnit ?? prevU,
           },
         ],
       };
@@ -949,7 +1005,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setStartedFromPlan(null);
     setSessionStartTime(Date.now());
     if (exercises.length === 0 || exercises.every(e => !e.name.trim())) {
-      setExercises([{ name: 'Bench Press', sets: [{ reps: 8, weight: userUnit === 'kg' ? 60 : 135, unit: userUnit }] }]);
+      const defaultW = userUnit === 'kg' ? 60 : 135;
+      setExercises([
+        {
+          name: 'Bench Press',
+          sets: [
+            {
+              reps: 8,
+              weight: defaultW,
+              unit: userUnit,
+              completed: false,
+              status: 'pending' as const,
+              rpe: 8,
+              prescribedWeight: defaultW,
+              prescribedReps: 8,
+              prescribedRpe: 8,
+              prescribedUnit: userUnit,
+            },
+          ],
+        },
+      ]);
     }
     setIsModalOpen(true);
   };
@@ -979,13 +1054,21 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         }
       }
 
+      const pWeight = typeof assignedWeight === 'number' && assignedWeight > 0 ? assignedWeight : undefined;
+      const targetUnit = pe.targetUnit ?? userUnit;
       return {
         name: pe.name,
         sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
           weight: assignedWeight !== '' && assignedWeight > 0 ? assignedWeight : ('' as any),
           reps: pe.targetReps,
-          unit: pe.targetUnit ?? userUnit,
+          unit: targetUnit,
           rpe: assignedRpe,
+          completed: false,
+          status: 'pending' as const,
+          prescribedWeight: pWeight,
+          prescribedReps: pe.targetReps,
+          prescribedRpe: assignedRpe,
+          prescribedUnit: targetUnit,
         })),
       };
     });
@@ -1116,25 +1199,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // ─── Save Workout ─────────────────────────────────────────────────────────
 
   const handleSaveWorkout = () => {
-    const validExercises = exercises
-      .map(e => {
-        const cleanName = e.name.trim();
-        const isBW = isBodyweightExercise(cleanName);
-        const validSets = e.sets.filter(s => {
-          const r = parseInt(String(s.reps), 10) || 0;
-          const w = parseFloat(String(s.weight)) || 0;
-          return r > 0 && (w > 0 || isBW || s.isWarmup) && s.completed !== false;
-        });
-        return {
-          ...e,
-          name: cleanName,
-          sets: validSets,
-        };
-      })
-      .filter(e => e.name.length > 0 && e.sets.length > 0);
+    const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
-    if (validExercises.length === 0) {
-      toast.error('Please add at least one exercise with sets.', 'Empty Workout');
+    if (!hasMeaningfulData) {
+      toast.error('No exercises or planned sets recorded to save.', 'Empty Workout');
       return;
     }
 
@@ -1145,54 +1213,56 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const newWorkout: WorkoutEntry = { id: workoutId, date, exercises: validExercises };
     addWorkout(newWorkout);
 
-    // Auto-PR Detection
+    // Auto-PR Detection (only evaluates completed sets)
     let newPRCount = 0;
-    const userBW = profile?.bodyweightKg || 75;
-    for (const ex of validExercises) {
-      const exName = ex.name.trim();
-      const isBW = isBodyweightExercise(exName);
-      const existingPRs = prs.filter(p => p.exercise.toLowerCase() === exName.toLowerCase());
-      const currentBest1RMKg = existingPRs.length > 0 ? Math.max(...existingPRs.map(p => p.oneRepMax)) : 0;
+    if (hasCompletedSets) {
+      const userBW = profile?.bodyweightKg || 75;
+      for (const ex of validExercises) {
+        const exName = ex.name.trim();
+        const isBW = isBodyweightExercise(exName);
+        const existingPRs = prs.filter(p => p.exercise.toLowerCase() === exName.toLowerCase());
+        const currentBest1RMKg = existingPRs.length > 0 ? Math.max(...existingPRs.map(p => p.oneRepMax)) : 0;
 
-      let topSet = { weightKg: 0, weightLbs: 0, reps: 0, e1RMKg: 0, rawWeight: 0, unit: userUnit as 'kg' | 'lbs' };
+        let topSet = { weightKg: 0, weightLbs: 0, reps: 0, e1RMKg: 0, rawWeight: 0, unit: userUnit as 'kg' | 'lbs' };
 
-      for (const s of ex.sets) {
-        if (s.isWarmup) continue;
-        const wNum = s.weight;
-        const rNum = s.reps;
-        if (rNum > 0 && (wNum > 0 || isBW)) {
-          const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
-          const wLbs = s.unit === 'lbs' ? wNum : wNum * 2.20462;
-          const effectiveLoadKg = getEffectiveExerciseLoad(exName, wKg, userBW);
-          const e1RM = calculateOneRepMax(effectiveLoadKg, rNum);
-          if (e1RM > topSet.e1RMKg) {
-            topSet = {
-              weightKg: Math.round(wKg * 10) / 10,
-              weightLbs: Math.round(wLbs * 10) / 10,
-              reps: rNum,
-              e1RMKg: Math.round(e1RM * 10) / 10,
-              rawWeight: wNum,
-              unit: s.unit,
-            };
+        for (const s of ex.sets) {
+          if (s.isWarmup || !isSetCompleted(s)) continue;
+          const wNum = s.weight;
+          const rNum = s.reps;
+          if (rNum > 0 && (wNum > 0 || isBW)) {
+            const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
+            const wLbs = s.unit === 'lbs' ? wNum : wNum * 2.20462;
+            const effectiveLoadKg = getEffectiveExerciseLoad(exName, wKg, userBW);
+            const e1RM = calculateOneRepMax(effectiveLoadKg, rNum);
+            if (e1RM > topSet.e1RMKg) {
+              topSet = {
+                weightKg: Math.round(wKg * 10) / 10,
+                weightLbs: Math.round(wLbs * 10) / 10,
+                reps: rNum,
+                e1RMKg: Math.round(e1RM * 10) / 10,
+                rawWeight: wNum,
+                unit: s.unit,
+              };
+            }
           }
         }
-      }
 
-      if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
-        const prId = typeof crypto !== 'undefined' && crypto.randomUUID
-          ? crypto.randomUUID()
-          : `pr_${Date.now()}_${Math.random()}`;
-        addPR({
-          id: prId,
-          exercise: exName,
-          weightKg: topSet.weightKg,
-          weightLbs: topSet.weightLbs,
-          reps: topSet.reps,
-          oneRepMax: topSet.e1RMKg,
-          date,
-          notes: 'Auto-detected from workout session',
-        });
-        newPRCount++;
+        if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          const prId = typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `pr_${Date.now()}_${Math.random()}`;
+          addPR({
+            id: prId,
+            exercise: exName,
+            weightKg: topSet.weightKg,
+            weightLbs: topSet.weightLbs,
+            reps: topSet.reps,
+            oneRepMax: topSet.e1RMKg,
+            date,
+            notes: 'Auto-detected from workout session',
+          });
+          newPRCount++;
+        }
       }
     }
 
@@ -1201,10 +1271,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         `${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
         'New PR Milestone'
       );
-    } else {
+    } else if (hasCompletedSets) {
       toast.success(
         `Logged workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''}!`,
         'Workout Saved'
+      );
+    } else {
+      toast.info(
+        `Saved interrupted workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''} (0 completed sets).`,
+        'Interrupted Session Saved'
       );
     }
 
@@ -1275,14 +1350,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleStartSuggestedWorkout = (workoutName: string, suggestedExercises: PlannedExercise[]) => {
     setSessionStartTime(Date.now());
-    const preFilled: WorkoutExercise[] = suggestedExercises.map(pe => ({
-      name: pe.name,
-      sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-        weight: pe.targetWeight ?? 0,
-        reps: pe.targetReps,
-        unit: pe.targetUnit ?? userUnit,
-      })),
-    }));
+    const preFilled: WorkoutExercise[] = suggestedExercises.map(pe => {
+      const pWeight = pe.targetWeight ?? (userUnit === 'lbs' ? 135 : 60);
+      const targetUnit = pe.targetUnit ?? userUnit;
+      return {
+        name: pe.name,
+        sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
+          weight: pe.targetWeight ?? 0,
+          reps: pe.targetReps,
+          unit: targetUnit,
+          completed: false,
+          status: 'pending' as const,
+          rpe: 8,
+          prescribedWeight: pWeight,
+          prescribedReps: pe.targetReps,
+          prescribedRpe: 8,
+          prescribedUnit: targetUnit,
+        })),
+      };
+    });
     setExercises(preFilled);
     setDate(getLocalTodayStr());
     setStartedFromPlan(workoutName);
@@ -2006,20 +2092,46 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                     ? Math.max(0, Math.round((10 - rpeVal) * 10) / 10)
                                     : undefined;
 
+                                const isSkipped = set.status === 'skipped';
+                                const isNotAttempted = set.status === 'not_attempted';
+                                const isDone = isSetCompleted(set);
+
                                 return (
                                   <div
                                     key={j}
-                                    className="bg-bg-primary px-2.5 py-1.5 rounded border border-border flex items-center justify-between gap-1.5"
+                                    className={`px-2.5 py-1.5 rounded border flex items-center justify-between gap-1.5 ${
+                                      isSkipped
+                                        ? 'bg-rose-500/5 border-rose-500/20 opacity-75'
+                                        : isNotAttempted
+                                        ? 'bg-bg-primary/50 border-border/60 opacity-60'
+                                        : 'bg-bg-primary border-border'
+                                    }`}
                                   >
                                     <div className="truncate">
                                       Set {j + 1}:{' '}
-                                      <span className="text-text-primary font-medium tabular-nums">
+                                      <span className={`tabular-nums ${isDone ? 'text-text-primary font-medium' : 'text-text-muted line-through'}`}>
                                         {set.weight} {set.unit}
                                       </span>{' '}
                                       × {set.reps}
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
-                                      {rpeVal !== undefined && (
+                                      {isSkipped && (
+                                        <span
+                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
+                                          title="Skipped Set"
+                                        >
+                                          SKIPPED
+                                        </span>
+                                      )}
+                                      {isNotAttempted && (
+                                        <span
+                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-bg-secondary text-text-muted border border-border/60 font-bold"
+                                          title="Not Attempted"
+                                        >
+                                          NOT ATTEMPTED
+                                        </span>
+                                      )}
+                                      {isDone && rpeVal !== undefined && (
                                         <span
                                           className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
                                           title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
@@ -2027,7 +2139,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                           @{rpeVal}
                                         </span>
                                       )}
-                                      {set.isPR && (
+                                      {isDone && set.isPR && (
                                         <span
                                           className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
                                           title="Personal Record Set"

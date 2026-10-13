@@ -1,5 +1,5 @@
 import { AppState } from './store';
-import { AITrainingProfile } from './types';
+import { AITrainingProfile, isSetCompleted } from './types';
 import { toLocalDateString, calculateHydrationTarget, getCreatineStats } from './habits';
 import { getVolumeComparison, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
 
@@ -48,8 +48,9 @@ export function buildCompactUserContext(state: AppState): string {
     workoutLines.push('RECENT WORKOUTS:');
     for (const w of recentWorkouts) {
       const exSummaries = w.exercises.map((e) => {
-        const topSet = e.sets.reduce((max, s) => (s.weight > max.weight ? s : max), e.sets[0] || { weight: 0, reps: 0, unit });
-        return `${e.name}: ${e.sets.length} sets (top ${topSet.weight}${topSet.unit || unit}×${topSet.reps})`;
+        const completedSets = e.sets.filter(isSetCompleted);
+        const topSet = completedSets.reduce((max, s) => (s.weight > max.weight ? s : max), completedSets[0] || { weight: 0, reps: 0, unit });
+        return `${e.name}: ${completedSets.length} sets (top ${topSet.weight}${topSet.unit || unit}×${topSet.reps})`;
       });
       workoutLines.push(`- [${w.date}] ${exSummaries.slice(0, 4).join('; ')}`);
     }
@@ -74,8 +75,11 @@ export function buildCompactUserContext(state: AppState): string {
     for (const w of state.workouts || []) {
       const match = w.exercises.find((e) => e.name.toLowerCase().includes(exName.toLowerCase()));
       if (match && match.sets.length > 0) {
-        const top = match.sets.reduce((m, s) => (s.weight > m.weight ? s : m), match.sets[0]);
-        entries.push({ date: w.date, weight: top.weight, reps: top.reps });
+        const completedSets = match.sets.filter(isSetCompleted);
+        if (completedSets.length > 0) {
+          const top = completedSets.reduce((m, s) => (s.weight > m.weight ? s : m), completedSets[0]);
+          entries.push({ date: w.date, weight: top.weight, reps: top.reps });
+        }
       }
     }
 

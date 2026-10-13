@@ -10,6 +10,7 @@ import {
   LifterConfidenceTier,
   AthleteGoal,
   ATHLETE_GOAL_CONFIGS,
+  isSetCompleted,
 } from './types';
 import {
   calculateOneRepMax,
@@ -115,7 +116,7 @@ export function getExerciseHistorySessions(
 
     if (match && match.sets.length > 0) {
       const validSets = match.sets
-        .filter((s) => s.reps > 0)
+        .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
           if (s.unit && s.unit !== userUnit) {

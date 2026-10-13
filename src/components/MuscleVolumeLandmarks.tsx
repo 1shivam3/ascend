@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useStore } from '@/lib/store';
+import { isSetCompleted } from '@/lib/types';
 import {
   getExerciseMuscle,
   getExerciseSecondaryMuscles,
@@ -67,7 +68,7 @@ export default function MuscleVolumeLandmarks() {
       w.exercises.forEach((ex) => {
         const primary = getExerciseMuscle(ex.name);
         const secondaries = getExerciseSecondaryMuscles(ex.name);
-        const completedCount = ex.sets.filter((s) => s.completed !== false && (s.reps > 0 || (s.weight && s.weight > 0))).length;
+        const completedCount = ex.sets.filter((s) => isSetCompleted(s) && (s.reps > 0 || (s.weight && s.weight > 0))).length;
         if (primary !== 'Conditioning' && primary in setCounts) {
           setCounts[primary as ResistanceMuscleGroup] = (setCounts[primary as ResistanceMuscleGroup] || 0) + completedCount;
         }

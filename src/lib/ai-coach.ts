@@ -8,7 +8,8 @@ import {
   AISubstitutionResult,
   AIWorkoutCommandResult,
   AIPostWorkoutTake,
-  AIWeeklyReview
+  AIWeeklyReview,
+  isSetCompleted,
 } from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
 import { buildCompactUserContext } from './ai-context';
@@ -23,6 +24,7 @@ export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75
   return workout.exercises.reduce((totalEx, ex) => {
     const isBw = /pull[\s-]?up|chin[\s-]?up|dip|push[\s-]?up/i.test(ex.name);
     const exTonnage = ex.sets.reduce((totalSet, set) => {
+      if (!isSetCompleted(set)) return totalSet;
       const reps = Math.max(0, Number(set.reps) || 0);
       let weightKg = Math.max(0, Number(set.weight) || 0);
 

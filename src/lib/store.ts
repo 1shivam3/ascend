@@ -30,6 +30,7 @@ import {
   DayOfWeek,
   DayScheduleConfig,
   WeeklySchedule,
+  isSetCompleted,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
@@ -402,7 +403,7 @@ export const useAppStore = create<AppState>()(
             (k) => k.trim().toLowerCase() === cleanExName
           );
           const decision = decisionKey ? updatedDecisions[decisionKey] : undefined;
-          const validSets = ex.sets.filter((s) => s.reps > 0 && !s.isWarmup && s.completed !== false);
+          const validSets = ex.sets.filter((s) => s.reps > 0 && !s.isWarmup && isSetCompleted(s));
 
           if (decision && validSets.length > 0) {
             const topSet = validSets.reduce((prev, curr) => curr.weight >= prev.weight ? curr : prev, validSets[0]);

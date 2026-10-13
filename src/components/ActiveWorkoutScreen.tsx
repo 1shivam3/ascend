@@ -28,7 +28,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
   EXERCISE_LIBRARY,
@@ -42,6 +42,8 @@ import {
   getProgressionRecommendation,
   getQuickSubstitutes,
   getExercisePrescription,
+  isActiveSetCompleted,
+  finalizeWorkoutExercises,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
@@ -155,11 +157,30 @@ export default function ActiveWorkoutScreen({
                 finalWeight = '';
               }
             }
+
+            const isDone = isActiveSetCompleted(s);
+            const resolvedStatus = s.status || (isDone ? 'completed' : 'pending');
+
+            // CRITICAL (Issue 2):
+            // When resuming an existing draft, NEVER fabricate prescriptions!
+            // If the draft recorded prescribedWeight / prescribedReps, retain them.
+            // If it is an old draft without recorded prescriptions, leave them undefined.
+            // Handle partial prescription fields deliberately without assumptions.
+            const prescribedWeight = s.prescribedWeight !== undefined ? s.prescribedWeight : undefined;
+            const prescribedReps = s.prescribedReps !== undefined ? s.prescribedReps : undefined;
+            const prescribedRpe = s.prescribedRpe !== undefined ? s.prescribedRpe : undefined;
+            const prescribedUnit = s.prescribedUnit !== undefined ? s.prescribedUnit : undefined;
+
             return {
               ...s,
               weight: finalWeight,
               unit: s.unit || userUnit,
-              completed: s.completed || false,
+              completed: isDone,
+              status: resolvedStatus,
+              prescribedWeight,
+              prescribedReps,
+              prescribedRpe,
+              prescribedUnit,
             };
           }),
         };
@@ -173,9 +194,42 @@ export default function ActiveWorkoutScreen({
       {
         name: 'Bench Press',
         sets: [
-          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
-          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
-          { weight: defaultBenchW, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          {
+            weight: defaultBenchW,
+            reps: defaultReps,
+            unit: userUnit,
+            completed: false,
+            status: 'pending',
+            rpe: 8,
+            prescribedWeight: defaultBenchW,
+            prescribedReps: defaultReps,
+            prescribedRpe: 8,
+            prescribedUnit: userUnit,
+          },
+          {
+            weight: defaultBenchW,
+            reps: defaultReps,
+            unit: userUnit,
+            completed: false,
+            status: 'pending',
+            rpe: 8,
+            prescribedWeight: defaultBenchW,
+            prescribedReps: defaultReps,
+            prescribedRpe: 8,
+            prescribedUnit: userUnit,
+          },
+          {
+            weight: defaultBenchW,
+            reps: defaultReps,
+            unit: userUnit,
+            completed: false,
+            status: 'pending',
+            rpe: 8,
+            prescribedWeight: defaultBenchW,
+            prescribedReps: defaultReps,
+            prescribedRpe: 8,
+            prescribedUnit: userUnit,
+          },
         ],
       },
     ];
@@ -314,7 +368,7 @@ export default function ActiveWorkoutScreen({
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
 
   const completedSetsThisEx = useMemo(() => {
-    return currentExercise?.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0)).length || 0;
+    return currentExercise?.sets.filter(isActiveSetCompleted).length || 0;
   }, [currentExercise?.sets]);
 
   const totalSetsThisEx = currentExercise?.sets.length || 0;
@@ -347,16 +401,16 @@ export default function ActiveWorkoutScreen({
     setLocalExerciseName(exercises[activeExerciseIdx]?.name || '');
     setSelectedSuggestionIdx(-1);
     const currentSets = exercises[activeExerciseIdx]?.sets || [];
-    const firstIncomplete = currentSets.findIndex((s) => !s.completed);
+    const firstIncomplete = currentSets.findIndex((s) => !isActiveSetCompleted(s));
     setActiveSetIdx(firstIncomplete !== -1 ? firstIncomplete : 0);
-    setShowEffortPrompt(currentSets.length > 0 && currentSets.every((s) => s.completed));
+    setShowEffortPrompt(currentSets.length > 0 && currentSets.every(isActiveSetCompleted));
     setEffortChosen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExerciseIdx]);
 
   // ── Auto-save In-Progress Session to Local Storage ────────────────────────
   useEffect(() => {
-    if (exercises.some((e) => e.name.trim() || e.sets.some((s) => s.completed || (parseFloat(String(s.weight)) || 0) > 0))) {
+    if (exercises.some((e) => e.name.trim() || e.sets.some((s) => isActiveSetCompleted(s) || (parseFloat(String(s.weight)) || 0) > 0))) {
       saveWorkoutDraft({
         date: getLocalTodayStr(),
         name: workoutName,
@@ -398,11 +452,11 @@ export default function ActiveWorkoutScreen({
           // If switching between bodyweight and weighted exercise on uncompleted sets, adapt default weights
           let updatedSets = ex.sets;
           if (isBodyweight && !wasBodyweight) {
-            updatedSets = ex.sets.map((s) => (s.completed ? s : { ...s, weight: 0 }));
+            updatedSets = ex.sets.map((s) => (isActiveSetCompleted(s) ? s : { ...s, weight: 0 }));
           } else if (!isBodyweight && wasBodyweight) {
             const defaultWeight = userUnit === 'lbs' ? 115 : 50;
             updatedSets = ex.sets.map((s) =>
-              s.completed ? s : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
+              isActiveSetCompleted(s) ? s : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
             );
           }
 
@@ -726,7 +780,7 @@ export default function ActiveWorkoutScreen({
 
     for (const ex of exercises) {
       if (!ex.name.trim()) continue;
-      const validSets = ex.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0));
+      const validSets = ex.sets.filter(isActiveSetCompleted);
       if (validSets.length === 0) continue;
       const allDone = validSets.every((s) => (s.rpe ?? 8) <= 8 && s.reps >= 8);
       const pr = prs.find((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
@@ -826,14 +880,15 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleToggleSetComplete = (setIdx: number) => {
-    const isNowCompleted = !currentExercise.sets[setIdx].completed;
+    const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
+    const isNowCompleted = !wasCompleted;
 
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted } : s)),
+          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted, status: isNowCompleted ? 'completed' : 'pending' } : s)),
         };
       })
     );
@@ -853,6 +908,39 @@ export default function ActiveWorkoutScreen({
     }
   };
 
+  const handleSkipSet = (setIdx: number) => {
+    const isCurrentlySkipped = currentExercise?.sets[setIdx]?.status === 'skipped';
+    setExercises((prev) =>
+      prev.map((ex, i) => {
+        if (i !== activeExerciseIdx) return ex;
+        return {
+          ...ex,
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            return {
+              ...s,
+              completed: false,
+              status: isCurrentlySkipped ? 'pending' : 'skipped',
+            };
+          }),
+        };
+      })
+    );
+
+    if (!isCurrentlySkipped) {
+      toast.info(`Set ${setIdx + 1} marked as skipped.`, 'Set Skipped');
+      // Advance to next incomplete set if available
+      const nextIncomplete = currentExercise.sets.findIndex(
+        (s, j) => j > setIdx && !isActiveSetCompleted(s) && s.status !== 'skipped'
+      );
+      if (nextIncomplete !== -1) {
+        setActiveSetIdx(nextIncomplete);
+      }
+    } else {
+      toast.info(`Set ${setIdx + 1} set to pending.`, 'Set Pending');
+    }
+  };
+
   const handleApplyCoachTarget = () => {
     if (!progRec) return;
     setExercises((prev) =>
@@ -861,7 +949,7 @@ export default function ActiveWorkoutScreen({
         return {
           ...ex,
           sets: ex.sets.map((s) => {
-            if (!s.completed) {
+            if (!isActiveSetCompleted(s)) {
               return {
                 ...s,
                 weight: progRec.targetWeight,
@@ -890,7 +978,18 @@ export default function ActiveWorkoutScreen({
           ...ex,
           sets: [
             ...ex.sets,
-            { weight: newWeight, reps: newReps, unit: userUnit, completed: false, rpe: 8 },
+            {
+              weight: newWeight,
+              reps: newReps,
+              unit: userUnit,
+              completed: false,
+              status: 'pending',
+              rpe: 8,
+              prescribedWeight: lastSet?.prescribedWeight ?? newWeight,
+              prescribedReps: lastSet?.prescribedReps ?? newReps,
+              prescribedRpe: lastSet?.prescribedRpe ?? 8,
+              prescribedUnit: lastSet?.prescribedUnit ?? userUnit,
+            },
           ],
         };
       })
@@ -910,14 +1009,15 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleCompleteActiveSet = (setIdx: number) => {
-    const isNowCompleted = !currentExercise.sets[setIdx].completed;
+    const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
+    const isNowCompleted = !wasCompleted;
 
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted } : s)),
+          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted, status: isNowCompleted ? 'completed' : 'pending' } : s)),
         };
       })
     );
@@ -932,13 +1032,13 @@ export default function ActiveWorkoutScreen({
       setIsRestFinished(false);
 
       // Check if there is another set to perform in this exercise
-      const remainingSets = currentExercise.sets.filter((s, j) => j !== setIdx && !s.completed);
+      const remainingSets = currentExercise.sets.filter((s, j) => j !== setIdx && !isActiveSetCompleted(s));
       if (remainingSets.length > 0) {
-        const nextIncomplete = currentExercise.sets.findIndex((s, j) => j > setIdx && !s.completed);
+        const nextIncomplete = currentExercise.sets.findIndex((s, j) => j > setIdx && !isActiveSetCompleted(s));
         if (nextIncomplete !== -1) {
           setActiveSetIdx(nextIncomplete);
         } else {
-          const anyIncomplete = currentExercise.sets.findIndex((s, j) => j !== setIdx && !s.completed);
+          const anyIncomplete = currentExercise.sets.findIndex((s, j) => j !== setIdx && !isActiveSetCompleted(s));
           if (anyIncomplete !== -1) setActiveSetIdx(anyIncomplete);
         }
       } else {
@@ -988,7 +1088,7 @@ export default function ActiveWorkoutScreen({
         if (result.setIndex && result.setIndex > 0) {
           targetSetIdx = result.setIndex - 1;
         } else {
-          targetSetIdx = ex.sets.findIndex((s) => !s.completed);
+          targetSetIdx = ex.sets.findIndex((s) => !isActiveSetCompleted(s));
         }
 
         let nextSets = [...ex.sets];
@@ -999,6 +1099,7 @@ export default function ActiveWorkoutScreen({
             reps: result.reps,
             rpe: result.rpe ?? nextSets[targetSetIdx].rpe ?? 8,
             completed: true,
+            status: 'completed',
           };
         } else {
           nextSets.push({
@@ -1007,6 +1108,11 @@ export default function ActiveWorkoutScreen({
             unit: userUnit,
             rpe: result.rpe ?? 8,
             completed: true,
+            status: 'completed',
+            prescribedWeight: result.weight,
+            prescribedReps: result.reps,
+            prescribedRpe: result.rpe ?? 8,
+            prescribedUnit: userUnit,
           });
         }
 
@@ -1114,8 +1220,13 @@ export default function ActiveWorkoutScreen({
       reps: w.reps,
       unit: w.unit,
       completed: false,
+      status: 'pending',
       rpe: w.rpe,
       isWarmup: true,
+      prescribedWeight: w.weight,
+      prescribedReps: w.reps,
+      prescribedRpe: w.rpe,
+      prescribedUnit: w.unit,
     }));
 
     setExercises((prev) =>
@@ -1156,12 +1267,12 @@ export default function ActiveWorkoutScreen({
         totalSetsCount++;
         const sWeight = parseFloat(String(s.weight)) || 0;
         const sReps = parseInt(String(s.reps), 10) || 0;
-        const isDone = s.completed || (sReps > 0 && sWeight > 0);
+        const isDone = isActiveSetCompleted(s);
         if (isDone && sReps > 0) {
           completedSetsCount++;
           const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
           totalVolumeKg += wKg * sReps;
-        } else if (s.completed) {
+        } else if (isDone) {
           completedSetsCount++;
         }
       }
@@ -1169,7 +1280,7 @@ export default function ActiveWorkoutScreen({
 
     return {
       totalVolumeKg: Math.round(totalVolumeKg),
-      completedSetsCount: Math.max(completedSetsCount, exercises.some(e => e.sets.some(s => s.reps > 0)) ? 1 : 0),
+      completedSetsCount,
       totalSetsCount,
       durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
     };
@@ -1178,122 +1289,100 @@ export default function ActiveWorkoutScreen({
   // Finish Workout & detect PRs
   const handleConfirmFinish = () => {
     const today = getLocalTodayStr();
-    const validExercises = exercises
-      .map((e, idx) => {
-        const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : `Exercise ${idx + 1}`;
-        const isBW = isBodyweightExercise(cleanName);
-        const validSets = e.sets
-          .map((s) => {
-            const w = parseFloat(String(s.weight)) || 0;
-            const r = parseInt(String(s.reps), 10) || 0;
-            const isCompleted = s.completed === true;
-            return {
-              ...s,
-              completed: isCompleted,
-              weight: w,
-              reps: r,
-            };
-          })
-          .filter((s) => s.reps > 0 && s.completed);
+    const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
-        return {
-          name: cleanName,
-          sets: validSets,
-          notes: e.notes,
-        };
-      })
-      .filter((e) => e.sets.length > 0);
-
-    if (validExercises.length === 0) {
-      toast.error('Please record at least 1 completed set with reps before finishing.', 'Cannot Finish');
+    if (!hasMeaningfulData) {
+      toast.error('No exercises or planned sets recorded to finish.', 'Cannot Finish');
       return;
     }
 
-    // PR detection
+    // PR detection (only evaluates completed sets)
     let newPRsCount = 0;
-    const userBW = profile?.bodyweightKg || 75;
-    for (const ex of validExercises) {
-      const isBW = isBodyweightExercise(ex.name);
-      const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
-      const currentBest1RMKg =
-        existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
+    if (hasCompletedSets) {
+      const userBW = profile?.bodyweightKg || 75;
+      for (const ex of validExercises) {
+        const isBW = isBodyweightExercise(ex.name);
+        const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
+        const currentBest1RMKg =
+          existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
 
-      // PR detection (Both 1RM PRs and Rep PRs at working loads)
-      let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
-      let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
+        // PR detection (Both 1RM PRs and Rep PRs at working loads)
+        let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
+        let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
 
-      for (const s of ex.sets) {
-        if (s.isWarmup) continue;
-        const sWeight = parseFloat(String(s.weight)) || 0;
-        const sReps = parseInt(String(s.reps), 10) || 0;
-        if (sReps > 0 && (sWeight > 0 || isBW)) {
-          const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
-          const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
-          const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
-          if (e1rm > topSet.e1RMKg) {
-            topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
-          }
+        for (const s of ex.sets) {
+          if (s.isWarmup || !isSetCompleted(s)) continue;
+          const sWeight = parseFloat(String(s.weight)) || 0;
+          const sReps = parseInt(String(s.reps), 10) || 0;
+          if (sReps > 0 && (sWeight > 0 || isBW)) {
+            const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+            const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
+            const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
+            if (e1rm > topSet.e1RMKg) {
+              topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
+            }
 
-          // Scan past workouts to check if this is a Rep PR at this specific working weight
-          let maxPrevRepsAtWeight = 0;
-          for (const pastWk of workouts) {
-            for (const pastEx of pastWk.exercises) {
-              if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
-                for (const pastSet of pastEx.sets) {
-                  if (pastSet.isWarmup) continue;
-                  const pw = parseFloat(String(pastSet.weight)) || 0;
-                  const pr = parseInt(String(pastSet.reps), 10) || 0;
-                  const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
-                  if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
-                    maxPrevRepsAtWeight = pr;
+            // Scan past workouts to check if this is a Rep PR at this specific working weight
+            let maxPrevRepsAtWeight = 0;
+            for (const pastWk of workouts) {
+              for (const pastEx of pastWk.exercises) {
+                if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
+                  for (const pastSet of pastEx.sets) {
+                    if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
+                    const pw = parseFloat(String(pastSet.weight)) || 0;
+                    const pr = parseInt(String(pastSet.reps), 10) || 0;
+                    const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
+                    if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
+                      maxPrevRepsAtWeight = pr;
+                    }
                   }
                 }
               }
             }
-          }
 
-          if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
-            if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
-              bestRepPR = {
-                weightKg: Math.round(wKg * 10) / 10,
-                weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
-                reps: sReps,
-                prevReps: maxPrevRepsAtWeight,
-                e1RMKg: Math.round(e1rm * 10) / 10,
-              };
+            if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
+              if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
+                bestRepPR = {
+                  weightKg: Math.round(wKg * 10) / 10,
+                  weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
+                  reps: sReps,
+                  prevReps: maxPrevRepsAtWeight,
+                  e1RMKg: Math.round(e1rm * 10) / 10,
+                };
+              }
             }
           }
         }
-      }
 
-      if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
-        const prId = safeRandomId('pr');
-        addPR({
-          id: prId,
-          exercise: ex.name,
-          weightKg: topSet.weightKg,
-          weightLbs: Math.round(topSet.weightKg * 2.20462 * 10) / 10,
-          reps: topSet.reps,
-          oneRepMax: topSet.e1RMKg,
-          date: today,
-          notes: 'All-Time 1RM PR',
-          prType: '1rm',
-        });
-        newPRsCount++;
-      } else if (bestRepPR) {
-        const prId = safeRandomId('pr_rep');
-        addPR({
-          id: prId,
-          exercise: ex.name,
-          weightKg: bestRepPR.weightKg,
-          weightLbs: bestRepPR.weightLbs,
-          reps: bestRepPR.reps,
-          oneRepMax: bestRepPR.e1RMKg,
-          date: today,
-          notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
-          prType: 'reps',
-        });
-        newPRsCount++;
+        if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          const prId = safeRandomId('pr');
+          addPR({
+            id: prId,
+            exercise: ex.name,
+            weightKg: topSet.weightKg,
+            weightLbs: Math.round(topSet.weightKg * 2.20462 * 10) / 10,
+            reps: topSet.reps,
+            oneRepMax: topSet.e1RMKg,
+            date: today,
+            notes: 'All-Time 1RM PR',
+            prType: '1rm',
+          });
+          newPRsCount++;
+        } else if (bestRepPR) {
+          const prId = safeRandomId('pr_rep');
+          addPR({
+            id: prId,
+            exercise: ex.name,
+            weightKg: bestRepPR.weightKg,
+            weightLbs: bestRepPR.weightLbs,
+            reps: bestRepPR.reps,
+            oneRepMax: bestRepPR.e1RMKg,
+            date: today,
+            notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
+            prType: 'reps',
+          });
+          newPRsCount++;
+        }
       }
     }
 
@@ -1304,6 +1393,9 @@ export default function ActiveWorkoutScreen({
     };
 
     setIsFinishModalOpen(false);
+    if (!hasCompletedSets) {
+      toast.info('Workout saved as interrupted session (0 sets completed).', 'Session Saved');
+    }
     onFinish(workoutEntry, newPRsCount);
   };
 
@@ -1783,15 +1875,17 @@ export default function ActiveWorkoutScreen({
                     className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
                         ? 'bg-accent text-white shadow-xs'
-                        : s.completed
+                        : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : s.status === 'skipped'
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                         : s.isWarmup
                         ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                         : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                     }`}
-                    title={s.isWarmup ? `Warm-up Set ${idx + 1}` : `Set ${idx + 1}`}
+                    title={s.status === 'skipped' ? `Skipped Set ${idx + 1}` : s.isWarmup ? `Warm-up Set ${idx + 1}` : `Set ${idx + 1}`}
                   >
-                    {s.completed ? '✓' : s.isWarmup ? 'W' : idx + 1}
+                    {isActiveSetCompleted(s) ? '✓' : s.status === 'skipped' ? 'S' : s.isWarmup ? 'W' : idx + 1}
                   </button>
                 ))}
                 <button
@@ -2031,13 +2125,26 @@ export default function ActiveWorkoutScreen({
                   type="button"
                   onClick={() => handleCompleteActiveSet(activeSetIdx)}
                   className={`w-full py-4 rounded-xl text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
-                    currentExercise.sets[activeSetIdx]?.completed
+                    isActiveSetCompleted(currentExercise.sets[activeSetIdx])
                       ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
                       : 'bg-accent hover:brightness-105 text-white shadow-accent/25'
                   }`}
                 >
                   <Check className="w-5 h-5 stroke-[3]" />
-                  <span>{currentExercise.sets[activeSetIdx]?.completed ? `Set ${activeSetIdx + 1} Completed` : `Complete Set ${activeSetIdx + 1}`}</span>
+                  <span>{isActiveSetCompleted(currentExercise.sets[activeSetIdx]) ? `Set ${activeSetIdx + 1} Completed` : `Complete Set ${activeSetIdx + 1}`}</span>
+                </button>
+
+                {/* Skip Set button */}
+                <button
+                  type="button"
+                  onClick={() => handleSkipSet(activeSetIdx)}
+                  className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
+                    currentExercise.sets[activeSetIdx]?.status === 'skipped'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
+                      : 'bg-transparent border-border/60 text-text-muted hover:text-text-primary hover:border-border'
+                  }`}
+                >
+                  <span>{currentExercise.sets[activeSetIdx]?.status === 'skipped' ? `Unskip Set ${activeSetIdx + 1}` : `Skip Set ${activeSetIdx + 1}`}</span>
                 </button>
               </div>
 
@@ -2090,7 +2197,11 @@ export default function ActiveWorkoutScreen({
                 >
                   {/* Set number */}
                   <div className="w-8 sm:w-12 shrink-0 flex items-center gap-1">
-                    {set.isWarmup ? (
+                    {set.status === 'skipped' ? (
+                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title="Skipped set">
+                        S{sIdx + 1}
+                      </span>
+                    ) : set.isWarmup ? (
                       <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title="Warm-up ramp set">
                         W{sIdx + 1}
                       </span>
@@ -2184,20 +2295,34 @@ export default function ActiveWorkoutScreen({
                     </button>
                   </div>
 
-
-                  {/* Checkmark Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleToggleSetComplete(sIdx)}
-                    className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
-                      set.completed
-                        ? 'bg-emerald-500 text-white shadow-sm'
-                        : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
-                    }`}
-                    aria-label={set.completed ? "Completed set" : "Mark set complete"}
-                  >
-                    <Check className={`w-4 h-4 sm:w-5 sm:h-5 stroke-[3] ${set.completed ? 'opacity-100' : 'opacity-0'}`} />
-                  </button>
+                  {/* Actions: Skip & Complete */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleSkipSet(sIdx)}
+                      className={`px-1.5 sm:px-2 py-1 rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
+                        set.status === 'skipped'
+                          ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                          : 'text-text-muted hover:text-text-primary border-transparent hover:border-border/60'
+                      }`}
+                      title={set.status === 'skipped' ? 'Set skipped (tap to unskip)' : 'Skip this set'}
+                      aria-label="Skip set"
+                    >
+                      {set.status === 'skipped' ? 'SKP' : 'Skip'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleSetComplete(sIdx)}
+                      className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                        isActiveSetCompleted(set)
+                          ? 'bg-emerald-500 text-white shadow-sm'
+                          : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
+                      }`}
+                      aria-label={isActiveSetCompleted(set) ? "Completed set" : "Mark set complete"}
+                    >
+                      <Check className={`w-4 h-4 sm:w-5 sm:h-5 stroke-[3] ${isActiveSetCompleted(set) ? 'opacity-100' : 'opacity-0'}`} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -2224,7 +2349,7 @@ export default function ActiveWorkoutScreen({
             </div>
 
             {/* Exercise Completion Auto-Advance Prompt (Advanced Mode) */}
-            {currentExercise.sets.length > 0 && currentExercise.sets.every((s) => s.completed) && (
+            {currentExercise.sets.length > 0 && currentExercise.sets.every(isActiveSetCompleted) && (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-bg-card to-accent/15 border border-emerald-500/40 flex items-center justify-between gap-3 animate-fade-in my-3 shadow-md">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
@@ -2435,7 +2560,7 @@ export default function ActiveWorkoutScreen({
             <div className="space-y-2 max-h-[60vh] overflow-y-auto no-scrollbar">
               {exercises.map((ex, idx) => {
                 const isCurrent = idx === activeExerciseIdx;
-                const completedCount = ex.sets.filter((s) => s.completed || (s.reps > 0 && (parseFloat(String(s.weight)) || 0) > 0)).length;
+                const completedCount = ex.sets.filter(isActiveSetCompleted).length;
                 const totalCount = ex.sets.length;
                 const isDone = totalCount > 0 && completedCount === totalCount;
 
@@ -2698,9 +2823,42 @@ export default function ActiveWorkoutScreen({
             {
               name: selected.name,
               sets: [
-                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
-                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
-                { weight: defaultW, reps: defaultR, unit: userUnit, completed: false, rpe: 8 },
+                {
+                  weight: defaultW,
+                  reps: defaultR,
+                  unit: userUnit,
+                  completed: false,
+                  status: 'pending',
+                  rpe: 8,
+                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedReps: defaultR,
+                  prescribedRpe: 8,
+                  prescribedUnit: userUnit,
+                },
+                {
+                  weight: defaultW,
+                  reps: defaultR,
+                  unit: userUnit,
+                  completed: false,
+                  status: 'pending',
+                  rpe: 8,
+                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedReps: defaultR,
+                  prescribedRpe: 8,
+                  prescribedUnit: userUnit,
+                },
+                {
+                  weight: defaultW,
+                  reps: defaultR,
+                  unit: userUnit,
+                  completed: false,
+                  status: 'pending',
+                  rpe: 8,
+                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedReps: defaultR,
+                  prescribedRpe: 8,
+                  prescribedUnit: userUnit,
+                },
               ],
             },
           ]);

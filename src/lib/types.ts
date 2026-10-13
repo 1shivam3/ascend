@@ -121,7 +121,10 @@ export interface PersonalRecord {
   prType?: '1rm' | 'reps';
 }
 
+export type SetExecutionStatus = 'pending' | 'completed' | 'skipped' | 'not_attempted';
+
 export interface WorkoutSet {
+  // Performed / actual execution values
   reps: number;
   weight: number;
   unit: Unit;
@@ -129,6 +132,84 @@ export interface WorkoutSet {
   rpe?: number;
   isPR?: boolean;
   isWarmup?: boolean;
+
+  // Prescribed / target values (optional for backwards compatibility with legacy records)
+  prescribedWeight?: number;
+  prescribedReps?: number;
+  prescribedRpe?: number;
+  prescribedUnit?: Unit;
+
+  // Explicit execution status (optional for backwards compatibility with legacy records)
+  status?: SetExecutionStatus;
+}
+
+/**
+ * Execution Status Resolution Precedence:
+ * ----------------------------------------
+ * 1. Explicit `status` field:
+ *    If `set.status` is provided ('completed' | 'skipped' | 'not_attempted' | 'pending'),
+ *    it takes highest priority over legacy boolean flags.
+ *
+ * 2. Legacy `completed` boolean:
+ *    If `set.status` is undefined:
+ *    - `completed === true`: resolves to 'completed'.
+ *    - `completed === false`:
+ *        - if `reps > 0`: resolves to 'pending' (planned/entered set awaiting completion).
+ *        - if `reps <= 0`: resolves to 'not_attempted'.
+ *        (Note: legacy records are never silently assumed to be 'skipped').
+ *
+ * 3. Omitted `completed` field (historical stored records):
+ *    If neither `status` nor `completed` is provided:
+ *    - `reps > 0`: resolves to 'completed' (matches existing ASCEND behavior where historical
+ *      records without `completed` but with positive reps represent logged sets).
+ *    - `reps <= 0`: resolves to 'not_attempted'.
+ */
+export function getSetExecutionStatus(set: WorkoutSet): SetExecutionStatus {
+  if (set?.status) {
+    return set.status;
+  }
+  if (set?.completed === true) {
+    return 'completed';
+  }
+  if (set?.completed === false) {
+    return (set.reps && set.reps > 0) ? 'pending' : 'not_attempted';
+  }
+  return (set?.reps && set.reps > 0) ? 'completed' : 'not_attempted';
+}
+
+/**
+ * Determines whether a set counts as successfully completed.
+ *
+ * Precedence rules:
+ * 1. If explicit `status` is present, returns true only when status === 'completed'.
+ * 2. If `status` is omitted and `completed` boolean is present, returns `set.completed`.
+ * 3. If neither is present (legacy historical records), returns true if `reps > 0`.
+ */
+export function isSetCompleted(set: WorkoutSet): boolean {
+  if (set?.status) {
+    return set.status === 'completed';
+  }
+  if (typeof set?.completed === 'boolean') {
+    return set.completed;
+  }
+  return Boolean(set?.reps && set.reps > 0);
+}
+
+/**
+ * Determines whether a set in an active workout draft or active session has been completed.
+ *
+ * Precedence rules:
+ * 1. If explicit `status` is present, returns true ONLY when status === 'completed'.
+ *    Explicit `status` of 'skipped', 'pending', or 'not_attempted' ALWAYS returns false,
+ *    even if a conflicting legacy `completed: true` flag exists.
+ * 2. If `status` is omitted, returns true ONLY when `completed === true`.
+ * 3. Never infers completion from positive reps or weights in an active draft.
+ */
+export function isActiveSetCompleted(set: WorkoutSet): boolean {
+  if (set?.status) {
+    return set.status === 'completed';
+  }
+  return set?.completed === true;
 }
 
 export interface WorkoutExercise {

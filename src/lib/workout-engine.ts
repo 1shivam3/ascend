@@ -1,7 +1,122 @@
-import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise, AthleteGoal, ATHLETE_GOAL_CONFIGS, Unit, WeeklySchedule, PersonalRecord, TrainingDecision } from './types';
+import {
+  WorkoutEntry,
+  WorkoutExercise,
+  WorkoutSet,
+  SetExecutionStatus,
+  PlannedWorkout,
+  PlannedExercise,
+  AthleteGoal,
+  ATHLETE_GOAL_CONFIGS,
+  Unit,
+  WeeklySchedule,
+  PersonalRecord,
+  TrainingDecision,
+  getSetExecutionStatus,
+  isSetCompleted,
+  isActiveSetCompleted,
+} from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad } from './strength-standards';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 import { calculateSetEffortDrift } from './lifter-twin';
+
+export {
+  getSetExecutionStatus,
+  isSetCompleted,
+  isActiveSetCompleted,
+};
+export type { SetExecutionStatus } from './types';
+
+/**
+ * Finalizes a single set for persistence in a completed or interrupted workout record.
+ *
+ * Rules:
+ * - If set is active-completed and reps > 0: status is 'completed', completed is true.
+ * - Else if status was 'skipped': status is 'skipped', completed is false.
+ * - Else: status is 'not_attempted', completed is false.
+ * - Preserves all prescription fields (prescribedWeight, prescribedReps, prescribedRpe, prescribedUnit).
+ */
+export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
+  const w = parseFloat(String(set.weight)) || 0;
+  const r = parseInt(String(set.reps), 10) || 0;
+  const isCompleted = isActiveSetCompleted(set) && r > 0;
+
+  let finalStatus: SetExecutionStatus;
+  if (isCompleted) {
+    finalStatus = 'completed';
+  } else if (set.status === 'skipped') {
+    finalStatus = 'skipped';
+  } else {
+    finalStatus = 'not_attempted';
+  }
+
+  return {
+    ...set,
+    weight: w,
+    reps: r,
+    completed: isCompleted,
+    status: finalStatus,
+  };
+}
+
+/**
+ * Checks whether a set contains meaningful data that should be preserved in workout history.
+ * Meaningful data includes:
+ * - Completed sets
+ * - Explicitly skipped sets
+ * - Prescribed sets (even if unattempted, preserving the athlete's target)
+ * - Sets with positive reps
+ *
+ * Blank/empty placeholder rows (no prescription, not skipped, not completed, 0 reps)
+ * are discarded to prevent phantom sets.
+ */
+export function shouldPreserveWorkoutSet(set: WorkoutSet): boolean {
+  const hasPrescription = set.prescribedWeight !== undefined || set.prescribedReps !== undefined;
+  return set.completed || set.status === 'skipped' || hasPrescription || (set.reps > 0);
+}
+
+/**
+ * Pure finalization engine for an entire workout session.
+ * Used by ActiveWorkoutScreen, WorkoutPage, and automated verification.
+ *
+ * Takes raw exercise entries, sanitizes exercise names, finalizes sets to their execution
+ * status ('completed', 'skipped', 'not_attempted'), preserves prescriptions, and filters
+ * out empty placeholder sets and empty exercise blocks.
+ *
+ * Returns:
+ * - `validExercises`: array of finalized exercises with preserved sets.
+ * - `hasCompletedSets`: boolean indicating whether at least one set was completed.
+ * - `hasMeaningfulData`: boolean indicating whether validExercises contains any preserved sets.
+ */
+export function finalizeWorkoutExercises(exercises: WorkoutExercise[]): {
+  validExercises: WorkoutExercise[];
+  hasCompletedSets: boolean;
+  hasMeaningfulData: boolean;
+} {
+  const validExercises = (exercises || [])
+    .map((e, idx) => {
+      const cleanName = e.name && e.name.trim().length > 0 ? e.name.trim() : `Exercise ${idx + 1}`;
+      const finalizedSets = (e.sets || [])
+        .map(finalizeWorkoutSet)
+        .filter(shouldPreserveWorkoutSet);
+
+      return {
+        ...e,
+        name: cleanName,
+        sets: finalizedSets,
+        notes: e.notes,
+      };
+    })
+    .filter((e) => e.name.length > 0 && e.sets.length > 0);
+
+  const hasCompletedSets = validExercises.some((e) => e.sets.some(isSetCompleted));
+  const hasMeaningfulData = validExercises.length > 0;
+
+  return {
+    validExercises,
+    hasCompletedSets,
+    hasMeaningfulData,
+  };
+}
 
 /**
  * Finds the most recent performance of a given exercise across past workouts.
@@ -34,7 +149,7 @@ export function getLastExercisePerformance(
     });
     if (match && match.sets.length > 0) {
       const validSets = match.sets
-        .filter((s) => s.reps > 0 && s.completed !== false)
+        .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
           if (s.unit && s.unit !== userUnit) {
@@ -466,7 +581,7 @@ export function getProgressionRecommendation(
     });
     if (match && match.sets.length > 0) {
       const validSets = match.sets
-        .filter((s) => s.reps > 0 && s.completed !== false)
+        .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
           if (s.unit && s.unit !== userUnit) {
@@ -648,17 +763,21 @@ export function getProgressionRecommendation(
   const minRepIndex = nextTargetReps.lastIndexOf(Math.min(...nextTargetReps));
   nextTargetReps[minRepIndex] = (nextTargetReps[minRepIndex] || minTargetReps) + 1;
 
-  let repRationale = `Target +1 rep compared to last session (${repList.join(', ')} → ${nextTargetReps.join(', ')}).`;
+  const repChangeDesc = repList.length > 1
+    ? `${repList.join(', ')} → ${nextTargetReps.join(', ')}`
+    : `${repList[0]} → ${nextTargetReps[0]}`;
+
+  let repRationale = `Target +1 rep compared to last session (${repChangeDesc} reps).`;
   if (isStrength) {
-    repRationale = `Weight was challenging on final set. Hold load steady at ${lastWeight}${userUnit} and aim for +1 rep (${lastReps} → ${lastReps + 1} reps) to consolidate technical bar speed before increasing weight.`;
+    repRationale = `Weight was challenging on final set. Hold load steady at ${lastWeight}${userUnit} and aim for +1 rep (${repChangeDesc} reps) to consolidate technical bar speed before increasing weight.`;
   } else if (isMuscle) {
-    repRationale = `Solid effort at ${lastWeight}${userUnit}. Accumulate volume by adding +1 rep (${lastReps} → ${lastReps + 1} reps) to maximize muscle fiber stimulation before increasing the load.`;
+    repRationale = `Solid effort at ${lastWeight}${userUnit}. Accumulate volume by adding +1 rep (${repChangeDesc} reps) to maximize muscle fiber stimulation before increasing the load.`;
   } else if (isFatLoss) {
-    repRationale = `Maintain ${lastWeight}${userUnit} today and focus on hitting +1 clean rep (${lastReps} → ${lastReps + 1} reps). Controlled volume progression preserves contractile tissue without generating excess systemic fatigue.`;
+    repRationale = `Maintain ${lastWeight}${userUnit} today and focus on hitting +1 clean rep (${repChangeDesc} reps). Controlled volume progression preserves contractile tissue without generating excess systemic fatigue.`;
   } else if (isStamina) {
-    repRationale = `Hold ${lastWeight}${userUnit} and aim for +1 extra rep (${lastReps} → ${lastReps + 1} reps) to build local muscular endurance and lactate tolerance.`;
+    repRationale = `Hold ${lastWeight}${userUnit} and aim for +1 extra rep (${repChangeDesc} reps) to build local muscular endurance and lactate tolerance.`;
   } else if (isFitness) {
-    repRationale = `Keep load at ${lastWeight}${userUnit} and target +1 rep (${lastReps} → ${lastReps + 1} reps) with smooth control and full range of motion.`;
+    repRationale = `Keep load at ${lastWeight}${userUnit} and target +1 rep (${repChangeDesc} reps) with smooth control and full range of motion.`;
   }
 
   return {

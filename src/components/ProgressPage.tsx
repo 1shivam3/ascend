@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useStore } from '@/lib/store';
+import { isSetCompleted } from '@/lib/types';
 import {
   TrendingUp,
   Dumbbell,
@@ -219,7 +220,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
     const recentWorkouts = workouts.slice(0, 10);
     const totalSets = recentWorkouts.reduce(
-      (sum, w) => sum + w.exercises.reduce((eSum, ex) => eSum + ex.sets.length, 0),
+      (sum, w) => sum + w.exercises.reduce((eSum, ex) => eSum + ex.sets.filter(isSetCompleted).length, 0),
       0
     );
 
@@ -819,15 +820,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             ) : (
               <div className="divide-y divide-border/60">
                 {workouts.slice(0, 10).map((w) => {
-                  const totalSets = w.exercises.reduce((acc, ex) => acc + ex.sets.length, 0);
+                  const totalSets = w.exercises.reduce((acc, ex) => acc + ex.sets.filter(isSetCompleted).length, 0);
                   const totalTonnage = w.exercises.reduce(
                     (sum, ex) =>
                       sum +
-                      ex.sets.reduce((sSum, s) => sSum + (s.weight || 0) * (s.reps || 0), 0),
+                      ex.sets
+                        .filter(isSetCompleted)
+                        .reduce((sSum, s) => sSum + (s.weight || 0) * (s.reps || 0), 0),
                     0
                   );
                   const allRpes = w.exercises.flatMap((e) =>
-                    e.sets.map((s) => s.rpe).filter((r): r is number => typeof r === 'number')
+                    e.sets
+                      .filter(isSetCompleted)
+                      .map((s) => s.rpe)
+                      .filter((r): r is number => typeof r === 'number')
                   );
                   const avgRpe =
                     allRpes.length > 0

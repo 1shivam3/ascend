@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
-import { AIPostWorkoutTake } from '@/lib/types';
+import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake } from '@/lib/ai-coach';
 import {
   Trophy,
@@ -64,13 +64,14 @@ export default function PostWorkoutTakeModal({
 
   const userUnit = store.profile?.unit || 'kg';
   const totalSets = useMemo(() => {
-    return completedWorkout.exercises.reduce((acc, e) => acc + e.sets.length, 0);
+    return completedWorkout.exercises.reduce((acc, e) => acc + e.sets.filter((s) => isSetCompleted(s as any)).length, 0);
   }, [completedWorkout.exercises]);
 
   const totalVolume = useMemo(() => {
     let volKg = 0;
     for (const ex of completedWorkout.exercises) {
       for (const s of ex.sets) {
+        if (!isSetCompleted(s as any)) continue;
         const w = parseFloat(String(s.weight)) || 0;
         const r = parseInt(String(s.reps), 10) || 0;
         if (r > 0 && w > 0) {
