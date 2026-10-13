@@ -285,6 +285,7 @@ export interface PlannedExercise {
   targetReps: number;
   targetWeight?: number;
   targetUnit?: Unit;
+  targetRpe?: number;
   notes?: string;
 }
 
@@ -560,4 +561,23 @@ export interface RealWorldConstraint {
   readinessOption?: 'reduce_volume' | 'cap_rpe' | 'maintain_load';
   notes?: string;
 }
+
+// ─── Training Decision Policy v0 Re-exports ──────────────────────────────────
+export type {
+  DecisionActionCategory,
+  DecisionConfidenceTier,
+  ProgressionModelType,
+  EvidenceSufficiencyTier,
+  EvidenceSufficiencyAudit,
+  RpeProgressionOverride,
+  IncrementApprovalSource,
+  IncrementConfiguration,
+  LoadIncrementStatus,
+  LoadIncrementResolution,
+  CurrentPrescriptionTarget,
+  TrainingDecisionRecord,
+  EvaluateDecisionOptions,
+  LedgerPersistenceCheck,
+} from './training-decision-policy';
+export { canPersistDecisionToLedger } from './training-decision-policy';
 
