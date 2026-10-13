@@ -1218,6 +1218,7 @@ export const useAppStore = create<AppState>()(
         goals: state.goals,
         userMode: state.userMode,
         weeklySchedule: state.weeklySchedule,
+        activeWorkoutDraft: state.activeWorkoutDraft,
       })
     }
   )

@@ -2250,6 +2250,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               );
             }
           }}
+          onPause={() => {
+            setIsModalOpen(false);
+            setExercises([]);
+            setStartedFromPlan(null);
+          }}
           onCancel={() => {
             clearWorkoutDraft();
             setIsModalOpen(false);

@@ -59,6 +59,7 @@ interface ActiveWorkoutScreenProps {
   workoutName?: string;
   onFinish: (workout: WorkoutEntry, newPRsCount: number) => void;
   onCancel: () => void;
+  onPause?: () => void;
 }
 
 function getPlateSummary(targetWeight: number, unit: 'kg' | 'lbs' = 'kg'): string | null {
@@ -90,6 +91,7 @@ export default function ActiveWorkoutScreen({
   workoutName = 'Workout Session',
   onFinish,
   onCancel,
+  onPause,
 }: ActiveWorkoutScreenProps) {
   const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions } = useStore();
   const userMode = useStore((state) => state.userMode) || 'beginner';
@@ -1521,7 +1523,11 @@ export default function ActiveWorkoutScreen({
                 savedAt: new Date().toISOString(),
               });
               toast.info('Workout saved! You can resume anytime from the Home screen.', 'Session Paused');
-              onCancel();
+              if (onPause) {
+                onPause();
+              } else {
+                onCancel();
+              }
             }}
             className="bg-bg-secondary hover:bg-bg-tertiary active:scale-95 text-text-secondary hover:text-text-primary border border-border/80 font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
             title="Pause and save workout draft to resume later"
