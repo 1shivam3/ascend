@@ -90,20 +90,20 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       expect(squatEvidence.completedPrescribedSets).toBe(3);
       expect(squatEvidence.usableRepComparisonsCount).toBe(3);
 
-      // Verify exact distribution: 1 under, 1 met, 1 exceeded
+      // Verify exact distribution: 1 below_target, 1 met_target, 1 above_target
       expect(squatEvidence.repOutcomesDistribution).toEqual({
-        under: 1,
-        met: 1,
-        exceeded: 1,
+        below_target: 1,
+        met_target: 1,
+        above_target: 1,
       });
 
       // Verify chronological sequence order
       expect(squatEvidence.exposures[0].workoutId).toBe('w-exp-1');
-      expect(squatEvidence.exposures[0].repOutcomes).toEqual({ under: 0, met: 1, exceeded: 0 });
+      expect(squatEvidence.exposures[0].repOutcomes).toEqual({ below_target: 0, met_target: 1, above_target: 0 });
       expect(squatEvidence.exposures[1].workoutId).toBe('w-exp-2');
-      expect(squatEvidence.exposures[1].repOutcomes).toEqual({ under: 1, met: 0, exceeded: 0 });
+      expect(squatEvidence.exposures[1].repOutcomes).toEqual({ below_target: 1, met_target: 0, above_target: 0 });
       expect(squatEvidence.exposures[2].workoutId).toBe('w-exp-3');
-      expect(squatEvidence.exposures[2].repOutcomes).toEqual({ under: 0, met: 0, exceeded: 1 });
+      expect(squatEvidence.exposures[2].repOutcomes).toEqual({ below_target: 0, met_target: 0, above_target: 1 });
     });
   });
 
@@ -159,7 +159,7 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       const bench = evidence.exercises[canonicalizeExerciseName('Bench Press')];
 
       expect(bench.usableLoadComparisonsCount).toBe(2);
-      expect(bench.loadOutcomesDistribution).toEqual({ under: 0, met: 0, exceeded: 2 });
+      expect(bench.loadOutcomesDistribution).toEqual({ below_target: 0, met_target: 0, above_target: 2 });
 
       // First exposure: +5 kg
       expect(bench.exposures[0].loadDeltasKg[0]).toBe(5);
@@ -199,11 +199,20 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       expect(ohp.comparablePrescribedExposures).toBe(0);
       expect(ohp.manualExposures).toBe(1);
       expect(ohp.totalPrescribedSets).toBe(0);
-      expect(ohp.extraCompletedSets).toBe(2);
+      expect(ohp.completedPrescribedSets).toBe(0);
+      expect(ohp.extraCompletedSets).toBe(0);
+      expect(ohp.manualCompletedSets).toBe(2);
+      expect(ohp.totalCompletedWorkingSets).toBe(2);
       expect(ohp.usableRepComparisonsCount).toBe(0);
       expect(ohp.usableLoadComparisonsCount).toBe(0);
       expect(ohp.averageLoadDeltaKg).toBeNull();
       expect(ohp.averageRpeDelta).toBeNull();
+
+      // Verify actual performance is fully preserved in observations
+      expect(ohp.exposures[0].workingSetObservations.length).toBe(2);
+      expect(ohp.exposures[0].workingSetObservations[0].actualWeight).toBe(50);
+      expect(ohp.exposures[0].workingSetObservations[0].actualReps).toBe(8);
+      expect(ohp.exposures[0].workingSetObservations[0].isCompleted).toBe(true);
     });
   });
 
@@ -261,11 +270,14 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       expect(dl.completedPrescribedSets).toBe(1);
       expect(dl.skippedPrescribedSets).toBe(1);
       expect(dl.notAttemptedPrescribedSets).toBe(1);
+      expect(dl.extraCompletedSets).toBe(0);
+      expect(dl.manualCompletedSets).toBe(0);
+      expect(dl.totalCompletedWorkingSets).toBe(1);
 
       // Usable comparison should only include the 1 completed set
       expect(dl.usableRepComparisonsCount).toBe(1);
       expect(dl.usableLoadComparisonsCount).toBe(1);
-      expect(dl.repOutcomesDistribution).toEqual({ under: 0, met: 1, exceeded: 0 });
+      expect(dl.repOutcomesDistribution).toEqual({ below_target: 0, met_target: 1, above_target: 0 });
     });
   });
 
@@ -311,8 +323,173 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       expect(row.totalPrescribedSets).toBe(1);
       expect(row.completedPrescribedSets).toBe(1);
       expect(row.extraCompletedSets).toBe(1);
+      expect(row.manualCompletedSets).toBe(0);
+      expect(row.totalCompletedWorkingSets).toBe(2);
       expect(row.usableRepComparisonsCount).toBe(1); // strictly 1, not 2
-      expect(row.repOutcomesDistribution).toEqual({ under: 0, met: 1, exceeded: 0 });
+      expect(row.repOutcomesDistribution).toEqual({ below_target: 0, met_target: 1, above_target: 0 });
+    });
+  });
+
+  // ─── 5B. Partially prescribed exposure ──────────────────────────────────────
+  describe('Case 5B: Partially prescribed exposure with both planned and unprescribed sets', () => {
+    it('classifies planned sets as prescribed and additional completed sets as extra without miscategorizing as manual', () => {
+      const workouts: WorkoutEntry[] = [
+        {
+          id: 'w-partial-1',
+          date: '2026-10-11T14:00:00Z',
+          exercises: [
+            {
+              name: 'Incline Dumbbell Press',
+              sets: [
+                {
+                  prescribedWeight: 30,
+                  prescribedReps: 10,
+                  prescribedUnit: 'kg',
+                  weight: 30,
+                  reps: 10,
+                  unit: 'kg',
+                  status: 'completed',
+                  completed: true,
+                },
+                {
+                  prescribedWeight: 30,
+                  prescribedReps: 10,
+                  prescribedUnit: 'kg',
+                  weight: 30,
+                  reps: 10,
+                  unit: 'kg',
+                  status: 'completed',
+                  completed: true,
+                },
+                // 3rd set unprescribed, completed during prescribed session
+                {
+                  weight: 32,
+                  reps: 8,
+                  unit: 'kg',
+                  status: 'completed',
+                  completed: true,
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const evidence = aggregateMultiSessionEvidence(workouts);
+      const inc = evidence.exercises[canonicalizeExerciseName('Incline Dumbbell Press')];
+
+      expect(inc.totalExposures).toBe(1);
+      expect(inc.comparablePrescribedExposures).toBe(1);
+      expect(inc.manualExposures).toBe(0);
+      expect(inc.totalPrescribedSets).toBe(2);
+      expect(inc.completedPrescribedSets).toBe(2);
+      expect(inc.extraCompletedSets).toBe(1);
+      expect(inc.manualCompletedSets).toBe(0);
+      expect(inc.totalCompletedWorkingSets).toBe(3);
+      expect(inc.usableRepComparisonsCount).toBe(2);
+      expect(inc.repOutcomesDistribution).toEqual({ below_target: 0, met_target: 2, above_target: 0 });
+      expect(inc.exposures[0].hasPrescriptionData).toBe(true);
+    });
+  });
+
+  // ─── 5C. Directional neutral categories for reps, load, and RPE ─────────────
+  describe('Case 5C: Neutral directional categories for reps, load, and RPE', () => {
+    it('accurately categorizes exact-match, below-target, and above-target outcomes without value judgements', () => {
+      const workouts: WorkoutEntry[] = [
+        {
+          id: 'w-neutral-categories',
+          date: '2026-10-11T18:00:00Z',
+          exercises: [
+            {
+              name: 'Military Press',
+              sets: [
+                // Set 1: Below target reps (-2), below target load (-5 kg), below target RPE (-1)
+                {
+                  prescribedWeight: 60,
+                  prescribedUnit: 'kg',
+                  prescribedReps: 10,
+                  prescribedRpe: 8,
+                  weight: 55,
+                  unit: 'kg',
+                  reps: 8,
+                  rpe: 7,
+                  status: 'completed',
+                  completed: true,
+                },
+                // Set 2: Exact match (met target) for reps (0), load (0 kg), RPE (0)
+                {
+                  prescribedWeight: 60,
+                  prescribedUnit: 'kg',
+                  prescribedReps: 10,
+                  prescribedRpe: 8,
+                  weight: 60,
+                  unit: 'kg',
+                  reps: 10,
+                  rpe: 8,
+                  status: 'completed',
+                  completed: true,
+                },
+                // Set 3: Above target reps (+2), above target load (+5 kg), above target RPE (+1)
+                {
+                  prescribedWeight: 60,
+                  prescribedUnit: 'kg',
+                  prescribedReps: 10,
+                  prescribedRpe: 8,
+                  weight: 65,
+                  unit: 'kg',
+                  reps: 12,
+                  rpe: 9,
+                  status: 'completed',
+                  completed: true,
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const evidence = aggregateMultiSessionEvidence(workouts);
+      const mp = evidence.exercises[canonicalizeExerciseName('Military Press')];
+      const obs = mp.exposures[0].workingSetObservations;
+
+      // Set 1: below_target
+      expect(obs[0].repDelta).toBe(-2);
+      expect(obs[0].repOutcome).toBe('below_target');
+      expect(obs[0].loadDeltaKg).toBe(-5);
+      expect(obs[0].loadOutcome).toBe('below_target');
+      expect(obs[0].rpeDelta).toBe(-1);
+      expect(obs[0].rpeOutcome).toBe('below_target');
+
+      // Set 2: met_target
+      expect(obs[1].repDelta).toBe(0);
+      expect(obs[1].repOutcome).toBe('met_target');
+      expect(obs[1].loadDeltaKg).toBe(0);
+      expect(obs[1].loadOutcome).toBe('met_target');
+      expect(obs[1].rpeDelta).toBe(0);
+      expect(obs[1].rpeOutcome).toBe('met_target');
+
+      // Set 3: above_target
+      expect(obs[2].repDelta).toBe(2);
+      expect(obs[2].repOutcome).toBe('above_target');
+      expect(obs[2].loadDeltaKg).toBe(5);
+      expect(obs[2].loadOutcome).toBe('above_target');
+      expect(obs[2].rpeDelta).toBe(1);
+      expect(obs[2].rpeOutcome).toBe('above_target');
+
+      // Aggregate distributions: exactly 1 below_target, 1 met_target, 1 above_target for each
+      expect(mp.repOutcomesDistribution).toEqual({ below_target: 1, met_target: 1, above_target: 1 });
+      expect(mp.loadOutcomesDistribution).toEqual({ below_target: 1, met_target: 1, above_target: 1 });
+      expect(mp.rpeOutcomesDistribution).toEqual({ below_target: 1, met_target: 1, above_target: 1 });
+
+      // Aggregate deltas preserved
+      expect(mp.loadDeltasKg).toEqual([-5, 0, 5]);
+      expect(mp.averageLoadDeltaKg).toBe(0);
+      expect(mp.minLoadDeltaKg).toBe(-5);
+      expect(mp.maxLoadDeltaKg).toBe(5);
+      expect(mp.rpeDeltas).toEqual([-1, 0, 1]);
+      expect(mp.averageRpeDelta).toBe(0);
+      expect(mp.minRpeDelta).toBe(-1);
+      expect(mp.maxRpeDelta).toBe(1);
     });
   });
 
@@ -558,8 +735,13 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
       expect(pullups.manualExposures).toBe(1);
       expect(pullups.comparablePrescribedExposures).toBe(0);
       expect(pullups.totalPrescribedSets).toBe(0);
-      expect(pullups.extraCompletedSets).toBe(2);
+      expect(pullups.completedPrescribedSets).toBe(0);
+      expect(pullups.extraCompletedSets).toBe(0);
+      expect(pullups.manualCompletedSets).toBe(2);
+      expect(pullups.totalCompletedWorkingSets).toBe(2);
       expect(pullups.usableRepComparisonsCount).toBe(0);
+      expect(pullups.exposures[0].workingSetObservations[0].actualReps).toBe(10);
+      expect(pullups.exposures[0].workingSetObservations[1].actualReps).toBe(8);
     });
   });
 

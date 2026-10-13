@@ -14,12 +14,16 @@ import {
 } from '@/lib/workout-adherence';
 
 /**
- * Outcome category for performance relative to prescribed target.
- * - 'under': actual performance was below the prescribed target.
- * - 'met': actual performance matched the prescribed target exactly.
- * - 'exceeded': actual performance was above the prescribed target.
+ * Neutral directional classification for performance relative to prescribed target.
+ * - 'below_target': actual value was below the prescribed target.
+ * - 'met_target': actual value matched the prescribed target.
+ * - 'above_target': actual value was above the prescribed target.
+ *
+ * This classification is purely descriptive and directional; it carries no qualitative
+ * or coaching judgment. For example, an RPE that is 'above_target' means the effort felt
+ * harder than planned, not that the athlete over-achieved.
  */
-export type TargetOutcome = 'under' | 'met' | 'exceeded';
+export type TargetOutcome = 'below_target' | 'met_target' | 'above_target';
 
 /**
  * Granular observation of a single set's outcome within an exposure.
@@ -70,12 +74,12 @@ export interface SetOutcomeObservation {
 }
 
 /**
- * Distribution of outcomes across sets or exposures.
+ * Distribution of directional outcomes across sets or exposures.
  */
 export interface OutcomeDistribution {
-  under: number;
-  met: number;
-  exceeded: number;
+  below_target: number;
+  met_target: number;
+  above_target: number;
 }
 
 /**
@@ -95,6 +99,8 @@ export interface ExerciseExposureEvidence {
   skippedPrescribedSets: number;
   notAttemptedPrescribedSets: number;
   extraCompletedSets: number;
+  manualCompletedSets: number;
+  totalCompletedWorkingSets: number;
 
   // Usable comparison counts for working sets
   usableRepComparisonsCount: number;
@@ -142,6 +148,8 @@ export interface ExerciseOutcomeEvidence {
   skippedPrescribedSets: number;
   notAttemptedPrescribedSets: number;
   extraCompletedSets: number;
+  manualCompletedSets: number;
+  totalCompletedWorkingSets: number;
 
   // Cumulative usable comparison counts
   usableRepComparisonsCount: number;
@@ -209,11 +217,11 @@ export function canonicalizeExerciseName(name: string): string {
 }
 
 /**
- * Classifies a delta into an outcome category ('under' | 'met' | 'exceeded').
+ * Classifies a delta into a neutral directional category ('below_target' | 'met_target' | 'above_target').
  */
 function classifyOutcome(delta: number, tolerance: number = 0.001): TargetOutcome {
-  if (Math.abs(delta) <= tolerance) return 'met';
-  return delta > 0 ? 'exceeded' : 'under';
+  if (Math.abs(delta) <= tolerance) return 'met_target';
+  return delta > 0 ? 'above_target' : 'below_target';
 }
 
 /**
@@ -276,7 +284,7 @@ export function analyzeSetOutcome(
 
   if (!isPrescribed) {
     if (completed) {
-      exclusions.push('Unprescribed extra set: target comparisons omitted');
+      exclusions.push('Unprescribed set: target comparisons omitted');
     } else {
       exclusions.push('Unprescribed uncompleted set: performance comparisons omitted');
     }
@@ -395,19 +403,24 @@ export function getExerciseExposureEvidence(
     exclusions.push('Missing workout date');
   }
 
+  // Pre-determine whether this exposure has recorded prescription context
+  // An exposure has prescription context when at least one non-warmup set has prescription targets
+  const hasPrescriptionData = sets.some((s) => !s.isWarmup && isSetPrescribed(s));
+
   let totalPrescribedSets = 0;
   let completedPrescribedSets = 0;
   let skippedPrescribedSets = 0;
   let notAttemptedPrescribedSets = 0;
   let extraCompletedSets = 0;
+  let manualCompletedSets = 0;
 
   let usableRepComparisonsCount = 0;
   let usableLoadComparisonsCount = 0;
   let usableRpeComparisonsCount = 0;
 
-  const repOutcomes: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
-  const loadOutcomes: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
-  const rpeOutcomes: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
+  const repOutcomes: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
+  const loadOutcomes: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
+  const rpeOutcomes: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
 
   const loadDeltasKg: number[] = [];
   const rpeDeltas: number[] = [];
@@ -465,14 +478,20 @@ export function getExerciseExposureEvidence(
         rpeDeltas.push(obs.rpeDelta);
       }
     } else {
-      // Extra working set
+      // Unprescribed working set
       if (obs.isCompleted) {
-        extraCompletedSets++;
+        if (hasPrescriptionData) {
+          // Exposure has planned context; this completed set was additional to the plan
+          extraCompletedSets++;
+        } else {
+          // Wholly unprescribed/manual exposure; set is part of normal manual history, not extra
+          manualCompletedSets++;
+        }
       }
     }
   }
 
-  const hasPrescriptionData = totalPrescribedSets > 0;
+  const totalCompletedWorkingSets = completedPrescribedSets + extraCompletedSets + manualCompletedSets;
 
   const averageLoadDeltaKg =
     loadDeltasKg.length > 0
@@ -496,6 +515,8 @@ export function getExerciseExposureEvidence(
     skippedPrescribedSets,
     notAttemptedPrescribedSets,
     extraCompletedSets,
+    manualCompletedSets,
+    totalCompletedWorkingSets,
     usableRepComparisonsCount,
     usableLoadComparisonsCount,
     usableRpeComparisonsCount,
@@ -529,14 +550,15 @@ export function aggregateExerciseEvidenceFromExposures(
   let skippedPrescribedSets = 0;
   let notAttemptedPrescribedSets = 0;
   let extraCompletedSets = 0;
+  let manualCompletedSets = 0;
 
   let usableRepComparisonsCount = 0;
   let usableLoadComparisonsCount = 0;
   let usableRpeComparisonsCount = 0;
 
-  const repOutcomesDistribution: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
-  const loadOutcomesDistribution: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
-  const rpeOutcomesDistribution: OutcomeDistribution = { under: 0, met: 0, exceeded: 0 };
+  const repOutcomesDistribution: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
+  const loadOutcomesDistribution: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
+  const rpeOutcomesDistribution: OutcomeDistribution = { below_target: 0, met_target: 0, above_target: 0 };
 
   const loadDeltasKg: number[] = [];
   const rpeDeltas: number[] = [];
@@ -566,22 +588,23 @@ export function aggregateExerciseEvidenceFromExposures(
     skippedPrescribedSets += exp.skippedPrescribedSets;
     notAttemptedPrescribedSets += exp.notAttemptedPrescribedSets;
     extraCompletedSets += exp.extraCompletedSets;
+    manualCompletedSets += exp.manualCompletedSets;
 
     usableRepComparisonsCount += exp.usableRepComparisonsCount;
     usableLoadComparisonsCount += exp.usableLoadComparisonsCount;
     usableRpeComparisonsCount += exp.usableRpeComparisonsCount;
 
-    repOutcomesDistribution.under += exp.repOutcomes.under;
-    repOutcomesDistribution.met += exp.repOutcomes.met;
-    repOutcomesDistribution.exceeded += exp.repOutcomes.exceeded;
+    repOutcomesDistribution.below_target += exp.repOutcomes.below_target;
+    repOutcomesDistribution.met_target += exp.repOutcomes.met_target;
+    repOutcomesDistribution.above_target += exp.repOutcomes.above_target;
 
-    loadOutcomesDistribution.under += exp.loadOutcomes.under;
-    loadOutcomesDistribution.met += exp.loadOutcomes.met;
-    loadOutcomesDistribution.exceeded += exp.loadOutcomes.exceeded;
+    loadOutcomesDistribution.below_target += exp.loadOutcomes.below_target;
+    loadOutcomesDistribution.met_target += exp.loadOutcomes.met_target;
+    loadOutcomesDistribution.above_target += exp.loadOutcomes.above_target;
 
-    rpeOutcomesDistribution.under += exp.rpeOutcomes.under;
-    rpeOutcomesDistribution.met += exp.rpeOutcomes.met;
-    rpeOutcomesDistribution.exceeded += exp.rpeOutcomes.exceeded;
+    rpeOutcomesDistribution.below_target += exp.rpeOutcomes.below_target;
+    rpeOutcomesDistribution.met_target += exp.rpeOutcomes.met_target;
+    rpeOutcomesDistribution.above_target += exp.rpeOutcomes.above_target;
 
     loadDeltasKg.push(...exp.loadDeltasKg);
     rpeDeltas.push(...exp.rpeDeltas);
@@ -593,6 +616,8 @@ export function aggregateExerciseEvidenceFromExposures(
       exclusions.push(...exp.exclusions);
     }
   }
+
+  const totalCompletedWorkingSets = completedPrescribedSets + extraCompletedSets + manualCompletedSets;
 
   const averageLoadDeltaKg =
     loadDeltasKg.length > 0
@@ -613,6 +638,7 @@ export function aggregateExerciseEvidenceFromExposures(
   const limitations = [
     'Exercises are identified and grouped strictly by exact normalized name; the current data model does not provide unique exercise UUIDs.',
     'Comparisons between exposures rely on chronological sorting of recorded session dates.',
+    'Wholly manual exposures do not have planned target data and their completed sets are reported as manual completed sets, not extra sets.',
     'No coaching instructions, deload triggers, or readiness thresholds are applied in this evidence layer.',
   ];
 
@@ -627,6 +653,8 @@ export function aggregateExerciseEvidenceFromExposures(
     skippedPrescribedSets,
     notAttemptedPrescribedSets,
     extraCompletedSets,
+    manualCompletedSets,
+    totalCompletedWorkingSets,
     usableRepComparisonsCount,
     usableLoadComparisonsCount,
     usableRpeComparisonsCount,
