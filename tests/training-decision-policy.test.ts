@@ -600,6 +600,55 @@ describe('Training Decision Policy v0 Engine (training-decision-policy.ts)', () 
       expect(decision.explanation).not.toContain('substitute');
       expect(decision.explanation).not.toContain('injury');
     });
+
+    it('holds targets under HOLD-ATHLETE-REQUEST when athlete requests hold without pain', () => {
+      const decision = evaluateTrainingDecisionPolicyV0(
+        'Barbell Back Squat',
+        { targetWeight: 100, targetReps: 8, targetSets: 3, targetUnit: 'kg' },
+        null,
+        {
+          athleteFlags: { requestHold: true },
+          stepIncrement: 2.5,
+          incrementApprovalSource: 'coach_approved',
+          rpeOverride: { athleteConfirmedReserve: true },
+        }
+      );
+
+      expect(decision.actionCategory).toBe('hold_current_target');
+      expect(decision.ruleId).toBe('HOLD-ATHLETE-REQUEST');
+      expect(decision.proposedPrescription.deltaWeight).toBe(0);
+      expect(decision.proposedPrescription.deltaReps).toBe(0);
+      expect(decision.proposedPrescription.weight).toBe(100);
+      expect(decision.proposedPrescription.reps).toBe(8);
+      expect(decision.headline).toBe('Athlete Requested Target Hold — Targets Maintained');
+      expect(decision.explanation).toContain('Athlete requested target hold');
+      expect(decision.explanation).not.toContain('pain');
+      expect(decision.explanation).not.toContain('discomfort');
+      expect(decision.explanation).not.toContain('injury');
+      expect(decision.evidenceAudit.limitations.some((l) => l.includes('Athlete explicitly requested target hold'))).toBe(true);
+    });
+
+    it('prioritizes SAFETY-01 when both reportsPain and requestHold are true and preserves both in audit', () => {
+      const decision = evaluateTrainingDecisionPolicyV0(
+        'Barbell Back Squat',
+        { targetWeight: 100, targetReps: 8, targetSets: 3, targetUnit: 'kg' },
+        null,
+        {
+          athleteFlags: { reportsPain: true, requestHold: true },
+        }
+      );
+
+      // SAFETY-01 takes precedence over hold request
+      expect(decision.actionCategory).toBe('review_required');
+      expect(decision.ruleId).toBe('SAFETY-01');
+      expect(decision.proposedPrescription.deltaWeight).toBe(0);
+      expect(decision.proposedPrescription.deltaReps).toBe(0);
+      expect(decision.headline).toContain('Athlete Discomfort Reported');
+
+      // Both reasons must be preserved in evidenceAudit.limitations
+      expect(decision.evidenceAudit.limitations.some((l) => l.includes('SAFETY-01'))).toBe(true);
+      expect(decision.evidenceAudit.limitations.some((l) => l.includes('Athlete explicitly requested target hold'))).toBe(true);
+    });
   });
 
   describe('TC-13: Non-causal phrasing assertion', () => {

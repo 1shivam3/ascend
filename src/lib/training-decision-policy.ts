@@ -167,7 +167,7 @@ export interface TrainingDecisionRecord {
   /** The mutually exclusive action category */
   actionCategory: DecisionActionCategory;
 
-  /** Exact rule identifier (e.g. 'LOAD-PROG-01', 'REP-PROG-01', 'HOLD-01', 'HOLD-RPE-UNRECORDED', 'REV-01', 'REV-INCREMENT', 'IE-01', 'SAFETY-01') */
+  /** Exact rule identifier (e.g. 'LOAD-PROG-01', 'REP-PROG-01', 'HOLD-01', 'HOLD-ATHLETE-REQUEST', 'HOLD-RPE-UNRECORDED', 'REV-01', 'REV-INCREMENT', 'IE-01', 'SAFETY-01') */
   ruleId: string;
 
   /** Transparent evidence sufficiency classification based on verified comparable exposures */
@@ -224,6 +224,12 @@ export interface TrainingDecisionRecord {
 
   /** User interaction state (always 'pending' when created) */
   status: 'pending' | 'accepted' | 'overridden' | 'dismissed';
+
+  /** Timestamp when decision was accepted by athlete */
+  acceptedAt?: string;
+
+  /** Timestamp when decision was dismissed by athlete */
+  dismissedAt?: string;
 
   /** Optional user override recorded when athlete customizes targets */
   userOverride?: {
@@ -560,6 +566,17 @@ export function evaluateTrainingDecisionPolicyV0(
     limitations.push(identityLimitation);
   }
 
+  // ── Structured Safety Signal Limitation Audit ─────────────────────────────
+  if (options?.athleteFlags?.reportsPain === true) {
+    limitations.push('Structured athlete pain or discomfort was explicitly reported for this exercise. Target progression is locked under SAFETY-01.');
+  } else {
+    limitations.push('No structured athlete pain or discomfort signal was recorded. Absence of a pain report does not constitute medical clearance or guarantee physical readiness.');
+  }
+
+  if (options?.athleteFlags?.requestHold === true) {
+    limitations.push('Athlete explicitly requested target hold. Progression is held without load or rep advancement.');
+  }
+
   const sessionTag = workoutId ? `_w_${workoutId}` : '_unanchored';
   const sessionIndexTag =
     options?.sessionIndex !== undefined ? `_s${options.sessionIndex}` : '';
@@ -736,20 +753,32 @@ export function evaluateTrainingDecisionPolicyV0(
   };
 
   // ── RULE 0: Safety & Athlete Flags ──────────────────────────────────────────
-  // A reported pain or discomfort flag locks progression unconditionally.
-  // This rule preempts all other branches and cannot be overridden by options.
+  // A reported pain or discomfort flag locks progression unconditionally under SAFETY-01.
+  // An athlete hold request maintains targets under HOLD-ATHLETE-REQUEST.
+  // If both signals are true, the pain safety rule takes precedence and the audit record preserves both reasons.
+  // These rules preempt all progression branches, approved equipment increments, and RPE overrides.
   // Explanations are non-diagnostic and do not claim unverified physiological causes.
-  if (options?.athleteFlags?.reportsPain || options?.athleteFlags?.requestHold) {
-    const isPain = Boolean(options.athleteFlags.reportsPain);
+  if (options?.athleteFlags?.reportsPain === true) {
     return buildRecord({
       actionCategory: 'review_required',
       ruleId: 'SAFETY-01',
-      headline: isPain
-        ? 'Athlete Discomfort Reported — Progression Locked'
-        : 'Athlete Flag Active — Targets Held',
-      explanation: isPain
-        ? 'Discomfort or pain was reported for this movement. Target progression is locked. Consult a qualified professional if discomfort persists.'
-        : 'Athlete requested target hold. Maintaining current load and repetitions.',
+      headline: 'Athlete Discomfort Reported — Progression Locked',
+      explanation:
+        'Discomfort or pain was reported for this movement. Target progression is locked. Consult a qualified professional if discomfort persists.',
+      proposedWeight: targetWeight,
+      proposedReps: targetReps,
+      deltaWeight: 0,
+      deltaReps: 0,
+    });
+  }
+
+  if (options?.athleteFlags?.requestHold === true) {
+    return buildRecord({
+      actionCategory: 'hold_current_target',
+      ruleId: 'HOLD-ATHLETE-REQUEST',
+      headline: 'Athlete Requested Target Hold — Targets Maintained',
+      explanation:
+        'Athlete requested target hold. Maintaining current load and repetitions without progression.',
       proposedWeight: targetWeight,
       proposedReps: targetReps,
       deltaWeight: 0,

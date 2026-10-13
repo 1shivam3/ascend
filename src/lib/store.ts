@@ -31,11 +31,24 @@ import {
   DayScheduleConfig,
   WeeklySchedule,
   isSetCompleted,
+  TrainingDecisionRecord,
+  CurrentPrescriptionTarget,
+  Unit,
+  AthleteSafetyFlags,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
+import {
+  evaluateTrainingDecisionPolicyV0,
+  canPersistDecisionToLedger,
+} from './training-decision-policy';
+import {
+  aggregateMultiSessionEvidence,
+  canonicalizeExerciseName,
+} from './workout-outcome-evidence';
+import { isSetPrescribed } from './workout-adherence';
 
 export * from './types';
 
@@ -171,6 +184,17 @@ export interface AppState {
   overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => void;
   recordTrainingDecision: (decision: TrainingDecision) => void;
   refreshLifterProfile: () => void;
+
+  // Policy v0 Decisions Ledger
+  policyDecisionRecords: Record<string, TrainingDecisionRecord>;
+  policyDecisionsLedgerHistory: TrainingDecisionRecord[];
+  acceptPolicyDecision: (id: string) => void;
+  overridePolicyDecision: (
+    id: string,
+    override?: { customWeight?: number; customReps?: number; reason?: string }
+  ) => void;
+  dismissPolicyDecision: (id: string) => void;
+  clearPolicyDecisions: () => void;
 
   clearAllData: () => void;
   logout: (options?: { clearLocalData?: boolean }) => void;
@@ -310,6 +334,10 @@ export const useAppStore = create<AppState>()(
       trainingDecisions: {},
       decisionsLedgerHistory: [],
       lifterProfile: null,
+
+      // Policy v0 Decisions Ledger State
+      policyDecisionRecords: {},
+      policyDecisionsLedgerHistory: [],
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -390,6 +418,11 @@ export const useAppStore = create<AppState>()(
       }),
 
       addWorkout: (workout) => set((state) => {
+        // Idempotency guard: If workout already exists, return current state
+        if (workout?.id && state.workouts.some((w) => w.id === workout.id)) {
+          return state;
+        }
+
         const nextWorkouts = [...state.workouts, workout];
         const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
 
@@ -448,11 +481,119 @@ export const useAppStore = create<AppState>()(
           }
         }
 
+        // ── Policy v0 Deterministic Evaluation & Ledger ──
+        const updatedPolicyRecords = { ...state.policyDecisionRecords };
+        let updatedPolicyHistory = [...state.policyDecisionsLedgerHistory];
+
+        // Build multi-session evidence summary with the newly included workout
+        const evidenceSummary = aggregateMultiSessionEvidence(nextWorkouts);
+
+        // Look for matching planned workout (if any)
+        const matchedPlan = state.plannedWorkouts.find(
+          (p) =>
+            (workout.name && p.name.trim().toLowerCase() === workout.name.trim().toLowerCase()) ||
+            p.id === workout.name
+        );
+
+        // Check for explicit, structured athlete safety flags only.
+        // Never infer pain or hold requests from unstructured free-text notes (e.g. "no pain" vs positive pain reports).
+        const workoutReportsPain =
+          workout.reportsPain === true ||
+          workout.athleteFlags?.reportsPain === true;
+        const workoutRequestHold =
+          workout.requestHold === true ||
+          workout.athleteFlags?.requestHold === true;
+
+        for (const ex of workout.exercises) {
+          if (!ex || !ex.name) continue;
+
+          const plannedEx = matchedPlan?.exercises.find(
+            (pe) =>
+              canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(ex.name)
+          );
+
+          const prescribedSets = (ex.sets || []).filter((s) => isSetPrescribed(s));
+          const hasPrescribedSets = prescribedSets.length > 0;
+          const hasPlannedEx = Boolean(plannedEx);
+
+          // If wholly manual (no prescribed sets and no planned workout exercise), skip evaluation!
+          if (!hasPrescribedSets && !hasPlannedEx) {
+            continue;
+          }
+
+          // Structured athlete safety flags: strictly check explicit boolean properties, never notes text
+          const exReportsPain =
+            workoutReportsPain ||
+            ex.reportsPain === true ||
+            ex.athleteFlags?.reportsPain === true;
+
+          const exRequestHold =
+            workoutRequestHold ||
+            ex.requestHold === true ||
+            ex.athleteFlags?.requestHold === true;
+
+          const athleteFlags: AthleteSafetyFlags | undefined =
+            exReportsPain || exRequestHold
+              ? {
+                  reportsPain: exReportsPain ? true : undefined,
+                  requestHold: exRequestHold ? true : undefined,
+                  notes: ex.athleteFlags?.notes ?? workout.athleteFlags?.notes,
+                }
+              : undefined;
+
+          const firstPrescribedSet = prescribedSets[0];
+          const targetUnit: Unit =
+            plannedEx?.targetUnit ??
+            firstPrescribedSet?.prescribedUnit ??
+            state.profile?.unit ??
+            'kg';
+
+          const currentTarget: CurrentPrescriptionTarget = {
+            name: ex.name,
+            targetWeight: plannedEx?.targetWeight ?? firstPrescribedSet?.prescribedWeight,
+            targetReps: plannedEx?.targetReps ?? firstPrescribedSet?.prescribedReps,
+            targetSets: plannedEx?.targetSets ?? (hasPrescribedSets ? prescribedSets.length : (ex.sets?.length || 1)),
+            targetUnit,
+            targetRpe: plannedEx?.targetRpe ?? firstPrescribedSet?.prescribedRpe,
+            notes: plannedEx?.notes ?? ex.notes,
+          };
+
+          const targetRepsVal = currentTarget.targetReps ?? 8;
+          const repRange = { min: targetRepsVal, max: targetRepsVal };
+
+          const policyDecision = evaluateTrainingDecisionPolicyV0(
+            ex.name,
+            currentTarget,
+            evidenceSummary,
+            {
+              workoutId: workout.id,
+              referenceDate: workout.date,
+              userUnit: targetUnit,
+              repRange,
+              athleteFlags,
+              // CRITICAL: Never pass hardcoded incrementApprovalSource or incrementConfig here.
+              // Equipment increments remain unconfigured until explicit user/coach configuration.
+            }
+          );
+
+          // Enforce Stage 2 Ledger Persistence Contract
+          const persistenceCheck = canPersistDecisionToLedger(policyDecision);
+          if (persistenceCheck.canPersist) {
+            updatedPolicyRecords[policyDecision.id] = policyDecision;
+            updatedPolicyHistory = [
+              policyDecision,
+              ...updatedPolicyHistory.filter((d) => d.id !== policyDecision.id),
+            ].slice(0, 50);
+          }
+        }
+
         return {
           workouts: nextWorkouts,
           lifterProfile: nextProfile,
           trainingDecisions: updatedDecisions,
           decisionsLedgerHistory: updatedLedger,
+          policyDecisionRecords: updatedPolicyRecords,
+          policyDecisionsLedgerHistory: updatedPolicyHistory,
         };
       }),
       deleteWorkout: (id) => set((state) => {
@@ -899,6 +1040,130 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      // Policy v0 Decisions Ledger Handlers
+      acceptPolicyDecision: (id: string) => {
+        set((state) => {
+          const existing =
+            state.policyDecisionRecords[id] ||
+            state.policyDecisionsLedgerHistory.find((d) => d.id === id);
+
+          // Transition guard: decision must exist and be in 'pending' status
+          if (!existing || existing.status !== 'pending') {
+            return state;
+          }
+
+          const updated: TrainingDecisionRecord = {
+            ...existing,
+            status: 'accepted',
+            acceptedAt: new Date().toISOString(),
+          };
+
+          const nextRecords = {
+            ...state.policyDecisionRecords,
+            [updated.id]: updated,
+          };
+
+          const nextHistory = state.policyDecisionsLedgerHistory.map((d) =>
+            d.id === updated.id ? updated : d
+          );
+          if (!state.policyDecisionsLedgerHistory.some((d) => d.id === updated.id)) {
+            nextHistory.unshift(updated);
+          }
+
+          return {
+            policyDecisionRecords: nextRecords,
+            policyDecisionsLedgerHistory: nextHistory.slice(0, 50),
+          };
+        });
+      },
+
+      overridePolicyDecision: (
+        id: string,
+        override?: { customWeight?: number; customReps?: number; reason?: string }
+      ) => {
+        set((state) => {
+          const existing =
+            state.policyDecisionRecords[id] ||
+            state.policyDecisionsLedgerHistory.find((d) => d.id === id);
+
+          // Transition guard: decision must exist and be in 'pending' status
+          if (!existing || existing.status !== 'pending') {
+            return state;
+          }
+
+          const updated: TrainingDecisionRecord = {
+            ...existing,
+            status: 'overridden',
+            userOverride: {
+              customWeight: override?.customWeight,
+              customReps: override?.customReps,
+              overrideReason: override?.reason,
+              overriddenAt: new Date().toISOString(),
+            },
+          };
+
+          const nextRecords = {
+            ...state.policyDecisionRecords,
+            [updated.id]: updated,
+          };
+
+          const nextHistory = state.policyDecisionsLedgerHistory.map((d) =>
+            d.id === updated.id ? updated : d
+          );
+          if (!state.policyDecisionsLedgerHistory.some((d) => d.id === updated.id)) {
+            nextHistory.unshift(updated);
+          }
+
+          return {
+            policyDecisionRecords: nextRecords,
+            policyDecisionsLedgerHistory: nextHistory.slice(0, 50),
+          };
+        });
+      },
+
+      dismissPolicyDecision: (id: string) => {
+        set((state) => {
+          const existing =
+            state.policyDecisionRecords[id] ||
+            state.policyDecisionsLedgerHistory.find((d) => d.id === id);
+
+          // Transition guard: decision must exist and be in 'pending' status
+          if (!existing || existing.status !== 'pending') {
+            return state;
+          }
+
+          const updated: TrainingDecisionRecord = {
+            ...existing,
+            status: 'dismissed',
+            dismissedAt: new Date().toISOString(),
+          };
+
+          const nextRecords = {
+            ...state.policyDecisionRecords,
+            [updated.id]: updated,
+          };
+
+          const nextHistory = state.policyDecisionsLedgerHistory.map((d) =>
+            d.id === updated.id ? updated : d
+          );
+          if (!state.policyDecisionsLedgerHistory.some((d) => d.id === updated.id)) {
+            nextHistory.unshift(updated);
+          }
+
+          return {
+            policyDecisionRecords: nextRecords,
+            policyDecisionsLedgerHistory: nextHistory.slice(0, 50),
+          };
+        });
+      },
+
+      clearPolicyDecisions: () => {
+        set({
+          policyDecisionRecords: {},
+          policyDecisionsLedgerHistory: [],
+        });
+      },
+
       clearAllData: () => {
         set({
           profile: null,
@@ -926,6 +1191,8 @@ export const useAppStore = create<AppState>()(
           trainingDecisions: {},
           decisionsLedgerHistory: [],
           lifterProfile: null,
+          policyDecisionRecords: {},
+          policyDecisionsLedgerHistory: [],
         });
         if (typeof window !== 'undefined') {
           try {
@@ -1028,6 +1295,13 @@ export const useAppStore = create<AppState>()(
             trainingDecisions: data.trainingDecisions || state.trainingDecisions,
             decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
             lifterProfile: data.lifterProfile || state.lifterProfile,
+            policyDecisionRecords:
+              data.policyDecisionRecords && typeof data.policyDecisionRecords === 'object'
+                ? data.policyDecisionRecords
+                : state.policyDecisionRecords,
+            policyDecisionsLedgerHistory: Array.isArray(data.policyDecisionsLedgerHistory)
+              ? data.policyDecisionsLedgerHistory
+              : state.policyDecisionsLedgerHistory,
             goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
             userMode: data.userMode || state.userMode,
             weeklySchedule: data.weeklySchedule && typeof data.weeklySchedule === 'object' ? data.weeklySchedule : state.weeklySchedule,
@@ -1215,6 +1489,8 @@ export const useAppStore = create<AppState>()(
         trainingDecisions: state.trainingDecisions,
         decisionsLedgerHistory: state.decisionsLedgerHistory,
         lifterProfile: state.lifterProfile,
+        policyDecisionRecords: state.policyDecisionRecords,
+        policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
         goals: state.goals,
         userMode: state.userMode,
         weeklySchedule: state.weeklySchedule,
@@ -1243,6 +1519,8 @@ if (typeof window !== 'undefined') {
             macroGoals: state.macroGoals,
             plannedWorkouts: state.plannedWorkouts,
             favoriteFoods: state.favoriteFoods,
+            policyDecisionRecords: state.policyDecisionRecords,
+            policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
             goals: state.goals,
             userMode: state.userMode,
             theme: state.theme,

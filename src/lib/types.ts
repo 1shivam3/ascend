@@ -212,10 +212,26 @@ export function isActiveSetCompleted(set: WorkoutSet): boolean {
   return set?.completed === true;
 }
 
+/**
+ * Structured athlete safety signals.
+ * NOTE: Not yet exposed to the athlete through the normal user interface check-in flow.
+ */
+export interface AthleteSafetyFlags {
+  reportsPain?: boolean;
+  requestHold?: boolean;
+  notes?: string;
+}
+
 export interface WorkoutExercise {
   name: string;
   sets: WorkoutSet[];
   notes?: string;
+  /** Explicit structured athlete pain/discomfort flag (never inferred from free-text notes) */
+  reportsPain?: boolean;
+  /** Explicit structured athlete target hold request (never inferred from free-text notes) */
+  requestHold?: boolean;
+  /** Explicit structured athlete safety flags for this exercise */
+  athleteFlags?: AthleteSafetyFlags;
 }
 
 export interface WorkoutEntry {
@@ -225,6 +241,12 @@ export interface WorkoutEntry {
   durationMinutes?: number;
   notes?: string;
   exercises: WorkoutExercise[];
+  /** Explicit structured athlete pain/discomfort flag for entire session */
+  reportsPain?: boolean;
+  /** Explicit structured athlete target hold request for entire session */
+  requestHold?: boolean;
+  /** Explicit structured athlete safety flags */
+  athleteFlags?: AthleteSafetyFlags;
 }
 
 export interface FoodItem {
