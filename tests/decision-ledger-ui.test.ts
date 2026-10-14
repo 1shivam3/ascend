@@ -70,9 +70,9 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
         totalPrescribedSetsEvaluated: 9,
         completedPrescribedSets: 9,
         usableRepComparisons: 9,
-        repOutcomes: { metOrExceeded: 9, withinTolerance: 0, belowPrescription: 0 },
-        loadOutcomes: { metOrExceeded: 9, withinTolerance: 0, belowPrescription: 0 },
-        rpeOutcomes: { metOrExceeded: 9, withinTolerance: 0, belowPrescription: 0 },
+        repOutcomes: { below_target: 0, met_target: 9, above_target: 0 },
+        loadOutcomes: { below_target: 0, met_target: 9, above_target: 0 },
+        rpeOutcomes: { below_target: 0, met_target: 9, above_target: 0 },
         averageLoadDeltaKg: 0,
         averageRpeDelta: 0,
         exclusions: [],
@@ -127,7 +127,7 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
   it('Requirement 2: displays current and proposed targets, and handles unconfigured initial targets', () => {
     // Normal configured targets
     const decisionConfigured = createSamplePolicyRecord({
-      currentPrescription: { weight: 90, reps: 10, unit: 'kg' },
+      currentPrescription: { weight: 90, reps: 10, sets: 3, unit: 'kg' },
       proposedPrescription: {
         weight: 92.5,
         reps: 10,
@@ -146,7 +146,7 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
 
     // Unconfigured initial target
     const decisionUnconfigured = createSamplePolicyRecord({
-      currentPrescription: { unit: 'kg' }, // weight & reps omitted
+      currentPrescription: { weight: undefined, reps: undefined, sets: 0, unit: 'kg' } as any, // weight & reps omitted
     });
     const htmlUnconfigured = renderToStaticMarkup(
       React.createElement(PolicyDecisionCard, { decision: decisionUnconfigured, userUnit: 'kg' })
@@ -175,7 +175,7 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
     );
     expect(html).toContain('ACCEPTED');
     expect(html).toContain('Target accepted on');
-    expect(html).toContain('Decision Resolved');
+    expect(html).toMatch(/Apply to Future Plan Template|Apply to Future Workout|Decision Resolved/);
     expect(html).not.toContain('Accept</button>');
   });
 
@@ -269,9 +269,9 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
         totalPrescribedSetsEvaluated: 3,
         completedPrescribedSets: 3,
         usableRepComparisons: 3,
-        repOutcomes: { metOrExceeded: 3, withinTolerance: 0, belowPrescription: 0 },
-        loadOutcomes: { metOrExceeded: 3, withinTolerance: 0, belowPrescription: 0 },
-        rpeOutcomes: { metOrExceeded: 3, withinTolerance: 0, belowPrescription: 0 },
+        repOutcomes: { below_target: 0, met_target: 3, above_target: 0 },
+        loadOutcomes: { below_target: 0, met_target: 3, above_target: 0 },
+        rpeOutcomes: { below_target: 0, met_target: 3, above_target: 0 },
         averageLoadDeltaKg: 0,
         averageRpeDelta: 0,
         exclusions: [],
@@ -325,11 +325,17 @@ describe('Decision Ledger UI & Athlete Actions (Task 3C-6)', () => {
     const legacyDecision: TrainingDecision = {
       id: 'legacy-dec-1',
       exerciseName: 'Barbell Deadlift',
-      previousPerformance: { weight: 140, reps: 5, rpe: 8.5 },
+      date: '2026-10-14',
+      programIntent: 'strength',
+      previousPerformance: { weight: 140, reps: 5, rpe: 8.5, sets: 3 },
       nextPrescription: { weight: 142.5, reps: 5, sets: 3, targetRpe: 8.5 },
+      expectedRpe: 8.5,
+      reasonType: 'progressive_overload',
+      headline: 'Candidate Load Progression (+2.5 kg)',
       deltaKg: 2.5,
+      deltaPercent: 1.8,
       explanation: 'Solid working sets with target RPE in reserve.',
-      confidenceTier: 'established',
+      confidence: 'established',
       evidenceCount: 4,
       status: 'pending',
       timestamp: '2026-10-14T10:00:00Z',

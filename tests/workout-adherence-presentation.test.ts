@@ -301,6 +301,9 @@ describe('Workout Adherence Presentation & Review Formatting (workout-adherence-
     it('displays planned target and neutral missing indicator without coercing to zero', () => {
       // Set prescribed with reps, weight, RPE, but athlete completed without logging reps or weight
       const setWithMissingActuals: WorkoutSet = {
+        reps: undefined as any,
+        weight: undefined as any,
+        unit: 'kg',
         prescribedWeight: 100,
         prescribedUnit: 'kg',
         prescribedReps: 5,
@@ -347,6 +350,9 @@ describe('Workout Adherence Presentation & Review Formatting (workout-adherence-
             name: 'Overhead Press',
             sets: [
               {
+                reps: 0,
+                weight: 0,
+                unit: 'kg',
                 prescribedWeight: 50,
                 prescribedReps: 5,
                 prescribedUnit: 'kg',
@@ -354,6 +360,9 @@ describe('Workout Adherence Presentation & Review Formatting (workout-adherence-
                 completed: false,
               },
               {
+                reps: 0,
+                weight: 0,
+                unit: 'kg',
                 prescribedWeight: 50,
                 prescribedReps: 5,
                 prescribedUnit: 'kg',

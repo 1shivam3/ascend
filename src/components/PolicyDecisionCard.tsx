@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { TrainingDecisionRecord, Unit } from '@/lib/types';
+import { TrainingDecisionRecord, Unit, validatePolicyDecisionApplication } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import {
   Check,
@@ -18,6 +18,8 @@ import {
   XCircle,
   Sliders,
   HelpCircle,
+  Calendar,
+  CheckCheck,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -30,6 +32,7 @@ export interface PolicyDecisionCardProps {
   onAccepted?: (decision: TrainingDecisionRecord) => void;
   onOverridden?: (decision: TrainingDecisionRecord) => void;
   onDismissed?: (decision: TrainingDecisionRecord) => void;
+  onApplied?: (decision: TrainingDecisionRecord) => void;
 }
 
 export default function PolicyDecisionCard({
@@ -38,13 +41,22 @@ export default function PolicyDecisionCard({
   onAccepted,
   onOverridden,
   onDismissed,
+  onApplied,
 }: PolicyDecisionCardProps) {
   const acceptPolicyDecision = useStore((state) => state.acceptPolicyDecision);
   const overridePolicyDecision = useStore((state) => state.overridePolicyDecision);
   const dismissPolicyDecision = useStore((state) => state.dismissPolicyDecision);
+  const plannedWorkouts = useStore((state) => state.plannedWorkouts);
+  const policyDecisionApplications = useStore((state) => state.policyDecisionApplications);
+  const applyPolicyDecisionToFuturePrescription = useStore(
+    (state) => state.applyPolicyDecisionToFuturePrescription
+  );
   const toast = useToast();
 
   const [isOverriding, setIsOverriding] = useState(false);
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('');
+  const [selectedExerciseIndex, setSelectedExerciseIndex] = useState<number>(0);
   const [customWeight, setCustomWeight] = useState<number>(
     decision.userOverride?.customWeight ?? decision.proposedPrescription.weight
   );
@@ -60,6 +72,102 @@ export default function PolicyDecisionCard({
   const isAccepted = decision.status === 'accepted';
   const isOverridden = decision.status === 'overridden';
   const isDismissed = decision.status === 'dismissed';
+  const isApplied = Boolean(decision.appliedAt);
+  const isApplicableAction =
+    decision.ruleId !== 'SAFETY-01' &&
+    decision.actionCategory !== 'review_required' &&
+    decision.actionCategory !== 'insufficient_evidence';
+
+  // Candidate plans containing this exercise (case-insensitive)
+  const candidatePlans = (plannedWorkouts || []).filter((p) =>
+    p.exercises.some(
+      (ex) => ex.name.trim().toLowerCase() === decision.exerciseName.trim().toLowerCase()
+    )
+  );
+
+  const currentSelectedPlan =
+    plannedWorkouts?.find((p) => p.id === selectedPlanId) || candidatePlans[0];
+
+  const matchingExercisesInSelectedPlan = currentSelectedPlan
+    ? currentSelectedPlan.exercises
+        .map((ex, idx) => ({ exercise: ex, index: idx }))
+        .filter(
+          ({ exercise }) =>
+            exercise.name.trim().toLowerCase() === decision.exerciseName.trim().toLowerCase()
+        )
+    : [];
+
+  const effectiveExerciseIndex =
+    matchingExercisesInSelectedPlan.some((m) => m.index === selectedExerciseIndex)
+      ? selectedExerciseIndex
+      : (matchingExercisesInSelectedPlan[0]?.index ?? 0);
+
+  const selectedTargetExercise = currentSelectedPlan?.exercises[effectiveExerciseIndex];
+
+  const validationResult =
+    currentSelectedPlan && selectedTargetExercise
+      ? validatePolicyDecisionApplication(
+          decision,
+          currentSelectedPlan,
+          effectiveExerciseIndex,
+          selectedTargetExercise.id,
+          policyDecisionApplications
+        )
+      : null;
+
+  const appliedPlanName =
+    decision.appliedTargetPlanName ||
+    (decision.appliedTargetPlanId
+      ? plannedWorkouts?.find((p) => p.id === decision.appliedTargetPlanId)?.name ||
+        decision.appliedTargetPlanId
+      : 'workout plan');
+
+  const handleOpenApplyModal = () => {
+    if (candidatePlans.length > 0) {
+      const first = candidatePlans[0];
+      setSelectedPlanId(first.id);
+      const firstMatch = first.exercises.findIndex(
+        (ex) => ex.name.trim().toLowerCase() === decision.exerciseName.trim().toLowerCase()
+      );
+      setSelectedExerciseIndex(firstMatch >= 0 ? firstMatch : 0);
+    } else {
+      setSelectedPlanId('');
+      setSelectedExerciseIndex(0);
+    }
+    setIsApplyModalOpen(true);
+  };
+
+  const handleConfirmApply = () => {
+    if (!currentSelectedPlan) {
+      toast.error('No target workout plan selected.', 'Application Failed');
+      return;
+    }
+
+    const res = applyPolicyDecisionToFuturePrescription({
+      decisionId: decision.id,
+      targetPlanId: currentSelectedPlan.id,
+      targetExerciseIndex: effectiveExerciseIndex,
+      targetExerciseId: selectedTargetExercise?.id,
+      actionSource: 'athlete_confirmed',
+    });
+
+    if (res.success) {
+      toast.success(res.message, 'Plan Target Updated');
+      setIsApplyModalOpen(false);
+      if (onApplied) {
+        onApplied({
+          ...decision,
+          appliedAt: res.auditRecord?.appliedAt || new Date().toISOString(),
+          appliedTargetPlanId: currentSelectedPlan.id,
+          appliedTargetExerciseName: selectedTargetExercise?.name || decision.exerciseName,
+          appliedTargetExerciseId: selectedTargetExercise?.id,
+          appliedTargetExerciseIndex: effectiveExerciseIndex,
+        });
+      }
+    } else {
+      toast.error(res.message, 'Application Failed');
+    }
+  };
 
   const handleAccept = () => {
     if (!isPending) {
@@ -177,10 +285,16 @@ export default function PolicyDecisionCard({
               <span>PENDING REVIEW</span>
             </Badge>
           )}
-          {isAccepted && (
+          {isAccepted && !isApplied && (
             <Badge variant="success" size="sm" className="flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               <span>ACCEPTED</span>
+            </Badge>
+          )}
+          {isAccepted && isApplied && (
+            <Badge variant="success" size="sm" className="flex items-center gap-1 font-mono">
+              <CheckCheck className="w-3 h-3 text-emerald-400" />
+              <span>APPLIED</span>
             </Badge>
           )}
           {isOverridden && (
@@ -475,13 +589,27 @@ export default function PolicyDecisionCard({
           <div className="text-[11px] font-mono text-text-muted">
             {isAccepted && (
               <div className="space-y-0.5">
-                <span className="text-emerald-400 font-bold flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 inline shrink-0" />
-                  Target accepted on {decision.acceptedAt ? decision.acceptedAt.split('T')[0] : 'recent review'}.
-                </span>
-                <span className="text-[10px] text-text-muted block">
-                  Recorded in ledger. Does not alter workout plans automatically.
-                </span>
+                {isApplied ? (
+                  <>
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCheck className="w-3.5 h-3.5 inline shrink-0" />
+                      Applied to plan template &apos;{appliedPlanName}&apos; on {decision.appliedAt?.split('T')[0]}.
+                    </span>
+                    <span className="text-[10px] text-text-muted block">
+                      Future sessions loaded from this plan template will use the applied targets. Completed workouts are untouched.
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 inline shrink-0" />
+                      Target accepted on {decision.acceptedAt ? decision.acceptedAt.split('T')[0] : 'recent review'}.
+                    </span>
+                    <span className="text-[10px] text-text-muted block">
+                      Recorded in ledger. Ready to apply to a future workout plan template.
+                    </span>
+                  </>
+                )}
               </div>
             )}
             {isOverridden && (
@@ -491,7 +619,7 @@ export default function PolicyDecisionCard({
                   Target manually overridden by athlete.
                 </span>
                 <span className="text-[10px] text-text-muted block">
-                  Override recorded in ledger. Does not alter workout plans automatically.
+                  Override recorded in ledger. Does not alter workout plan templates automatically.
                 </span>
               </div>
             )}
@@ -502,7 +630,7 @@ export default function PolicyDecisionCard({
                   Recommendation dismissed.
                 </span>
                 <span className="text-[10px] text-text-muted block">
-                  Existing prescriptions preserved.
+                  Existing plan templates preserved.
                 </span>
               </div>
             )}
@@ -542,6 +670,28 @@ export default function PolicyDecisionCard({
                   Dismiss
                 </Button>
               </>
+            ) : isAccepted && isApplicableAction ? (
+              isApplied ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="opacity-80 cursor-not-allowed font-mono text-emerald-400 border-emerald-500/40 text-xs"
+                  aria-disabled="true"
+                >
+                  Applied to Plan
+                </Button>
+              ) : (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleOpenApplyModal}
+                  aria-label={`Apply accepted recommendation for ${decision.exerciseName} to future workout plan template`}
+                  leftIcon={<Calendar className="w-3.5 h-3.5" />}
+                >
+                  Apply to Future Plan Template
+                </Button>
+              )
             ) : (
               <Button
                 variant="outline"
@@ -552,6 +702,227 @@ export default function PolicyDecisionCard({
               >
                 Decision Resolved
               </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Apply Recommendation to Future Workout ── */}
+      {isApplyModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={`apply-modal-title-${decision.id}`}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setIsApplyModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-lg bg-bg-card border border-border rounded-2xl shadow-2xl p-5 space-y-4 max-h-[90vh] overflow-y-auto text-left font-sans">
+            <div className="flex items-start justify-between gap-3 border-b border-border/70 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">
+                    DELIBERATE APPLICATION
+                  </span>
+                </div>
+                <h3
+                  id={`apply-modal-title-${decision.id}`}
+                  className="text-base font-black font-display text-text-primary tracking-tight mt-0.5"
+                >
+                  Apply to Future Workout Plan Template
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsApplyModalOpen(false)}
+                className="text-text-muted hover:text-text-primary p-1 rounded-md transition-colors"
+                aria-label="Close modal"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {candidatePlans.length === 0 ? (
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
+                <div className="flex items-center gap-2 font-bold text-amber-400 font-mono">
+                  <AlertTriangle className="w-4 h-4" />
+                  <span>No Matching Workout Plans Found</span>
+                </div>
+                <p className="text-text-secondary leading-relaxed">
+                  None of your saved workout plans currently contain <strong>{decision.exerciseName}</strong>.
+                </p>
+                <p className="text-text-muted text-[11px] leading-relaxed">
+                  To apply this recommendation, add <strong>{decision.exerciseName}</strong> to a planned workout in the Workouts tab first.
+                </p>
+                <div className="pt-2 flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={() => setIsApplyModalOpen(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4 text-xs">
+                {/* Plan Selector */}
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor={`select-plan-${decision.id}`}
+                    className="text-[11px] font-mono font-bold text-text-secondary block"
+                  >
+                    Select Target Workout Plan Template
+                  </label>
+                  <select
+                    id={`select-plan-${decision.id}`}
+                    value={currentSelectedPlan?.id || ''}
+                    onChange={(e) => {
+                      const newPlanId = e.target.value;
+                      setSelectedPlanId(newPlanId);
+                      const targetP = plannedWorkouts?.find((p) => p.id === newPlanId);
+                      if (targetP) {
+                        const idx = targetP.exercises.findIndex(
+                          (ex) => ex.name.trim().toLowerCase() === decision.exerciseName.trim().toLowerCase()
+                        );
+                        setSelectedExerciseIndex(idx >= 0 ? idx : 0);
+                      }
+                    }}
+                    className="w-full bg-bg-secondary border border-border rounded-xl py-2 px-3 text-xs font-mono text-text-primary outline-none focus:border-accent"
+                  >
+                    {candidatePlans.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.exercises.length} exercises)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Multiple Exercise Disambiguation (if more than 1 in plan) */}
+                {matchingExercisesInSelectedPlan.length > 1 && (
+                  <div className="space-y-1.5">
+                    <label
+                      htmlFor={`select-ex-instance-${decision.id}`}
+                      className="text-[11px] font-mono font-bold text-text-secondary block"
+                    >
+                      Select Exercise Instance in Template
+                    </label>
+                    <select
+                      id={`select-ex-instance-${decision.id}`}
+                      value={effectiveExerciseIndex}
+                      onChange={(e) => setSelectedExerciseIndex(parseInt(e.target.value, 10))}
+                      className="w-full bg-bg-secondary border border-border rounded-xl py-2 px-3 text-xs font-mono text-text-primary outline-none focus:border-accent"
+                    >
+                      {matchingExercisesInSelectedPlan.map(({ exercise, index }) => (
+                        <option key={index} value={index}>
+                          Instance #{index + 1}: {exercise.targetSets} sets × {exercise.targetReps} reps @ {exercise.targetWeight ?? 'unset'} {exercise.targetUnit || userUnit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Side-by-side Targets Comparison */}
+                <div className="grid grid-cols-2 gap-2 font-mono text-center">
+                  <div className="p-3 rounded-xl bg-bg-secondary border border-border/80">
+                    <span className="text-[9px] uppercase font-bold text-text-muted block">
+                      CURRENT TEMPLATE TARGET
+                    </span>
+                    <span className="text-sm font-bold text-text-primary block mt-1">
+                      {selectedTargetExercise?.targetWeight !== undefined
+                        ? `${selectedTargetExercise.targetWeight} ${selectedTargetExercise.targetUnit || userUnit}`
+                        : 'Unset'}{' '}
+                      × {selectedTargetExercise?.targetReps ?? '—'} reps
+                    </span>
+                    <span className="text-[10px] text-text-muted block mt-0.5">
+                      {selectedTargetExercise?.targetSets ?? 3} sets
+                      {selectedTargetExercise?.targetRpe ? ` @ RPE ${selectedTargetExercise.targetRpe}` : ''}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                    <span className="text-[9px] uppercase font-bold text-emerald-400 block">
+                      NEW TEMPLATE TARGET
+                    </span>
+                    <span className="text-sm font-black text-text-primary block mt-1">
+                      {decision.proposedPrescription.weight} {decision.proposedPrescription.unit} × {decision.proposedPrescription.reps} reps
+                    </span>
+                    <span className="text-[10px] text-emerald-400 block mt-0.5">
+                      {decision.proposedPrescription.sets} sets @ RPE {decision.proposedPrescription.targetRpe ?? 8}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progression Delta */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/70 border border-border/60 font-mono text-[11px]">
+                  <span className="text-text-muted">Target Progression:</span>
+                  <span className="font-bold text-accent">
+                    {decision.proposedPrescription.deltaWeight && decision.proposedPrescription.deltaWeight > 0
+                      ? `+${decision.proposedPrescription.deltaWeight} ${decision.proposedPrescription.unit} Load`
+                      : decision.proposedPrescription.deltaReps && decision.proposedPrescription.deltaReps > 0
+                      ? `+${decision.proposedPrescription.deltaReps} Reps`
+                      : 'Hold Target'}
+                  </span>
+                </div>
+
+                {/* Plain-Language Explanation */}
+                <div className="p-2.5 rounded-xl bg-bg-secondary/50 border border-border/50 space-y-1">
+                  <span className="text-[10px] font-mono font-bold text-text-muted uppercase block">
+                    Policy Rationale
+                  </span>
+                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                    {decision.explanation}
+                  </p>
+                </div>
+
+                {/* Validation Warnings / Blocks */}
+                {validationResult && !validationResult.valid && (
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 space-y-1 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Application Blocked</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-rose-300">
+                      {validationResult.message}
+                    </p>
+                  </div>
+                )}
+
+                {/* Already Applied Notice */}
+                {validationResult?.alreadyApplied && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1 text-xs">
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>Target Already Applied</span>
+                    </div>
+                    <p className="text-[11px] leading-relaxed text-emerald-300">
+                      This workout plan template already reflects the proposed prescription.
+                    </p>
+                  </div>
+                )}
+
+                {/* Explicit Invariant Disclaimer */}
+                <div className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/40 text-[10px] text-text-muted leading-relaxed font-mono">
+                  Deliberate Application Guard: Applying updates only the future plan template for &apos;{currentSelectedPlan?.name}&apos;. Active workout drafts, scheduled calendar events, and completed workout logs are never modified.
+                </div>
+
+                {/* Modal Actions */}
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-border/60">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsApplyModalOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!validationResult?.valid || validationResult?.alreadyApplied}
+                    onClick={handleConfirmApply}
+                    leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
+                  >
+                    Confirm & Apply to Template
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </div>

@@ -302,6 +302,7 @@ export interface MacroGoals {
 }
 
 export interface PlannedExercise {
+  id?: string;
   name: string;
   targetSets: number;
   targetReps: number;
@@ -584,6 +585,67 @@ export interface RealWorldConstraint {
   notes?: string;
 }
 
+// ─── Policy Decision Application Audit & Operations (Task 3C-7) ──────────────
+/**
+ * Immutable audit record tracking the explicit application of an accepted Policy v0 recommendation
+ * to a future workout prescription / training plan.
+ */
+export interface PolicyDecisionApplicationAudit {
+  /** Deterministic or unique identifier: e.g. "audit_app_{decisionId}_{targetPlanId}_{timestamp}" */
+  id: string;
+  decisionId: string;
+  policyVersion: '0.1.0';
+  targetPlanId: string;
+  targetPlanName: string;
+  targetExerciseId?: string;
+  targetExerciseName: string;
+  targetExerciseIndex: number;
+  previousPrescription: {
+    weight?: number;
+    reps?: number;
+    sets?: number;
+    unit?: Unit;
+    targetRpe?: number;
+  };
+  appliedPrescription: {
+    weight: number;
+    reps: number;
+    sets?: number;
+    unit: Unit;
+    targetRpe?: number;
+  };
+  appliedAt: string;
+  actionSource: 'athlete_confirmed';
+  status: 'applied';
+}
+
+export interface ApplyPolicyDecisionOptions {
+  decisionId: string;
+  targetPlanId: string;
+  targetExerciseIndex?: number;
+  targetExerciseId?: string;
+  targetExerciseName?: string;
+  actionSource?: 'athlete_confirmed';
+}
+
+export interface ApplyPolicyDecisionResult {
+  success: boolean;
+  alreadyApplied?: boolean;
+  error?: string;
+  message: string;
+  auditRecord?: PolicyDecisionApplicationAudit;
+  targetPlan?: PlannedWorkout;
+}
+
+export interface ValidateApplicationResult {
+  valid: boolean;
+  alreadyApplied?: boolean;
+  error?: string;
+  message: string;
+  targetExerciseIndex?: number;
+  targetExercise?: PlannedExercise;
+}
+
 // ─── Training Decision Policy v0 Re-exports ──────────────────────────────────
 export type {
   DecisionActionCategory,
@@ -601,5 +663,8 @@ export type {
   EvaluateDecisionOptions,
   LedgerPersistenceCheck,
 } from './training-decision-policy';
-export { canPersistDecisionToLedger } from './training-decision-policy';
+export {
+  canPersistDecisionToLedger,
+  validatePolicyDecisionApplication,
+} from './training-decision-policy';
 

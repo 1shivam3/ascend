@@ -317,7 +317,7 @@ describe('Store & Policy v0 Decision Ledger Integration (Task 3C-5)', () => {
     const decision = records[0];
     // Must NOT trigger SAFETY-01 due to keyword "pain" or "impingement"
     expect(decision.ruleId).not.toBe('SAFETY-01');
-    expect(decision.actionCategory).not.toBe('review_required' as any || decision.ruleId === 'SAFETY-01');
+    expect(decision.actionCategory).not.toBe('review_required');
     expect(decision.explanation).not.toContain('Discomfort or pain was reported');
   });
 
@@ -982,8 +982,9 @@ describe('Store & Policy v0 Decision Ledger Integration (Task 3C-5)', () => {
     useAppStore.getState().clearPolicyDecisions();
     expect(useAppStore.getState().policyDecisionRecords).toEqual({});
     expect(useAppStore.getState().policyDecisionsLedgerHistory).toEqual([]);
+    expect(useAppStore.getState().policyDecisionApplications).toEqual([]);
 
-    // 2. importAllData imports policyDecisionRecords and history
+    // 2. importAllData imports policyDecisionRecords, history, and applications
     const mockImport = {
       profile: { id: 'u1', name: 'Imported Athlete', unit: 'kg' },
       policyDecisionRecords: {
@@ -992,22 +993,41 @@ describe('Store & Policy v0 Decision Ledger Integration (Task 3C-5)', () => {
       policyDecisionsLedgerHistory: [
         { id: 'dec-imp-1', exerciseName: 'Deadlift', status: 'accepted' },
       ],
+      policyDecisionApplications: [
+        {
+          id: 'audit-imp-1',
+          decisionId: 'dec-imp-1',
+          policyVersion: '0.1.0',
+          targetPlanId: 'p-1',
+          targetPlanName: 'Plan 1',
+          targetExerciseName: 'Deadlift',
+          targetExerciseIndex: 0,
+          previousPrescription: { weight: 140, reps: 5, unit: 'kg' },
+          appliedPrescription: { weight: 145, reps: 5, unit: 'kg' },
+          appliedAt: '2026-10-14T10:00:00Z',
+          actionSource: 'athlete_confirmed',
+          status: 'applied',
+        },
+      ],
     };
 
     const success = useAppStore.getState().importAllData(mockImport);
     expect(success).toBe(true);
     expect(useAppStore.getState().policyDecisionRecords['dec-imp-1']).toBeDefined();
     expect(useAppStore.getState().policyDecisionsLedgerHistory.length).toBe(1);
+    expect(useAppStore.getState().policyDecisionApplications.length).toBe(1);
 
     // 3. Fallback resilience: importing empty data doesn't wipe state with undefined
     useAppStore.getState().importAllData({});
     expect(useAppStore.getState().policyDecisionRecords['dec-imp-1']).toBeDefined();
     expect(useAppStore.getState().policyDecisionsLedgerHistory.length).toBe(1);
+    expect(useAppStore.getState().policyDecisionApplications.length).toBe(1);
 
     // 4. clearAllData resets policy collections
     useAppStore.getState().clearAllData();
     expect(useAppStore.getState().policyDecisionRecords).toEqual({});
     expect(useAppStore.getState().policyDecisionsLedgerHistory).toEqual([]);
+    expect(useAppStore.getState().policyDecisionApplications).toEqual([]);
   });
 
   // ── Criterion 12: Legacy trainingDecisions consumers continue to function without regression ──

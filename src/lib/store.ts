@@ -35,6 +35,9 @@ import {
   CurrentPrescriptionTarget,
   Unit,
   AthleteSafetyFlags,
+  PolicyDecisionApplicationAudit,
+  ApplyPolicyDecisionOptions,
+  ApplyPolicyDecisionResult,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
@@ -43,6 +46,7 @@ import { safeRandomId } from './formatters';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
+  validatePolicyDecisionApplication,
 } from './training-decision-policy';
 import {
   aggregateMultiSessionEvidence,
@@ -188,6 +192,7 @@ export interface AppState {
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
   policyDecisionsLedgerHistory: TrainingDecisionRecord[];
+  policyDecisionApplications: PolicyDecisionApplicationAudit[];
   acceptPolicyDecision: (id: string) => void;
   overridePolicyDecision: (
     id: string,
@@ -195,6 +200,9 @@ export interface AppState {
   ) => void;
   dismissPolicyDecision: (id: string) => void;
   clearPolicyDecisions: () => void;
+  applyPolicyDecisionToFuturePrescription: (
+    options: ApplyPolicyDecisionOptions
+  ) => ApplyPolicyDecisionResult;
 
   clearAllData: () => void;
   logout: (options?: { clearLocalData?: boolean }) => void;
@@ -245,7 +253,7 @@ const DEFAULT_FAVORITE_FOODS: FavoriteFood[] = [
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       profile: null,
       prs: [],
       workouts: [],
@@ -338,6 +346,7 @@ export const useAppStore = create<AppState>()(
       // Policy v0 Decisions Ledger State
       policyDecisionRecords: {},
       policyDecisionsLedgerHistory: [],
+      policyDecisionApplications: [],
       
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
@@ -1161,7 +1170,168 @@ export const useAppStore = create<AppState>()(
         set({
           policyDecisionRecords: {},
           policyDecisionsLedgerHistory: [],
+          policyDecisionApplications: [],
         });
+      },
+
+      applyPolicyDecisionToFuturePrescription: (
+        options: ApplyPolicyDecisionOptions
+      ): ApplyPolicyDecisionResult => {
+        const state = get();
+        const { decisionId, targetPlanId, targetExerciseIndex, targetExerciseId } = options;
+
+        const decision =
+          state.policyDecisionRecords[decisionId] ||
+          state.policyDecisionsLedgerHistory.find((d) => d.id === decisionId);
+
+        if (!decision) {
+          return {
+            success: false,
+            error: 'decision_not_found',
+            message: `Decision record '${decisionId}' was not found.`,
+          };
+        }
+
+        const plan = state.plannedWorkouts.find((p) => p.id === targetPlanId);
+        if (!plan) {
+          return {
+            success: false,
+            error: 'plan_not_found',
+            message: `Target workout plan '${targetPlanId}' was not found.`,
+          };
+        }
+
+        const validation = validatePolicyDecisionApplication(
+          decision,
+          plan,
+          targetExerciseIndex,
+          targetExerciseId,
+          state.policyDecisionApplications
+        );
+
+        if (!validation.valid) {
+          return {
+            success: false,
+            error: validation.error,
+            message: validation.message,
+          };
+        }
+
+        const resolvedIndex = validation.targetExerciseIndex!;
+        const targetExercise = plan.exercises[resolvedIndex];
+
+        // If targets are already applied, handle idempotently without mutating or creating duplicate audits
+        if (validation.alreadyApplied) {
+          const existingAudit = state.policyDecisionApplications?.find(
+            (a) =>
+              a.decisionId === decision.id &&
+              a.targetPlanId === plan.id &&
+              (targetExercise.id ? a.targetExerciseId === targetExercise.id : a.targetExerciseIndex === resolvedIndex)
+          );
+          return {
+            success: true,
+            alreadyApplied: true,
+            message: validation.message,
+            auditRecord: existingAudit,
+            targetPlan: plan,
+          };
+        }
+
+        const timestamp = new Date().toISOString();
+        const auditId = `audit_app_${decision.id}_${plan.id}_${Date.now()}`;
+
+        const previousPrescription = {
+          weight: targetExercise.targetWeight,
+          reps: targetExercise.targetReps,
+          sets: targetExercise.targetSets,
+          unit: targetExercise.targetUnit,
+          targetRpe: targetExercise.targetRpe,
+        };
+
+        const appliedPrescription = {
+          weight: decision.proposedPrescription.weight,
+          reps: decision.proposedPrescription.reps,
+          sets: decision.proposedPrescription.sets ?? targetExercise.targetSets,
+          unit: decision.proposedPrescription.unit,
+          targetRpe: decision.proposedPrescription.targetRpe ?? targetExercise.targetRpe,
+        };
+
+        const auditRecord: PolicyDecisionApplicationAudit = {
+          id: auditId,
+          decisionId: decision.id,
+          policyVersion: '0.1.0',
+          targetPlanId: plan.id,
+          targetPlanName: plan.name,
+          targetExerciseId: targetExercise.id,
+          targetExerciseName: targetExercise.name,
+          targetExerciseIndex: resolvedIndex,
+          previousPrescription,
+          appliedPrescription,
+          appliedAt: timestamp,
+          actionSource: 'athlete_confirmed',
+          status: 'applied',
+        };
+
+        // Construct updated plan narrowly: preserve order, other exercises, sets, notes, metadata
+        const updatedExercises = plan.exercises.map((ex, idx) => {
+          if (idx !== resolvedIndex) return ex;
+          return {
+            ...ex,
+            targetWeight: decision.proposedPrescription.weight,
+            targetReps: decision.proposedPrescription.reps,
+            targetUnit: decision.proposedPrescription.unit,
+            targetRpe: decision.proposedPrescription.targetRpe ?? ex.targetRpe,
+            targetSets: decision.proposedPrescription.sets ?? ex.targetSets,
+          };
+        });
+
+        const updatedPlan: PlannedWorkout = {
+          ...plan,
+          exercises: updatedExercises,
+        };
+
+        const updatedPlannedWorkouts = state.plannedWorkouts.map((p) =>
+          p.id === plan.id ? updatedPlan : p
+        );
+
+        // Update decision record with application metadata
+        const updatedDecision: TrainingDecisionRecord = {
+          ...decision,
+          appliedAt: timestamp,
+          appliedTargetPlanId: plan.id,
+          appliedTargetPlanName: plan.name,
+          appliedTargetExerciseName: targetExercise.name,
+          appliedTargetExerciseId: targetExercise.id,
+          appliedTargetExerciseIndex: resolvedIndex,
+        };
+
+        const nextRecords = {
+          ...state.policyDecisionRecords,
+          [updatedDecision.id]: updatedDecision,
+        };
+
+        const nextHistory = state.policyDecisionsLedgerHistory.map((d) =>
+          d.id === updatedDecision.id ? updatedDecision : d
+        );
+        if (!state.policyDecisionsLedgerHistory.some((d) => d.id === updatedDecision.id)) {
+          nextHistory.unshift(updatedDecision);
+        }
+
+        const nextApplications = [auditRecord, ...(state.policyDecisionApplications || [])].slice(0, 100);
+
+        set({
+          plannedWorkouts: updatedPlannedWorkouts,
+          policyDecisionRecords: nextRecords,
+          policyDecisionsLedgerHistory: nextHistory.slice(0, 50),
+          policyDecisionApplications: nextApplications,
+        });
+
+        return {
+          success: true,
+          message: `Successfully applied recommendation for ${targetExercise.name} to '${plan.name}': ${decision.proposedPrescription.weight} ${decision.proposedPrescription.unit} × ${decision.proposedPrescription.reps} reps.`,
+          auditRecord,
+          targetPlan: updatedPlan,
+        };
       },
 
       clearAllData: () => {
@@ -1193,6 +1363,7 @@ export const useAppStore = create<AppState>()(
           lifterProfile: null,
           policyDecisionRecords: {},
           policyDecisionsLedgerHistory: [],
+          policyDecisionApplications: [],
         });
         if (typeof window !== 'undefined') {
           try {
@@ -1237,6 +1408,9 @@ export const useAppStore = create<AppState>()(
             trainingDecisions: {},
             decisionsLedgerHistory: [],
             lifterProfile: null,
+            policyDecisionRecords: {},
+            policyDecisionsLedgerHistory: [],
+            policyDecisionApplications: [],
           });
           if (typeof window !== 'undefined') {
             try {
@@ -1302,6 +1476,69 @@ export const useAppStore = create<AppState>()(
             policyDecisionsLedgerHistory: Array.isArray(data.policyDecisionsLedgerHistory)
               ? data.policyDecisionsLedgerHistory
               : state.policyDecisionsLedgerHistory,
+            policyDecisionApplications: Array.isArray(data.policyDecisionApplications)
+              ? data.policyDecisionApplications.filter((a: any) => {
+                  if (
+                    !a ||
+                    typeof a !== 'object' ||
+                    typeof a.id !== 'string' ||
+                    a.id.trim().length === 0 ||
+                    typeof a.decisionId !== 'string' ||
+                    a.decisionId.trim().length === 0 ||
+                    typeof a.targetPlanId !== 'string' ||
+                    a.targetPlanId.trim().length === 0 ||
+                    typeof a.targetExerciseName !== 'string' ||
+                    a.targetExerciseName.trim().length === 0 ||
+                    typeof a.targetExerciseIndex !== 'number' ||
+                    a.targetExerciseIndex < 0 ||
+                    a.status !== 'applied' ||
+                    typeof a.appliedAt !== 'string' ||
+                    isNaN(Date.parse(a.appliedAt)) ||
+                    !a.appliedPrescription ||
+                    typeof a.appliedPrescription !== 'object' ||
+                    !Number.isFinite(a.appliedPrescription.weight) ||
+                    a.appliedPrescription.weight < 0 ||
+                    !Number.isFinite(a.appliedPrescription.reps) ||
+                    a.appliedPrescription.reps <= 0
+                  ) {
+                    return false;
+                  }
+
+                  // Cross-validation: Check for mismatched decision exercise
+                  const matchedDecision =
+                    (data.policyDecisionRecords && data.policyDecisionRecords[a.decisionId]) ||
+                    (Array.isArray(data.policyDecisionsLedgerHistory) &&
+                      data.policyDecisionsLedgerHistory.find((d: any) => d && d.id === a.decisionId));
+
+                  if (
+                    matchedDecision &&
+                    matchedDecision.exerciseName &&
+                    matchedDecision.exerciseName.trim().toLowerCase() !==
+                      a.targetExerciseName.trim().toLowerCase()
+                  ) {
+                    return false;
+                  }
+
+                  // Cross-validation: Check for mismatched plan exercise
+                  const matchedPlan =
+                    Array.isArray(data.plannedWorkouts) &&
+                    data.plannedWorkouts.find((p: any) => p && p.id === a.targetPlanId);
+
+                  if (matchedPlan && Array.isArray(matchedPlan.exercises)) {
+                    const exAtIndex = matchedPlan.exercises[a.targetExerciseIndex];
+                    if (
+                      exAtIndex &&
+                      exAtIndex.name &&
+                      exAtIndex.name.trim().toLowerCase() !==
+                        a.targetExerciseName.trim().toLowerCase()
+                    ) {
+                      return false;
+                    }
+                  }
+
+                  return true;
+                })
+              : state.policyDecisionApplications,
             goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
             userMode: data.userMode || state.userMode,
             weeklySchedule: data.weeklySchedule && typeof data.weeklySchedule === 'object' ? data.weeklySchedule : state.weeklySchedule,
@@ -1438,6 +1675,11 @@ export const useAppStore = create<AppState>()(
             useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
           }
 
+          // Ensure policyDecisionApplications array is initialized if missing in legacy storage
+          if (!Array.isArray(state.policyDecisionApplications)) {
+            useAppStore.setState({ policyDecisionApplications: [] });
+          }
+
           // Initialize or refresh Lifter Twin Profile if workouts exist
           if (state.workouts && state.workouts.length > 0 && !state.lifterProfile) {
             state.refreshLifterProfile();
@@ -1491,6 +1733,7 @@ export const useAppStore = create<AppState>()(
         lifterProfile: state.lifterProfile,
         policyDecisionRecords: state.policyDecisionRecords,
         policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
+        policyDecisionApplications: state.policyDecisionApplications,
         goals: state.goals,
         userMode: state.userMode,
         weeklySchedule: state.weeklySchedule,
@@ -1521,6 +1764,7 @@ if (typeof window !== 'undefined') {
             favoriteFoods: state.favoriteFoods,
             policyDecisionRecords: state.policyDecisionRecords,
             policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
+            policyDecisionApplications: state.policyDecisionApplications,
             goals: state.goals,
             userMode: state.userMode,
             theme: state.theme,

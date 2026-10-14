@@ -13,7 +13,13 @@
  * 5. Deterministic & Idempotent: Evaluates consistently across identical inputs.
  */
 
-import { Unit, PlannedExercise } from '@/lib/types';
+import {
+  Unit,
+  PlannedExercise,
+  PlannedWorkout,
+  ValidateApplicationResult,
+  PolicyDecisionApplicationAudit,
+} from '@/lib/types';
 import {
   ExerciseOutcomeEvidence,
   ExerciseExposureEvidence,
@@ -248,6 +254,24 @@ export interface TrainingDecisionRecord {
     completedSets: number;
     predictionErrorRpe?: number;
   };
+
+  /** Timestamp when decision was explicitly applied to a future prescription */
+  appliedAt?: string;
+
+  /** ID of the planned workout template where decision was applied */
+  appliedTargetPlanId?: string;
+
+  /** Name of the planned workout template where decision was applied */
+  appliedTargetPlanName?: string;
+
+  /** Name of the target exercise in the plan where decision was applied */
+  appliedTargetExerciseName?: string;
+
+  /** Stable ID of the target exercise in the plan where decision was applied, if available */
+  appliedTargetExerciseId?: string;
+
+  /** Index of the target exercise in the plan where decision was applied */
+  appliedTargetExerciseIndex?: number;
 }
 
 /**
@@ -1015,4 +1039,426 @@ export function evaluateTrainingDecisionPolicyV0(
     deltaWeight: 0,
     deltaReps: 0,
   });
+}
+
+/**
+ * Validates whether an accepted Policy v0 decision can be safely and deterministically applied
+ * to a selected future workout plan template.
+ */
+export function validatePolicyDecisionApplication(
+  decision: TrainingDecisionRecord,
+  plan: PlannedWorkout,
+  exerciseIndex?: number,
+  exerciseId?: string,
+  existingApplications?: PolicyDecisionApplicationAudit[]
+): ValidateApplicationResult {
+  if (!decision) {
+    return {
+      valid: false,
+      error: 'invalid_decision',
+      message: 'Decision record is missing or invalid.',
+    };
+  }
+
+  // 1. Status requirements: Only accepted decisions are eligible for application
+  if (decision.status === 'pending') {
+    return {
+      valid: false,
+      error: 'decision_not_accepted',
+      message: 'Cannot apply a pending recommendation. The athlete must accept the recommendation before applying it to future prescriptions.',
+    };
+  }
+
+  if (decision.status === 'overridden') {
+    return {
+      valid: false,
+      error: 'decision_overridden',
+      message: 'Cannot automatically apply system proposed targets for an overridden decision.',
+    };
+  }
+
+  if (decision.status === 'dismissed') {
+    return {
+      valid: false,
+      error: 'decision_dismissed',
+      message: 'Dismissed decisions cannot be applied to future prescriptions.',
+    };
+  }
+
+  if (decision.status !== 'accepted') {
+    return {
+      valid: false,
+      error: 'invalid_status',
+      message: `Decisions with status '${decision.status}' cannot be applied.`,
+    };
+  }
+
+  // 2. Safety and review locks
+  if (decision.ruleId === 'SAFETY-01') {
+    return {
+      valid: false,
+      error: 'safety_locked',
+      message: 'Cannot apply recommendations under active pain safety lock (SAFETY-01).',
+    };
+  }
+
+  if (decision.ruleId === 'HOLD-ATHLETE-REQUEST') {
+    return {
+      valid: false,
+      error: 'athlete_hold_requested',
+      message: 'Cannot apply recommendations under active athlete hold request.',
+    };
+  }
+
+  if (decision.ruleId === 'REV-INCREMENT') {
+    return {
+      valid: false,
+      error: 'unresolved_increment',
+      message: 'Cannot apply recommendation with unconfigured or unapproved load increment.',
+    };
+  }
+
+  if (decision.ruleId === 'HOLD-RPE-UNRECORDED') {
+    return {
+      valid: false,
+      error: 'rpe_unrecorded',
+      message: 'Cannot apply progression recommendation when effort was unrecorded and no RPE override was authorized.',
+    };
+  }
+
+  if (decision.actionCategory === 'review_required') {
+    return {
+      valid: false,
+      error: 'review_required',
+      message: 'Recommendations requiring review cannot be applied until explicitly resolved.',
+    };
+  }
+
+  if (decision.actionCategory === 'insufficient_evidence') {
+    return {
+      valid: false,
+      error: 'insufficient_evidence',
+      message: 'Recommendations with insufficient evidence cannot be applied.',
+    };
+  }
+
+  // 2b. External load increment provenance and rule validation
+  if (decision.actionCategory === 'candidate_load_progression') {
+    if (decision.ruleId !== 'LOAD-PROG-01') {
+      return {
+        valid: false,
+        error: 'unresolved_increment',
+        message: 'External load progression requires verified rule approval (LOAD-PROG-01).',
+      };
+    }
+    if (
+      decision.evidenceAudit?.limitations?.some(
+        (l) =>
+          l.toLowerCase().includes('unconfigured') ||
+          l.toLowerCase().includes('unverified increment')
+      )
+    ) {
+      return {
+        valid: false,
+        error: 'unresolved_increment',
+        message: 'Cannot apply recommendation with unconfigured or unapproved load increment.',
+      };
+    }
+  }
+
+  // 2c. Single-target application guard (Plan-level check):
+  // Check decision metadata and application audit ledger records.
+  // Validate that any audit record matches this decision's canonical exercise.
+  const canonicalDecisionKey = canonicalizeExerciseName(decision.exerciseName);
+  const priorAudit = existingApplications?.find(
+    (a) =>
+      a.decisionId === decision.id &&
+      a.status === 'applied' &&
+      canonicalizeExerciseName(a.targetExerciseName) === canonicalDecisionKey
+  );
+  const isPreviouslyApplied = Boolean(
+    decision.appliedAt ||
+    decision.appliedTargetPlanId ||
+    priorAudit
+  );
+  const priorPlanId = decision.appliedTargetPlanId ?? priorAudit?.targetPlanId;
+  const priorPlanName = decision.appliedTargetPlanName ?? priorAudit?.targetPlanName ?? priorPlanId;
+
+  if (isPreviouslyApplied && priorPlanId && plan && priorPlanId !== plan.id) {
+    return {
+      valid: false,
+      error: 'already_applied_to_other_target',
+      message: `This recommendation has already been applied to workout plan template '${priorPlanName}'. A decision cannot be applied to multiple distinct plan templates.`,
+    };
+  }
+
+  // 3. Proposed prescription validity
+  if (!decision.proposedPrescription) {
+    return {
+      valid: false,
+      error: 'missing_proposed_prescription',
+      message: 'Decision record contains no proposed prescription targets.',
+    };
+  }
+
+  const { weight: propWeight, reps: propReps, deltaWeight, deltaReps } = decision.proposedPrescription;
+  if (!Number.isFinite(propWeight) || propWeight < 0 || !Number.isFinite(propReps) || propReps <= 0) {
+    return {
+      valid: false,
+      error: 'invalid_proposed_values',
+      message: 'Proposed prescription values are non-finite or negative.',
+    };
+  }
+
+  if (deltaWeight < 0 || (deltaWeight === 0 && deltaReps < 0)) {
+    return {
+      valid: false,
+      error: 'invalid_progression_delta',
+      message: 'Progression deltas cannot regress load or volume without explicit deload authorization.',
+    };
+  }
+
+  // 4. Target plan validity
+  if (!plan || !Array.isArray(plan.exercises) || plan.exercises.length === 0) {
+    return {
+      valid: false,
+      error: 'empty_plan',
+      message: 'Selected workout plan contains no exercises.',
+    };
+  }
+
+  // 5. Target exercise resolution
+  let resolvedIndex: number = -1;
+
+  if (exerciseId) {
+    resolvedIndex = plan.exercises.findIndex((e) => e.id === exerciseId);
+    if (resolvedIndex === -1) {
+      return {
+        valid: false,
+        error: 'exercise_not_found',
+        message: `Exercise with ID '${exerciseId}' not found in the selected plan.`,
+      };
+    }
+    const ex = plan.exercises[resolvedIndex];
+    if (canonicalizeExerciseName(ex.name) !== canonicalDecisionKey) {
+      return {
+        valid: false,
+        error: 'exercise_mismatch',
+        message: `Selected exercise '${ex.name}' does not match decision exercise '${decision.exerciseName}'.`,
+      };
+    }
+  } else if (exerciseIndex !== undefined) {
+    if (exerciseIndex < 0 || exerciseIndex >= plan.exercises.length) {
+      return {
+        valid: false,
+        error: 'invalid_exercise_index',
+        message: `Exercise index ${exerciseIndex} is out of bounds for the selected plan.`,
+      };
+    }
+    const ex = plan.exercises[exerciseIndex];
+    if (canonicalizeExerciseName(ex.name) !== canonicalDecisionKey) {
+      return {
+        valid: false,
+        error: 'exercise_mismatch',
+        message: `Exercise at index ${exerciseIndex} ('${ex.name}') does not match decision exercise '${decision.exerciseName}'.`,
+      };
+    }
+    resolvedIndex = exerciseIndex;
+  } else {
+    // Find all matching exercises in the plan by canonical name
+    const matches: number[] = [];
+    plan.exercises.forEach((e, idx) => {
+      if (canonicalizeExerciseName(e.name) === canonicalDecisionKey) {
+        matches.push(idx);
+      }
+    });
+
+    if (matches.length === 0) {
+      return {
+        valid: false,
+        error: 'exercise_not_found',
+        message: `No exercise matching '${decision.exerciseName}' found in workout plan '${plan.name}'.`,
+      };
+    }
+
+    if (matches.length > 1) {
+      return {
+        valid: false,
+        error: 'ambiguous_target',
+        message: `Multiple exercises matching '${decision.exerciseName}' found in workout plan '${plan.name}'. An explicit exercise index or ID must be specified.`,
+      };
+    }
+
+    resolvedIndex = matches[0];
+  }
+
+  const targetEx = plan.exercises[resolvedIndex];
+
+  // 5b. Single-target application guard (Exercise-level check within the same plan):
+  // A policy decision may be applied to exactly one target, identified by:
+  // - Decision ID
+  // - Target plan/template ID
+  // - Stable exercise ID when available
+  // - Exercise index as a fallback when stable IDs are unavailable
+  const priorExerciseId = decision.appliedTargetExerciseId ?? priorAudit?.targetExerciseId;
+  const priorExerciseIndex = decision.appliedTargetExerciseIndex ?? priorAudit?.targetExerciseIndex;
+  const priorExerciseName = decision.appliedTargetExerciseName ?? priorAudit?.targetExerciseName;
+
+  if (isPreviouslyApplied && priorPlanId === plan.id) {
+    // If stable exercise IDs exist on both prior application and target exercise, compare IDs:
+    if (priorExerciseId !== undefined && targetEx.id !== undefined) {
+      if (targetEx.id !== priorExerciseId) {
+        return {
+          valid: false,
+          error: 'already_applied_to_other_target',
+          message: `This recommendation has already been applied to exercise '${priorExerciseName || 'exercise'}' (ID: ${priorExerciseId}) in workout plan template '${plan.name}'. A decision cannot be applied to a different exercise target or instance in the same plan.`,
+        };
+      }
+    } else if (
+      priorExerciseIndex !== undefined &&
+      priorExerciseIndex !== resolvedIndex &&
+      !(priorExerciseId !== undefined && targetEx.id !== undefined && targetEx.id === priorExerciseId)
+    ) {
+      // Fallback: If stable exercise IDs are not both available, compare exercise index:
+      return {
+        valid: false,
+        error: 'already_applied_to_other_target',
+        message: `This recommendation has already been applied to exercise instance at index ${priorExerciseIndex} ('${priorExerciseName || 'exercise'}') in workout plan template '${plan.name}'. A decision cannot be applied to a second instance or different exercise target in the same plan.`,
+      };
+    }
+  }
+
+  // 6. Idempotency vs Coincidence:
+  // Genuine idempotent re-application requires that THIS decision was actually recorded
+  // as applied to THIS EXACT target (plan ID and exercise ID / index),
+  // AND that the target plan prescription still matches the proposed prescription.
+  const isRecordedAppliedToThisTarget =
+    isPreviouslyApplied &&
+    priorPlanId === plan.id &&
+    (priorExerciseId !== undefined && targetEx.id !== undefined
+      ? targetEx.id === priorExerciseId
+      : priorExerciseIndex !== undefined
+      ? priorExerciseIndex === resolvedIndex
+      : Boolean(
+          decision.appliedTargetExerciseName &&
+          canonicalizeExerciseName(decision.appliedTargetExerciseName) === canonicalDecisionKey
+        ));
+
+  const isWeightMatchingProposed =
+    targetEx.targetWeight !== undefined &&
+    targetEx.targetWeight === propWeight;
+  const isRepsMatchingProposed =
+    targetEx.targetReps !== undefined &&
+    targetEx.targetReps === propReps;
+  const isUnitMatchingProposed =
+    !targetEx.targetUnit ||
+    !decision.proposedPrescription.unit ||
+    targetEx.targetUnit === decision.proposedPrescription.unit;
+  const isSetsMatchingProposed =
+    decision.proposedPrescription.sets === undefined ||
+    targetEx.targetSets === undefined ||
+    targetEx.targetSets === decision.proposedPrescription.sets;
+  const isRpeMatchingProposed =
+    decision.proposedPrescription.targetRpe === undefined ||
+    targetEx.targetRpe === undefined ||
+    targetEx.targetRpe === decision.proposedPrescription.targetRpe;
+
+  if (
+    isRecordedAppliedToThisTarget &&
+    isWeightMatchingProposed &&
+    isRepsMatchingProposed &&
+    isUnitMatchingProposed &&
+    isSetsMatchingProposed &&
+    isRpeMatchingProposed
+  ) {
+    return {
+      valid: true,
+      alreadyApplied: true,
+      targetExerciseIndex: resolvedIndex,
+      targetExercise: targetEx,
+      message: `Decision targets (${propWeight} ${decision.proposedPrescription.unit} × ${propReps} reps) are already applied to this workout plan template.`,
+    };
+  }
+
+  // 7. Unit Consistency Check
+  if (
+    targetEx.targetUnit &&
+    decision.currentPrescription.unit &&
+    targetEx.targetUnit !== decision.currentPrescription.unit
+  ) {
+    return {
+      valid: false,
+      error: 'unit_mismatch',
+      message: `Workout plan unit (${targetEx.targetUnit}) does not match decision prescription unit (${decision.currentPrescription.unit}).`,
+    };
+  }
+
+  // 8. Stale Target Protection across all prescription fields:
+  // Reject application if target load, reps, sets, RPE, or unit have drifted from decision baseline.
+  if (
+    decision.currentPrescription.weight !== undefined &&
+    targetEx.targetWeight !== undefined &&
+    targetEx.targetWeight !== decision.currentPrescription.weight
+  ) {
+    return {
+      valid: false,
+      error: 'stale_prescription',
+      message: `stale_prescription: target load drifted from baseline ${decision.currentPrescription.weight} ${decision.currentPrescription.unit} to ${targetEx.targetWeight} ${targetEx.targetUnit || 'kg'}. Cannot apply stale recommendation.`,
+    };
+  }
+
+  if (
+    decision.currentPrescription.reps !== undefined &&
+    targetEx.targetReps !== undefined &&
+    targetEx.targetReps !== decision.currentPrescription.reps
+  ) {
+    return {
+      valid: false,
+      error: 'stale_prescription',
+      message: `stale_prescription: target reps drifted from baseline ${decision.currentPrescription.reps} reps to ${targetEx.targetReps} reps. Cannot apply stale recommendation.`,
+    };
+  }
+
+  if (
+    decision.currentPrescription.sets !== undefined &&
+    targetEx.targetSets !== undefined &&
+    targetEx.targetSets !== decision.currentPrescription.sets
+  ) {
+    return {
+      valid: false,
+      error: 'stale_prescription',
+      message: `stale_prescription: target sets drifted from baseline ${decision.currentPrescription.sets} sets to ${targetEx.targetSets} sets. Cannot apply stale recommendation.`,
+    };
+  }
+
+  if (
+    decision.currentPrescription.targetRpe !== undefined &&
+    targetEx.targetRpe !== undefined &&
+    targetEx.targetRpe !== decision.currentPrescription.targetRpe
+  ) {
+    return {
+      valid: false,
+      error: 'stale_prescription',
+      message: `stale_prescription: target RPE drifted from baseline RPE ${decision.currentPrescription.targetRpe} to RPE ${targetEx.targetRpe}. Cannot apply stale recommendation.`,
+    };
+  }
+
+  if (
+    decision.currentPrescription.unit !== undefined &&
+    targetEx.targetUnit !== undefined &&
+    targetEx.targetUnit !== decision.currentPrescription.unit
+  ) {
+    return {
+      valid: false,
+      error: 'stale_prescription',
+      message: `stale_prescription: target unit drifted from baseline ${decision.currentPrescription.unit} to ${targetEx.targetUnit}. Cannot apply stale recommendation.`,
+    };
+  }
+
+  return {
+    valid: true,
+    targetExerciseIndex: resolvedIndex,
+    targetExercise: targetEx,
+    message: 'Valid for application.',
+  };
 }

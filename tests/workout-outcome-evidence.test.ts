@@ -624,7 +624,7 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
                   // missing prescribedRpe and actual rpe
                   status: 'completed',
                   completed: true,
-                },
+                } as unknown as WorkoutSet,
               ],
             },
           ],
@@ -662,6 +662,9 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
               name: 'Leg Press',
               sets: [
                 {
+                  reps: 0,
+                  weight: 0,
+                  unit: 'kg',
                   prescribedWeight: 200,
                   prescribedReps: 10,
                   prescribedUnit: 'kg',
@@ -669,6 +672,9 @@ describe('Multi-Session Training Outcome Evidence Engine (workout-outcome-eviden
                   completed: false,
                 },
                 {
+                  reps: 0,
+                  weight: 0,
+                  unit: 'kg',
                   prescribedWeight: 200,
                   prescribedReps: 10,
                   prescribedUnit: 'kg',
