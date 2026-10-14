@@ -156,12 +156,13 @@ export default function PrivacyPage() {
           </h2>
           <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-xs text-text-secondary space-y-2">
             <p className="text-2xs">
-              Google Play requires clear disclosure of how users can request or execute complete deletion of their data. In ASCEND:
+              Google Play requires clear disclosure of how users can request or execute complete deletion of their account and data. In ASCEND:
             </p>
-            <ul className="list-disc list-inside text-2xs space-y-1 pl-1">
-              <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Data Vault &rarr; Wipe All Data</em>. This action immediately and irrevocably deletes your profile, all workout sessions, PRs, nutrition history, and cached AI keys from device storage.</li>
-              <li><strong>No Remote Retention:</strong> Because ASCEND does not store user profiles on cloud databases, wiping your device data leaves zero residual traces on any server.</li>
-              <li><strong>Manual Support Inquiries:</strong> If you have questions regarding data deletion or privacy inquiries, contact our development team directly at <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">support@ascendfit.app</a>.</li>
+            <ul className="list-disc list-inside text-2xs space-y-1.5 pl-1">
+              <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Account &amp; Privacy &rarr; Delete My Account</em>. This immediately and permanently deletes your Supabase cloud account, all synchronized workout, PR, meal, and biometric records, and wipes all device storage.</li>
+              <li><strong>External Web Deletion Portal:</strong> In compliance with Google Play Data Safety requirements, you can also initiate deletion without having the app installed via our dedicated <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>.</li>
+              <li><strong>Zero Retention Policy:</strong> Wiping or requesting deletion results in immediate 0-day erasure across cloud databases and authentication directories.</li>
+              <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">support@ascendfit.app</a>.</li>
             </ul>
           </div>
         </section>

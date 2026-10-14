@@ -26,5 +26,6 @@ export function useSupabaseSync() {
     sendEmailOtp: (email: string) => syncEngine.sendEmailOtp(email),
     verifyEmailOtp: (email: string, token: string) => syncEngine.verifyEmailOtp(email, token),
     signOut: (options?: { clearLocalData?: boolean }) => syncEngine.signOut(options),
+    deleteAccount: () => syncEngine.deleteAccount(),
   };
 }

@@ -689,3 +689,65 @@ export {
   validatePolicyDecisionApplication,
 } from './training-decision-policy';
 
+// ─── Notification & Reminder Preferences (Play Store compliant) ──────────────
+export interface NotificationPreferences {
+  enabled: boolean;
+  waterReminders: {
+    enabled: boolean;
+    intervalHours: number; // 1, 2, or 3
+  };
+  mealReminders: {
+    enabled: boolean;
+    breakfastTime: string;
+    lunchTime: string;
+    dinnerTime: string;
+  };
+  workoutReminders: {
+    enabled: boolean;
+    preferredTime: string;
+    daysOfWeek: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+  };
+  weeklyReport: {
+    enabled: boolean;
+    reportDay: 'saturday' | 'sunday' | 'monday';
+    reportTime: string;
+  };
+  quietHours: {
+    enabled: boolean;
+    start: string;
+    end: string;
+  };
+  lockScreenPrivacy: boolean;
+}
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  enabled: false,
+  waterReminders: {
+    enabled: false,
+    intervalHours: 2,
+  },
+  mealReminders: {
+    enabled: false,
+    breakfastTime: '08:00',
+    lunchTime: '13:00',
+    dinnerTime: '19:30',
+  },
+  workoutReminders: {
+    enabled: false,
+    preferredTime: '17:30',
+    daysOfWeek: [1, 2, 4, 5],
+  },
+  weeklyReport: {
+    enabled: false,
+    reportDay: 'sunday',
+    reportTime: '10:00',
+  },
+  quietHours: {
+    enabled: true,
+    start: '22:00',
+    end: '07:00',
+  },
+  lockScreenPrivacy: true,
+};
+
+

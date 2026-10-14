@@ -140,7 +140,7 @@ export default function LegalHubModal({
               </p>
             </div>
 
-            <div className="pt-2 flex justify-between items-center text-2xs border-t border-border/60">
+            <div className="pt-2 flex flex-wrap justify-between items-center gap-2 text-2xs border-t border-border/60">
               <Link
                 href="/privacy"
                 target="_blank"
@@ -148,6 +148,15 @@ export default function LegalHubModal({
                 className="text-accent hover:underline flex items-center gap-1"
               >
                 <span>Read Full Privacy Policy</span>
+                <ExternalLink className="w-3 h-3" />
+              </Link>
+              <Link
+                href="/delete-account"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-danger hover:underline flex items-center gap-1 font-mono"
+              >
+                <span>Delete Account &amp; Data</span>
                 <ExternalLink className="w-3 h-3" />
               </Link>
             </div>

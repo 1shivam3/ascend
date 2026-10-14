@@ -22,6 +22,10 @@ import {
   CheckCircle2,
   AlertCircle,
   MessageSquare,
+  Bell,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -32,6 +36,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import AuthModal from '@/components/AuthModal';
 import FeedbackModal from '@/components/FeedbackModal';
+import ReminderCenterModal from '@/components/ReminderCenterModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import { Button } from '@/components/ui/Button';
@@ -61,7 +66,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Cloud Sync (Supabase)
-  const { status: syncStatus, lastSyncedAt, error: syncError, syncNow, user, signOut } = useSupabaseSync();
+  const {
+    status: syncStatus,
+    lastSyncedAt,
+    error: syncError,
+    syncNow,
+    user,
+    signOut,
+    deleteAccount,
+  } = useSupabaseSync();
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Sub-modal states
@@ -70,6 +83,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [isLegalHubOpen, setIsLegalHubOpen] = useState(false);
   const [isBodyMetricsOpen, setIsBodyMetricsOpen] = useState(false);
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+  const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
 
   React.useEffect(() => {
@@ -143,6 +160,36 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
     logout({ clearLocalData: false });
     toast.info('Logged out. Switched to welcome screen.', 'Logged Out');
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') {
+      toast.error('Please type DELETE to confirm.', 'Confirmation Required');
+      return;
+    }
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteAccount();
+      if (result.success) {
+        setShowDeleteAccountModal(false);
+        onClose();
+        toast.success(
+          'Your ASCEND account and all associated cloud and device data have been permanently deleted.',
+          'Account Eradicated'
+        );
+      } else {
+        toast.info(
+          result.error || 'Cloud sync was offline, but all local device data was purged.',
+          'Data Purged'
+        );
+        setShowDeleteAccountModal(false);
+        onClose();
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to complete account deletion.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -419,10 +466,76 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 4: Data Vault & Manual Backup */}
+          {/* Section 4: Account & Privacy */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              4. Device Data Vault &amp; Manual JSON
+              4. Account &amp; Privacy
+            </span>
+
+            <Card variant="default" padding="sm" className="divide-y divide-border/60">
+              {/* Export my data */}
+              <div className="py-2.5 flex items-center justify-between px-1">
+                <div className="flex items-center gap-2.5">
+                  <Download className="w-4 h-4 text-accent" />
+                  <div>
+                    <span className="text-xs font-semibold text-text-primary block">Export my data</span>
+                    <span className="text-2xs text-text-muted">Download a backup before leaving.</span>
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDirectExport}
+                  className="shrink-0 text-2xs px-2.5 py-1"
+                >
+                  Export
+                </Button>
+              </div>
+
+              {/* Notification preferences */}
+              <button
+                type="button"
+                onClick={() => setIsReminderCenterOpen(true)}
+                className="w-full py-2.5 min-h-[44px] flex items-center justify-between text-left cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Bell className="w-4 h-4 text-accent" />
+                  <div>
+                    <span className="text-xs font-semibold text-text-primary block">Notification preferences</span>
+                    <span className="text-2xs text-text-muted">Manage reminders and reports.</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+
+              {/* Delete my account */}
+              <div className="py-2.5 flex items-center justify-between px-1">
+                <div className="flex items-center gap-2.5">
+                  <Trash2 className="w-4 h-4 text-danger" />
+                  <div>
+                    <span className="text-xs font-semibold text-danger block">Delete my account</span>
+                    <span className="text-2xs text-text-muted">Permanently delete your ASCEND account and associated data.</span>
+                  </div>
+                </div>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    setDeleteConfirmText('');
+                    setShowDeleteAccountModal(true);
+                  }}
+                  className="shrink-0 text-2xs px-2.5 py-1"
+                >
+                  Delete
+                </Button>
+              </div>
+            </Card>
+          </div>
+
+          {/* Section 5: Data Vault & Manual Backup */}
+          <div className="space-y-1.5">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
+              5. Device Data Vault &amp; Manual JSON
             </span>
 
             <Card variant="default" padding="sm" className="space-y-3">
@@ -477,10 +590,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 5: Legal Hub & Safety */}
+          {/* Section 6: Legal Hub & Safety */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              5. Safety, Privacy &amp; Medical Terms
+              6. Safety, Privacy &amp; Medical Terms
             </span>
 
             <Card
@@ -531,10 +644,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             </Card>
           </div>
 
-          {/* Section 6: Community & Support */}
+          {/* Section 7: Community & Support */}
           <div className="space-y-1.5">
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted px-1 block">
-              6. Reviews &amp; Bug Reports
+              7. Reviews &amp; Bug Reports
             </span>
 
             <Card
@@ -621,6 +734,98 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <BodyMetricsModal isOpen={isBodyMetricsOpen} onClose={() => setIsBodyMetricsOpen(false)} />
       <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
       <FeedbackModal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} />
+      <ReminderCenterModal isOpen={isReminderCenterOpen} onClose={() => setIsReminderCenterOpen(false)} />
+
+      {/* Account Deletion Confirmation Modal */}
+      {showDeleteAccountModal && (
+        <div
+          className="modal-overlay z-60"
+          onClick={() => !isDeletingAccount && setShowDeleteAccountModal(false)}
+        >
+          <div
+            className="modal-content max-w-sm w-full p-5 space-y-4 border border-danger/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 text-danger border-b border-border/60 pb-3">
+              <AlertTriangle className="w-5 h-5 shrink-0" />
+              <div>
+                <h3 className="font-bold text-sm text-text-primary font-display">
+                  Delete ASCEND Account
+                </h3>
+                <p className="text-3xs text-danger font-mono font-semibold">
+                  Irrevocable 0-Day Data Erasure
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 text-2xs font-mono text-text-secondary space-y-1.5">
+              <p className="text-text-primary font-semibold">Warning: This action cannot be undone.</p>
+              <ul className="list-disc list-inside space-y-1 text-3xs">
+                <li>Purges your Supabase cloud user and sync credentials</li>
+                <li>Permanently deletes all workouts, PRs, nutrition, and metric records</li>
+                <li>Erases all local device and browser offline storage</li>
+              </ul>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-2xs text-text-muted">
+                We strongly recommend downloading an offline backup first:
+              </p>
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={handleDirectExport}
+                leftIcon={<Download className="w-3.5 h-3.5" />}
+              >
+                Export Data Backup (.json)
+              </Button>
+            </div>
+
+            <div className="space-y-1 pt-1">
+              <label className="block text-3xs font-mono uppercase font-bold text-text-muted">
+                Type &quot;DELETE&quot; to confirm:
+              </label>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                disabled={isDeletingAccount}
+                className="w-full bg-bg-secondary border border-border rounded-lg px-3 py-2 text-xs font-mono text-text-primary focus:outline-none focus:border-danger uppercase tracking-wider"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 pt-2 border-t border-border/60">
+              <Button
+                variant="ghost"
+                size="sm"
+                fullWidth
+                disabled={isDeletingAccount}
+                onClick={() => setShowDeleteAccountModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                fullWidth
+                disabled={isDeletingAccount || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
+                onClick={handleConfirmDeleteAccount}
+                leftIcon={
+                  isDeletingAccount ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-3.5 h-3.5" />
+                  )
+                }
+              >
+                {isDeletingAccount ? 'Purging...' : 'Delete Forever'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

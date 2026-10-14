@@ -212,6 +212,82 @@ class SupabaseSyncEngine {
     }
   }
 
+  public async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+    clearTimeout(this.debounceTimer);
+    this.isSyncing = false;
+    const supabase = getSupabase();
+
+    let apiError: string | undefined;
+
+    if (supabase) {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          const res = await fetch('/api/auth/delete-account', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const json = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            apiError = json?.message || 'Server account deletion failed';
+          }
+        }
+      } catch (err: any) {
+        apiError = err?.message || 'Network error during account deletion';
+      }
+
+      try {
+        await supabase.auth.signOut();
+      } catch {}
+    }
+
+    this.currentUser = null;
+    this.status = 'unconfigured';
+    this.notify();
+
+    // Comprehensive local wipe
+    if (typeof window !== 'undefined') {
+      try {
+        const keysToRemove = [
+          'ascend_store',
+          'ascend_profile',
+          'ascend_prs',
+          'ascend_workouts',
+          'ascend_meals',
+          'ascend_body_metrics',
+          'ascend_emergency_snapshot',
+          'ascend_planned_workouts',
+          'ascend_telemetry_consent',
+          'ascend_reminders',
+          'ascend_notification_prefs',
+        ];
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+        // Remove supabase tokens and any lingering ascend prefixes
+        const allKeys: string[] = [];
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k) allKeys.push(k);
+          }
+        } catch {}
+        allKeys.forEach((k) => {
+          if (k.startsWith('sb-') || k.startsWith('ascend_')) {
+            localStorage.removeItem(k);
+          }
+        });
+        localStorage.setItem('ascend_logged_out', 'true');
+      } catch {}
+    }
+
+    useStore.getState().clearAllData();
+
+    return { success: !apiError, error: apiError };
+  }
+
   private scheduleDebouncedPush() {
     clearTimeout(this.debounceTimer);
     this.debounceTimer = setTimeout(() => {
