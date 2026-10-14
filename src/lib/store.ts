@@ -1701,131 +1701,134 @@ export const useAppStore = create<AppState>()(
 
           // Disaster Recovery: If profile is missing or PRs/workouts are empty, check fallbacks
           if (typeof window !== 'undefined') {
-            try {
-              if (localStorage.getItem('ascend_logged_out') === 'true') {
-                // Athlete explicitly logged out. Do not resurrect old profile session.
-                return;
-              }
-
-              // 1. Check emergency snapshot
-              const rawSnap = localStorage.getItem('ascend_emergency_snapshot');
-              if (rawSnap) {
-                const snap = JSON.parse(rawSnap);
-                const snapState = snap.state || snap;
-                if (
-                  snapState?.profile?.name ||
-                  (Array.isArray(snapState?.workouts) && snapState.workouts.length > 0) ||
-                  (Array.isArray(snapState?.prs) && snapState.prs.length > 0)
-                ) {
-                  if (!state.profile || (!state.workouts?.length && snapState.workouts?.length)) {
-                    state.importAllData(snapState);
-                  }
+            queueMicrotask(() => {
+              try {
+                if (localStorage.getItem('ascend_logged_out') === 'true') {
+                  // Athlete explicitly logged out. Do not resurrect old profile session.
+                  return;
                 }
-              }
 
-              // 2. Check discrete legacy keys if profile is still missing
-              const currentProfile = useAppStore.getState().profile;
-              if (!currentProfile) {
-                const rawProfile = localStorage.getItem('ascend_profile');
-                if (rawProfile) {
-                  try {
-                    const parsedProfile = JSON.parse(rawProfile);
-                    if (parsedProfile?.name) {
-                      useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                // 1. Check emergency snapshot
+                const rawSnap = localStorage.getItem('ascend_emergency_snapshot');
+                if (rawSnap) {
+                  const snap = JSON.parse(rawSnap);
+                  const snapState = snap.state || snap;
+                  if (
+                    snapState?.profile?.name ||
+                    (Array.isArray(snapState?.workouts) && snapState.workouts.length > 0) ||
+                    (Array.isArray(snapState?.prs) && snapState.prs.length > 0)
+                  ) {
+                    if (!state.profile || (!state.workouts?.length && snapState.workouts?.length)) {
+                      state.importAllData(snapState);
                     }
-                  } catch {
-                    // Ignore malformed profile backup
                   }
                 }
-              }
 
-              const currentWorkouts = useAppStore.getState().workouts;
-              if (!currentWorkouts || currentWorkouts.length === 0) {
-                const rawW = localStorage.getItem('ascend_workouts');
-                if (rawW) {
-                  try {
-                    const parsedW = JSON.parse(rawW);
-                    if (Array.isArray(parsedW) && parsedW.length > 0) {
-                      useAppStore.setState({ workouts: parsedW });
+                // 2. Check discrete legacy keys if profile is still missing
+                const currentProfile = useAppStore.getState().profile;
+                if (!currentProfile) {
+                  const rawProfile = localStorage.getItem('ascend_profile');
+                  if (rawProfile) {
+                    try {
+                      const parsedProfile = JSON.parse(rawProfile);
+                      if (parsedProfile?.name) {
+                        useAppStore.setState({ profile: parsedProfile, hasCompletedOnboarding: true });
+                      }
+                    } catch {
+                      // Ignore malformed profile backup
                     }
-                  } catch {
-                    // Ignore malformed workouts backup
                   }
                 }
-              }
 
-              const currentPRs = useAppStore.getState().prs;
-              if (!currentPRs || currentPRs.length === 0) {
-                const rawPRs = localStorage.getItem('ascend_prs');
-                if (rawPRs) {
-                  try {
-                    const parsedPRs = JSON.parse(rawPRs);
-                    if (Array.isArray(parsedPRs) && parsedPRs.length > 0) {
-                      useAppStore.setState({ prs: parsedPRs });
+                const currentWorkouts = useAppStore.getState().workouts;
+                if (!currentWorkouts || currentWorkouts.length === 0) {
+                  const rawW = localStorage.getItem('ascend_workouts');
+                  if (rawW) {
+                    try {
+                      const parsedW = JSON.parse(rawW);
+                      if (Array.isArray(parsedW) && parsedW.length > 0) {
+                        useAppStore.setState({ workouts: parsedW });
+                      }
+                    } catch {
+                      // Ignore malformed workouts backup
                     }
-                  } catch {
-                    // Ignore malformed PRs backup
                   }
                 }
-              }
 
-              const currentMeals = useAppStore.getState().meals;
-              if (!currentMeals || currentMeals.length === 0) {
-                const rawMeals = localStorage.getItem('ascend_meals');
-                if (rawMeals) {
-                  try {
-                    const parsedMeals = JSON.parse(rawMeals);
-                    if (Array.isArray(parsedMeals) && parsedMeals.length > 0) {
-                      useAppStore.setState({ meals: parsedMeals });
+                const currentPRs = useAppStore.getState().prs;
+                if (!currentPRs || currentPRs.length === 0) {
+                  const rawPRs = localStorage.getItem('ascend_prs');
+                  if (rawPRs) {
+                    try {
+                      const parsedPRs = JSON.parse(rawPRs);
+                      if (Array.isArray(parsedPRs) && parsedPRs.length > 0) {
+                        useAppStore.setState({ prs: parsedPRs });
+                      }
+                    } catch {
+                      // Ignore malformed PRs backup
                     }
-                  } catch {
-                    // Ignore malformed meals backup
                   }
                 }
+
+                const currentMeals = useAppStore.getState().meals;
+                if (!currentMeals || currentMeals.length === 0) {
+                  const rawMeals = localStorage.getItem('ascend_meals');
+                  if (rawMeals) {
+                    try {
+                      const parsedMeals = JSON.parse(rawMeals);
+                      if (Array.isArray(parsedMeals) && parsedMeals.length > 0) {
+                        useAppStore.setState({ meals: parsedMeals });
+                      }
+                    } catch {
+                      // Ignore malformed meals backup
+                    }
+                  }
+                }
+
+                // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
+                const currentState = useAppStore.getState();
+                if (currentState.profile?.bodyweightKg && (!currentState.bodyMetrics || currentState.bodyMetrics.length === 0)) {
+                  const entry: BodyMetricEntry = {
+                    id: 'initial_bw_' + (currentState.profile.id || 'user'),
+                    date: currentState.profile.createdAt ? currentState.profile.createdAt.split('T')[0] : getLocalTodayStr(),
+                    weightKg: currentState.profile.bodyweightKg,
+                    heightCm: currentState.profile.heightCm,
+                    notes: 'Baseline calibration',
+                  };
+                  useAppStore.setState({ bodyMetrics: [entry] });
+                } else if (currentState.bodyMetrics && currentState.bodyMetrics.length > 0) {
+                  // Deduplicate existing bodyMetrics by date
+                  const seenDates = new Set<string>();
+                  const deduped: BodyMetricEntry[] = [];
+                  for (const m of currentState.bodyMetrics) {
+                    if (!seenDates.has(m.date)) {
+                      seenDates.add(m.date);
+                      deduped.push(m);
+                    }
+                  }
+                  if (deduped.length !== currentState.bodyMetrics.length) {
+                    useAppStore.setState({ bodyMetrics: deduped });
+                  }
+                }
+
+                // Ensure staple foods are populated if empty
+                if (!currentState.favoriteFoods || currentState.favoriteFoods.length === 0) {
+                  useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
+                }
+
+                // Ensure policyDecisionApplications array is initialized if missing in legacy storage
+                if (!Array.isArray(currentState.policyDecisionApplications)) {
+                  useAppStore.setState({ policyDecisionApplications: [] });
+                }
+
+                // Initialize or refresh Lifter Twin Profile if workouts exist
+                if (currentState.workouts && currentState.workouts.length > 0 && !currentState.lifterProfile) {
+                  currentState.refreshLifterProfile();
+                }
+              } catch (recoveryErr) {
+                console.warn('Disaster recovery check error:', recoveryErr);
               }
-            } catch (recoveryErr) {
-              console.warn('Disaster recovery check error:', recoveryErr);
-            }
-          }
-
-          // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
-          if (state.profile?.bodyweightKg && (!state.bodyMetrics || state.bodyMetrics.length === 0)) {
-            const entry: BodyMetricEntry = {
-              id: 'initial_bw_' + (state.profile.id || 'user'),
-              date: state.profile.createdAt ? state.profile.createdAt.split('T')[0] : getLocalTodayStr(),
-              weightKg: state.profile.bodyweightKg,
-              heightCm: state.profile.heightCm,
-              notes: 'Baseline calibration',
-            };
-            useAppStore.setState({ bodyMetrics: [entry] });
-          } else if (state.bodyMetrics && state.bodyMetrics.length > 0) {
-            // Deduplicate existing bodyMetrics by date
-            const seenDates = new Set<string>();
-            const deduped: BodyMetricEntry[] = [];
-            for (const m of state.bodyMetrics) {
-              if (!seenDates.has(m.date)) {
-                seenDates.add(m.date);
-                deduped.push(m);
-              }
-            }
-            if (deduped.length !== state.bodyMetrics.length) {
-              useAppStore.setState({ bodyMetrics: deduped });
-            }
-          }
-
-          // Ensure staple foods are populated if empty
-          if (!state.favoriteFoods || state.favoriteFoods.length === 0) {
-            useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
-          }
-
-          // Ensure policyDecisionApplications array is initialized if missing in legacy storage
-          if (!Array.isArray(state.policyDecisionApplications)) {
-            useAppStore.setState({ policyDecisionApplications: [] });
-          }
-
-          // Initialize or refresh Lifter Twin Profile if workouts exist
-          if (state.workouts && state.workouts.length > 0 && !state.lifterProfile) {
-            state.refreshLifterProfile();
+            });
           }
 
           // Auto-sync with device theme if not manually customized by athlete

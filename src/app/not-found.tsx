@@ -48,21 +48,21 @@ export default function NotFound() {
 
           <div className="grid grid-cols-3 gap-2 pt-2">
             <Link
-              href="/"
+              href="/?tab=home"
               className="p-2.5 rounded-lg bg-bg-secondary border border-border/70 hover:border-accent/40 flex flex-col items-center justify-center gap-1 text-2xs font-mono text-text-muted hover:text-text-primary transition-colors"
             >
               <Home className="w-3.5 h-3.5 text-accent" />
               <span>Home</span>
             </Link>
             <Link
-              href="/"
+              href="/?tab=prs"
               className="p-2.5 rounded-lg bg-bg-secondary border border-border/70 hover:border-accent/40 flex flex-col items-center justify-center gap-1 text-2xs font-mono text-text-muted hover:text-text-primary transition-colors"
             >
               <Trophy className="w-3.5 h-3.5 text-accent" />
               <span>PRs</span>
             </Link>
             <Link
-              href="/"
+              href="/?tab=meals"
               className="p-2.5 rounded-lg bg-bg-secondary border border-border/70 hover:border-accent/40 flex flex-col items-center justify-center gap-1 text-2xs font-mono text-text-muted hover:text-text-primary transition-colors"
             >
               <UtensilsCrossed className="w-3.5 h-3.5 text-accent" />

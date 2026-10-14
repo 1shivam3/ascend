@@ -227,7 +227,7 @@ Schema:
   "keyAchievements": ["Achievement 1", "Achievement 2"],
   "nextSessionTarget": "Specific weight and rep target for the next time this workout or lift is performed"
 }`;
-      promptText = `Athlete Context:\n${body.userContext || ''}\n\nCompleted Session:\n${JSON.stringify(body.completedWorkout || {})}\nGenerate post-workout take in JSON.`;
+      promptText = `Athlete Context:\n<athlete_context>\n${body.userContext || ''}\n</athlete_context>\n\nCompleted Session:\n${JSON.stringify(body.completedWorkout || {})}\nGenerate post-workout take in JSON.`;
     } else if (task === 'WEEKLY_REVIEW') {
       systemInstruction = `${baseGuardrails}
 Job: Generate a weekly review synthesizing training completion, key lift progress, and water/creatine habit consistency.
@@ -240,7 +240,7 @@ Schema:
   "habitInsight": "1 sentence connecting water/creatine consistency to recovery",
   "focusNextWeek": "1-2 sentences detailing next week's progressive overload target"
 }`;
-      promptText = `Athlete Context & 7-Day History:\n${body.userContext || ''}\n\nWeekly Stats:\n${JSON.stringify(body.weeklyStats || {})}\nGenerate weekly review in JSON.`;
+      promptText = `Athlete Context & 7-Day History:\n<athlete_context>\n${body.userContext || ''}\n</athlete_context>\n\nWeekly Stats:\n${JSON.stringify(body.weeklyStats || {})}\nGenerate weekly review in JSON.`;
     } else {
       // COACH_INSIGHT (General Tactical Home Card)
       systemInstruction = `${baseGuardrails}
@@ -252,7 +252,7 @@ Schema:
   "tacticalAdvice": "2-3 specific, high-leverage tactical instructions for today's workout or recovery strategy (e.g. lift selection, RPE target, deload advice, hydration/creatine timing)",
   "fatigueWarning": "Optional 1 sentence warning if overtraining risk, high consecutive training days, or severe dehydration/protein deficit is detected. Otherwise null or empty string."
 }`;
-      promptText = `Athlete Data & Context:\n${body.userContext || ''}\n\nGenerate tactical coaching feedback in JSON.`;
+      promptText = `Athlete Data & Context:\n<athlete_context>\n${body.userContext || ''}\n</athlete_context>\n\nGenerate tactical coaching feedback in JSON.`;
     }
 
     let rawText = '';

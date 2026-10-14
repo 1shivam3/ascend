@@ -31,9 +31,25 @@ export function Card({
     lg: 'p-5 sm:p-6',
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (props.onKeyDown) {
+      props.onKeyDown(e);
+      return;
+    }
+    if (props.onClick && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      props.onClick(e as unknown as React.MouseEvent<HTMLDivElement>);
+    }
+  };
+
+  const isClickable = Boolean(props.onClick) || variant === 'interactive';
+
   return (
     <div
-      className={`${baseStyles} ${variants[variant]} ${paddings[padding]} ${className}`}
+      role={props.role || (props.onClick ? 'button' : undefined)}
+      tabIndex={props.tabIndex !== undefined ? props.tabIndex : (props.onClick ? 0 : undefined)}
+      onKeyDown={props.onKeyDown || (props.onClick ? handleKeyDown : undefined)}
+      className={`${baseStyles} ${variants[variant]} ${paddings[padding]} ${isClickable ? 'focus:outline-none focus:ring-1 focus:ring-accent/40' : ''} ${className}`}
       {...props}
     >
       {children}

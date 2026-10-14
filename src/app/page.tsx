@@ -222,6 +222,8 @@ export default function AppPage() {
               <button
                 key={tab.id}
                 type="button"
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={tab.label}
                 onClick={() => {
                   navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined });
                 }}

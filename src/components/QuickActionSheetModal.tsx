@@ -17,6 +17,8 @@ import { useToast } from '@/components/ui/Toast';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import { MealEntry } from '@/lib/types';
+import { getLocalTodayStr } from '@/lib/formatters';
+import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 
 interface QuickActionSheetModalProps {
   isOpen: boolean;
@@ -54,6 +56,7 @@ export default function QuickActionSheetModal({
     if (!q || isParsingFood) return;
 
     setIsParsingFood(true);
+    const today = getLocalTodayStr();
     try {
       const res = await fetch('/api/ai/parse-meal', {
         method: 'POST',
@@ -61,9 +64,12 @@ export default function QuickActionSheetModal({
         body: JSON.stringify({ query: q }),
       });
 
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
-        const today = new Date().toISOString().split('T')[0];
         const newMeal: MealEntry = {
           id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
           date: today,
@@ -78,11 +84,34 @@ export default function QuickActionSheetModal({
           'Meal Logged'
         );
         onClose();
-      } else {
-        toast.error('Could not parse foods from text.', 'Parse Failed');
+        return;
       }
-    } catch {
-      toast.error('Could not log meal. Please check connection.', 'Error');
+      throw new Error('No foods returned from server');
+    } catch (networkOrParseErr) {
+      // Offline fallback: Use client-side IFCT heuristic parser
+      try {
+        const offlineFoods = parseNaturalMealOffline(q);
+        if (offlineFoods && offlineFoods.length > 0) {
+          const totals = calculateMealMacros(offlineFoods);
+          const newMeal: MealEntry = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+            date: today,
+            name: 'Quick Meal (Offline)',
+            foods: offlineFoods,
+          };
+          addMeal(newMeal);
+          setQuickFoodQuery('');
+          toast.success(
+            `Logged ${offlineFoods.length} items (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
+            'Meal Logged (Offline)'
+          );
+          onClose();
+          return;
+        }
+      } catch (offlineErr) {
+        console.error('Offline parse error in Quick Actions:', offlineErr);
+      }
+      toast.error('Could not log meal. Please check food text or connection.', 'Error');
     } finally {
       setIsParsingFood(false);
     }

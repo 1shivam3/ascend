@@ -8,6 +8,7 @@ import {
   getFoodSuggestions,
   calculateRecommendedMacroGoals,
   getMacroCalorieDrift,
+  parseNaturalMealOffline,
 } from '@/lib/macros';
 import {
   Plus,
@@ -152,6 +153,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealPortionMultipliers, setMealPortionMultipliers] = useState<Record<string, number>>({});
+  const [mealToDelete,          setMealToDelete]          = useState<{ id: string; name: string } | null>(null);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [showMacroDetails,      setShowMacroDetails]      = useState(false);
@@ -798,6 +800,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (!q || isNaturalParsing) return;
 
     setIsNaturalParsing(true);
+    const today = getLocalTodayStr();
     try {
       const res = await fetch('/api/ai/parse-meal', {
         method: 'POST',
@@ -809,9 +812,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         }),
       });
 
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
-        const today = getLocalTodayStr();
         const newMeal: MealEntry = {
           id: safeRandomId('meal'),
           date: today,
@@ -826,12 +832,33 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
         );
-      } else {
-        toast.error('Could not parse foods from text. Please try again.', 'Parse Failed');
+        return;
       }
+      throw new Error('No foods returned from server');
     } catch (err) {
-      console.error('Natural log error:', err);
-      toast.error('Could not log meal. Please check connection.', 'Error');
+      // Offline fallback: Use client-side IFCT heuristic parser
+      try {
+        const offlineFoods = parseNaturalMealOffline(q);
+        if (offlineFoods && offlineFoods.length > 0) {
+          const totals = calculateMealMacros(offlineFoods);
+          const newMeal: MealEntry = {
+            id: safeRandomId('meal'),
+            date: today,
+            name: 'Quick Meal (Offline)',
+            foods: offlineFoods,
+          };
+          addMeal(newMeal);
+          setNaturalQuery('');
+          toast.success(
+            `Logged ${offlineFoods.length} items (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
+            'Meal Logged (Offline)'
+          );
+          return;
+        }
+      } catch (offlineErr) {
+        console.error('Offline parse error in MealsPage:', offlineErr);
+      }
+      toast.error('Could not parse meal. Please check food text or connection.', 'Error');
     } finally {
       setIsNaturalParsing(false);
     }
@@ -1914,7 +1941,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <form onSubmit={handleNaturalLogSubmit} className="relative flex items-center">
             <input
               type="text"
-              placeholder='Log meal (e.g. "2 eggs, 100g oats, 1 scoop whey")...'
+              placeholder='e.g. 2 eggs, 100g oats, 1 scoop whey'
+              aria-label="Describe foods and quantities to log meal"
               value={naturalQuery}
               onChange={(e) => setNaturalQuery(e.target.value)}
               disabled={isNaturalParsing}
@@ -1924,7 +1952,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
-                className="px-3 py-1.5 rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs cursor-pointer"
+                aria-label="Log meal"
+                className="px-3 py-1.5 min-h-[36px] rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="animate-pulse text-2xs">...</span>
@@ -1939,13 +1968,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </form>
 
           {/* Secondary Tools Dropdown ("More") */}
-          <div className="flex items-center justify-between text-2xs text-text-muted px-1 pt-0.5">
-            <span className="font-mono text-3xs">AI Vision • Natural Language • Indian IFCT</span>
+          <div className="flex items-center justify-between text-xs text-text-secondary px-1 pt-0.5">
+            <span className="font-mono text-xs">AI Vision • Natural Language • Indian IFCT</span>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsMoreToolsOpen(!isMoreToolsOpen)}
-                className="text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                className="py-1 px-1.5 min-h-[44px] text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1 cursor-pointer"
+                aria-label="More options"
               >
                 <span>More options</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${isMoreToolsOpen ? 'rotate-180' : ''}`} />
@@ -2009,12 +2039,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {/* Water row */}
           <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
-            <div
-              className="flex items-center gap-2 min-w-0 cursor-pointer"
+            <button
+              type="button"
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-sky-400 rounded-lg p-1 transition-opacity hover:opacity-90"
               onClick={() => setIsHydrationModalOpen(true)}
-              title="Click to view hydration details"
+              aria-label="View hydration details"
             >
-              <div className="w-7 h-7 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
                 <Droplet className="w-4 h-4" />
               </div>
               <div className="truncate">
@@ -2023,7 +2054,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
                 </span>
               </div>
-            </div>
+            </button>
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
@@ -2031,7 +2062,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   logWater(250, todayDate);
                   toast.success('+250 ml logged!', 'Hydration');
                 }}
-                className="px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[54px] px-3 py-2 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                aria-label="Log 250ml water"
               >
                 +250ml
               </button>
@@ -2041,7 +2073,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   logWater(500, todayDate);
                   toast.success('+500 ml logged!', 'Hydration');
                 }}
-                className="px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                className="min-h-[44px] min-w-[54px] px-3 py-2 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                aria-label="Log 500ml water"
               >
                 +500ml
               </button>
@@ -2050,12 +2083,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           {/* Creatine row */}
           <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
-            <div
-              className="flex items-center gap-2 min-w-0 cursor-pointer"
+            <button
+              type="button"
+              className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-purple-400 rounded-lg p-1 transition-opacity hover:opacity-90"
               onClick={() => setIsCreatineModalOpen(true)}
-              title="Click to view creatine details"
+              aria-label="View creatine details"
             >
-              <div className="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div className="truncate">
@@ -2064,7 +2098,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {creatineTaken ? `${creatineAmountG}g Taken Today` : `${dailyCreatineTarget}g Daily Target`}
                 </span>
               </div>
-            </div>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -2075,11 +2109,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   toast.info('Creatine marked as not taken', 'Creatine');
                 }
               }}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 ${
+              className={`min-h-[44px] px-3.5 py-2 rounded-lg border text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 flex items-center justify-center ${
                 creatineTaken
                   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                   : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
               }`}
+              aria-label={creatineTaken ? "Mark creatine not taken" : `Log ${dailyCreatineTarget}g creatine`}
             >
               {creatineTaken ? '✓ Taken' : `+ Log ${dailyCreatineTarget}g`}
             </button>
@@ -2142,13 +2177,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteMeal(meal.id);
-                          toast.info(`Deleted ${meal.name}`);
+                          setMealToDelete({ id: meal.id, name: meal.name });
                         }}
-                        className="p-1 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                         title="Delete this meal"
+                        aria-label={`Delete meal ${meal.name}`}
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                       <div className="p-1 text-text-muted">
                         {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -2297,13 +2332,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            deleteMeal(m.id);
-                                            toast.info(`Deleted ${m.name} from history`);
+                                            setMealToDelete({ id: m.id, name: m.name });
                                           }}
-                                          className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                           title="Delete meal from history"
+                                          aria-label={`Delete meal ${m.name} from history`}
                                         >
-                                          <Trash2 className="w-3 h-3" />
+                                          <Trash2 className="w-3.5 h-3.5" />
                                         </button>
                                         <div className="p-0.5 text-text-muted">
                                           {isMExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -3345,6 +3380,54 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   </span>
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Meal Deletion Confirmation Dialog ── */}
+      {mealToDelete && (
+        <div className="modal-overlay z-50" onClick={() => setMealToDelete(null)}>
+          <div
+            className="modal-content max-w-sm w-full p-5 space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-meal-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-danger/15 text-danger flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 id="delete-meal-title" className="text-sm font-bold text-text-primary">
+                  Delete Meal?
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Are you sure you want to delete &ldquo;{mealToDelete.name}&rdquo;? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setMealToDelete(null)}
+                className="btn-secondary flex-1 py-2.5 text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteMeal(mealToDelete.id);
+                  toast.info(`Deleted ${mealToDelete.name}`);
+                  setMealToDelete(null);
+                }}
+                className="btn-danger flex-1 py-2.5 text-xs font-bold"
+              >
+                Delete Meal
+              </button>
             </div>
           </div>
         </div>

@@ -307,7 +307,7 @@ const COMMON_BARCODES: Record<string, {
 
 
 import { checkRateLimit } from '@/lib/rate-limit';
-import { rateLimitResponse } from '@/lib/server-security';
+import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
 export async function GET(req: Request) {
   // 1. Rate limiting: 60 barcode lookups per minute per client IP
@@ -458,9 +458,10 @@ export async function GET(req: Request) {
       message: 'Product not found in Open Food Facts or local databases.',
     });
   } catch (err: any) {
-    console.error('Barcode API route error:', err);
+    const rawMsg = err?.message || 'Error looking up barcode.';
+    console.error('Barcode API route error:', redactSecrets(rawMsg));
     return NextResponse.json(
-      { error: 'SERVER_ERROR', message: err.message || 'Error looking up barcode.' },
+      { error: 'SERVER_ERROR', message: 'Error looking up barcode. Please try again later.' },
       { status: 500 }
     );
   }

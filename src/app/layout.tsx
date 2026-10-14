@@ -37,10 +37,11 @@ export const metadata: Metadata = {
   creator: 'Shivam Kumar',
   publisher: 'ASCEND Strength Systems',
   manifest: '/manifest.json',
+  metadataBase: new URL('https://ascendtonext.vercel.app'),
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://ascend-alpha.vercel.app',
+    url: 'https://ascendtonext.vercel.app',
     siteName: 'ASCEND',
     title: 'ASCEND | Evidence-Based Training & Nutrition System',
     description:
@@ -58,8 +59,14 @@ export const metadata: Metadata = {
     title: 'ASCEND',
   },
   icons: {
-    icon: '/icon.svg',
-    apple: '/icon.svg',
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
   },
   verification: {
     google: 'DOQWeBS380XVv0mtya1LH8zKaVyjKrSuR_hE6bTVw9M',
@@ -71,6 +78,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   themeColor: '#0a0a0a',
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({

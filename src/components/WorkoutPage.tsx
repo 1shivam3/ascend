@@ -1813,22 +1813,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               )}
 
               {/* Clean secondary choices: at most 2 choices */}
-              <div className="flex items-center justify-between text-xs pt-1 px-1">
+              <div className="flex items-center justify-between text-xs pt-1">
                 <button
                   type="button"
                   onClick={() => setIsChangeWorkoutOpen(true)}
-                  className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  className="min-h-[44px] px-2 text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  aria-label="Change current routine or split"
                 >
-                  <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
+                  <ArrowRightLeft className="w-4 h-4 text-accent" />
                   <span>Change Routine / Split</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setIsLogPastModalOpen(true)}
-                  className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
+                  className="min-h-[44px] px-2 text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  aria-label="Log past workout session"
                 >
-                  <Calendar className="w-3.5 h-3.5 text-accent" />
+                  <Calendar className="w-4 h-4 text-accent" />
                   <span>Log Past Session</span>
                 </button>
               </div>
@@ -2039,18 +2041,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </div>
             <div>
               <p className="text-sm font-bold text-text-primary">Your journey starts here.</p>
-              <p className="text-xs text-text-secondary mt-0.5">
-                Log your first workout to begin tracking consistency and volume.
+              <p className="text-xs text-text-muted mt-1 max-w-xs mx-auto">
+                Completed training sessions, logged sets, and volume metrics will appear here.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={openBlankLogger}
-              className="btn-primary mx-auto text-xs py-2 px-4 flex items-center gap-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>START WORKOUT</span>
-            </button>
           </div>
         ) : filteredWorkouts.length === 0 && historyFilter.trim() !== '' ? (
           <div className="card text-center py-6 px-4 space-y-1 text-text-muted text-xs">
@@ -2065,9 +2059,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
               return (
                 <div key={workout.id} className="card">
-                  <div
-                    className="flex justify-between items-center cursor-pointer"
+                  <button
+                    type="button"
+                    className="w-full flex justify-between items-center text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40 rounded-lg p-0.5"
                     onClick={() => toggleExpand(workout.id)}
+                    aria-expanded={isExpanded}
+                    aria-label={`Workout on ${new Date(workout.date).toLocaleDateString()}`}
                   >
                     <div>
                       <h3 className="font-semibold text-text-primary">
@@ -2087,7 +2084,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         ? <ChevronUp className="w-5 h-5 text-text-secondary" />
                         : <ChevronDown className="w-5 h-5 text-text-secondary" />}
                     </div>
-                  </div>
+                  </button>
 
                   {isExpanded && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
+import { getLocalTodayStr } from '@/lib/formatters';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   const currentWeightKg = profile?.bodyweightKg || 75;
 
   const [weightInput, setWeightInput] = useState<string>('');
+  const [heightInput, setHeightInput] = useState<string>('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>(preferredUnit);
   const [dateInput, setDateInput] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
@@ -30,10 +32,11 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           ? (currentWeightKg * 2.20462).toFixed(1)
           : currentWeightKg.toFixed(1);
       setWeightInput(displayWeight);
-      setDateInput(new Date().toISOString().split('T')[0]);
+      setHeightInput(profile?.heightCm ? String(profile.heightCm) : '');
+      setDateInput(getLocalTodayStr());
       setSuccessMsg('');
     }
-  }, [isOpen, currentWeightKg, unit]);
+  }, [isOpen, currentWeightKg, unit, profile?.heightCm]);
 
   if (!isOpen) return null;
 
@@ -56,9 +59,11 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     if (isNaN(parsedWeight) || parsedWeight <= 0) return;
 
     const finalWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+    const parsedHeight = parseFloat(heightInput);
+    const validHeight = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250 ? parsedHeight : profile?.heightCm;
 
-    updateBodyMetrics(finalWeightKg, profile?.heightCm);
-    setSuccessMsg('Bodyweight saved successfully!');
+    updateBodyMetrics(finalWeightKg, validHeight);
+    setSuccessMsg('Body metrics saved successfully!');
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -111,7 +116,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           {/* Weight Field */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <label className="section-title text-2xs font-mono uppercase text-text-muted">
+              <label htmlFor="modal-weight-input" className="section-title text-2xs font-mono uppercase text-text-muted">
                 BODYWEIGHT
               </label>
               <div className="flex rounded-md bg-bg-secondary p-0.5 border border-border/80">
@@ -141,6 +146,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
             <div className="relative">
               <input
+                id="modal-weight-input"
                 type="number"
                 step="0.1"
                 min="20"
@@ -158,13 +164,40 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
           </div>
 
+          {/* Height Field */}
+          <div>
+            <label htmlFor="modal-height-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
+              HEIGHT (CM)
+            </label>
+            <div className="relative">
+              <input
+                id="modal-height-input"
+                type="number"
+                step="1"
+                min="100"
+                max="250"
+                value={heightInput}
+                onChange={(e) => setHeightInput(e.target.value)}
+                placeholder="175"
+                className="w-full text-sm font-mono font-bold pl-3 pr-12 py-2.5 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
+              />
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted uppercase">
+                CM
+              </span>
+            </div>
+            <p className="text-3xs text-text-muted mt-1 font-mono">
+              Calibrates Mifflin-St Jeor metabolic expenditure and daily macro targets.
+            </p>
+          </div>
+
           {/* Date Field */}
           <div>
-            <label className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
+            <label htmlFor="modal-date-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
               ENTRY DATE
             </label>
             <div className="relative">
               <input
+                id="modal-date-input"
                 type="date"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}

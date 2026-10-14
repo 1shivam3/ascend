@@ -159,13 +159,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 ASCEND SETTINGS
               </span>
               <h2 className="text-lg font-black text-text-primary tracking-tight font-display">
-                System Preferences
+                Athlete Settings
               </h2>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+              aria-label="Close Settings"
             >
               <X className="w-5 h-5" />
             </button>
@@ -273,9 +274,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
 
               {/* Body Metrics Trigger */}
-              <div
+              <button
+                type="button"
                 onClick={() => setIsBodyMetricsOpen(true)}
-                className="py-2.5 flex items-center justify-between cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
+                className="w-full py-2.5 min-h-[44px] flex items-center justify-between text-left cursor-pointer hover:bg-bg-secondary/40 px-1 rounded-lg transition-colors"
               >
                 <div className="flex items-center gap-2.5">
                   <Scale className="w-4 h-4 text-accent" />
@@ -287,7 +289,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
-              </div>
+              </button>
 
               {/* Theme Toggle */}
               <div className="py-2.5 flex items-center justify-between px-1">
@@ -396,22 +398,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </Button>
               </div>
 
-              {/* 1-Tap Sync Action Button */}
-              <div className="pt-0.5">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    syncNow();
-                    toast.info('Syncing data with cloud...');
-                  }}
-                  disabled={syncStatus === 'syncing'}
-                  leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />}
-                  fullWidth
-                >
-                  {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
-                </Button>
-              </div>
+              {/* 1-Tap Sync Action Button (Visible only when cloud sync is configured) */}
+              {syncStatus !== 'unconfigured' && (
+                <div className="pt-0.5">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      syncNow();
+                      toast.info('Syncing data with cloud...');
+                    }}
+                    disabled={syncStatus === 'syncing'}
+                    leftIcon={<RefreshCw className={`w-3.5 h-3.5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />}
+                    fullWidth
+                  >
+                    {syncStatus === 'syncing' ? 'Syncing...' : 'Sync Now'}
+                  </Button>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -462,13 +466,14 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 />
               </div>
 
-              <div
+              <button
+                type="button"
                 onClick={() => setIsDataVaultOpen(true)}
-                className="pt-2 border-t border-border/50 flex items-center justify-between cursor-pointer hover:text-accent transition-colors text-2xs text-text-muted"
+                className="w-full pt-2 min-h-[44px] border-t border-border/50 flex items-center justify-between text-left cursor-pointer hover:text-accent transition-colors text-2xs text-text-muted"
               >
                 <span>Advanced Vault (CSV Importer, Factory Reset)</span>
                 <ChevronRight className="w-3.5 h-3.5" />
-              </div>
+              </button>
             </Card>
           </div>
 

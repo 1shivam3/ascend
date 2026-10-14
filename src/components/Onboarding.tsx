@@ -77,6 +77,18 @@ const GOALS: GoalOption[] = [
     icon: <Flame className="w-4 h-4 text-rose-400" />,
     tagline: 'Muscle retention & calorie deficit',
   },
+  {
+    id: 'stamina',
+    title: 'Stamina',
+    icon: <RotateCcw className="w-4 h-4 text-sky-400" />,
+    tagline: 'Work capacity & conditioning',
+  },
+  {
+    id: 'general_fitness',
+    title: 'General Fitness',
+    icon: <Check className="w-4 h-4 text-amber-400" />,
+    tagline: 'Longevity & functional strength',
+  },
 ];
 
 export default function OnboardingScreen() {
@@ -84,7 +96,7 @@ export default function OnboardingScreen() {
   const { user, signInWithGoogle } = useSupabaseSync();
 
   // Step 0: Auth choice (Google vs Guest)
-  // Step 1: Quick basic details (Name, Goal, Sex, Bodyweight)
+  // Step 1: Quick basic details (Name, Goal, Sex, Bodyweight, Height, Age)
   const [step, setStep] = useState<0 | 1>(0);
   const [showGuestWarning, setShowGuestWarning] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
@@ -95,6 +107,11 @@ export default function OnboardingScreen() {
   const [gender, setGender] = useState<'male' | 'female'>('male');
   const [bodyweight, setBodyweight] = useState('70');
   const [unit, setUnit] = useState<'kg' | 'lbs'>('kg');
+  const [height, setHeight] = useState('175');
+  const [age, setAge] = useState('25');
+  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
+  const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Emergency snapshot detection & restore
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -177,11 +194,44 @@ export default function OnboardingScreen() {
   };
 
   const handleFinish = () => {
-    const bw = parseFloat(bodyweight) || (unit === 'lbs' ? 154 : 70);
-    const athleteName = name.trim() || (user?.name || 'Athlete');
+    setFormError(null);
+
+    const athleteName = name.trim() || user?.name?.trim();
+    if (!athleteName) {
+      setFormError('Please enter your name or athlete nickname.');
+      toast.error('Athlete name is required.', 'Missing Name');
+      return;
+    }
+
+    const bw = parseFloat(bodyweight);
+    if (isNaN(bw) || bw <= 0) {
+      setFormError('Please enter a valid numeric bodyweight.');
+      toast.error('A valid bodyweight is required.', 'Invalid Bodyweight');
+      return;
+    }
 
     const bodyweightKg = unit === 'lbs' ? bw * 0.453592 : bw;
     const bodyweightLbs = unit === 'kg' ? bw * 2.20462 : bw;
+
+    if (bodyweightKg < 30 || bodyweightKg > 300) {
+      setFormError(
+        unit === 'kg'
+          ? 'Please enter a realistic bodyweight between 30 kg and 300 kg.'
+          : 'Please enter a realistic bodyweight between 66 lbs and 660 lbs.'
+      );
+      toast.error('Bodyweight out of realistic physiological range.', 'Invalid Bodyweight');
+      return;
+    }
+
+    const parsedHeight = parseFloat(height);
+    const validHeight = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250
+      ? Math.round(parsedHeight)
+      : (gender === 'male' ? 175 : 162);
+
+    const parsedAge = parseInt(age, 10);
+    const validAge = !isNaN(parsedAge) && parsedAge >= 13 && parsedAge <= 99
+      ? parsedAge
+      : 25;
 
     const profileData = {
       id: user?.id || safeRandomId('user'),
@@ -189,8 +239,10 @@ export default function OnboardingScreen() {
       gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
+      heightCm: validHeight,
+      age: validAge,
       unit,
-      dietPreference: 'non_vegetarian' as DietPreference,
+      dietPreference,
       createdAt: new Date().toISOString(),
       goals: [primaryGoal],
     };
@@ -210,19 +262,25 @@ export default function OnboardingScreen() {
         ? 'fat_loss'
         : 'general_fitness',
       experience: 'beginner',
-      daysPerWeek: 4,
+      daysPerWeek: daysPerWeek,
       preferredDurationMin: 45,
       equipment: 'full_gym',
-      preferredSplit: 'upper_lower',
+      preferredSplit: daysPerWeek <= 3 ? 'full_body' : 'upper_lower',
       dislikedExercises: [],
       injuriesOrLimitations: [],
       coachingStyle: 'balanced',
     });
 
     setPlannedWorkouts(generatedSplit);
-    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, 4));
+    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
 
-    const initialMacros = calculateRecommendedMacroGoals(bodyweightKg, primaryGoal, gender);
+    const initialMacros = calculateRecommendedMacroGoals(
+      bodyweightKg,
+      primaryGoal,
+      gender,
+      validHeight,
+      validAge
+    );
     setMacroGoals(initialMacros);
 
     const today = getLocalTodayStr();
@@ -230,6 +288,7 @@ export default function OnboardingScreen() {
       id: safeRandomId('bm'),
       date: today,
       weightKg: Math.round(bodyweightKg * 10) / 10,
+      heightCm: validHeight,
       notes: 'Initial Calibration',
     });
 
@@ -461,33 +520,45 @@ export default function OnboardingScreen() {
 
             <Card variant="default" padding="md" className="space-y-4">
               <div>
-                <h2 className="text-sm font-bold text-text-primary tracking-tight">Quick Calibration</h2>
+                <h2 className="text-sm font-bold text-text-primary tracking-tight">Precision Calibration</h2>
                 <p className="text-2xs text-text-muted mt-0.5">
-                  Calibrate your strength standards &amp; recommended macros
+                  Calibrate your strength standards, training split &amp; metabolic macro targets
                 </p>
               </div>
 
+              {formError && (
+                <div className="p-3 rounded-xl bg-danger/15 border border-danger/30 text-danger text-xs font-semibold flex items-center gap-2 animate-fade-in">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{formError}</span>
+                </div>
+              )}
+
               {/* 1. Name */}
               <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  1. Your Name
+                <label htmlFor="athlete-name-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  1. Your Name / Nickname
                 </label>
                 <input
+                  id="athlete-name-input"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (formError) setFormError(null);
+                  }}
                   placeholder="e.g. Alex"
                   className="w-full text-xs font-semibold py-2.5 px-3.5 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary placeholder:text-text-muted/60"
                   maxLength={24}
+                  required
                 />
               </div>
 
-              {/* 2. Primary Goal */}
+              {/* 2. Primary Focus */}
               <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
                   2. Primary Focus
-                </label>
-                <div className="grid grid-cols-3 gap-2">
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {GOALS.map((g) => {
                     const isSelected = primaryGoal === g.id;
                     return (
@@ -495,11 +566,12 @@ export default function OnboardingScreen() {
                         key={g.id}
                         type="button"
                         onClick={() => setPrimaryGoal(g.id)}
-                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer ${
+                        className={`p-2.5 rounded-xl border text-center transition-all flex flex-col items-center justify-center gap-1 cursor-pointer min-h-[58px] ${
                           isSelected
                             ? 'border-accent bg-accent/15 ring-1 ring-accent text-text-primary'
                             : 'border-border/80 bg-bg-secondary hover:border-border text-text-muted hover:text-text-primary'
                         }`}
+                        aria-pressed={isSelected}
                       >
                         {g.icon}
                         <span className="text-2xs font-bold block leading-tight">{g.title}</span>
@@ -511,12 +583,17 @@ export default function OnboardingScreen() {
 
               {/* 3. Biological Sex */}
               <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  3. Biological Sex
-                </label>
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  3. Biological Sex (for Strength &amp; BMR Ratios)
+                </span>
                 <SegmentedControl
                   value={gender}
-                  onChange={(val) => setGender(val as 'male' | 'female')}
+                  onChange={(val) => {
+                    const nextGender = val as 'male' | 'female';
+                    setGender(nextGender);
+                    if (height === '175' && nextGender === 'female') setHeight('162');
+                    if (height === '162' && nextGender === 'male') setHeight('175');
+                  }}
                   options={[
                     { value: 'male', label: 'Male' },
                     { value: 'female', label: 'Female' },
@@ -526,46 +603,135 @@ export default function OnboardingScreen() {
                 />
               </div>
 
-              {/* 4. Current Bodyweight */}
-              <div className="space-y-1.5">
-                <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  4. Current Bodyweight
-                </label>
-                <div className="flex gap-2">
+              {/* 4. Bodyweight & Height */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Bodyweight */}
+                <div className="space-y-1.5">
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="athlete-bodyweight-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                      4. Current Weight
+                    </label>
+                    <div className="w-20">
+                      <SegmentedControl
+                        value={unit}
+                        onChange={(val) => {
+                          const nextUnit = val as 'kg' | 'lbs';
+                          const currentVal = parseFloat(bodyweight);
+                          if (!isNaN(currentVal) && currentVal > 0) {
+                            if (nextUnit === 'lbs' && unit === 'kg') {
+                              setBodyweight(String(Math.round(currentVal * 2.20462 * 10) / 10));
+                            } else if (nextUnit === 'kg' && unit === 'lbs') {
+                              setBodyweight(String(Math.round(currentVal * 0.453592 * 10) / 10));
+                            }
+                          } else {
+                            setBodyweight(nextUnit === 'kg' ? '70' : '154');
+                          }
+                          setUnit(nextUnit);
+                        }}
+                        options={[
+                          { value: 'kg', label: 'kg' },
+                          { value: 'lbs', label: 'lbs' },
+                        ]}
+                        size="sm"
+                        fullWidth
+                      />
+                    </div>
+                  </div>
                   <input
+                    id="athlete-bodyweight-input"
                     type="number"
                     step="0.5"
+                    min="30"
+                    max="300"
                     value={bodyweight}
-                    onChange={(e) => setBodyweight(e.target.value)}
+                    onChange={(e) => {
+                      setBodyweight(e.target.value);
+                      if (formError) setFormError(null);
+                    }}
                     placeholder={unit === 'kg' ? '70' : '154'}
-                    className="flex-1 text-sm font-semibold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary"
+                    className="w-full text-sm font-semibold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary"
+                    required
                   />
-                  <div className="w-24 shrink-0">
-                    <SegmentedControl
-                      value={unit}
-                      onChange={(val) => {
-                        const nextUnit = val as 'kg' | 'lbs';
-                        const currentVal = parseFloat(bodyweight);
-                        if (!isNaN(currentVal) && currentVal > 0) {
-                          if (nextUnit === 'lbs' && unit === 'kg') {
-                            setBodyweight(String(Math.round(currentVal * 2.20462 * 10) / 10));
-                          } else if (nextUnit === 'kg' && unit === 'lbs') {
-                            setBodyweight(String(Math.round(currentVal * 0.453592 * 10) / 10));
-                          }
-                        } else {
-                          setBodyweight(nextUnit === 'kg' ? '70' : '154');
-                        }
-                        setUnit(nextUnit);
-                      }}
-                      options={[
-                        { value: 'kg', label: 'kg' },
-                        { value: 'lbs', label: 'lbs' },
-                      ]}
-                      size="sm"
-                      fullWidth
-                    />
-                  </div>
                 </div>
+
+                {/* Height */}
+                <div className="space-y-1.5">
+                  <label htmlFor="athlete-height-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                    5. Height (cm)
+                  </label>
+                  <input
+                    id="athlete-height-input"
+                    type="number"
+                    step="1"
+                    min="100"
+                    max="250"
+                    value={height}
+                    onChange={(e) => setHeight(e.target.value)}
+                    placeholder={gender === 'male' ? '175' : '162'}
+                    className="w-full text-sm font-semibold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* 5. Age & Training Frequency */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Age */}
+                <div className="space-y-1.5">
+                  <label htmlFor="athlete-age-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                    6. Age (Years)
+                  </label>
+                  <input
+                    id="athlete-age-input"
+                    type="number"
+                    step="1"
+                    min="14"
+                    max="90"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                    placeholder="25"
+                    className="w-full text-sm font-semibold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 outline-none focus:border-accent text-text-primary"
+                    required
+                  />
+                </div>
+
+                {/* Training Frequency */}
+                <div className="space-y-1.5">
+                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                    7. Training Days / Wk
+                  </span>
+                  <SegmentedControl
+                    value={String(daysPerWeek)}
+                    onChange={(val) => setDaysPerWeek(parseInt(val, 10))}
+                    options={[
+                      { value: '3', label: '3d' },
+                      { value: '4', label: '4d' },
+                      { value: '5', label: '5d' },
+                      { value: '6', label: '6d' },
+                    ]}
+                    size="sm"
+                    fullWidth
+                  />
+                </div>
+              </div>
+
+              {/* 6. Dietary Preference */}
+              <div className="space-y-1.5">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                  8. Dietary Preference
+                </span>
+                <SegmentedControl
+                  value={dietPreference}
+                  onChange={(val) => setDietPreference(val as DietPreference)}
+                  options={[
+                    { value: 'non_vegetarian', label: 'Non-Veg' },
+                    { value: 'eggitarian', label: 'Egg' },
+                    { value: 'vegetarian', label: 'Veg' },
+                    { value: 'vegan', label: 'Vegan' },
+                  ]}
+                  size="sm"
+                  fullWidth
+                />
               </div>
 
               {/* Launch CTA */}

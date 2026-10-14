@@ -1495,7 +1495,8 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsDiscardConfirmOpen(true)}
-            className="w-8 h-8 rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95"
+            className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95"
+            aria-label="Discard Workout"
             title="Discard Workout"
           >
             <X className="w-5 h-5" />
@@ -1519,7 +1520,8 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              aria-label="Workout Tools & Options"
               title="Workout Tools & Options"
             >
               <MoreHorizontal className="w-4 h-4" />
@@ -1639,7 +1641,7 @@ export default function ActiveWorkoutScreen({
           type="button"
           disabled={activeExerciseIdx === 0}
           onClick={() => setActiveExerciseIdx((prev) => Math.max(0, prev - 1))}
-          className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center gap-1 cursor-pointer"
+          className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center justify-center gap-1 cursor-pointer"
           aria-label="Previous exercise"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -1669,7 +1671,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsAddExerciseModalOpen(true)}
-            className="p-1.5 rounded-lg text-text-muted hover:text-accent transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-accent transition-colors flex items-center justify-center cursor-pointer"
             title="Add Exercise"
             aria-label="Add Exercise"
           >
@@ -1679,7 +1681,7 @@ export default function ActiveWorkoutScreen({
             type="button"
             disabled={activeExerciseIdx === exercises.length - 1}
             onClick={() => setActiveExerciseIdx((prev) => Math.min(exercises.length - 1, prev + 1))}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center gap-1 cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary disabled:opacity-20 transition-all flex items-center justify-center gap-1 cursor-pointer"
             aria-label="Next exercise"
           >
             <span className="text-xs font-semibold hidden sm:inline">Next</span>
@@ -1750,8 +1752,9 @@ export default function ActiveWorkoutScreen({
                           setLocalExerciseName('');
                           renameInputRef.current?.focus();
                         }}
-                        className="absolute right-2.5 p-1 rounded-md text-text-muted hover:text-text-primary transition-colors"
+                        className="absolute right-2.5 p-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary transition-colors"
                         title="Clear search"
+                        aria-label="Clear search"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1877,14 +1880,16 @@ export default function ActiveWorkoutScreen({
                   </div>
                 </div>
               ) : (
-                <div
+                <button
+                  type="button"
                   onClick={() => {
                     setLocalExerciseName(currentExercise.name);
                     setSelectedSuggestionIdx(-1);
                     setIsEditingName(true);
                     setTimeout(() => renameInputRef.current?.select(), 50);
                   }}
-                  className="flex items-center gap-2 cursor-pointer group"
+                  className="flex items-center gap-2 cursor-pointer group text-left bg-transparent border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-lg"
+                  aria-label={`Change or rename exercise: ${currentExercise.name || 'Untitled Exercise'}`}
                   title="Tap to change or rename exercise"
                 >
                   <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans truncate group-hover:text-accent transition-colors">
@@ -1894,7 +1899,7 @@ export default function ActiveWorkoutScreen({
                     <Edit2 className="w-3 h-3" />
                     <span className="text-[10px] font-semibold hidden sm:inline">Change</span>
                   </div>
-                </div>
+                </button>
               )}
             </div>
 
@@ -1902,7 +1907,8 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={() => handleRemoveExercise(activeExerciseIdx)}
-                className="p-2 rounded-xl text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                aria-label="Remove this exercise from workout"
                 title="Remove this exercise from workout"
               >
                 <Trash2 className="w-4 h-4" />
@@ -1977,14 +1983,15 @@ export default function ActiveWorkoutScreen({
                     }`}
                     title={s.status === 'skipped' ? `Skipped Set ${idx + 1}` : s.isWarmup ? `Warm-up Set ${idx + 1}` : `Set ${idx + 1}`}
                   >
-                    {isActiveSetCompleted(s) ? '✓' : s.status === 'skipped' ? 'S' : s.isWarmup ? 'W' : idx + 1}
+                    {isActiveSetCompleted(s) ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : s.status === 'skipped' ? 'S' : s.isWarmup ? 'W' : idx + 1}
                   </button>
                 ))}
                 <button
                   type="button"
                   onClick={handleAddSet}
-                  className="w-7 h-7 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
                   title="Add set"
+                  aria-label="Add set"
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
@@ -1995,7 +2002,7 @@ export default function ActiveWorkoutScreen({
               /* Post-exercise effort prompt (Idea 5: Ask effort once per exercise) */
               <div className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/40 text-center space-y-4 animate-fade-in shadow-md">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto text-xl font-bold">
-                  ✓
+                  <Check className="w-6 h-6 stroke-[3]" />
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-text-primary tracking-tight">
@@ -2095,7 +2102,8 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, -currentWeightStep)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        aria-label="Decrease weight"
+                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         -
                       </button>
@@ -2103,6 +2111,7 @@ export default function ActiveWorkoutScreen({
                         <input
                           type="text"
                           inputMode="decimal"
+                          aria-label={isCurrentBodyweight ? `Added weight in ${userUnit}` : `Weight in ${userUnit}`}
                           value={weightInputStr !== null ? weightInputStr : (currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '')}
                           placeholder={isCurrentBodyweight ? '0 (BW)' : (currentExercise.sets[activeSetIdx]?.prescribedWeight !== undefined ? String(currentExercise.sets[activeSetIdx].prescribedWeight) : '—')}
                           onFocus={(e) => {
@@ -2146,7 +2155,8 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, currentWeightStep)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        aria-label="Increase weight"
+                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         +
                       </button>
@@ -2159,7 +2169,8 @@ export default function ActiveWorkoutScreen({
                           key={delta}
                           type="button"
                           onClick={() => handleWeightStep(activeSetIdx, delta)}
-                          className="px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                          aria-label={`Adjust weight by ${delta > 0 ? `+${delta}` : delta} ${userUnit}`}
+                          className="px-2 py-1 min-h-[36px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer flex items-center justify-center"
                         >
                           {delta > 0 ? `+${delta}` : delta}
                         </button>
@@ -2176,13 +2187,15 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, -1)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        aria-label="Decrease reps"
+                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         -
                       </button>
                       <input
                         type="text"
                         inputMode="numeric"
+                        aria-label="Reps"
                         value={currentExercise.sets[activeSetIdx]?.reps ?? ''}
                         onFocus={(e) => e.target.select()}
                         onChange={(e) => {
@@ -2196,7 +2209,8 @@ export default function ActiveWorkoutScreen({
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, 1)}
-                        className="w-10 h-10 rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        aria-label="Increase reps"
+                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
                       >
                         +
                       </button>
@@ -2320,6 +2334,7 @@ export default function ActiveWorkoutScreen({
                         <input
                           type="text"
                           inputMode="decimal"
+                          aria-label={isCurrentBodyweight ? `Set ${sIdx + 1} added weight in ${userUnit}` : `Set ${sIdx + 1} weight in ${userUnit}`}
                           value={set.weight !== undefined ? String(set.weight) : ''}
                           placeholder={isCurrentBodyweight ? '0 (BW)' : (set.prescribedWeight !== undefined ? String(set.prescribedWeight) : '—')}
                           onFocus={(e) => e.target.select()}
@@ -2365,6 +2380,7 @@ export default function ActiveWorkoutScreen({
                       <input
                         type="text"
                         inputMode="numeric"
+                        aria-label={`Set ${sIdx + 1} reps`}
                         value={set.reps ?? ''}
                         placeholder="1"
                         onFocus={(e) => e.target.select()}
@@ -2454,8 +2470,8 @@ export default function ActiveWorkoutScreen({
             {currentExercise.sets.length > 0 && currentExercise.sets.every(isActiveSetCompleted) && (
               <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-bg-card to-accent/15 border border-emerald-500/40 flex items-center justify-between gap-3 animate-fade-in my-3 shadow-md">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm shrink-0">
-                    ✓
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Check className="w-4 h-4 stroke-[3]" />
                   </div>
                   <div>
                     <p className="text-xs font-black text-text-primary">
@@ -2584,7 +2600,8 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => setIsRestTimerDismissed(true)}
-                  className="p-1 rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                  className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                  aria-label="Hide timer controls"
                   title="Hide timer controls"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -2653,7 +2670,8 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={() => setIsExerciseJumpOpen(false)}
-                className="p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                aria-label="Close jump to exercise"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -2692,7 +2710,7 @@ export default function ActiveWorkoutScreen({
                             : 'bg-bg-secondary text-text-muted border border-border'
                         }`}
                       >
-                        {isDone ? '✓' : idx + 1}
+                        {isDone ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : idx + 1}
                       </span>
                       <div className="min-w-0">
                         <div className="font-bold text-xs truncate font-sans">
@@ -2729,7 +2747,12 @@ export default function ActiveWorkoutScreen({
                 <Flame className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Warm-up Sets Generator</h3>
               </div>
-              <button type="button" onClick={() => setIsWarmupModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button
+                type="button"
+                onClick={() => setIsWarmupModalOpen(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close warm-up generator"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2793,7 +2816,12 @@ export default function ActiveWorkoutScreen({
                 <Dumbbell className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Plate Calculator</h3>
               </div>
-              <button type="button" onClick={() => setIsPlateModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button
+                type="button"
+                onClick={() => setIsPlateModalOpen(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close plate calculator"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -2805,8 +2833,9 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setPlateTargetWeight((w) => Math.max(20, Math.round((w - 2.5) * 10) / 10))}
-                    className="w-8 h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all border border-border/40"
-                    title="-2.5 kg"
+                    className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all border border-border/40 cursor-pointer"
+                    aria-label={`Decrease target barbell weight by 2.5 ${userUnit}`}
+                    title={`-2.5 ${userUnit}`}
                   >
                     -2.5
                   </button>
@@ -2814,6 +2843,7 @@ export default function ActiveWorkoutScreen({
                     <input
                       type="text"
                       inputMode="decimal"
+                      aria-label="Target barbell weight"
                       value={plateTargetWeight || ''}
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => {
@@ -2832,8 +2862,9 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setPlateTargetWeight((w) => Math.round((w + 2.5) * 10) / 10)}
-                    className="w-8 h-8 rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all border border-border/40"
-                    title="+2.5 kg"
+                    className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-bg-card hover:bg-accent/20 active:scale-90 text-text-secondary hover:text-accent font-mono font-bold text-xs flex items-center justify-center transition-all border border-border/40 cursor-pointer"
+                    aria-label={`Increase target barbell weight by 2.5 ${userUnit}`}
+                    title={`+2.5 ${userUnit}`}
                   >
                     +2.5
                   </button>
@@ -3024,7 +3055,12 @@ export default function ActiveWorkoutScreen({
                 <Trophy className="w-5 h-5 text-accent" />
                 <h3 className="font-bold text-text-primary">Workout Summary</h3>
               </div>
-              <button type="button" onClick={() => setIsFinishModalOpen(false)} className="text-text-muted hover:text-text-primary">
+              <button
+                type="button"
+                onClick={() => setIsFinishModalOpen(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close workout summary"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -3138,7 +3174,8 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={() => setActiveRpePickerSetIdx(null)}
-                className="p-1 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
+                aria-label="Close effort picker"
               >
                 <X className="w-4 h-4" />
               </button>

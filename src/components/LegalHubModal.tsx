@@ -55,18 +55,21 @@ export default function LegalHubModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            aria-label="Close Legal Hub"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-bg-secondary rounded-xl border border-border/70 text-2xs font-mono font-semibold">
+        <div role="tablist" aria-label="Legal documents" className="grid grid-cols-4 gap-1 p-1 bg-bg-secondary rounded-xl border border-border/70 text-2xs font-mono font-semibold">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'privacy'}
             onClick={() => setActiveTab('privacy')}
-            className={`py-2 px-1 rounded-lg text-center transition-all ${
+            className={`py-2.5 px-1 min-h-[40px] flex items-center justify-center rounded-lg text-center transition-all ${
               activeTab === 'privacy'
                 ? 'bg-accent text-bg-primary font-bold shadow-xs'
                 : 'text-text-muted hover:text-text-primary'

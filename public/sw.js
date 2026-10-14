@@ -5,6 +5,9 @@ const STATIC_PRECACHE = [
   '/',
   '/manifest.json',
   '/icon.svg',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/icon-maskable-512.png',
 ];
 
 // Install Event: Precaches the core app shell

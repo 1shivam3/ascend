@@ -185,9 +185,25 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    let initialTab: TabId = 'home';
     try {
-      window.history.replaceState({ tab: 'home', root: true, stackDepth: 0 }, '');
-      window.history.pushState({ tab: 'home', root: true, stackDepth: 1 }, '');
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab') as TabId | null;
+      if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs'].includes(tabParam)) {
+        if (tabParam === 'prs') {
+          setProgressInitialTab('prs');
+          initialTab = 'progress';
+        } else {
+          initialTab = tabParam;
+        }
+        setActiveTab(initialTab);
+        setHistoryStack(['home', initialTab]);
+      }
+    } catch {}
+
+    try {
+      window.history.replaceState({ tab: initialTab, root: true, stackDepth: 0 }, '');
+      window.history.pushState({ tab: initialTab, root: true, stackDepth: 1 }, '');
     } catch {}
 
     const handlePopState = (event: PopStateEvent) => {

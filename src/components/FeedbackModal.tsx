@@ -174,7 +174,8 @@ export default function FeedbackModal({
           <button
             type="button"
             onClick={handleResetAndClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+            className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors cursor-pointer"
+            aria-label="Close Feedback"
           >
             <X className="w-4 h-4" />
           </button>

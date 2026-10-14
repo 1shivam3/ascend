@@ -25,6 +25,6 @@ export function useSupabaseSync() {
     signInWithGoogle: () => syncEngine.signInWithGoogle(),
     sendEmailOtp: (email: string) => syncEngine.sendEmailOtp(email),
     verifyEmailOtp: (email: string, token: string) => syncEngine.verifyEmailOtp(email, token),
-    signOut: () => syncEngine.signOut(),
+    signOut: (options?: { clearLocalData?: boolean }) => syncEngine.signOut(options),
   };
 }

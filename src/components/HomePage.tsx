@@ -17,6 +17,7 @@ import {
   Camera,
   Sparkles,
   X,
+  Trash2,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
@@ -263,6 +264,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
+  const [showDiscardDraftConfirm, setShowDiscardDraftConfirm] = useState(false);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -580,11 +582,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  clearWorkoutDraft();
-                  toast.info('Session draft discarded.');
-                }}
-                className="px-3 py-3 rounded-xl border border-border/80 text-text-muted hover:text-danger text-xs font-semibold cursor-pointer"
+                onClick={() => setShowDiscardDraftConfirm(true)}
+                className="px-3.5 py-3 rounded-xl border border-border/80 text-text-muted hover:text-danger text-xs font-semibold cursor-pointer min-h-[44px] flex items-center justify-center transition-colors"
+                aria-label="Discard ongoing workout draft"
               >
                 Discard
               </button>
@@ -913,6 +913,54 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               >
                 <span>Set today as Rest Day (Recovery)</span>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Discard Workout Draft Confirmation Dialog ── */}
+      {showDiscardDraftConfirm && (
+        <div className="modal-overlay z-50" onClick={() => setShowDiscardDraftConfirm(false)}>
+          <div
+            className="modal-content max-w-sm w-full p-5 space-y-4"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="discard-draft-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-danger/15 text-danger flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 id="discard-draft-title" className="text-sm font-bold text-text-primary">
+                  Discard Ongoing Workout?
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Are you sure you want to discard your workout draft? All completed sets in this session will be lost.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDiscardDraftConfirm(false)}
+                className="btn-secondary flex-1 py-2.5 text-xs font-bold min-h-[44px]"
+              >
+                Keep Workout
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearWorkoutDraft();
+                  setShowDiscardDraftConfirm(false);
+                  toast.info('Session draft discarded.');
+                }}
+                className="btn-danger flex-1 py-2.5 text-xs font-bold min-h-[44px]"
+              >
+                Discard Session
               </button>
             </div>
           </div>

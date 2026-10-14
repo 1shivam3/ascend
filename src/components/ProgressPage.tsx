@@ -291,7 +291,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <button
               type="button"
               onClick={goBack}
-              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
               aria-label="Go back to previous page"
               title="Go back"
             >
@@ -311,8 +311,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <button
             type="button"
             onClick={() => setIsWeeklyRecapOpen(true)}
-            className="btn-secondary py-1.5 px-2.5 text-xs font-bold flex items-center gap-1.5 text-text-primary hover:text-accent border-border hover:border-accent/40 transition-colors shadow-xs cursor-pointer"
+            className="btn-secondary py-2 min-h-[44px] px-2.5 text-xs font-bold flex items-center gap-1.5 text-text-primary hover:text-accent border-border hover:border-accent/40 transition-colors shadow-xs cursor-pointer"
             title="Generate Weekly Training Card (WhatsApp / Instagram)"
+            aria-label="Generate Weekly Training Card"
           >
             <Share2 className="w-3.5 h-3.5 text-accent" />
             <span className="text-2xs font-bold hidden sm:inline">Weekly Card</span>
@@ -320,7 +321,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <button
             type="button"
             onClick={() => setIsToolsMenuOpen(true)}
-            className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="py-2 min-h-[44px] px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             title="Analytics Tools & Actions"
             aria-label="Analytics Tools"
           >
@@ -331,13 +332,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       </header>
 
       {/* Sub-Navigation (3 clean tabs) */}
-      <div className="flex items-center gap-2 border-b border-border/80 pb-2">
+      <div role="tablist" aria-label="Progress views" className="flex items-center gap-2 border-b border-border/80 pb-2">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={activeTab === tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all text-center cursor-pointer ${
+            className={`flex-1 py-2.5 min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
               activeTab === tab.id
                 ? 'bg-accent text-white shadow-xs'
                 : 'bg-bg-secondary text-text-muted hover:text-text-primary'
@@ -352,11 +355,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'strength' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-view selector for Strength */}
-          <div className="flex items-center gap-1.5 p-1 bg-bg-secondary rounded-xl border border-border/70">
+          <div role="tablist" aria-label="Strength views" className="flex items-center gap-1.5 p-1 bg-bg-secondary rounded-xl border border-border/70">
             <button
               type="button"
+              role="tab"
+              aria-selected={strengthSubView === 'overview'}
               onClick={() => setStrengthSubView('overview')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
                 strengthSubView === 'overview'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
@@ -366,8 +371,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={strengthSubView === 'twin'}
               onClick={() => setStrengthSubView('twin')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
+              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
                 strengthSubView === 'twin'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
@@ -378,8 +385,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={strengthSubView === 'prs'}
               onClick={() => setStrengthSubView('prs')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer ${
+              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
                 strengthSubView === 'prs'
                   ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
                   : 'text-text-muted hover:text-text-primary'
@@ -391,6 +400,74 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
           {strengthSubView === 'overview' ? (
             <div className="space-y-4">
+              {/* Beginner Onboarding Trajectory Banner (when workouts.length < 3) */}
+              {workouts.length < 3 && (
+                <div className="card p-4 sm:p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/10 border border-accent/40 space-y-3.5 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-accent" />
+                      <span className="text-xs font-bold text-accent font-mono uppercase tracking-wider">
+                        Progression Calibration
+                      </span>
+                    </div>
+                    <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent/20 text-accent">
+                      {workouts.length}/3 Workouts
+                    </span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-text-primary">
+                      Unlock Full Hypertrophy &amp; Overload Cockpit
+                    </h3>
+                    <p className="text-xs text-text-secondary mt-1 leading-relaxed">
+                      Complete 3 workouts and log your bodyweight to unlock verified progressive overload trajectories, volume landmarks, fatigue indexing, and recovery intelligence.
+                    </p>
+                  </div>
+
+                  {/* 3 Step Milestone checklist */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-2xs font-mono">
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${workouts.length > 0 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-bg-secondary/60 border-border text-text-muted'}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>1. Log 3 workouts ({workouts.length}/3 done)</span>
+                    </div>
+                    <div className={`p-2.5 rounded-xl border flex items-center gap-2 ${bodyMetrics.length > 0 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-bg-secondary/60 border-border text-text-muted'}`}>
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>2. Log bodyweight ({bodyMetrics.length > 0 ? 'Calibrated' : 'Pending'})</span>
+                    </div>
+                  </div>
+
+                  {/* Quick CTAs */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.('workout')}
+                      className="btn-primary py-2 px-3 text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Dumbbell className="w-3.5 h-3.5" />
+                      <span>Log Workout</span>
+                    </button>
+                    {bodyMetrics.length === 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsWeightModalOpen(true)}
+                        className="btn-secondary py-2 px-3 text-xs font-semibold flex items-center gap-1.5 cursor-pointer text-text-secondary hover:text-text-primary"
+                      >
+                        <Scale className="w-3.5 h-3.5 text-accent" />
+                        <span>Log Weight</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setStrengthSubView('prs')}
+                      className="py-2 px-3 text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer ml-auto"
+                    >
+                      <Trophy className="w-3.5 h-3.5" />
+                      <span>View Personal Records →</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Grounded Insight Banner (No fake progress on new accounts) */}
               <div className="card p-3.5 bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/30 space-y-1.5 shadow-xs">
                 <div className="flex items-center gap-2">
@@ -718,7 +795,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <button
                     type="button"
                     onClick={() => setIsWeightModalOpen(true)}
-                    className="btn-primary py-1.5 px-3 text-xs font-semibold flex items-center gap-1"
+                    className="btn-primary py-2 min-h-[44px] px-3.5 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Log Weight</span>
@@ -903,7 +980,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <button
                 type="button"
                 onClick={() => setIsDotsInfoOpen(false)}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+                aria-label="Close DOTS info"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -982,7 +1060,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                aria-label="Close progress tools"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -83,7 +83,8 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
         profile.bodyweightKg,
         primaryGoal,
         profile.gender || 'male',
-        profile.heightCm
+        profile.heightCm,
+        profile.age
       );
       setMacroGoals(newMacros);
       toast.success(

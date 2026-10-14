@@ -248,7 +248,8 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+            aria-label="Close Data Vault"
           >
             <X className="w-5 h-5" />
           </button>

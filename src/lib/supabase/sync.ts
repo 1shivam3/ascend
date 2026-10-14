@@ -184,7 +184,7 @@ class SupabaseSyncEngine {
     }
   }
 
-  public async signOut(): Promise<{ error?: string }> {
+  public async signOut(options?: { clearLocalData?: boolean }): Promise<{ error?: string }> {
     clearTimeout(this.debounceTimer);
     this.isSyncing = false;
     this.currentUser = null;
@@ -195,6 +195,10 @@ class SupabaseSyncEngine {
       try {
         localStorage.setItem('ascend_logged_out', 'true');
       } catch {}
+    }
+
+    if (options?.clearLocalData) {
+      useStore.getState().logout({ clearLocalData: true });
     }
 
     const supabase = getSupabase();
@@ -275,11 +279,19 @@ class SupabaseSyncEngine {
 
       const localState = useStore.getState();
 
-      // 3. Reconcile Cloud -> Local (Recovery on phone or new device)
+      // Detect if the existing local profile belongs to a DIFFERENT authenticated account
+      const isCrossAccountSwitch = Boolean(
+        localState.profile?.id &&
+        localState.profile.id !== user.id &&
+        !localState.profile.id.startsWith('user_')
+      );
+
+      // 3. Reconcile Cloud -> Local (Recovery on phone, device switch, or account switch)
       let needsLocalUpdate = false;
       const updates: any = {};
 
-      if (!localState.profile && remoteProfile.data) {
+      if (remoteProfile.data) {
+        // Authoritative cloud profile for the authenticated account
         const rp = remoteProfile.data;
         updates.profile = {
           id: rp.id,
@@ -295,74 +307,170 @@ class SupabaseSyncEngine {
         };
         updates.hasCompletedOnboarding = true;
         needsLocalUpdate = true;
-      }
-
-      // Merge PRs
-      if (remotePRs.data && remotePRs.data.length > 0) {
-        const localPRMap = new Map(localState.prs.map((p) => [p.id, p]));
-        let prMerged = false;
-        for (const r of remotePRs.data) {
-          if (!localPRMap.has(r.id)) {
-            localPRMap.set(r.id, {
-              id: r.id,
-              exercise: r.exercise,
-              weightKg: Number(r.weight_kg),
-              weightLbs: Number(r.weight_lbs),
-              reps: Number(r.reps),
-              oneRepMax: Number(r.one_rep_max),
-              date: r.date,
-              notes: r.notes || undefined,
-            });
-            prMerged = true;
-          }
-        }
-        if (prMerged) {
-          updates.prs = Array.from(localPRMap.values());
+      } else if (localState.profile && !isCrossAccountSwitch) {
+        // Guest profile linking to newly authenticated cloud account for the first time
+        if (localState.profile.id !== user.id) {
+          updates.profile = {
+            ...localState.profile,
+            id: user.id,
+          };
           needsLocalUpdate = true;
         }
       }
 
-      // Merge Workouts
-      if (remoteWorkouts.data && remoteWorkouts.data.length > 0) {
-        const localWMap = new Map(localState.workouts.map((w) => [w.id, w]));
-        let wMerged = false;
-        for (const r of remoteWorkouts.data) {
-          if (!localWMap.has(r.id)) {
-            localWMap.set(r.id, {
-              id: r.id,
-              name: r.name || undefined,
-              date: r.date,
-              durationMinutes: r.duration_minutes || undefined,
-              notes: r.notes || undefined,
-              exercises: r.exercises || [],
-            });
-            wMerged = true;
-          }
-        }
-        if (wMerged) {
-          updates.workouts = Array.from(localWMap.values());
-          needsLocalUpdate = true;
-        }
-      }
+      if (isCrossAccountSwitch) {
+        // Cross-account switch: Replace local store completely with current user's remote records
+        updates.prs = (remotePRs.data || []).map((r: any) => ({
+          id: r.id,
+          exercise: r.exercise,
+          weightKg: Number(r.weight_kg),
+          weightLbs: Number(r.weight_lbs),
+          reps: Number(r.reps),
+          oneRepMax: Number(r.one_rep_max),
+          date: r.date,
+          notes: r.notes || undefined,
+        }));
+        updates.workouts = (remoteWorkouts.data || []).map((r: any) => ({
+          id: r.id,
+          name: r.name || undefined,
+          date: r.date,
+          durationMinutes: r.duration_minutes || undefined,
+          notes: r.notes || undefined,
+          exercises: r.exercises || [],
+        }));
+        updates.meals = (remoteMeals.data || []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          date: r.date,
+          foods: r.foods || [],
+        }));
+        updates.bodyMetrics = (remoteMetrics.data || []).map((r: any) => ({
+          id: r.id,
+          date: r.date,
+          weightKg: Number(r.weight_kg),
+          heightCm: r.height_cm ? Number(r.height_cm) : undefined,
+          notes: r.notes || undefined,
+        }));
+        updates.plannedWorkouts = (remotePlans.data || []).map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          exercises: r.exercises || [],
+          createdAt: r.created_at || new Date().toISOString(),
+        }));
+        needsLocalUpdate = true;
+      } else {
+        // Same account / guest migration: Merge remote cloud records into local store
 
-      // Merge Meals
-      if (remoteMeals.data && remoteMeals.data.length > 0) {
-        const localMMap = new Map(localState.meals.map((m) => [m.id, m]));
-        let mMerged = false;
-        for (const r of remoteMeals.data) {
-          if (!localMMap.has(r.id)) {
-            localMMap.set(r.id, {
-              id: r.id,
-              name: r.name,
-              date: r.date,
-              foods: r.foods || [],
-            });
-            mMerged = true;
+        // Merge PRs
+        if (remotePRs.data && remotePRs.data.length > 0) {
+          const localPRMap = new Map(localState.prs.map((p) => [p.id, p]));
+          let prMerged = false;
+          for (const r of remotePRs.data) {
+            if (!localPRMap.has(r.id)) {
+              localPRMap.set(r.id, {
+                id: r.id,
+                exercise: r.exercise,
+                weightKg: Number(r.weight_kg),
+                weightLbs: Number(r.weight_lbs),
+                reps: Number(r.reps),
+                oneRepMax: Number(r.one_rep_max),
+                date: r.date,
+                notes: r.notes || undefined,
+              });
+              prMerged = true;
+            }
+          }
+          if (prMerged) {
+            updates.prs = Array.from(localPRMap.values());
+            needsLocalUpdate = true;
           }
         }
-        if (mMerged) {
-          updates.meals = Array.from(localMMap.values());
-          needsLocalUpdate = true;
+
+        // Merge Workouts
+        if (remoteWorkouts.data && remoteWorkouts.data.length > 0) {
+          const localWMap = new Map(localState.workouts.map((w) => [w.id, w]));
+          let wMerged = false;
+          for (const r of remoteWorkouts.data) {
+            if (!localWMap.has(r.id)) {
+              localWMap.set(r.id, {
+                id: r.id,
+                name: r.name || undefined,
+                date: r.date,
+                durationMinutes: r.duration_minutes || undefined,
+                notes: r.notes || undefined,
+                exercises: r.exercises || [],
+              });
+              wMerged = true;
+            }
+          }
+          if (wMerged) {
+            updates.workouts = Array.from(localWMap.values());
+            needsLocalUpdate = true;
+          }
+        }
+
+        // Merge Meals
+        if (remoteMeals.data && remoteMeals.data.length > 0) {
+          const localMMap = new Map(localState.meals.map((m) => [m.id, m]));
+          let mMerged = false;
+          for (const r of remoteMeals.data) {
+            if (!localMMap.has(r.id)) {
+              localMMap.set(r.id, {
+                id: r.id,
+                name: r.name,
+                date: r.date,
+                foods: r.foods || [],
+              });
+              mMerged = true;
+            }
+          }
+          if (mMerged) {
+            updates.meals = Array.from(localMMap.values());
+            needsLocalUpdate = true;
+          }
+        }
+
+        // Merge Body Metrics (Weigh-ins)
+        if (remoteMetrics.data && remoteMetrics.data.length > 0) {
+          const localBMap = new Map((localState.bodyMetrics || []).map((b) => [b.id, b]));
+          let bMerged = false;
+          for (const r of remoteMetrics.data) {
+            if (!localBMap.has(r.id)) {
+              localBMap.set(r.id, {
+                id: r.id,
+                date: r.date,
+                weightKg: Number(r.weight_kg),
+                heightCm: r.height_cm ? Number(r.height_cm) : undefined,
+                notes: r.notes || undefined,
+              });
+              bMerged = true;
+            }
+          }
+          if (bMerged) {
+            updates.bodyMetrics = Array.from(localBMap.values());
+            needsLocalUpdate = true;
+          }
+        }
+
+        // Merge Planned Workouts (Routines & Templates)
+        if (remotePlans.data && remotePlans.data.length > 0) {
+          const localPMap = new Map((localState.plannedWorkouts || []).map((p) => [p.id, p]));
+          let pMerged = false;
+          for (const r of remotePlans.data) {
+            if (!localPMap.has(r.id)) {
+              localPMap.set(r.id, {
+                id: r.id,
+                name: r.name,
+                exercises: r.exercises || [],
+                createdAt: r.created_at || new Date().toISOString(),
+              });
+              pMerged = true;
+            }
+          }
+          if (pMerged) {
+            updates.plannedWorkouts = Array.from(localPMap.values());
+            needsLocalUpdate = true;
+          }
         }
       }
 
@@ -372,7 +480,9 @@ class SupabaseSyncEngine {
       }
 
       // 4. Push Local -> Cloud (Initial Migration or Incremental Updates)
-      await this.pushLocalData(user.id);
+      if (!isCrossAccountSwitch) {
+        await this.pushLocalData(user.id);
+      }
 
       this.status = 'synced';
       this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
