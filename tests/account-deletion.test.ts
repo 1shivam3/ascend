@@ -47,6 +47,7 @@ describe('Account Deletion & Data Safety (Task 1)', () => {
       name: 'Test Athlete',
       gender: 'male',
       bodyweightKg: 80,
+      bodyweightLbs: 176,
       unit: 'kg',
       createdAt: new Date().toISOString(),
     });

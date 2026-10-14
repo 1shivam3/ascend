@@ -8,6 +8,7 @@ import { validateImageFile, resizeAndCompressImage, captureVideoFrame } from '@/
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import { useAppNavigation } from '@/lib/navigation';
 import {
   Camera,
   Upload,
@@ -210,6 +211,41 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       }
     };
   }, [stopLiveCamera]);
+
+  const { registerBackHandler } = useAppNavigation();
+
+  // If live camera is active inside the scanner, Back stops the camera
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isLiveCameraActive) {
+      return registerBackHandler(() => {
+        stopLiveCamera();
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isLiveCameraActive, stopLiveCamera, registerBackHandler]);
+
+  // If editing an item, Back dismisses editing
+  useEffect(() => {
+    if (!isOpen) return;
+    if (editingItemIndex !== null || showAddItem) {
+      return registerBackHandler(() => {
+        setEditingItemIndex(null);
+        setShowAddItem(false);
+        return true;
+      }, 110);
+    }
+  }, [isOpen, editingItemIndex, showAddItem, registerBackHandler]);
+
+  // If ScanMealModal itself is open, Back closes it
+  useEffect(() => {
+    if (isOpen) {
+      return registerBackHandler(() => {
+        onClose();
+        return true;
+      }, 100);
+    }
+  }, [isOpen, onClose, registerBackHandler]);
 
   if (!isOpen) return null;
 

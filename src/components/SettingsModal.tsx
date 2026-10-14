@@ -37,6 +37,7 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import AuthModal from '@/components/AuthModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
+import { useAppNavigation } from '@/lib/navigation';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import { Button } from '@/components/ui/Button';
@@ -95,6 +96,109 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     window.addEventListener(TELEMETRY_CONSENT_EVENT, handler);
     return () => window.removeEventListener(TELEMETRY_CONSENT_EVENT, handler);
   }, []);
+
+  const { registerBackHandler } = useAppNavigation();
+
+  // Settings sub-modal back handlers (higher priority than SettingsModal itself)
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (showDeleteAccountModal) {
+      return registerBackHandler(() => {
+        setShowDeleteAccountModal(false);
+        return true;
+      }, 140);
+    }
+  }, [isOpen, showDeleteAccountModal, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (showLogoutConfirm) {
+      return registerBackHandler(() => {
+        setShowLogoutConfirm(false);
+        return true;
+      }, 130);
+    }
+  }, [isOpen, showLogoutConfirm, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isReminderCenterOpen) {
+      return registerBackHandler(() => {
+        setIsReminderCenterOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isReminderCenterOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isGoalSelectorOpen) {
+      return registerBackHandler(() => {
+        setIsGoalSelectorOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isGoalSelectorOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isDataVaultOpen) {
+      return registerBackHandler(() => {
+        setIsDataVaultOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isDataVaultOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isLegalHubOpen) {
+      return registerBackHandler(() => {
+        setIsLegalHubOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isLegalHubOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isBodyMetricsOpen) {
+      return registerBackHandler(() => {
+        setIsBodyMetricsOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isBodyMetricsOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isAuthModalOpen) {
+      return registerBackHandler(() => {
+        setIsAuthModalOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isAuthModalOpen, registerBackHandler]);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (isFeedbackModalOpen) {
+      return registerBackHandler(() => {
+        setIsFeedbackModalOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isFeedbackModalOpen, registerBackHandler]);
+
+  // Main SettingsModal back handler
+  React.useEffect(() => {
+    if (isOpen) {
+      return registerBackHandler(() => {
+        onClose();
+        return true;
+      }, 100);
+    }
+  }, [isOpen, onClose, registerBackHandler]);
 
   if (!isOpen) return null;
 

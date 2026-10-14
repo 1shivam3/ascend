@@ -735,6 +735,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
   }, [sharingPlan, registerBackHandler]);
 
+  useEffect(() => {
+    if (isModalOpen) {
+      return registerBackHandler(() => {
+        setIsModalOpen(false);
+        return true;
+      }, 100);
+    }
+  }, [isModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (expandedWorkouts.size > 0) {
+      return registerBackHandler(() => {
+        setExpandedWorkouts(new Set());
+        return true;
+      }, 80);
+    }
+  }, [expandedWorkouts, registerBackHandler]);
+
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
   useEffect(() => {
     if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => (typeof s.weight === 'number' && s.weight > 0) || s.reps > 0))) {

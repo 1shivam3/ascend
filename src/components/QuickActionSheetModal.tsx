@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -19,6 +19,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import { MealEntry } from '@/lib/types';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
+import { useAppNavigation } from '@/lib/navigation';
 
 interface QuickActionSheetModalProps {
   isOpen: boolean;
@@ -38,6 +39,36 @@ export default function QuickActionSheetModal({
   const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
   const [quickFoodQuery, setQuickFoodQuery] = useState('');
   const [isParsingFood, setIsParsingFood] = useState(false);
+  const { registerBackHandler } = useAppNavigation();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isWeightModalOpen) {
+      return registerBackHandler(() => {
+        setIsWeightModalOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isWeightModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isFeedbackModalOpen) {
+      return registerBackHandler(() => {
+        setIsFeedbackModalOpen(false);
+        return true;
+      }, 120);
+    }
+  }, [isOpen, isFeedbackModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isOpen) {
+      return registerBackHandler(() => {
+        onClose();
+        return true;
+      }, 100);
+    }
+  }, [isOpen, onClose, registerBackHandler]);
 
   if (!isOpen) return null;
 

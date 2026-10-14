@@ -23,6 +23,7 @@ import { saveCustomBarcode } from '@/lib/storage';
 import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { useAppNavigation } from '@/lib/navigation';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -402,6 +403,29 @@ export default function BarcodeScannerModal({
     isProcessingRef.current = false;
     startCamera();
   };
+
+  const { registerBackHandler } = useAppNavigation();
+
+  // If a product result or manual form is open, Back resets back to active camera scanner
+  useEffect(() => {
+    if (!isOpen) return;
+    if (scannedProduct || isNotFoundInDB) {
+      return registerBackHandler(() => {
+        handleScanAgain();
+        return true;
+      }, 110);
+    }
+  }, [isOpen, scannedProduct, isNotFoundInDB, registerBackHandler]);
+
+  // Main modal back handler
+  useEffect(() => {
+    if (isOpen) {
+      return registerBackHandler(() => {
+        handleClose();
+        return true;
+      }, 100);
+    }
+  }, [isOpen, handleClose, registerBackHandler]);
 
   if (!isOpen) return null;
 
