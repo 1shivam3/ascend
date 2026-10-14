@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
-import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import type { AuthUser } from '@/lib/supabase/sync';
 import {
   Dumbbell,
   ArrowRight,
@@ -18,11 +18,7 @@ import {
   User,
 } from 'lucide-react';
 import { AthleteGoal, DietPreference } from '@/lib/types';
-import { getGoalAdaptiveSplitTemplates } from '@/lib/workout-engine';
-import { buildDefaultWeeklySchedule } from '@/lib/workout-schedule';
-import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
-import { importFullBackupJSON } from '@/lib/storage';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -93,7 +89,7 @@ const GOALS: GoalOption[] = [
 
 export default function OnboardingScreen() {
   const toast = useToast();
-  const { user, signInWithGoogle } = useSupabaseSync();
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
 
   // Step 0: Auth choice (Google vs Guest)
   // Step 1: Quick basic details (Name, Goal, Sex, Bodyweight, Height, Age)
@@ -117,15 +113,33 @@ export default function OnboardingScreen() {
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Detect Google auth session or local snapshots
+  // Detect Google auth session or local snapshots on-demand
   useEffect(() => {
-    if (user && !user.isAnonymous) {
-      if (user.name) {
-        setName((prev) => prev || user.name || '');
-      }
-      setStep(1);
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    const hasAuthCallback = hash.includes('access_token') || hash.includes('error=') || search.includes('code=');
+    const hasExistingSession = Boolean(
+      localStorage.getItem('sb-auth-token') ||
+      Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    );
+
+    if (hasAuthCallback || hasExistingSession) {
+      import('@/lib/supabase/sync').then(({ syncEngine }) => {
+        syncEngine.init();
+        const unsub = syncEngine.subscribe((_s, _l, _e, user) => {
+          if (user && !user.isAnonymous) {
+            setAuthUser(user);
+            if (user.name) {
+              setName((prev) => prev || user.name || '');
+            }
+            setStep(1);
+          }
+        });
+        return unsub;
+      });
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -173,7 +187,9 @@ export default function OnboardingScreen() {
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     try {
-      const { error } = await signInWithGoogle();
+      const { syncEngine } = await import('@/lib/supabase/sync');
+      syncEngine.init();
+      const { error } = await syncEngine.signInWithGoogle();
       if (error) {
         toast.error(error, 'Sign-In Failed');
         setIsSigningIn(false);
@@ -193,10 +209,10 @@ export default function OnboardingScreen() {
     setStep(1);
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     setFormError(null);
 
-    const athleteName = name.trim() || user?.name?.trim();
+    const athleteName = name.trim() || authUser?.name?.trim();
     if (!athleteName) {
       setFormError('Please enter your name or athlete nickname.');
       toast.error('Athlete name is required.', 'Missing Name');
@@ -234,7 +250,7 @@ export default function OnboardingScreen() {
       : 25;
 
     const profileData = {
-      id: user?.id || safeRandomId('user'),
+      id: authUser?.id || safeRandomId('user'),
       name: athleteName,
       gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
@@ -250,6 +266,16 @@ export default function OnboardingScreen() {
     setProfile(profileData);
     setGoals([primaryGoal]);
     setUserMode('beginner');
+
+    const [
+      { getGoalAdaptiveSplitTemplates },
+      { buildDefaultWeeklySchedule },
+      { calculateRecommendedMacroGoals },
+    ] = await Promise.all([
+      import('@/lib/workout-engine'),
+      import('@/lib/workout-schedule'),
+      import('@/lib/macros'),
+    ]);
 
     const generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
 
@@ -305,9 +331,10 @@ export default function OnboardingScreen() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const text = event.target?.result as string;
+        const { importFullBackupJSON } = await import('@/lib/storage');
         const success = importFullBackupJSON(text);
         if (success) {
           toast.success('Successfully restored your profile and data!', 'Backup Restored');
@@ -380,11 +407,11 @@ export default function OnboardingScreen() {
 
         {/* ── STEP 0: SIGN-IN CHOICES (Google or Guest) ────────────────────── */}
         {step === 0 && (
-          <div className="space-y-4 animate-fade-in">
+          <div className="space-y-4">
             <Card variant="default" padding="md" className="space-y-4">
               <div className="text-center space-y-1">
                 <h2 className="text-sm font-bold text-text-primary">Get Started</h2>
-                <p className="text-xs text-slate-600 dark:text-text-muted">Choose how you want to use the app</p>
+                <p className="text-xs text-text-secondary">Choose how you want to use the app</p>
               </div>
 
               {/* Primary Option: Google OAuth */}
@@ -400,14 +427,14 @@ export default function OnboardingScreen() {
                 >
                   {isSigningIn ? 'Connecting to Google...' : 'Continue with Google'}
                 </Button>
-                <p className="text-xs text-center text-slate-600 dark:text-text-muted">
+                <p className="text-xs text-center text-text-secondary">
                   Recommended &bull; Automatic cloud backup across all your devices
                 </p>
               </div>
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-border/70" />
-                <span className="flex-shrink mx-3 text-xs font-mono text-slate-500 dark:text-text-muted uppercase">or</span>
+                <span className="flex-shrink mx-3 text-xs font-mono text-text-secondary uppercase">or</span>
                 <div className="flex-grow border-t border-border/70" />
               </div>
 
@@ -418,12 +445,12 @@ export default function OnboardingScreen() {
                   size="md"
                   fullWidth
                   onClick={handleGuestSelect}
-                  leftIcon={<User className="w-4 h-4 text-text-muted" />}
+                  leftIcon={<User className="w-4 h-4 text-text-secondary" />}
                   className="h-11 text-xs font-semibold cursor-pointer"
                 >
                   Continue as Guest
                 </Button>
-                <p className="text-xs text-center text-slate-600 dark:text-text-muted">
+                <p className="text-xs text-center text-text-secondary">
                   No account required &bull; 100% offline &bull; Data stays on this device
                 </p>
               </div>
@@ -434,7 +461,7 @@ export default function OnboardingScreen() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="text-2xs text-text-muted hover:text-accent transition-colors underline cursor-pointer"
+                className="text-xs text-text-secondary hover:text-accent font-medium transition-colors underline cursor-pointer"
               >
                 Have a backup file? Restore JSON backup
               </button>
@@ -514,7 +541,7 @@ export default function OnboardingScreen() {
                 <span>Back</span>
               </button>
               <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
-                {user && !user.isAnonymous ? 'Google Account Connected' : 'Guest Profile'}
+                {authUser && !authUser.isAnonymous ? 'Google Account Connected' : 'Guest Profile'}
               </span>
             </div>
 

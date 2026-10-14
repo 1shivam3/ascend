@@ -19,13 +19,16 @@ import {
   X,
   Trash2,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
-import SettingsModal from '@/components/SettingsModal';
-import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
-import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
-import ScanMealModal from '@/components/ScanMealModal';
-import InstallAppBanner from '@/components/InstallAppBanner';
+
+const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
+const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
+const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
+const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
+
+const InstallAppBanner = dynamic(() => import('@/components/InstallAppBanner'), { ssr: false });
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';

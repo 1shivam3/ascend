@@ -5,7 +5,6 @@ import { Home, Dumbbell, TrendingUp, UtensilsCrossed, Plus } from 'lucide-react'
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
-import HomePage from '@/components/HomePage';
 
 function TabLoadingFallback({ label }: { label: string }) {
   return (
@@ -15,6 +14,11 @@ function TabLoadingFallback({ label }: { label: string }) {
     </div>
   );
 }
+
+const HomePage = dynamic(() => import('@/components/HomePage'), {
+  loading: () => <TabLoadingFallback label="Loading dashboard..." />,
+  ssr: false,
+});
 
 const ProgressPage = dynamic(() => import('@/components/ProgressPage'), {
   loading: () => <TabLoadingFallback label="Loading analytics & PRs..." />,
@@ -267,7 +271,7 @@ export default function AppPage() {
         <button
           type="button"
           onClick={() => setIsQuickActionOpen(true)}
-          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-full bg-accent text-white shadow-lg hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40"
+          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-full bg-accent text-stone-950 font-bold shadow-lg hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40"
           title="Quick Actions"
           aria-label="Quick Actions"
         >
