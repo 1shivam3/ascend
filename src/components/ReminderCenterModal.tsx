@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { NotificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES } from '@/lib/types';
+import { subscribeToPush, unsubscribeFromPush } from '@/lib/push-notifications';
 
 interface ReminderCenterModalProps {
   isOpen: boolean;
@@ -138,6 +139,17 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         });
       } catch {
         // Local-first: non-blocking
+      }
+
+      // Manage Web Push subscription based on toggle state
+      try {
+        if (hasAnyEnabled) {
+          await subscribeToPush();
+        } else {
+          await unsubscribeFromPush();
+        }
+      } catch (pushErr) {
+        console.warn('Push subscription toggle notice:', pushErr);
       }
 
       toast.success('Reminder preferences updated successfully.', 'Reminders Saved');

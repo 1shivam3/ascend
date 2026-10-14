@@ -127,3 +127,61 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(request))
   );
 });
+
+// ── Web Push Event: Incoming Push Delivery ───────────────────────────────────
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data = { title: 'ASCEND', body: event.data.text() };
+    }
+  }
+
+  const title = data.title || 'ASCEND Training';
+  const options = {
+    body: data.body || 'You have a training or nutrition reminder.',
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
+    tag: data.tag || 'ascend-reminder',
+    renotify: true,
+    data: {
+      url: data.url || '/',
+      tab: data.tab || 'home',
+      timestamp: Date.now(),
+      ...(data.data || {}),
+    },
+    actions: data.actions || [
+      { action: 'open', title: 'Open ASCEND' },
+    ],
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── Notification Click Event: Focus Tab or Open Window ──────────────────────
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetTab = event.notification.data?.tab || 'home';
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // 1. Focus existing window client if already running
+      for (const client of clientList) {
+        if (client.url && 'focus' in client) {
+          client.postMessage({ type: 'NAVIGATE_TAB', tab: targetTab });
+          return client.focus();
+        }
+      }
+      // 2. Open new window client if none found
+      if (clients.openWindow) {
+        const fullUrl = targetTab && targetTab !== 'home' ? `/?tab=${targetTab}` : targetUrl;
+        return clients.openWindow(fullUrl);
+      }
+    })
+  );
+});
+

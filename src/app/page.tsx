@@ -113,6 +113,20 @@ export default function AppPage() {
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
+  // Listen for service worker push notification clicks
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const handleSWMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'NAVIGATE_TAB' && event.data.tab) {
+        navigate(event.data.tab as TabId);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+  }, [navigate]);
+
   const handleStartSharedWorkout = (plan: PlannedWorkout) => {
     setPendingStartPlan(plan);
     navigate('workout');
