@@ -174,19 +174,8 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Hydration barrier: Never render OnboardingScreen or app until mounted AND Zustand has rehydrated
-  if (!mounted || !_hasHydrated) {
-    return (
-      <main id="main-content" className="min-h-screen bg-bg-primary flex flex-col items-center justify-center gap-3">
-        <div className="text-accent text-lg tracking-widest uppercase font-mono font-bold animate-pulse">
-          ASCEND
-        </div>
-        <span className="text-2xs text-text-muted font-mono">Restoring athlete data &amp; records...</span>
-      </main>
-    );
-  }
-
-  if (!profile) {
+  // Render OnboardingScreen during SSR and initial load for instant LCP with zero element render delay
+  if (!mounted || !profile) {
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <OnboardingScreen />

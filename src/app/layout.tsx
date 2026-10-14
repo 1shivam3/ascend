@@ -5,11 +5,12 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { NavigationProvider } from '@/lib/navigation';
 import TelemetryProvider from '@/components/TelemetryProvider';
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 const barlowCondensed = Barlow_Condensed({
   subsets: ['latin'],
   weight: ['400', '600', '700', '800', '900'],
   variable: '--font-display',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
