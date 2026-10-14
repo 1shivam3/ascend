@@ -382,12 +382,12 @@ export default function BarcodeScannerModal({
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     stopCamera();
     onClose();
-  };
+  }, [stopCamera, onClose]);
 
-  const handleScanAgain = () => {
+  const handleScanAgain = useCallback(() => {
     stopCamera();
     setScannedProduct(null);
     setIsNotFoundInDB(false);
@@ -402,7 +402,7 @@ export default function BarcodeScannerModal({
     setShowSuggestions(false);
     isProcessingRef.current = false;
     startCamera();
-  };
+  }, [stopCamera, startCamera]);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -415,7 +415,7 @@ export default function BarcodeScannerModal({
         return true;
       }, 110);
     }
-  }, [isOpen, scannedProduct, isNotFoundInDB, registerBackHandler]);
+  }, [isOpen, scannedProduct, isNotFoundInDB, handleScanAgain, registerBackHandler]);
 
   // Main modal back handler
   useEffect(() => {

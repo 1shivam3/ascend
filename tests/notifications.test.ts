@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isWithinQuietHours, formatNotificationPayload } from '@/app/api/notifications/dispatch/route';
+import { isWithinQuietHours, formatNotificationPayload } from '@/lib/notifications';
 import { DEFAULT_NOTIFICATION_PREFERENCES, NotificationPreferences } from '@/lib/types';
 
 describe('Notification Preferences & Quiet Hours', () => {
