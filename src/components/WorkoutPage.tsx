@@ -2567,7 +2567,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 >
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    <span>Browse ready-made splits &amp; AI plan generator</span>
+                    <span>Browse ready-made splits &amp; workout plan builder</span>
                   </div>
                   <ChevronDown
                     className={`w-4 h-4 transition-transform duration-200 ${

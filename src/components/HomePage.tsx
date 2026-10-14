@@ -518,11 +518,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <button
               type="button"
               onClick={() => setIsSuggestedModalOpen(true)}
-              className="text-xs font-medium text-accent hover:underline flex items-center gap-1 transition-colors cursor-pointer"
-              title="Generate a custom AI workout session"
+              className="text-xs font-medium text-text-muted hover:text-accent flex items-center gap-1 transition-colors cursor-pointer"
+              title="Autoregulate session based on recovery and fatigue"
             >
-              <Sparkles className="w-3 h-3" />
-              <span>AI Routine</span>
+              <Sparkles className="w-3 h-3 text-accent" />
+              <span>Adaptive Split</span>
             </button>
             <span className="text-border">•</span>
             <button

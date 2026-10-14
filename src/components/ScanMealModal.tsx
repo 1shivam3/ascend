@@ -654,10 +654,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             </div>
             <div>
               <h2 className="font-black text-base sm:text-lg text-text-primary tracking-tight leading-tight">
-                Scan Meal
+                Macro Lens
               </h2>
               <p className="text-2xs text-text-muted font-sans mt-0.5">
-                Photo &rarr; Instant AI Macro Breakdown
+                Photo &rarr; Instant Macro Breakdown
               </p>
             </div>
           </div>
@@ -1349,7 +1349,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <div className="p-3 rounded-xl bg-bg-secondary/40 border border-border space-y-2">
                     <span className="text-2xs font-bold uppercase tracking-wider text-text-muted flex items-center gap-1">
                       <MessageSquare className="w-3 h-3 text-accent" />
-                      Tell AI / Improve Estimate
+                      Fine-Tune Ingredients &amp; Portions
                     </span>
                     <div className="flex gap-2">
                       <input

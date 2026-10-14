@@ -208,7 +208,7 @@ export default function PostWorkoutTakeModal({
               </span>
               {take.source === 'gemini' ? (
                 <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                  AI Coach
+                  Autoregulated Coach
                 </span>
               ) : (
                 <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">

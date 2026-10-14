@@ -1969,7 +1969,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           {/* Secondary Tools Dropdown ("More") */}
           <div className="flex items-center justify-between text-xs text-text-secondary px-1 pt-0.5">
-            <span className="font-mono text-xs">AI Vision • Natural Language • Indian IFCT</span>
+            <span className="font-mono text-xs text-text-muted">Macro Lens • Voice / Text • Indian IFCT</span>
             <div className="relative">
               <button
                 type="button"

@@ -178,7 +178,7 @@ export default function QuickActionSheetModal({
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Natural food log</span>
                 </span>
-                <span className="text-[11px] text-text-secondary font-medium font-sans">AI &amp; IFCT</span>
+                <span className="text-[11px] text-text-secondary font-medium font-sans">IFCT &amp; Macro Parser</span>
               </div>
               <form onSubmit={handleQuickFoodSubmit} className="relative">
                 <input
