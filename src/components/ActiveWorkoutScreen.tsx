@@ -57,6 +57,7 @@ import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
   workoutName?: string;
+  planId?: string;
   onFinish: (workout: WorkoutEntry, newPRsCount: number) => void;
   onCancel: () => void;
   onPause?: () => void;
@@ -89,6 +90,7 @@ function triggerHaptic(type: 'set_complete' | 'rest_done' | 'pr_hit') {
 export default function ActiveWorkoutScreen({
   initialExercises,
   workoutName = 'Workout Session',
+  planId,
   onFinish,
   onCancel,
   onPause,
@@ -142,22 +144,24 @@ export default function ActiveWorkoutScreen({
     if (initialExercises && initialExercises.length > 0) {
       return initialExercises.map((e, idx) => {
         const exName = e.name && e.name.trim().length > 0 ? e.name.trim() : (idx === 0 ? 'Bench Press' : `Exercise ${idx + 1}`);
-        const pr = prs.find((p) => p.exercise.toLowerCase() === exName.toLowerCase());
+        const isBW = isBodyweightExercise(exName);
         const rawSets = (e.sets && e.sets.length > 0) ? e.sets : [
-          { weight: 0, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
+          { weight: isBW ? 0 : undefined, reps: defaultReps, unit: userUnit, completed: false, rpe: 8 },
         ];
         return {
           ...e,
           name: exName,
           sets: rawSets.map((s) => {
-            const numW = parseFloat(String(s.weight));
-            let finalWeight: any = s.weight;
-            if (isNaN(numW) || numW <= 0) {
-              if (pr && pr.oneRepMax > 0) {
-                finalWeight = suggestLoad(pr.oneRepMax, s.reps || defaultReps, s.rpe || 8, userUnit);
-              } else {
-                finalWeight = '';
-              }
+            let finalWeight: number | undefined = undefined;
+            if (typeof s.weight === 'number' && !isNaN(s.weight)) {
+              finalWeight = s.weight;
+            } else if (typeof s.weight === 'string' && (s.weight as string).trim() !== '') {
+              const parsed = parseFloat(s.weight as string);
+              finalWeight = isNaN(parsed) ? undefined : parsed;
+            } else if (isBW) {
+              finalWeight = 0;
+            } else {
+              finalWeight = undefined;
             }
 
             const isDone = isActiveSetCompleted(s);
@@ -172,6 +176,7 @@ export default function ActiveWorkoutScreen({
             const prescribedReps = s.prescribedReps !== undefined ? s.prescribedReps : undefined;
             const prescribedRpe = s.prescribedRpe !== undefined ? s.prescribedRpe : undefined;
             const prescribedUnit = s.prescribedUnit !== undefined ? s.prescribedUnit : undefined;
+            const appliedDecisionId = s.appliedDecisionId || e.appliedDecisionId;
 
             return {
               ...s,
@@ -183,6 +188,7 @@ export default function ActiveWorkoutScreen({
               prescribedReps,
               prescribedRpe,
               prescribedUnit,
+              appliedDecisionId,
             };
           }),
         };
@@ -260,6 +266,7 @@ export default function ActiveWorkoutScreen({
   const renameInputRef = useRef<HTMLInputElement>(null);
   const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState<number>(-1);
   const [isChangeExerciseModalOpen, setIsChangeExerciseModalOpen] = useState<boolean>(false);
+  const [weightInputStr, setWeightInputStr] = useState<string | null>(null);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -767,6 +774,44 @@ export default function ActiveWorkoutScreen({
     );
   }, [currentExercise?.name, workouts, prs, userUnit, primaryGoal, trainingDecisions]);
 
+  const targetDisplay = useMemo(() => {
+    if (!currentExercise || !currentExercise.sets || currentExercise.sets.length === 0) {
+      return { text: '—', isUnconfigured: true, targetRpe: undefined };
+    }
+    const firstSet = currentExercise.sets[0];
+    const isBW = isBodyweightExercise(currentExercise.name);
+    const targetReps = firstSet?.prescribedReps ?? firstSet?.reps ?? 8;
+    const targetRpe = firstSet?.prescribedRpe;
+
+    // 1. Explicit numeric prescribed weight
+    if (typeof firstSet?.prescribedWeight === 'number' && Number.isFinite(firstSet.prescribedWeight)) {
+      if (isBW) {
+        if (firstSet.prescribedWeight === 0) {
+          return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+        } else {
+          return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+        }
+      }
+      return {
+        text: `${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`,
+        isUnconfigured: false,
+        targetRpe: targetRpe ?? 8,
+      };
+    }
+
+    // 2. Bodyweight exercise without explicit extra load:
+    if (isBW) {
+      return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+    }
+
+    // 3. Unconfigured non-bodyweight exercise:
+    return {
+      text: `Unconfigured load × ${targetReps} reps`,
+      isUnconfigured: true,
+      targetRpe: undefined,
+    };
+  }, [currentExercise, userUnit]);
+
   const formCues = useMemo(() => {
     if (!currentExercise?.name) return [];
     return getExerciseFormCues(currentExercise.name);
@@ -805,7 +850,19 @@ export default function ActiveWorkoutScreen({
   }, [exercises, prs, userUnit]);
 
   // Weight & Reps handlers (direct typing + steppers)
-  const handleSetWeightChange = (setIdx: number, val: string | number) => {
+  const handleSetWeightChange = (setIdx: number, val: string | number | undefined) => {
+    let numericWeight: number | undefined = undefined;
+    if (typeof val === 'number') {
+      numericWeight = isNaN(val) ? undefined : val;
+    } else if (typeof val === 'string') {
+      const trimmed = val.trim();
+      if (trimmed === '') {
+        numericWeight = undefined;
+      } else {
+        const parsed = parseFloat(trimmed);
+        numericWeight = isNaN(parsed) ? undefined : parsed;
+      }
+    }
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -813,7 +870,7 @@ export default function ActiveWorkoutScreen({
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
-            return { ...s, weight: val as any };
+            return { ...s, weight: numericWeight };
           }),
         };
       })
@@ -821,6 +878,7 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleWeightStep = (setIdx: number, step: number) => {
+    setWeightInputStr(null);
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -828,8 +886,10 @@ export default function ActiveWorkoutScreen({
           ...ex,
           sets: ex.sets.map((s, j) => {
             if (j !== setIdx) return s;
-            const currentW = parseFloat(String(s.weight)) || 0;
-            const newW = Math.max(0, Math.round((currentW + step) * 10) / 10);
+            const baseW = typeof s.weight === 'number' && !isNaN(s.weight)
+              ? s.weight
+              : (typeof s.prescribedWeight === 'number' && !isNaN(s.prescribedWeight) ? s.prescribedWeight : 0);
+            const newW = Math.max(0, Math.round((baseW + step) * 10) / 10);
             return { ...s, weight: newW };
           }),
         };
@@ -882,6 +942,7 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleToggleSetComplete = (setIdx: number) => {
+    setWeightInputStr(null);
     const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
     const isNowCompleted = !wasCompleted;
 
@@ -890,7 +951,16 @@ export default function ActiveWorkoutScreen({
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted, status: isNowCompleted ? 'completed' : 'pending' } : s)),
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            const finalW = (s.weight === undefined && isCurrentBodyweight) ? 0 : s.weight;
+            return {
+              ...s,
+              weight: finalW,
+              completed: isNowCompleted,
+              status: isNowCompleted ? 'completed' : 'pending',
+            };
+          }),
         };
       })
     );
@@ -911,6 +981,7 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleSkipSet = (setIdx: number) => {
+    setWeightInputStr(null);
     const isCurrentlySkipped = currentExercise?.sets[setIdx]?.status === 'skipped';
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -974,23 +1045,26 @@ export default function ActiveWorkoutScreen({
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         const lastSet = ex.sets[ex.sets.length - 1];
-        const newWeight = lastSet ? (parseFloat(String(lastSet.weight)) || 0) : (userUnit === 'lbs' ? 135 : 60);
-        const newReps = lastSet ? (parseInt(String(lastSet.reps), 10) || 0) : defaultTargetReps;
+        const lastValidWeight = (lastSet && typeof lastSet.weight === 'number' && !isNaN(lastSet.weight))
+          ? lastSet.weight
+          : (isCurrentBodyweight ? 0 : undefined);
+        const newReps = lastSet ? (parseInt(String(lastSet.reps), 10) || 8) : defaultTargetReps;
         return {
           ...ex,
           sets: [
             ...ex.sets,
             {
-              weight: newWeight,
+              weight: lastValidWeight,
               reps: newReps,
               unit: userUnit,
               completed: false,
               status: 'pending',
-              rpe: 8,
-              prescribedWeight: lastSet?.prescribedWeight ?? newWeight,
-              prescribedReps: lastSet?.prescribedReps ?? newReps,
-              prescribedRpe: lastSet?.prescribedRpe ?? 8,
-              prescribedUnit: lastSet?.prescribedUnit ?? userUnit,
+              rpe: lastSet?.rpe ?? 8,
+              prescribedWeight: lastSet?.prescribedWeight,
+              prescribedReps: lastSet?.prescribedReps,
+              prescribedRpe: lastSet?.prescribedRpe,
+              prescribedUnit: lastSet?.prescribedUnit,
+              appliedDecisionId: lastSet?.appliedDecisionId,
             },
           ],
         };
@@ -1011,6 +1085,7 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleCompleteActiveSet = (setIdx: number) => {
+    setWeightInputStr(null);
     const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
     const isNowCompleted = !wasCompleted;
 
@@ -1019,7 +1094,16 @@ export default function ActiveWorkoutScreen({
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s, j) => (j === setIdx ? { ...s, completed: isNowCompleted, status: isNowCompleted ? 'completed' : 'pending' } : s)),
+          sets: ex.sets.map((s, j) => {
+            if (j !== setIdx) return s;
+            const finalW = (s.weight === undefined && isCurrentBodyweight) ? 0 : s.weight;
+            return {
+              ...s,
+              weight: finalW,
+              completed: isNowCompleted,
+              status: isNowCompleted ? 'completed' : 'pending',
+            };
+          }),
         };
       })
     );
@@ -1391,6 +1475,8 @@ export default function ActiveWorkoutScreen({
     const workoutEntry: WorkoutEntry = {
       id: safeRandomId('wk'),
       date: today,
+      name: workoutName,
+      planId,
       exercises: validExercises,
     };
 
@@ -1833,11 +1919,11 @@ export default function ActiveWorkoutScreen({
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-base sm:text-lg font-bold font-sans text-accent">
-                    {prescription ? `${prescription.targetWeight} ${userUnit} × ${prescription.targetReps} reps` : `${currentExercise.sets[0]?.weight || 0} ${userUnit} × ${currentExercise.sets[0]?.reps || 8}`}
+                    {targetDisplay.text}
                   </span>
-                  {userMode === 'advanced' && (
+                  {userMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
                     <span className="text-xs font-mono text-text-muted">
-                      @{prescription?.targetRpe || 8}
+                      @{targetDisplay.targetRpe}
                     </span>
                   )}
                 </div>
@@ -2017,20 +2103,27 @@ export default function ActiveWorkoutScreen({
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={currentExercise.sets[activeSetIdx]?.weight ?? ''}
-                          placeholder={isCurrentBodyweight ? '0 (BW)' : '0'}
-                          onFocus={(e) => e.target.select()}
+                          value={weightInputStr !== null ? weightInputStr : (currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '')}
+                          placeholder={isCurrentBodyweight ? '0 (BW)' : (currentExercise.sets[activeSetIdx]?.prescribedWeight !== undefined ? String(currentExercise.sets[activeSetIdx].prescribedWeight) : '—')}
+                          onFocus={(e) => {
+                            setWeightInputStr(currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '');
+                            e.target.select();
+                          }}
                           onChange={(e) => {
                             const val = e.target.value;
                             if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                              setWeightInputStr(val);
                               handleSetWeightChange(activeSetIdx, val);
                             }
+                          }}
+                          onBlur={() => {
+                            setWeightInputStr(null);
                           }}
                           className="w-28 sm:w-32 px-1 py-0.5 text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent tabular-nums tracking-tight"
                         />
                         {isCurrentBodyweight && (
                           <span className="text-3xs text-accent font-semibold mt-0.5">
-                            {(parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0) === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
+                            {currentExercise.sets[activeSetIdx]?.weight === undefined || currentExercise.sets[activeSetIdx]?.weight === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
                           </span>
                         )}
                         {isCurrentDumbbell && (
@@ -2227,8 +2320,8 @@ export default function ActiveWorkoutScreen({
                         <input
                           type="text"
                           inputMode="decimal"
-                          value={set.weight ?? ''}
-                          placeholder="0"
+                          value={set.weight !== undefined ? String(set.weight) : ''}
+                          placeholder={isCurrentBodyweight ? '0 (BW)' : (set.prescribedWeight !== undefined ? String(set.prescribedWeight) : '—')}
                           onFocus={(e) => e.target.select()}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -2237,8 +2330,11 @@ export default function ActiveWorkoutScreen({
                             }
                           }}
                           onBlur={() => {
-                            const parsed = parseFloat(String(set.weight));
-                            handleSetWeightChange(sIdx, isNaN(parsed) ? 0 : Math.max(0, Math.round(parsed * 10) / 10));
+                            const parsed = typeof set.weight === 'number' ? set.weight : parseFloat(String(set.weight));
+                            const finalW = isNaN(parsed)
+                              ? (isCurrentBodyweight ? 0 : undefined)
+                              : Math.max(0, Math.round(parsed * 10) / 10);
+                            handleSetWeightChange(sIdx, finalW !== undefined ? finalW : '');
                           }}
                           className="w-full min-w-0 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
@@ -2251,8 +2347,8 @@ export default function ActiveWorkoutScreen({
                       )}
                       {isCurrentBarbell && (
                         (() => {
-                          const w = parseFloat(String(set.weight)) || 0;
-                          const plates = getPlateSummary(w, userUnit);
+                          const w = typeof set.weight === 'number' && !isNaN(set.weight) ? set.weight : 0;
+                          const plates = w > 0 ? getPlateSummary(w, userUnit) : null;
                           return plates ? (
                             <span className="text-[9px] font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
                               {plates}
@@ -2836,7 +2932,7 @@ export default function ActiveWorkoutScreen({
                   completed: false,
                   status: 'pending',
                   rpe: 8,
-                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedWeight: isBW ? 0 : (defaultW > 0 ? defaultW : undefined),
                   prescribedReps: defaultR,
                   prescribedRpe: 8,
                   prescribedUnit: userUnit,
@@ -2848,7 +2944,7 @@ export default function ActiveWorkoutScreen({
                   completed: false,
                   status: 'pending',
                   rpe: 8,
-                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedWeight: isBW ? 0 : (defaultW > 0 ? defaultW : undefined),
                   prescribedReps: defaultR,
                   prescribedRpe: 8,
                   prescribedUnit: userUnit,
@@ -2860,7 +2956,7 @@ export default function ActiveWorkoutScreen({
                   completed: false,
                   status: 'pending',
                   rpe: 8,
-                  prescribedWeight: defaultW > 0 ? defaultW : undefined,
+                  prescribedWeight: isBW ? 0 : (defaultW > 0 ? defaultW : undefined),
                   prescribedReps: defaultR,
                   prescribedRpe: 8,
                   prescribedUnit: userUnit,

@@ -311,6 +311,8 @@ export interface EvaluateDecisionOptions {
   workoutId?: string;
   sessionId?: string;
   sessionIndex?: number;
+  targetExerciseId?: string;
+  planExerciseId?: string;
   isBodyweight?: boolean;
 }
 
@@ -519,9 +521,16 @@ export function evaluateTrainingDecisionPolicyV0(
 
   // Resolve exercise-specific evidence whether caller passes MultiSessionEvidenceSummary or ExerciseOutcomeEvidence
   let exerciseEvidence: ExerciseOutcomeEvidence | null = null;
+  const targetId = options?.targetExerciseId ?? options?.planExerciseId;
   if (evidence) {
     if ('exercises' in evidence && evidence.exercises) {
-      exerciseEvidence = evidence.exercises[canonicalKey] ?? null;
+      if (targetId && evidence.exercises[`${canonicalKey}::${targetId}`]) {
+        exerciseEvidence = evidence.exercises[`${canonicalKey}::${targetId}`];
+      } else if (targetId && evidence.exercises[targetId]) {
+        exerciseEvidence = evidence.exercises[targetId];
+      } else {
+        exerciseEvidence = evidence.exercises[canonicalKey] ?? null;
+      }
     } else if ('canonicalExerciseKey' in evidence || 'exposures' in evidence) {
       exerciseEvidence = evidence as ExerciseOutcomeEvidence;
     }

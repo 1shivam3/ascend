@@ -11,13 +11,16 @@ import {
   WeeklySchedule,
   PersonalRecord,
   TrainingDecision,
+  PolicyDecisionApplicationAudit,
+  ActiveWorkoutDraft,
   getSetExecutionStatus,
   isSetCompleted,
   isActiveSetCompleted,
 } from './types';
-import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad } from './strength-standards';
+import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise } from './strength-standards';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 import { calculateSetEffortDrift } from './lifter-twin';
+import { canonicalizeExerciseName } from './workout-outcome-evidence';
 
 export {
   getSetExecutionStatus,
@@ -36,7 +39,16 @@ export type { SetExecutionStatus } from './types';
  * - Preserves all prescription fields (prescribedWeight, prescribedReps, prescribedRpe, prescribedUnit).
  */
 export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
-  const w = parseFloat(String(set.weight)) || 0;
+  const hasValidNumericWeight = typeof set.weight === 'number' && !isNaN(set.weight);
+  let w: number | undefined = undefined;
+  if (hasValidNumericWeight) {
+    w = set.weight;
+  } else if (typeof set.weight === 'string' && (set.weight as string).trim() !== '') {
+    const parsed = parseFloat(set.weight as string);
+    if (!isNaN(parsed)) {
+      w = parsed;
+    }
+  }
   const r = parseInt(String(set.reps), 10) || 0;
   const isCompleted = isActiveSetCompleted(set) && r > 0;
 
@@ -118,6 +130,163 @@ export function finalizeWorkoutExercises(exercises: WorkoutExercise[]): {
   };
 }
 
+export interface CreateWorkoutExercisesFromPlanOptions {
+  userUnit?: Unit;
+  userPrs?: PersonalRecord[];
+  applications?: PolicyDecisionApplicationAudit[];
+}
+
+export interface CreateWorkoutDraftFromPlanOptions extends CreateWorkoutExercisesFromPlanOptions {
+  date?: string;
+  sessionStartTime?: number;
+}
+
+/**
+ * Canonical plan-to-workout mapper:
+ * Accurately translates a PlannedWorkout template into live workout exercises.
+ *
+ * Rules:
+ * - Preserves targetWeight, targetReps, targetSets, targetRpe, and targetUnit from the template.
+ * - Handles bodyweight exercises (targetWeight === 0) cleanly without coercing to heavy barbell loads.
+ * - Unconfigured non-bodyweight targets remain strictly unconfigured (prescribedWeight: undefined);
+ *   never fabricates an assumed prescription or PR-derived fallback load.
+ * - Attaches appliedDecisionId to exercises and sets ONLY when an authentic, unambiguous
+ *   PolicyDecisionApplication audit exists for this specific plan and target exercise.
+ * - If identity is ambiguous (e.g. duplicate exercise instances without stable IDs), fails closed.
+ */
+export function createWorkoutExercisesFromPlan(
+  plan: PlannedWorkout,
+  options?: CreateWorkoutExercisesFromPlanOptions
+): WorkoutExercise[] {
+  const userUnit = options?.userUnit || 'kg';
+  const applications = options?.applications || [];
+
+  return (plan.exercises || []).map((pe, idx) => {
+    const isBW = isBodyweightExercise(pe.name);
+    const hasConfiguredWeight = typeof pe.targetWeight === 'number';
+    const hasConfiguredRpe = typeof pe.targetRpe === 'number';
+
+    // Target load:
+    // Configured weight -> exact number
+    // Bodyweight unconfigured -> 0 kg/lbs external load
+    // Non-bodyweight unconfigured -> undefined (absent numeric load; NEVER fabricated)
+    const assignedWeight: number | undefined = hasConfiguredWeight
+      ? (pe.targetWeight as number)
+      : (isBW ? 0 : undefined);
+
+    const targetUnit = pe.targetUnit ?? userUnit;
+
+    const prescribedWeight: number | undefined = hasConfiguredWeight
+      ? (pe.targetWeight as number)
+      : (isBW ? 0 : undefined);
+
+    const prescribedReps: number | undefined =
+      typeof pe.targetReps === 'number' ? pe.targetReps : undefined;
+
+    const prescribedRpe: number | undefined = hasConfiguredRpe
+      ? (pe.targetRpe as number)
+      : undefined;
+
+    const prescribedUnit: Unit | undefined =
+      (hasConfiguredWeight || isBW) ? targetUnit : undefined;
+
+    // Lineage verification:
+    // Match against authentic application audits for this specific plan and target exercise.
+    const candidateAudits = applications.filter(
+      (a) =>
+        a.targetPlanId === plan.id &&
+        a.status === 'applied' &&
+        canonicalizeExerciseName(a.targetExerciseName) === canonicalizeExerciseName(pe.name)
+    );
+
+    const sameNameExercisesInPlan = (plan.exercises || []).filter(
+      (e) => canonicalizeExerciseName(e.name) === canonicalizeExerciseName(pe.name)
+    );
+    const isNameDuplicateInPlan = sameNameExercisesInPlan.length > 1;
+
+    let matchingAudit: PolicyDecisionApplicationAudit | undefined = undefined;
+
+    for (const a of candidateAudits) {
+      if (a.targetExerciseId) {
+        // Audit specifically targeted a stable exercise ID
+        if (pe.id && pe.id === a.targetExerciseId) {
+          matchingAudit = a;
+          break;
+        }
+        // If pe.id does not match or is missing, this audit was for a different exercise instance
+      } else {
+        // Fallback: audit has no targetExerciseId (index-based)
+        if (a.targetExerciseIndex !== undefined) {
+          if (a.targetExerciseIndex === idx) {
+            matchingAudit = a;
+            break;
+          }
+        } else {
+          // Both targetExerciseId and targetExerciseIndex are missing from audit:
+          // If the plan has duplicate exercises with this name, identity is ambiguous -> fail closed!
+          if (!isNameDuplicateInPlan) {
+            matchingAudit = a;
+            break;
+          }
+        }
+      }
+    }
+
+    // Only attach appliedDecisionId if:
+    // 1. A valid matching audit was unambiguously resolved
+    // 2. The exercise actually has a configured prescription (configured weight or bodyweight)
+    const appliedDecisionId = (matchingAudit && (hasConfiguredWeight || isBW))
+      ? matchingAudit.decisionId
+      : undefined;
+
+    return {
+      name: pe.name,
+      planExerciseId: pe.id,
+      appliedDecisionId,
+      sets: Array.from({ length: Math.max(1, pe.targetSets || 1) }, () => ({
+        weight: assignedWeight,
+        reps: pe.targetReps ?? 8,
+        unit: targetUnit,
+        rpe: hasConfiguredRpe ? (pe.targetRpe as number) : 8,
+        completed: false,
+        status: 'pending' as const,
+        prescribedWeight,
+        prescribedReps,
+        prescribedRpe,
+        prescribedUnit,
+        appliedDecisionId,
+      })),
+    };
+  });
+}
+
+/**
+ * Creates an ActiveWorkoutDraft from a PlannedWorkout template.
+ */
+export function createWorkoutDraftFromPlan(
+  plan: PlannedWorkout,
+  options?: CreateWorkoutDraftFromPlanOptions
+): ActiveWorkoutDraft {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const todayStr = `${year}-${month}-${day}`;
+
+  const exercises = createWorkoutExercisesFromPlan(plan, options);
+
+  return {
+    date: options?.date || todayStr,
+    name: plan.name,
+    planId: plan.id,
+    exercises,
+    startedFromPlan: plan.name,
+    startedFromPlanId: plan.id,
+    sessionStartTime: options?.sessionStartTime || Date.now(),
+    savedAt: new Date().toISOString(),
+  };
+}
+
 /**
  * Finds the most recent performance of a given exercise across past workouts.
  */
@@ -152,7 +321,7 @@ export function getLastExercisePerformance(
         .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
-          if (s.unit && s.unit !== userUnit) {
+          if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
               normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
@@ -168,18 +337,39 @@ export function getLastExercisePerformance(
 
       if (validSets.length === 0) continue;
 
-      const summary = validSets.map((s) => `${s.weight > 0 ? `${s.weight}${userUnit} × ` : ''}${s.reps}`).join(', ');
+      const isBW = isBodyweightExercise(exerciseName);
+      const summary = validSets.map((s) => {
+        if (typeof s.weight === 'number' && Number.isFinite(s.weight)) {
+          if (isBW && s.weight === 0) {
+            return `BW × ${s.reps}`;
+          } else if (isBW && s.weight > 0) {
+            return `+${s.weight}${userUnit} × ${s.reps}`;
+          }
+          return `${s.weight}${userUnit} × ${s.reps}`;
+        }
+        if (isBW) {
+          return `BW × ${s.reps}`;
+        }
+        return `— × ${s.reps}`;
+      }).join(', ');
 
       let bestWeight = 0;
       let bestReps = 0;
       let bestE1RM = 0;
 
       for (const s of validSets) {
-        const e1rm = calculateOneRepMax(s.weight, s.reps);
-        if (e1rm > bestE1RM) {
-          bestE1RM = e1rm;
-          bestWeight = s.weight;
-          bestReps = s.reps;
+        if (typeof s.weight === 'number' && Number.isFinite(s.weight)) {
+          const wVal = s.weight;
+          const e1rm = calculateOneRepMax(wVal, s.reps);
+          if (e1rm > bestE1RM || (e1rm === bestE1RM && s.reps > bestReps)) {
+            bestE1RM = e1rm;
+            bestWeight = wVal;
+            bestReps = s.reps;
+          }
+        } else {
+          if (s.reps > bestReps) {
+            bestReps = s.reps;
+          }
         }
       }
 
@@ -584,7 +774,7 @@ export function getProgressionRecommendation(
         .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
-          if (s.unit && s.unit !== userUnit) {
+          if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
               normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
@@ -598,7 +788,7 @@ export function getProgressionRecommendation(
           };
         });
       if (validSets.length > 0) {
-        const bestE1RM = Math.max(...validSets.map((s) => calculateOneRepMax(s.weight, s.reps)));
+        const bestE1RM = Math.max(...validSets.map((s) => calculateOneRepMax(typeof s.weight === 'number' ? s.weight : 0, s.reps)));
         sessions.push({ date: w.date, sets: validSets, bestE1RM });
         if (sessions.length >= 5) break;
       }
@@ -612,14 +802,35 @@ export function getProgressionRecommendation(
   const explicitWorkSets = lastSession.sets.filter((s) => !s.isWarmup && s.reps > 0 && s.completed !== false);
   const candidateSets = explicitWorkSets.length > 0 ? explicitWorkSets : lastSession.sets.filter((s) => s.reps > 0);
 
+  const isBW = isBodyweightExercise(exerciseName);
+  const setsWithMeasuredLoad = candidateSets.filter((s) => typeof s.weight === 'number' && Number.isFinite(s.weight));
+
+  // If this is a non-bodyweight movement and no working sets have a measured load, progression cannot be safely determined.
+  if (!isBW && setsWithMeasuredLoad.length === 0) {
+    return null;
+  }
+
   // Isolate true working sets from unflagged preparatory warmups (e.g. empty bar 20kg before 100kg work sets)
-  const maxLoad = Math.max(...candidateSets.map((s) => s.weight));
+  const loadSets = isBW ? candidateSets : setsWithMeasuredLoad;
+  const maxLoad = Math.max(...loadSets.map((s) => typeof s.weight === 'number' ? s.weight : 0));
   const thresholdLoad = maxLoad > 30 ? maxLoad * 0.70 : maxLoad;
-  const trueWorkSets = candidateSets.filter((s) => s.weight >= thresholdLoad);
-  const lastSets = trueWorkSets.length > 0 ? trueWorkSets : candidateSets;
+  const trueWorkSets = loadSets.filter((s) => (typeof s.weight === 'number' ? s.weight : 0) >= thresholdLoad);
+  const lastSets = trueWorkSets.length > 0 ? trueWorkSets : loadSets;
 
   // Working load: peak working set load
-  const lastWeight = lastSets.reduce((prev, curr) => (curr.weight >= prev.weight ? curr : prev), lastSets[0])?.weight || 0;
+  const rawLastWeight = lastSets.reduce((prev, curr) => {
+    const prevW = typeof prev.weight === 'number' && Number.isFinite(prev.weight) ? prev.weight : (isBW ? 0 : -1);
+    const currW = typeof curr.weight === 'number' && Number.isFinite(curr.weight) ? curr.weight : (isBW ? 0 : -1);
+    return currW >= prevW ? curr : prev;
+  }, lastSets[0])?.weight;
+
+  const lastWeight = typeof rawLastWeight === 'number' && Number.isFinite(rawLastWeight)
+    ? rawLastWeight
+    : (isBW ? 0 : null);
+
+  if (lastWeight === null) {
+    return null;
+  }
   const lastReps = Math.round(lastSets.reduce((sum, s) => sum + s.reps, 0) / lastSets.length) || 8;
   const lastSetsCount = lastSets.length;
 
@@ -713,7 +924,9 @@ export function getProgressionRecommendation(
   // If all reps were hit at RPE 8 or below (or hit target reps cleanly) -> Suggest +2.5 kg (or +5 lbs)
   const hasRPE = lastSets.some((s) => s.rpe !== undefined);
   const allRpeAtOrBelow8 = hasRPE ? lastSets.every((s) => (s.rpe ?? 8) <= 8) : false;
-  const allSetsCompletedTargetReps = lastSets.every((s) => s.reps >= minTargetReps && s.weight >= lastWeight);
+  const allSetsCompletedTargetReps = lastSets.every(
+    (s) => s.reps >= minTargetReps && typeof s.weight === 'number' && s.weight >= lastWeight
+  );
 
   if (allRpeAtOrBelow8 || (allSetsCompletedTargetReps && lastSets.length >= 2)) {
     const increment = userUnit === 'lbs' ? 5 : 2.5;
@@ -1100,7 +1313,7 @@ export function getTodaySessionState(
     for (const tw of todayWorkouts) {
       for (const ex of tw.exercises) {
         for (const s of ex.sets) {
-          if (s.weight > 0 && s.reps > 0) {
+          if (typeof s.weight === 'number' && s.weight > 0 && s.reps > 0) {
             const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
             vol += wKg * s.reps;
           }

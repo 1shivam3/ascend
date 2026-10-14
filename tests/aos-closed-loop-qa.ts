@@ -83,6 +83,7 @@ console.log('\n--- TEST 2: Warmup PR Isolation ---');
   let detectedPR = false;
   for (const s of sets) {
     if (s.isWarmup) continue; // Critical guard
+    if (typeof s.weight !== 'number' || !Number.isFinite(s.weight)) continue;
     const e1rm = calculateOneRepMax(s.weight, s.reps);
     if (e1rm > currentBest1RM) {
       detectedPR = true;

@@ -2,6 +2,7 @@ import { AppState } from './store';
 import { AITrainingProfile, isSetCompleted } from './types';
 import { toLocalDateString, calculateHydrationTarget, getCreatineStats } from './habits';
 import { getVolumeComparison, getConsecutiveWorkoutDays, getDaysSinceLastWorkout } from './ai-coach';
+import { isBodyweightExercise } from './strength-standards';
 
 export const DEFAULT_AI_TRAINING_PROFILE: AITrainingProfile = {
   goal: 'muscle_gain',
@@ -49,8 +50,34 @@ export function buildCompactUserContext(state: AppState): string {
     for (const w of recentWorkouts) {
       const exSummaries = w.exercises.map((e) => {
         const completedSets = e.sets.filter(isSetCompleted);
-        const topSet = completedSets.reduce((max, s) => (s.weight > max.weight ? s : max), completedSets[0] || { weight: 0, reps: 0, unit });
-        return `${e.name}: ${completedSets.length} sets (top ${topSet.weight}${topSet.unit || unit}×${topSet.reps})`;
+        if (completedSets.length === 0) {
+          return `${e.name}: 0 sets completed`;
+        }
+        const isBW = isBodyweightExercise(e.name);
+        const weightedSets = completedSets.filter(
+          (s) => typeof s.weight === 'number' && Number.isFinite(s.weight)
+        );
+
+        if (weightedSets.length > 0) {
+          const topSet = weightedSets.reduce(
+            (max, s) => (s.weight! > max.weight! ? s : max),
+            weightedSets[0]
+          );
+          if (isBW && topSet.weight === 0) {
+            return `${e.name}: ${completedSets.length} sets (top BW×${topSet.reps})`;
+          }
+          const loadPrefix = isBW ? '+' : '';
+          return `${e.name}: ${completedSets.length} sets (top ${loadPrefix}${topSet.weight}${topSet.unit || unit}×${topSet.reps})`;
+        }
+
+        const topRepSet = completedSets.reduce(
+          (max, s) => (s.reps > max.reps ? s : max),
+          completedSets[0]
+        );
+        if (isBW) {
+          return `${e.name}: ${completedSets.length} sets (top BW×${topRepSet.reps})`;
+        }
+        return `${e.name}: ${completedSets.length} sets (${topRepSet.reps} reps, unmeasured load)`;
       });
       workoutLines.push(`- [${w.date}] ${exSummaries.slice(0, 4).join('; ')}`);
     }
@@ -71,21 +98,37 @@ export function buildCompactUserContext(state: AppState): string {
   const trendLines: string[] = ['PERFORMANCE TRENDS:'];
   for (const exName of keyExercises) {
     // Find all sessions containing this exercise
-    const entries: { date: string; weight: number; reps: number }[] = [];
+    const entries: { date: string; weight?: number; reps: number; isBW: boolean }[] = [];
     for (const w of state.workouts || []) {
       const match = w.exercises.find((e) => e.name.toLowerCase().includes(exName.toLowerCase()));
       if (match && match.sets.length > 0) {
         const completedSets = match.sets.filter(isSetCompleted);
         if (completedSets.length > 0) {
-          const top = completedSets.reduce((m, s) => (s.weight > m.weight ? s : m), completedSets[0]);
-          entries.push({ date: w.date, weight: top.weight, reps: top.reps });
+          const isBW = isBodyweightExercise(match.name);
+          const weightedSets = completedSets.filter(
+            (s) => typeof s.weight === 'number' && Number.isFinite(s.weight)
+          );
+          if (weightedSets.length > 0) {
+            const top = weightedSets.reduce((m, s) => (s.weight! > m.weight! ? s : m), weightedSets[0]);
+            entries.push({ date: w.date, weight: top.weight, reps: top.reps, isBW });
+          } else if (isBW) {
+            const top = completedSets.reduce((m, s) => (s.reps > m.reps ? s : m), completedSets[0]);
+            entries.push({ date: w.date, weight: 0, reps: top.reps, isBW: true });
+          }
+          // Intentionally exclude non-bodyweight unmeasured sessions from load trends
         }
       }
     }
 
     if (entries.length > 0) {
       const recent = entries.slice(0, 3);
-      const recentHistory = recent.map((r) => `${r.weight}${unit}×${r.reps}`).join(' -> ');
+      const recentHistory = recent.map((r) => {
+        if (r.isBW && (r.weight === 0 || r.weight === undefined)) {
+          return `BW×${r.reps}`;
+        }
+        const loadPrefix = r.isBW ? '+' : '';
+        return `${loadPrefix}${r.weight}${unit}×${r.reps}`;
+      }).join(' -> ');
       const pr = state.prs.find((p) => p.exercise.toLowerCase().includes(exName.toLowerCase()));
       const prText = pr ? ` (PR: ${pr.weightKg}${unit}×${pr.reps})` : '';
       trendLines.push(`- ${exName}: ${recentHistory}${prText}`);

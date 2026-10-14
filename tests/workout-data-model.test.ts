@@ -278,7 +278,7 @@ describe('Workout Data Model & Execution Status (Task 3B-1)', () => {
       };
 
       // 1RM must be calculated on actual performed values (100 * (1 + 5/30) = 116.7 kg)
-      const e1rmActual = Math.round(set.weight * (1 + set.reps / 30) * 10) / 10;
+      const e1rmActual = Math.round(set.weight! * (1 + set.reps / 30) * 10) / 10;
       const e1rmPrescribed = Math.round(set.prescribedWeight! * (1 + set.prescribedReps! / 30) * 10) / 10;
 
       expect(e1rmActual).toBe(116.7);

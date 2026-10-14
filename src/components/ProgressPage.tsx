@@ -826,7 +826,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       sum +
                       ex.sets
                         .filter(isSetCompleted)
-                        .reduce((sSum, s) => sSum + (s.weight || 0) * (s.reps || 0), 0),
+                        .reduce((sSum, s) => {
+                          if (typeof s.weight === 'number' && Number.isFinite(s.weight)) {
+                            const wKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+                            return sSum + wKg * (s.reps || 0);
+                          }
+                          return sSum;
+                        }, 0),
                     0
                   );
                   const allRpes = w.exercises.flatMap((e) =>

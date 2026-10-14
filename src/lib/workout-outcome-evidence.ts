@@ -90,6 +90,8 @@ export interface ExerciseExposureEvidence {
   workoutDate?: string;
   exerciseName: string;
   canonicalExerciseKey: string;
+  planExerciseId?: string;
+  appliedDecisionId?: string;
   exposureIndex: number; // Chronological sequence index (0-based) for this exercise
   hasPrescriptionData: boolean;
 
@@ -508,6 +510,8 @@ export function getExerciseExposureEvidence(
     workoutDate,
     exerciseName,
     canonicalExerciseKey: canonicalKey,
+    planExerciseId: exercise.planExerciseId,
+    appliedDecisionId: exercise.appliedDecisionId,
     exposureIndex,
     hasPrescriptionData,
     totalPrescribedSets,
@@ -733,41 +737,107 @@ export function aggregateMultiSessionEvidence(
 
     const exercises = workout.exercises || [];
 
-    // Group sets by canonical exercise key within this workout
-    // (handles rare cases where an exercise appears in multiple blocks within the same session)
-    const exerciseBlocksByCanonicalKey: Record<string, { name: string; sets: WorkoutSet[] }> = {};
-
+    // Group exercises by canonical key in this workout to detect duplicates
+    const exercisesByCanonicalKey: Record<string, WorkoutExercise[]> = {};
     for (const ex of exercises) {
       if (!ex || !ex.name) continue;
       const key = canonicalizeExerciseName(ex.name);
-      if (!exerciseBlocksByCanonicalKey[key]) {
-        exerciseBlocksByCanonicalKey[key] = {
-          name: ex.name.trim(),
-          sets: [],
-        };
+      if (!exercisesByCanonicalKey[key]) {
+        exercisesByCanonicalKey[key] = [];
       }
-      // Combine sets for this session (preserving exact sequential order, no duplicates)
-      exerciseBlocksByCanonicalKey[key].sets.push(...(ex.sets || []));
+      exercisesByCanonicalKey[key].push(ex);
     }
 
-    for (const [key, block] of Object.entries(exerciseBlocksByCanonicalKey)) {
+    for (const [key, exList] of Object.entries(exercisesByCanonicalKey)) {
       if (!exerciseDisplayNameByKey[key]) {
-        exerciseDisplayNameByKey[key] = block.name;
+        exerciseDisplayNameByKey[key] = exList[0].name.trim();
       }
 
-      if (!exposuresByExerciseKey[key]) {
-        exposuresByExerciseKey[key] = [];
+      if (exList.length === 1) {
+        // Single instance of this exercise in this workout session
+        const ex = exList[0];
+        if (!exposuresByExerciseKey[key]) {
+          exposuresByExerciseKey[key] = [];
+        }
+        const exposureSeqIndex = exposuresByExerciseKey[key].length;
+        const exposureEvidence = getExerciseExposureEvidence(ex, workout, exposureSeqIndex);
+        exposuresByExerciseKey[key].push(exposureEvidence);
+
+        if (ex.planExerciseId) {
+          const subKey = `${key}::${ex.planExerciseId}`;
+          if (!exposuresByExerciseKey[subKey]) exposuresByExerciseKey[subKey] = [];
+          exposuresByExerciseKey[subKey].push(exposureEvidence);
+          if (!exerciseDisplayNameByKey[subKey]) exerciseDisplayNameByKey[subKey] = ex.name.trim();
+
+          if (!exposuresByExerciseKey[ex.planExerciseId]) exposuresByExerciseKey[ex.planExerciseId] = [];
+          exposuresByExerciseKey[ex.planExerciseId].push(exposureEvidence);
+          if (!exerciseDisplayNameByKey[ex.planExerciseId]) exerciseDisplayNameByKey[ex.planExerciseId] = ex.name.trim();
+        }
+        totalExposuresAnalyzed++;
+      } else {
+        // Multiple blocks of this exercise in the same session!
+        // Check if they are compatible unsegmented blocks (identical prescriptions, no distinct IDs)
+        const allHaveNoIds = exList.every((e) => !e.planExerciseId && !e.appliedDecisionId);
+        const pSet0 = (exList[0].sets || []).find((s) => isSetPrescribed(s));
+        const allMatchingPrescriptions = exList.every((e) => {
+          const s = (e.sets || []).find((st) => isSetPrescribed(st));
+          if (!pSet0 && !s) return true;
+          if (!pSet0 || !s) return false;
+          return (
+            s.prescribedWeight === pSet0.prescribedWeight &&
+            s.prescribedReps === pSet0.prescribedReps &&
+            s.prescribedUnit === pSet0.prescribedUnit
+          );
+        });
+
+        if (allHaveNoIds && allMatchingPrescriptions) {
+          // Compatible identical blocks within the same session (e.g. split sets)
+          const combinedSets: WorkoutSet[] = [];
+          for (const e of exList) {
+            combinedSets.push(...(e.sets || []));
+          }
+          if (!exposuresByExerciseKey[key]) exposuresByExerciseKey[key] = [];
+          const exposureSeqIndex = exposuresByExerciseKey[key].length;
+          const exposureEvidence = getExerciseExposureEvidence(
+            { name: exList[0].name.trim(), sets: combinedSets },
+            workout,
+            exposureSeqIndex
+          );
+          exposuresByExerciseKey[key].push(exposureEvidence);
+          totalExposuresAnalyzed++;
+        } else {
+          // Distinct or ambiguous instances!
+          // DO NOT SILENTLY COMBINE! Isolate each instance.
+          for (let i = 0; i < exList.length; i++) {
+            const ex = exList[i];
+            const exposureEvidence = getExerciseExposureEvidence(ex, workout, i);
+
+            if (!ex.planExerciseId && !ex.appliedDecisionId) {
+              exposureEvidence.exclusions.push(
+                'Ambiguous duplicate exercise instance in same session; sets not combined to prevent evidence distortion'
+              );
+            }
+
+            if (ex.planExerciseId) {
+              const subKey = `${key}::${ex.planExerciseId}`;
+              if (!exposuresByExerciseKey[subKey]) exposuresByExerciseKey[subKey] = [];
+              exposuresByExerciseKey[subKey].push(exposureEvidence);
+              if (!exerciseDisplayNameByKey[subKey]) exerciseDisplayNameByKey[subKey] = ex.name.trim();
+
+              if (!exposuresByExerciseKey[ex.planExerciseId]) exposuresByExerciseKey[ex.planExerciseId] = [];
+              exposuresByExerciseKey[ex.planExerciseId].push(exposureEvidence);
+              if (!exerciseDisplayNameByKey[ex.planExerciseId]) exerciseDisplayNameByKey[ex.planExerciseId] = ex.name.trim();
+            }
+
+            // Include in general key only if it is the primary instance or has appliedDecisionId
+            if (ex.appliedDecisionId || i === 0) {
+              if (!exposuresByExerciseKey[key]) exposuresByExerciseKey[key] = [];
+              exposuresByExerciseKey[key].push(exposureEvidence);
+            }
+            totalExposuresAnalyzed++;
+          }
+        }
       }
-
-      const exposureSeqIndex = exposuresByExerciseKey[key].length;
-      const exposureEvidence = getExerciseExposureEvidence(
-        { name: block.name, sets: block.sets },
-        workout,
-        exposureSeqIndex
-      );
-
-      exposuresByExerciseKey[key].push(exposureEvidence);
-      totalExposuresAnalyzed++;
     }
   }
 

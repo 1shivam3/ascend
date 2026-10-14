@@ -126,7 +126,7 @@ export type SetExecutionStatus = 'pending' | 'completed' | 'skipped' | 'not_atte
 export interface WorkoutSet {
   // Performed / actual execution values
   reps: number;
-  weight: number;
+  weight?: number;
   unit: Unit;
   completed?: boolean;
   rpe?: number;
@@ -138,6 +138,9 @@ export interface WorkoutSet {
   prescribedReps?: number;
   prescribedRpe?: number;
   prescribedUnit?: Unit;
+
+  // Provenance linking back to an applied policy decision (set only when verified via audit)
+  appliedDecisionId?: string;
 
   // Explicit execution status (optional for backwards compatibility with legacy records)
   status?: SetExecutionStatus;
@@ -226,6 +229,10 @@ export interface WorkoutExercise {
   name: string;
   sets: WorkoutSet[];
   notes?: string;
+  /** Reference to the PlannedExercise ID from which this exercise was started */
+  planExerciseId?: string;
+  /** Reference to the applied PolicyDecision ID, set only when reliably established via application audit */
+  appliedDecisionId?: string;
   /** Explicit structured athlete pain/discomfort flag (never inferred from free-text notes) */
   reportsPain?: boolean;
   /** Explicit structured athlete target hold request (never inferred from free-text notes) */
@@ -238,6 +245,8 @@ export interface WorkoutEntry {
   id: string;
   date: string; // YYYY-MM-DD
   name?: string;
+  /** Source plan/template ID when started from or associated with a planned workout */
+  planId?: string;
   durationMinutes?: number;
   notes?: string;
   exercises: WorkoutExercise[];
@@ -247,6 +256,18 @@ export interface WorkoutEntry {
   requestHold?: boolean;
   /** Explicit structured athlete safety flags */
   athleteFlags?: AthleteSafetyFlags;
+}
+
+export interface ActiveWorkoutDraft {
+  id?: string;
+  name?: string;
+  planId?: string;
+  date: string;
+  exercises: WorkoutExercise[];
+  startedFromPlan?: string | null;
+  startedFromPlanId?: string | null;
+  sessionStartTime?: number;
+  savedAt: string;
 }
 
 export interface FoodItem {
@@ -529,7 +550,7 @@ export interface TrainingDecision {
   };
   expectedRpe: number;
   actualExecution?: {
-    weight: number;
+    weight?: number;
     reps: number;
     actualRpe: number;
     completedSets: number;

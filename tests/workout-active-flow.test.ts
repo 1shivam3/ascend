@@ -446,7 +446,7 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       expect(set.weight).toBe(220);
 
       // Normalization comparison: 220 lbs * 0.453592 = 99.79 kg
-      const actualWeightKg = Math.round(set.weight * 0.453592 * 10) / 10;
+      const actualWeightKg = Math.round(set.weight! * 0.453592 * 10) / 10;
       expect(actualWeightKg).toBe(99.8);
       // Prescribed weight in kg is untouched
       expect(set.prescribedWeight).toBe(100);
@@ -580,7 +580,9 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       expect(sets.every((s) => s.prescribedWeight === 100 && s.prescribedReps === 5)).toBe(true);
 
       // Zero completed volume and no PRs can ever be generated
-      const volume = sets.filter(isSetCompleted).reduce((sum, s) => sum + s.weight * s.reps, 0);
+      const volume = sets
+        .filter(isSetCompleted)
+        .reduce((sum, s) => sum + (typeof s.weight === 'number' && Number.isFinite(s.weight) ? s.weight * s.reps : 0), 0);
       expect(volume).toBe(0);
     });
 
@@ -638,7 +640,7 @@ describe('Active Workout Flow & Prescription Preservation (Task 3B-2 & 3B-2A)', 
       // Volume calculation: only the 1 completed set counts
       const completedVolume = finalizedSets
         .filter(isSetCompleted)
-        .reduce((acc, s) => acc + s.weight * s.reps, 0);
+        .reduce((acc, s) => acc + (typeof s.weight === 'number' && Number.isFinite(s.weight) ? s.weight * s.reps : 0), 0);
       expect(completedVolume).toBe(500); // 100 * 5 = 500, not 500 + 1200 + 1800
 
       const workoutEntry: WorkoutEntry = {

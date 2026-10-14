@@ -163,7 +163,7 @@ const eqAdapted = adaptWorkoutForConstraints(testWorkout, {
   substituteExerciseName: 'Dumbbell Press',
 });
 check(eqAdapted.adaptedExercises[0].name === 'Dumbbell Press', 'Bench Press swapped for Dumbbell Press');
-check(eqAdapted.adaptedExercises[0].sets[0].weight < 80, 'Bench 80kg converted to safe dumbbell load (< 80kg)');
+check(typeof eqAdapted.adaptedExercises[0].sets[0].weight === 'number' && eqAdapted.adaptedExercises[0].sets[0].weight < 80, 'Bench 80kg converted to safe dumbbell load (< 80kg)');
 
 // Bodyweight equipment swap sets load to 0kg instead of machine load
 const bwAdapted = adaptWorkoutForConstraints([

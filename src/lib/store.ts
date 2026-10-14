@@ -10,6 +10,7 @@ import {
   BodyMetricEntry,
   MacroGoals,
   PlannedWorkout,
+  PlannedExercise,
   FavoriteFood,
   FoodItem,
   DayType,
@@ -53,15 +54,18 @@ import {
   canonicalizeExerciseName,
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
+import { isBodyweightExercise } from './strength-standards';
 
 export * from './types';
 
 export interface ActiveWorkoutDraft {
   id?: string;
   name?: string;
+  planId?: string;
   date: string;
   exercises: WorkoutExercise[];
   startedFromPlan?: string | null;
+  startedFromPlanId?: string | null;
   sessionStartTime?: number;
   savedAt: string;
 }
@@ -432,14 +436,34 @@ export const useAppStore = create<AppState>()(
           return state;
         }
 
-        const nextWorkouts = [...state.workouts, workout];
+        const sanitizedWorkout: WorkoutEntry = {
+          ...workout,
+          exercises: (workout.exercises || []).map((ex) => ({
+            ...ex,
+            sets: (ex.sets || []).map((s) => {
+              let cleanWeight: number | undefined = undefined;
+              if (typeof s.weight === 'number' && !isNaN(s.weight)) {
+                cleanWeight = s.weight;
+              } else if (typeof s.weight === 'string' && (s.weight as string).trim() !== '') {
+                const p = parseFloat(s.weight as string);
+                if (!isNaN(p)) cleanWeight = p;
+              }
+              return {
+                ...s,
+                weight: cleanWeight,
+              };
+            }),
+          })),
+        };
+
+        const nextWorkouts = [...state.workouts, sanitizedWorkout];
         const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
 
         // Correlate completed workout with active training decisions to track prediction error
         const updatedDecisions = { ...state.trainingDecisions };
         let updatedLedger = [...state.decisionsLedgerHistory];
 
-        for (const ex of workout.exercises) {
+        for (const ex of sanitizedWorkout.exercises) {
           const cleanExName = ex.name.trim().toLowerCase();
           const decisionKey = Object.keys(updatedDecisions).find(
             (k) => k.trim().toLowerCase() === cleanExName
@@ -448,7 +472,18 @@ export const useAppStore = create<AppState>()(
           const validSets = ex.sets.filter((s) => s.reps > 0 && !s.isWarmup && isSetCompleted(s));
 
           if (decision && validSets.length > 0) {
-            const topSet = validSets.reduce((prev, curr) => curr.weight >= prev.weight ? curr : prev, validSets[0]);
+            const isBW = isBodyweightExercise(ex.name);
+            const setsWithNumericWeight = validSets.filter(
+              (s) => typeof s.weight === 'number' && Number.isFinite(s.weight)
+            );
+            const topSet = setsWithNumericWeight.length > 0
+              ? setsWithNumericWeight.reduce((prev, curr) => (curr.weight! >= prev.weight! ? curr : prev), setsWithNumericWeight[0])
+              : validSets.reduce((prev, curr) => (curr.reps >= prev.reps ? curr : prev), validSets[0]);
+
+            const recordedWeight = typeof topSet.weight === 'number' && Number.isFinite(topSet.weight)
+              ? topSet.weight
+              : (isBW ? 0 : undefined);
+
             const rpes = validSets.map((s) => s.rpe ?? 8);
             const actualRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
             const expectedRpe = decision.expectedRpe || decision.nextPrescription.targetRpe || 8.0;
@@ -457,7 +492,7 @@ export const useAppStore = create<AppState>()(
             const evaluatedDecision: TrainingDecision = {
               ...decision,
               actualExecution: {
-                weight: topSet.weight,
+                weight: recordedWeight,
                 reps: topSet.reps,
                 actualRpe,
                 completedSets: validSets.length,
@@ -500,6 +535,7 @@ export const useAppStore = create<AppState>()(
         // Look for matching planned workout (if any)
         const matchedPlan = state.plannedWorkouts.find(
           (p) =>
+            (workout.planId && p.id === workout.planId) ||
             (workout.name && p.name.trim().toLowerCase() === workout.name.trim().toLowerCase()) ||
             p.id === workout.name
         );
@@ -513,13 +549,38 @@ export const useAppStore = create<AppState>()(
           workout.requestHold === true ||
           workout.athleteFlags?.requestHold === true;
 
-        for (const ex of workout.exercises) {
+        for (let exIndex = 0; exIndex < workout.exercises.length; exIndex++) {
+          const ex = workout.exercises[exIndex];
           if (!ex || !ex.name) continue;
 
-          const plannedEx = matchedPlan?.exercises.find(
-            (pe) =>
-              canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(ex.name)
-          );
+          // Target Planned Exercise Resolution:
+          // Strictly resolve exact target identity: ID match first, single name match, or index fallback.
+          // Fails closed if ambiguous.
+          let plannedEx: PlannedExercise | undefined = undefined;
+          if (matchedPlan) {
+            if (ex.planExerciseId) {
+              const matchesById = matchedPlan.exercises.filter((pe) => pe.id === ex.planExerciseId);
+              if (matchesById.length === 1) {
+                plannedEx = matchesById[0];
+              }
+            } else {
+              const matchesByName = matchedPlan.exercises.filter(
+                (pe) => canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(ex.name)
+              );
+              if (matchesByName.length === 1) {
+                plannedEx = matchesByName[0];
+              } else if (matchesByName.length > 1) {
+                if (
+                  exIndex < matchedPlan.exercises.length &&
+                  canonicalizeExerciseName(matchedPlan.exercises[exIndex].name) === canonicalizeExerciseName(ex.name)
+                ) {
+                  plannedEx = matchedPlan.exercises[exIndex];
+                } else {
+                  plannedEx = undefined;
+                }
+              }
+            }
+          }
 
           const prescribedSets = (ex.sets || []).filter((s) => isSetPrescribed(s));
           const hasPrescribedSets = prescribedSets.length > 0;
@@ -552,23 +613,28 @@ export const useAppStore = create<AppState>()(
 
           const firstPrescribedSet = prescribedSets[0];
           const targetUnit: Unit =
-            plannedEx?.targetUnit ??
             firstPrescribedSet?.prescribedUnit ??
+            plannedEx?.targetUnit ??
             state.profile?.unit ??
             'kg';
 
           const currentTarget: CurrentPrescriptionTarget = {
             name: ex.name,
-            targetWeight: plannedEx?.targetWeight ?? firstPrescribedSet?.prescribedWeight,
-            targetReps: plannedEx?.targetReps ?? firstPrescribedSet?.prescribedReps,
+            targetWeight: firstPrescribedSet?.prescribedWeight ?? plannedEx?.targetWeight,
+            targetReps: firstPrescribedSet?.prescribedReps ?? plannedEx?.targetReps,
             targetSets: plannedEx?.targetSets ?? (hasPrescribedSets ? prescribedSets.length : (ex.sets?.length || 1)),
             targetUnit,
-            targetRpe: plannedEx?.targetRpe ?? firstPrescribedSet?.prescribedRpe,
-            notes: plannedEx?.notes ?? ex.notes,
+            targetRpe: firstPrescribedSet?.prescribedRpe ?? plannedEx?.targetRpe,
+            notes: ex.notes ?? plannedEx?.notes,
           };
 
           const targetRepsVal = currentTarget.targetReps ?? 8;
           const repRange = { min: targetRepsVal, max: targetRepsVal };
+
+          const sameCanonicalCount = workout.exercises.filter(
+            (e) => e && canonicalizeExerciseName(e.name) === canonicalizeExerciseName(ex.name)
+          ).length;
+          const sessionIndex = sameCanonicalCount > 1 ? exIndex : undefined;
 
           const policyDecision = evaluateTrainingDecisionPolicyV0(
             ex.name,
@@ -580,6 +646,9 @@ export const useAppStore = create<AppState>()(
               userUnit: targetUnit,
               repRange,
               athleteFlags,
+              sessionIndex,
+              targetExerciseId: ex.planExerciseId || plannedEx?.id,
+              planExerciseId: ex.planExerciseId || plannedEx?.id,
               // CRITICAL: Never pass hardcoded incrementApprovalSource or incrementConfig here.
               // Equipment increments remain unconfigured until explicit user/coach configuration.
             }
@@ -965,7 +1034,34 @@ export const useAppStore = create<AppState>()(
 
       setCustomGeminiKey: (key: string) => set({ customGeminiKey: key.trim() ? key.trim() : undefined }),
 
-      saveWorkoutDraft: (draft) => set({ activeWorkoutDraft: draft }),
+      saveWorkoutDraft: (draft) => {
+        if (!draft) {
+          set({ activeWorkoutDraft: null });
+          return;
+        }
+        const sanitizedExercises = (draft.exercises || []).map((ex) => ({
+          ...ex,
+          sets: (ex.sets || []).map((s) => {
+            let cleanWeight: number | undefined = undefined;
+            if (typeof s.weight === 'number' && !isNaN(s.weight)) {
+              cleanWeight = s.weight;
+            } else if (typeof s.weight === 'string' && (s.weight as string).trim() !== '') {
+              const p = parseFloat(s.weight as string);
+              if (!isNaN(p)) cleanWeight = p;
+            }
+            return {
+              ...s,
+              weight: cleanWeight,
+            };
+          }),
+        }));
+        set({
+          activeWorkoutDraft: {
+            ...draft,
+            exercises: sanitizedExercises,
+          },
+        });
+      },
       clearWorkoutDraft: () => set({ activeWorkoutDraft: null }),
 
       savePortionPreference: (foodName, grams) =>
@@ -1441,7 +1537,31 @@ export const useAppStore = create<AppState>()(
           set((state) => ({
             profile: data.profile || state.profile,
             prs: Array.isArray(data.prs) ? data.prs : state.prs,
-            workouts: Array.isArray(data.workouts) ? data.workouts : state.workouts,
+            workouts: Array.isArray(data.workouts)
+              ? data.workouts.map((w: any) => ({
+                  ...w,
+                  exercises: Array.isArray(w.exercises)
+                    ? w.exercises.map((ex: any) => ({
+                        ...ex,
+                        sets: Array.isArray(ex.sets)
+                          ? ex.sets.map((s: any) => {
+                              let cleanWeight: number | undefined = undefined;
+                              if (typeof s?.weight === 'number' && !isNaN(s.weight)) {
+                                cleanWeight = s.weight;
+                              } else if (typeof s?.weight === 'string' && s.weight.trim() !== '') {
+                                const p = parseFloat(s.weight);
+                                if (!isNaN(p)) cleanWeight = p;
+                              }
+                              return {
+                                ...s,
+                                weight: cleanWeight,
+                              };
+                            })
+                          : [],
+                      }))
+                    : [],
+                }))
+              : state.workouts,
             meals: Array.isArray(data.meals) ? data.meals : state.meals,
             bodyMetrics: Array.isArray(data.bodyMetrics) ? data.bodyMetrics : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
@@ -1555,6 +1675,29 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
+
+          if (state.activeWorkoutDraft) {
+            const sanitizedExercises = (state.activeWorkoutDraft.exercises || []).map((ex) => ({
+              ...ex,
+              sets: (ex.sets || []).map((s) => {
+                let cleanWeight: number | undefined = undefined;
+                if (typeof s.weight === 'number' && !isNaN(s.weight)) {
+                  cleanWeight = s.weight;
+                } else if (typeof s.weight === 'string' && (s.weight as string).trim() !== '') {
+                  const p = parseFloat(s.weight as string);
+                  if (!isNaN(p)) cleanWeight = p;
+                }
+                return {
+                  ...s,
+                  weight: cleanWeight,
+                };
+              }),
+            }));
+            state.activeWorkoutDraft = {
+              ...state.activeWorkoutDraft,
+              exercises: sanitizedExercises,
+            };
+          }
 
           // Disaster Recovery: If profile is missing or PRs/workouts are empty, check fallbacks
           if (typeof window !== 'undefined') {

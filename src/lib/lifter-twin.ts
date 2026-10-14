@@ -119,7 +119,7 @@ export function getExerciseHistorySessions(
         .filter((s) => s.reps > 0 && isSetCompleted(s))
         .map((s) => {
           let normalizedWeight = s.weight;
-          if (s.unit && s.unit !== userUnit) {
+          if (typeof s.weight === 'number' && !isNaN(s.weight) && s.unit && s.unit !== userUnit) {
             if (userUnit === 'lbs' && s.unit === 'kg') {
               normalizedWeight = Math.round(s.weight * 2.20462 * 10) / 10;
             } else if (userUnit === 'kg' && s.unit === 'lbs') {
@@ -140,8 +140,12 @@ export function getExerciseHistorySessions(
       let bestE1RM = 0;
       let totalVolume = 0;
 
-      for (const s of validSets) {
-        const wNorm = s.weight;
+      const weightedSets = validSets.filter(
+        (s) => typeof s.weight === 'number' && Number.isFinite(s.weight)
+      );
+
+      for (const s of weightedSets) {
+        const wNorm = s.weight!;
         const e1rm = calculateOneRepMax(wNorm, s.reps);
         totalVolume += wNorm * s.reps;
         if (e1rm > bestE1RM) {
@@ -149,6 +153,14 @@ export function getExerciseHistorySessions(
           bestWeight = wNorm;
           bestReps = s.reps;
         }
+      }
+
+      if (weightedSets.length === 0) {
+        const topRepSet = validSets.reduce(
+          (prev, curr) => (curr.reps >= prev.reps ? curr : prev),
+          validSets[0]
+        );
+        bestReps = topRepSet.reps;
       }
 
       history.push({
@@ -189,6 +201,11 @@ export function generateTrainingDecision(
   const history = getExerciseHistorySessions(exerciseName, workouts, userUnit);
   if (history.length === 0) return null;
 
+  const isBW = isBodyweightExercise(exerciseName);
+  const lastSession = history[history.length - 1];
+  const hasMeasuredLoad = lastSession.sets.some((s) => typeof s.weight === 'number' && Number.isFinite(s.weight));
+  if (!isBW && !hasMeasuredLoad) return null;
+
   const activeGoals: AthleteGoal[] = goals && goals.length > 0 ? goals : ['get_stronger', 'build_muscle'];
   const hasStrength = activeGoals.includes('get_stronger');
   const hasMuscle = activeGoals.includes('build_muscle');
@@ -198,7 +215,6 @@ export function generateTrainingDecision(
   const goalsLabel = activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
 
   const evidenceCount = history.length;
-  const lastSession = history[history.length - 1];
   const lastSets = lastSession.sets;
   const lastWeight = lastSession.bestWeight;
   const lastReps = lastSession.bestReps;
@@ -779,10 +795,10 @@ export function adaptWorkoutForConstraints(
       const isNewDumbbell = isDumbbellExercise(newName);
       const isOldDumbbell = isDumbbellExercise(currentEx.name);
 
-      let targetWeight = currentEx.sets[0]?.weight || 0;
+      let targetWeight: number | undefined = currentEx.sets[0]?.weight;
       if (isNewBodyweight) {
         targetWeight = 0; // Pure bodyweight baseline
-      } else if (isNewDumbbell && !isOldDumbbell) {
+      } else if (typeof targetWeight === 'number' && isNewDumbbell && !isOldDumbbell) {
         // Barbell to dumbbell conversion without personal history:
         // Set safe exploratory calibration weight (~35% of barbell weight per hand)
         targetWeight = Math.max(userUnit === 'kg' ? 12 : 25, Math.round(targetWeight * 0.35));

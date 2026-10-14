@@ -12,7 +12,8 @@ import {
   CreatineLog,
   CreatineConfig,
   CreatineSupply,
-  DailyTimelineEvent
+  DailyTimelineEvent,
+  isSetCompleted,
 } from './types';
 
 export type { DayType };
@@ -531,8 +532,11 @@ export function getMonthlyAscensionReport(params: {
   for (const w of monthWorkouts) {
     for (const ex of w.exercises || []) {
       for (const s of ex.sets || []) {
-        const wtKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
-        totalVolumeKg += wtKg * (s.reps || 0);
+        if (!isSetCompleted(s) || s.isWarmup) continue;
+        if (typeof s.weight === 'number' && Number.isFinite(s.weight)) {
+          const wtKg = s.unit === 'lbs' ? s.weight * 0.453592 : s.weight;
+          totalVolumeKg += wtKg * (s.reps || 0);
+        }
       }
     }
   }

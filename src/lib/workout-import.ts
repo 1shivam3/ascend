@@ -122,7 +122,7 @@ export function parseWorkoutCSV(csvText: string): ImportWorkoutResult {
   for (const w of workouts) {
     for (const ex of w.exercises) {
       for (const s of ex.sets) {
-        if (s.weight > 0 && s.reps > 0) {
+        if (typeof s.weight === 'number' && s.weight > 0 && s.reps > 0) {
           const e1rm = calculateOneRepMax(s.weight, s.reps);
           const current = prMap[ex.name];
           if (!current || e1rm > current.e1RM) {

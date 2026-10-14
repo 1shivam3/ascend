@@ -27,7 +27,7 @@ interface WorkoutCoachDrawerProps {
     name: string;
     exercises: Array<{
       name: string;
-      sets: Array<{ reps: number; weight: number; unit: string }>;
+      sets: Array<{ reps: number; weight?: number; unit: string }>;
     }>;
   };
   onApplyModifiedWorkout: (modifiedExercises: any[]) => void;

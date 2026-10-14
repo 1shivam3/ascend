@@ -29,7 +29,7 @@ import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
-import { getTodaySessionState, getExercisePrescription } from '@/lib/workout-engine';
+import { getTodaySessionState, getExercisePrescription, createWorkoutDraftFromPlan, createWorkoutExercisesFromPlan } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -334,31 +334,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     let exercisesToDraft: WorkoutExercise[] = [];
 
     if (yesterdaySched.plan?.exercises && yesterdaySched.plan.exercises.length > 0) {
-      exercisesToDraft = yesterdaySched.plan.exercises.map((pe) => {
-        const pr = prs.find((p) => p.exercise.toLowerCase() === pe.name.toLowerCase());
-        let assignedWeight: number = pe.targetWeight ?? 0;
-        if (!assignedWeight || assignedWeight === 0) {
-          if (pr && pr.oneRepMax > 0) {
-            assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
-          }
-        }
-        const finalAssignedW = assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60);
-        const targetUnit = pe.targetUnit ?? userUnit;
-        return {
-          name: pe.name,
-          sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-            weight: finalAssignedW,
-            reps: pe.targetReps,
-            unit: targetUnit,
-            rpe: 8,
-            completed: false,
-            status: 'pending' as const,
-            prescribedWeight: finalAssignedW,
-            prescribedReps: pe.targetReps,
-            prescribedRpe: 8,
-            prescribedUnit: targetUnit,
-          })),
-        };
+      exercisesToDraft = createWorkoutExercisesFromPlan(yesterdaySched.plan, {
+        userUnit,
+        userPrs: prs,
       });
     } else {
       exercisesToDraft = [
@@ -411,41 +389,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       : null) || plannedWorkouts[0];
 
     if (planToStart && planToStart.exercises && planToStart.exercises.length > 0) {
-      const draftExercises: WorkoutExercise[] = planToStart.exercises.map((pe) => {
-        const pr = prs.find((p) => p.exercise.toLowerCase() === pe.name.toLowerCase());
-        let assignedWeight: number = pe.targetWeight ?? 0;
-        if (!assignedWeight || assignedWeight === 0) {
-          if (pr && pr.oneRepMax > 0) {
-            assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, 8, userUnit);
-          }
-        }
-        const finalAssignedW = assignedWeight > 0 ? assignedWeight : (userUnit === 'lbs' ? 135 : 60);
-        const targetUnit = pe.targetUnit ?? userUnit;
-        return {
-          name: pe.name,
-          sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-            weight: finalAssignedW,
-            reps: pe.targetReps,
-            unit: targetUnit,
-            rpe: 8,
-            completed: false,
-            status: 'pending' as const,
-            prescribedWeight: finalAssignedW,
-            prescribedReps: pe.targetReps,
-            prescribedRpe: 8,
-            prescribedUnit: targetUnit,
-          })),
-        };
+      const applications = useStore.getState().policyDecisionApplications || [];
+      const draft = createWorkoutDraftFromPlan(planToStart, {
+        userUnit,
+        userPrs: prs,
+        applications,
+        date: todayStr,
       });
 
-      saveWorkoutDraft({
-        date: todayStr,
-        exercises: draftExercises,
-        startedFromPlan: planToStart.name,
-        sessionStartTime: Date.now(),
-        savedAt: new Date().toISOString(),
-      });
-      toast.success(`Loaded "${planToStart.name}" with ${draftExercises.length} movements. Let's lift!`, 'Session Started');
+      saveWorkoutDraft(draft);
+      toast.success(`Loaded "${planToStart.name}" with ${draft.exercises.length} movements. Let's lift!`, 'Session Started');
     }
     onNavigate('workout');
   };

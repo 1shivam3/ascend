@@ -137,12 +137,14 @@ const todayExercise = {
 let detectedRepPR: any = null;
 const userBW = 75;
 for (const s of todayExercise.sets) {
+  if (typeof s.weight !== 'number' || !Number.isFinite(s.weight)) continue;
   const wKg = s.weight;
   let maxPrevRepsAtWeight = 0;
   for (const pw of pastWorkouts) {
     for (const pex of pw.exercises) {
       if (pex.name.toLowerCase() === todayExercise.name.toLowerCase()) {
         for (const ps of pex.sets) {
+          if (typeof ps.weight !== 'number' || !Number.isFinite(ps.weight)) continue;
           const pwKg = ps.weight;
           if (Math.abs(pwKg - wKg) < 1.0 && ps.reps > maxPrevRepsAtWeight) {
             maxPrevRepsAtWeight = ps.reps;

@@ -55,6 +55,7 @@ import {
   getGoalAdaptiveSplitTemplates,
   isSetCompleted,
   finalizeWorkoutExercises,
+  createWorkoutExercisesFromPlan,
 } from '@/lib/workout-engine';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
@@ -622,6 +623,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   /** When the logger is pre-filled from a plan, store its name here */
   const [startedFromPlan, setStartedFromPlan] = useState<string | null>(null);
+  const [startedFromPlanId, setStartedFromPlanId] = useState<string | null>(null);
   const [sharingPlan, setSharingPlan] = useState<PlannedWorkout | null>(null);
 
   // ── Rest Timer State ───────────────────────────────────────────────────────
@@ -735,22 +737,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ── Auto-save Draft to Local Storage ──────────────────────────────────────
   useEffect(() => {
-    if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => s.weight > 0 || s.reps > 0))) {
+    if (isModalOpen && exercises.some((e) => e.name.trim() || e.sets.some((s) => (typeof s.weight === 'number' && s.weight > 0) || s.reps > 0))) {
       saveWorkoutDraft({
         date,
+        name: startedFromPlan || undefined,
+        planId: startedFromPlanId || undefined,
         exercises,
         startedFromPlan,
+        startedFromPlanId,
         sessionStartTime,
         savedAt: new Date().toISOString(),
       });
     }
-  }, [isModalOpen, exercises, date, startedFromPlan, sessionStartTime, saveWorkoutDraft]);
+  }, [isModalOpen, exercises, date, startedFromPlan, startedFromPlanId, sessionStartTime, saveWorkoutDraft]);
 
   const handleResumeWorkout = () => {
     if (!activeWorkoutDraft) return;
     setDate(activeWorkoutDraft.date);
     setExercises(activeWorkoutDraft.exercises);
     setStartedFromPlan(activeWorkoutDraft.startedFromPlan || null);
+    setStartedFromPlanId(activeWorkoutDraft.startedFromPlanId || activeWorkoutDraft.planId || null);
     setSessionStartTime(activeWorkoutDraft.sessionStartTime || Date.now());
     setIsModalOpen(true);
     toast.success('Resumed active workout session!', 'Workout Restored');
@@ -758,6 +764,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleDiscardDraft = () => {
     clearWorkoutDraft();
+    setStartedFromPlan(null);
+    setStartedFromPlanId(null);
     toast.info('Workout draft discarded.', 'Draft Cleared');
   };
 
@@ -876,10 +884,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     if (substitutionExerciseIndex !== null) {
       setExercises(prev => prev.map((ex, i) => {
         if (i === substitutionExerciseIndex) {
+          const isBW = isBodyweightExercise(replacement.replacementExercise);
+          const repWeight = typeof replacement.targetWeightKg === 'number' && Number.isFinite(replacement.targetWeightKg)
+            ? replacement.targetWeightKg
+            : (typeof ex.sets[0]?.weight === 'number' && Number.isFinite(ex.sets[0].weight)
+                ? ex.sets[0].weight
+                : (isBW ? 0 : undefined));
+
           return {
             name: replacement.replacementExercise,
             sets: Array.from({ length: replacement.targetSets || ex.sets.length || 3 }).map(() => ({
-              weight: replacement.targetWeightKg || ex.sets[0]?.weight || 0,
+              weight: repWeight,
               reps: parseInt(replacement.targetReps || '8') || 8,
               unit: userUnit,
             })),
@@ -976,7 +991,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setExercises(prev => {
       const updated = [...prev];
       const prevSet = updated[exerciseIndex].sets[updated[exerciseIndex].sets.length - 1];
-      const prevW = prevSet?.weight ?? 0;
+      const isBW = isBodyweightExercise(updated[exerciseIndex].name);
+      const prevW = prevSet ? prevSet.weight : (isBW ? 0 : undefined);
       const prevR = prevSet?.reps ?? 8;
       const prevU = prevSet?.unit ?? userUnit;
       updated[exerciseIndex] = {
@@ -990,10 +1006,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             completed: false,
             status: 'pending' as const,
             rpe: prevSet?.rpe ?? 8,
-            prescribedWeight: prevSet?.prescribedWeight ?? (prevW > 0 ? prevW : undefined),
-            prescribedReps: prevSet?.prescribedReps ?? prevR,
-            prescribedRpe: prevSet?.prescribedRpe ?? 8,
-            prescribedUnit: prevSet?.prescribedUnit ?? prevU,
+            prescribedWeight: prevSet?.prescribedWeight,
+            prescribedReps: prevSet?.prescribedReps,
+            prescribedRpe: prevSet?.prescribedRpe,
+            prescribedUnit: prevSet?.prescribedUnit,
+            appliedDecisionId: prevSet?.appliedDecisionId,
           },
         ],
       };
@@ -1030,6 +1047,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const openBlankLogger = () => {
     setStartedFromPlan(null);
+    setStartedFromPlanId(null);
     setSessionStartTime(Date.now());
     if (exercises.length === 0 || exercises.every(e => !e.name.trim())) {
       const defaultW = userUnit === 'kg' ? 60 : 135;
@@ -1060,48 +1078,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleStartPlan = (plan: PlannedWorkout) => {
     setSessionStartTime(Date.now());
-    const storedDecisions = useStore.getState().trainingDecisions;
     const userPrs = useStore.getState().prs;
-    const preFilledExercises: WorkoutExercise[] = plan.exercises.map(pe => {
-      const activeDecision = storedDecisions[pe.name];
-      let assignedWeight: number | '' = pe.targetWeight ?? 0;
-      let assignedRpe = 8;
-      if (activeDecision?.status === 'accepted') {
-        assignedWeight = activeDecision.nextPrescription.weight;
-        assignedRpe = activeDecision.nextPrescription.targetRpe;
-      } else if (activeDecision?.status === 'overridden' && activeDecision.userOverrideWeight !== undefined) {
-        assignedWeight = activeDecision.userOverrideWeight;
-        assignedRpe = activeDecision.nextPrescription.targetRpe;
-      } else if (!assignedWeight || assignedWeight === 0) {
-        const pr = userPrs.find(p => p.exercise.toLowerCase() === pe.name.toLowerCase());
-        if (pr && pr.oneRepMax > 0) {
-          assignedWeight = suggestLoad(pr.oneRepMax, pe.targetReps, assignedRpe, userUnit);
-        } else {
-          assignedWeight = '';
-        }
-      }
-
-      const pWeight = typeof assignedWeight === 'number' && assignedWeight > 0 ? assignedWeight : undefined;
-      const targetUnit = pe.targetUnit ?? userUnit;
-      return {
-        name: pe.name,
-        sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-          weight: assignedWeight !== '' && assignedWeight > 0 ? assignedWeight : ('' as any),
-          reps: pe.targetReps,
-          unit: targetUnit,
-          rpe: assignedRpe,
-          completed: false,
-          status: 'pending' as const,
-          prescribedWeight: pWeight,
-          prescribedReps: pe.targetReps,
-          prescribedRpe: assignedRpe,
-          prescribedUnit: targetUnit,
-        })),
-      };
+    const applications = useStore.getState().policyDecisionApplications || [];
+    const preFilledExercises = createWorkoutExercisesFromPlan(plan, {
+      userUnit,
+      userPrs,
+      applications,
     });
     setExercises(preFilledExercises);
     setDate(getLocalTodayStr());
     setStartedFromPlan(plan.name);
+    setStartedFromPlanId(plan.id);
     try {
       const setDaySchedule = useStore.getState().setDaySchedule;
       if (setDaySchedule) {
@@ -1237,7 +1224,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       ? crypto.randomUUID()
       : `w_${Date.now()}`;
 
-    const newWorkout: WorkoutEntry = { id: workoutId, date, exercises: validExercises };
+    const newWorkout: WorkoutEntry = {
+      id: workoutId,
+      date,
+      name: startedFromPlan || undefined,
+      planId: startedFromPlanId || undefined,
+      exercises: validExercises,
+    };
     addWorkout(newWorkout);
 
     // Auto-PR Detection (only evaluates completed sets)
@@ -1254,7 +1247,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
         for (const s of ex.sets) {
           if (s.isWarmup || !isSetCompleted(s)) continue;
-          const wNum = s.weight;
+          const wNum = typeof s.weight === 'number' && !isNaN(s.weight) ? s.weight : 0;
           const rNum = s.reps;
           if (rNum > 0 && (wNum > 0 || isBW)) {
             const wKg = s.unit === 'lbs' ? wNum * 0.453592 : wNum;
@@ -1320,6 +1313,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     clearWorkoutDraft();
     setIsModalOpen(false);
     setStartedFromPlan(null);
+    setStartedFromPlanId(null);
     setDate(getLocalTodayStr());
     setExercises([]);
   };
@@ -1377,24 +1371,18 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleStartSuggestedWorkout = (workoutName: string, suggestedExercises: PlannedExercise[]) => {
     setSessionStartTime(Date.now());
-    const preFilled: WorkoutExercise[] = suggestedExercises.map(pe => {
-      const pWeight = pe.targetWeight ?? (userUnit === 'lbs' ? 135 : 60);
-      const targetUnit = pe.targetUnit ?? userUnit;
-      return {
-        name: pe.name,
-        sets: Array.from({ length: Math.max(1, pe.targetSets) }, () => ({
-          weight: pe.targetWeight ?? 0,
-          reps: pe.targetReps,
-          unit: targetUnit,
-          completed: false,
-          status: 'pending' as const,
-          rpe: 8,
-          prescribedWeight: pWeight,
-          prescribedReps: pe.targetReps,
-          prescribedRpe: 8,
-          prescribedUnit: targetUnit,
-        })),
-      };
+    const userPrs = useStore.getState().prs;
+    const applications = useStore.getState().policyDecisionApplications || [];
+    const suggestedPlan: PlannedWorkout = {
+      id: `suggested_${Date.now()}`,
+      name: workoutName,
+      createdAt: getLocalTodayStr(),
+      exercises: suggestedExercises,
+    };
+    const preFilled = createWorkoutExercisesFromPlan(suggestedPlan, {
+      userUnit,
+      userPrs,
+      applications,
     });
     setExercises(preFilled);
     setDate(getLocalTodayStr());
@@ -2283,6 +2271,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <ActiveWorkoutScreen
           initialExercises={exercises}
           workoutName={startedFromPlan || 'Workout Session'}
+          planId={startedFromPlanId || undefined}
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
@@ -2295,6 +2284,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             setIsModalOpen(false);
             setExercises([]);
             setStartedFromPlan(null);
+            setStartedFromPlanId(null);
             if (newPRsCount > 0) {
               toast.success(
                 `${newPRsCount} New PR${newPRsCount > 1 ? 's' : ''} detected & synced to your PRs!`,

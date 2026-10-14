@@ -25,7 +25,7 @@ interface PostWorkoutTakeModalProps {
     durationMinutes: number;
     exercises: Array<{
       name: string;
-      sets: Array<{ reps: number; weight: number; unit: string }>;
+      sets: Array<{ reps: number; weight?: number; unit: string }>;
     }>;
   };
 }
