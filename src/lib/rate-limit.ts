@@ -41,18 +41,33 @@ export interface RateLimitResult {
 }
 
 /**
+ * Validates basic IP address string format to prevent header injection or bloated key allocations.
+ */
+function isValidIpFormat(ip: string): boolean {
+  if (!ip || ip.length > 45) return false;
+  return /^[0-9a-fA-F:.]+$/.test(ip);
+}
+
+/**
  * Extracts the real client IP from standard reverse proxy headers.
+ * Prioritizes trusted edge headers (Cloudflare, verified proxy) over client-spoofable forwarded headers.
  */
 export function getClientIp(req: Request): string {
+  // 1. Cloudflare connecting IP (set at edge network, cannot be forged by client)
+  const cfConnectingIp = req.headers.get('cf-connecting-ip')?.trim();
+  if (cfConnectingIp && isValidIpFormat(cfConnectingIp)) return cfConnectingIp;
+
+  // 2. Direct reverse-proxy / load-balancer verified header
+  const realIp = req.headers.get('x-real-ip')?.trim();
+  if (realIp && isValidIpFormat(realIp)) return realIp;
+
+  // 3. X-Forwarded-For: origin client IP is the first entry
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const firstIp = forwarded.split(',')[0]?.trim();
-    if (firstIp) return firstIp;
+    if (firstIp && isValidIpFormat(firstIp)) return firstIp;
   }
-  const realIp = req.headers.get('x-real-ip')?.trim();
-  if (realIp) return realIp;
-  const cfConnectingIp = req.headers.get('cf-connecting-ip')?.trim();
-  if (cfConnectingIp) return cfConnectingIp;
+
   return '127.0.0.1';
 }
 

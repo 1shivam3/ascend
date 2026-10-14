@@ -129,7 +129,11 @@ function sanitizeImportObject<T extends Record<string, any>>(obj: any): T {
   for (const [key, value] of Object.entries(obj)) {
     if (DISALLOWED_IMPORT_KEYS.has(key)) continue;
     if (key.includes('__proto__') || key.includes('constructor') || key.includes('prototype')) continue;
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (Array.isArray(value)) {
+      clean[key] = value.map((item) =>
+        item && typeof item === 'object' && !Array.isArray(item) ? sanitizeImportObject(item) : item
+      );
+    } else if (value && typeof value === 'object') {
       clean[key] = sanitizeImportObject(value);
     } else {
       clean[key] = value;

@@ -24,7 +24,7 @@ export function redactSecrets(message: string): string {
   if (!message) return '';
   return message
     .replace(/AIzaSy[A-Za-z0-9_-]{33}/g, '[REDACTED_API_KEY]')
-    .replace(/(?:key|token|secret|password)=["']?[A-Za-z0-9_.-]+["']?/gi, '$1=[REDACTED]')
+    .replace(/((?:api_?key|key|token|secret|password)\s*[:=]\s*)["']?[A-Za-z0-9_.-]+["']?/gi, '$1[REDACTED]')
     .replace(/bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED]');
 }
 
