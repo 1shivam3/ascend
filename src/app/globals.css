@@ -92,7 +92,7 @@
 
   /* Solid vibrant orange primary CTA — exclusively for actionable intent */
   .btn-primary {
-    @apply bg-accent text-white font-semibold px-4 py-2.5 rounded-xl text-sm;
+    @apply bg-accent text-stone-950 font-bold px-4 py-2.5 rounded-xl text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
     @apply hover:brightness-105 flex items-center justify-center gap-2;
     min-height: 48px;

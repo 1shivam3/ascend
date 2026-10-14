@@ -2,14 +2,42 @@
 
 import { useState, useEffect } from 'react';
 import { Home, Dumbbell, TrendingUp, UtensilsCrossed, Plus } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
 import HomePage from '@/components/HomePage';
-import ProgressPage from '@/components/ProgressPage';
-import WorkoutPage from '@/components/WorkoutPage';
-import MealsPage from '@/components/MealsPage';
-import QuickActionSheetModal from '@/components/QuickActionSheetModal';
-import ImportProgramModal from '@/components/ImportProgramModal';
+
+function TabLoadingFallback({ label }: { label: string }) {
+  return (
+    <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 p-8 animate-fade-in text-center">
+      <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <span className="text-xs text-text-muted font-mono">{label}</span>
+    </div>
+  );
+}
+
+const ProgressPage = dynamic(() => import('@/components/ProgressPage'), {
+  loading: () => <TabLoadingFallback label="Loading analytics & PRs..." />,
+  ssr: false,
+});
+
+const WorkoutPage = dynamic(() => import('@/components/WorkoutPage'), {
+  loading: () => <TabLoadingFallback label="Loading training engine..." />,
+  ssr: false,
+});
+
+const MealsPage = dynamic(() => import('@/components/MealsPage'), {
+  loading: () => <TabLoadingFallback label="Loading nutrition & macros..." />,
+  ssr: false,
+});
+
+const QuickActionSheetModal = dynamic(() => import('@/components/QuickActionSheetModal'), {
+  ssr: false,
+});
+
+const ImportProgramModal = dynamic(() => import('@/components/ImportProgramModal'), {
+  ssr: false,
+});
 import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
 import { PlannedWorkout } from '@/lib/types';
 import { useAppNavigation, TabId } from '@/lib/navigation';
@@ -149,17 +177,21 @@ export default function AppPage() {
   // Hydration barrier: Never render OnboardingScreen or app until mounted AND Zustand has rehydrated
   if (!mounted || !_hasHydrated) {
     return (
-      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center gap-3">
+      <main id="main-content" className="min-h-screen bg-bg-primary flex flex-col items-center justify-center gap-3">
         <div className="text-accent text-lg tracking-widest uppercase font-mono font-bold animate-pulse">
           ASCEND
         </div>
         <span className="text-2xs text-text-muted font-mono">Restoring athlete data &amp; records...</span>
-      </div>
+      </main>
     );
   }
 
   if (!profile) {
-    return <OnboardingScreen />;
+    return (
+      <main id="main-content" className="w-full min-h-[100dvh]">
+        <OnboardingScreen />
+      </main>
+    );
   }
 
   return (
@@ -174,7 +206,7 @@ export default function AppPage() {
           <span>Offline Gym Mode Active &bull; All workouts, PRs, and meals are safely saved locally</span>
         </aside>
       )}
-      <main className="w-full">
+      <main id="main-content" className="w-full">
         {activeTab === 'home' && (
           <HomePage
             onNavigate={(tab) => {

@@ -3,7 +3,7 @@ import { Dumbbell, ArrowLeft, Home, Trophy, UtensilsCrossed } from 'lucide-react
 
 export default function NotFound() {
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden selection:bg-accent/30">
+    <main id="main-content" className="min-h-screen bg-bg-primary text-text-primary flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden selection:bg-accent/30">
       {/* Background Decorative Rings */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] h-[340px] rounded-full border border-border/20 pointer-events-none" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] rounded-full border border-border/10 pointer-events-none" />
@@ -76,6 +76,6 @@ export default function NotFound() {
           ASCEND v2.0 • Offline Powerlifting Sanctuary
         </p>
       </div>
-    </div>
+    </main>
   );
 }

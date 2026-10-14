@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary px-4 py-8 max-w-xl mx-auto space-y-6">
+    <main id="main-content" className="min-h-screen bg-bg-primary text-text-primary px-4 py-8 max-w-xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/60 pb-4">
         <Link
@@ -209,6 +209,6 @@ export default function PrivacyPage() {
           <span>Back to Dashboard</span>
         </Link>
       </div>
-    </div>
+    </main>
   );
 }

@@ -384,7 +384,7 @@ export default function OnboardingScreen() {
             <Card variant="default" padding="md" className="space-y-4">
               <div className="text-center space-y-1">
                 <h2 className="text-sm font-bold text-text-primary">Get Started</h2>
-                <p className="text-2xs text-text-muted">Choose how you want to use the app</p>
+                <p className="text-xs text-slate-600 dark:text-text-muted">Choose how you want to use the app</p>
               </div>
 
               {/* Primary Option: Google OAuth */}
@@ -400,14 +400,14 @@ export default function OnboardingScreen() {
                 >
                   {isSigningIn ? 'Connecting to Google...' : 'Continue with Google'}
                 </Button>
-                <p className="text-3xs text-center text-text-muted">
+                <p className="text-xs text-center text-slate-600 dark:text-text-muted">
                   Recommended &bull; Automatic cloud backup across all your devices
                 </p>
               </div>
 
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-border/70" />
-                <span className="flex-shrink mx-3 text-3xs font-mono text-text-muted uppercase">or</span>
+                <span className="flex-shrink mx-3 text-xs font-mono text-slate-500 dark:text-text-muted uppercase">or</span>
                 <div className="flex-grow border-t border-border/70" />
               </div>
 
@@ -423,7 +423,7 @@ export default function OnboardingScreen() {
                 >
                   Continue as Guest
                 </Button>
-                <p className="text-3xs text-center text-text-muted">
+                <p className="text-xs text-center text-slate-600 dark:text-text-muted">
                   No account required &bull; 100% offline &bull; Data stays on this device
                 </p>
               </div>
