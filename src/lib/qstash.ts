@@ -7,5 +7,6 @@ import { Client } from '@upstash/qstash';
 export function getQStashClient(): Client | null {
   const token = process.env.QSTASH_TOKEN?.trim();
   if (!token) return null;
-  return new Client({ token });
+  const baseUrl = process.env.QSTASH_URL?.trim();
+  return new Client({ token, baseUrl: baseUrl || undefined });
 }

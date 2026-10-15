@@ -17,13 +17,14 @@ try {
 } catch {}
 
 const token = process.env.QSTASH_TOKEN?.trim();
+const baseUrl = process.env.QSTASH_URL?.trim();
 
 if (!token) {
   console.error('Error: QSTASH_TOKEN is not configured in environment or .env.local');
   process.exit(1);
 }
 
-const client = new Client({ token });
+const client = new Client({ token, baseUrl: baseUrl || undefined });
 const action = process.argv[2] || 'list';
 
 async function main() {
