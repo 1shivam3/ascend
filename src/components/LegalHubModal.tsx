@@ -118,25 +118,25 @@ export default function LegalHubModal({
             <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-2xs space-y-1">
               <div className="flex items-center gap-1.5 font-bold text-xs">
                 <Lock className="w-3.5 h-3.5" />
-                <span>100% On-Device Local Data Guarantee</span>
+                <span>Local-First Default &amp; Encrypted Cloud Privacy</span>
               </div>
               <p className="leading-relaxed">
-                ASCEND operates without cloud tracking databases. Your PRs, workouts, and body metrics are saved strictly in your device&apos;s local storage.
+                ASCEND operates local-first by default in Guest Mode. For athletes who choose to sign in, records are synced to an encrypted Supabase database protected by Row Level Security with zero advertising monetization.
               </p>
             </div>
 
             <div className="space-y-2.5 leading-relaxed text-2xs">
               <p>
-                <strong>Data Collection:</strong> We collect only what you type (athlete name, bodyweight, height, PRs, workouts, nutrition). We do not record telemetry or advertise.
+                <strong>Data Collection:</strong> In Guest Mode, all data resides in device storage. In Cloud Mode, your workouts, PRs, meals, and optional reminder preferences are saved exclusively under your authenticated account.
               </p>
               <p>
-                <strong>AI &amp; External APIs:</strong> AI Coach and meal recognition use Google Gemini on-demand. Personal identifiers are never attached. If you provide a custom API key, it stays strictly in local device storage.
+                <strong>Athletic Intelligence:</strong> The Autoregulated Coach and Macro Lens use Google Gemini on-demand. Personal contact identifiers are never transmitted. If you provide a custom API key, it stays strictly in local device storage.
               </p>
               <p>
-                <strong>GDPR &amp; CCPA Rights:</strong> You can export a complete `.json` copy of your data anytime from the Data Vault, or purge all local records with 1 tap.
+                <strong>GDPR &amp; CCPA Rights:</strong> Export a complete `.json` copy of your data anytime from the Data Vault, or execute an instant 0-day cascade account deletion.
               </p>
               <p>
-                <strong>Cookies:</strong> Zero third-party ad cookies. Only essential functional localStorage keys (`ascend_store`) are used.
+                <strong>Cookies:</strong> Zero third-party advertising cookies. Only essential functional localStorage keys (`ascend_store`) are used.
               </p>
             </div>
 

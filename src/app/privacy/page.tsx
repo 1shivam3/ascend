@@ -63,10 +63,10 @@ export default function PrivacyPage() {
       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono space-y-1.5">
         <div className="flex items-center gap-2 font-bold text-sm">
           <Lock className="w-4 h-4" />
-          <span>100% Local-First Data Architecture Guarantee</span>
+          <span>Local-First Default &amp; Transparent Cloud Privacy</span>
         </div>
         <p className="text-2xs opacity-90 leading-relaxed">
-          ASCEND is engineered with privacy as a foundational principle. We do NOT harvest, monetize, sell, or sync your personal workouts, lift numbers, bodyweight metrics, or habits to any external database or cloud storage. Your data belongs exclusively to you and resides solely on your device.
+          ASCEND is engineered with privacy as a foundational principle. By default, ASCEND operates in <strong>Guest Mode (100% local-first)</strong> with zero cloud tracking. For trainees who choose to link a cloud account or enable push reminders, your data is protected with strict Row Level Security (RLS), zero advertising monetization, and instantaneous 0-day cascade account deletion.
         </p>
       </div>
 
@@ -76,19 +76,18 @@ export default function PrivacyPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-accent" />
-            1. Information Stored Locally on Your Device
+            1. Information Storage: Guest Mode vs. Optional Cloud Account
           </h2>
           <p className="text-2xs">
-            All primary application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key) inside your device browser or sandbox container:
+            ASCEND gives athletes full control over how and where their training data is stored:
           </p>
-          <ul className="list-disc list-inside text-2xs space-y-1 pl-2">
-            <li><strong>Athlete Profile:</strong> Name/alias, biological sex, baseline bodyweight, height, and unit preferences (kg/lbs).</li>
-            <li><strong>Strength &amp; Workouts:</strong> Personal records (PRs), workout sessions, individual sets, reps, active workout drafts, weekly schedule, and custom workout plans.</li>
-            <li><strong>Daily Habits &amp; Nutrition:</strong> Water intake batches, creatine daily logs and container supply, meal entries, daily macro goals, and pinned food staples.</li>
-            <li><strong>UI Preferences:</strong> Theme selection (OLED Dark or Premium Light) and Athlete Mode (Beginner or Advanced).</li>
+          <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
+            <li><strong>Guest Mode (Default &amp; On-Device):</strong> All application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key). In Guest Mode, zero workout records, PRs, or nutritional entries ever touch any remote server.</li>
+            <li><strong>Optional Cloud Sync (Google OAuth &amp; Supabase):</strong> If you choose to sign in to protect your data across device changes, your profile, PRs, workouts, meals, body metrics, and custom routines are backed up to a private, encrypted Supabase PostgreSQL database. Every table is guarded by strict Row Level Security (RLS) policies enforcing that only your authenticated user ID can read or modify your records.</li>
+            <li><strong>Optional Push Notifications (Reminder Center):</strong> If you explicitly opt in to reminders (hydration, meal timing, workout notifications), your device web push subscription token (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">endpoint</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">p256dh</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">auth</code>) and reminder schedules are stored strictly to deliver your chosen alerts. You can modify preferences or unsubscribe at any time.</li>
           </ul>
           <p className="text-2xs text-amber-300/80 pt-1">
-            <strong>Important Notice:</strong> Because this information is stored locally on your device, clearing your browser history, site data, or cache without an exported backup file will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
+            <strong>Important Notice for Guest Mode:</strong> If you remain in Guest Mode without a cloud account or exported backup file, clearing your browser history, site data, or cache will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
           </p>
         </section>
 
@@ -96,16 +95,16 @@ export default function PrivacyPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent" />
-            2. Generative AI Policy &amp; Data Handling (Google Gemini)
+            2. Generative Athletic Intelligence &amp; Data Handling (Google Gemini)
           </h2>
           <p className="text-2xs">
-            ASCEND includes optional generative AI capabilities powered by Google Gemini (such as the AI Training Coach, AI Photo Meal Scanner, Natural Language Voice Logger, and Exercise Substitutions):
+            ASCEND includes optional athletic utilities powered by Google Gemini (such as the Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger, and Exercise Substitutions):
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
             <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature. No background automated scraping occurs.</li>
             <li><strong>Zero Personal Identifiers Transmitted:</strong> We never transmit your personal contact details, email addresses, names, or device identifiers to AI providers. Only the specific anonymized training numbers or meal photo necessary to process your request is sent.</li>
             <li><strong>Custom Gemini API Key Security:</strong> If you supply a custom Google Gemini API Key in Settings, that key is stored strictly on your local device in <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>. It is never transmitted to, collected by, or stored on any ASCEND backend servers.</li>
-            <li><strong>In-App AI Content Reporting:</strong> In strict compliance with Google Play Store AI Policies, ASCEND provides an integrated in-app reporting button (flag icon) next to all AI outputs. Users can immediately report unsafe, inaccurate, or offensive responses, which suppresses the output locally and logs the report for safety reviews.</li>
+            <li><strong>In-App Content Reporting:</strong> In strict compliance with Google Play Store AI Policies, ASCEND provides an integrated in-app reporting button (flag icon) next to all AI outputs. Users can immediately report unsafe, inaccurate, or offensive responses, which suppresses the output locally and logs the report for safety reviews.</li>
           </ul>
         </section>
 
@@ -139,11 +138,13 @@ export default function PrivacyPage() {
           </h2>
           <div className="p-3 rounded-lg bg-bg-secondary border border-border/80 text-2xs space-y-2">
             <p className="font-semibold text-text-primary">Summary of Data Practices for App Store Reviewers &amp; Trainees:</p>
-            <div className="space-y-1 text-2xs">
-              <p>• <strong>Data Collected:</strong> None transmitted to first-party servers. All athletic, workout, and nutritional records remain 100% on the user&apos;s local device.</p>
-              <p>• <strong>Data Shared:</strong> None with advertisers, data brokers, or marketing networks. Third-party API communication is strictly user-initiated (Google Gemini for AI features, Open Food Facts for barcode lookups).</p>
-              <p>• <strong>Tracking:</strong> Zero advertising tracking, zero cross-app tracking, zero analytics telemetry cookies.</p>
-              <p>• <strong>Data Encryption:</strong> Local device storage is sandboxed by the operating system and browser; external API requests use HTTPS / TLS 1.3 encryption.</p>
+            <div className="space-y-1.5 text-2xs">
+              <p>• <strong>Personal Info (Optional):</strong> Name and email are collected only when you explicitly sign in with Google OAuth for cloud backup. Not collected in Guest Mode.</p>
+              <p>• <strong>Health &amp; Fitness:</strong> Workout logs, personal records, bodyweight, and nutrition. Stored 100% locally on-device in Guest Mode; synced with TLS 1.3 encryption to a private Supabase PostgreSQL database with Row Level Security in Cloud Mode.</p>
+              <p>• <strong>Device &amp; Other Identifiers:</strong> Web Push subscription tokens (endpoint and cryptographic keys) are stored solely for delivering user-configured workout and habit reminders when push notifications are enabled.</p>
+              <p>• <strong>Data Shared with Third Parties:</strong> None with advertisers, data brokers, or marketing networks. Third-party API communication is strictly user-initiated (Google Gemini for athletic coaching, Open Food Facts for barcode lookups, Web Push for reminders).</p>
+              <p>• <strong>Tracking:</strong> Zero advertising tracking, zero cross-app tracking, zero marketing cookies.</p>
+              <p>• <strong>Data Deletion:</strong> 1-tap local device wiping and instant 0-day cascade cloud account deletion via in-app settings or the external deletion portal.</p>
             </div>
           </div>
         </section>

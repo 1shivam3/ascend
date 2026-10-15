@@ -16,7 +16,7 @@
   <a href="https://tailwindcss.com/"><img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" /></a>
   <a href="https://ai.google.dev/"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-AI-orange?logo=google" /></a>
   <a href="https://web.dev/progressive-web-apps/"><img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" /></a>
-  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-310%20Passed-emerald" /></a>
+  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-387%20Passed-emerald" /></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></a>
 </p>
 
@@ -115,16 +115,19 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 ### 3. Data Safety Form Answers (Google Play Console)
 | Data Category | Data Type | Collected? | Stored Where? | Shared with 3rd Parties? |
 |---|---|---|---|---|
-| **Health & Fitness** | Fitness, workouts, PRs, bodyweight, height | Yes (user-entered) | 100% on-device (`localStorage`) | No |
+| **Personal Info** | Name, Email | Optional (Cloud Sync only) | Private Supabase PostgreSQL (RLS) | No |
+| **Health & Fitness** | Fitness, workouts, PRs, bodyweight, height | Yes (user-entered) | 100% on-device (`localStorage`) in Guest Mode; private encrypted Supabase in Cloud Mode | No |
+| **Device Identifiers** | Web Push Subscription Token & Keys | Optional (Reminder Center) | Supabase `push_subscriptions` table (for push delivery only) | No |
 | **Photos & Videos** | Food / meal photos | Optional (on-demand) | Ephemeral in-memory | Only to Google Gemini API if user scans meal |
 | **Audio Files** | Voice dictation | Optional (on-demand) | Processed in-memory (Web Speech API) | No |
-| **Identifiers** | Name, email, device ID | No | None stored | No |
-| **App Performance** | Crash logs, analytics | No | Zero telemetry | No |
+| **App Performance** | Crash logs, analytics | Optional (opt-in Sentry/GA) | Zero tracking cookies | No third-party sales |
 
 ### 4. Account & User Data Deletion (Play Store Mandatory)
-* **Instant In-App Wiping:** Trainees can erase all profiles, workouts, PRs, and cached keys at any time via **Settings $\rightarrow$ Data Vault $\rightarrow$ "Wipe All Data"**.
-* **Zero Remote Residue:** Because all data is stored on-device, wiping storage leaves zero copies on any server.
-* **Support Email:** Trainees can contact `support@ascendfit.app` for data questions or manual deletion verification.
+* **In-App Account Deletion:** Trainees can erase their account, all synchronized cloud data (10 tables cascade purged), and wiped local storage at any time via **Settings $\rightarrow$ Account & Privacy $\rightarrow$ "Delete My Account"**.
+* **External Web Deletion Portal:** In strict compliance with Google Play Data Safety policies, users can request account and data deletion without reinstalling the app via [`/delete-account`](https://ascendtonext.vercel.app/delete-account).
+* **Guest Local Wiping:** Guest users can instantly wipe all local device storage via **Settings $\rightarrow$ Data Vault $\rightarrow$ "Wipe All Data"**.
+* **Zero Retention Guarantee:** Deletion results in immediate 0-day purging across cloud databases and authentication directories.
+* **Support Contact:** Trainees can contact `support@ascendfit.app` for privacy questions or manual verification.
 
 ### 5. Hardware Permissions
 * **Camera:** Used strictly for barcode scanning (Open Food Facts) and meal photo capture. Video streams are analyzed in real-time and never recorded.
@@ -137,8 +140,9 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 
 ## 🔒 Privacy, Security & Data Ownership
 
-* **100% Local Storage:** All workouts, PRs, nutrition history, and settings are stored locally in browser `localStorage`.
-* **Zero Third-Party Telemetry:** No Google Analytics, no Meta pixels, no tracking cookies, and no data harvesting.
+* **Local-First Default:** All workouts, PRs, nutrition history, and settings are stored locally in browser `localStorage` by default (Guest Mode).
+* **Encrypted Cloud Sync (Optional):** Trainees can securely sign in with Google OAuth to back up their data to a private Supabase database protected by Row Level Security (RLS).
+* **Zero Advertising Monetization:** No ad networks, no tracking pixels, no selling of user training or health data.
 * **Bring-Your-Own-Key (BYOK):** Optional Google Gemini AI features can use your personal free Gemini API key, stored exclusively on your device.
 * **Data Vault (Backup & Restore):** 1-tap export of your complete athletic history to a standardized `.json` backup file with instant restoration.
 
@@ -152,18 +156,19 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 | **Language** | [TypeScript 5](https://www.typescriptlang.org/) |
 | **Styling** | [Tailwind CSS 3](https://tailwindcss.com/) with custom design tokens |
 | **State Management** | [Zustand](https://zustand-demo.pmnd.rs/) with localStorage persistence & migration |
+| **Cloud & Auth** | [Supabase](https://supabase.com/) (PostgreSQL with RLS, Google OAuth, Web Push) |
 | **Data Visualization** | [Recharts](https://recharts.org/) (Custom Volume Load & Fatigue charts) |
-| **AI Engine** | [Google Gemini API](https://ai.google.dev/) (`gemini-2.5-flash` / `gemini-1.5-flash`) |
+| **Athletic AI** | [Google Gemini API](https://ai.google.dev/) (`gemini-2.5-flash` / `gemini-1.5-flash`) |
 | **Barcode Scanning** | [@zxing/browser](https://github.com/zxing-js/browser) + [Open Food Facts](https://world.openfoodfacts.org/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
-| **Offline Caching** | Native PWA Service Worker (`CacheStorage` API) |
-| **Testing** | Automated Comprehensive QA & Experiment Suites (Node.js + `tsx`) |
+| **Offline Caching** | Native PWA Service Worker (`CacheStorage` API) + Web Push notifications |
+| **Testing** | [Vitest](https://vitest.dev/) (387 unit & integration tests) |
 
 ---
 
 ## 🧪 Automated QA Testing
 
-ASCEND enforces a strict 5-tier verification gate across all mathematical models, strength coefficients, autoregulation drift calculations, and UI builds:
+ASCEND enforces a strict multi-tier verification gate across all mathematical models, strength coefficients, autoregulation drift calculations, back navigation, account deletion, and UI builds:
 
 ```bash
 # 1. Type check (0 errors)
@@ -172,13 +177,10 @@ npx tsc --noEmit
 # 2. Lint check (0 errors, 0 warnings)
 npm run lint
 
-# 3. Comprehensive QA Test Suite (251 automated tests)
-npx tsx tests/comprehensive-qa.ts
+# 3. Full Automated Test Suite (21 test files, 387 passed tests)
+npm test
 
-# 4. Experiment & Adaptation Features QA Suite (59 automated tests)
-npx tsx tests/experiment-features-qa.ts
-
-# 5. Production Next.js Build (11 static & dynamic routes)
+# 4. Production Next.js Build
 npm run build
 ```
 

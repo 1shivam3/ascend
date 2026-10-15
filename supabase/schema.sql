@@ -209,6 +209,50 @@ DO $$ BEGIN
 END $$;
 
 
+-- 11. Push Subscriptions Table (Web Push Infrastructure)
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+  endpoint TEXT PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  timezone TEXT NOT NULL DEFAULT 'UTC',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON public.push_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_updated ON public.push_subscriptions(updated_at DESC);
+
+ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Allow athletes and guests to manage push subscriptions" ON public.push_subscriptions;
+  CREATE POLICY "Allow athletes and guests to manage push subscriptions" ON public.push_subscriptions
+    FOR ALL TO anon, authenticated
+    USING (user_id IS NULL OR auth.uid() = user_id)
+    WITH CHECK (user_id IS NULL OR auth.uid() = user_id);
+END $$;
+
+-- 12. Notification Preferences Table (Reminder Center Settings)
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  preferences JSONB NOT NULL DEFAULT '{}'::JSONB,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Athletes can manage own notification preferences" ON public.notification_preferences;
+  CREATE POLICY "Athletes can manage own notification preferences" ON public.notification_preferences
+    FOR ALL TO authenticated
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+END $$;
+
+
 -- ==============================================================================
 -- SECURITY HARDENING & LINTER RESOLUTIONS
 -- ==============================================================================
