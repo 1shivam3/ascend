@@ -80,7 +80,10 @@ export async function POST(req: Request) {
     );
 
     if (error) {
-      console.warn('Supabase push subscription upsert notice:', error.message);
+      return NextResponse.json(
+        { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -107,7 +110,13 @@ export async function DELETE(req: Request) {
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+      const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+      if (error) {
+        return NextResponse.json(
+          { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ success: true, message: 'Unsubscribed from push' });

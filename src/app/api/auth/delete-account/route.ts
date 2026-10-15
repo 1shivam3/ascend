@@ -105,6 +105,7 @@ export async function POST(req: Request) {
       'daily_habits',
       'planned_workouts',
       'custom_barcodes',
+      'notification_deliveries',
       'push_subscriptions',
       'notification_preferences',
       'profiles',

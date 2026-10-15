@@ -62,7 +62,10 @@ export async function POST(req: Request) {
         { onConflict: 'user_id' }
       );
       if (error) {
-        console.warn('Supabase notification preferences upsert notice:', error.message);
+        return NextResponse.json(
+          { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
+          { status: 500 }
+        );
       }
     }
 
