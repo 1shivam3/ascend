@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import webpush from 'web-push';
+import { Receiver } from '@upstash/qstash';
 import { createClient } from '@supabase/supabase-js';
 import { redactSecrets } from '@/lib/server-security';
 import { NotificationPreferences } from '@/lib/types';
@@ -130,28 +131,60 @@ async function markDeliveryFailed(supabase: any, idempotencyKey: string, error: 
 }
 
 export async function POST(req: Request) {
-  // 1. Cron Authentication (Fail Closed)
+  // 1. Cron / QStash Authentication (Fail Closed)
   const cronSecret = process.env.CRON_SECRET?.trim();
-  if (!cronSecret) {
+  const qstashCurrentKey = process.env.QSTASH_CURRENT_SIGNING_KEY?.trim();
+  const qstashNextKey = process.env.QSTASH_NEXT_SIGNING_KEY?.trim();
+
+  if (!cronSecret && !qstashCurrentKey) {
     return NextResponse.json(
-      { error: 'CONFIGURATION_ERROR', message: 'Cron authentication secret is not configured' },
+      {
+        error: 'CONFIGURATION_ERROR',
+        message: 'Cron authentication secret or QStash signing key is not configured',
+      },
       { status: 500 }
     );
   }
 
-  const authHeader =
-    req.headers.get('authorization') || req.headers.get('upstash-forward-authorization');
-  if (!authHeader || !authHeader.toLowerCase().startsWith('bearer ')) {
-    return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: 'Valid Bearer token required' },
-      { status: 401 }
-    );
+  let isAuthorized = false;
+
+  // Method A: Native Upstash QStash cryptographic signature
+  const upstashSignature = req.headers.get('upstash-signature');
+  if (upstashSignature && (qstashCurrentKey || qstashNextKey)) {
+    try {
+      const receiver = new Receiver({
+        currentSigningKey: qstashCurrentKey,
+        nextSigningKey: qstashNextKey,
+      });
+      const clonedReq = req.clone();
+      const rawBody = await clonedReq.text();
+      const isValid = await receiver.verify({
+        signature: upstashSignature,
+        body: rawBody,
+      });
+      if (isValid) {
+        isAuthorized = true;
+      }
+    } catch {
+      // Signature verification failed
+    }
   }
 
-  const token = authHeader.substring(7).trim();
-  if (!timingSafeTokenCompare(token, cronSecret)) {
+  // Method B: Bearer token (Authorization or Upstash-Forward-Authorization)
+  if (!isAuthorized && cronSecret) {
+    const authHeader =
+      req.headers.get('authorization') || req.headers.get('upstash-forward-authorization');
+    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.substring(7).trim();
+      if (timingSafeTokenCompare(token, cronSecret)) {
+        isAuthorized = true;
+      }
+    }
+  }
+
+  if (!isAuthorized) {
     return NextResponse.json(
-      { error: 'UNAUTHORIZED', message: 'Invalid bearer token' },
+      { error: 'UNAUTHORIZED', message: 'Valid QStash signature or Bearer token required' },
       { status: 401 }
     );
   }

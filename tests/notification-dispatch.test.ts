@@ -303,6 +303,24 @@ describe('Web Push Dispatch Route (/api/notifications/dispatch)', () => {
     expect(res3.status).toBe(200);
   });
 
+  // 2b. Native Upstash-Signature authorization
+  it('2b. allows access via valid Upstash-Signature header when QStash signing keys are configured', async () => {
+    process.env.QSTASH_CURRENT_SIGNING_KEY = 'sigkey_curr_123';
+    const { Receiver } = await import('@upstash/qstash');
+    const verifySpy = vi.spyOn(Receiver.prototype, 'verify').mockResolvedValue(true);
+
+    const { POST } = await import('../src/app/api/notifications/dispatch/route');
+    const req = new Request('https://ascendtonext.vercel.app/api/notifications/dispatch', {
+      method: 'POST',
+      headers: {
+        'upstash-signature': 'mock-valid-signature',
+      },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(verifySpy).toHaveBeenCalled();
+  });
+
   // 3. Missing VAPID configuration fails explicitly
   it('3. fails explicitly with 500 CONFIGURATION_ERROR when VAPID keys are missing', async () => {
     delete process.env.VAPID_PRIVATE_KEY;
