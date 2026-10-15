@@ -23,3 +23,5 @@ next-env.d.ts
 .hermes/
 .roo/
 supabase/.temp/
+.vercel
+.env*
