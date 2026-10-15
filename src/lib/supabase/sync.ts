@@ -8,7 +8,60 @@ export interface AuthUser {
   id: string;
   email?: string;
   name?: string;
+  avatarUrl?: string;
+  provider?: string;
   isAnonymous: boolean;
+}
+
+export function extractUserName(user: any): string | undefined {
+  if (!user) return undefined;
+
+  // 1. Check user_metadata fields
+  const meta = user.user_metadata || {};
+  if (typeof meta.full_name === 'string' && meta.full_name.trim()) {
+    return meta.full_name.trim();
+  }
+  if (typeof meta.name === 'string' && meta.name.trim()) {
+    return meta.name.trim();
+  }
+  if (typeof meta.given_name === 'string' && meta.given_name.trim()) {
+    const given = meta.given_name.trim();
+    const family = typeof meta.family_name === 'string' ? meta.family_name.trim() : '';
+    return family ? `${given} ${family}` : given;
+  }
+
+  // 2. Check identities[0].identity_data
+  const identity = Array.isArray(user.identities) && user.identities.length > 0 ? user.identities[0]?.identity_data : null;
+  if (identity) {
+    if (typeof identity.full_name === 'string' && identity.full_name.trim()) {
+      return identity.full_name.trim();
+    }
+    if (typeof identity.name === 'string' && identity.name.trim()) {
+      return identity.name.trim();
+    }
+    if (typeof identity.given_name === 'string' && identity.given_name.trim()) {
+      const given = identity.given_name.trim();
+      const family = typeof identity.family_name === 'string' ? identity.family_name.trim() : '';
+      return family ? `${given} ${family}` : given;
+    }
+  }
+
+  // 3. Fallback to email prefix formatted nicely
+  if (typeof user.email === 'string' && user.email.includes('@')) {
+    const emailPrefix = user.email.split('@')[0];
+    if (emailPrefix) {
+      const parts = emailPrefix
+        .split(/[._-]+/)
+        .map((p: string) => p.replace(/\d+/g, '').trim())
+        .filter((p: string) => p.length > 0);
+
+      if (parts.length > 0) {
+        return parts.map((p: string) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+      }
+    }
+  }
+
+  return undefined;
 }
 
 type SyncListener = (
@@ -81,7 +134,9 @@ class SupabaseSyncEngine {
         this.currentUser = {
           id: session.user.id,
           email: session.user.email,
-          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name,
+          name: extractUserName(session.user),
+          avatarUrl: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture,
+          provider: session.user.app_metadata?.provider || 'google',
           isAnonymous: Boolean(session.user.is_anonymous),
         };
         this.notify();
@@ -336,10 +391,13 @@ class SupabaseSyncEngine {
         return;
       }
 
+      const extractedName = extractUserName(user);
       this.currentUser = {
         id: user.id,
         email: user.email,
-        name: user.user_metadata?.full_name || user.user_metadata?.name,
+        name: extractedName,
+        avatarUrl: user.user_metadata?.avatar_url || user.user_metadata?.picture,
+        provider: user.app_metadata?.provider || 'google',
         isAnonymous: Boolean(user.is_anonymous),
       };
 
@@ -386,9 +444,14 @@ class SupabaseSyncEngine {
       } else if (localState.profile && !isCrossAccountSwitch) {
         // Guest profile linking to newly authenticated cloud account for the first time
         if (localState.profile.id !== user.id) {
+          const currentName = localState.profile.name?.trim().toLowerCase() || '';
+          const isGenericName = !currentName || currentName === 'athlete' || currentName === 'guest';
+          const resolvedName = isGenericName && extractedName ? extractedName : localState.profile.name;
+
           updates.profile = {
             ...localState.profile,
             id: user.id,
+            name: resolvedName,
           };
           needsLocalUpdate = true;
         }

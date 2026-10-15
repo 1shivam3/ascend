@@ -142,6 +142,12 @@ export default function OnboardingScreen() {
   }, []);
 
   useEffect(() => {
+    if (authUser?.name && !name) {
+      setName(authUser.name);
+    }
+  }, [authUser, name]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
         if (localStorage.getItem('ascend_logged_out') === 'true') {
@@ -562,9 +568,17 @@ export default function OnboardingScreen() {
 
               {/* 1. Name */}
               <div className="space-y-1.5">
-                <label htmlFor="athlete-name-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                  1. Your Name / Nickname
-                </label>
+                <div className="flex items-center justify-between">
+                  <label htmlFor="athlete-name-input" className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+                    1. Your Name / Nickname
+                  </label>
+                  {authUser && !authUser.isAnonymous && authUser.name && (
+                    <span className="inline-flex items-center gap-1 text-3xs font-mono font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30 animate-fade-in">
+                      <Check className="w-2.5 h-2.5 text-emerald-400" />
+                      Fetched from Google
+                    </span>
+                  )}
+                </div>
                 <input
                   id="athlete-name-input"
                   type="text"
