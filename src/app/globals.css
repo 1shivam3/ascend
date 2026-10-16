@@ -457,7 +457,7 @@ textarea::placeholder {
   inset: 0 auto 0 0;
   z-index: 45;
   width: 248px;
-  display: flex;
+  display: none;
   flex-direction: column;
   padding: 28px 16px 18px;
   background: rgb(var(--bg-secondary));
@@ -677,6 +677,10 @@ textarea::placeholder {
 }
 
 @media (min-width: 1024px) {
+  .desktop-rail {
+    display: flex;
+  }
+
   .page {
     padding-bottom: 40px;
   }
@@ -698,5 +702,142 @@ textarea::placeholder {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+
+/* Additional screen-specific polish shared across the existing feature set. */
+.today-training-hero h2 {
+  font-family: var(--font-display), "Barlow Condensed", sans-serif !important;
+  font-size: clamp(1.55rem, 3.5vw, 2.15rem) !important;
+  font-weight: 700 !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.025em !important;
+}
+
+.today-training-hero .text-xs.font-semibold.text-text-secondary {
+  letter-spacing: 0.01em;
+}
+
+.week-at-a-glance {
+  border-color: transparent !important;
+  border-top: 1px solid rgb(var(--border)) !important;
+  border-bottom: 1px solid rgb(var(--border)) !important;
+  border-radius: 0 !important;
+  padding-inline: 2px !important;
+}
+
+.week-at-a-glance > div:first-child {
+  padding-inline: 2px;
+}
+
+.week-at-a-glance .grid > div > div {
+  border-radius: 8px !important;
+}
+
+.daily-fuel-card {
+  border-left: 2px solid rgb(var(--accent) / 0.72) !important;
+}
+
+.page [role="tablist"][aria-label="Progress views"] {
+  gap: 18px;
+  border-bottom: 1px solid rgb(var(--border));
+  padding: 0;
+}
+
+.page [role="tablist"][aria-label="Progress views"] button[role="tab"] {
+  position: relative;
+  justify-content: flex-start;
+  min-height: 44px;
+  padding: 10px 1px 12px;
+  border: 0;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: rgb(var(--text-muted));
+  box-shadow: none !important;
+}
+
+.page [role="tablist"][aria-label="Progress views"] button[aria-selected="true"] {
+  color: rgb(var(--accent));
+}
+
+.page [role="tablist"][aria-label="Progress views"] button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: rgb(var(--accent));
+}
+
+:root .page button.bg-accent,
+:root .modal-content button.bg-accent {
+  color: #fffdf7;
+}
+
+.dark .page button.bg-accent,
+.dark .modal-content button.bg-accent {
+  color: #181913;
+}
+
+.dark .page button.bg-accent.text-white,
+.dark .modal-content button.bg-accent.text-white {
+  color: #181913;
+}
+
+.page .bg-emerald-500.rounded-full,
+.page .bg-accent.rounded-full {
+  box-shadow: none;
+}
+
+.page .text-3xs,
+.page .text-2xs {
+  letter-spacing: 0.01em;
+}
+
+.page .text-\[9px\],
+.page .text-\[10px\] {
+  line-height: 1.45;
+}
+
+.page .text-text-muted {
+  color: rgb(var(--text-muted));
+}
+
+.page .border-dashed {
+  border-style: dashed;
+}
+
+@media (min-width: 1024px) {
+  .desktop-content {
+    min-height: 100dvh;
+  }
+
+  .page {
+    max-width: 900px;
+    padding-top: 34px;
+  }
+
+  .page > header {
+    padding-bottom: 22px;
+  }
+
+  .page .grid.grid-cols-2 {
+    column-gap: 18px;
+  }
+}
+
+@media (max-width: 360px) {
+  .page {
+    padding-inline: 12px;
+  }
+
+  .native-tab-bar {
+    padding-inline: 4px;
+  }
+
+  .native-tab-item span {
+    font-size: 9px;
   }
 }
