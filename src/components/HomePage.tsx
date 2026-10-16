@@ -420,7 +420,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   return (
-    <div className="page animate-fade-in space-y-4 pb-24 max-w-md mx-auto px-4">
+    <div className="page home-page animate-fade-in space-y-4 pb-24 max-w-md mx-auto px-4">
       {/* ── 1. CLEAN HEADER (Warm & Direct) ──────────────────────────────── */}
       <header className="pt-2 flex justify-between items-center">
         <div>
