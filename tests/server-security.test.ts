@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { redactSecrets, rateLimitResponse } from '@/lib/server-security';
-import { getClientIp, checkRateLimit } from '@/lib/rate-limit';
+import { getClientIp, checkRateLimit, setRateLimiterSupabaseForTests, resetRateLimitStoreForTests } from '@/lib/rate-limit';
 
 describe('Server Security Utilities', () => {
   describe('redactSecrets', () => {
@@ -100,6 +100,65 @@ describe('Rate Limiter IP Extraction & Hardening', () => {
     const third = await checkRateLimit(makeReq(), opts);
     expect(third.success).toBe(false);
     expect(third.remaining).toBe(0);
+  });
+
+  it('correctly unpacks array results returned by Supabase RPC (RETURNS TABLE)', async () => {
+    try {
+      // Mock Supabase client returning array from ascend_check_rate_limit
+      const mockSupabase = {
+        rpc: async (_fn: string, _args: any) => ({
+          data: [{ allowed: true, count: 1, reset_ms: 59000 }],
+          error: null,
+        }),
+      };
+      setRateLimiterSupabaseForTests(mockSupabase);
+
+      const req = new Request('https://ascend.app/api/ai/scan-meal', {
+        headers: { 'cf-connecting-ip': '198.51.100.77' },
+      });
+
+      const res = await checkRateLimit(req, {
+        windowMs: 60000,
+        maxRequests: 20,
+        keyPrefix: 'ai-scan-meal',
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.limit).toBe(20);
+      expect(res.remaining).toBe(19);
+      expect(res.resetMs).toBe(59000);
+    } finally {
+      resetRateLimitStoreForTests();
+    }
+  });
+
+  it('correctly unpacks rate-limited array results when limit is exceeded', async () => {
+    try {
+      const mockSupabase = {
+        rpc: async (_fn: string, _args: any) => ({
+          data: [{ allowed: false, count: 21, reset_ms: 15000 }],
+          error: null,
+        }),
+      };
+      setRateLimiterSupabaseForTests(mockSupabase);
+
+      const req = new Request('https://ascend.app/api/ai/scan-meal', {
+        headers: { 'cf-connecting-ip': '198.51.100.77' },
+      });
+
+      const res = await checkRateLimit(req, {
+        windowMs: 60000,
+        maxRequests: 20,
+        keyPrefix: 'ai-scan-meal',
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.limit).toBe(20);
+      expect(res.remaining).toBe(0);
+      expect(res.resetMs).toBe(15000);
+    } finally {
+      resetRateLimitStoreForTests();
+    }
   });
 });
 

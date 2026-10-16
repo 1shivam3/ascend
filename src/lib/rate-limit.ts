@@ -22,9 +22,17 @@ interface RateLimitRecord {
  */
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
-/** Exported for test cleanup: resets the in-memory rate limit store. */
+/** Exported for test cleanup: resets the in-memory rate limit store and client. */
 export function resetRateLimitStoreForTests(): void {
   rateLimitStore.clear();
+  supabaseRateLimiter = null;
+  supabaseCheckAttempted = false;
+}
+
+/** Exported for testing distributed Supabase RPC handling without live network calls. */
+export function setRateLimiterSupabaseForTests(client: any): void {
+  supabaseRateLimiter = client;
+  supabaseCheckAttempted = true;
 }
 
 // Reuse a single Supabase client instance across invocations within the same
@@ -172,19 +180,17 @@ try {
       return null;
     }
 
-    const result = data as {
-      allowed: boolean;
-      count: number;
-      reset_ms: number;
-    } | null;
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row !== 'object') return null;
 
-    if (!result) return null;
+    const count = Number(row.count) || 1;
+    const resetMs = Number(row.reset_ms);
 
     return {
-      success: result.allowed,
+      success: Boolean(row.allowed),
       limit: options.maxRequests,
-      remaining: Math.max(0, result.count - 1),
-      resetMs: result.reset_ms,
+      remaining: Math.max(0, options.maxRequests - count),
+      resetMs: !isNaN(resetMs) && resetMs >= 0 ? resetMs : options.windowMs,
     };
   } catch {
     return null;
