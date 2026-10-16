@@ -30,7 +30,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-sans font-bold select-none transition-all duration-150 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary';
+      'inline-flex items-center justify-center font-sans font-bold select-none transition-all duration-150 active:scale-[0.985] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100 rounded-[var(--radius-control)] outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary';
 
     const variants = {
       primary:
@@ -48,7 +48,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const sizes = {
       sm: 'text-xs px-3 py-1.5 min-h-[36px] gap-1.5',
       md: 'text-sm px-4 py-2.5 min-h-[44px] gap-2',
-      lg: 'text-base px-5 py-3.5 min-h-[52px] gap-2.5 rounded-2xl',
+      lg: 'text-base px-5 py-3.5 min-h-[52px] gap-2.5 rounded-[var(--radius-panel)]',
       icon: 'w-10 h-10 p-0 shrink-0 min-h-[40px]',
     };
 
