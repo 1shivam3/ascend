@@ -892,3 +892,140 @@ textarea::placeholder {
     padding-block: 56px;
   }
 }
+
+
+/* Screen-specific hierarchy; semantic data and interactions stay in React. */
+.home-page > header > div:first-child > span {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.home-page .today-training-hero {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.home-page .today-training-hero > div {
+  padding-inline: 18px;
+}
+
+.home-page .today-training-hero > div:first-child {
+  padding-top: 15px;
+}
+
+.home-page .today-training-hero > div:nth-child(2) {
+  padding-top: 16px;
+}
+
+.home-page .today-training-hero > div:last-child {
+  padding-bottom: 18px;
+}
+
+.home-page .today-training-hero .btn-primary,
+.home-page .today-training-hero .btn-secondary {
+  min-height: 50px;
+}
+
+.home-page .daily-fuel-card > div:nth-child(2) > div {
+  padding: 10px 0;
+  border-bottom: 1px solid rgb(var(--border));
+  border-radius: 0 !important;
+  background: transparent !important;
+  border-top: 0;
+  border-inline: 0;
+}
+
+.home-page .daily-fuel-card > div:nth-child(2) > div:last-child {
+  border-bottom: 0;
+}
+
+.train-page > header p {
+  max-width: 34ch;
+}
+
+.train-page > section.card,
+.train-page section.card {
+  box-shadow: none !important;
+}
+
+.train-page .section-title {
+  margin-bottom: 2px;
+}
+
+.train-page section[aria-label="Progression Policy Recommendation"] {
+  border-top: 1px solid rgb(var(--border));
+  padding-top: 18px;
+}
+
+.train-page .card[class*="border-accent"] {
+  border-left: 2px solid rgb(var(--accent));
+}
+
+.fuel-page > section.card:first-of-type {
+  border: 0 !important;
+  border-top: 2px solid rgb(var(--accent)) !important;
+  border-bottom: 1px solid rgb(var(--border)) !important;
+  border-radius: 0 !important;
+  padding: 18px 0 20px !important;
+  background: transparent !important;
+}
+
+.fuel-page > section.card:first-of-type > div:first-child {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgb(var(--border));
+}
+
+.fuel-page > section.card:first-of-type .grid.grid-cols-2 {
+  gap: 0 !important;
+}
+
+.fuel-page > section.card:first-of-type .grid.grid-cols-2 > div {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 11px 10px 8px 0;
+}
+
+.fuel-page > section.card:first-of-type .grid.grid-cols-2 > div + div {
+  border-left: 1px solid rgb(var(--border)) !important;
+  padding-left: 16px;
+}
+
+.fuel-page > section.card:not(:first-of-type) {
+  border-radius: var(--radius-panel);
+}
+
+.fuel-page section .font-mono {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.progress-page [role="tablist"][aria-label="Strength views"] {
+  border-bottom: 1px solid rgb(var(--border));
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 0;
+  gap: 18px;
+}
+
+.progress-page [role="tablist"][aria-label="Strength views"] > button {
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding-inline: 1px;
+}
+
+.progress-page .tabular-nums {
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 420px) {
+  .home-page .today-training-hero > div {
+    padding-inline: 14px;
+  }
+
+  .fuel-page > section.card:first-of-type .grid.grid-cols-2 > div + div {
+    padding-left: 11px;
+  }
+}
