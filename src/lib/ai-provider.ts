@@ -62,42 +62,49 @@ export function cleanAndParseJson<T = any>(rawText: string): T {
   return JSON.parse(cleaned) as T;
 }
 
-// Stable production models with 1,500 RPD / 15 RPM free tier quotas
+// Active models supported by Google GenAI SDK (v1alpha / v1beta)
 const GEMINI_VISION_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-2.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
   'gemini-flash-latest',
+  'gemini-flash-lite-latest',
 ];
 
 const GEMINI_TEXT_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-2.5-flash',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-3.7-flash',
   'gemini-flash-latest',
+  'gemini-flash-lite-latest',
 ];
 
-const GROQ_VISION_MODELS = [
-  'llama-3.2-11b-vision-preview',
-  'llama-3.2-90b-vision-preview',
+// Groq models: ultra-fast inference with dedicated LPU
+const GROQ_VISION_MODELS: string[] = [
+  // Groq's active tier focuses on high-speed text & audio reasoning
 ];
 
 const GROQ_TEXT_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b',
 ];
 
+// OpenRouter verified free models
 const OPENROUTER_VISION_MODELS = [
-  'meta-llama/llama-3.2-11b-vision-instruct:free',
-  'google/gemini-2.0-flash-exp:free',
-  'qwen/qwen-2-vl-72b-instruct:free',
+  'dots-studio/dots-3-note-preview:free',
+  'nvidia/nemotron-3.5-super-vl:free',
+  'google/gemma-4-31b-it:free',
+  'google/gemma-4-26b-a4b-it:free',
 ];
 
 const OPENROUTER_TEXT_MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'google/gemini-2.0-flash-exp:free',
+  'nvidia/nemotron-3.5-lightning:free',
+  'google/gemma-4-31b-it:free',
+  'liquid/lfm-2.5-2.6b:free',
+  'poolside/laguna-s-2.1:free',
 ];
 
 /**
@@ -192,6 +199,10 @@ async function callGroqVision<T>(
     }
 
     const json = await res.json();
+    if (json.error) {
+      const errMsg = json.error.message || JSON.stringify(json.error);
+      throw new Error(`Groq ${model} error: ${redactSecrets(errMsg)}`);
+    }
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
@@ -253,6 +264,10 @@ async function callOpenRouterVision<T>(
     }
 
     const json = await res.json();
+    if (json.error) {
+      const errMsg = json.error.message || JSON.stringify(json.error);
+      throw new Error(`OpenRouter ${model} error: ${redactSecrets(errMsg)}`);
+    }
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
@@ -398,6 +413,10 @@ async function callGroqText<T>(
     }
 
     const json = await res.json();
+    if (json.error) {
+      const errMsg = json.error.message || JSON.stringify(json.error);
+      throw new Error(`Groq ${model} error: ${redactSecrets(errMsg)}`);
+    }
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
@@ -450,6 +469,10 @@ async function callOpenRouterText<T>(
     }
 
     const json = await res.json();
+    if (json.error) {
+      const errMsg = json.error.message || JSON.stringify(json.error);
+      throw new Error(`OpenRouter ${model} error: ${redactSecrets(errMsg)}`);
+    }
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {

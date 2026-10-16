@@ -46,20 +46,20 @@ describe('AI Multi-Provider Engine', () => {
       vi.restoreAllMocks();
     });
 
-    it('falls over from failed Gemini to Groq vision model', async () => {
+    it('falls over from failed Gemini to OpenRouter vision model', async () => {
       process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
-      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
 
-      // Mock fetch: Groq succeeds
+      // Mock fetch: OpenRouter succeeds
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
-        if (String(url).includes('groq.com')) {
+        if (String(url).includes('openrouter.ai')) {
           return new Response(
             JSON.stringify({
               choices: [
                 {
                   message: {
                     content: JSON.stringify({
-                      mealName: 'Groq Scanned Meal',
+                      mealName: 'OpenRouter Scanned Meal',
                       items: [{ name: 'Oatmeal', calories: 250, proteinG: 10, carbsG: 40, fatG: 5 }],
                     }),
                   },
@@ -72,15 +72,15 @@ describe('AI Multi-Provider Engine', () => {
         return new Response('Not found', { status: 404 });
       });
 
-      // Execute vision call (Gemini will fail with mock key network error, then Groq succeeds)
+      // Execute vision call (Gemini fails, Groq vision skipped, OpenRouter succeeds)
       const result = await executeMultiProviderVision<any>({
         imageBase64: 'fakebase64',
         prompt: 'Analyze food',
         timeoutMs: 1000,
       });
 
-      expect(result.provider).toBe('groq');
-      expect(result.data.mealName).toBe('Groq Scanned Meal');
+      expect(result.provider).toBe('openrouter');
+      expect(result.data.mealName).toBe('OpenRouter Scanned Meal');
       fetchSpy.mockRestore();
     });
   });
