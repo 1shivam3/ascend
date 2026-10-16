@@ -217,17 +217,69 @@ export default function AppPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
+    <div className="app-workspace min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       {isOffline && (
-        <aside
-          role="status"
-          aria-live="polite"
-          className="bg-amber-950/70 border-b border-amber-500/30 text-amber-200 text-xs px-3 py-1.5 flex items-center justify-center text-center sticky top-0 z-50 backdrop-blur"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2" />
-          <span>Offline Gym Mode Active &bull; All workouts, PRs, and meals are safely saved locally</span>
+        <aside role="status" aria-live="polite" className="offline-gym-banner text-xs flex items-center justify-center text-center sticky top-0 z-50">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-300 mr-2" />
+          <span>Offline gym mode · Workouts and meals remain saved on this device</span>
         </aside>
       )}
+
+      {/* Desktop workspace navigation; mobile keeps the familiar bottom tabs. */}
+      <aside className="desktop-rail hidden lg:flex" aria-label="Workspace navigation">
+        <div className="desktop-brand-lockup">
+          <span className="brand-mark" aria-hidden="true"><span /><span /><span /></span>
+          <span>
+            <span className="desktop-brand-word">ASCEND</span>
+            <span className="desktop-brand-subtitle">Strength systems</span>
+          </span>
+        </div>
+        <span className="desktop-rail-label">Workspace</span>
+        <nav className="desktop-nav" aria-label="Main navigation">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = tab.id === 'progress'
+              ? (activeTab === 'progress' || activeTab === 'prs')
+              : activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined })}
+                className={`desktop-nav-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon aria-hidden="true" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+        <div className="desktop-rail-footer">
+          <div className="desktop-privacy-note">
+            <span className="privacy-dot" aria-hidden="true" />
+            <span>Local-first by default. Your training stays yours.</span>
+          </div>
+          <button type="button" className="desktop-quick-action" onClick={() => setIsQuickActionOpen(true)}>
+            <Plus size={16} strokeWidth={2.5} />
+            <span>Quick action</span>
+          </button>
+          <div className="flex items-center gap-3 px-2 pt-1">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-bg-tertiary text-sm font-bold text-text-primary border border-border">
+              {(profile?.name || 'A').trim().charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="block truncate text-xs font-semibold text-text-primary">{profile?.name || 'Athlete'}</span>
+              <span className="block text-[10px] text-text-muted">Training profile</span>
+            </div>
+            <button type="button" onClick={() => setIsSettingsOpen(true)} className="btn-circle" aria-label="Open settings" title="Settings">
+              <Settings size={16} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="desktop-content min-w-0 lg:ml-[248px]">
       <main id="main-content" className="w-full">
         {activeTab === 'home' && (
           <HomePage
@@ -300,7 +352,7 @@ export default function AppPage() {
         <button
           type="button"
           onClick={() => setIsQuickActionOpen(true)}
-          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-full bg-accent text-stone-950 font-bold shadow-lg hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40"
+          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-xl bg-accent text-stone-950 font-bold hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40 lg:hidden"
           title="Quick Actions"
           aria-label="Quick Actions"
         >
@@ -325,6 +377,7 @@ export default function AppPage() {
         onClose={() => setIsImportModalOpen(false)}
         onStartWorkout={handleStartSharedWorkout}
       />
+      </div>
     </div>
   );
 }
