@@ -801,10 +801,6 @@ textarea::placeholder {
   line-height: 1.45;
 }
 
-.page .text-text-muted {
-  color: rgb(var(--text-muted));
-}
-
 .page .border-dashed {
   border-style: dashed;
 }
@@ -839,5 +835,60 @@ textarea::placeholder {
 
   .native-tab-item span {
     font-size: 9px;
+  }
+}
+
+
+.onboarding-shell {
+  padding-top: max(32px, env(safe-area-inset-top, 0px));
+  padding-bottom: max(32px, env(safe-area-inset-bottom, 0px));
+}
+
+.onboarding-shell > div {
+  max-width: 400px;
+}
+
+.onboarding-brand-mark {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 8px;
+  border-radius: 12px;
+}
+
+.onboarding-wordmark {
+  font-family: var(--font-display), "Barlow Condensed", sans-serif !important;
+  font-size: 43px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.025em !important;
+  line-height: 1 !important;
+}
+
+:root button.bg-accent.text-stone-950,
+:root .btn-primary {
+  color: #fffdf7;
+}
+
+.dark button.bg-accent.text-stone-950,
+.dark .btn-primary {
+  color: #181913;
+}
+
+.modal-content {
+  background: rgb(var(--bg-card));
+  border: 1px solid rgb(var(--border));
+  border-radius: 16px 16px 0 0;
+}
+
+.modal-content > header {
+  border-color: rgb(var(--border));
+}
+
+.modal-content button:active {
+  transform: scale(0.99);
+}
+
+@media (min-width: 640px) {
+  .onboarding-shell {
+    padding-block: 56px;
   }
 }
