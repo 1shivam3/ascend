@@ -127,6 +127,14 @@ export default function OnboardingScreen() {
     if (hasAuthCallback || hasExistingSession) {
       import('@/lib/supabase/sync').then(({ syncEngine }) => {
         syncEngine.init();
+        const currentUser = syncEngine.getCurrentUser();
+        if (currentUser && !currentUser.isAnonymous) {
+          setAuthUser(currentUser);
+          if (currentUser.name) {
+            setName((prev) => prev || currentUser.name || '');
+          }
+          setStep(1);
+        }
         const unsub = syncEngine.subscribe((_s, _l, _e, user) => {
           if (user && !user.isAnonymous) {
             setAuthUser(user);

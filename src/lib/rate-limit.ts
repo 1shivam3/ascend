@@ -209,18 +209,21 @@ export async function checkRateLimit(
   const ip = getClientIp(req);
   const key = `${options.keyPrefix || 'global'}:${ip}`;
 
-  // Attempt distributed check first
-  const distributedResult = await checkRateLimitSupabase(key, options);
-  if (distributedResult) return distributedResult;
+  // Attempt distributed check first if Supabase is configured
+  const supabase = getRateLimiterSupabase();
+  if (supabase) {
+    const distributedResult = await checkRateLimitSupabase(key, options);
+    if (distributedResult) return distributedResult;
 
-  // Distributed limiter unavailable
-  if (options.failClosed) {
-    throw new RateLimitUnavailableError(
-      `Distributed rate limiter unavailable for key prefix: ${options.keyPrefix || 'global'}`
-    );
+    // Distributed limiter configured but unavailable/failed
+    if (options.failClosed) {
+      throw new RateLimitUnavailableError(
+        `Distributed rate limiter unavailable for key prefix: ${options.keyPrefix || 'global'}`
+      );
+    }
   }
 
-  // Fall back to in-process memory
+  // Fall back to in-process memory when Supabase is not configured
   return checkRateLimitInMemory(key, options);
 }
 

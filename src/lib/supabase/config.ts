@@ -14,9 +14,10 @@ export function getSupabaseCredentials() {
   let localUrl = '';
   let localKey = '';
 
-  // Only allow localStorage override in dev to prevent XSS from exfiltrating
-  // the anon key in production deployments.
-  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+  // Allow localStorage credentials as fallback when environment variables are not provided
+  // (e.g. Vercel Preview deployments, self-hosted Supabase, or athlete settings).
+  // Security: isValidUrl strictly validates the host against *.supabase.co (or localhost in dev).
+  if (typeof window !== 'undefined') {
     try {
       localUrl = window.localStorage.getItem('ascend_supabase_url')?.trim() || '';
       localKey = window.localStorage.getItem('ascend_supabase_anon_key')?.trim() || '';

@@ -69,7 +69,7 @@ export default function AppPage() {
 
   // Dynamic device theme synchronization (when not manually overridden in Settings)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !_hasHydrated) return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -90,7 +90,7 @@ export default function AppPage() {
 
     mediaQuery.addEventListener('change', handleDeviceChange);
     return () => mediaQuery.removeEventListener('change', handleDeviceChange);
-  }, [hasCustomTheme, theme, setTheme]);
+  }, [_hasHydrated, hasCustomTheme, theme, setTheme]);
 
   // Listen for shared program links (#plan=...) in URL
   useEffect(() => {
@@ -134,15 +134,16 @@ export default function AppPage() {
   };
 
   useEffect(() => {
-    if (typeof document !== 'undefined') {
-      const activeTheme = theme || 'dark';
-      if (activeTheme === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.classList.add('light');
-      }
+    if (typeof document === 'undefined' || !_hasHydrated) return;
+    const activeTheme = theme || 'dark';
+    if (activeTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+      document.documentElement.setAttribute('data-theme', 'light');
     }
   }, [theme, _hasHydrated]);
 

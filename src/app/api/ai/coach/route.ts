@@ -96,7 +96,6 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 25,
       keyPrefix: 'ai-coach',
-      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -141,10 +140,11 @@ export async function POST(req: Request) {
 
     // Fallback model list in order of tested performance
     const candidateModels = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
     ];
 
     let systemInstruction = '';

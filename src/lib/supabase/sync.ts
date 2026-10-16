@@ -107,6 +107,14 @@ class SupabaseSyncEngine {
     };
   }
 
+  public getCurrentUser() {
+    return this.currentUser;
+  }
+
+  public getSyncStatus() {
+    return this.status;
+  }
+
   public init() {
     if (this.initialized || typeof window === 'undefined') return;
     this.initialized = true;
@@ -136,6 +144,11 @@ class SupabaseSyncEngine {
     // Listen to Supabase auth state changes (OAuth callbacks, token refresh, magic link)
     supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('ascend_logged_out');
+          } catch {}
+        }
         this.currentUser = {
           id: session.user.id,
           email: session.user.email,
@@ -200,6 +213,11 @@ class SupabaseSyncEngine {
   }
 
   public async sendEmailOtp(email: string): Promise<{ error?: string }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
     const supabase = getSupabase();
     if (!supabase) return { error: 'Supabase is not configured' };
 
@@ -218,6 +236,11 @@ class SupabaseSyncEngine {
   }
 
   public async verifyEmailOtp(email: string, token: string): Promise<{ error?: string }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
     const supabase = getSupabase();
     if (!supabase) return { error: 'Supabase is not configured' };
 
@@ -387,10 +410,24 @@ class SupabaseSyncEngine {
     }
 
     if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
-      this.currentUser = null;
-      this.status = 'unconfigured';
-      this.notify();
-      return;
+      const supabaseClient = getSupabase();
+      let hasActiveSession = false;
+      if (supabaseClient) {
+        try {
+          const { data: { session } } = await supabaseClient.auth.getSession();
+          if (session?.user) {
+            hasActiveSession = true;
+            localStorage.removeItem('ascend_logged_out');
+          }
+        } catch {}
+      }
+
+      if (!hasActiveSession) {
+        this.currentUser = null;
+        this.status = 'unconfigured';
+        this.notify();
+        return;
+      }
     }
 
     const supabase = getSupabase();
@@ -414,7 +451,8 @@ class SupabaseSyncEngine {
     const sync = async () => {
     try {
       // 1. Ensure active session
-      const { data: { user } } = await supabase.auth.getUser();
+      const userRes = await supabase.auth.getUser().catch(() => null);
+      const user = userRes?.data?.user;
 
       if (!user) {
         this.currentUser = null;

@@ -14,7 +14,6 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 25,
       keyPrefix: 'ai-parse-voice',
-      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -54,10 +53,11 @@ export async function POST(req: Request) {
     const ai = new GoogleGenAI({ apiKey });
 
     const candidateModels = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
     ];
 
     const systemPrompt = `You are a powerlifting and strength training voice assistant specializing in Hinglish and Indian gym slang.

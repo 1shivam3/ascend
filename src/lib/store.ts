@@ -125,6 +125,7 @@ export interface AppState {
   setProfile: (profile: UserProfile) => void;
   setTheme: (theme: Theme, isCustom?: boolean) => void;
   toggleTheme: () => void;
+  resetThemeToSystem: () => void;
   
   addPR: (pr: PersonalRecord) => void;
   addMultiplePRs: (prs: PersonalRecord[]) => void;
@@ -389,10 +390,18 @@ export const useAppStore = create<AppState>()(
           if (theme === 'dark') {
             document.documentElement.classList.add('dark');
             document.documentElement.classList.remove('light');
+            document.documentElement.setAttribute('data-theme', 'dark');
           } else {
             document.documentElement.classList.remove('dark');
             document.documentElement.classList.add('light');
+            document.documentElement.setAttribute('data-theme', 'light');
           }
+        }
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('ascend_theme', theme);
+            localStorage.setItem('ascend_has_custom_theme', isCustom ? 'true' : 'false');
+          } catch {}
         }
         set({ theme, hasCustomTheme: isCustom });
       },
@@ -403,13 +412,46 @@ export const useAppStore = create<AppState>()(
           if (nextTheme === 'dark') {
             document.documentElement.classList.add('dark');
             document.documentElement.classList.remove('light');
+            document.documentElement.setAttribute('data-theme', 'dark');
           } else {
             document.documentElement.classList.remove('dark');
             document.documentElement.classList.add('light');
+            document.documentElement.setAttribute('data-theme', 'light');
           }
+        }
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('ascend_theme', nextTheme);
+            localStorage.setItem('ascend_has_custom_theme', 'true');
+          } catch {}
         }
         return { theme: nextTheme, hasCustomTheme: true };
       }),
+
+      resetThemeToSystem: () => {
+        let systemTheme: Theme = 'dark';
+        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+          systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        if (typeof document !== 'undefined') {
+          if (systemTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        }
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem('ascend_theme', systemTheme);
+            localStorage.setItem('ascend_has_custom_theme', 'false');
+          } catch {}
+        }
+        set({ theme: systemTheme, hasCustomTheme: false });
+      },
       
       addPR: (pr) => set((state) => ({ prs: [...state.prs, pr] })),
       addMultiplePRs: (newPrs) => set((state) => ({ prs: [...state.prs, ...newPrs] })),
@@ -1889,7 +1931,8 @@ export const useAppStore = create<AppState>()(
 
           // Auto-sync with device theme if not manually customized by athlete
           if (typeof window !== 'undefined') {
-            if (!state.hasCustomTheme && window.matchMedia) {
+            const hasCustom = state.hasCustomTheme ?? (localStorage.getItem('ascend_has_custom_theme') === 'true');
+            if (!hasCustom && typeof window.matchMedia === 'function') {
               const deviceTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
               state.setTheme(deviceTheme, false);
             } else {
@@ -1897,9 +1940,11 @@ export const useAppStore = create<AppState>()(
               if (currentTheme === 'dark') {
                 document.documentElement.classList.add('dark');
                 document.documentElement.classList.remove('light');
+                document.documentElement.setAttribute('data-theme', 'dark');
               } else {
                 document.documentElement.classList.remove('dark');
                 document.documentElement.classList.add('light');
+                document.documentElement.setAttribute('data-theme', 'light');
               }
             }
           }

@@ -62,6 +62,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const theme = useStore((state) => state.theme);
   const hasCustomTheme = useStore((state) => state.hasCustomTheme);
+  const resetThemeToSystem = useStore((state) => state.resetThemeToSystem);
 
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
@@ -470,6 +471,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       ? `${theme === 'dark' ? 'Dark' : 'Light'} Mode (manual)`
                       : `Synced with device (${theme === 'dark' ? 'Dark' : 'Light'})`}
                   </span>
+                  {hasCustomTheme && (
+                    <button
+                      type="button"
+                      onClick={() => resetThemeToSystem()}
+                      className="text-[10px] text-accent hover:underline mt-0.5 block text-left font-medium"
+                    >
+                      Reset to System
+                    </button>
+                  )}
                 </div>
                 <ThemeToggle />
               </div>

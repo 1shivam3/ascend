@@ -33,7 +33,6 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 20,
       keyPrefix: 'ai-scan-meal',
-      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -241,22 +240,27 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 }`;
 
     const candidateModels = [
-      'gemini-1.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      'gemini-2.0-flash-lite',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-flash-latest',
+      'gemini-flash-lite-latest',
+      'gemini-3.8-flash',
     ];
 
     let lastError: any = null;
     let resultJson: MealAnalysisResult | null = null;
 
     for (const model of candidateModels) {
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 15000);
+
       try {
         const response = await ai.models.generateContent({
           model,
           contents: [imagePart, prompt],
           config: {
             responseMimeType: 'application/json',
+            abortSignal: abortController.signal,
           },
         });
 
@@ -323,6 +327,8 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
       } catch (err) {
         lastError = err;
         console.warn(`Model ${model} failed for scan-meal:`, err);
+      } finally {
+        clearTimeout(timeoutId);
       }
     }
 
