@@ -223,6 +223,30 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
   }, [selectedHistoryDate, registerBackHandler]);
 
+  useEffect(() => {
+    if (mealToDelete) {
+      return registerBackHandler(() => { setMealToDelete(null); return true; }, 100);
+    }
+  }, [mealToDelete, registerBackHandler]);
+
+  useEffect(() => {
+    if (confirmClearAll) {
+      return registerBackHandler(() => { setConfirmClearAll(false); return true; }, 100);
+    }
+  }, [confirmClearAll, registerBackHandler]);
+
+  useEffect(() => {
+    if (isMealHistoryOpen) {
+      return registerBackHandler(() => { setIsMealHistoryOpen(false); return true; }, 100);
+    }
+  }, [isMealHistoryOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isMoreToolsOpen) {
+      return registerBackHandler(() => { setIsMoreToolsOpen(false); return true; }, 100);
+    }
+  }, [isMoreToolsOpen, registerBackHandler]);
+
   // ── Pinned food edit / add form ───────────────────────────────────────────
   const [pinnedName,     setPinnedName]     = useState('');
   const [pinnedQuantity, setPinnedQuantity] = useState('');

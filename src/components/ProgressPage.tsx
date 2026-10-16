@@ -111,15 +111,43 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     }
   }, [isToolsMenuOpen, registerBackHandler]);
 
-  // Sub-view Back Handler: If viewing Lifter Twin or PRs, back returns to overview
+  // Sub-view Back Handler: If viewing Lifter Twin or PRs subview inside strength, back returns to strength overview
   useEffect(() => {
     if (activeTab === 'strength' && strengthSubView !== 'overview') {
       return registerBackHandler(() => {
         setStrengthSubView('overview');
         return true;
-      }, 50);
+      }, 60);
     }
   }, [activeTab, strengthSubView, registerBackHandler]);
+
+  // Sub-tab Back Handler: If on Body Comp or Consistency, back returns to Strength (the primary Progress hub)
+  useEffect(() => {
+    if (activeTab !== 'strength') {
+      return registerBackHandler(() => {
+        setActiveTab('strength');
+        return true;
+      }, 40);
+    }
+  }, [activeTab, registerBackHandler]);
+
+  // Synchronize active sub-tab with URL and localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const currentSub = activeTab === 'strength' && strengthSubView === 'prs' ? 'prs' : activeTab;
+      localStorage.setItem('ascend_progress_subtab', currentSub);
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('tab') === 'progress' || url.searchParams.get('tab') === 'prs') {
+        if (currentSub === 'strength') {
+          url.searchParams.delete('sub');
+        } else {
+          url.searchParams.set('sub', currentSub);
+        }
+        window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+      }
+    } catch {}
+  }, [activeTab, strengthSubView]);
 
   // Modal Back Handlers
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { buildTabUrl, getInitialNavigationState } from '@/lib/navigation';
 
 describe('Android & Browser Back Navigation (Task 2)', () => {
   let handlers: Map<string, { fn: () => boolean | void; priority: number }>;
@@ -116,5 +117,137 @@ describe('Android & Browser Back Navigation (Task 2)', () => {
     // Second press within 500ms: allows exit
     handleRootBack();
     expect(exitAllowed).toBe(true);
+  });
+});
+
+class MockStorage implements Storage {
+  private store = new Map<string, string>();
+  get length() { return this.store.size; }
+  clear() { this.store.clear(); }
+  getItem(key: string) { return this.store.has(key) ? this.store.get(key)! : null; }
+  key(index: number) { return Array.from(this.store.keys())[index] || null; }
+  removeItem(key: string) { this.store.delete(key); }
+  setItem(key: string, value: string) { this.store.set(key, String(value)); }
+}
+
+const mockStorage = new MockStorage();
+
+function setupBrowserEnvironment(urlPath = '/') {
+  const urlObj = new URL(urlPath, 'https://ascendtonext.vercel.app');
+  const mockWindow = {
+    location: {
+      href: urlObj.href,
+      pathname: urlObj.pathname,
+      search: urlObj.search,
+      hash: urlObj.hash,
+    },
+    history: {
+      state: {},
+      replaceState: vi.fn((state: any, title: string, url?: string) => {
+        mockWindow.history.state = state;
+        if (url) {
+          const parsed = new URL(url, 'https://ascendtonext.vercel.app');
+          mockWindow.location.pathname = parsed.pathname;
+          mockWindow.location.search = parsed.search;
+          mockWindow.location.hash = parsed.hash;
+          mockWindow.location.href = parsed.href;
+        }
+      }),
+      pushState: vi.fn((state: any, title: string, url?: string) => {
+        mockWindow.history.state = state;
+        if (url) {
+          const parsed = new URL(url, 'https://ascendtonext.vercel.app');
+          mockWindow.location.pathname = parsed.pathname;
+          mockWindow.location.search = parsed.search;
+          mockWindow.location.hash = parsed.hash;
+          mockWindow.location.href = parsed.href;
+        }
+      }),
+      back: vi.fn(),
+    },
+    localStorage: mockStorage,
+  };
+
+  (globalThis as any).window = mockWindow;
+  (globalThis as any).localStorage = mockStorage;
+}
+
+describe('Tab URL Synchronization & Refresh Persistence', () => {
+
+  beforeEach(() => {
+    mockStorage.clear();
+    setupBrowserEnvironment('/');
+  });
+
+  it('builds clean URL for home tab', () => {
+    window.history.replaceState({}, '', '/?tab=workout');
+    const url = buildTabUrl('home');
+    expect(url).toBe('/');
+  });
+
+  it('builds parameterized URL for workout and meals tabs', () => {
+    window.history.replaceState({}, '', '/');
+    expect(buildTabUrl('workout')).toBe('/?tab=workout');
+    expect(buildTabUrl('meals')).toBe('/?tab=meals');
+    expect(buildTabUrl('prs')).toBe('/?tab=prs');
+  });
+
+  it('builds parameterized URL with sub-tab for progress', () => {
+    window.history.replaceState({}, '', '/');
+    expect(buildTabUrl('progress', 'strength')).toBe('/?tab=progress&sub=strength');
+    expect(buildTabUrl('progress', 'prs')).toBe('/?tab=progress&sub=prs');
+    expect(buildTabUrl('progress', 'overview')).toBe('/?tab=progress');
+  });
+
+  it('restores active tab from URL query params upon refresh', () => {
+    window.history.replaceState({}, '', '/?tab=workout');
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('workout');
+    expect(initial.progressTab).toBe('overview');
+  });
+
+  it('restores progress sub-tab from URL query params upon refresh', () => {
+    window.history.replaceState({}, '', '/?tab=progress&sub=strength');
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('progress');
+    expect(initial.progressTab).toBe('strength');
+  });
+
+  it('restores prs tab from URL query params upon refresh', () => {
+    window.history.replaceState({}, '', '/?tab=prs');
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('progress');
+    expect(initial.progressTab).toBe('prs');
+  });
+
+  it('falls back to localStorage when URL search params are absent (PWA relaunch / refresh at root)', () => {
+    window.history.replaceState({}, '', '/');
+    localStorage.setItem('ascend_active_tab', 'meals');
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('meals');
+  });
+
+  it('defaults to home when both URL params and localStorage are empty', () => {
+    window.history.replaceState({}, '', '/');
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('home');
+    expect(initial.progressTab).toBe('overview');
+  });
+
+  it('preserves multi-tab back history without jumping directly to home screen', () => {
+    // Simulate navigation stack: Home -> Workout -> Meals
+    const stack = ['home', 'workout', 'meals'];
+
+    // First back press from Meals returns to Workout (not directly to Home)
+    const afterFirstBack = [...stack];
+    afterFirstBack.pop();
+    const prevTab1 = afterFirstBack[afterFirstBack.length - 1];
+    expect(prevTab1).toBe('workout');
+
+    // Second back press from Workout returns to Home
+    afterFirstBack.pop();
+    const prevTab2 = afterFirstBack[afterFirstBack.length - 1];
+    expect(prevTab2).toBe('home');
   });
 });

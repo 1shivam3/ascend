@@ -32,11 +32,80 @@ export interface NavigationContextValue {
 
 const NavigationContext = createContext<NavigationContextValue | undefined>(undefined);
 
+export function buildTabUrl(tab: TabId, progressTab?: ProgressTabId): string {
+  if (typeof window === 'undefined') return '/';
+  try {
+    const url = new URL(window.location.href);
+    if (tab === 'home') {
+      url.searchParams.delete('tab');
+      url.searchParams.delete('sub');
+    } else if (tab === 'prs') {
+      url.searchParams.set('tab', 'prs');
+      url.searchParams.delete('sub');
+    } else {
+      url.searchParams.set('tab', tab);
+      if (tab === 'progress' && progressTab && progressTab !== 'overview') {
+        url.searchParams.set('sub', progressTab);
+      } else {
+        url.searchParams.delete('sub');
+      }
+    }
+    return url.pathname + (url.search ? url.search : '') + url.hash;
+  } catch {
+    return tab === 'home' ? '/' : `/?tab=${tab}`;
+  }
+}
+
+export function getInitialNavigationState(): { tab: TabId; progressTab: ProgressTabId } {
+  if (typeof window === 'undefined') {
+    return { tab: 'home', progressTab: 'overview' };
+  }
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab') as TabId | null;
+    const subParam = params.get('sub') as ProgressTabId | null;
+
+    if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs'].includes(tabParam)) {
+      if (tabParam === 'prs') {
+        return { tab: 'progress', progressTab: 'prs' };
+      }
+      return {
+        tab: tabParam,
+        progressTab: subParam && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(subParam)
+          ? subParam
+          : 'overview',
+      };
+    }
+
+    // Secondary fallback: check localStorage for explicitly persisted tab
+    const savedTab = localStorage.getItem('ascend_active_tab') as TabId | null;
+    const savedSubTab = localStorage.getItem('ascend_progress_subtab') as ProgressTabId | null;
+    if (savedTab && ['home', 'workout', 'progress', 'meals', 'prs'].includes(savedTab)) {
+      if (savedTab === 'prs') {
+        return { tab: 'progress', progressTab: 'prs' };
+      }
+      return {
+        tab: savedTab,
+        progressTab: savedSubTab && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(savedSubTab)
+          ? savedSubTab
+          : 'overview',
+      };
+    }
+  } catch {}
+
+  return { tab: 'home', progressTab: 'overview' };
+}
+
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
-  const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [progressInitialTab, setProgressInitialTab] = useState<ProgressTabId>('overview');
-  const [historyStack, setHistoryStack] = useState<TabId[]>(['home']);
+  const [activeTab, setActiveTab] = useState<TabId>(() => getInitialNavigationState().tab);
+  const [progressInitialTab, setProgressInitialTab] = useState<ProgressTabId>(() => getInitialNavigationState().progressTab);
+  const [historyStack, setHistoryStack] = useState<TabId[]>(() => {
+    const initial = getInitialNavigationState();
+    const stack: TabId[] = initial.tab === 'home' ? ['home'] : ['home', initial.tab];
+    return stack;
+  });
   const handlersRef = useRef<Map<string, { fn: () => boolean | void; priority: number }>>(new Map());
   const lastBackPressRef = useRef<number>(0);
   const isHandlingPopStateRef = useRef<boolean>(false);
@@ -84,38 +153,63 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       }
     ) => {
       const targetTab = tab === 'prs' ? 'progress' : tab;
+      const targetProgressTab = options?.progressTab || (tab === 'prs' ? 'prs' : undefined);
 
-      if (options?.progressTab) {
-        setProgressInitialTab(options.progressTab);
-      } else if (tab === 'prs') {
-        setProgressInitialTab('prs');
+      if (targetProgressTab) {
+        setProgressInitialTab(targetProgressTab);
       }
 
       const currentTab = activeTabRef.current;
       const currentStack = historyStackRef.current;
 
       // Avoid redundant navigations to exact same tab unless progressTab was specified
-      if (targetTab === currentTab && !options?.progressTab && tab !== 'prs') {
+      if (targetTab === currentTab && !targetProgressTab && tab !== 'prs') {
         return;
+      }
+
+      const targetUrl = buildTabUrl(targetTab, targetProgressTab);
+
+      // Persist to localStorage immediately so refresh stays on this tab
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('ascend_active_tab', targetTab);
+          if (targetProgressTab) {
+            localStorage.setItem('ascend_progress_subtab', targetProgressTab);
+          } else if (targetTab !== 'progress') {
+            localStorage.removeItem('ascend_progress_subtab');
+          }
+        } catch {}
       }
 
       if (options?.clearHistory) {
         setHistoryStack([targetTab]);
         if (typeof window !== 'undefined') {
           try {
-            window.history.replaceState({ tab: targetTab, stackDepth: 1 }, '');
+            window.history.replaceState({ tab: targetTab, stackDepth: 1 }, '', targetUrl);
           } catch {}
         }
         setActiveTab(targetTab);
         return;
       }
 
+      // If navigating to 'home', reset stack to root ['home']
+      if (targetTab === 'home') {
+        setHistoryStack(['home']);
+        if (typeof window !== 'undefined') {
+          try {
+            window.history.pushState({ tab: 'home', stackDepth: 1 }, '', targetUrl);
+          } catch {}
+        }
+        setActiveTab('home');
+        return;
+      }
+
       if (typeof window !== 'undefined') {
         try {
           if (options?.replace) {
-            window.history.replaceState({ tab: targetTab, stackDepth: currentStack.length }, '');
+            window.history.replaceState({ tab: targetTab, stackDepth: currentStack.length }, '', targetUrl);
           } else {
-            window.history.pushState({ tab: targetTab, stackDepth: currentStack.length + 1 }, '');
+            window.history.pushState({ tab: targetTab, stackDepth: currentStack.length + 1 }, '', targetUrl);
           }
         } catch {}
       }
@@ -128,6 +222,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         });
       } else {
         setHistoryStack((prev) => {
+          // If the targetTab is already the previous item in the stack, trim to it
+          const existingIndex = prev.lastIndexOf(targetTab);
+          if (existingIndex !== -1 && existingIndex === prev.length - 2) {
+            return prev.slice(0, existingIndex + 1);
+          }
           const next = [...prev, targetTab];
           // Cap stack at 30 entries to prevent memory overflow
           return next.length > 30 ? next.slice(-30) : next;
@@ -150,7 +249,6 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     const currentStack = historyStackRef.current;
     if (currentStack.length > 1) {
       if (typeof window !== 'undefined') {
-        // Trigger browser back which triggers popstate handler
         window.history.back();
       } else {
         const nextStack = [...currentStack];
@@ -171,7 +269,6 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     // 4. On root home with no history: Double-back exit check
     const now = Date.now();
     if (now - lastBackPressRef.current < 2000) {
-      // Second press within 2000ms: allow exit
       if (typeof window !== 'undefined') {
         window.history.back();
       }
@@ -185,25 +282,26 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    let initialTab: TabId = 'home';
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab') as TabId | null;
-      if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs'].includes(tabParam)) {
-        if (tabParam === 'prs') {
-          setProgressInitialTab('prs');
-          initialTab = 'progress';
-        } else {
-          initialTab = tabParam;
-        }
-        setActiveTab(initialTab);
-        setHistoryStack(['home', initialTab]);
-      }
-    } catch {}
+    const initial = getInitialNavigationState();
+    const initialUrl = buildTabUrl(initial.tab, initial.progressTab);
+
+    setActiveTab(initial.tab);
+    setProgressInitialTab(initial.progressTab);
+    const initialStack: TabId[] = initial.tab === 'home' ? ['home'] : ['home', initial.tab];
+    setHistoryStack(initialStack);
+    historyStackRef.current = initialStack;
+    activeTabRef.current = initial.tab;
 
     try {
-      window.history.replaceState({ tab: initialTab, root: true, stackDepth: 0 }, '');
-      window.history.pushState({ tab: initialTab, root: true, stackDepth: 1 }, '');
+      window.history.replaceState(
+        { tab: initial.tab, root: initial.tab === 'home', stackDepth: initialStack.length },
+        '',
+        initialUrl
+      );
+      localStorage.setItem('ascend_active_tab', initial.tab);
+      if (initial.progressTab && initial.progressTab !== 'overview') {
+        localStorage.setItem('ascend_progress_subtab', initial.progressTab);
+      }
     } catch {}
 
     const handlePopState = (event: PopStateEvent) => {
@@ -215,9 +313,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         if (runBackHandlers()) {
           // Re-push current state to compensate for the browser pop
           try {
+            const currentUrl = buildTabUrl(activeTabRef.current);
             window.history.pushState(
               { tab: activeTabRef.current, stackDepth: historyStackRef.current.length },
-              ''
+              '',
+              currentUrl
             );
           } catch {}
           return;
@@ -231,6 +331,12 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
           const prevTab = nextStack[nextStack.length - 1] || 'home';
           setHistoryStack(nextStack);
           setActiveTab(prevTab);
+
+          const prevUrl = buildTabUrl(prevTab);
+          try {
+            window.history.replaceState({ tab: prevTab, stackDepth: nextStack.length }, '', prevUrl);
+            localStorage.setItem('ascend_active_tab', prevTab);
+          } catch {}
           return;
         }
 
@@ -238,8 +344,10 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         if (activeTabRef.current !== 'home') {
           setHistoryStack(['home']);
           setActiveTab('home');
+          const homeUrl = buildTabUrl('home');
           try {
-            window.history.pushState({ tab: 'home', root: true, stackDepth: 1 }, '');
+            window.history.replaceState({ tab: 'home', root: true, stackDepth: 1 }, '', homeUrl);
+            localStorage.setItem('ascend_active_tab', 'home');
           } catch {}
           return;
         }
@@ -254,7 +362,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
           lastBackPressRef.current = now;
           toast.info('Press back again to exit', 'ASCEND');
           try {
-            window.history.pushState({ tab: 'home', root: true, stackDepth: 1 }, '');
+            window.history.pushState({ tab: 'home', root: true, stackDepth: 1 }, '', buildTabUrl('home'));
           } catch {}
         }
       } finally {
