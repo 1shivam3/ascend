@@ -79,8 +79,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
+  userScalable: true,
   viewportFit: 'cover',
   themeColor: '#0a0a0a',
   interactiveWidget: 'resizes-content',
@@ -98,13 +98,6 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                // Prevent gesture/pinch zoom on iOS WebKit
-                if (typeof document !== 'undefined') {
-                  document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
-                  document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
-                  document.addEventListener('gestureend', function(e) { e.preventDefault(); });
-                }
-
                 var theme = null;
                 var hasCustom = false;
                 var customFlag = localStorage.getItem('ascend_has_custom_theme');
