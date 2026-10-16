@@ -358,14 +358,12 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center px-4 py-8 text-text-primary">
+    <div className="onboarding-shell min-h-screen bg-bg-primary flex flex-col items-center justify-center px-4 py-8 text-text-primary">
       <div className="w-full max-w-sm space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-1.5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-bg-secondary border border-border/80 text-accent mb-1 shadow-sm">
-            <Dumbbell className="w-6 h-6" />
-          </div>
-          <h1 className="text-2xl font-black tracking-tight font-sans text-text-primary">
+          <span className="brand-mark onboarding-brand-mark" aria-hidden="true"><span /><span /><span /></span>
+          <h1 className="onboarding-wordmark text-2xl font-black tracking-tight font-sans text-text-primary">
             ASCEND
           </h1>
           <p className="text-text-muted text-xs font-medium">
