@@ -218,6 +218,10 @@ function createDuePreferences(userId: string, timezone: string = 'UTC') {
   if (h === 24) h = 0;
   const m = parseInt(mapping.minute, 10);
   const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  const distantHour1 = (h + 6) % 24;
+  const distantHour2 = (h + 12) % 24;
+  const lunchStr = `${String(distantHour1).padStart(2, '0')}:00`;
+  const dinnerStr = `${String(distantHour2).padStart(2, '0')}:00`;
 
   return {
     user_id: userId,
@@ -227,8 +231,8 @@ function createDuePreferences(userId: string, timezone: string = 'UTC') {
       mealReminders: {
         enabled: true,
         breakfastTime: timeStr,
-        lunchTime: '13:00',
-        dinnerTime: '19:30',
+        lunchTime: lunchStr,
+        dinnerTime: dinnerStr,
       },
       workoutReminders: { enabled: false },
       weeklyReport: { enabled: false },
