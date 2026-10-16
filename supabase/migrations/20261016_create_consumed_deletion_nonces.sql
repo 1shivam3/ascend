@@ -18,11 +18,11 @@ CREATE TABLE IF NOT EXISTS public.consumed_deletion_nonces (
 ALTER TABLE public.consumed_deletion_nonces ALTER COLUMN email DROP NOT NULL;
 
 -- Index by expiry for automated cleanup jobs
-CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_exp 
+CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_exp
   ON public.consumed_deletion_nonces (expires_at);
 
 -- Index by email for lookup during recovery requests
-CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_email 
+CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_email
   ON public.consumed_deletion_nonces (email);
 
 -- Enable RLS: only service role can access this table
