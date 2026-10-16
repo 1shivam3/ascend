@@ -1766,7 +1766,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ─── Render ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="page animate-fade-in space-y-5">
+    <div className="page fuel-page animate-fade-in space-y-5">
       {/* ── Header ── */}
       <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2">
