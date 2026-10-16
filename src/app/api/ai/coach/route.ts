@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
+import { executeMultiProviderText } from '@/lib/ai-provider';
 
 export const runtime = 'nodejs';
 
@@ -123,29 +123,6 @@ export async function POST(req: Request) {
       body.substitution.exerciseToReplace = body.substitution.exerciseToReplace.slice(0, 150);
     }
 
-    const apiKey = getServerGeminiApiKey();
-
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: 'NO_API_KEY',
-          message:
-            'AI coaching intelligence is temporarily unavailable. Using offline recommendations.',
-        },
-        { status: 503 }
-      );
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    // Fallback model list in order of tested performance
-    const candidateModels = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.8-flash',
-    ];
 
     let systemInstruction = '';
     let promptText = '';
@@ -263,57 +240,18 @@ Schema:
       promptText = `Athlete Data & Context:\n<athlete_context>\n${body.userContext || ''}\n</athlete_context>\n\nGenerate tactical coaching feedback in JSON.`;
     }
 
-    let rawText = '';
-    let lastError: any = null;
-
-    for (const modelName of candidateModels) {
-      try {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: promptText,
-          config: {
-            systemInstruction,
-            responseMimeType: 'application/json',
-          },
-        });
-
-        if (response && response.text) {
-          rawText = response.text;
-          break;
-        }
-      } catch (err: any) {
-        lastError = err;
-        if (
-          err?.status === 401 ||
-          err?.status === 403 ||
-          err?.message?.includes('API_KEY_INVALID') ||
-          err?.message?.includes('API key not valid')
-        ) {
-          throw err;
-        }
-      }
-    }
-
-    if (!rawText) {
-      throw lastError || new Error('Failed to generate response from Gemini API.');
-    }
-
-    let parsed: any;
-    try {
-      parsed = JSON.parse(rawText);
-    } catch {
-      const cleaned = rawText
-        .replace(/^```json\s*/i, '')
-        .replace(/```\s*$/i, '')
-        .trim();
-      parsed = JSON.parse(cleaned);
-    }
+    const execResult = await executeMultiProviderText<any>({
+      prompt: promptText,
+      systemPrompt: systemInstruction,
+      timeoutMs: 15000,
+    });
 
     return NextResponse.json({
       success: true,
       task,
-      source: 'gemini',
-      data: parsed,
+      source: execResult.provider,
+      model: execResult.model,
+      data: execResult.data,
     });
   } catch (error: any) {
     const rawMsg = error?.message || 'Failed to process AI Coach request.';

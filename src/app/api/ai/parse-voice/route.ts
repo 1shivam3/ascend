@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { executeMultiProviderText } from '@/lib/ai-provider';
+import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,26 +39,6 @@ export async function POST(req: Request) {
     // 2. Bound transcript length to 1000 characters
     const transcript = rawTranscript.slice(0, 1000);
 
-    const apiKey = getServerGeminiApiKey();
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: 'NO_API_KEY',
-          message: 'Voice recognition is temporarily unavailable. Please enter workout details manually.',
-        },
-        { status: 503 }
-      );
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    const candidateModels = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.8-flash',
-    ];
 
     const systemPrompt = `You are a powerlifting and strength training voice assistant specializing in Hinglish and Indian gym slang.
 Extract structured set data from spoken audio transcript.
@@ -85,27 +65,15 @@ Respond with ONLY raw JSON matching this schema:
     let parsed: any = null;
     let lastError: any = null;
 
-    for (const model of candidateModels) {
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text: `Transcript: "${transcript}"` }] }],
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
-            temperature: 0.1,
-          },
-        });
-
-        const rawText = response.text?.trim() || '{}';
-        const cleanJson = rawText.replace(/^```json\s*/i, '').replace(/```$/i, '').trim();
-        parsed = JSON.parse(cleanJson);
-        if (parsed && typeof parsed.weight === 'number' && typeof parsed.reps === 'number' && parsed.reps > 0) {
-          break;
-        }
-      } catch (err) {
-        lastError = err;
-      }
+    try {
+      const execResult = await executeMultiProviderText<any>({
+        prompt: `Transcript: "${transcript}"`,
+        systemPrompt,
+        timeoutMs: 15000,
+      });
+      parsed = execResult.data;
+    } catch (err: any) {
+      lastError = err;
     }
 
     if (!parsed || typeof parsed.reps !== 'number' || parsed.reps <= 0) {

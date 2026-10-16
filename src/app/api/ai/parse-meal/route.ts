@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { executeMultiProviderText } from '@/lib/ai-provider';
+import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { FoodItem } from '@/lib/types';
 
@@ -46,31 +46,6 @@ export async function POST(req: Request) {
     // 2. Bound query length to 500 characters
     const query = rawQuery.slice(0, 500);
 
-    const apiKey = getServerGeminiApiKey();
-
-    // If no API key configured on server, seamlessly fallback to calibrated offline database
-    if (!apiKey) {
-      const offlineFoods = parseNaturalMealOffline(query);
-      const totals = calculateMealMacros(offlineFoods);
-      return NextResponse.json({
-        source: 'offline_heuristic',
-        mealName: 'Logged Meal',
-        foods: offlineFoods,
-        totalCalories: totals.calories,
-        totalProteinG: totals.proteinG,
-        totalCarbsG: totals.carbsG,
-        totalFatG: totals.fatG,
-      });
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-    const candidateModels = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.8-flash',
-    ];
 
     const systemPrompt = `You are ASCEND's precision Sports Nutritionist and Indian Food Database parser.
 Given a natural language meal description (e.g. "2 roti, 1 bowl dal, 100g paneer" or "1 scoop whey, 400ml milk, 2 bananas"), parse every food item and calculate exact nutritional macros.
@@ -108,54 +83,40 @@ RULES FOR PRECISION:
   "totalFatG": 3
 }`;
 
-    for (const modelName of candidateModels) {
-      try {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: `Parse this meal accurately into individual food items with exact macros:\n"${query}"` }],
-            },
-          ],
-          config: {
-            systemInstruction: systemPrompt,
-            responseMimeType: 'application/json',
-            temperature: 0.1,
-          },
+    try {
+      const execResult = await executeMultiProviderText<any>({
+        prompt: `Parse this meal accurately into individual food items with exact macros:\n"${query}"`,
+        systemPrompt,
+        timeoutMs: 15000,
+      });
+
+      const parsed = execResult.data;
+      if (parsed && Array.isArray(parsed.foods) && parsed.foods.length > 0) {
+        const validatedFoods: FoodItem[] = parsed.foods.map((f: any) => ({
+          name: String(f.name || 'Food'),
+          quantity: typeof f.quantity === 'number' ? f.quantity : 1,
+          unit: String(f.unit || 'g'),
+          calories: Math.round(Number(f.calories) || 0),
+          proteinG: Math.round((Number(f.proteinG) || 0) * 10) / 10,
+          carbsG: Math.round((Number(f.carbsG) || 0) * 10) / 10,
+          fatG: Math.round((Number(f.fatG) || 0) * 10) / 10,
+        }));
+
+        const totals = calculateMealMacros(validatedFoods);
+
+        return NextResponse.json({
+          source: execResult.provider,
+          model: execResult.model,
+          mealName: parsed.mealName || 'Quick Meal',
+          foods: validatedFoods,
+          totalCalories: totals.calories,
+          totalProteinG: totals.proteinG,
+          totalCarbsG: totals.carbsG,
+          totalFatG: totals.fatG,
         });
-
-        const rawText = response.text?.trim() || '';
-        const cleaned = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-        const parsed = JSON.parse(cleaned);
-
-        if (parsed && Array.isArray(parsed.foods) && parsed.foods.length > 0) {
-          const validatedFoods: FoodItem[] = parsed.foods.map((f: any) => ({
-            name: String(f.name || 'Food'),
-            quantity: typeof f.quantity === 'number' ? f.quantity : 1,
-            unit: String(f.unit || 'g'),
-            calories: Math.round(Number(f.calories) || 0),
-            proteinG: Math.round((Number(f.proteinG) || 0) * 10) / 10,
-            carbsG: Math.round((Number(f.carbsG) || 0) * 10) / 10,
-            fatG: Math.round((Number(f.fatG) || 0) * 10) / 10,
-          }));
-
-          const totals = calculateMealMacros(validatedFoods);
-
-          return NextResponse.json({
-            source: 'gemini',
-            model: modelName,
-            mealName: parsed.mealName || 'Quick Meal',
-            foods: validatedFoods,
-            totalCalories: totals.calories,
-            totalProteinG: totals.proteinG,
-            totalCarbsG: totals.carbsG,
-            totalFatG: totals.fatG,
-          });
-        }
-      } catch (modelErr) {
-        console.warn(`Gemini model ${modelName} failed to parse meal, trying next model:`, modelErr);
       }
+    } catch (modelErr) {
+      console.warn('Multi-provider parse-meal failed, falling back to calibrated offline heuristics:', modelErr);
     }
 
     // Fallback if all Gemini models fail or rate limit

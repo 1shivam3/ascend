@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { MealAnalysisResult } from '@/lib/types';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { executeMultiProviderVision } from '@/lib/ai-provider';
+import { generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
+import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 
@@ -133,28 +134,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Use ONLY the server-side env-configured API key — never accept keys from the client.
-    const apiKey = getServerGeminiApiKey();
-
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: 'NO_API_KEY',
-          message:
-            'Meal recognition service is temporarily unavailable. Please try again later or use offline estimation.',
-        },
-        { status: 503 }
-      );
-    }
-
-    const ai = new GoogleGenAI({ apiKey });
-
-    const imagePart = {
-      inlineData: {
-        data: cleanBase64,
-        mimeType: mimeType || 'image/jpeg',
-      },
-    };
 
     const prompt = `You are ASCEND's precision AI Sports Nutritionist, Supplement Analyst, and Computer Vision Food Classifier.
 Analyze the attached photograph with clinical precision.
@@ -239,101 +218,79 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
   "coachingNote": "One concise sentence on nutritional relevance or strength purpose."
 }`;
 
-    const candidateModels = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-flash-lite-latest',
-      'gemini-3.8-flash',
-    ];
-
-    let lastError: any = null;
     let resultJson: MealAnalysisResult | null = null;
+    let providerUsed = 'gemini';
 
-    for (const model of candidateModels) {
-      const abortController = new AbortController();
-      const timeoutId = setTimeout(() => abortController.abort(), 15000);
+    try {
+      const execResult = await executeMultiProviderVision<any>({
+        imageBase64: cleanBase64,
+        mimeType: mimeType || 'image/jpeg',
+        prompt,
+        timeoutMs: 15000,
+      });
 
-      try {
-        const response = await ai.models.generateContent({
-          model,
-          contents: [imagePart, prompt],
-          config: {
-            responseMimeType: 'application/json',
-            abortSignal: abortController.signal,
-          },
-        });
+      providerUsed = execResult.provider;
+      const parsed = execResult.data;
 
-        const rawText = response.text || '';
-        const cleanJson = rawText
-          .replace(/```json/g, '')
-          .replace(/```/g, '')
-          .trim();
+      if (parsed && Array.isArray(parsed.items)) {
+        const calculatedTotalCalories = parsed.items.reduce(
+          (sum: number, it: any) => sum + (Number(it.calories) || 0),
+          0
+        );
+        const calculatedTotalProtein = Number(
+          parsed.items
+            .reduce((sum: number, it: any) => sum + (Number(it.proteinG) || 0), 0)
+            .toFixed(1)
+        );
+        const calculatedTotalCarbs = Number(
+          parsed.items
+            .reduce((sum: number, it: any) => sum + (Number(it.carbsG) || 0), 0)
+            .toFixed(1)
+        );
+        const calculatedTotalFat = Number(
+          parsed.items
+            .reduce((sum: number, it: any) => sum + (Number(it.fatG) || 0), 0)
+            .toFixed(1)
+        );
 
-        const parsed = JSON.parse(cleanJson);
-        if (parsed && Array.isArray(parsed.items)) {
-          // Calculate verified totals
-          const calculatedTotalCalories = parsed.items.reduce(
-            (sum: number, it: any) => sum + (Number(it.calories) || 0),
-            0
-          );
-          const calculatedTotalProtein = Number(
-            parsed.items
-              .reduce((sum: number, it: any) => sum + (Number(it.proteinG) || 0), 0)
-              .toFixed(1)
-          );
-          const calculatedTotalCarbs = Number(
-            parsed.items
-              .reduce((sum: number, it: any) => sum + (Number(it.carbsG) || 0), 0)
-              .toFixed(1)
-          );
-          const calculatedTotalFat = Number(
-            parsed.items
-              .reduce((sum: number, it: any) => sum + (Number(it.fatG) || 0), 0)
-              .toFixed(1)
-          );
-
-          resultJson = {
-            mealName: parsed.mealName || 'Scanned Meal',
-            items: parsed.items.map((it: any) => ({
-              name: String(it.name || 'Food Item'),
-              quantity: String(it.quantity || `${it.estimatedGrams || 100}g`),
-              estimatedGrams: Number(it.estimatedGrams) || 100,
-              calories: Math.round(Number(it.calories) || 0),
-              proteinG: Number(Number(it.proteinG || 0).toFixed(1)),
-              carbsG: Number(Number(it.carbsG || 0).toFixed(1)),
-              fatG: Number(Number(it.fatG || 0).toFixed(1)),
-              confidence: (['high', 'medium', 'low'].includes(it.confidence)
-                ? it.confidence
-                : 'high') as 'high' | 'medium' | 'low',
-              preparation: it.preparation || undefined,
-              notes: it.notes || undefined,
-            })),
-            totalCalories: Math.round(parsed.totalCalories || calculatedTotalCalories),
-            totalProtein: Number((parsed.totalProtein || calculatedTotalProtein).toFixed(1)),
-            totalCarbs: Number((parsed.totalCarbs || calculatedTotalCarbs).toFixed(1)),
-            totalFat: Number((parsed.totalFat || calculatedTotalFat).toFixed(1)),
-            hiddenIngredients: parsed.hiddenIngredients || hiddenIngredients,
-            confidence: (['high', 'medium', 'low'].includes(parsed.confidence)
-              ? parsed.confidence
+        resultJson = {
+          mealName: parsed.mealName || 'Scanned Meal',
+          items: parsed.items.map((it: any) => ({
+            name: String(it.name || 'Food Item'),
+            quantity: String(it.quantity || `${it.estimatedGrams || 100}g`),
+            estimatedGrams: Number(it.estimatedGrams) || 100,
+            calories: Math.round(Number(it.calories) || 0),
+            proteinG: Number(Number(it.proteinG || 0).toFixed(1)),
+            carbsG: Number(Number(it.carbsG || 0).toFixed(1)),
+            fatG: Number(Number(it.fatG || 0).toFixed(1)),
+            confidence: (['high', 'medium', 'low'].includes(it.confidence)
+              ? it.confidence
               : 'high') as 'high' | 'medium' | 'low',
-            coachingNote:
-              parsed.coachingNote ||
-              `Logged ~${calculatedTotalCalories} kcal and ${calculatedTotalProtein}g protein toward today's goals.`,
-            timestamp: new Date().toISOString(),
-          };
-          break;
-        }
-      } catch (err) {
-        lastError = err;
-        console.warn(`Model ${model} failed for scan-meal:`, err);
-      } finally {
-        clearTimeout(timeoutId);
+            preparation: it.preparation || undefined,
+            notes: it.notes || undefined,
+          })),
+          totalCalories: Math.round(parsed.totalCalories || calculatedTotalCalories),
+          totalProtein: Number((parsed.totalProtein || calculatedTotalProtein).toFixed(1)),
+          totalCarbs: Number((parsed.totalCarbs || calculatedTotalCarbs).toFixed(1)),
+          totalFat: Number((parsed.totalFat || calculatedTotalFat).toFixed(1)),
+          hiddenIngredients: parsed.hiddenIngredients || hiddenIngredients,
+          confidence: (['high', 'medium', 'low'].includes(parsed.confidence)
+            ? parsed.confidence
+            : 'high') as 'high' | 'medium' | 'low',
+          coachingNote:
+            parsed.coachingNote ||
+            `Logged ~${calculatedTotalCalories} kcal and ${calculatedTotalProtein}g protein toward today's goals (${providerUsed}).`,
+          timestamp: new Date().toISOString(),
+        };
       }
+    } catch (visionErr: any) {
+      console.warn('Multi-provider vision failed, falling back to offline nutrition database:', redactSecrets(visionErr?.message || String(visionErr)));
+      resultJson = generateOfflineMealEstimate(userNotes, hiddenIngredients);
+      resultJson.coachingNote = 'AI vision providers were unavailable or rate-limited. Estimated using ASCEND calibrated food database.';
     }
 
     if (!resultJson) {
-      throw lastError || new Error('Failed to generate structured meal analysis');
+      resultJson = generateOfflineMealEstimate(userNotes, hiddenIngredients);
     }
 
     return NextResponse.json(resultJson);

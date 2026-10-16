@@ -18,12 +18,36 @@ export function getServerGeminiApiKey(): string | undefined {
 }
 
 /**
+ * Resolves the server-side Groq API key securely from environment variables.
+ */
+export function getServerGroqApiKey(): string | undefined {
+  const envKey = process.env.GROQ_API_KEY?.trim();
+  if (envKey && envKey.length > 5) {
+    return envKey;
+  }
+  return undefined;
+}
+
+/**
+ * Resolves the server-side OpenRouter API key securely from environment variables.
+ */
+export function getServerOpenRouterApiKey(): string | undefined {
+  const envKey = process.env.OPENROUTER_API_KEY?.trim();
+  if (envKey && envKey.length > 5) {
+    return envKey;
+  }
+  return undefined;
+}
+
+/**
  * Redacts any potential API keys, tokens, or credentials from error strings or logs.
  */
 export function redactSecrets(message: string): string {
   if (!message) return '';
   return message
     .replace(/AIzaSy[A-Za-z0-9_-]{33}/g, '[REDACTED_API_KEY]')
+    .replace(/gsk_[A-Za-z0-9_-]+/g, '[REDACTED_API_KEY]')
+    .replace(/sk-or-[A-Za-z0-9_-]+/g, '[REDACTED_API_KEY]')
     .replace(/re_[A-Za-z0-9_-]+/g, '[REDACTED_API_KEY]')
     .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/g, '[REDACTED_JWT]')
     .replace(/((?:api_?key|key|token|secret|password)\s*[:=]\s*)["']?[A-Za-z0-9_.-]+["']?/gi, '$1[REDACTED]')
