@@ -28,7 +28,6 @@ const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkou
 const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
 const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
 
-const InstallAppBanner = dynamic(() => import('@/components/InstallAppBanner'), { ssr: false });
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
@@ -422,8 +421,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   return (
     <div className="page animate-fade-in space-y-4 pb-24 max-w-md mx-auto px-4">
-      <InstallAppBanner />
-
       {/* ── 1. CLEAN HEADER (Warm & Direct) ──────────────────────────────── */}
       <header className="pt-2 flex justify-between items-center">
         <div>

@@ -193,8 +193,22 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Render OnboardingScreen during SSR and initial load for instant LCP with zero element render delay
-  if (!mounted || !profile) {
+  // Branded splash/skeleton during SSR & storage hydration to prevent flashing the login screen to existing athletes
+  if (!mounted || !_hasHydrated) {
+    return (
+      <main id="main-content" className="w-full min-h-[100dvh] flex items-center justify-center bg-bg-primary">
+        <div className="flex flex-col items-center gap-3 animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center shadow-lg">
+            <Dumbbell className="w-6 h-6 text-accent" />
+          </div>
+          <span className="text-xs font-mono font-bold tracking-widest text-text-muted uppercase">ASCEND</span>
+        </div>
+      </main>
+    );
+  }
+
+  // If hydrated and no athlete profile exists, render the onboarding & sign-in screen
+  if (!profile) {
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <OnboardingScreen />
