@@ -311,7 +311,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   ] as const;
 
   return (
-    <div className="page animate-fade-in space-y-4">
+    <div className="page progress-page animate-fade-in space-y-4">
       {/* Header */}
       <header className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2">
