@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ASCEND</string>
+    <string name="title_activity_main">ASCEND</string>
+    <string name="package_name">com.ascend.training</string>
+    <string name="custom_url_scheme">com.ascend.training</string>
+</resources>

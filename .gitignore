@@ -27,3 +27,6 @@ supabase/.temp/
 .env*
 kilo.json
 run-checks.sh
+*.apk
+android/app/build/
+android/.gradle/
