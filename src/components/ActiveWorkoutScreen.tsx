@@ -1488,7 +1488,7 @@ export default function ActiveWorkoutScreen({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-bg-primary text-text-primary flex flex-col overflow-hidden select-none animate-fade-in font-sans">
+    <div className="active-workout-shell fixed inset-0 z-50 bg-bg-primary text-text-primary flex flex-col overflow-hidden select-none animate-fade-in font-sans">
       {/* ── Top Bar (Navigation locked: full screen gym focus) ───────────── */}
       <header className="px-4 py-3 bg-bg-card border-b border-border/80 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
