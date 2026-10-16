@@ -14,7 +14,7 @@ export function Card({
   children,
   ...props
 }: CardProps) {
-  const baseStyles = 'rounded-2xl transition-all duration-150';
+  const baseStyles = 'rounded-[var(--radius-panel)] transition-colors duration-150';
 
   const variants = {
     default: 'bg-bg-card border border-border/80 shadow-xs',
