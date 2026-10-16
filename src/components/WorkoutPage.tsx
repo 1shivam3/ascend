@@ -1457,7 +1457,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="page animate-fade-in space-y-4">
+    <div className="page train-page animate-fade-in space-y-4">
       {/* ── Page Header ─────────────────────────────────────────────────── */}
       <header className="flex justify-between items-center mb-2">
         <div className="flex items-center gap-2">
