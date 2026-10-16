@@ -486,7 +486,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <Card
         variant="elevated"
         padding="lg"
-        className="border-accent/40 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 space-y-4"
+        className="today-training-hero border-accent/40 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 space-y-4"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -636,7 +636,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </Card>
 
       {/* ── 3. THIS WEEK CONSISTENCY (7-Day Strip) ─────────────────────────── */}
-      <Card variant="default" padding="md" className="space-y-2.5">
+      <Card variant="default" padding="md" className="week-at-a-glance space-y-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-text-primary">
             This Week
@@ -680,7 +680,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         variant="interactive"
         padding="md"
         onClick={() => onNavigate('meals')}
-        className="space-y-3 cursor-pointer"
+        className="daily-fuel-card space-y-3 cursor-pointer"
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
