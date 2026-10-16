@@ -359,8 +359,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         </div>
       </header>
 
-      {/* Sub-Navigation (3 clean tabs) */}
-      <div role="tablist" aria-label="Progress views" className="flex items-center gap-2 border-b border-border/80 pb-2">
+      {/* Sub-Navigation (3 clean tabs: Strength | Body | Consistency) */}
+      <div role="tablist" aria-label="Progress views" className="segmented-control">
         {subTabs.map((tab) => (
           <button
             key={tab.id}
@@ -368,11 +368,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             aria-selected={activeTab === tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 py-2.5 min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-accent text-white shadow-xs'
-                : 'bg-bg-secondary text-text-muted hover:text-text-primary'
-            }`}
+            className={`segmented-item ${activeTab === tab.id ? 'active' : ''}`}
           >
             {tab.label}
           </button>
@@ -383,17 +379,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'strength' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-view selector for Strength */}
-          <div role="tablist" aria-label="Strength views" className="flex items-center gap-1.5 p-1 bg-bg-secondary rounded-xl border border-border/70">
+          <div role="tablist" aria-label="Strength views" className="segmented-control">
             <button
               type="button"
               role="tab"
               aria-selected={strengthSubView === 'overview'}
               onClick={() => setStrengthSubView('overview')}
-              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
-                strengthSubView === 'overview'
-                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
+              className={`segmented-item ${strengthSubView === 'overview' ? 'active' : ''}`}
             >
               Lift Trends
             </button>
@@ -402,13 +394,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               role="tab"
               aria-selected={strengthSubView === 'twin'}
               onClick={() => setStrengthSubView('twin')}
-              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer ${
-                strengthSubView === 'twin'
-                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
+              className={`segmented-item ${strengthSubView === 'twin' ? 'active' : ''}`}
             >
-              <Activity className="w-3.5 h-3.5 text-accent" />
+              <Activity className="w-3.5 h-3.5 text-accent mr-1 inline" />
               <span>Lifter Twin</span>
             </button>
             <button
@@ -416,11 +404,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               role="tab"
               aria-selected={strengthSubView === 'prs'}
               onClick={() => setStrengthSubView('prs')}
-              className={`flex-1 py-2 min-h-[44px] px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer ${
-                strengthSubView === 'prs'
-                  ? 'bg-bg-card text-accent shadow-xs border border-accent/20'
-                  : 'text-text-muted hover:text-text-primary'
-              }`}
+              className={`segmented-item ${strengthSubView === 'prs' ? 'active' : ''}`}
             >
               Personal Records
             </button>

@@ -255,13 +255,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     const calTarget = macroGoals?.calories || 2400;
     const protTarget = macroGoals?.proteinG || Math.round(bwKg * 2.0);
 
+    const carbsTarget = macroGoals?.carbsG || 250;
+    const fatTarget = macroGoals?.fatG || 65;
+
     return {
       calories: Math.round(macros.calories),
       targetCalories: calTarget,
       protein: Math.round(macros.proteinG),
       targetProtein: protTarget,
+      carbs: Math.round(macros.carbsG),
+      targetCarbs: carbsTarget,
+      fat: Math.round(macros.fatG),
+      targetFat: fatTarget,
       calPct: Math.min(100, Math.round((macros.calories / Math.max(1, calTarget)) * 100)),
       protPct: Math.min(100, Math.round((macros.proteinG / Math.max(1, protTarget)) * 100)),
+      carbsPct: Math.min(100, Math.round((macros.carbsG / Math.max(1, carbsTarget)) * 100)),
+      fatPct: Math.min(100, Math.round((macros.fatG / Math.max(1, fatTarget)) * 100)),
     };
   }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
@@ -696,12 +705,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </Card>
 
-      {/* ── 4. DAILY CARD (Protein, Water, Creatine — S3 Spec) ─────────────── */}
-      <Card variant="default" padding="md" className="space-y-3.5">
+      {/* ── 4. NUTRITION & FUEL CARD (Matching Visual Design References) ──── */}
+      <Card
+        variant="default"
+        padding="md"
+        className="space-y-4"
+      >
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-text-primary">
-            Daily fuel & habits
-          </span>
+          <div className="flex items-center gap-2">
+            <UtensilsCrossed className="w-4 h-4 text-accent" />
+            <h3 className="text-sm font-bold text-text-primary">
+              Nutrition & Fuel
+            </h3>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -709,53 +725,115 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               className="px-2.5 py-1 rounded-lg bg-accent text-white dark:text-stone-950 text-2xs font-bold flex items-center gap-1 shadow-xs hover:brightness-105 active:scale-95 transition-all cursor-pointer"
               title="Scan meal with camera"
             >
-              <Camera className="w-3 h-3" />
-              <span>Scan</span>
+              <Camera className="w-3.5 h-3.5" />
+              <span>Scan Meal</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigate('meals')}
-              className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+              className="text-xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-0.5 cursor-pointer"
             >
-              <span>Log food</span>
-              <ChevronRight className="w-3 h-3" />
+              <span>Details</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
 
-        {/* Row 1: Protein */}
-        <div className="space-y-1.5">
-          <div className="flex items-baseline justify-between text-xs">
-            <span className="text-text-secondary font-medium">Protein</span>
-            <span className="tabular-nums font-bold text-text-primary">
-              {fuelStats.protein} <span className="font-normal text-2xs text-text-muted">/ {fuelStats.targetProtein} g</span>
+        {/* Circular Donut Ring on Left + Macro Bars on Right */}
+        <div className="flex items-center gap-4 py-1">
+          {/* Circular Donut Ring */}
+          <div className="shrink-0 flex flex-col items-center">
+            <CircularRing
+              size={86}
+              strokeWidth={7}
+              progress={fuelStats.calPct}
+              strokeColor="rgb(var(--accent))"
+              trackColor="rgb(var(--bg-secondary))"
+            >
+              <div className="flex flex-col items-center justify-center text-center">
+                <span className="text-base font-extrabold tabular-nums text-text-primary leading-tight">
+                  {fuelStats.calories.toLocaleString()}
+                </span>
+                <span className="text-[10px] text-text-muted font-medium">cal</span>
+              </div>
+            </CircularRing>
+            <span className="text-[10px] text-text-muted mt-1.5 tabular-nums">
+              Target: {fuelStats.targetCalories.toLocaleString()}
             </span>
           </div>
-          <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
-            <div
-              className="h-full bg-text-primary rounded-full transition-all duration-500"
-              style={{ width: `${fuelStats.protPct}%` }}
-            />
+
+          {/* Stacked Macro Breakdown */}
+          <div className="flex-1 space-y-2 min-w-0">
+            {/* Protein */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-2xs">
+                <span className="font-semibold text-text-primary">Protein</span>
+                <span className="tabular-nums font-bold text-accent">
+                  {fuelStats.protein}g <span className="font-normal text-text-muted">/ {fuelStats.targetProtein}g</span>
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-accent rounded-full transition-all duration-500"
+                  style={{ width: `${fuelStats.protPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Carbs */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-2xs">
+                <span className="font-medium text-text-secondary">Carbs</span>
+                <span className="tabular-nums font-bold text-text-primary">
+                  {fuelStats.carbs}g <span className="font-normal text-text-muted">/ {fuelStats.targetCarbs}g</span>
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-text-secondary rounded-full transition-all duration-500"
+                  style={{ width: `${fuelStats.carbsPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Fat */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-2xs">
+                <span className="font-medium text-text-secondary">Fat</span>
+                <span className="tabular-nums font-bold text-text-primary">
+                  {fuelStats.fat}g <span className="font-normal text-text-muted">/ {fuelStats.targetFat}g</span>
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-bg-secondary rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-text-muted rounded-full transition-all duration-500"
+                  style={{ width: `${fuelStats.fatPct}%` }}
+                />
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Row 2: Water */}
-        <div className="space-y-1.5 pt-1.5 border-t border-border/40">
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-text-secondary font-medium">Water</span>
-            <div className="flex items-center gap-2">
-              <span className="tabular-nums font-bold text-text-primary">
-                {waterStats.currentL} <span className="font-normal text-2xs text-text-muted">/ {waterStats.targetL} L</span>
+        {/* Daily Habits: Water & Creatine */}
+        <div className="pt-3 border-t border-border/50 grid grid-cols-2 gap-3 text-xs">
+          {/* Water */}
+          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-2xs font-semibold text-text-secondary">Water</span>
+              <span className="text-2xs font-bold tabular-nums text-text-primary">
+                {waterStats.currentL} / {waterStats.targetL} L
               </span>
+            </div>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => {
                   logWater(250, todayStr);
                   toast.success('+250 ml logged', 'Hydration');
                 }}
-                className="px-2 py-0.5 rounded text-2xs font-semibold bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer"
+                className="flex-1 py-1 rounded-lg text-2xs font-bold bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer"
               >
-                +250 ml
+                +250ml
               </button>
               <button
                 type="button"
@@ -763,42 +841,36 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   logWater(500, todayStr);
                   toast.success('+500 ml logged', 'Hydration');
                 }}
-                className="px-2 py-0.5 rounded text-2xs font-semibold bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer"
+                className="flex-1 py-1 rounded-lg text-2xs font-bold bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer"
               >
-                +500 ml
+                +500ml
               </button>
             </div>
           </div>
-          <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
-            <div
-              className="h-full bg-text-primary rounded-full transition-all duration-500"
-              style={{ width: `${waterStats.pct}%` }}
-            />
-          </div>
-        </div>
 
-        {/* Row 3: Creatine */}
-        <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
-          <div>
-            <span className="font-medium text-text-primary">Creatine</span>
-            <span className="text-2xs text-text-muted ml-1.5">5 g daily</span>
+          {/* Creatine */}
+          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 flex items-center justify-between">
+            <div>
+              <span className="text-2xs font-semibold text-text-secondary block">Creatine</span>
+              <span className="text-3xs text-text-muted">5g daily dose</span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasTakenCreatine}
+                onChange={() => {
+                  toggleCreatine(todayStr, 5);
+                  toast.success(hasTakenCreatine ? 'Creatine unmarked' : 'Creatine logged for today', 'Habit Synced');
+                }}
+                className="sr-only peer"
+              />
+              <div className={`w-9 h-5 rounded-full transition-colors peer-focus:outline-none ${
+                hasTakenCreatine ? 'bg-accent' : 'bg-bg-tertiary border border-border'
+              } after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all ${
+                hasTakenCreatine ? 'after:translate-x-4' : ''
+              }`} />
+            </label>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={hasTakenCreatine}
-              onChange={() => {
-                toggleCreatine(todayStr, 5);
-                toast.success(hasTakenCreatine ? 'Creatine unmarked' : 'Creatine logged for today', 'Habit Synced');
-              }}
-              className="sr-only peer"
-            />
-            <div className={`w-9 h-5 rounded-full transition-colors peer-focus:outline-none ${
-              hasTakenCreatine ? 'bg-accent' : 'bg-bg-secondary border border-border'
-            } after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all ${
-              hasTakenCreatine ? 'after:translate-x-4' : ''
-            }`} />
-          </label>
         </div>
       </Card>
 

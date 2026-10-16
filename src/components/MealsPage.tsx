@@ -161,6 +161,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isToolsMenuOpen,       setIsToolsMenuOpen]       = useState(false);
   const [isHabitsExpanded,      setIsHabitsExpanded]      = useState(false);
   const [isPacingExpanded,      setIsPacingExpanded]      = useState(false);
+  const [fuelSubTab,            setFuelSubTab]            = useState<'today' | 'meals' | 'macros'>('today');
+
+  // Sub-tab Back Handler: returning to today tab
+  useEffect(() => {
+    if (fuelSubTab !== 'today') {
+      return registerBackHandler(() => {
+        setFuelSubTab('today');
+        return true;
+      }, 40);
+    }
+  }, [fuelSubTab, registerBackHandler]);
 
   // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
   useEffect(() => {
@@ -1800,141 +1811,162 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         </div>
       </header>
 
-      {/* ── Today's Nutrition ── */}
-      <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="section-title text-[11px] mb-0 font-sans">TODAY&apos;S NUTRITION</h2>
-            <p className="text-2xs text-text-muted mt-0.5">Daily caloric intake &amp; macronutrient breakdown</p>
-          </div>
-          <button
-            type="button"
-            onClick={handleOpenGoalsModal}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
-          >
-            <Target className="w-3.5 h-3.5" />
-            <span>{macroGoals ? 'Edit Targets' : 'Set Targets'}</span>
-          </button>
-        </div>
+      {/* ── Segmented Control (Reference: Screen 18 in Image 1 & Image 3) ── */}
+      <div role="tablist" aria-label="Fuel navigation" className="segmented-control">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={fuelSubTab === 'today'}
+          onClick={() => setFuelSubTab('today')}
+          className={`segmented-item ${fuelSubTab === 'today' ? 'active' : ''}`}
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={fuelSubTab === 'meals'}
+          onClick={() => setFuelSubTab('meals')}
+          className={`segmented-item ${fuelSubTab === 'meals' ? 'active' : ''}`}
+        >
+          Meals {todayMeals.length > 0 && `(${todayMeals.length})`}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={fuelSubTab === 'macros'}
+          onClick={() => setFuelSubTab('macros')}
+          className={`segmented-item ${fuelSubTab === 'macros' ? 'active' : ''}`}
+        >
+          Macros
+        </button>
+      </div>
 
-        {/* Focused Dual Metric: Calories & Protein */}
-        <div className="grid grid-cols-2 gap-3">
-          {/* Calories Box */}
-          <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent" />
-              CALORIES
-            </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-accent font-sans">
-                {Math.round(todayMacros.calories)}
+      {/* ── TAB 1: TODAY ── */}
+      {fuelSubTab === 'today' && (
+        <div className="space-y-4 animate-fade-in">
+          {/* Calorie Donut & Macro Breakdown (Reference: Screen 18 & Screen 11) */}
+          <section className="card p-5 sm:p-6 bg-bg-card border border-border/80 flex flex-col items-center justify-center space-y-4">
+            <div className="w-full flex items-center justify-between">
+              <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
+                Daily Intake
               </span>
-              {macroGoals && (
-                <span className="text-xs text-text-muted font-medium">/ {macroGoals.calories} kcal</span>
-              )}
+              <button
+                type="button"
+                onClick={handleOpenGoalsModal}
+                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Target className="w-3.5 h-3.5" />
+                <span>{macroGoals ? 'Edit Target' : 'Set Target'}</span>
+              </button>
             </div>
-            {macroGoals && (
-              <div className="level-bar h-1.5 mt-1">
-                <div
-                  className="level-bar-fill bg-accent"
-                  style={{ width: `${Math.min(100, Math.round((todayMacros.calories / macroGoals.calories) * 100))}%` }}
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Protein Box (Key strength metric) */}
-          <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-[#22C55E] tracking-wider block flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
-              PROTEIN (KEY)
+            {/* Circular Donut Ring */}
+            <div className="relative inline-flex items-center justify-center">
+              <svg width={130} height={130} className="transform -rotate-90">
+                <circle
+                  cx={65}
+                  cy={65}
+                  r={54}
+                  stroke="rgb(var(--bg-secondary))"
+                  strokeWidth={10}
+                  fill="transparent"
+                />
+                <circle
+                  cx={65}
+                  cy={65}
+                  r={54}
+                  stroke="rgb(var(--accent))"
+                  strokeWidth={10}
+                  strokeDasharray={339.29}
+                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, macroGoals ? (todayMacros.calories / macroGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className="transition-all duration-700 ease-out"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-3xl font-black tabular-nums text-text-primary leading-none">
+                  {Math.round(todayMacros.calories).toLocaleString()}
+                </span>
+                <span className="text-2xs text-text-muted font-medium mt-1">
+                  cal
+                </span>
+              </div>
+            </div>
+            <span className="text-2xs font-semibold text-text-muted tabular-nums">
+              of {macroGoals?.calories || 2400} daily target
             </span>
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black text-[#22C55E] font-sans">
-                {Math.round(todayMacros.proteinG)}g
-              </span>
-              {macroGoals && (
-                <span className="text-xs text-text-muted font-medium">/ {macroGoals.proteinG}g</span>
-              )}
-            </div>
-            {macroGoals && (
-              <div className="level-bar h-1.5 mt-1">
-                <div
-                  className="level-bar-fill bg-[#22C55E]"
-                  style={{ width: `${Math.min(100, Math.round((todayMacros.proteinG / macroGoals.proteinG) * 100))}%` }}
-                />
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Dropdown Toggle for Carbs, Fat & Pacing Details */}
-        <div className="pt-0.5">
-          <div className="flex justify-center">
+            {/* 3 Macro Cards in 3 Columns */}
+            <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
+              {/* Protein */}
+              <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
+                <span className="text-3xs uppercase font-bold text-accent tracking-wider block">Protein</span>
+                <span className="text-base font-extrabold text-text-primary tabular-nums block">
+                  {Math.round(todayMacros.proteinG)}g
+                </span>
+                <span className="text-3xs text-text-muted block">
+                  / {macroGoals?.proteinG || proteinTargetG}g
+                </span>
+              </div>
+
+              {/* Carbs */}
+              <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
+                <span className="text-3xs uppercase font-bold text-text-secondary tracking-wider block">Carbs</span>
+                <span className="text-base font-extrabold text-text-primary tabular-nums block">
+                  {Math.round(todayMacros.carbsG)}g
+                </span>
+                <span className="text-3xs text-text-muted block">
+                  / {macroGoals?.carbsG || 220}g
+                </span>
+              </div>
+
+              {/* Fat */}
+              <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
+                <span className="text-3xs uppercase font-bold text-text-muted tracking-wider block">Fat</span>
+                <span className="text-base font-extrabold text-text-primary tabular-nums block">
+                  {Math.round(todayMacros.fatG)}g
+                </span>
+                <span className="text-3xs text-text-muted block">
+                  / {macroGoals?.fatG || 70}g
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Dual Scanner Action Tiles (Reference: Screen 19 "Add Food" in Image 1) */}
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => setShowMacroDetails(!showMacroDetails)}
-              className="text-3xs font-mono font-bold text-text-muted hover:text-text-primary px-3 py-1 rounded-full bg-bg-secondary/80 border border-border flex items-center gap-1.5 transition-colors cursor-pointer"
+              onClick={() => setIsScanModalOpen(true)}
+              className="p-4 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95 group"
             >
-              <span>{showMacroDetails ? 'Hide Carbs & Fat' : '+ Show Carbs & Fat'}</span>
-              <ChevronDown className={`w-3 h-3 text-accent transition-transform ${showMacroDetails ? 'rotate-180' : ''}`} />
+              <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Camera className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-text-primary block">Scan Food</span>
+                <span className="text-3xs text-text-muted">Take a photo</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsBarcodeModalOpen(true)}
+              className="p-4 rounded-2xl bg-bg-card border border-border/80 hover:border-accent/50 flex flex-col items-center justify-center text-center gap-2 transition-all cursor-pointer shadow-xs active:scale-95 group"
+            >
+              <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center group-hover:scale-110 transition-transform">
+                <BarcodeIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-text-primary block">Scan Barcode</span>
+                <span className="text-3xs text-text-muted">Packaged products</span>
+              </div>
             </button>
           </div>
 
-          {showMacroDetails && (
-            <div className="space-y-3 pt-3 animate-fade-in">
-              <div className="grid grid-cols-2 gap-3">
-                {/* Carbs Box */}
-                <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-[#38BDF8] tracking-wider block flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
-                    CARBS
-                  </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-text-primary font-sans">
-                      {Math.round(todayMacros.carbsG)}g
-                    </span>
-                    {macroGoals?.carbsG && (
-                      <span className="text-xs text-text-muted font-medium">/ {macroGoals.carbsG}g</span>
-                    )}
-                  </div>
-                  {macroGoals?.carbsG && (
-                    <div className="level-bar h-1 mt-1">
-                      <div
-                        className="level-bar-fill bg-[#38BDF8]"
-                        style={{ width: `${Math.min(100, Math.round((todayMacros.carbsG / macroGoals.carbsG) * 100))}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Fat Box */}
-                <div className="p-3 rounded-xl bg-bg-secondary/50 border border-border/60 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-[#F5B301] tracking-wider block flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#F5B301]" />
-                    FAT
-                  </span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-text-primary font-sans">
-                      {Math.round(todayMacros.fatG)}g
-                    </span>
-                    {macroGoals?.fatG && (
-                      <span className="text-xs text-text-muted font-medium">/ {macroGoals.fatG}g</span>
-                    )}
-                  </div>
-                  {macroGoals?.fatG && (
-                    <div className="level-bar h-1 mt-1">
-                      <div
-                        className="level-bar-fill bg-[#F5B301]"
-                        style={{ width: `${Math.min(100, Math.round((todayMacros.fatG / macroGoals.fatG) * 100))}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+          <section className="card p-4 sm:p-5 bg-bg-card border border-border space-y-4">
 
         {/* ── Primary Action Buttons: Scan Meal & Add Manually ── */}
         <div className="pt-2 border-t border-border/60 space-y-2.5">
@@ -2255,166 +2287,356 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
         )}
 
-        {/* Previous Days History (Collapsed by Default) */}
         {groupedMeals.filter(([d]) => d !== todayDate).length > 0 && (
-          <div className="pt-2 border-t border-border/50">
+          <div className="pt-2 text-center border-t border-border/50">
             <button
               type="button"
-              onClick={() => setIsMealHistoryOpen(!isMealHistoryOpen)}
-              className="w-full flex items-center justify-between py-2 px-3 rounded-xl bg-bg-secondary/40 hover:bg-bg-secondary/70 border border-border/60 transition-colors text-left cursor-pointer"
+              onClick={() => setFuelSubTab('meals')}
+              className="text-xs font-semibold text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              <span className="text-2xs font-semibold text-text-muted flex items-center gap-1.5">
-                <Calendar className="w-3 h-3 text-accent" />
-                <span>Previous Days&apos; Meal History ({groupedMeals.filter(([d]) => d !== todayDate).length} days)</span>
-              </span>
-              <ChevronDown className={`w-3.5 h-3.5 text-text-muted transition-transform ${isMealHistoryOpen ? "rotate-180" : ""}`} />
+              <span>View full meal history ({groupedMeals.length} days recorded)</span>
+              <ChevronRight className="w-3.5 h-3.5" />
             </button>
+          </div>
+        )}
+      </section>
+    </div>
+  )}
 
-            {isMealHistoryOpen && (
-              <div className="pt-2.5 space-y-2 animate-fade-in">
-                {groupedMeals
-                  .filter(([d]) => d !== todayDate)
-                  .slice(0, 14)
-                  .map(([date, dayMeals]) => {
-                    const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
-                    const isDayExpanded = expandedHistoryDays.has(date);
+  {/* ── TAB 2: MEALS HISTORY (Reference: Screen 14 in Board 2) ── */}
+  {fuelSubTab === 'meals' && (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-extrabold text-text-primary">Meal History</h2>
+          <p className="text-2xs text-text-muted">All logged nutrition and meals by day</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsScanModalOpen(true)}
+            className="py-1.5 px-3 rounded-xl bg-accent text-white text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Scan Meal</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (foods.length === 0) handleAddFood();
+              setIsModalOpen(true);
+            }}
+            className="py-1.5 px-3 rounded-xl bg-bg-card border border-border text-xs font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>Add</span>
+          </button>
+        </div>
+      </div>
+
+      {groupedMeals.length === 0 ? (
+        <div className="card p-8 text-center space-y-3 bg-bg-card border border-border">
+          <div className="w-12 h-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center mx-auto">
+            <Utensils className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-text-primary">No Meals Logged Yet</h3>
+            <p className="text-2xs text-text-muted mt-1 max-w-xs mx-auto">
+              Scan a plate with AI or add individual foods to start tracking your daily calories and macros.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsScanModalOpen(true)}
+            className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold inline-flex items-center gap-2"
+          >
+            <Camera className="w-4 h-4" />
+            <span>Scan First Meal</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {groupedMeals.map(([date, dayMeals]) => {
+            const dayMacros = calculateMealMacros(dayMeals.flatMap((m) => m.foods));
+            const isToday = date === todayDate;
+            const isYesterday = (() => {
+              const y = new Date();
+              y.setDate(y.getDate() - 1);
+              return date === y.toISOString().slice(0, 10);
+            })();
+
+            return (
+              <div key={date} className="card p-4 bg-bg-card border border-border/80 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-border/60">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-text-primary">
+                        {isToday ? 'Today' : isYesterday ? 'Yesterday' : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </h3>
+                      <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
+                        {dayMeals.length} {dayMeals.length === 1 ? 'meal' : 'meals'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-black text-text-primary tabular-nums block font-mono">
+                      ~{Math.round(dayMacros.calories)} cal
+                    </span>
+                    <span className="text-3xs text-accent font-semibold block font-mono">
+                      {Math.round(dayMacros.proteinG)}g P • {Math.round(dayMacros.carbsG)}g C • {Math.round(dayMacros.fatG)}g F
+                    </span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {dayMeals.map((meal) => {
+                    const mMacros = calculateMealMacros(meal.foods);
+                    const isExpanded = expandedMeals.has(meal.id);
+
                     return (
-                      <div key={date} className="rounded-xl bg-bg-secondary/30 border border-border/50 overflow-hidden text-2xs transition-all">
-                        {/* Day summary row */}
+                      <div key={meal.id} className="p-3 rounded-xl bg-bg-secondary/60 border border-border/60 space-y-2">
                         <div
-                          onClick={() => toggleHistoryDay(date)}
-                          className="p-2.5 flex justify-between items-center cursor-pointer hover:bg-bg-secondary/50 transition-colors"
+                          className="flex items-start justify-between cursor-pointer gap-2"
+                          onClick={() => toggleExpand(meal.id)}
                         >
                           <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-text-primary">
-                                {new Date(date).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-xs text-text-primary truncate">
+                                {meal.name}
+                              </h4>
+                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                                ~{Math.round(mMacros.calories)} cal
                               </span>
-                              <span className="text-3xs px-1.5 py-0.2 rounded bg-bg-card border border-border/60 text-text-muted">
-                                {dayMeals.length} {dayMeals.length === 1 ? 'meal' : 'meals'}
+                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                                ~{Math.round(mMacros.proteinG)}g P
                               </span>
                             </div>
-                            <p className="text-3xs text-text-muted truncate mt-0.5">
-                              {dayMeals.map((m) => m.name).join(" • ")}
+                            <p className="text-2xs text-text-muted truncate mt-0.5">
+                              {meal.foods.map((f) => f.name).join(", ")}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <span className="font-mono text-text-muted text-3xs">
-                              ~{Math.round(dayMacros.calories)} kcal • ~{Math.round(dayMacros.proteinG)}g P
-                            </span>
-                            <div className="p-0.5 text-text-muted">
-                              {isDayExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMealToDelete({ id: meal.id, name: meal.name });
+                              }}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                              title="Delete meal"
+                              aria-label={`Delete meal ${meal.name}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="p-1 text-text-muted">
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                             </div>
                           </div>
                         </div>
 
-                        {/* Expanded Day Details (Meals list) */}
-                        {isDayExpanded && (
-                          <div className="p-2.5 pt-0 border-t border-border/40 space-y-2 animate-fade-in bg-bg-secondary/20">
-                            <div className="flex items-center justify-between pt-2 pb-1 text-3xs text-text-muted">
-                              <span>Logged Meals on {new Date(date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const count = copyMealsFromDate(date);
-                                  toast.success(`Copied ${count} meals to today!`);
-                                }}
-                                className="text-accent hover:underline flex items-center gap-1 font-semibold cursor-pointer"
-                              >
-                                <Copy className="w-3 h-3" />
-                                <span>Copy to Today</span>
-                              </button>
-                            </div>
-
-                            <div className="space-y-1.5">
-                              {dayMeals.map((m) => {
-                                const mMacros = calculateMealMacros(m.foods);
-                                const isMExpanded = expandedMeals.has(m.id);
-                                return (
-                                  <div key={m.id} className="p-2 rounded-lg bg-bg-card/70 border border-border/50 space-y-1.5">
-                                    <div
-                                      onClick={() => toggleExpand(m.id)}
-                                      className="flex items-center justify-between cursor-pointer"
-                                    >
-                                      <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                          <span className="font-semibold text-text-primary text-2xs truncate">{m.name}</span>
-                                          <span className="text-3xs font-mono px-1 py-0.2 rounded bg-accent/10 text-accent">
-                                            ~{Math.round(mMacros.calories)} kcal
-                                          </span>
-                                          <span className="text-3xs font-mono px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400">
-                                            ~{Math.round(mMacros.proteinG)}g P
-                                          </span>
-                                        </div>
-                                        <p className="text-3xs text-text-muted truncate mt-0.5">
-                                          {m.foods.map((f) => f.name).join(", ")}
-                                        </p>
-                                      </div>
-                                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setMealToDelete({ id: m.id, name: m.name });
-                                          }}
-                                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                                          title="Delete meal from history"
-                                          aria-label={`Delete meal ${m.name} from history`}
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <div className="p-0.5 text-text-muted">
-                                          {isMExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Expanded food items inside past meal */}
-                                    {isMExpanded && (
-                                      <div className="pt-1.5 border-t border-border/40 space-y-1">
-                                        {m.foods.map((food, fIdx) => (
-                                          <div key={fIdx} className="flex justify-between items-center text-3xs py-0.5 px-1.5 rounded bg-bg-secondary/40">
-                                            <div className="truncate flex-1">
-                                              <span className="text-text-primary font-medium">{food.name}</span>
-                                              <span className="text-text-muted ml-1">
-                                                ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
-                                              </span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-                                              <span className="font-mono text-accent">~{Math.round(food.calories)} kcal</span>
-                                              <span className="font-mono text-emerald-400">P:~{Math.round(food.proteinG)}g</span>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  deleteFoodFromMeal(m.id, fIdx);
-                                                  toast.info(`Deleted ${food.name}`);
-                                                }}
-                                                className="p-0.5 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                                                title="Delete food item"
-                                              >
-                                                <Trash2 className="w-2.5 h-2.5" />
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                        {isExpanded && (
+                          <div className="pt-2 border-t border-border/50 space-y-1.5 animate-fade-in">
+                            {meal.foods.map((food, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
+                                <div className="flex items-center gap-1.5 truncate">
+                                  <span className="text-text-primary font-medium truncate">{food.name}</span>
+                                  <span className="text-text-muted text-3xs">
+                                    ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0 ml-2">
+                                  <div className="text-3xs font-mono text-text-muted shrink-0">
+                                    <span className="text-accent font-semibold">~{Math.round(food.calories)} cal</span>
+                                    <span className="mx-1">•</span>
+                                    <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
                                   </div>
-                                );
-                              })}
-                            </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteFoodFromMeal(meal.id, idx);
+                                      toast.info(`Deleted ${food.name}`);
+                                    }}
+                                    className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                    title="Delete this food item"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
                     );
                   })}
+                </div>
               </div>
-            )}
+            );
+          })}
+        </div>
+      )}
+    </div>
+  )}
+
+  {/* ── TAB 3: MACROS & TARGETS ── */}
+  {fuelSubTab === 'macros' && (
+    <div className="space-y-4 animate-fade-in">
+      {/* Target Breakdown Card */}
+      <section className="card p-5 bg-bg-card border border-border space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-border/60">
+          <div>
+            <h2 className="text-sm font-extrabold text-text-primary">Daily Macro Goals</h2>
+            <p className="text-2xs text-text-muted">Target calories and macronutrient distribution</p>
           </div>
-        )}
+          <button
+            type="button"
+            onClick={handleOpenGoalsModal}
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+          >
+            <Target className="w-3.5 h-3.5" />
+            <span>Edit Targets</span>
+          </button>
+        </div>
+
+        {/* Big numbers row */}
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
+            <span className="text-3xs uppercase font-bold text-text-muted block">Target</span>
+            <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
+              {macroGoals?.calories || 2400}
+            </span>
+            <span className="text-3xs text-text-muted">cal</span>
+          </div>
+          <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
+            <span className="text-3xs uppercase font-bold text-accent block">Protein</span>
+            <span className="text-lg font-black text-accent tabular-nums block font-mono">
+              {macroGoals?.proteinG || proteinTargetG}g
+            </span>
+            <span className="text-3xs text-text-muted">
+              {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%
+            </span>
+          </div>
+          <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
+            <span className="text-3xs uppercase font-bold text-text-secondary block">Carbs</span>
+            <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
+              {macroGoals?.carbsG || 220}g
+            </span>
+            <span className="text-3xs text-text-muted">
+              {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%
+            </span>
+          </div>
+          <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
+            <span className="text-3xs uppercase font-bold text-text-muted block">Fat</span>
+            <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
+              {macroGoals?.fatG || 70}g
+            </span>
+            <span className="text-3xs text-text-muted">
+              {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%
+            </span>
+          </div>
+        </div>
+
+        {/* Visual Macro Ratio Bar */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex justify-between text-3xs text-text-muted font-mono">
+            <span>Macro Split</span>
+            <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}% • C {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}% • F {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%</span>
+          </div>
+          <div className="h-2 rounded-full overflow-hidden flex bg-bg-secondary">
+            <div
+              style={{ width: `${Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              className="bg-accent h-full"
+              title="Protein"
+            />
+            <div
+              style={{ width: `${Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              className="bg-sky-400 h-full"
+              title="Carbs"
+            />
+            <div
+              style={{ width: `${Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              className="bg-amber-400 h-full"
+              title="Fat"
+            />
+          </div>
+        </div>
       </section>
+
+      {/* Today's Adherence Card */}
+      <section className="card p-5 bg-bg-card border border-border space-y-3">
+        <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider text-text-muted">
+          Today&apos;s Target Adherence
+        </h3>
+
+        <div className="space-y-3">
+          {/* Calorie Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-2xs font-mono">
+              <span className="font-semibold text-text-primary">Calories</span>
+              <span className="text-text-muted">
+                {Math.round(todayMacros.calories)} / {macroGoals?.calories || 2400} cal ({Math.round((todayMacros.calories / (macroGoals?.calories || 2400)) * 100)}%)
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-accent transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, (todayMacros.calories / (macroGoals?.calories || 2400)) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Protein Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-2xs font-mono">
+              <span className="font-semibold text-accent">Protein</span>
+              <span className="text-text-muted">
+                {Math.round(todayMacros.proteinG)}g / {macroGoals?.proteinG || proteinTargetG}g ({Math.round((todayMacros.proteinG / (macroGoals?.proteinG || proteinTargetG)) * 100)}%)
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-emerald-400 transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, (todayMacros.proteinG / (macroGoals?.proteinG || proteinTargetG)) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Carbs Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-2xs font-mono">
+              <span className="font-semibold text-text-primary">Carbohydrates</span>
+              <span className="text-text-muted">
+                {Math.round(todayMacros.carbsG)}g / {macroGoals?.carbsG || 220}g ({Math.round((todayMacros.carbsG / (macroGoals?.carbsG || 220)) * 100)}%)
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-sky-400 transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, (todayMacros.carbsG / (macroGoals?.carbsG || 220)) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Fat Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-2xs font-mono">
+              <span className="font-semibold text-text-primary">Dietary Fat</span>
+              <span className="text-text-muted">
+                {Math.round(todayMacros.fatG)}g / {macroGoals?.fatG || 70}g ({Math.round((todayMacros.fatG / (macroGoals?.fatG || 70)) * 100)}%)
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-amber-400 transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, (todayMacros.fatG / (macroGoals?.fatG || 70)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  )}
 
       {/* ══════════════════ LOG MEAL MODAL ══════════════════ */}
       {isModalOpen && (

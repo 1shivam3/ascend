@@ -2092,51 +2092,57 @@ export default function ActiveWorkoutScreen({
             ) : (
               /* The One Set Focus Card */
               <div className="card p-5 sm:p-6 bg-bg-card border border-border/80 shadow-md space-y-6 animate-fade-in">
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Weight Stepper */}
-                  <div className="text-center space-y-2">
-                    <span className="text-xs font-medium text-text-muted">
+                <div className="space-y-4">
+                  {/* Weight Stepper Row (Reference: Screen 12 & Screen 6) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
+                    <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
                       {isCurrentBodyweight ? `Added Weight (${userUnit})` : isCurrentDumbbell ? `Weight / DB (${userUnit})` : `Weight (${userUnit})`}
                     </span>
-                    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <div className="w-full flex items-center justify-between px-2">
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, -currentWeightStep)}
                         aria-label="Decrease weight"
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-2xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-xs"
                       >
                         -
                       </button>
+
                       <div className="flex flex-col items-center">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          aria-label={isCurrentBodyweight ? `Added weight in ${userUnit}` : `Weight in ${userUnit}`}
-                          value={weightInputStr !== null ? weightInputStr : (currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '')}
-                          placeholder={isCurrentBodyweight ? '0 (BW)' : (currentExercise.sets[activeSetIdx]?.prescribedWeight !== undefined ? String(currentExercise.sets[activeSetIdx].prescribedWeight) : '—')}
-                          onFocus={(e) => {
-                            setWeightInputStr(currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '');
-                            e.target.select();
-                          }}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                              setWeightInputStr(val);
-                              handleSetWeightChange(activeSetIdx, val);
-                            }
-                          }}
-                          onBlur={() => {
-                            setWeightInputStr(null);
-                          }}
-                          className="w-28 sm:w-32 px-1 py-0.5 text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent tabular-nums tracking-tight"
-                        />
+                        <div className="flex items-baseline justify-center gap-1.5">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            aria-label={isCurrentBodyweight ? `Added weight in ${userUnit}` : `Weight in ${userUnit}`}
+                            value={weightInputStr !== null ? weightInputStr : (currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '')}
+                            placeholder={isCurrentBodyweight ? '0' : (currentExercise.sets[activeSetIdx]?.prescribedWeight !== undefined ? String(currentExercise.sets[activeSetIdx].prescribedWeight) : '—')}
+                            onFocus={(e) => {
+                              setWeightInputStr(currentExercise.sets[activeSetIdx]?.weight !== undefined ? String(currentExercise.sets[activeSetIdx].weight) : '');
+                              e.target.select();
+                            }}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                setWeightInputStr(val);
+                                handleSetWeightChange(activeSetIdx, val);
+                              }
+                            }}
+                            onBlur={() => {
+                              setWeightInputStr(null);
+                            }}
+                            className="w-32 px-1 text-center font-sans font-black text-4xl sm:text-5xl text-text-primary bg-transparent outline-none border-none tabular-nums tracking-tight"
+                          />
+                          <span className="text-sm sm:text-base font-bold text-text-muted">
+                            {isCurrentBodyweight ? 'BW' : userUnit}
+                          </span>
+                        </div>
                         {isCurrentBodyweight && (
                           <span className="text-3xs text-accent font-semibold mt-0.5">
                             {currentExercise.sets[activeSetIdx]?.weight === undefined || currentExercise.sets[activeSetIdx]?.weight === 0 ? 'Bodyweight' : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
                           </span>
                         )}
                         {isCurrentDumbbell && (
-                          <span className="text-[10px] font-mono font-medium text-amber-500/90 mt-0.5" title="Weight per dumbbell">
+                          <span className="text-2xs font-mono font-medium text-amber-500/90 mt-0.5" title="Weight per dumbbell">
                             (per dumbbell)
                           </span>
                         )}
@@ -2145,32 +2151,33 @@ export default function ActiveWorkoutScreen({
                             const w = parseFloat(String(currentExercise.sets[activeSetIdx]?.weight)) || 0;
                             const plates = getPlateSummary(w, userUnit);
                             return plates ? (
-                              <span className="text-[10px] font-mono font-medium text-accent/90 mt-0.5" title={plates}>
+                              <span className="text-2xs font-mono font-medium text-accent/90 mt-0.5" title={plates}>
                                 [{plates}]
                               </span>
                             ) : null;
                           })()
                         )}
                       </div>
+
                       <button
                         type="button"
                         onClick={() => handleWeightStep(activeSetIdx, currentWeightStep)}
                         aria-label="Increase weight"
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-2xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-xs"
                       >
                         +
                       </button>
                     </div>
 
                     {/* Quick increment chips */}
-                    <div className="flex items-center justify-center gap-1 pt-1">
+                    <div className="flex items-center justify-center gap-1.5 pt-1">
                       {[-5, -2.5, 2.5, 5].map((delta) => (
                         <button
                           key={delta}
                           type="button"
                           onClick={() => handleWeightStep(activeSetIdx, delta)}
                           aria-label={`Adjust weight by ${delta > 0 ? `+${delta}` : delta} ${userUnit}`}
-                          className="px-2 py-1 min-h-[36px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+                          className="px-2.5 py-1 min-h-[32px] rounded-lg bg-bg-card hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
                         >
                           {delta > 0 ? `+${delta}` : delta}
                         </button>
@@ -2178,39 +2185,42 @@ export default function ActiveWorkoutScreen({
                     </div>
                   </div>
 
-                  {/* Reps Stepper */}
-                  <div className="text-center space-y-2">
-                    <span className="text-xs font-medium text-text-muted">
+                  {/* Reps Stepper Row (Reference: Screen 12 & Screen 6) */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-bg-secondary/40 border border-border/70 flex flex-col items-center gap-2">
+                    <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
                       Reps
                     </span>
-                    <div className="flex items-center justify-center gap-1.5 sm:gap-2">
+                    <div className="w-full flex items-center justify-between px-2">
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, -1)}
                         aria-label="Decrease reps"
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-2xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-xs"
                       >
                         -
                       </button>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        aria-label="Reps"
-                        value={currentExercise.sets[activeSetIdx]?.reps ?? ''}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (val === '' || /^\d*$/.test(val)) {
-                            handleSetRepsChange(activeSetIdx, val);
-                          }
-                        }}
-                        className="w-24 sm:w-28 px-1 py-0.5 text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b-2 border-border focus:border-accent tabular-nums tracking-tight"
-                      />
+                      <div className="flex items-baseline justify-center gap-1.5">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          aria-label="Reps"
+                          value={currentExercise.sets[activeSetIdx]?.reps ?? ''}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d*$/.test(val)) {
+                              handleSetRepsChange(activeSetIdx, val);
+                            }
+                          }}
+                          className="w-24 px-1 text-center font-sans font-black text-4xl sm:text-5xl text-text-primary bg-transparent outline-none border-none tabular-nums tracking-tight"
+                        />
+                        <span className="text-sm sm:text-base font-bold text-text-muted">reps</span>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRepsStep(activeSetIdx, 1)}
                         aria-label="Increase reps"
-                        className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border font-bold text-lg flex items-center justify-center active:scale-90 transition-transform cursor-pointer"
+                        className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-2xl flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-xs"
                       >
                         +
                       </button>

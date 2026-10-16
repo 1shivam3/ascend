@@ -3,35 +3,35 @@
 @tailwind utilities;
 
 :root {
-  /* Chalk (Light) — Calm Warm Paper Logbook Palette */
-  --bg-primary: 246 244 239;      /* #F6F4EF */
-  --bg-secondary: 237 234 227;    /* #EDEAE3 --sunken */
-  --bg-tertiary: 217 212 201;     /* #D9D4C9 */
-  --bg-card: 255 255 255;         /* #FFFFFF --surface */
+  /* Chalk (Light) — Warm Luxury Gallery Paper Logbook */
+  --bg-primary: 248 247 244;      /* #F8F7F4 warm luxury chalk */
+  --bg-secondary: 240 238 233;    /* #F0EEE9 sunken container */
+  --bg-tertiary: 230 227 220;     /* #E6E3DC */
+  --bg-card: 255 255 255;         /* #FFFFFF pure crisp white surface */
   --bg-elevated: 255 255 255;     /* #FFFFFF */
-  --text-primary: 26 24 21;       /* #1A1815 */
-  --text-secondary: 88 83 74;     /* #58534A */
-  --text-muted: 110 104 93;       /* #6E685D */
-  --border: 217 212 201;          /* #D9D4C9 hairline */
-  --border-subtle: 237 234 227;   /* #EDEAE3 */
-  --border-hover: 140 134 121;    /* #8C8679 control border (3.3:1) */
-  --accent: 201 60 26;            /* #C93C1A — Vermilion action */
-  --accent-dim: 168 48 15;        /* #A8300F */
-  --accent-glow: rgba(201, 60, 26, 0.12);
+  --text-primary: 23 25 22;       /* #171916 deep graphite text */
+  --text-secondary: 92 96 90;     /* #5C605A refined body text */
+  --text-muted: 130 134 128;      /* #828680 muted meta */
+  --border: 228 225 218;          /* #E4E1DA hairline subtle border */
+  --border-subtle: 238 236 230;   /* #EEECE6 */
+  --border-hover: 160 156 148;    /* #A09C94 */
+  --accent: 196 68 39;            /* #C44427 — Vermilion from reference image 1 */
+  --accent-dim: 166 54 29;        /* #A6361D */
+  --accent-glow: rgba(196, 68, 39, 0.12);
 
   /* Direct CSS Specification Tokens */
-  --bg: #F6F4EF;
+  --bg: #F8F7F4;
   --surface: #FFFFFF;
-  --sunken: #EDEAE3;
-  --border-hex: #D9D4C9;
-  --border-control: #8C8679;
-  --text: #1A1815;
-  --text-2: #58534A;
-  --text-3: #6E685D;
-  --accent-hex: #C93C1A;
+  --sunken: #F0EEE9;
+  --border-hex: #E4E1DA;
+  --border-control: #A09C94;
+  --text: #171916;
+  --text-2: #5C605A;
+  --text-3: #828680;
+  --accent-hex: #C44427;
   --accent-on: #FFFFFF;
-  --accent-subtle: #FBEAE4;
-  --accent-text: #A8300F;
+  --accent-subtle: #FDF0EC;
+  --accent-text: #A6361D;
   --success: #1B6E45;
   --success-bg: #E3F1E9;
   --warning: #8A5A00;
@@ -39,50 +39,50 @@
   --danger: #B42318;
   --danger-bg: #FDE8E6;
   --scrim: rgba(18, 17, 16, 0.5);
-  --inverse: #1A1815;
-  --inverse-text: #F6F4EF;
+  --inverse: #171916;
+  --inverse-text: #F8F7F4;
 }
 
 .dark,
 :root[data-theme='dark'] {
-  /* Iron (Dark) — Deep Titanium Slate Logbook Palette */
-  --bg-primary: 18 17 16;         /* #121110 */
-  --bg-secondary: 12 11 10;       /* #0C0B0A --sunken */
-  --bg-tertiary: 27 26 24;        /* #1B1A18 */
-  --bg-card: 27 26 24;            /* #1B1A18 --surface */
-  --bg-elevated: 27 26 24;        /* #1B1A18 */
-  --text-primary: 242 239 233;    /* #F2EFE9 */
-  --text-secondary: 182 176 164;  /* #B6B0A4 */
-  --text-muted: 143 137 124;      /* #8F897C */
-  --border: 52 49 45;             /* #34312D hairline */
-  --border-subtle: 35 33 30;
-  --border-hover: 107 101 91;     /* #6B655B control border */
-  --accent: 255 122 89;           /* #FF7A59 — Athletic Vermilion action */
-  --accent-dim: 255 156 130;      /* #FF9C82 */
-  --accent-glow: rgba(255, 122, 89, 0.12);
+  /* Iron (Dark) — Deep Titanium Slate & Obsidian */
+  --bg-primary: 15 16 15;         /* #0F100F rich velvety graphite */
+  --bg-secondary: 23 25 23;       /* #171917 sunken */
+  --bg-tertiary: 32 35 32;        /* #202320 */
+  --bg-card: 23 25 23;            /* #171917 surface card */
+  --bg-elevated: 28 31 28;        /* #1C1F1C elevated */
+  --text-primary: 245 245 243;    /* #F5F5F3 crisp white text */
+  --text-secondary: 168 172 165;  /* #A8ACA5 secondary text */
+  --text-muted: 115 120 113;      /* #737871 muted meta */
+  --border: 38 41 38;             /* #262926 hairline border */
+  --border-subtle: 28 31 28;
+  --border-hover: 70 75 70;
+  --accent: 255 107 74;           /* #FF6B4A athletic vermilion */
+  --accent-dim: 226 82 50;        /* #E25232 */
+  --accent-glow: rgba(255, 107, 74, 0.15);
 
   /* Direct CSS Specification Tokens */
-  --bg: #121110;
-  --surface: #1B1A18;
-  --sunken: #0C0B0A;
-  --border-hex: #34312D;
-  --border-control: #6B655B;
-  --text: #F2EFE9;
-  --text-2: #B6B0A4;
-  --text-3: #8F897C;
-  --accent-hex: #FF7A59;
-  --accent-on: #1A0B06;
-  --accent-subtle: #33180F;
-  --accent-text: #FF9C82;
-  --success: #4CC38A;
+  --bg: #0F100F;
+  --surface: #171917;
+  --sunken: #121312;
+  --border-hex: #262926;
+  --border-control: #464B46;
+  --text: #F5F5F3;
+  --text-2: #A8ACA5;
+  --text-3: #737871;
+  --accent-hex: #FF6B4A;
+  --accent-on: #0F100F;
+  --accent-subtle: #2A140F;
+  --accent-text: #FF886E;
+  --success: #34D399;
   --success-bg: #12281D;
-  --warning: #E3B23C;
+  --warning: #FBBF24;
   --warning-bg: #2B2210;
-  --danger: #FF8A80;
+  --danger: #F87171;
   --danger-bg: #3A1714;
   --scrim: rgba(0, 0, 0, 0.65);
-  --inverse: #F2EFE9;
-  --inverse-text: #121110;
+  --inverse: #F5F5F3;
+  --inverse-text: #0F100F;
 }
 
 @layer base {
@@ -235,6 +235,28 @@
     @apply border border-border shadow-2xl;
     @apply animate-slide-up;
     @apply pb-[max(env(safe-area-inset-bottom),1.25rem)];
+  }
+
+  /* Segmented Pill Switcher (Matches Mockup Reference Images) */
+  .segmented-control {
+    @apply flex items-center p-1 rounded-xl bg-bg-secondary border border-border/70 gap-1;
+  }
+
+  .segmented-item {
+    @apply flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none;
+  }
+
+  .segmented-item.active {
+    @apply bg-bg-card text-text-primary shadow-xs;
+  }
+
+  .segmented-item:not(.active) {
+    @apply text-text-muted hover:text-text-primary;
+  }
+
+  /* Large Circular Stepper Button (For Active Workout HUD) */
+  .stepper-btn {
+    @apply w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-xl sm:text-2xl flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-xs select-none;
   }
 }
 
