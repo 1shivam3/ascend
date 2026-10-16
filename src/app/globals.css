@@ -47,7 +47,9 @@
   html {
     @apply antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    touch-action: manipulation;
+    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
@@ -57,13 +59,22 @@
     -moz-osx-font-smoothing: grayscale;
     min-height: 100vh;
     min-height: 100dvh;
+    touch-action: pan-x pan-y;
   }
 
+  /* Prevent mobile browsers (especially iOS Safari) from auto-zooming on input focus */
   input, textarea, select {
-    @apply bg-bg-elevated text-text-primary border border-border rounded-xl px-3 py-2.5 text-base sm:text-sm;
+    @apply bg-bg-elevated text-text-primary border border-border rounded-xl px-3 py-2.5;
     @apply outline-none transition-colors duration-150;
     @apply placeholder:text-text-muted;
     @apply focus:border-accent focus:ring-1 focus:ring-accent;
+    font-size: 16px !important; /* Critical: < 16px triggers iOS/Android auto-zoom on focus */
+  }
+
+  @screen sm {
+    input, textarea, select {
+      font-size: 0.875rem !important; /* 14px on desktop/tablets */
+    }
   }
 
   select {
