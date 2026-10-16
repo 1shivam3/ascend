@@ -124,7 +124,17 @@ export function getDaysSinceLastWorkout(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
-  const lastDate = new Date(sorted[0].date);
+  // Parse the date string as a LOCAL date, not UTC. A string like "2026-10-15"
+  // would be interpreted as UTC midnight by `new Date("2026-10-15")`, but the
+  // workout was logged in local time. Using local timezone parsing ensures
+  // the day-diff calculation is consistent with how dates are stored.
+  const lastDateStr = sorted[0].date;
+  const parts = lastDateStr.split('-');
+  const lastDate =
+    parts.length === 3
+      ? new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+      : new Date(lastDateStr);
+
   const diffMs = targetDate.getTime() - lastDate.getTime();
   const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   return Math.max(0, days);

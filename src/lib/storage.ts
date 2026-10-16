@@ -3,6 +3,18 @@ import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry } from './types';
 const PREFIX = 'ascend_';
 
 export function generateId(): string {
+  // Use the Web Crypto API for cryptographically strong IDs when available,
+  // falling back to Math.random only in constrained environments.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    let hex = '';
+    for (let i = 0; i < 16; i++) hex += bytes[i].toString(16).padStart(2, '0');
+    return hex;
+  }
   return Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
 }
 

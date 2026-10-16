@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { FoodItem } from '@/lib/types';
 
@@ -14,11 +14,20 @@ interface ParseMealRequestBody {
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 25 requests per minute per client IP
-  const rateLimit = checkRateLimit(req, {
-    windowMs: 60 * 1000,
-    maxRequests: 25,
-    keyPrefix: 'ai-parse-meal',
-  });
+  let rateLimit;
+  try {
+    rateLimit = await checkRateLimit(req, {
+      windowMs: 60 * 1000,
+      maxRequests: 25,
+      keyPrefix: 'ai-parse-meal',
+      failClosed: true,
+    });
+  } catch (err) {
+    if (err instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
+    throw err;
+  }
 
   if (!rateLimit.success) {
     return rateLimitResponse(rateLimit.resetMs);
@@ -57,10 +66,10 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
     const candidateModels = [
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-flash-latest',
-      'gemini-3.8-flash',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
+      'gemini-2.0-flash-lite',
     ];
 
     const systemPrompt = `You are ASCEND's precision Sports Nutritionist and Indian Food Database parser.

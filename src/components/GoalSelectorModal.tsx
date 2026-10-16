@@ -69,13 +69,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
       });
     }
     setTrainingProfile({
-      goal: primaryGoal === 'get_stronger'
-        ? 'strength'
-        : primaryGoal === 'build_muscle'
-        ? 'muscle_gain'
-        : primaryGoal === 'lose_fat'
-        ? 'fat_loss'
-        : 'general_fitness',
+      goal: primaryGoal,
     });
 
     if (recalcMacros && profile?.bodyweightKg) {

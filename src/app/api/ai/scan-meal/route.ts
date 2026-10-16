@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { MealAnalysisResult } from '@/lib/types';
-
-import { checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
+import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 
@@ -24,16 +23,24 @@ interface ScanMealRequestBody {
   mimeType?: string;
   userNotes?: string;
   hiddenIngredients?: string[];
-  customApiKey?: string;
 }
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 20 meal scans per minute per client IP
-  const rateLimit = checkRateLimit(req, {
-    windowMs: 60 * 1000,
-    maxRequests: 20,
-    keyPrefix: 'ai-scan-meal',
-  });
+  let rateLimit;
+  try {
+    rateLimit = await checkRateLimit(req, {
+      windowMs: 60 * 1000,
+      maxRequests: 20,
+      keyPrefix: 'ai-scan-meal',
+      failClosed: true,
+    });
+  } catch (err) {
+    if (err instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
+    throw err;
+  }
 
   if (!rateLimit.success) {
     return rateLimitResponse(rateLimit.resetMs);
@@ -127,10 +134,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const customHeaderKey = req.headers.get('x-gemini-api-key')?.trim();
-    const apiKey =
-      getServerGeminiApiKey() ||
-      (customHeaderKey && customHeaderKey.length > 5 ? customHeaderKey : undefined);
+    // Use ONLY the server-side env-configured API key — never accept keys from the client.
+    const apiKey = getServerGeminiApiKey();
 
     if (!apiKey) {
       return NextResponse.json(
@@ -236,10 +241,10 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 }`;
 
     const candidateModels = [
-      'gemini-3.5-flash-lite',
-      'gemini-3.5-flash',
-      'gemini-2.5-flash',
-      'gemini-flash-latest',
+      'gemini-1.5-flash',
+      'gemini-2.0-flash',
+      'gemini-1.5-pro',
+      'gemini-2.0-flash-lite',
     ];
 
     let lastError: any = null;

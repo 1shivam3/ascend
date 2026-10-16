@@ -24,6 +24,27 @@ export interface DueReminder {
  * NEVER parses a localized date string back into a JavaScript Date.
  * Falls back safely to UTC if timezone is invalid or unparseable.
  */
+/**
+ * Computes the day of the week (0=Sun … 6=Sat) for a given year/month/day
+ * using Zeller's congruence. This is locale-independent and avoids the
+ * fragility of parsing Intl short weekday names which can vary by ICU data.
+ */
+function dayOfWeekFromYmd(year: number, month: number, day: number): number {
+  // Zeller's congruence: month is 1-12, but Jan/Feb are treated as months 13/14 of the prior year
+  let m = month;
+  let y = year;
+  if (m < 3) {
+    m += 12;
+    y -= 1;
+  }
+  const k = y % 100;
+  const j = Math.floor(y / 100);
+  const dow = (day + Math.floor((13 * (m + 1)) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) - 2 * j) % 7;
+  // Zeller's returns 0=Saturday, 1=Sunday, ..., 6=Friday.
+  // Convert to standard 0=Sunday, 1=Monday, ..., 6=Saturday.
+  return (dow + 6) % 7;
+}
+
 export function getZonedTime(date: Date, timeZone?: string | null): ZonedTime {
   let resolvedTz = (timeZone || '').trim() || 'UTC';
   try {
@@ -65,7 +86,11 @@ export function getZonedTime(date: Date, timeZone?: string | null): ZonedTime {
     Fri: 5,
     Sat: 6,
   };
-  const dayOfWeek = weekdayMap[mapping.weekday] ?? date.getUTCDay();
+  // Use a locale-independent calculation as the authoritative source.
+  // The Intl short weekday name can vary by ICU data availability in some runtimes;
+  // computing from the resolved year/month/day components is always correct for
+  // the given timezone.
+  const dayOfWeek = dayOfWeekFromYmd(year, month, day);
   const mm = String(month).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   const dateString = `${year}-${mm}-${dd}`;

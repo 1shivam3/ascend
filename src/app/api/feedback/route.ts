@@ -35,7 +35,7 @@ function getSupabaseServerClient() {
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 10 feedback requests per 10 minutes per IP
-  const rateLimit = checkRateLimit(req, {
+  const rateLimit = await checkRateLimit(req, {
     windowMs: 10 * 60 * 1000,
     maxRequests: 10,
     keyPrefix: 'user-feedback',

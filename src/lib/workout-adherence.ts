@@ -18,6 +18,7 @@ export const KG_TO_LBS = 2.20462;
  * Normalizes any weight value to kilograms.
  */
 export function normalizeWeightToKg(weight: number, unit: Unit): number {
+  if (weight < 0) return 0; // Guard against negative weights (0 is valid for bodyweight)
   if (unit === 'lbs') {
     return weight * LBS_TO_KG;
   }

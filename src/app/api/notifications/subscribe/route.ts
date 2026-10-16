@@ -19,7 +19,7 @@ function getSupabaseServerClient() {
 }
 
 export async function POST(req: Request) {
-  const rateLimit = checkRateLimit(req, {
+  const rateLimit = await checkRateLimit(req, {
     windowMs: 60 * 1000,
     maxRequests: 30,
     keyPrefix: 'push-sub',

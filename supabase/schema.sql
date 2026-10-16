@@ -339,3 +339,123 @@ DO $$ BEGIN
     REVOKE EXECUTE ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
   END IF;
 END $$;
+
+-- ==============================================================================
+-- API RATE LIMITING (Distributed, cross-serverless-instance)
+-- ==============================================================================
+-- Table: public.api_rate_limits
+--   Stores a single row per (key, window_start) so multiple serverless
+--   invocations share the same counter instead of relying on in-process memory.
+CREATE TABLE IF NOT EXISTS public.api_rate_limits (
+  key        TEXT NOT NULL,
+  window_ms  BIGINT NOT NULL,
+  count      INTEGER NOT NULL DEFAULT 0,
+  reset_at   TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (key, window_ms)
+);
+
+-- Indexes for efficient lookup and cleanup
+CREATE INDEX IF NOT EXISTS idx_api_rate_limits_key ON public.api_rate_limits (key);
+CREATE INDEX IF NOT EXISTS idx_api_rate_limits_reset ON public.api_rate_limits (reset_at);
+
+-- Stored Procedure: ascend_check_rate_limit
+-- Atomically increments the rate limit counter for a given key within a sliding
+-- window. Returns a JSON object with: allowed, count, reset_ms.
+-- Uses INSERT ... ON CONFLICT to ensure atomicity within a single transaction.
+CREATE OR REPLACE FUNCTION public.ascend_check_rate_limit(
+  p_key           TEXT,
+  p_window_ms     BIGINT,
+  p_max_requests  INTEGER
+)
+RETURNS TABLE (
+  allowed   BOOLEAN,
+  count     INTEGER,
+  reset_ms  BIGINT
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_now_ms     BIGINT := EXTRACT(EPOCH FROM now()) * 1000;
+  v_window_ms  BIGINT := p_window_ms;
+  v_count      INTEGER;
+  v_reset_ms   BIGINT := v_now_ms + v_window_ms;
+  v_allowed    BOOLEAN;
+BEGIN
+  -- Insert or update the rate limit row atomically
+  INSERT INTO public.api_rate_limits (key, window_ms, count, reset_at)
+  VALUES (p_key, v_window_ms, 1, to_timestamp(v_reset_ms / 1000))
+  ON CONFLICT (key, window_ms) DO UPDATE
+    SET count = CASE
+                  WHEN api_rate_limits.reset_at < now() THEN 1  -- window expired, reset
+                  ELSE api_rate_limits.count + 1
+                END,
+        reset_at = CASE
+                     WHEN api_rate_limits.reset_at < now()
+                     THEN to_timestamp(v_reset_ms / 1000)
+                     ELSE api_rate_limits.reset_at
+                   END
+  RETURNING api_rate_limits.count INTO v_count;
+
+  v_allowed := v_count <= p_max_requests;
+
+  IF v_allowed THEN
+    v_reset_ms := EXTRACT(EPOCH FROM (
+      (SELECT reset_at FROM public.api_rate_limits WHERE key = p_key AND window_ms = v_window_ms)
+    )) * 1000;
+  ELSE
+    v_reset_ms := EXTRACT(EPOCH FROM (
+      (SELECT reset_at FROM public.api_rate_limits WHERE key = p_key AND window_ms = v_window_ms)
+    )) * 1000;
+  END IF;
+
+  RETURN QUERY SELECT v_allowed, v_count, GREATEST(0, v_reset_ms - v_now_ms);
+END;
+$$;
+
+-- Only authenticated/anon roles need to call this; revoke from PUBLIC for safety
+REVOKE ALL ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) TO anon, authenticated, service_role;
+
+-- 15. Consumed Deletion Nonces Table (Durable Account Deletion Ledger)
+-- Prevents replay attacks across multiple serverless function instances and restarts.
+-- Supports tracking partial deletion recovery states.
+CREATE TABLE IF NOT EXISTS public.consumed_deletion_nonces (
+  jti         TEXT PRIMARY KEY,
+  user_id     UUID,
+  email       TEXT, -- Nullable to allow anonymizing personal identifiers upon complete deletion
+  status      TEXT NOT NULL DEFAULT 'consumed', -- 'consumed' | 'partial'
+  consumed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at  TIMESTAMPTZ NOT NULL
+);
+
+-- Index by expiry for cleanup
+CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_exp
+  ON public.consumed_deletion_nonces (expires_at);
+
+-- Index by email for lookup during recovery requests
+CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_email
+  ON public.consumed_deletion_nonces (email);
+
+-- Enable RLS: only service role can access this table
+ALTER TABLE public.consumed_deletion_nonces ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access to consumed_deletion_nonces"
+  ON public.consumed_deletion_nonces
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
+
+-- Retention policy: Purge nonces 48 hours after expiration (audit window buffer)
+CREATE OR REPLACE FUNCTION public.cleanup_expired_deletion_nonces()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  DELETE FROM public.consumed_deletion_nonces
+  WHERE expires_at < now() - INTERVAL '48 hours';
+END;
+$$;

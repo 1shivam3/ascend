@@ -24,7 +24,10 @@ export function redactSecrets(message: string): string {
   if (!message) return '';
   return message
     .replace(/AIzaSy[A-Za-z0-9_-]{33}/g, '[REDACTED_API_KEY]')
+    .replace(/re_[A-Za-z0-9_-]+/g, '[REDACTED_API_KEY]')
+    .replace(/eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+/g, '[REDACTED_JWT]')
     .replace(/((?:api_?key|key|token|secret|password)\s*[:=]\s*)["']?[A-Za-z0-9_.-]+["']?/gi, '$1[REDACTED]')
+    .replace(/del_[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, '[REDACTED_TOKEN]')
     .replace(/bearer\s+[A-Za-z0-9_.-]+/gi, 'Bearer [REDACTED]');
 }
 
@@ -45,5 +48,21 @@ export function rateLimitResponse(resetMs: number): NextResponse {
         'X-RateLimit-Reset': String(Math.ceil((Date.now() + resetMs) / 1000)),
       },
     }
+  );
+}
+
+/**
+ * Returns a 503 Service Unavailable response when the rate limiter
+ * infrastructure is unavailable. This is used for fail-closed behavior
+ * on expensive operations to prevent uncontrolled backend costs.
+ */
+export function rateLimitUnavailableResponse(): NextResponse {
+  return NextResponse.json(
+    {
+      error: 'SERVICE_UNAVAILABLE',
+      message:
+        'Rate limiting service is temporarily unavailable. Please try again later.',
+    },
+    { status: 503 }
   );
 }

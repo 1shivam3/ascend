@@ -5,7 +5,7 @@ import { getVolumeComparison, getConsecutiveWorkoutDays, getDaysSinceLastWorkout
 import { isBodyweightExercise } from './strength-standards';
 
 export const DEFAULT_AI_TRAINING_PROFILE: AITrainingProfile = {
-  goal: 'muscle_gain',
+  goal: 'build_muscle',
   experience: 'intermediate',
   daysPerWeek: 4,
   preferredDurationMin: 55,

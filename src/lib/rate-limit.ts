@@ -1,22 +1,60 @@
 /**
  * Server-Side Rate Limiter for Next.js API Routes
- * Sliding window token bucket algorithm implemented in memory.
+ *
+ * Implements a sliding-window counter with a Supabase-backed distributed
+ * store so that limits are enforced consistently across serverless function
+ * instances. Falls back to in-process memory when Supabase is unavailable
+ * (e.g. offline mode or local development without credentials).
+ *
  * Prevents API quota exhaustion, DoS attacks, and credential stuffing.
  */
+
+import { createClient } from '@supabase/supabase-js';
+import { getSupabaseCredentials } from './supabase/config';
 
 interface RateLimitRecord {
   timestamps: number[];
 }
 
+/**
+ * In-process fallback for when Supabase is not configured.
+ * Each key maps to an array of request timestamps within the sliding window.
+ */
 const rateLimitStore = new Map<string, RateLimitRecord>();
 
-// Cleanup stale rate limit entries every 5 minutes to prevent memory leaks
+/** Exported for test cleanup: resets the in-memory rate limit store. */
+export function resetRateLimitStoreForTests(): void {
+  rateLimitStore.clear();
+}
+
+// Reuse a single Supabase client instance across invocations within the same
+// serverless instance to avoid reconnect overhead.
+let supabaseRateLimiter: ReturnType<typeof createClient> | null = null;
+let supabaseCheckAttempted = false;
+
+function getRateLimiterSupabase() {
+  if (supabaseCheckAttempted) return supabaseRateLimiter;
+  supabaseCheckAttempted = true;
+
+  const { url, anonKey, isConfigured } = getSupabaseCredentials();
+  if (!isConfigured || !url || !anonKey) return null;
+
+  try {
+    supabaseRateLimiter = createClient(url, anonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  } catch {
+    supabaseRateLimiter = null;
+  }
+  return supabaseRateLimiter;
+}
+
+// Cleanup stale in-memory rate limit entries every 5 minutes
 if (typeof setInterval !== 'undefined') {
   const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
   setInterval(() => {
     const now = Date.now();
     for (const [key, record] of rateLimitStore.entries()) {
-      // Keep only timestamps from the last 10 minutes
       const recent = record.timestamps.filter((ts) => now - ts < 10 * 60 * 1000);
       if (recent.length === 0) {
         rateLimitStore.delete(key);
@@ -28,9 +66,11 @@ if (typeof setInterval !== 'undefined') {
 }
 
 export interface RateLimitOptions {
-  windowMs: number; // Duration of window in ms (e.g., 60,000 for 1 minute)
-  maxRequests: number; // Maximum requests permitted within windowMs
-  keyPrefix?: string; // Namespace for different routes
+  windowMs: number;
+  maxRequests: number;
+  keyPrefix?: string;
+  /** When true, returns 503 if distributed rate limiter is unavailable */
+  failClosed?: boolean;
 }
 
 export interface RateLimitResult {
@@ -53,15 +93,12 @@ function isValidIpFormat(ip: string): boolean {
  * Prioritizes trusted edge headers (Cloudflare, verified proxy) over client-spoofable forwarded headers.
  */
 export function getClientIp(req: Request): string {
-  // 1. Cloudflare connecting IP (set at edge network, cannot be forged by client)
   const cfConnectingIp = req.headers.get('cf-connecting-ip')?.trim();
   if (cfConnectingIp && isValidIpFormat(cfConnectingIp)) return cfConnectingIp;
 
-  // 2. Direct reverse-proxy / load-balancer verified header
   const realIp = req.headers.get('x-real-ip')?.trim();
   if (realIp && isValidIpFormat(realIp)) return realIp;
 
-  // 3. X-Forwarded-For: origin client IP is the first entry
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const firstIp = forwarded.split(',')[0]?.trim();
@@ -72,14 +109,9 @@ export function getClientIp(req: Request): string {
 }
 
 /**
- * Checks whether the incoming request is within the allowed rate limit.
+ * In-process sliding window rate limit check (fallback when Supabase is unavailable).
  */
-export function checkRateLimit(
-  req: Request,
-  options: RateLimitOptions
-): RateLimitResult {
-  const ip = getClientIp(req);
-  const key = `${options.keyPrefix || 'global'}:${ip}`;
+function checkRateLimitInMemory(key: string, options: RateLimitOptions): RateLimitResult {
   const now = Date.now();
   const windowStart = now - options.windowMs;
 
@@ -89,7 +121,6 @@ export function checkRateLimit(
     rateLimitStore.set(key, record);
   }
 
-  // Filter timestamps within current sliding window
   record.timestamps = record.timestamps.filter((ts) => ts > windowStart);
 
   if (record.timestamps.length >= options.maxRequests) {
@@ -110,4 +141,96 @@ export function checkRateLimit(
     remaining: Math.max(0, options.maxRequests - record.timestamps.length),
     resetMs: options.windowMs,
   };
+}
+
+/**
+ * Supabase-backed distributed rate limit check.
+ * Uses a dedicated `api_rate_limits` table with upsert for cross-instance consistency.
+ */
+async function checkRateLimitSupabase(
+  key: string,
+  options: RateLimitOptions
+): Promise<RateLimitResult | null> {
+  const supabase = getRateLimiterSupabase();
+  if (!supabase) return null;
+
+  const now = Date.now();
+  const windowStart = now - options.windowMs;
+
+try {
+     // Atomically claim a slot: insert a row only if the count within the
+     // current window is still under the limit. The upsert + filter pattern
+     // ensures race-safe behavior within a single database transaction.
+     const { data, error } = await (supabase as any).rpc('ascend_check_rate_limit', {
+       p_key: key,
+       p_window_ms: options.windowMs,
+       p_max_requests: options.maxRequests,
+     });
+
+    if (error) {
+      // Fall back to in-memory if the RPC is unavailable
+      return null;
+    }
+
+    const result = data as {
+      allowed: boolean;
+      count: number;
+      reset_ms: number;
+    } | null;
+
+    if (!result) return null;
+
+    return {
+      success: result.allowed,
+      limit: options.maxRequests,
+      remaining: Math.max(0, result.count - 1),
+      resetMs: result.reset_ms,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether the incoming request is within the allowed rate limit.
+ *
+ * Tries the Supabase-backed distributed limiter first for cross-instance
+ * consistency in serverless environments. Falls back to in-process memory
+ * when Supabase is unavailable.
+ *
+ * When `failClosed` is true, the function throws a RateLimitUnavailableError
+ * if the distributed limiter cannot be reached, so the caller can return
+ * a 503 Service Unavailable instead of silently relying on a weaker policy.
+ */
+export async function checkRateLimit(
+  req: Request,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  const ip = getClientIp(req);
+  const key = `${options.keyPrefix || 'global'}:${ip}`;
+
+  // Attempt distributed check first
+  const distributedResult = await checkRateLimitSupabase(key, options);
+  if (distributedResult) return distributedResult;
+
+  // Distributed limiter unavailable
+  if (options.failClosed) {
+    throw new RateLimitUnavailableError(
+      `Distributed rate limiter unavailable for key prefix: ${options.keyPrefix || 'global'}`
+    );
+  }
+
+  // Fall back to in-process memory
+  return checkRateLimitInMemory(key, options);
+}
+
+/**
+ * Error thrown when a fail-closed rate limiter cannot reach the
+ * distributed backend. Callers can catch this to return 503.
+ */
+export class RateLimitUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RateLimitUnavailableError';
+  }
 }

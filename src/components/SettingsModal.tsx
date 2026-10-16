@@ -282,10 +282,29 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           'Account Eradicated'
         );
       } else {
-        toast.info(
-          result.error || 'Cloud sync was offline, but all local device data was purged.',
-          'Data Purged'
-        );
+        // Distinguish between cloud failure and local-data-only scenarios
+        if (result.error?.includes('Cloud account deletion failed')) {
+          toast.error(
+            'Cloud account deletion failed. Your local device data remains intact. ' +
+              'See error details for support.',
+            'Deletion Failed'
+          );
+        } else if (result.error?.includes('Partial deletion')) {
+          toast.error(
+            'Partial deletion: Some cloud records could not be purged. Please contact support@ascendfit.app.',
+            'Partial Deletion'
+          );
+        } else if (result.error?.includes('Cloud deletion skipped')) {
+          toast.info(
+            'Cloud deletion was skipped (no Supabase config). All local device data was purged.',
+            'Data Purged Locally'
+          );
+        } else {
+          toast.info(
+            result.error || 'Cloud sync was offline, but all local device data was purged.',
+            'Data Purged'
+          );
+        }
         setShowDeleteAccountModal(false);
         onClose();
       }

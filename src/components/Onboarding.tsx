@@ -286,13 +286,7 @@ export default function OnboardingScreen() {
     const generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
 
     setTrainingProfile({
-      goal: primaryGoal === 'get_stronger'
-        ? 'strength'
-        : primaryGoal === 'build_muscle'
-        ? 'muscle_gain'
-        : primaryGoal === 'lose_fat'
-        ? 'fat_loss'
-        : 'general_fitness',
+      goal: primaryGoal,
       experience: 'beginner',
       daysPerWeek: daysPerWeek,
       preferredDurationMin: 45,

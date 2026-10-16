@@ -35,7 +35,7 @@ const nextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
+            "script-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://*.openfoodfacts.org https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms",
             "font-src 'self' data:",
@@ -46,6 +46,32 @@ const nextConfig = {
             "form-action 'self'",
             "base-uri 'self'",
           ].join('; '),
+        },
+      ],
+    },
+    {
+      source: '/delete-account',
+      headers: [
+        {
+          key: 'Referrer-Policy',
+          value: 'no-referrer',
+        },
+        {
+          key: 'Cache-Control',
+          value: 'no-store, no-cache, must-revalidate, private',
+        },
+      ],
+    },
+    {
+      source: '/api/auth/delete-account',
+      headers: [
+        {
+          key: 'Referrer-Policy',
+          value: 'no-referrer',
+        },
+        {
+          key: 'Cache-Control',
+          value: 'no-store, no-cache, must-revalidate, private',
         },
       ],
     },

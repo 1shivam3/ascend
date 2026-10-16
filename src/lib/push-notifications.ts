@@ -46,11 +46,17 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<PushSubs
     let subscription = await registration.pushManager.getSubscription();
 
     if (!subscription) {
-      const key =
+       const key =
         vapidPublicKey ||
-        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
-        // Fallback demo key for development/local testing
-        'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+
+      if (!key) {
+        return {
+          success: false,
+          error:
+            'Push notifications are not configured on this server. Please contact the app administrator.',
+        };
+      }
 
       const convertedKey = urlBase64ToUint8Array(key);
       subscription = await registration.pushManager.subscribe({

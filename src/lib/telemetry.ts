@@ -13,7 +13,7 @@ export const TELEMETRY_CONSENT_EVENT = 'ascend_telemetry_consent_changed';
  */
 export function getGaMeasurementId(): string | undefined {
   const envId = process.env.NEXT_PUBLIC_GA_ID?.trim();
-  return envId || 'G-DV7VT2H5LP';
+  return envId || (process.env.NODE_ENV !== 'production' ? 'G-DV7VT2H5LP' : undefined);
 }
 
 /**
@@ -21,7 +21,7 @@ export function getGaMeasurementId(): string | undefined {
  */
 export function getClarityProjectId(): string | undefined {
   const envId = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
-  return envId || 'ywdt5rqnzv';
+  return envId || (process.env.NODE_ENV !== 'production' ? 'ywdt5rqnzv' : undefined);
 }
 
 /**
@@ -38,7 +38,9 @@ export function getSentryLoaderUrl(): string | undefined {
       return `https://js.sentry-cdn.com/${match[1]}.min.js`;
     }
   }
-  return 'https://js.sentry-cdn.com/5943361d29069b1cc12e20ca7d6e2f90.min.js';
+  return process.env.NODE_ENV !== 'production'
+    ? 'https://js.sentry-cdn.com/5943361d29069b1cc12e20ca7d6e2f90.min.js'
+    : undefined;
 }
 
 /**

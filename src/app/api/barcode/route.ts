@@ -311,7 +311,7 @@ import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
 
 export async function GET(req: Request) {
   // 1. Rate limiting: 60 barcode lookups per minute per client IP
-  const rateLimit = checkRateLimit(req, {
+  const rateLimit = await checkRateLimit(req, {
     windowMs: 60 * 1000,
     maxRequests: 60,
     keyPrefix: 'barcode',

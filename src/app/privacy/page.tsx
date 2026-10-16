@@ -103,7 +103,7 @@ export default function PrivacyPage() {
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
             <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature. No background automated scraping occurs.</li>
             <li><strong>Zero Personal Identifiers Transmitted:</strong> We never transmit your personal contact details, email addresses, names, or device identifiers to AI providers. Only the specific anonymized training numbers or meal photo necessary to process your request is sent.</li>
-            <li><strong>Custom Gemini API Key Security:</strong> If you supply a custom Google Gemini API Key in Settings, that key is stored strictly on your local device in <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code>. It is never transmitted to, collected by, or stored on any ASCEND backend servers.</li>
+            <li><strong>Server-Side Key Management:</strong> All Google Gemini API keys are managed exclusively on ASCEND backend servers via secure environment variables. Client-supplied API keys are never accepted or processed, preventing key injection attacks.</li>
             <li><strong>In-App Content Reporting:</strong> In strict compliance with Google Play Store AI Policies, ASCEND provides an integrated in-app reporting button (flag icon) next to all AI outputs. Users can immediately report unsafe, inaccurate, or offensive responses, which suppresses the output locally and logs the report for safety reviews.</li>
           </ul>
         </section>

@@ -80,6 +80,11 @@ class SupabaseSyncEngine {
   private debounceTimer: any = null;
   private isSyncing = false;
   private initialized = false;
+  /**
+   * Tracks the in-flight sync promise so concurrent callers share a single
+   * network round-trip instead of racing against each other.
+   */
+  private pendingSyncPromise: Promise<void> | null = null;
 
   public subscribe(cb: SyncListener) {
     this.listeners.add(cb);
@@ -267,81 +272,106 @@ class SupabaseSyncEngine {
     }
   }
 
-  public async deleteAccount(): Promise<{ success: boolean; error?: string }> {
-    clearTimeout(this.debounceTimer);
-    this.isSyncing = false;
-    const supabase = getSupabase();
+   public async deleteAccount(): Promise<{ success: boolean; error?: string }> {
+     clearTimeout(this.debounceTimer);
+     this.isSyncing = false;
+     const supabase = getSupabase();
 
-    let apiError: string | undefined;
+     let apiError: string | undefined;
+     let cloudDeleted = false;
 
-    if (supabase) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (token) {
-          const res = await fetch('/api/auth/delete-account', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-          });
-          const json = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            apiError = json?.message || 'Server account deletion failed';
-          }
-        }
-      } catch (err: any) {
-        apiError = err?.message || 'Network error during account deletion';
-      }
+     if (supabase) {
+       try {
+         const { data: { session } } = await supabase.auth.getSession();
+         const token = session?.access_token;
+         if (token) {
+           const res = await fetch('/api/auth/delete-account', {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               Authorization: `Bearer ${token}`,
+             },
+           });
+           const json = await res.json().catch(() => ({}));
 
-      try {
-        await supabase.auth.signOut();
-      } catch {}
-    }
+           // Handle non-2xx responses
+           if (!res.ok) {
+             apiError = json?.message || 'Server account deletion failed';
+           } else if (res.status === 207) {
+             cloudDeleted = false;
+             apiError = json?.message || 'Partial deletion: Some cloud records could not be purged.';
+           } else {
+             // Parse the new response format
+             cloudDeleted = !!json.cloudDeleted;
+             if (!cloudDeleted && json.message?.includes('Cloud deletion skipped')) {
+               // In offline/dev mode, cloud deletion was intentionally skipped
+               // This is not an error from the sync engine's perspective
+               apiError = undefined;
+             } else if (!cloudDeleted) {
+               apiError = json?.message || 'Cloud account deletion failed';
+             }
+           }
+         }
+       } catch (err: any) {
+         apiError = err?.message || 'Network error during account deletion';
+       }
 
-    this.currentUser = null;
-    this.status = 'unconfigured';
-    this.notify();
+       try {
+         await supabase.auth.signOut();
+       } catch {}
+     }
 
-    // Comprehensive local wipe
-    if (typeof window !== 'undefined') {
-      try {
-        const keysToRemove = [
-          'ascend_store',
-          'ascend_profile',
-          'ascend_prs',
-          'ascend_workouts',
-          'ascend_meals',
-          'ascend_body_metrics',
-          'ascend_emergency_snapshot',
-          'ascend_planned_workouts',
-          'ascend_telemetry_consent',
-          'ascend_reminders',
-          'ascend_notification_prefs',
-        ];
-        keysToRemove.forEach((k) => localStorage.removeItem(k));
-        // Remove supabase tokens and any lingering ascend prefixes
-        const allKeys: string[] = [];
-        try {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k) allKeys.push(k);
-          }
-        } catch {}
-        allKeys.forEach((k) => {
-          if (k.startsWith('sb-') || k.startsWith('ascend_')) {
-            localStorage.removeItem(k);
-          }
-        });
-        localStorage.setItem('ascend_logged_out', 'true');
-      } catch {}
-    }
+     this.currentUser = null;
+     this.status = 'unconfigured';
+     this.notify();
 
-    useStore.getState().clearAllData();
+     // Comprehensive local wipe
+     let localWipeError: string | undefined;
+     if (typeof window !== 'undefined') {
+       try {
+         const keysToRemove = [
+           'ascend_store',
+           'ascend_profile',
+           'ascend_prs',
+           'ascend_workouts',
+           'ascend_meals',
+           'ascend_body_metrics',
+           'ascend_emergency_snapshot',
+           'ascend_planned_workouts',
+           'ascend_telemetry_consent',
+           'ascend_reminders',
+           'ascend_notification_prefs',
+         ];
+         keysToRemove.forEach((k) => localStorage.removeItem(k));
+         // Remove supabase tokens and any lingering ascend prefixes
+         const allKeys: string[] = [];
+         try {
+           for (let i = 0; i < localStorage.length; i++) {
+             const k = localStorage.key(i);
+             if (k) allKeys.push(k);
+           }
+         } catch {}
+         allKeys.forEach((k) => {
+           if (k.startsWith('sb-') || k.startsWith('ascend_')) {
+             localStorage.removeItem(k);
+           }
+         });
+         localStorage.setItem('ascend_logged_out', 'true');
+       } catch (err: any) {
+         localWipeError = err?.message || 'Local wipe failed';
+       }
+     }
 
-    return { success: !apiError, error: apiError };
-  }
+     useStore.getState().clearAllData();
+
+     // Success means: cloud deletion succeeded (or was intentionally skipped in offline mode)
+     // AND local wipe completed without error
+     const success = !apiError && cloudDeleted && !localWipeError;
+     return {
+       success,
+       error: apiError || localWipeError
+     };
+   }
 
   private scheduleDebouncedPush() {
     clearTimeout(this.debounceTimer);
@@ -351,12 +381,14 @@ class SupabaseSyncEngine {
   }
 
   public async triggerSyncNow() {
-    if (this.isSyncing) return;
+    // Deduplicate concurrent sync calls by returning the in-flight promise
+    if (this.pendingSyncPromise) {
+      return this.pendingSyncPromise;
+    }
 
     if (typeof window !== 'undefined' && localStorage.getItem('ascend_logged_out') === 'true') {
       this.currentUser = null;
       this.status = 'unconfigured';
-      this.isSyncing = false;
       this.notify();
       return;
     }
@@ -379,6 +411,7 @@ class SupabaseSyncEngine {
     this.errorMessage = null;
     this.notify();
 
+    const sync = async () => {
     try {
       // 1. Ensure active session
       const { data: { user } } = await supabase.auth.getUser();
@@ -626,14 +659,23 @@ class SupabaseSyncEngine {
       this.status = 'synced';
       this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
       this.notify();
-    } catch (err: any) {
+     } catch (err: any) {
       console.error('Supabase sync error:', err);
       this.status = 'error';
       this.errorMessage = err?.message || 'Sync failed';
       this.notify();
     } finally {
       this.isSyncing = false;
+      this.pendingSyncPromise = null;
     }
+    };
+
+    this.pendingSyncPromise = sync()
+      .finally(() => {
+        this.pendingSyncPromise = null;
+      });
+
+    return this.pendingSyncPromise;
   }
 
   private async pushLocalData(userId: string) {
@@ -731,24 +773,34 @@ class SupabaseSyncEngine {
   }
 
   private async syncPush() {
-    if (this.isSyncing) return;
+    // If a sync is already in flight, deduplicate by returning the same promise
+    if (this.pendingSyncPromise) {
+      return this.pendingSyncPromise;
+    }
+
     const supabase = getSupabase();
     if (!supabase || !navigator.onLine) return;
 
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const sync = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      this.isSyncing = true;
-      await this.pushLocalData(user.id);
-      this.status = 'synced';
-      this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      this.notify();
-    } catch (err: any) {
-      console.warn('Background sync push warning:', err?.message);
-    } finally {
-      this.isSyncing = false;
-    }
+        await this.pushLocalData(user.id);
+        this.status = 'synced';
+        this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        this.notify();
+      } catch (err: any) {
+        console.warn('Background sync push warning:', err?.message);
+      }
+    };
+
+    this.pendingSyncPromise = sync()
+      .finally(() => {
+        this.pendingSyncPromise = null;
+      });
+
+    return this.pendingSyncPromise;
   }
 }
 

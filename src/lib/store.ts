@@ -119,7 +119,6 @@ export interface AppState {
   dayTypeOverrides: Record<string, DayType>;
   gymLogs: Record<string, boolean>;
   toggleGymToday: (date?: string) => boolean;
-  customGeminiKey?: string;
   aiInsightsCache: Record<string, AICoachInsight>;
   
   setHasHydrated: (state: boolean) => void;
@@ -178,7 +177,6 @@ export interface AppState {
   logQuickProtein: (proteinG: number, date?: string) => void;
 
   // AI Coach Actions
-  setCustomGeminiKey: (key: string) => void;
   cacheAIInsight: (date: string, insight: AICoachInsight) => void;
   setTrainingProfile: (profile: Partial<AITrainingProfile>) => void;
   setTodaysAIWorkoutPlan: (plan: AIPlannedWorkout | undefined) => void;
@@ -334,7 +332,6 @@ export const useAppStore = create<AppState>()(
       creatineSupply: DEFAULT_CREATINE_SUPPLY,
       dayTypeOverrides: {},
       gymLogs: {},
-      customGeminiKey: undefined,
       aiInsightsCache: {},
 
       // AI State
@@ -1032,8 +1029,6 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
-      setCustomGeminiKey: (key: string) => set({ customGeminiKey: key.trim() ? key.trim() : undefined }),
-
       saveWorkoutDraft: (draft) => {
         if (!draft) {
           set({ activeWorkoutDraft: null });
@@ -1449,7 +1444,6 @@ export const useAppStore = create<AppState>()(
           creatineConfig: DEFAULT_CREATINE_CONFIG,
           creatineSupply: DEFAULT_CREATINE_SUPPLY,
           dayTypeOverrides: {},
-          customGeminiKey: undefined,
           aiInsightsCache: {},
           trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
           todaysAIWorkoutPlan: undefined,
@@ -1496,7 +1490,6 @@ export const useAppStore = create<AppState>()(
             creatineConfig: DEFAULT_CREATINE_CONFIG,
             creatineSupply: DEFAULT_CREATINE_SUPPLY,
             dayTypeOverrides: {},
-            customGeminiKey: undefined,
             aiInsightsCache: {},
             trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
             todaysAIWorkoutPlan: undefined,
@@ -1534,8 +1527,71 @@ export const useAppStore = create<AppState>()(
               localStorage.removeItem('ascend_logged_out');
             } catch {}
           }
-          set((state) => ({
-            profile: data.profile || state.profile,
+
+          // Validate profile data before merging into store — only allow
+          // well-formed fields with correct types to prevent injection of
+          // arbitrary or malformed data from backup imports.
+          set((state) => {
+            const validatedProfile =
+              data.profile && typeof data.profile === 'object'
+                ? {
+                    id: typeof data.profile.id === 'string' && data.profile.id.trim()
+                      ? data.profile.id.trim()
+                      : undefined,
+                    name: typeof data.profile.name === 'string' ? data.profile.name.trim().slice(0, 100) : undefined,
+                    gender:
+                      data.profile.gender === 'male' ||
+                      data.profile.gender === 'female' ||
+                      data.profile.gender === 'other'
+                        ? data.profile.gender
+                        : undefined,
+                    bodyweightKg:
+                      typeof data.profile.bodyweightKg === 'number' &&
+                      !isNaN(data.profile.bodyweightKg) &&
+                      data.profile.bodyweightKg > 0 &&
+                      data.profile.bodyweightKg < 500
+                        ? data.profile.bodyweightKg
+                        : undefined,
+                    bodyweightLbs:
+                      typeof data.profile.bodyweightLbs === 'number' &&
+                      !isNaN(data.profile.bodyweightLbs) &&
+                      data.profile.bodyweightLbs > 0 &&
+                      data.profile.bodyweightLbs < 1100
+                        ? data.profile.bodyweightLbs
+                        : undefined,
+                    heightCm:
+                      typeof data.profile.heightCm === 'number' &&
+                      !isNaN(data.profile.heightCm) &&
+                      data.profile.heightCm > 0 &&
+                      data.profile.heightCm < 300
+                        ? data.profile.heightCm
+                        : undefined,
+                    age:
+                      typeof data.profile.age === 'number' &&
+                      !isNaN(data.profile.age) &&
+                      data.profile.age >= 10 &&
+                      data.profile.age <= 120
+                        ? data.profile.age
+                        : undefined,
+                    unit: data.profile.unit === 'kg' || data.profile.unit === 'lbs' ? data.profile.unit : undefined,
+                    goals: Array.isArray(data.profile.goals)
+                      ? data.profile.goals.filter(
+                          (g: any) =>
+                            g === 'build_muscle' ||
+                            g === 'get_stronger' ||
+                            g === 'lose_fat' ||
+                            g === 'stamina' ||
+                            g === 'general_fitness'
+                        )
+                      : undefined,
+                    createdAt:
+                      typeof data.profile.createdAt === 'string' && !isNaN(Date.parse(data.profile.createdAt))
+                        ? data.profile.createdAt
+                        : new Date().toISOString(),
+                  }
+                : state.profile;
+            return {
+              profile: validatedProfile || state.profile,
             prs: Array.isArray(data.prs) ? data.prs : state.prs,
             workouts: Array.isArray(data.workouts)
               ? data.workouts.map((w: any) => ({
@@ -1662,7 +1718,7 @@ export const useAppStore = create<AppState>()(
             goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
             userMode: data.userMode || state.userMode,
             weeklySchedule: data.weeklySchedule && typeof data.weeklySchedule === 'object' ? data.weeklySchedule : state.weeklySchedule,
-          }));
+          }});
           return true;
         } catch {
           return false;
@@ -1891,10 +1947,24 @@ export const useAppStore = create<AppState>()(
 
 export const useStore = useAppStore;
 
+// Auto-refresh the Lifter Twin profile whenever workouts or profile unit changes.
+// This ensures the profile stays consistent after cloud sync pulls remote data,
+// not just on local add/delete operations.
+let lastLifterProfileWorkoutCount = 0;
+useAppStore.subscribe((state) => {
+  const workoutCount = state.workouts?.length || 0;
+  if (workoutCount !== lastLifterProfileWorkoutCount) {
+    lastLifterProfileWorkoutCount = workoutCount;
+    if (workoutCount > 0 && state.hasCompletedOnboarding) {
+      state.refreshLifterProfile();
+    }
+  }
+});
+
 // Continuous redundancy mirror: keep an emergency snapshot and legacy keys updated
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
-  useAppStore.subscribe((state) => {
+  const unsubscribe = useAppStore.subscribe((state) => {
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
       clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {
@@ -1935,4 +2005,12 @@ if (typeof window !== 'undefined') {
       }, 500);
     }
   });
+
+  // Clean up timer and unsubscribe on page unload to prevent memory leaks
+  const cleanup = () => {
+    clearTimeout(syncTimer);
+    unsubscribe();
+  };
+  window.addEventListener('beforeunload', cleanup);
+  window.addEventListener('pagehide', cleanup);
 }

@@ -130,7 +130,7 @@ export default function LegalHubModal({
                 <strong>Data Collection:</strong> In Guest Mode, all data resides in device storage. In Cloud Mode, your workouts, PRs, meals, and optional reminder preferences are saved exclusively under your authenticated account.
               </p>
               <p>
-                <strong>Athletic Intelligence:</strong> The Autoregulated Coach and Macro Lens use Google Gemini on-demand. Personal contact identifiers are never transmitted. If you provide a custom API key, it stays strictly in local device storage.
+                <strong>Athletic Intelligence:</strong> The Autoregulated Coach and Macro Lens use Google Gemini on-demand, securely accessed via ASCEND backend servers. Personal contact identifiers are never transmitted.
               </p>
               <p>
                 <strong>GDPR &amp; CCPA Rights:</strong> Export a complete `.json` copy of your data anytime from the Data Vault, or execute an instant 0-day cascade account deletion.

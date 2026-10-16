@@ -391,7 +391,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         file: processedBlob,
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
-        customApiKey: store.customGeminiKey,
       });
 
       const result = applyLearnedPortionPreferences(rawResult);
@@ -573,7 +572,6 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           file: processedBlob,
           userNotes: `${userNotes ? userNotes + '. ' : ''}Correction from user: ${refinementInput.trim()}`,
           hiddenIngredients: selectedHiddenIngredients,
-          customApiKey: store.customGeminiKey,
         });
         setAnalysis(refinedResult);
         toast.success('Meal re-analyzed with updated directives.', 'AI Refined');

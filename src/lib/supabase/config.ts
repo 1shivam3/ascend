@@ -1,6 +1,10 @@
 /**
  * Supabase Configuration & Credentials Provider
  * Supports both environment variables (.env.local) and in-app fallback settings.
+ *
+ * Security note: In production, only environment variables are used for credential
+ * resolution. The localStorage fallback is available only in development to support
+ * local testing with custom Supabase instances.
  */
 
 export function getSupabaseCredentials() {
@@ -10,7 +14,9 @@ export function getSupabaseCredentials() {
   let localUrl = '';
   let localKey = '';
 
-  if (typeof window !== 'undefined') {
+  // Only allow localStorage override in dev to prevent XSS from exfiltrating
+  // the anon key in production deployments.
+  if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
     try {
       localUrl = window.localStorage.getItem('ascend_supabase_url')?.trim() || '';
       localKey = window.localStorage.getItem('ascend_supabase_anon_key')?.trim() || '';

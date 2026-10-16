@@ -419,7 +419,7 @@ export interface AICoachInsight {
 }
 
 export interface AITrainingProfile {
-  goal: 'muscle_gain' | 'strength' | 'fat_loss' | 'general_fitness';
+  goal: AthleteGoal;
   experience: 'beginner' | 'intermediate' | 'advanced';
   daysPerWeek: number;
   preferredDurationMin: number;

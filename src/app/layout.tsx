@@ -4,6 +4,7 @@ import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { NavigationProvider } from '@/lib/navigation';
 import TelemetryProvider from '@/components/TelemetryProvider';
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'optional' });
 const barlowCondensed = Barlow_Condensed({
@@ -117,14 +118,6 @@ export default function RootLayout({
                   document.documentElement.classList.remove('light');
                 }
               } catch (e) {}
-
-              if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function(err) {
-                    console.warn('[PWA] ServiceWorker registration notice:', err);
-                  });
-                });
-              }
             `,
           }}
         />
@@ -144,6 +137,8 @@ export default function RootLayout({
         <ToastProvider>
           <NavigationProvider>{children}</NavigationProvider>
         </ToastProvider>
+
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

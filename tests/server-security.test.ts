@@ -80,7 +80,7 @@ describe('Rate Limiter IP Extraction & Hardening', () => {
     expect(getClientIp(req)).toBe('127.0.0.1');
   });
 
-  it('enforces sliding window rate limit correctly', () => {
+  it('enforces sliding window rate limit correctly', async () => {
     const fakeIp = '203.0.113.50';
     const makeReq = () =>
       new Request('https://ascend.app/api/test', {
@@ -89,15 +89,15 @@ describe('Rate Limiter IP Extraction & Hardening', () => {
 
     const opts = { windowMs: 1000, maxRequests: 2, keyPrefix: 'test-limiter' };
 
-    const first = checkRateLimit(makeReq(), opts);
+    const first = await checkRateLimit(makeReq(), opts);
     expect(first.success).toBe(true);
     expect(first.remaining).toBe(1);
 
-    const second = checkRateLimit(makeReq(), opts);
+    const second = await checkRateLimit(makeReq(), opts);
     expect(second.success).toBe(true);
     expect(second.remaining).toBe(0);
 
-    const third = checkRateLimit(makeReq(), opts);
+    const third = await checkRateLimit(makeReq(), opts);
     expect(third.success).toBe(false);
     expect(third.remaining).toBe(0);
   });

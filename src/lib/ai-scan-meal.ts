@@ -10,7 +10,6 @@ export interface ScanMealOptions {
   file: File | Blob;
   userNotes?: string;
   hiddenIngredients?: string[];
-  customApiKey?: string;
 }
 
 /**
@@ -75,13 +74,8 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   if (options.hiddenIngredients && options.hiddenIngredients.length > 0) {
     formData.append('hiddenIngredients', JSON.stringify(options.hiddenIngredients));
   }
-  const headers: Record<string, string> = {};
-  if (options.customApiKey && options.customApiKey.trim()) {
-    headers['x-gemini-api-key'] = options.customApiKey.trim();
-  }
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
-    headers,
     body: formData,
   });
 
