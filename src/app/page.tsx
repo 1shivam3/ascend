@@ -261,7 +261,7 @@ export default function AppPage() {
         )}
       </main>
 
-      {/* Native-Feel 4-Destination Bottom Navigation */}
+      {/* Native 4-Destination Bottom Navigation (Part 5 Spec) */}
       {!activeWorkoutDraft && (
         <nav
           className="native-tab-bar"
@@ -282,30 +282,18 @@ export default function AppPage() {
                   navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined });
                 }}
                 className={`native-tab-item ${
-                  isActive ? 'active text-accent' : 'text-text-muted hover:text-text-primary'
+                  isActive ? 'active' : ''
                 }`}
               >
-                <Icon size={20} strokeWidth={isActive ? 2.4 : 1.7} className={isActive ? 'text-accent' : 'text-text-muted'} />
-                <span className={`text-[11px] mt-1 ${isActive ? 'text-accent font-semibold' : 'text-text-muted font-medium'}`}>
+                {isActive && <div className="native-tab-indicator" />}
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-text-primary' : 'text-text-muted'} />
+                <span className={`text-[12px] mt-1 ${isActive ? 'text-text-primary font-semibold' : 'text-text-muted font-normal'}`}>
                   {tab.label}
                 </span>
               </button>
             );
           })}
         </nav>
-      )}
-
-      {/* Floating Action Button for Quick Actions */}
-      {!activeWorkoutDraft && (
-        <button
-          type="button"
-          onClick={() => setIsQuickActionOpen(true)}
-          className="fixed right-4 bottom-20 z-40 w-11 h-11 rounded-full bg-accent text-stone-950 font-bold shadow-lg hover:brightness-110 active:scale-95 flex items-center justify-center transition-all cursor-pointer border border-accent/40"
-          title="Quick Actions"
-          aria-label="Quick Actions"
-        >
-          <Plus className="w-5 h-5 stroke-[2.5]" />
-        </button>
       )}
 
       {/* Quick Action Sheet Modal */}
