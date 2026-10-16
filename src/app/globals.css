@@ -3,39 +3,47 @@
 @tailwind utilities;
 
 :root {
-  /* Clean Light Theme — Crisp Off-White, Deep Navy & Energetic Orange */
-  --bg-primary: 248 250 252;      /* slate-50 #f8fafc */
-  --bg-secondary: 241 245 249;    /* slate-100 #f1f5f9 */
-  --bg-tertiary: 226 232 240;     /* slate-200 #e2e8f0 */
-  --bg-card: 255 255 255;         /* white */
-  --bg-elevated: 255 255 255;     /* white */
-  --text-primary: 15 23 42;       /* slate-900 #0f172a - deep navy */
-  --text-secondary: 71 85 105;    /* slate-600 #475569 */
-  --text-muted: 100 116 139;      /* slate-500 #64748b */
-  --border: 226 232 240;          /* slate-200 #e2e8f0 */
-  --border-subtle: 241 245 249;   /* slate-100 */
-  --border-hover: 203 213 225;    /* slate-300 */
-  --accent: 234 88 12;            /* orange-600 #ea580c — primary brand action */
-  --accent-dim: 194 65 12;        /* orange-700 #c2410c */
-  --accent-glow: rgba(234, 88, 12, 0.16);
+  color-scheme: light;
+  /* ASCEND / Field Manual — warm paper, ink, and signal vermilion */
+  --bg-primary: 243 242 235;
+  --bg-secondary: 234 233 223;
+  --bg-tertiary: 220 220 207;
+  --bg-card: 250 249 243;
+  --bg-elevated: 255 254 248;
+  --text-primary: 27 30 25;
+  --text-secondary: 78 83 73;
+  --text-muted: 96 102 91;
+  --border: 211 213 199;
+  --border-subtle: 230 230 219;
+  --border-hover: 183 187 170;
+  --accent: 196 68 39;
+  --accent-dim: 160 54 30;
+  --accent-glow: rgba(196, 68, 39, 0.13);
+  --surface-rule: rgba(27, 30, 25, 0.13);
+  --radius-control: 10px;
+  --radius-panel: 14px;
 }
 
 .dark {
-  /* Strict "Precision Training" Near-Black Palette */
-  --bg-primary: 9 9 11;           /* #09090B - true near-black canvas */
-  --bg-secondary: 20 20 23;       /* #141417 - single dark elevated surface */
-  --bg-tertiary: 28 28 33;        /* #1C1C21 - high contrast surface */
-  --bg-card: 20 20 23;            /* #141417 */
-  --bg-elevated: 28 28 33;        /* #1C1C21 */
-  --text-primary: 250 250 250;    /* #FAFAFA - crisp strong white */
-  --text-secondary: 161 161 170;  /* #A1A1AA - neutral secondary */
-  --text-muted: 156 163 175;      /* #9CA3AF - high-contrast muted text (5.4:1 on #141417) */
-  --border: 39 39 42;             /* #27272A - subtle hairline divider */
-  --border-subtle: 28 28 31;      /* #1C1C1F */
-  --border-hover: 63 63 70;       /* #3F3F46 */
-  --accent: 249 115 22;           /* #F97316 - ASCEND orange for action */
-  --accent-dim: 234 88 12;
-  --accent-glow: rgba(249, 115, 22, 0.15);
+  color-scheme: dark;
+  /* Same brand system, recalibrated for low-light training environments */
+  --bg-primary: 15 17 14;
+  --bg-secondary: 25 28 23;
+  --bg-tertiary: 35 39 31;
+  --bg-card: 21 24 20;
+  --bg-elevated: 29 33 27;
+  --text-primary: 243 242 234;
+  --text-secondary: 190 193 180;
+  --text-muted: 154 160 145;
+  --border: 49 54 43;
+  --border-subtle: 35 39 31;
+  --border-hover: 71 77 60;
+  --accent: 238 112 76;
+  --accent-dim: 196 68 39;
+  --accent-glow: rgba(238, 112, 76, 0.14);
+  --surface-rule: rgba(243, 242, 234, 0.13);
+  --radius-control: 10px;
+  --radius-panel: 14px;
 }
 
 @layer base {
@@ -214,3 +222,481 @@ input[type="number"]::-webkit-outer-spin-button {
   display: none;
 }
 
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+   ASCEND INTERFACE SYSTEM
+   Field Manual: disciplined editorial type, warm neutrals, signal vermilion.
+   These rules intentionally sit after Tailwind so every existing screen,
+   sheet and form inherits one coherent system without changing app behavior.
+   ────────────────────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
+}
+
+body {
+  background: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
+}
+
+::selection {
+  background: rgb(var(--accent) / 0.22);
+  color: inherit;
+}
+
+button,
+[role="button"],
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 3px;
+}
+
+.page {
+  width: 100%;
+  max-width: 790px;
+  margin-inline: auto;
+  padding: clamp(20px, 3vw, 32px) clamp(16px, 3vw, 32px) calc(112px + env(safe-area-inset-bottom, 0px));
+}
+
+.page > header {
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 6px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgb(var(--border) / 0.9);
+}
+
+.page h1 {
+  font-family: var(--font-display), "Barlow Condensed", sans-serif !important;
+  font-size: clamp(1.9rem, 3.1vw, 2.45rem) !important;
+  font-weight: 700 !important;
+  line-height: 0.98 !important;
+  letter-spacing: -0.025em !important;
+  text-wrap: balance;
+}
+
+.page h2 {
+  letter-spacing: -0.018em;
+  text-wrap: balance;
+}
+
+.page .section-title,
+.page h2.section-title {
+  font-family: var(--font-sans), Inter, sans-serif;
+  font-size: 11px !important;
+  font-weight: 750;
+  letter-spacing: 0.105em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.page .card,
+.page > section.card,
+.page [class~="rounded-2xl"].card {
+  border-radius: var(--radius-panel);
+  box-shadow: none !important;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.page .bg-gradient-to-br,
+.page .bg-gradient-to-b,
+.page .bg-gradient-to-r {
+  background-image: none !important;
+}
+
+.page .shadow-xs,
+.page .shadow-sm,
+.page .shadow-md,
+.page .shadow-lg,
+.page .shadow-xl {
+  box-shadow: none !important;
+}
+
+.page .rounded-2xl {
+  border-radius: var(--radius-panel);
+}
+
+.page .rounded-xl {
+  border-radius: var(--radius-control);
+}
+
+.page .border-border\/80,
+.page .border-border\/70 {
+  border-color: rgb(var(--border) / 0.92);
+}
+
+.page .font-mono,
+.tabular-nums,
+.metric-value {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.page > section,
+.page > .space-y-4 > section {
+  scroll-margin-top: 24px;
+}
+
+.page .card-elevated {
+  box-shadow: none;
+}
+
+.today-training-hero {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(var(--border));
+  border-left: 3px solid rgb(var(--accent));
+  background: rgb(var(--bg-card)) !important;
+}
+
+.today-training-hero > div:first-child {
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgb(var(--border) / 0.8);
+}
+
+.week-at-a-glance {
+  background: transparent !important;
+}
+
+.daily-fuel-card {
+  background: rgb(var(--bg-card)) !important;
+}
+
+.daily-fuel-card:hover {
+  border-color: rgb(var(--accent) / 0.7) !important;
+}
+
+.btn-primary,
+button.btn-primary,
+.page button.bg-accent,
+.modal-content button.bg-accent {
+  border-radius: var(--radius-control);
+  box-shadow: none !important;
+  font-weight: 750;
+  letter-spacing: -0.005em;
+}
+
+.btn-secondary,
+.btn-ghost,
+.btn-danger {
+  border-radius: var(--radius-control);
+  box-shadow: none !important;
+}
+
+input,
+textarea,
+select {
+  border-color: rgb(var(--border));
+  border-radius: var(--radius-control) !important;
+  background-color: rgb(var(--bg-elevated));
+  color: rgb(var(--text-primary));
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgb(var(--text-muted));
+  opacity: 0.86;
+}
+
+.native-tab-bar {
+  min-height: 70px;
+  padding-top: 5px;
+  padding-bottom: max(7px, env(safe-area-inset-bottom, 7px));
+  background: rgb(var(--bg-primary) / 0.98);
+  border-top: 1px solid rgb(var(--border));
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.035);
+  backdrop-filter: blur(18px);
+}
+
+.native-tab-item {
+  min-height: 52px;
+  border-radius: 0 !important;
+  gap: 2px;
+}
+
+.native-tab-item::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: calc(50% - 12px);
+  width: 24px;
+  height: 2px;
+  background: transparent;
+  transition: background-color 140ms ease;
+}
+
+.native-tab-item.active::before {
+  background: rgb(var(--accent));
+}
+
+.native-tab-item.active svg {
+  stroke-width: 2.2;
+}
+
+.native-tab-item span {
+  font-size: 10px;
+  letter-spacing: 0.015em;
+}
+
+.app-workspace {
+  min-height: 100dvh;
+  min-width: 0;
+}
+
+.desktop-rail {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 45;
+  width: 248px;
+  display: flex;
+  flex-direction: column;
+  padding: 28px 16px 18px;
+  background: rgb(var(--bg-secondary));
+  border-right: 1px solid rgb(var(--border));
+}
+
+.desktop-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 2px 8px 26px;
+  border-bottom: 1px solid rgb(var(--border));
+}
+
+.brand-mark {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 7px;
+  background: rgb(var(--accent));
+  border-radius: 8px;
+}
+
+.brand-mark span {
+  display: block;
+  width: 4px;
+  background: #fff8ef;
+  border-radius: 1px 1px 0 0;
+}
+
+.brand-mark span:nth-child(1) { height: 8px; opacity: 0.72; }
+.brand-mark span:nth-child(2) { height: 13px; }
+.brand-mark span:nth-child(3) { height: 18px; }
+
+.desktop-brand-word {
+  display: block;
+  color: rgb(var(--text-primary));
+  font-family: var(--font-display), "Barlow Condensed", sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+  line-height: 1;
+}
+
+.desktop-brand-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: rgb(var(--text-muted));
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.desktop-rail-label {
+  margin: 28px 12px 10px;
+  color: rgb(var(--text-muted));
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.desktop-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.desktop-nav-item {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: rgb(var(--text-secondary));
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.desktop-nav-item svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: rgb(var(--text-muted));
+  stroke-width: 1.8;
+}
+
+.desktop-nav-item:hover {
+  background: rgb(var(--bg-card) / 0.72);
+  color: rgb(var(--text-primary));
+}
+
+.desktop-nav-item.active {
+  background: rgb(var(--accent) / 0.09);
+  border-color: rgb(var(--accent) / 0.2);
+  box-shadow: inset 2px 0 0 rgb(var(--accent));
+  color: rgb(var(--accent));
+}
+
+.desktop-nav-item.active svg {
+  color: rgb(var(--accent));
+  stroke-width: 2.2;
+}
+
+.desktop-rail-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: auto;
+  padding: 18px 4px 0;
+}
+
+.desktop-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: rgb(var(--text-muted));
+  font-size: 10px;
+  line-height: 1.5;
+  letter-spacing: 0.035em;
+}
+
+.desktop-privacy-note .privacy-dot {
+  width: 6px;
+  height: 6px;
+  margin-top: 4px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #477d58;
+}
+
+.desktop-quick-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 46px;
+  width: 100%;
+  border: 1px solid rgb(var(--accent) / 0.5);
+  border-radius: 10px;
+  background: transparent;
+  color: rgb(var(--accent));
+  font-size: 12px;
+  font-weight: 750;
+  transition: background-color 140ms ease, transform 140ms ease;
+}
+
+.desktop-quick-action:hover {
+  background: rgb(var(--accent) / 0.08);
+}
+
+.desktop-quick-action:active {
+  transform: scale(0.985);
+}
+
+.offline-gym-banner {
+  position: relative;
+  z-index: 55;
+  margin-left: 0;
+  padding: 7px 16px;
+  background: #594017;
+  border-bottom: 1px solid #8c6423;
+  color: #fff2cf;
+}
+
+.active-workout-shell button {
+  touch-action: manipulation;
+}
+
+.active-workout-shell header {
+  background: rgb(var(--bg-card));
+  border-bottom-color: rgb(var(--border));
+}
+
+.active-workout-shell > main {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.active-workout-shell h1,
+.active-workout-shell h2 {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+.active-workout-shell .text-2xl,
+.active-workout-shell .text-3xl {
+  letter-spacing: -0.035em;
+}
+
+.modal-overlay {
+  background: rgb(0 0 0 / 0.58);
+  backdrop-filter: blur(5px);
+}
+
+.modal-content {
+  border-radius: 16px 16px 0 0;
+  border-color: rgb(var(--border));
+  box-shadow: 0 -12px 44px rgb(0 0 0 / 0.12);
+}
+
+@media (min-width: 640px) {
+  .modal-content {
+    border-radius: 16px;
+    box-shadow: 0 22px 70px rgb(0 0 0 / 0.18);
+  }
+}
+
+@media (min-width: 1024px) {
+  .page {
+    padding-bottom: 40px;
+  }
+
+  .offline-gym-banner {
+    margin-left: 248px;
+  }
+
+  .native-tab-bar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
