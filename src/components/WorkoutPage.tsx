@@ -2003,13 +2003,49 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="section-title text-[11px] mb-0 font-sans">AVAILABLE ROUTINES</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 cursor-pointer bg-accent/10 hover:bg-accent/20 px-2.5 py-1 rounded-lg border border-accent/30 transition-colors"
+              title="Generate a workout plan from your daily routine or target muscle"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-accent" />
+              <span>Suggested Workout</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="text-xs font-semibold text-text-secondary hover:text-text-primary hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Weekly Split</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Suggested Workout Highlight Card */}
+        <div className="card p-3.5 sm:p-4 bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/40 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-accent/20 text-accent flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-text-primary">Suggested Workout</p>
+              <p className="text-2xs text-text-muted">
+                {todaySessionInfo?.title && !todaySessionInfo.isRestDay
+                  ? `Today's Split: ${todaySessionInfo.title}`
+                  : 'Tailored routine from your weekly split or choose what to train'}
+              </p>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="btn-primary py-2 px-3.5 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm shadow-accent/20"
           >
-            <Calendar className="w-3.5 h-3.5" />
-            <span>Weekly Split</span>
+            <Sparkles className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
+            <span>Generate Plan</span>
           </button>
         </div>
 
@@ -2067,17 +2103,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     onClick={() => handleStartPlan(template)}
                     className="btn-primary py-2 px-4 text-xs font-bold flex-1 flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <Play className="w-3.5 h-3.5 fill-white stroke-white" />
+                    <Play className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
                     <span>Start Workout</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDuplicatePlan(template)}
-                    className="btn-secondary py-2 px-3 text-xs font-semibold flex items-center gap-1 text-text-secondary hover:text-text-primary cursor-pointer"
-                    title="Customize this routine"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 text-accent" />
-                    <span className="hidden sm:inline">Customize</span>
                   </button>
                 </div>
               </div>

@@ -340,9 +340,28 @@ export default function SuggestedWorkoutModal({
 }: SuggestedWorkoutModalProps) {
   const toast = useToast();
   const setPlannedWorkouts = useStore((state) => state.setPlannedWorkouts);
+  const plannedWorkouts = useStore((state) => state.plannedWorkouts);
+  const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const trainingProfile = useStore((state) => state.trainingProfile);
   const setTrainingProfile = useStore((state) => state.setTrainingProfile);
+
+  const todayDayName = useMemo(() => {
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+    return days[new Date().getDay()];
+  }, []);
+
+  const todaySchedule = useMemo(() => {
+    return weeklySchedule ? weeklySchedule[todayDayName] : null;
+  }, [weeklySchedule, todayDayName]);
+
+  const todayRoutineName = useMemo(() => {
+    if (!todaySchedule) return '';
+    if (todaySchedule.workoutPlanId === 'rest') return 'Rest & Recovery';
+    if (todaySchedule.customTitle) return todaySchedule.customTitle;
+    const plan = plannedWorkouts.find((p) => p.id === todaySchedule.workoutPlanId);
+    return plan?.name || todaySchedule.workoutPlanId || 'Scheduled Routine';
+  }, [todaySchedule, plannedWorkouts]);
 
   // Mode: 'bodyparts' | 'split'
   const [activeTab, setActiveTab] = useState<'bodyparts' | 'split'>('bodyparts');
@@ -357,6 +376,31 @@ export default function SuggestedWorkoutModal({
       setSelectedIntensity(defaultIntensity);
     }
   }, [isOpen, defaultIntensity]);
+
+  // Auto-align with today's scheduled split routine when opened
+  useEffect(() => {
+    if (isOpen && todaySchedule && todaySchedule.workoutPlanId !== 'rest') {
+      const lowerName = todayRoutineName.toLowerCase();
+      const validBodyParts: BodyPartOption[] = ['chest', 'back', 'legs', 'shoulders', 'arms', 'core', 'push', 'pull'];
+      const matchedParts = (todaySchedule.bodyParts || [])
+        .map((bp) => bp.toLowerCase() as BodyPartOption)
+        .filter((bp) => validBodyParts.includes(bp));
+
+      if (matchedParts.length > 0) {
+        setSelectedBodyParts(matchedParts);
+      } else if (lowerName.includes('push')) {
+        setSelectedBodyParts(['push']);
+      } else if (lowerName.includes('pull')) {
+        setSelectedBodyParts(['pull']);
+      } else if (lowerName.includes('leg')) {
+        setSelectedBodyParts(['legs']);
+      } else if (lowerName.includes('upper')) {
+        setSelectedBodyParts(['chest', 'back', 'shoulders']);
+      } else if (lowerName.includes('lower')) {
+        setSelectedBodyParts(['legs', 'core']);
+      }
+    }
+  }, [isOpen, todaySchedule, todayRoutineName]);
 
   // Split selection state
   const [selectedSplitId, setSelectedSplitId] = useState<string>('ppl');
@@ -565,16 +609,77 @@ export default function SuggestedWorkoutModal({
 
         {/* Modal Scrollable Body */}
         <div className="p-4 space-y-4 overflow-y-auto flex-1">
+          {/* Today's Scheduled Routine Banner (from user's weekly routine) */}
+          {todaySchedule && todaySchedule.workoutPlanId !== 'rest' ? (
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/40 flex items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-accent/20 text-accent flex items-center justify-center shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider block">
+                    TODAY&apos;S SCHEDULED ROUTINE
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-bold text-text-primary">
+                    {todayRoutineName}
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const matchedPlan = plannedWorkouts.find((p) => p.id === todaySchedule.workoutPlanId);
+                  if (matchedPlan && matchedPlan.exercises.length > 0) {
+                    onStartWorkout(matchedPlan.name, matchedPlan.exercises);
+                    onClose();
+                  } else {
+                    onStartWorkout(planTitle, exercises);
+                    onClose();
+                  }
+                }}
+                className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm"
+              >
+                <Play className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
+                <span>Start Routine</span>
+              </button>
+            </div>
+          ) : todaySchedule && todaySchedule.workoutPlanId === 'rest' ? (
+            <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 flex items-center gap-2.5 text-xs text-text-muted">
+              <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
+              <span>Today is a scheduled Rest Day. Pick what you want to train below to generate a bonus session:</span>
+            </div>
+          ) : null}
+
           {/* ── MODE 1: MULTI-BODY PART SELECTION ── */}
           {activeTab === 'bodyparts' && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-label font-bold text-text-muted">
-                  Target body parts (select multiple)
+                  What do you want to train today?
                 </span>
                 <span className="text-2xs text-accent font-bold font-mono">
                   {selectedBodyParts.length} selected
                 </span>
+              </div>
+
+              {/* 1-Tap Quick Presets */}
+              <div className="flex flex-wrap gap-1.5 pb-1">
+                {[
+                  { label: 'Push Day', parts: ['push'] as BodyPartOption[] },
+                  { label: 'Pull Day', parts: ['pull'] as BodyPartOption[] },
+                  { label: 'Legs', parts: ['legs'] as BodyPartOption[] },
+                  { label: 'Upper Body', parts: ['chest', 'back', 'shoulders'] as BodyPartOption[] },
+                  { label: 'Full Body', parts: ['full_body'] as BodyPartOption[] },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setSelectedBodyParts(preset.parts)}
+                    className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent border border-border/80 text-text-secondary text-2xs font-semibold active:scale-95 transition-all cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">

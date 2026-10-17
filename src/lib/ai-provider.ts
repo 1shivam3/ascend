@@ -168,6 +168,7 @@ async function callGeminiVision<T>(
       contents: [imagePart, fullPrompt],
       config: {
         responseMimeType: 'application/json',
+        temperature: 0.1,
         abortSignal: signal,
       },
     });

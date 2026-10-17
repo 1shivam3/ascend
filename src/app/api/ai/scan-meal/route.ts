@@ -192,6 +192,10 @@ STRICT ANTI-HALLUCINATION & ANTI-EXTRA-FOOD RULES:
 8. HIDDEN INGREDIENTS: ${hiddenIngredients.length > 0 ? hiddenIngredients.join(', ') : 'None'}
    Only add if explicitly specified by user notes or hidden ingredients flag.
 
+9. DETERMINISTIC REPRODUCIBILITY & CANONICAL PORTION WEIGHTS:
+   - Calculate macronutrients using canonical reference nutritional densities (USDA / IFCT).
+   - Ensure consistent, identical portion gram weights and macronutrient values regardless of client device, camera sensor, or image aspect ratio.
+
 OUTPUT FORMAT:
 Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or conversational text:
 {

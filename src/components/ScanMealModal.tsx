@@ -4,7 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
-import { validateImageFile, resizeAndCompressImage, captureVideoFrame } from '@/lib/image-processing';
+import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
@@ -161,7 +161,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setIsCapturingFrame(true);
     try {
       const { blob } = await captureVideoFrame(videoRef.current, {
-        maxDimension: 1280,
+        maxDimension: MAX_IMAGE_DIMENSION,
         quality: 0.75,
         format: 'image/jpeg',
       });

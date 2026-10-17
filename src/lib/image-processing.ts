@@ -123,7 +123,11 @@ export async function resizeAndCompressImage(
     let canvas: HTMLCanvasElement | null = null;
 
     try {
-      sourceBitmap = await createImageBitmap(file);
+      try {
+        sourceBitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      } catch {
+        sourceBitmap = await createImageBitmap(file);
+      }
       const { width: targetWidth, height: targetHeight } = calculateTargetDimensions(
         sourceBitmap.width,
         sourceBitmap.height,
@@ -147,6 +151,7 @@ export async function resizeAndCompressImage(
           resizeWidth: targetWidth,
           resizeHeight: targetHeight,
           resizeQuality: 'medium',
+          imageOrientation: 'from-image',
         });
         ctx.drawImage(resizedBitmap, 0, 0);
         drewScaled = true;

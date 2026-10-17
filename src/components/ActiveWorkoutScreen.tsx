@@ -346,6 +346,7 @@ export default function ActiveWorkoutScreen({
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
   const [isRestTimerDismissed, setIsRestTimerDismissed] = useState<boolean>(false);
   const [isRestTimerEnabled, setIsRestTimerEnabled] = useState<boolean>(true);
+  const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
   // Intensity metric preference: RPE vs RIR
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'rir'>(() => {
@@ -1372,6 +1373,24 @@ export default function ActiveWorkoutScreen({
     };
   }, [exercises, elapsedSeconds]);
 
+  // Pause Workout & Save Draft to resume later
+  const handlePauseWorkout = () => {
+    saveWorkoutDraft({
+      date: getLocalTodayStr(),
+      name: workoutName,
+      exercises,
+      startedFromPlan: workoutName,
+      sessionStartTime,
+      savedAt: new Date().toISOString(),
+    });
+    toast.info('Workout saved! You can resume anytime from the Home screen.', 'Session Paused');
+    if (onPause) {
+      onPause();
+    } else {
+      onCancel();
+    }
+  };
+
   // Finish Workout & detect PRs
   const handleConfirmFinish = () => {
     const today = getLocalTodayStr();
@@ -1489,42 +1508,61 @@ export default function ActiveWorkoutScreen({
 
   return (
     <div className="fixed inset-0 z-50 bg-bg-primary text-text-primary flex flex-col overflow-hidden select-none animate-fade-in font-sans">
-      {/* ── Top Bar (Navigation locked: full screen gym focus) ───────────── */}
-      <header className="px-4 py-3 bg-bg-card border-b border-border/80 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5">
+      {/* ── Top Bar (Minimal, focused gym header) ───────────── */}
+      <header className="px-4 py-2.5 bg-bg-card border-b border-border/80 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={() => setIsDiscardConfirmOpen(true)}
-            className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95"
+            className="w-9 h-9 min-h-[36px] min-w-[36px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95 cursor-pointer shrink-0"
             aria-label="Discard Workout"
             title="Discard Workout"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="text-sm font-black text-text-primary tracking-tight truncate max-w-[160px] sm:max-w-xs font-mono">
+          <div className="min-w-0">
+            <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[150px] sm:max-w-xs font-sans">
               {workoutName}
             </h1>
-            <div className="flex items-center gap-1.5 text-3xs font-mono text-accent">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-              <span>ACTIVE SESSION</span>
-              <span className="text-text-muted">•</span>
-              <span className="text-text-secondary">{formatTime(elapsedSeconds)}</span>
+            <div className="flex items-center gap-1.5 text-3xs font-mono text-text-muted">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              <span>{formatTime(elapsedSeconds)}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={handlePauseWorkout}
+            className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
+            title="Pause and save draft"
+            aria-label="Pause and save draft"
+          >
+            <Pause className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsFinishModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            title="Finish workout"
+            aria-label="Finish workout"
+          >
+            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span className="hidden sm:inline">Finish</span>
+          </button>
+
           {/* Secondary ⋯ Tools Menu (Available for quick tools & helper sheets) */}
           <div className="relative">
             <button
               type="button"
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
               aria-label="Workout Tools & Options"
               title="Workout Tools & Options"
             >
-              <MoreHorizontal className="w-4 h-4" />
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
 
             {isMoreMenuOpen && (
@@ -1532,6 +1570,23 @@ export default function ActiveWorkoutScreen({
                 className="absolute right-0 top-full mt-1.5 w-56 rounded-xl bg-bg-card border border-border shadow-xl p-1.5 z-50 animate-fade-in space-y-1"
                 onClick={() => setIsMoreMenuOpen(false)}
               >
+                <button
+                  type="button"
+                  onClick={handlePauseWorkout}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Pause className="w-3.5 h-3.5 text-text-muted" />
+                  <span>Pause & Save draft</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFinishModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Finish workout</span>
+                </button>
+                <div className="border-t border-border/40 my-1" />
                 <button
                   type="button"
                   onClick={() => {
@@ -1598,40 +1653,6 @@ export default function ActiveWorkoutScreen({
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              saveWorkoutDraft({
-                date: getLocalTodayStr(),
-                name: workoutName,
-                exercises,
-                startedFromPlan: workoutName,
-                sessionStartTime,
-                savedAt: new Date().toISOString(),
-              });
-              toast.info('Workout saved! You can resume anytime from the Home screen.', 'Session Paused');
-              if (onPause) {
-                onPause();
-              } else {
-                onCancel();
-              }
-            }}
-            className="bg-bg-secondary hover:bg-bg-tertiary active:scale-95 text-text-secondary hover:text-text-primary border border-border/80 font-bold text-xs px-2.5 sm:px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5"
-            title="Pause and save workout draft to resume later"
-          >
-            <Pause className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Pause</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIsFinishModalOpen(true)}
-            className="bg-[#FF6B1F] hover:bg-[#ff7d3b] active:scale-95 text-stone-950 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm shadow-[#FF6B1F]/25 transition-all flex items-center gap-1.5"
-          >
-            <Check className="w-4 h-4 stroke-[3]" />
-            <span>Finish</span>
-          </button>
         </div>
       </header>
 
@@ -1648,7 +1669,16 @@ export default function ActiveWorkoutScreen({
           <span className="text-xs font-semibold hidden sm:inline">Prev</span>
         </button>
 
-        <div className="flex flex-col items-center">
+        <div
+          onClick={() => setIsExerciseJumpOpen(true)}
+          className="flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
+          title="Tap to jump to any exercise"
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') setIsExerciseJumpOpen(true);
+          }}
+        >
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-mono font-black text-accent">
               {activeExerciseIdx + 1}
@@ -1657,6 +1687,7 @@ export default function ActiveWorkoutScreen({
             <span className="text-xs font-mono font-bold text-text-secondary">
               {exercises.length}
             </span>
+            <span className="text-[10px] text-accent font-sans">▾</span>
           </div>
           {/* Hairline progress track */}
           <div className="w-24 h-1 bg-bg-secondary rounded-full overflow-hidden mt-1">
@@ -1691,7 +1722,7 @@ export default function ActiveWorkoutScreen({
       </nav>
 
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-32">
+      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-16">
         {/* First-time guidance tips (Idea 9) */}
         {showFirstTimeTips && (
           <div className="mb-4 p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2 animate-fade-in">
@@ -2551,115 +2582,75 @@ export default function ActiveWorkoutScreen({
         )}
       </main>
 
-      {/* ── Sticky Bottom Session Bar: Pulse Strip + Rest Controls ── */}
-      <footer className="fixed bottom-0 left-0 right-0 z-40 bg-bg-card/95 backdrop-blur-md border-t border-border px-4 py-2.5 shadow-2xl">
-        <div className="max-w-[480px] mx-auto space-y-2">
-          {/* Live Pulse Strip & Quick Exercise Jump */}
-          <div className="flex items-center justify-between text-2xs font-mono">
-            <div className="flex items-center gap-1.5 min-w-0 pr-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
-              <span className="text-text-muted shrink-0">Ex {activeExerciseIdx + 1}/{exercises.length}:</span>
-              <span className="font-bold text-text-primary truncate">{currentExercise?.name}</span>
-              <span className="text-text-muted shrink-0">•</span>
-              <span className="text-text-secondary shrink-0">
-                Sets: {completedSetsThisEx}/{totalSetsThisEx} (Total {sessionStats.completedSetsCount}/{sessionStats.totalSetsCount})
-              </span>
-            </div>
+      {/* ── Single Small Floating Rest Timer Button ───────────────────────── */}
+      <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
+        {isRestPopoverOpen && (
+          <div className="bg-bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-2 flex items-center gap-1.5 animate-scale-in">
             <button
               type="button"
-              onClick={() => setIsExerciseJumpOpen(true)}
-              className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent border border-border/80 text-text-primary font-sans font-bold text-3xs shrink-0 flex items-center gap-1 active:scale-95 transition-all shadow-2xs"
-              title="Quick Jump to any exercise"
+              onClick={() => adjustTimer(-30)}
+              className="px-2 py-1 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              title="Subtract 30 seconds"
             >
-              <span>Jump</span>
-              <span className="text-[10px] text-accent">▾</span>
+              -30s
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustTimer(30)}
+              className="px-2 py-1 rounded-lg bg-bg-secondary text-accent hover:bg-accent/15 text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              title="Add 30 seconds"
+            >
+              +30s
+            </button>
+            <button
+              type="button"
+              onClick={togglePauseTimer}
+              className="px-2 py-1 rounded-lg bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+            >
+              {isRestRunning ? 'Pause' : 'Resume'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                skipTimer();
+                setIsRestPopoverOpen(false);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#FF6B1F] text-stone-950 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            >
+              Skip
             </button>
           </div>
+        )}
 
-          {/* Rest Timer row (if not dismissed) or compact rest pill toggle (if dismissed) */}
-          {isRestTimerDismissed ? (
-            <div className="flex items-center justify-between pt-1 border-t border-border/40 text-3xs font-mono text-text-muted">
-              <button
-                type="button"
-                onClick={() => setIsRestTimerDismissed(false)}
-                className="flex items-center gap-1.5 text-accent hover:underline font-semibold"
-              >
-                <Timer className="w-3 h-3" />
-                <span>Rest: {formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)} (Tap to show)</span>
-              </button>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => adjustTimer(-30)}
-                  className="px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted hover:text-text-primary active:scale-95"
-                >
-                  -30s
-                </button>
-                <button
-                  type="button"
-                  onClick={() => adjustTimer(30)}
-                  className="px-1.5 py-0.5 rounded bg-bg-secondary text-accent hover:bg-accent/15 active:scale-95"
-                >
-                  +30s
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between pt-1.5 border-t border-border/40">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsRestTimerDismissed(true)}
-                  className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-                  aria-label="Hide timer controls"
-                  title="Hide timer controls"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-                <div>
-                  <span className="text-[9px] font-semibold uppercase tracking-wider text-text-muted block leading-none">
-                    REST TIMER
-                  </span>
-                  <div className="text-lg sm:text-xl font-black font-mono text-text-primary tracking-tight leading-none mt-0.5 tabular-nums">
-                    {isRestFinished ? (
-                      <span className="text-emerald-400">READY</span>
-                    ) : (
-                      formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick timer adjustments */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => adjustTimer(-30)}
-                  className="px-2 py-1 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
-                  title="Subtract 30 seconds"
-                >
-                  -30s
-                </button>
-                <button
-                  type="button"
-                  onClick={() => adjustTimer(30)}
-                  className="px-2.5 py-1 rounded-lg bg-bg-secondary text-text-primary border border-border text-xs font-mono font-bold hover:border-accent/40 active:scale-95 transition-all"
-                  title="Add 30 seconds"
-                >
-                  +30s
-                </button>
-                <button
-                  type="button"
-                  onClick={skipTimer}
-                  className="px-3 py-1 rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 text-xs font-bold active:scale-95 transition-all shadow-xs"
-                >
-                  SKIP
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </footer>
+        <button
+          type="button"
+          onClick={() => {
+            if (isRestFinished) {
+              setIsRestFinished(false);
+              setRestSecondsLeft(0);
+            } else if (!isRestRunning && restSecondsLeft === 0) {
+              startTimer();
+            } else {
+              setIsRestPopoverOpen((prev) => !prev);
+            }
+          }}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+            isRestFinished
+              ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+              : isRestRunning
+              ? 'bg-bg-card/95 border-accent text-accent shadow-accent/20 animate-pulse'
+              : 'bg-bg-card/90 border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
+          }`}
+          title={isRestRunning ? 'Tap for timer controls' : 'Rest timer'}
+        >
+          <Timer className={`w-3.5 h-3.5 ${isRestRunning ? 'text-accent' : 'text-text-muted'}`} />
+          <span>
+            {isRestFinished
+              ? 'Ready!'
+              : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+          </span>
+        </button>
+      </div>
 
       {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
       {isExerciseJumpOpen && (

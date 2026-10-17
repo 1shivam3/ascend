@@ -62,6 +62,15 @@ export default function PostWorkoutTakeModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   const userUnit = store.profile?.unit || 'kg';
   const totalSets = useMemo(() => {
     return completedWorkout.exercises.reduce((acc, e) => acc + e.sets.filter((s) => isSetCompleted(s as any)).length, 0);
@@ -92,19 +101,27 @@ export default function PostWorkoutTakeModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative animate-scale-in space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Workout session summary"
+    >
+      <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md max-h-[88dvh] flex flex-col shadow-2xl relative animate-scale-in overflow-hidden">
+        {/* Sticky Header */}
+        <div className="p-4 pb-3 border-b border-border flex items-center justify-between shrink-0 bg-bg-card z-10">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-500">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/15 flex items-center justify-center text-emerald-500 shrink-0">
               <Trophy className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-black text-base text-text-primary">
+              <h3 className="font-black text-base text-text-primary leading-tight">
                 Session Complete!
               </h3>
-              <p className="text-2xs text-text-muted">
+              <p className="text-2xs text-text-muted truncate max-w-[220px]">
                 {completedWorkout.name || 'Workout'} logged to history
               </p>
             </div>
@@ -112,13 +129,16 @@ export default function PostWorkoutTakeModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+            className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer transition-colors"
+            aria-label="Close summary"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Quick Numbers Bar: 4 Core Athletic Metrics */}
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
+          {/* Quick Numbers Bar: 4 Core Athletic Metrics */}
         <div className="grid grid-cols-4 gap-1.5 py-2.5 border-y border-border text-center bg-bg-secondary/30 rounded-xl px-2">
           <div>
             <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
@@ -237,14 +257,19 @@ export default function PostWorkoutTakeModal({
             </div>
           </div>
         ) : null}
+        </div>
 
-        <button
-          type="button"
-          onClick={onClose}
-          className="w-full py-3 rounded-xl bg-accent text-white font-bold text-xs hover:bg-accent-hover transition-colors shadow-sm"
-        >
-          Done
-        </button>
+        {/* Sticky Pinned Footer with Done CTA */}
+        <div className="p-4 pt-3 border-t border-border shrink-0 bg-bg-card z-10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-3.5 rounded-xl bg-[#FF6B1F] text-stone-950 font-bold text-xs hover:bg-[#ff7d3b] active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+            <span>Done & Return to Workouts</span>
+          </button>
+        </div>
       </div>
     </div>
   );
