@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { getSupabaseCredentials, saveCustomSupabaseCredentials } from '../src/lib/supabase/config';
 import { syncEngine } from '../src/lib/supabase/sync';
+import { useStore } from '../src/lib/store';
 
 // Mock storage for tests
 class MockStorage implements Storage {
@@ -217,5 +218,75 @@ describe('Authentication & Login Recovery Flow', () => {
       expect(syncEngine.getCurrentUser()).toBeNull();
       expect(syncEngine.getSyncStatus()).toBe('unconfigured');
     });
+
+    it('synthesizes an athlete profile when returning user has remote workouts but profiles row was missing', async () => {
+      mockStorage.clear();
+      useStore.setState({ profile: null, prs: [], workouts: [], meals: [], hasCompletedOnboarding: false });
+
+      mockSupabase.auth.getSession.mockResolvedValue({
+        data: { session: { user: { id: 'usr_returning_hero', email: 'hero@ascend.app', user_metadata: { full_name: 'Iron Hero' } } } },
+        error: null,
+      });
+      mockSupabase.auth.getUser.mockResolvedValue({
+        data: { user: { id: 'usr_returning_hero', email: 'hero@ascend.app', user_metadata: { full_name: 'Iron Hero' } } },
+        error: null,
+      });
+
+      // Mock remote responses: profiles row is null, but workouts table has 1 existing workout
+      mockSupabase.from.mockImplementation((table: string) => {
+        if (table === 'profiles') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          };
+        }
+        if (table === 'workouts') {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue(Promise.resolve({
+                data: [
+                  {
+                    id: 'w_1',
+                    name: 'Heavy Leg Day',
+                    date: '2026-10-15',
+                    exercises: [{ name: 'Barbell Squat', sets: [{ reps: 5, weight: 140, unit: 'kg' }] }],
+                  },
+                ],
+                error: null,
+              })),
+            }),
+            upsert: vi.fn().mockResolvedValue({ error: null }),
+          };
+        }
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue(Promise.resolve({ data: [], error: null })),
+          }),
+          upsert: vi.fn().mockResolvedValue({ error: null }),
+        };
+      });
+
+      await syncEngine.triggerSyncNow();
+
+      const state = useStore.getState();
+      expect(state.profile).not.toBeNull();
+      expect(state.profile?.id).toBe('usr_returning_hero');
+      expect(state.profile?.name).toBe('Iron Hero');
+      expect(state.hasCompletedOnboarding).toBe(true);
+      expect(state.workouts.length).toBe(1);
+    });
+
+    it('returns an actionable error message when Supabase is not configured', async () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      mockStorage.clear();
+
+      const result = await syncEngine.signInWithGoogle();
+      expect(result.error).toContain('Cloud authentication is not configured');
+    });
   });
 });
+

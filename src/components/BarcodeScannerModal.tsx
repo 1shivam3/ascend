@@ -615,7 +615,7 @@ export default function BarcodeScannerModal({
                         {isScanningLabel ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                            <span>Reading nutrition label via Gemini...</span>
+                            <span>Reading nutrition label...</span>
                           </>
                         ) : (
                           <>

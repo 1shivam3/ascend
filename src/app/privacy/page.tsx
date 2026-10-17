@@ -95,15 +95,17 @@ export default function PrivacyPage() {
         <section className="space-y-2">
           <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent" />
-            2. Generative Athletic Intelligence &amp; Data Handling (Google Gemini)
+            2. Generative Athletic Intelligence &amp; Data Handling (Groq, OpenRouter, Google Gemini)
           </h2>
           <p className="text-2xs">
-            ASCEND includes optional athletic utilities powered by Google Gemini (such as the Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger, and Exercise Substitutions):
+            ASCEND includes optional athletic utilities powered by privacy-hardened machine learning providers (such as the Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger, and Exercise Substitutions):
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
-            <li><strong>Opt-In and On-Demand:</strong> Network requests to the Gemini API are executed <em>only</em> when you explicitly interact with an AI feature. No background automated scraping occurs.</li>
+            <li><strong>Meal Photo Handling &amp; Provider Data Retention:</strong> When using the optional Macro Lens photo scanner, meal images are transmitted in-memory over encrypted TLS to commercial AI developer APIs (Groq Cloud LPU and Google Gemini API). ASCEND does not permanently store meal photos on its servers. Upstream API providers retain operational logs for temporary security and abuse detection windows (typically up to 30 days pursuant to standard commercial API terms), and do not train models on API customer data on commercial developer tiers. Meal photos are strictly <em>never</em> sent to public crowd-sourced or free-tier third-party training pools.</li>
+            <li><strong>100% On-Device Offline Manual Entry:</strong> AI meal scanning is completely optional. Trainees can log foods manually using ASCEND&apos;s built-in on-device food database and offline estimation engine, which operates 100% locally with zero network transmission.</li>
+            <li><strong>Opt-In and On-Demand:</strong> Network requests to AI endpoints are executed <em>only</em> when you explicitly initiate an analysis. No background scraping or automated image transmission ever occurs.</li>
             <li><strong>Zero Personal Identifiers Transmitted:</strong> We never transmit your personal contact details, email addresses, names, or device identifiers to AI providers. Only the specific anonymized training numbers or meal photo necessary to process your request is sent.</li>
-            <li><strong>Server-Side Key Management:</strong> All Google Gemini API keys are managed exclusively on ASCEND backend servers via secure environment variables. Client-supplied API keys are never accepted or processed, preventing key injection attacks.</li>
+            <li><strong>Server-Side Key Management:</strong> All API credentials are managed exclusively on ASCEND backend servers via secure environment variables. Client-supplied API keys are never accepted or processed, preventing key injection attacks.</li>
             <li><strong>In-App Content Reporting:</strong> In strict compliance with Google Play Store AI Policies, ASCEND provides an integrated in-app reporting button (flag icon) next to all AI outputs. Users can immediately report unsafe, inaccurate, or offensive responses, which suppresses the output locally and logs the report for safety reviews.</li>
           </ul>
         </section>

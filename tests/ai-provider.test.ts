@@ -1,5 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanAndParseJson, executeMultiProviderVision, executeMultiProviderText } from '@/lib/ai-provider';
+import {
+  cleanAndParseJson,
+  executeMultiProviderVision,
+  executeMultiProviderText,
+  OPENROUTER_VISION_MODELS,
+} from '@/lib/ai-provider';
+
+const mockGenerateContent = vi.fn();
+vi.mock('@google/genai', () => ({
+  GoogleGenAI: class {
+    models = {
+      generateContent: (...args: any[]) => mockGenerateContent(...args),
+    };
+  },
+}));
 
 describe('AI Multi-Provider Engine', () => {
   describe('cleanAndParseJson', () => {
@@ -39,6 +53,7 @@ describe('AI Multi-Provider Engine', () => {
     beforeEach(() => {
       process.env = { ...originalEnv };
       vi.restoreAllMocks();
+      mockGenerateContent.mockReset();
     });
 
     afterEach(() => {
@@ -46,21 +61,21 @@ describe('AI Multi-Provider Engine', () => {
       vi.restoreAllMocks();
     });
 
-    it('falls over from failed Gemini to OpenRouter vision model', async () => {
-      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+    it('prioritizes Groq vision (qwen/qwen3.8-27b) when GROQ_API_KEY is present', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
       process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
 
-      // Mock fetch: OpenRouter succeeds
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
-        if (String(url).includes('openrouter.ai')) {
+        if (String(url).includes('groq.com')) {
           return new Response(
             JSON.stringify({
               choices: [
                 {
                   message: {
                     content: JSON.stringify({
-                      mealName: 'OpenRouter Scanned Meal',
-                      items: [{ name: 'Oatmeal', calories: 250, proteinG: 10, carbsG: 40, fatG: 5 }],
+                      mealName: 'Groq Qwen Meal',
+                      items: [{ name: 'Rice & Chicken', calories: 450, proteinG: 40, carbsG: 45, fatG: 10 }],
                     }),
                   },
                 },
@@ -72,15 +87,194 @@ describe('AI Multi-Provider Engine', () => {
         return new Response('Not found', { status: 404 });
       });
 
-      // Execute vision call (Gemini fails, Groq vision skipped, OpenRouter succeeds)
       const result = await executeMultiProviderVision<any>({
         imageBase64: 'fakebase64',
         prompt: 'Analyze food',
         timeoutMs: 1000,
       });
 
-      expect(result.provider).toBe('openrouter');
-      expect(result.data.mealName).toBe('OpenRouter Scanned Meal');
+      expect(result.provider).toBe('groq');
+      expect(result.model).toBe('qwen/qwen3.8-27b');
+      expect(result.data.mealName).toBe('Groq Qwen Meal');
+      fetchSpy.mockRestore();
+    });
+
+    it('falls over from failed Groq directly to Gemini vision model', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          mealName: 'Gemini Scanned Meal',
+          items: [{ name: 'Greek Yogurt Bowl', calories: 220, proteinG: 20, carbsG: 25, fatG: 4 }],
+        }),
+      });
+
+      const result = await executeMultiProviderVision<any>({
+        imageBase64: 'fakebase64',
+        prompt: 'Analyze food',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('gemini');
+      expect(result.data.mealName).toBe('Gemini Scanned Meal');
+      fetchSpy.mockRestore();
+    });
+
+    it('supports OpenRouter vision when explicitly configured with non-free model', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      OPENROUTER_VISION_MODELS.push('custom/enterprise-vision');
+
+      try {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+          if (String(url).includes('groq.com')) {
+            return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+              status: 429,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          if (String(url).includes('openrouter.ai')) {
+            return new Response(
+              JSON.stringify({
+                choices: [
+                  {
+                    message: {
+                      content: JSON.stringify({
+                        mealName: 'OpenRouter Scanned Meal',
+                        items: [{ name: 'Rice & Chicken', calories: 450, proteinG: 40, carbsG: 45, fatG: 10 }],
+                      }),
+                    },
+                  },
+                ],
+              }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+          return new Response('Not found', { status: 404 });
+        });
+
+        const result = await executeMultiProviderVision<any>({
+          imageBase64: 'fakebase64',
+          prompt: 'Analyze food',
+          timeoutMs: 1000,
+        });
+
+        expect(result.provider).toBe('openrouter');
+        expect(result.data.mealName).toBe('OpenRouter Scanned Meal');
+        fetchSpy.mockRestore();
+      } finally {
+        OPENROUTER_VISION_MODELS.length = 0;
+      }
+    });
+
+    it('blocks OpenRouter free-tier (:free) models from receiving meal photos to protect user data', async () => {
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      OPENROUTER_VISION_MODELS.push('meta/llama-3.2-11b-vision:free');
+
+      try {
+        await expect(
+          executeMultiProviderVision({
+            imageBase64: 'fakebase64',
+            prompt: 'Analyze food',
+            timeoutMs: 1000,
+          })
+        ).rejects.toThrow(/prohibited for user meal photos/);
+      } finally {
+        OPENROUTER_VISION_MODELS.length = 0;
+      }
+    });
+
+    it('aborts immediately and cancels downstream attempts when signal is aborted', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+
+      const abortController = new AbortController();
+      abortController.abort(); // already aborted
+
+      await expect(
+        executeMultiProviderVision({
+          imageBase64: 'fakebase64',
+          prompt: 'Analyze food',
+          timeoutMs: 1000,
+          signal: abortController.signal,
+        })
+      ).rejects.toThrow();
+    });
+
+    it('throws error when all vision providers fail', async () => {
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+        return new Response(JSON.stringify({ error: { message: 'OpenRouter down' } }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      });
+
+      mockGenerateContent.mockRejectedValue(new Error('Gemini quota exceeded'));
+
+      await expect(
+        executeMultiProviderVision({
+          imageBase64: 'fakebase64',
+          prompt: 'Analyze food',
+          timeoutMs: 1000,
+        })
+      ).rejects.toThrow(/All vision AI providers/);
+
+      fetchSpy.mockRestore();
+    });
+
+    it('enforces one shared wall-clock deadline when all providers hang or time out', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      // Simulate network requests hanging until abort
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init: any) => {
+        return new Promise((_resolve, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener('abort', () => reject(new Error('AbortError')));
+          }
+        });
+      });
+
+      mockGenerateContent.mockImplementation((params: any) => {
+        return new Promise((_resolve, reject) => {
+          const signal = params?.config?.abortSignal;
+          if (signal) {
+            signal.addEventListener('abort', () => reject(new Error('AbortError')));
+          }
+        });
+      });
+
+      const deadlineMs = 300;
+      const start = Date.now();
+
+      await expect(
+        executeMultiProviderVision({
+          imageBase64: 'fakebase64',
+          prompt: 'Analyze food',
+          timeoutMs: deadlineMs,
+        })
+      ).rejects.toThrow(/timed out within the shared|wall-clock deadline|All vision AI providers failed/);
+
+      const elapsed = Date.now() - start;
+      // Proves the shared deadline aborted early rather than accumulating sequential timeouts (5s+6s+8s)
+      expect(elapsed).toBeGreaterThanOrEqual(200);
+      expect(elapsed).toBeLessThan(1500);
+
       fetchSpy.mockRestore();
     });
   });
@@ -91,6 +285,7 @@ describe('AI Multi-Provider Engine', () => {
     beforeEach(() => {
       process.env = { ...originalEnv };
       vi.restoreAllMocks();
+      mockGenerateContent.mockReset();
     });
 
     afterEach(() => {
@@ -98,9 +293,10 @@ describe('AI Multi-Provider Engine', () => {
       vi.restoreAllMocks();
     });
 
-    it('falls over from failed Gemini to Groq text model', async () => {
-      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+    it('prioritizes Groq as Stage 1 for text inference', async () => {
       process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
         if (String(url).includes('groq.com')) {
@@ -132,15 +328,14 @@ describe('AI Multi-Provider Engine', () => {
       fetchSpy.mockRestore();
     });
 
-    it('falls over to OpenRouter when both Gemini and Groq fail', async () => {
-      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+    it('falls over from failed Groq to OpenRouter text model', async () => {
       process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
       process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
         if (String(url).includes('groq.com')) {
-          return new Response(JSON.stringify({ error: { message: 'Rate limited' } }), {
-            status: 429,
+          return new Response(JSON.stringify({ error: { message: 'Groq unavailable' } }), {
+            status: 503,
             headers: { 'Content-Type': 'application/json' },
           });
         }
@@ -170,6 +365,119 @@ describe('AI Multi-Provider Engine', () => {
 
       expect(result.provider).toBe('openrouter');
       expect(result.data.plan).toBe('OpenRouter Workout Plan');
+      fetchSpy.mockRestore();
+    });
+
+    it('falls over to Gemini when OpenRouter text model fails', async () => {
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url).includes('openrouter.ai')) {
+          return new Response(JSON.stringify({ error: { message: 'OpenRouter down' } }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          plan: 'Gemini Workout Plan',
+        }),
+      });
+
+      const result = await executeMultiProviderText<any>({
+        prompt: 'Generate plan',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('gemini');
+      expect(result.data.plan).toBe('Gemini Workout Plan');
+      fetchSpy.mockRestore();
+    });
+
+    it('aborts text execution immediately when signal is cancelled', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        executeMultiProviderText({
+          prompt: 'Generate plan',
+          timeoutMs: 1000,
+          signal: controller.signal,
+        })
+      ).rejects.toThrow();
+    });
+
+    it('enforces one shared wall-clock deadline when all text providers hang or time out', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init: any) => {
+        return new Promise((_resolve, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener('abort', () => reject(new Error('AbortError')));
+          }
+        });
+      });
+
+      mockGenerateContent.mockImplementation((params: any) => {
+        return new Promise((_resolve, reject) => {
+          const signal = params?.config?.abortSignal;
+          if (signal) {
+            signal.addEventListener('abort', () => reject(new Error('AbortError')));
+          }
+        });
+      });
+
+      const deadlineMs = 300;
+      const start = Date.now();
+
+      await expect(
+        executeMultiProviderText({
+          prompt: 'Generate plan',
+          timeoutMs: deadlineMs,
+        })
+      ).rejects.toThrow(/timed out within the shared|wall-clock deadline|All text AI providers failed/);
+
+      const elapsed = Date.now() - start;
+      expect(elapsed).toBeGreaterThanOrEqual(200);
+      expect(elapsed).toBeLessThan(1500);
+
+      fetchSpy.mockRestore();
+    });
+
+    it('aborts text execution mid-flight when client signal is cancelled and cleans up active requests', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+
+      let receivedSignal: AbortSignal | undefined;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init: any) => {
+        receivedSignal = init?.signal;
+        return new Promise((_resolve, reject) => {
+          if (init?.signal) {
+            init.signal.addEventListener('abort', () => reject(new Error('AbortError')));
+          }
+        });
+      });
+
+      const controller = new AbortController();
+      const promise = executeMultiProviderText({
+        prompt: 'Generate plan',
+        timeoutMs: 5000,
+        signal: controller.signal,
+      });
+
+      // Abort after 40ms while in-flight
+      setTimeout(() => controller.abort(), 40);
+
+      await expect(promise).rejects.toThrow();
+      expect(receivedSignal?.aborted).toBe(true);
+
       fetchSpy.mockRestore();
     });
   });

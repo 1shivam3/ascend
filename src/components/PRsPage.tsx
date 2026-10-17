@@ -466,8 +466,8 @@ function LiftCard({
       {/* 1. Exercise Header & Prominent 1RM */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base sm:text-lg font-bold text-text-primary capitalize leading-tight font-sans">
-            {item.exercise}
+          <h3 className="display-title font-display uppercase tracking-tight text-lg sm:text-xl text-text-primary leading-tight">
+            {item.exercise.toUpperCase()}.
           </h3>
           <p className="text-xs text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
             <span>
@@ -1041,10 +1041,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             </button>
           )}
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">
-              Personal Records
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">PERSONAL BESTS</div>
+            <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">
+              PERSONAL RECORDS.
             </h1>
-            <p className="text-2xs text-text-muted font-mono">Ranked by real bodyweight standards</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">

@@ -326,11 +326,11 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* Header */}
           <div className="flex items-center justify-between pb-2 border-b border-border/80">
             <div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
-                ASCEND SETTINGS
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#FF6B1F] block">
+                ATHLETE PREFERENCES
               </span>
-              <h2 className="text-lg font-black text-text-primary tracking-tight font-display">
-                Athlete Settings
+              <h2 className="display-title font-display uppercase tracking-tight text-xl sm:text-2xl text-text-primary">
+                YOUR PROFILE.
               </h2>
             </div>
             <button
@@ -510,7 +510,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-2xs text-text-muted font-mono">Not configured</span>
+                      <span className="text-2xs text-text-muted font-mono">Not set</span>
                     )}
                   </div>
                 </div>

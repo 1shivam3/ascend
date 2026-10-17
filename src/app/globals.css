@@ -3,39 +3,86 @@
 @tailwind utilities;
 
 :root {
-  /* Clean Light Theme — Crisp Off-White, Deep Navy & Energetic Orange */
-  --bg-primary: 248 250 252;      /* slate-50 #f8fafc */
-  --bg-secondary: 241 245 249;    /* slate-100 #f1f5f9 */
-  --bg-tertiary: 226 232 240;     /* slate-200 #e2e8f0 */
-  --bg-card: 255 255 255;         /* white */
-  --bg-elevated: 255 255 255;     /* white */
-  --text-primary: 15 23 42;       /* slate-900 #0f172a - deep navy */
-  --text-secondary: 71 85 105;    /* slate-600 #475569 */
-  --text-muted: 100 116 139;      /* slate-500 #64748b */
-  --border: 226 232 240;          /* slate-200 #e2e8f0 */
-  --border-subtle: 241 245 249;   /* slate-100 */
-  --border-hover: 203 213 225;    /* slate-300 */
-  --accent: 234 88 12;            /* orange-600 #ea580c — primary brand action */
-  --accent-dim: 194 65 12;        /* orange-700 #c2410c */
-  --accent-glow: rgba(234, 88, 12, 0.16);
+  /* Chalk (Light) — Warm Luxury Gallery Paper Logbook (Figma Reference) */
+  --bg-primary: 246 245 242;      /* #F6F5F2 warm chalk off-white */
+  --bg-secondary: 238 236 231;    /* #EEECE7 sunken container */
+  --bg-tertiary: 230 227 220;     /* #E6E3DC */
+  --bg-card: 255 255 255;         /* #FFFFFF pure crisp white surface */
+  --bg-elevated: 255 255 255;     /* #FFFFFF */
+  --text-primary: 18 19 18;       /* #121312 near-black typography */
+  --text-secondary: 85 88 83;     /* #555853 refined body text */
+  --text-muted: 130 134 128;      /* #828680 muted meta */
+  --border: 229 227 221;          /* #E5E3DD hairline subtle border */
+  --border-subtle: 238 236 230;   /* #EEECE6 */
+  --border-hover: 160 156 148;    /* #A09C94 */
+  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
+  --accent-dim: 224 88 18;        /* #E05812 */
+  --accent-glow: rgba(255, 107, 31, 0.16);
+
+  /* Direct CSS Specification Tokens */
+  --bg: #F6F5F2;
+  --surface: #FFFFFF;
+  --sunken: #EEECE7;
+  --border-hex: #E5E3DD;
+  --border-control: #A09C94;
+  --text: #121312;
+  --text-2: #555853;
+  --text-3: #828680;
+  --accent-hex: #FF6B1F;
+  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
+  --accent-subtle: #FFF3EB;
+  --accent-text: #E05812;
+  --success: #1B6E45;
+  --success-bg: #E3F1E9;
+  --warning: #8A5A00;
+  --warning-bg: #FBF0D3;
+  --danger: #B42318;
+  --danger-bg: #FDE8E6;
+  --scrim: rgba(18, 17, 16, 0.5);
+  --inverse: #121312;
+  --inverse-text: #F6F5F2;
 }
 
-.dark {
-  /* Strict "Precision Training" Near-Black Palette */
-  --bg-primary: 9 9 11;           /* #09090B - true near-black canvas */
-  --bg-secondary: 20 20 23;       /* #141417 - single dark elevated surface */
-  --bg-tertiary: 28 28 33;        /* #1C1C21 - high contrast surface */
-  --bg-card: 20 20 23;            /* #141417 */
-  --bg-elevated: 28 28 33;        /* #1C1C21 */
-  --text-primary: 250 250 250;    /* #FAFAFA - crisp strong white */
-  --text-secondary: 161 161 170;  /* #A1A1AA - neutral secondary */
-  --text-muted: 156 163 175;      /* #9CA3AF - high-contrast muted text (5.4:1 on #141417) */
-  --border: 39 39 42;             /* #27272A - subtle hairline divider */
-  --border-subtle: 28 28 31;      /* #1C1C1F */
-  --border-hover: 63 63 70;       /* #3F3F46 */
-  --accent: 249 115 22;           /* #F97316 - ASCEND orange for action */
-  --accent-dim: 234 88 12;
-  --accent-glow: rgba(249, 115, 22, 0.15);
+.dark,
+:root[data-theme='dark'] {
+  /* Charcoal (Dark) — Deep Athletic Cockpit (Figma Reference) */
+  --bg-primary: 18 19 18;         /* #121312 deep charcoal surface */
+  --bg-secondary: 27 28 26;       /* #1B1C1A sunken container */
+  --bg-tertiary: 35 37 34;        /* #232522 */
+  --bg-card: 27 28 26;            /* #1B1C1A card surface */
+  --bg-elevated: 34 36 33;        /* #222421 elevated */
+  --text-primary: 245 245 243;    /* #F5F5F3 readable warm-white */
+  --text-secondary: 168 172 165;  /* #A8ACA5 secondary text */
+  --text-muted: 115 120 113;      /* #737871 muted meta */
+  --border: 39 40 38;             /* #272826 hairline border */
+  --border-subtle: 30 31 29;
+  --border-hover: 70 75 70;
+  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
+  --accent-dim: 224 88 18;
+  --accent-glow: rgba(255, 107, 31, 0.2);
+
+  /* Direct CSS Specification Tokens */
+  --bg: #121312;
+  --surface: #1B1C1A;
+  --sunken: #0D0E0D;
+  --border-hex: #272826;
+  --border-control: #464B46;
+  --text: #F5F5F3;
+  --text-2: #A8ACA5;
+  --text-3: #737871;
+  --accent-hex: #FF6B1F;
+  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
+  --accent-subtle: #2C1608;
+  --accent-text: #FFA066;
+  --success: #34D399;
+  --success-bg: #12281D;
+  --warning: #FBBF24;
+  --warning-bg: #2B2210;
+  --danger: #F87171;
+  --danger-bg: #3A1714;
+  --scrim: rgba(0, 0, 0, 0.7);
+  --inverse: #F5F5F3;
+  --inverse-text: #121312;
 }
 
 @layer base {
@@ -101,7 +148,7 @@
     @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
-  /* Solid vibrant orange primary CTA — exclusively for actionable intent */
+  /* Solid #FF6B1F primary CTA — verified AAA high contrast on orange */
   .btn-primary {
     @apply bg-accent text-stone-950 font-bold px-4 py-2.5 rounded-xl text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
@@ -131,6 +178,11 @@
     min-height: 40px;
   }
 
+  /* Figma Display Heading (Barlow Condensed, all-caps, athletic precision) */
+  .display-title {
+    @apply font-display uppercase tracking-tight text-2xl sm:text-3xl font-bold text-text-primary;
+  }
+
   /* Section Title: disciplined 13-14px, sentence case or subtle uppercase */
   .section-title {
     @apply text-[13px] font-semibold tracking-wide text-text-muted font-sans;
@@ -148,8 +200,8 @@
   .native-tab-bar {
     @apply fixed left-0 right-0 bottom-0 z-40;
     @apply bg-bg-primary/95 backdrop-blur-xl;
-    @apply border-t border-border/50;
-    @apply flex items-center justify-around px-2 pt-2;
+    @apply border-t border-border/60;
+    @apply flex items-center justify-around px-2 pt-1.5;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
   }
 
@@ -160,7 +212,11 @@
   }
 
   .native-tab-item.active {
-    @apply text-accent font-semibold;
+    @apply text-text-primary font-semibold;
+  }
+
+  .native-tab-indicator {
+    @apply absolute top-0 w-6 h-[3px] rounded-full bg-accent;
   }
 
   /* Mobile-first centered container with safe bottom spacing */
@@ -184,6 +240,28 @@
     @apply border border-border shadow-2xl;
     @apply animate-slide-up;
     @apply pb-[max(env(safe-area-inset-bottom),1.25rem)];
+  }
+
+  /* Segmented Pill Switcher (Matches Mockup Reference Images) */
+  .segmented-control {
+    @apply flex items-center p-1 rounded-xl bg-bg-secondary border border-border/70 gap-1;
+  }
+
+  .segmented-item {
+    @apply flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none;
+  }
+
+  .segmented-item.active {
+    @apply bg-bg-card text-text-primary shadow-xs;
+  }
+
+  .segmented-item:not(.active) {
+    @apply text-text-muted hover:text-text-primary;
+  }
+
+  /* Large Circular Stepper Button (For Active Workout HUD) */
+  .stepper-btn {
+    @apply w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-bg-secondary hover:bg-bg-tertiary text-text-primary border border-border/80 font-bold text-xl sm:text-2xl flex items-center justify-center active:scale-90 transition-all cursor-pointer shadow-xs select-none;
   }
 }
 

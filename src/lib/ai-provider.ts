@@ -12,18 +12,47 @@ export interface VisionOptions {
   prompt: string;
   systemPrompt?: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface TextOptions {
   prompt: string;
   systemPrompt?: string;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 export interface ProviderExecutionResult<T> {
   data: T;
   provider: 'gemini' | 'groq' | 'openrouter';
   model: string;
+}
+
+/**
+ * Creates an AbortController combining a timeout with an optional caller AbortSignal.
+ */
+function createTimeoutController(timeoutMs: number, parentSignal?: AbortSignal) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  let onAbort: (() => void) | null = null;
+  if (parentSignal) {
+    if (parentSignal.aborted) {
+      controller.abort();
+    } else {
+      onAbort = () => controller.abort();
+      parentSignal.addEventListener('abort', onAbort, { once: true });
+    }
+  }
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    if (onAbort && parentSignal) {
+      parentSignal.removeEventListener('abort', onAbort);
+    }
+  };
+
+  return { signal: controller.signal, cleanup };
 }
 
 /**
@@ -62,49 +91,52 @@ export function cleanAndParseJson<T = any>(rawText: string): T {
   return JSON.parse(cleaned) as T;
 }
 
-// Active models supported by Google GenAI SDK (v1alpha / v1beta)
-const GEMINI_VISION_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-  'gemini-3.7-flash',
-  'gemini-flash-latest',
-  'gemini-flash-lite-latest',
-];
-
-const GEMINI_TEXT_MODELS = [
-  'gemini-3.1-flash-lite',
-  'gemini-3.5-flash-lite',
-  'gemini-3.5-flash',
-  'gemini-3.7-flash',
-  'gemini-flash-latest',
-  'gemini-flash-lite-latest',
-];
+// Shared wall-clock execution limits
+export const DEFAULT_AI_TIMEOUT_MS = 19000;
+export const GROQ_STAGE_TIMEOUT_MS = 5000;
+export const OPENROUTER_STAGE_TIMEOUT_MS = 6000;
+export const GEMINI_STAGE_TIMEOUT_MS = 8000;
 
 // Groq models: ultra-fast inference with dedicated LPU
-const GROQ_VISION_MODELS: string[] = [
-  // Groq's active tier focuses on high-speed text & audio reasoning
+// qwen/qwen3.8-27b verified live with multimodal image inputs in ~550ms.
+// Text models (openai/gpt-oss-120b, openai/gpt-oss-20b) are strictly text-only and excluded from vision.
+export const GROQ_VISION_MODELS = [
+  'qwen/qwen3.8-27b',
 ];
 
-const GROQ_TEXT_MODELS = [
+export const GROQ_TEXT_MODELS = [
   'openai/gpt-oss-120b',
   'openai/gpt-oss-20b',
   'qwen/qwen3.8-27b',
 ];
 
-// OpenRouter verified free models
-const OPENROUTER_VISION_MODELS = [
-  'dots-studio/dots-3-note-preview:free',
-  'nvidia/nemotron-3.5-super-vl:free',
-  'google/gemma-4-31b-it:free',
-  'google/gemma-4-26b-a4b-it:free',
+// OpenRouter Vision Models:
+// OpenRouter routes requests through third-party host aggregators whose data retention terms vary.
+// Free-tier endpoints (:free) log prompts and imagery for host model training, making them unsuitable for meal photos.
+// Production meal photos route directly to verified first-party developer endpoints (Groq LPU and Google Gemini API).
+// OpenRouter is intentionally skipped for vision (empty array) to guarantee user photo privacy.
+export const OPENROUTER_VISION_MODELS: string[] = [];
+
+// OpenRouter verified models for text-only (natural language logging, coach)
+// Empirically tested live with sub-3s response latencies under valid JSON completion
+export const OPENROUTER_TEXT_MODELS = [
+  'liquid/lfm-2.5-2.6b:free',
+  'poolside/laguna-xs-2.1:free',
 ];
 
-const OPENROUTER_TEXT_MODELS = [
-  'nvidia/nemotron-3.5-lightning:free',
-  'google/gemma-4-31b-it:free',
-  'liquid/lfm-2.5-2.6b:free',
-  'poolside/laguna-s-2.1:free',
+// Active production models supported by Google GenAI SDK (@google/genai)
+// Both gemini-3.1-flash-lite and gemini-3.5-flash-lite have been empirically verified live
+// with multimodal meal image inference (~1.9s - 2.3s latency) and separate active quotas.
+// Note: gemini-3.5-flash was verified to route to gemini-3.6-flash which hit daily free quota (429),
+// and gemini-2.5-flash is decommissioned for new users (404).
+export const GEMINI_VISION_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
+];
+
+export const GEMINI_TEXT_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash-lite',
 ];
 
 /**
@@ -117,8 +149,7 @@ async function callGeminiVision<T>(
   timeoutMs: number
 ): Promise<T> {
   const ai = new GoogleGenAI({ apiKey });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const imagePart = {
@@ -137,13 +168,13 @@ async function callGeminiVision<T>(
       contents: [imagePart, fullPrompt],
       config: {
         responseMimeType: 'application/json',
-        abortSignal: controller.signal,
+        abortSignal: signal,
       },
     });
 
     return cleanAndParseJson<T>(response.text || '');
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
@@ -156,8 +187,7 @@ async function callGroqVision<T>(
   opts: VisionOptions,
   timeoutMs: number
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const mime = opts.mimeType || 'image/jpeg';
@@ -187,10 +217,9 @@ async function callGroqVision<T>(
       body: JSON.stringify({
         model,
         messages,
-        response_format: { type: 'json_object' },
         temperature: 0.1,
       }),
-      signal: controller.signal,
+      signal,
     });
 
     if (!res.ok) {
@@ -206,7 +235,7 @@ async function callGroqVision<T>(
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
@@ -219,8 +248,13 @@ async function callOpenRouterVision<T>(
   opts: VisionOptions,
   timeoutMs: number
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (model.endsWith(':free')) {
+    throw new Error(
+      `OpenRouter model ${model} uses free-tier third-party logging/training terms and is strictly prohibited for user meal photos`
+    );
+  }
+
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const mime = opts.mimeType || 'image/jpeg';
@@ -248,14 +282,14 @@ async function callOpenRouterVision<T>(
         Authorization: `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://ascendtonext.vercel.app',
         'X-Title': 'ASCEND Strength System',
+        'X-Data-Collection': 'deny',
       },
       body: JSON.stringify({
         model,
         messages,
-        response_format: { type: 'json_object' },
         temperature: 0.1,
       }),
-      signal: controller.signal,
+      signal,
     });
 
     if (!res.ok) {
@@ -271,70 +305,125 @@ async function callOpenRouterVision<T>(
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
 /**
  * Unified Multi-Provider Vision Execution with Automatic Cascading Fallback:
- * Gemini -> Groq -> OpenRouter
+ * Groq -> OpenRouter -> Gemini
+ *
+ * Enforces one strict shared wall-clock deadline (default 19s) across all stages and models,
+ * with real-time AbortSignal propagation and user cancellation.
  */
 export async function executeMultiProviderVision<T>(
   opts: VisionOptions
 ): Promise<ProviderExecutionResult<T>> {
-  const timeoutMs = opts.timeoutMs || 15000;
   const errors: string[] = [];
+  const overallTimeoutMs = opts.timeoutMs ?? DEFAULT_AI_TIMEOUT_MS;
+  const startTime = Date.now();
+  const deadline = startTime + overallTimeoutMs;
 
-  // --- STAGE 1: GOOGLE GEMINI ---
-  const geminiKey = getServerGeminiApiKey();
-  if (geminiKey) {
-    for (const model of GEMINI_VISION_MODELS) {
-      try {
-        const data = await callGeminiVision<T>(geminiKey, model, opts, timeoutMs);
-        return { data, provider: 'gemini', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`Gemini [${model}]: ${msg}`);
-        // If 429 quota exhausted or 503 unavailable, try next model or next provider
-      }
-    }
-  } else {
-    errors.push('Gemini: GEMINI_API_KEY not configured');
+  if (opts.signal?.aborted) {
+    throw new Error('Vision request was aborted by client');
   }
 
-  // --- STAGE 2: GROQ CLOUD ---
-  const groqKey = getServerGroqApiKey();
-  if (groqKey) {
-    for (const model of GROQ_VISION_MODELS) {
-      try {
-        const data = await callGroqVision<T>(groqKey, model, opts, timeoutMs);
-        return { data, provider: 'groq', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`Groq [${model}]: ${msg}`);
-      }
-    }
-  } else {
-    errors.push('Groq: GROQ_API_KEY not configured');
+  // Master controller enforcing the shared wall-clock deadline across ALL providers
+  const masterController = new AbortController();
+  const masterTimer = setTimeout(() => {
+    masterController.abort(
+      new Error(`AI vision request exceeded shared wall-clock deadline of ${overallTimeoutMs}ms`)
+    );
+  }, overallTimeoutMs);
+
+  const parentSignal = opts.signal;
+  let onParentAbort: (() => void) | null = null;
+  if (parentSignal) {
+    onParentAbort = () => {
+      masterController.abort(parentSignal.reason || new Error('Vision request was aborted by client'));
+    };
+    parentSignal.addEventListener('abort', onParentAbort, { once: true });
   }
 
-  // --- STAGE 3: OPENROUTER ---
-  const openRouterKey = getServerOpenRouterApiKey();
-  if (openRouterKey) {
-    for (const model of OPENROUTER_VISION_MODELS) {
-      try {
-        const data = await callOpenRouterVision<T>(openRouterKey, model, opts, timeoutMs);
-        return { data, provider: 'openrouter', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`OpenRouter [${model}]: ${msg}`);
+  const getRemainingTime = () => Math.max(0, deadline - Date.now());
+  const scopedOpts: VisionOptions = {
+    ...opts,
+    signal: masterController.signal,
+  };
+
+  try {
+    // --- STAGE 1: GROQ CLOUD (Ultra-Fast LPU Inference ~500ms, max 5s timeout) ---
+    const groqKey = getServerGroqApiKey();
+    if (groqKey) {
+      for (const model of GROQ_VISION_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(GROQ_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callGroqVision<T>(groqKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'groq', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`Groq [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('Groq: GROQ_API_KEY not configured');
+    }
+
+    // --- STAGE 2: OPENROUTER (Skipped for vision by default to protect photo privacy) ---
+    const openRouterKey = getServerOpenRouterApiKey();
+    if (openRouterKey && OPENROUTER_VISION_MODELS.length > 0) {
+      for (const model of OPENROUTER_VISION_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(OPENROUTER_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callOpenRouterVision<T>(openRouterKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'openrouter', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`OpenRouter [${model}]: ${msg}`);
+        }
       }
     }
-  } else {
-    errors.push('OpenRouter: OPENROUTER_API_KEY not configured');
-  }
 
-  throw new Error(`All vision AI providers failed:\n${errors.join('\n')}`);
+    // --- STAGE 3: GOOGLE GEMINI (Enterprise developer endpoints, max 8s per model) ---
+    const geminiKey = getServerGeminiApiKey();
+    if (geminiKey) {
+      for (const model of GEMINI_VISION_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(GEMINI_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callGeminiVision<T>(geminiKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'gemini', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`Gemini [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('Gemini: GEMINI_API_KEY not configured');
+    }
+
+    const elapsed = Date.now() - startTime;
+    if (masterController.signal.aborted && !parentSignal?.aborted) {
+      throw new Error(
+        `All vision AI providers timed out within the shared ${overallTimeoutMs}ms wall-clock deadline (${elapsed}ms elapsed):\n${errors.join('\n')}`
+      );
+    }
+
+    throw new Error(`All vision AI providers failed (${elapsed}ms elapsed):\n${errors.join('\n')}`);
+  } finally {
+    clearTimeout(masterTimer);
+    if (onParentAbort && parentSignal) {
+      parentSignal.removeEventListener('abort', onParentAbort);
+    }
+  }
 }
 
 /**
@@ -347,8 +436,7 @@ async function callGeminiText<T>(
   timeoutMs: number
 ): Promise<T> {
   const ai = new GoogleGenAI({ apiKey });
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const fullPrompt = opts.systemPrompt
@@ -360,13 +448,13 @@ async function callGeminiText<T>(
       contents: [fullPrompt],
       config: {
         responseMimeType: 'application/json',
-        abortSignal: controller.signal,
+        abortSignal: signal,
       },
     });
 
     return cleanAndParseJson<T>(response.text || '');
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
@@ -379,8 +467,7 @@ async function callGroqText<T>(
   opts: TextOptions,
   timeoutMs: number
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const messages: any[] = [];
@@ -404,7 +491,7 @@ async function callGroqText<T>(
         response_format: { type: 'json_object' },
         temperature: 0.2,
       }),
-      signal: controller.signal,
+      signal,
     });
 
     if (!res.ok) {
@@ -420,7 +507,7 @@ async function callGroqText<T>(
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
@@ -433,8 +520,7 @@ async function callOpenRouterText<T>(
   opts: TextOptions,
   timeoutMs: number
 ): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
 
   try {
     const messages: any[] = [];
@@ -457,10 +543,9 @@ async function callOpenRouterText<T>(
       body: JSON.stringify({
         model,
         messages,
-        response_format: { type: 'json_object' },
         temperature: 0.2,
       }),
-      signal: controller.signal,
+      signal,
     });
 
     if (!res.ok) {
@@ -476,67 +561,125 @@ async function callOpenRouterText<T>(
     const rawContent = json.choices?.[0]?.message?.content || '';
     return cleanAndParseJson<T>(rawContent);
   } finally {
-    clearTimeout(timer);
+    cleanup();
   }
 }
 
 /**
  * Unified Multi-Provider Text Execution with Automatic Cascading Fallback:
- * Gemini -> Groq -> OpenRouter
+ * Groq -> OpenRouter -> Gemini
+ *
+ * Enforces one strict shared wall-clock deadline (default 19s) across all stages and models,
+ * with real-time AbortSignal propagation and user cancellation.
  */
 export async function executeMultiProviderText<T>(
   opts: TextOptions
 ): Promise<ProviderExecutionResult<T>> {
-  const timeoutMs = opts.timeoutMs || 15000;
   const errors: string[] = [];
+  const overallTimeoutMs = opts.timeoutMs ?? DEFAULT_AI_TIMEOUT_MS;
+  const startTime = Date.now();
+  const deadline = startTime + overallTimeoutMs;
 
-  // --- STAGE 1: GOOGLE GEMINI ---
-  const geminiKey = getServerGeminiApiKey();
-  if (geminiKey) {
-    for (const model of GEMINI_TEXT_MODELS) {
-      try {
-        const data = await callGeminiText<T>(geminiKey, model, opts, timeoutMs);
-        return { data, provider: 'gemini', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`Gemini [${model}]: ${msg}`);
-      }
-    }
-  } else {
-    errors.push('Gemini: GEMINI_API_KEY not configured');
+  if (opts.signal?.aborted) {
+    throw new Error('Text request was aborted by client');
   }
 
-  // --- STAGE 2: GROQ CLOUD ---
-  const groqKey = getServerGroqApiKey();
-  if (groqKey) {
-    for (const model of GROQ_TEXT_MODELS) {
-      try {
-        const data = await callGroqText<T>(groqKey, model, opts, timeoutMs);
-        return { data, provider: 'groq', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`Groq [${model}]: ${msg}`);
-      }
-    }
-  } else {
-    errors.push('Groq: GROQ_API_KEY not configured');
+  // Master controller enforcing the shared wall-clock deadline across ALL providers
+  const masterController = new AbortController();
+  const masterTimer = setTimeout(() => {
+    masterController.abort(
+      new Error(`AI text request exceeded shared wall-clock deadline of ${overallTimeoutMs}ms`)
+    );
+  }, overallTimeoutMs);
+
+  const parentSignal = opts.signal;
+  let onParentAbort: (() => void) | null = null;
+  if (parentSignal) {
+    onParentAbort = () => {
+      masterController.abort(parentSignal.reason || new Error('Text request was aborted by client'));
+    };
+    parentSignal.addEventListener('abort', onParentAbort, { once: true });
   }
 
-  // --- STAGE 3: OPENROUTER ---
-  const openRouterKey = getServerOpenRouterApiKey();
-  if (openRouterKey) {
-    for (const model of OPENROUTER_TEXT_MODELS) {
-      try {
-        const data = await callOpenRouterText<T>(openRouterKey, model, opts, timeoutMs);
-        return { data, provider: 'openrouter', model };
-      } catch (err: any) {
-        const msg = redactSecrets(err?.message || String(err));
-        errors.push(`OpenRouter [${model}]: ${msg}`);
-      }
-    }
-  } else {
-    errors.push('OpenRouter: OPENROUTER_API_KEY not configured');
-  }
+  const getRemainingTime = () => Math.max(0, deadline - Date.now());
+  const scopedOpts: TextOptions = {
+    ...opts,
+    signal: masterController.signal,
+  };
 
-  throw new Error(`All text AI providers failed:\n${errors.join('\n')}`);
+  try {
+    // --- STAGE 1: GROQ CLOUD (Ultra-Fast LPU Text ~300ms, max 5s timeout) ---
+    const groqKey = getServerGroqApiKey();
+    if (groqKey) {
+      for (const model of GROQ_TEXT_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(GROQ_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callGroqText<T>(groqKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'groq', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`Groq [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('Groq: GROQ_API_KEY not configured');
+    }
+
+    // --- STAGE 2: OPENROUTER (Bounded 6s fallback) ---
+    const openRouterKey = getServerOpenRouterApiKey();
+    if (openRouterKey) {
+      for (const model of OPENROUTER_TEXT_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(OPENROUTER_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callOpenRouterText<T>(openRouterKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'openrouter', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`OpenRouter [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('OpenRouter: OPENROUTER_API_KEY not configured');
+    }
+
+    // --- STAGE 3: GOOGLE GEMINI (Final Distinct Fallback, max 8s per model) ---
+    const geminiKey = getServerGeminiApiKey();
+    if (geminiKey) {
+      for (const model of GEMINI_TEXT_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(GEMINI_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callGeminiText<T>(geminiKey, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'gemini', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`Gemini [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('Gemini: GEMINI_API_KEY not configured');
+    }
+
+    const elapsed = Date.now() - startTime;
+    if (masterController.signal.aborted && !parentSignal?.aborted) {
+      throw new Error(
+        `All text AI providers timed out within the shared ${overallTimeoutMs}ms wall-clock deadline (${elapsed}ms elapsed):\n${errors.join('\n')}`
+      );
+    }
+
+    throw new Error(`All text AI providers failed (${elapsed}ms elapsed):\n${errors.join('\n')}`);
+  } finally {
+    clearTimeout(masterTimer);
+    if (onParentAbort && parentSignal) {
+      parentSignal.removeEventListener('abort', onParentAbort);
+    }
+  }
 }

@@ -10,6 +10,7 @@ export interface ScanMealOptions {
   file: File | Blob;
   userNotes?: string;
   hiddenIngredients?: string[];
+  signal?: AbortSignal;
 }
 
 /**
@@ -49,7 +50,7 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
       return generateOfflineMealEstimate(options.userNotes, options.hiddenIngredients);
     }
     throw new Error(
-      'You are currently offline. Connect to the internet to analyze photos with Gemini AI, or enter food manually.'
+      'You are currently offline. Connect to the internet to analyze photos with AI, or enter food manually.'
     );
   }
 
@@ -77,6 +78,7 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
     body: formData,
+    signal: options.signal,
   });
 
   if (!response.ok) {
@@ -311,7 +313,7 @@ export function generateOfflineMealEstimate(
       hiddenIngredients: hiddenIngredients || [],
       confidence: 'low',
       coachingNote:
-        'No matching foods found in offline database. Add items manually or connect to internet for Gemini photo scanning.',
+        'No matching foods found in offline database. Add items manually or connect to internet for photo scanning.',
       timestamp: new Date().toISOString(),
       imageUrl: undefined,
     };

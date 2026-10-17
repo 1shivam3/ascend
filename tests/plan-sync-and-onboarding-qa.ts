@@ -22,14 +22,14 @@ function it(name: string, fn: () => void) {
   }
 }
 
-// --- TEST SUITE 1: ONBOARDING NO LONGER ASKS FOR DAYS PER WEEK OR EQUIPMENT ---
-console.log('--- TEST 1: Onboarding Friction Elimination ---');
-it('Onboarding.tsx does NOT render Training Frequency or Equipment questions', () => {
+// --- TEST SUITE 1: ONBOARDING TRAINING FREQUENCY CALIBRATION ---
+console.log('--- TEST 1: Onboarding Training Frequency Calibration ---');
+it('Onboarding.tsx renders Training Days / Wk with 3d, 4d, 5d, 6d options and adaptive split generation', () => {
   const onboardingContent = fs.readFileSync(path.join(process.cwd(), 'src/components/Onboarding.tsx'), 'utf-8');
-  assert(!onboardingContent.includes('Training Frequency'), 'Onboarding should not contain Training Frequency prompt');
-  assert(!onboardingContent.includes('5. Training Frequency'), 'Step 5 should not be Training Frequency');
-  assert(!onboardingContent.includes('Available Equipment'), 'Onboarding should not contain Available Equipment question');
-  assert(onboardingContent.includes('daysPerWeek: 4'), 'Should default daysPerWeek to 4 in profile');
+  assert(onboardingContent.includes('Training Days / Wk'), 'Onboarding should contain Training Days / Wk prompt');
+  assert(onboardingContent.includes("value: '3', label: '3d'"), 'Option 3d must be present');
+  assert(onboardingContent.includes("value: '6', label: '6d'"), 'Option 6d must be present');
+  assert(onboardingContent.includes('preferredSplit: preferredSplit'), 'Should dynamically assign preferredSplit');
   assert(onboardingContent.includes("equipment: 'full_gym'"), 'Should default equipment to full_gym in profile');
 });
 

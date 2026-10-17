@@ -91,6 +91,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const [newItemName, setNewItemName] = useState('');
   const [newItemGrams, setNewItemGrams] = useState(100);
 
+  // Request cancellation ref to abort in-flight meal scans
+  const scanAbortControllerRef = useRef<AbortController | null>(null);
+
   // Stop in-app camera stream and release camera hardware
   const stopLiveCamera = useCallback(() => {
     if (streamRef.current) {
@@ -250,6 +253,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   if (!isOpen) return null;
 
   const handleReset = () => {
+    if (scanAbortControllerRef.current) {
+      scanAbortControllerRef.current.abort();
+      scanAbortControllerRef.current = null;
+    }
     stopLiveCamera();
     cleanupPreview();
     setStep('select');
@@ -264,6 +271,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   };
 
   const handleClose = () => {
+    if (scanAbortControllerRef.current) {
+      scanAbortControllerRef.current.abort();
+      scanAbortControllerRef.current = null;
+    }
     stopLiveCamera();
     handleReset();
     onClose();
@@ -384,6 +395,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       return;
     }
 
+    if (scanAbortControllerRef.current) {
+      scanAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    scanAbortControllerRef.current = controller;
+
     setScanError(null);
     setStep('analyzing');
     try {
@@ -391,6 +408,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         file: processedBlob,
         userNotes: userNotes.trim(),
         hiddenIngredients: selectedHiddenIngredients,
+        signal: controller.signal,
       });
 
       const result = applyLearnedPortionPreferences(rawResult);
@@ -398,6 +416,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setMealName(result.mealName || 'Scanned Meal');
       setStep('review');
     } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message?.toLowerCase().includes('abort')) {
+        setStep('select');
+        return;
+      }
       console.error('Meal scan failed:', err);
       const rawErrorMsg =
         err?.message || 'Failed to analyze meal photo. Please try again.';
@@ -409,13 +431,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         rawErrorMsg.toLowerCase().includes('api_key') ||
         rawErrorMsg.toLowerCase().includes('unconfigured') ||
         rawErrorMsg.toLowerCase().includes('key configured') ||
+        rawErrorMsg.toLowerCase().includes('all vision ai providers failed') ||
+        rawErrorMsg.toLowerCase().includes('groq') ||
+        rawErrorMsg.toLowerCase().includes('openrouter') ||
+        rawErrorMsg.toLowerCase().includes('gemini') ||
         rawErrorMsg.toLowerCase().includes('no_api_key');
       const errorMsg = isKeyErr
-        ? 'Cloud meal recognition is temporarily unavailable. You can use instant offline food estimation below.'
+        ? 'Meal photo recognition is temporarily unavailable. You can use manual food search or instant offline food estimation below.'
         : rawErrorMsg;
       setScanError(errorMsg);
       toast.error(errorMsg, 'Notice');
       setStep('select');
+    } finally {
+      if (scanAbortControllerRef.current === controller) {
+        scanAbortControllerRef.current = null;
+      }
     }
   };
 
@@ -910,13 +940,43 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                 Analyzing Food &amp; Portions...
               </h3>
               <p className="text-xs text-text-muted max-w-xs mx-auto">
-                Gemini is identifying visible dishes, estimating gram weights, and calculating protein, carbs, and calories.
+                Analyzing visible dishes, estimating portion sizes, gram weights, and calculating macronutrients.
               </p>
             </div>
 
             <div className="flex items-center justify-center gap-1.5 text-2xs text-text-secondary font-mono">
               <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />
               <span>Checking regional database &amp; ingredients</span>
+            </div>
+
+            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-xs mx-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  if (scanAbortControllerRef.current) {
+                    scanAbortControllerRef.current.abort();
+                    scanAbortControllerRef.current = null;
+                  }
+                  setStep('select');
+                }}
+                className="btn-secondary w-full py-2 text-xs font-semibold"
+              >
+                Cancel Scan
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (scanAbortControllerRef.current) {
+                    scanAbortControllerRef.current.abort();
+                    scanAbortControllerRef.current = null;
+                  }
+                  handleOfflineEstimate();
+                }}
+                className="btn-ghost w-full py-2 text-xs text-accent font-semibold hover:bg-accent/10 flex items-center justify-center gap-1"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                <span>Instant Offline Estimate</span>
+              </button>
             </div>
           </div>
         )}
@@ -947,7 +1007,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       </h3>
                       <p className="text-xs text-text-muted max-w-sm mx-auto leading-relaxed">
                         {analysis.coachingNote ||
-                          "Gemini couldn't find any identifiable food, drink, or workout supplement in this image."}
+                          'No identifiable food, drink, or workout supplement was detected in this image. Try taking a photo with clearer lighting or framing.'}
                       </p>
                     </div>
 

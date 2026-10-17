@@ -17,28 +17,26 @@ const barlowCondensed = Barlow_Condensed({
 
 export const metadata: Metadata = {
   title: {
-    default: 'ASCEND | Evidence-Based Training & Nutrition System',
+    default: 'ASCEND: Workout and Food Log',
     template: '%s | ASCEND',
   },
   description:
-    'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, calibrated macro tracking, and 100% offline privacy for every gym-goer.',
+    'Log your workouts, see what to lift next, and track protein with Indian foods. Works offline. AI features need a connection.',
   keywords: [
     'gym tracker',
     'workout log',
-    'hypertrophy tracker',
+    'training logbook',
     'progressive overload',
-    'RPE RIR autoregulation',
     'macro tracker',
-    'powerlifting tracker',
+    'indian foods protein',
     'strength standards',
     '1RM calculator',
-    'DOTS calculator',
     'offline fitness webapp',
     'PWA fitness app',
   ],
   authors: [{ name: 'Shivam Kumar' }],
   creator: 'Shivam Kumar',
-  publisher: 'ASCEND Strength Systems',
+  publisher: 'ASCEND',
   manifest: '/manifest.json',
   metadataBase: new URL('https://ascendtonext.vercel.app'),
   openGraph: {
@@ -46,15 +44,15 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://ascendtonext.vercel.app',
     siteName: 'ASCEND',
-    title: 'ASCEND | Evidence-Based Training & Nutrition System',
+    title: 'ASCEND: Workout and Food Log',
     description:
-      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, calibrated macro tracking, and 100% offline privacy for every gym-goer.',
+      'Log your workouts, see what to lift next, and track protein with Indian foods. Works offline. AI features need a connection.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'ASCEND | Evidence-Based Training & Nutrition System',
+    title: 'ASCEND: Workout and Food Log',
     description:
-      'Scientific workout logging, autoregulation (RPE/RIR), progressive overload, and macro tracking with 100% offline privacy.',
+      'Log your workouts, see what to lift next, and track protein with Indian foods. Works offline.',
   },
   appleWebApp: {
     capable: true,

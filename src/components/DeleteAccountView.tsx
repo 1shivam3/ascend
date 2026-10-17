@@ -225,7 +225,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('skipped');
         setStatusDetails(
           data.message ||
-            'Cloud deletion skipped: Supabase cloud is not configured in this environment. Local device data has been purged.'
+            'Cloud deletion skipped: Cloud synchronization is not enabled in this environment. Local device data has been purged.'
         );
         wipeLocalData();
       } else if (res.status === 207 || (data.cloudDeleted === false && data.authPurged)) {
