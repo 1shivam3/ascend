@@ -96,6 +96,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState<0 | 1>(0);
   const [showGuestWarning, setShowGuestWarning] = useState(false);
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isRestoringAccount, setIsRestoringAccount] = useState(false);
 
   // Quick Calibration Fields
   const [name, setName] = useState('');
@@ -116,15 +117,34 @@ export default function OnboardingScreen() {
   // Detect Google auth session or local snapshots on-demand
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const hash = window.location.hash || '';
-    const search = window.location.search || '';
-    const hasAuthCallback = hash.includes('access_token') || hash.includes('error=') || search.includes('code=');
+
+    // Check for OAuth error in URL hash or search params
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashClean = (window.location.hash || '').replace(/^#/, '');
+    const hashParams = new URLSearchParams(hashClean);
+    const oauthError =
+      searchParams.get('error_description') ||
+      searchParams.get('error') ||
+      hashParams.get('error_description') ||
+      hashParams.get('error');
+
+    if (oauthError) {
+      const cleanMsg = decodeURIComponent(oauthError.replace(/\+/g, ' '));
+      toast.error(cleanMsg, 'Sign-In Failed');
+      window.history.replaceState(null, '', window.location.pathname);
+      setIsSigningIn(false);
+      setIsRestoringAccount(false);
+      return;
+    }
+
+    const hasAuthCallback = hashClean.includes('access_token') || window.location.search.includes('code=');
     const hasExistingSession = Boolean(
       localStorage.getItem('sb-auth-token') ||
       Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
     );
 
     if (hasAuthCallback || hasExistingSession) {
+      setIsRestoringAccount(true);
       import('@/lib/supabase/sync').then(({ syncEngine }) => {
         syncEngine.init();
         const currentUser = syncEngine.getCurrentUser();
@@ -133,21 +153,47 @@ export default function OnboardingScreen() {
           if (currentUser.name) {
             setName((prev) => prev || currentUser.name || '');
           }
-          setStep(1);
+          if (useStore.getState().profile || useStore.getState().hasCompletedOnboarding) {
+            setIsRestoringAccount(false);
+            return;
+          }
         }
-        const unsub = syncEngine.subscribe((_s, _l, _e, user) => {
+        const unsub = syncEngine.subscribe((status, _l, error, user) => {
           if (user && !user.isAnonymous) {
             setAuthUser(user);
             if (user.name) {
               setName((prev) => prev || user.name || '');
             }
-            setStep(1);
+          }
+
+          // If store already reconciled the user profile, let the app root auto-render
+          if (useStore.getState().profile || useStore.getState().hasCompletedOnboarding) {
+            setIsRestoringAccount(false);
+            return;
+          }
+
+          if (status === 'synced') {
+            setIsRestoringAccount(false);
+            setIsSigningIn(false);
+            // Synced but profile is truly empty -> brand-new user, proceed to calibration
+            if (!useStore.getState().profile) {
+              setStep(1);
+            }
+          } else if (status === 'error') {
+            setIsRestoringAccount(false);
+            setIsSigningIn(false);
+            if (error) {
+              toast.error(error, 'Sync Error');
+            }
+            if (!useStore.getState().profile) {
+              setStep(1);
+            }
           }
         });
         return unsub;
       });
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     if (authUser?.name && !name) {
@@ -414,8 +460,26 @@ export default function OnboardingScreen() {
           </Card>
         )}
 
+        {/* Restoring / Connecting Cloud Account Card */}
+        {(isRestoringAccount || isSigningIn) && step === 0 && (
+          <Card variant="default" padding="lg" className="space-y-4 text-center border-accent/40 bg-bg-secondary/70 animate-fade-in">
+            <div className="w-12 h-12 mx-auto rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center text-accent shadow-sm">
+              <Loader2 className="w-6 h-6 animate-spin text-[#FF6B1F]" />
+            </div>
+            <div className="space-y-1">
+              <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">CLOUD RECOVERY</div>
+              <h2 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">
+                Connecting Your Account
+              </h2>
+              <p className="text-2xs text-text-muted">
+                Restoring your training profile, PRs, and workout history from the cloud...
+              </p>
+            </div>
+          </Card>
+        )}
+
         {/* ── STEP 0: SIGN-IN CHOICES (Google or Guest) ────────────────────── */}
-        {step === 0 && (
+        {!isRestoringAccount && !isSigningIn && step === 0 && (
           <div className="space-y-4">
             <Card variant="default" padding="md" className="space-y-4">
               <div className="text-center space-y-1">
@@ -537,7 +601,7 @@ export default function OnboardingScreen() {
         )}
 
         {/* ── STEP 1: QUICK CALIBRATION (Frictionless, 4 Basic Details) ───── */}
-        {step === 1 && (
+        {!isRestoringAccount && step === 1 && (
           <div className="space-y-4 animate-fade-in">
             {/* Top Navigation */}
             <div className="flex items-center justify-between pb-1">

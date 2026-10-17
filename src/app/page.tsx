@@ -184,6 +184,12 @@ export default function AppPage() {
 
   useEffect(() => {
     setMounted(true);
+    // Initialize background Supabase sync on root mount to handle OAuth callbacks and token refreshes
+    if (typeof window !== 'undefined') {
+      import('@/lib/supabase/sync').then(({ syncEngine }) => {
+        syncEngine.init();
+      });
+    }
     // Safety fallback: if Zustand storage rehydration takes longer than 600ms, unlock
     const timer = setTimeout(() => {
       if (!useStore.getState()._hasHydrated) {

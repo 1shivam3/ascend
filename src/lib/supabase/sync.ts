@@ -196,7 +196,11 @@ class SupabaseSyncEngine {
       } catch {}
     }
     const supabase = getSupabase();
-    if (!supabase) return { error: 'Supabase is not configured' };
+    if (!supabase) {
+      return {
+        error: 'Cloud authentication is not configured. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment.',
+      };
+    }
 
     try {
       const { error } = await supabase.auth.signInWithOAuth({
@@ -526,6 +530,25 @@ class SupabaseSyncEngine {
           };
           needsLocalUpdate = true;
         }
+      } else if (!localState.profile && (
+        (remotePRs.data && remotePRs.data.length > 0) ||
+        (remoteWorkouts.data && remoteWorkouts.data.length > 0) ||
+        (remoteMeals.data && remoteMeals.data.length > 0)
+      )) {
+        // Cloud account has records, but profiles row was missing/empty. Synthesize athlete profile so returning user is not locked out.
+        updates.profile = {
+          id: user.id,
+          name: extractedName || 'Athlete',
+          gender: 'male',
+          bodyweightKg: 75,
+          bodyweightLbs: 165,
+          unit: 'kg',
+          goals: ['build_muscle'],
+          dietPreference: 'non_vegetarian',
+          createdAt: new Date().toISOString(),
+        };
+        updates.hasCompletedOnboarding = true;
+        needsLocalUpdate = true;
       }
 
       if (isCrossAccountSwitch) {
