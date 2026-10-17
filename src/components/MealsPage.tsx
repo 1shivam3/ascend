@@ -1793,8 +1793,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </button>
           )}
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight">Meals &amp; Macros</h1>
-            <p className="text-label text-text-muted">Track nutrition &amp; fuel your strength</p>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">NUTRITION &amp; FUEL</div>
+            <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">FUEL THE WORK.</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -2009,7 +2009,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label="Log meal"
-                className="px-3 py-1.5 min-h-[36px] rounded-lg bg-accent text-white font-bold text-xs flex items-center gap-1 disabled:opacity-40 hover:brightness-105 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3 py-1.5 min-h-[36px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="animate-pulse text-2xs">...</span>
@@ -2645,7 +2645,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {/* Header */}
             <div className="p-4 border-b border-border flex justify-between items-center">
-              <h2 className="text-base font-bold text-text-primary">Log Meal</h2>
+              <h2 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">LOG MEAL.</h2>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
@@ -2677,7 +2677,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       onClick={() => setMealName(template)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border transition-colors ${
                         mealName === template
-                          ? 'bg-accent text-white border-accent'
+                          ? 'bg-[#FF6B1F] text-stone-950 font-bold border-[#FF6B1F]'
                           : 'bg-bg-elevated border-border text-text-secondary hover:border-accent/60 hover:text-accent'
                       }`}
                     >

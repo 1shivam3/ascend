@@ -56,6 +56,7 @@ import {
   isSetCompleted,
   finalizeWorkoutExercises,
   createWorkoutExercisesFromPlan,
+  getExercisePrescription,
 } from '@/lib/workout-engine';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
@@ -505,6 +506,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
+  const trainingProfile = useStore((state) => state.trainingProfile);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
@@ -1464,51 +1466,191 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     );
   }, [sortedWorkouts, historyFilter]);
 
+  // ─── Screen 4 Figma Blueprint State & Helpers ─────────────────────────────
+  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
+
+  const splitLabel = useMemo(() => {
+    const scheduledDaysCount = weeklySchedule
+      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
+      : 0;
+    const days = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
+    const splitType = trainingProfile?.preferredSplit === 'push_pull_legs' ? 'PUSH / PULL / LEGS' : trainingProfile?.preferredSplit === 'bro_split' ? 'BRO SPLIT' : 'UPPER / LOWER';
+    return `${days}-DAY ${splitType}`;
+  }, [weeklySchedule, trainingProfile]);
+
+  const currentWeekDateRange = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+    const startMonth = startOfWeek.toLocaleDateString('en-US', { month: 'short' });
+    const endMonth = endOfWeek.toLocaleDateString('en-US', { month: 'short' });
+    return startMonth === endMonth
+      ? `${startMonth} ${startOfWeek.getDate()}–${endOfWeek.getDate()}`
+      : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}`;
+  }, []);
+
+  const weeklyScheduleStats = useMemo(() => {
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const weekWorkouts = workouts.filter((w) => new Date(w.date) >= startOfWeek);
+    const trainedDates = new Set(weekWorkouts.map((w) => w.date.split('T')[0]));
+
+    const scheduledDaysCount = weeklySchedule
+      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
+      : 0;
+    const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
+
+    const daysLabels: { day: DayOfWeek; short: string }[] = [
+      { day: 'monday', short: 'MON' },
+      { day: 'tuesday', short: 'TUE' },
+      { day: 'wednesday', short: 'WED' },
+      { day: 'thursday', short: 'THU' },
+      { day: 'friday', short: 'FRI' },
+      { day: 'saturday', short: 'SAT' },
+      { day: 'sunday', short: 'SUN' },
+    ];
+
+    const days = daysLabels.map(({ day, short }, idx) => {
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + idx);
+      const dStr = getLocalTodayStr(d);
+      const isCompleted = trainedDates.has(dStr);
+      const isToday = day === todayDayOfWeek;
+      const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
+      return {
+        day,
+        short,
+        dStr,
+        isCompleted,
+        isToday,
+        isRest: sched.isRest,
+      };
+    });
+
+    return {
+      completedCount: trainedDates.size,
+      targetDays,
+      days,
+    };
+  }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek, todayDayOfWeek, plannedWorkouts]);
+
+  const activeRoutinePlan = useMemo(() => {
+    if (selectedRoutineId) {
+      const found = plannedWorkouts.find((p) => p.id === selectedRoutineId) || adaptiveSplitTemplates.find((p) => p.id === selectedRoutineId);
+      if (found) return found;
+    }
+    if (todaySessionInfo.plannedWorkoutId) {
+      const found = plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId);
+      if (found) return found;
+    }
+    return plannedWorkouts[0] || adaptiveSplitTemplates[0];
+  }, [selectedRoutineId, todaySessionInfo.plannedWorkoutId, plannedWorkouts, adaptiveSplitTemplates]);
+
+  const activeRoutineExercisesWithTargets = useMemo(() => {
+    if (!activeRoutinePlan?.exercises) return [];
+    return activeRoutinePlan.exercises.map((ex) => {
+      const presc = getExercisePrescription(
+        ex.name,
+        workouts,
+        prs,
+        userUnit,
+        primaryGoal,
+        trainingDecisions
+      );
+      return {
+        name: ex.name,
+        targetWeight: presc.targetWeight || (userUnit === 'lbs' ? 135 : 60),
+        targetReps: presc.targetReps || ex.targetReps || 8,
+        setsCount: ex.targetSets || 3,
+      };
+    });
+  }, [activeRoutinePlan, workouts, prs, userUnit, primaryGoal, trainingDecisions]);
+
+  const formatRelativeWorkoutTime = (dateStr: string) => {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const past = new Date(dateStr);
+      past.setHours(0, 0, 0, 0);
+      const diffDays = Math.round((today.getTime() - past.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return 'Today';
+      if (diffDays === 1) return 'Yesterday';
+      if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`;
+      return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="page animate-fade-in space-y-4">
-      {/* ── Page Header ─────────────────────────────────────────────────── */}
-      <header className="flex justify-between items-center mb-2">
-        <div className="flex items-center gap-2">
-          {canGoBack && (
-            <button
-              type="button"
-              onClick={goBack}
-              className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Go back to previous page"
-              title="Go back"
-            >
-              <ChevronLeft className="w-5 h-5 text-accent" />
-            </button>
-          )}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">Train</h1>
-            <p className="text-label text-text-muted">Today&apos;s workout &amp; training log</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {userMode === 'advanced' && (
-            <button
-              type="button"
-              onClick={() => setIsPlateModalOpen(true)}
-              className="p-2 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
-              title="Plate Helper"
-            >
-              <Dumbbell className="w-4 h-4 text-accent" />
-            </button>
-          )}
+      {/* ── Screen 4 Header (Figma Reference) ───────────────────────────── */}
+      <header className="pt-2 space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-text-muted">
+            {splitLabel}
+          </span>
           <button
             type="button"
-            onClick={() => setIsToolsMenuOpen(true)}
-            className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Training Tools & Actions"
-            aria-label="Training Tools"
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <SlidersHorizontal className="w-4 h-4 text-accent" />
-            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Tools</span>
+            <span>Adjust plan</span>
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {canGoBack && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
+                aria-label="Go back to previous page"
+                title="Go back"
+              >
+                <ChevronLeft className="w-5 h-5 text-accent" />
+              </button>
+            )}
+            <h1 className="display-title text-3xl sm:text-4xl text-text-primary font-display leading-tight">
+              YOUR TRAINING.
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {userMode === 'advanced' && (
+              <button
+                type="button"
+                onClick={() => setIsPlateModalOpen(true)}
+                className="w-9 h-9 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+                title="Plate Calculator"
+                aria-label="Plate Calculator"
+              >
+                <Dumbbell className="w-4 h-4 text-accent" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setIsToolsMenuOpen(true)}
+              className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Training Tools & Actions"
+              aria-label="Training Tools"
+            >
+              <SlidersHorizontal className="w-4 h-4 text-accent" />
+              <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Tools</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -1582,342 +1724,174 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── WEEKLY SCHEDULE STRIP (Progressive Disclosure) ── */}
-      {(() => {
-        const todaySched = getScheduledWorkoutForDay(weeklySchedule, todayDayOfWeek, plannedWorkouts);
-        return (
-          <section className="space-y-2">
-            <div className="card p-3 bg-bg-card border border-border/80 flex items-center justify-between gap-2 shadow-xs">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className={`w-2 h-2 rounded-full shrink-0 ${todaySched.isRest ? 'bg-emerald-500' : 'bg-accent animate-pulse'}`} />
-                <div className="truncate">
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-                      {DAY_DISPLAY_INFO[todayDayOfWeek]?.label || 'TODAY'}:
-                    </span>
-                    <span className="text-xs font-bold text-text-primary truncate font-sans">
-                      {todaySched.isRest ? 'Rest & Recovery' : (todaySched.plan?.name.replace('Builtin ', '') || todaySched.title)}
-                    </span>
-                  </div>
-                  <span className="text-3xs text-text-muted font-mono block truncate">
-                    {todaySched.isRest ? 'Scheduled recovery day' : (todaySched.bodyParts.join(' • ') || 'Full Training')}
-                  </span>
-                </div>
-              </div>
+      {/* ── Screen 4 Weekly Summary Strip (Figma Reference) ─────────────── */}
+      <div className="card p-4 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-text-primary uppercase tracking-wide font-mono">
+            {currentWeekDateRange}
+          </span>
+          <span className="text-xs font-semibold text-text-muted font-mono">
+            {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} complete
+          </span>
+        </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsScheduleExpanded((prev) => !prev)}
-                  className="text-2xs font-bold text-text-secondary hover:text-text-primary px-2.5 py-1 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 transition-colors flex items-center gap-1 cursor-pointer"
-                  title={isScheduleExpanded ? 'Hide weekly schedule' : 'View 7-day schedule'}
-                >
-                  <span>{isScheduleExpanded ? 'Collapse' : '7 Days'}</span>
-                  {isScheduleExpanded ? <ChevronUp className="w-3 h-3 text-accent" /> : <ChevronDown className="w-3 h-3 text-accent" />}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTargetScheduleDay(todayDayOfWeek);
-                    setIsScheduleModalOpen(true);
-                  }}
-                  className="text-2xs font-bold text-accent px-2 py-1 rounded-lg bg-accent/10 border border-accent/25 hover:bg-accent/20 transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Customize weekly schedule"
-                >
-                  <Edit2 className="w-3 h-3" />
-                  <span className="hidden sm:inline">Customize</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Expandable 7-day columns */}
-            {isScheduleExpanded && (
-              <div className="grid grid-cols-7 gap-1 sm:gap-2 animate-fade-in pt-1">
-                {DAYS_OF_WEEK.map((day) => {
-                  const info = DAY_DISPLAY_INFO[day];
-                  const sched = getScheduledWorkoutForDay(weeklySchedule, day, plannedWorkouts);
-                  const isToday = day === todayDayOfWeek;
-
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => {
-                        setTargetScheduleDay(day);
-                        setIsScheduleModalOpen(true);
-                      }}
-                      className={`py-2 px-1 rounded-xl border text-center transition-all flex flex-col items-center justify-between min-h-[68px] sm:min-h-[76px] cursor-pointer group active:scale-95 ${
-                        isToday
-                          ? 'border-accent bg-accent/10 shadow-xs ring-1 ring-accent/30'
-                          : sched.isRest
-                          ? 'border-border/40 bg-bg-secondary/40 text-text-muted hover:border-border'
-                          : 'border-border/70 bg-bg-card hover:border-accent/50 hover:bg-bg-card/80'
-                      }`}
-                      title={
-                        sched.isRest
-                          ? `${info.label}: Rest Day`
-                          : `${info.label}: ${sched.title} (${sched.bodyParts.join(', ') || 'Workout'})`
-                      }
-                    >
-                      <div className="flex items-center gap-1">
-                        {isToday && <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />}
-                        <span
-                          className={`text-[11px] font-mono font-black uppercase ${
-                            isToday ? 'text-accent' : 'text-text-muted group-hover:text-text-secondary'
-                          }`}
-                        >
-                          {info.short}
-                        </span>
-                      </div>
-
-                      <div className="my-1 w-full px-0.5">
-                        {sched.isRest ? (
-                          <span className="text-[10px] font-mono font-medium text-text-muted block">
-                            REST
-                          </span>
-                        ) : (
-                          <span className="text-2xs font-bold text-text-primary line-clamp-1 block leading-tight font-sans">
-                            {sched.plan?.name.replace('Builtin ', '') || sched.title}
-                          </span>
-                        )}
-                      </div>
-
-                      <span
-                        className={`text-[9px] font-mono font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full line-clamp-1 block ${
-                          sched.isRest
-                            ? 'bg-bg-secondary text-text-muted'
-                            : isToday
-                            ? 'bg-accent text-white'
-                            : 'bg-accent/15 text-accent border border-accent/20'
-                        }`}
-                      >
-                        {sched.isRest ? 'OFF' : sched.bodyParts[0] || 'TRAIN'}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        );
-      })()}
-
-      {/* ── 1. TODAY'S WORKOUT HERO (One screen, one decision) ── */}
-      {(() => {
-        const scheduledToday = getScheduledWorkoutForDay(weeklySchedule, todayDayOfWeek, plannedWorkouts);
-        const currentPlan =
-          (todaySessionInfo.plannedWorkoutId
-            ? plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId)
-            : scheduledToday.plan) ||
-          (plannedWorkouts.length > 0 ? plannedWorkouts[0] : adaptiveSplitTemplates[0]);
-
-        const workoutTitle =
-          todaySessionInfo.status === 'in_progress'
-            ? (activeWorkoutDraft?.startedFromPlan || 'Workout in Progress')
-            : todaySessionInfo.status === 'completed'
-            ? (todaySessionInfo.title || 'Today Completed')
-            : todaySessionInfo.isRestDay
-            ? 'Rest & Recovery'
-            : currentPlan?.name || "Today's Workout";
-
-        const exerciseList =
-          todaySessionInfo.status === 'in_progress'
-            ? (activeWorkoutDraft?.exercises.map((e) => e.name).filter(Boolean) || [])
-            : todaySessionInfo.status === 'completed'
-            ? todaySessionInfo.exercises
-            : todaySessionInfo.isRestDay
-            ? []
-            : currentPlan?.exercises.map((e) => e.name) || [];
-
-        const bodyParts = todaySessionInfo.bodyParts || (currentPlan ? getWorkoutBodyParts(currentPlan.exercises) : []);
-        const durationEst = Math.max(30, exerciseList.length * 10);
-
-        // If today is a rest day and no workout is in progress / completed
-        if (todaySessionInfo.isRestDay && todaySessionInfo.status !== 'in_progress' && todaySessionInfo.status !== 'completed') {
-          return (
-            <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-2xs font-mono font-bold tracking-wider uppercase text-text-muted">
-                    TODAY&apos;S SCHEDULE • {todayDayOfWeek.toUpperCase()}
-                  </span>
-                </div>
-                <span className="text-2xs text-emerald-400 font-semibold font-mono">
-                  Rest &amp; Recovery
-                </span>
-              </div>
-
-              <div>
-                <h2 className="text-2xl font-black text-text-primary tracking-tight">
-                  Rest &amp; Recovery
-                </h2>
-                <p className="text-xs text-text-secondary mt-1.5 leading-relaxed">
-                  Scheduled rest day. Hydrate, hit your protein target, and let muscle tissue adapt.
-                </p>
-              </div>
-
-              <div className="pt-1 space-y-3">
-                <button
-                  type="button"
-                  onClick={() => setIsChangeWorkoutOpen(true)}
-                  className="btn-secondary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-                >
-                  <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
-                  <span>START A WORKOUT ANYWAY</span>
-                </button>
-
-                <div className="flex items-center justify-between text-xs pt-1 px-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsScheduleModalOpen(true)}
-                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
-                  >
-                    <Calendar className="w-3.5 h-3.5 text-accent" />
-                    <span>Edit weekly schedule</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openBlankLogger}
-                    className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-accent" />
-                    <span>Start empty workout</span>
-                  </button>
-                </div>
-              </div>
-            </section>
-          );
-        }
-
-        return (
-          <section className="card p-5 bg-gradient-to-br from-bg-card via-bg-card to-accent/5 border border-border shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    todaySessionInfo.status === 'completed'
-                      ? 'bg-emerald-500'
-                      : todaySessionInfo.status === 'in_progress'
-                      ? 'bg-accent animate-pulse'
-                      : 'bg-accent'
-                  }`}
-                />
-                <span className="text-xs font-semibold text-text-secondary">
-                  {todaySessionInfo.status === 'completed'
-                    ? 'Completed Today'
-                    : todaySessionInfo.status === 'in_progress'
-                    ? 'Session in Progress'
-                    : `Today's Workout • ${todayDayOfWeek.charAt(0).toUpperCase() + todayDayOfWeek.slice(1)}`}
-                </span>
-              </div>
-              <span className="text-2xs text-text-muted font-medium">
-                ~{durationEst} min • {plural(exerciseList.length, 'movement')}
+        <div className="grid grid-cols-7 gap-1.5 pt-1">
+          {weeklyScheduleStats.days.map((day, idx) => (
+            <div key={idx} className="flex flex-col items-center gap-1.5">
+              <span className="text-[10px] text-text-muted font-mono font-semibold">
+                {day.short}
               </span>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-bold text-text-primary tracking-tight font-sans">
-                  {workoutTitle}
-                </h2>
-                {bodyParts.length > 0 && (
-                  <span className="px-2.5 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent text-3xs font-semibold">
-                    {bodyParts.join(' • ')}
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                  day.isCompleted
+                    ? 'bg-accent text-stone-950 font-black shadow-xs'
+                    : day.isToday
+                    ? 'border-2 border-accent text-accent font-bold'
+                    : 'bg-bg-secondary text-text-muted border border-border/60'
+                }`}
+              >
+                {day.isCompleted ? (
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                ) : (
+                  <span className="text-[10px] font-mono text-text-muted">
+                    •
                   </span>
                 )}
               </div>
-              {exerciseList.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {exerciseList.map((exName, exIdx) => (
-                    <span
-                      key={exIdx}
-                      className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border/70 text-xs text-text-secondary font-medium"
-                    >
-                      {exName}
-                    </span>
-                  ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Routine Selector Pills (Screen 4 Blueprint) ──────────────────── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {plannedWorkouts.map((plan) => {
+          const isSelected = activeRoutinePlan?.id === plan.id;
+          const cleanName = plan.name.replace(/^Builtin\s+/i, '');
+          return (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => setSelectedRoutineId(plan.id)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer select-none ${
+                isSelected
+                  ? 'bg-accent text-stone-950 shadow-xs'
+                  : 'bg-bg-card border border-border text-text-muted hover:text-text-primary hover:border-border-hover'
+              }`}
+            >
+              {cleanName}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Scheduled Workout Card (Screen 4 Hero Card) ──────────────────── */}
+      {activeRoutinePlan && (
+        <div className="card p-5 border border-border/80 bg-bg-card space-y-4 shadow-sm">
+          <div>
+            <h2 className="display-title text-2xl sm:text-3xl text-text-primary font-display leading-tight">
+              {activeRoutinePlan.name.replace(/^Builtin\s+/i, '').toUpperCase()}.
+            </h2>
+            <p className="text-xs text-text-muted font-medium mt-1 font-mono">
+              ~{Math.max(30, (activeRoutinePlan.exercises?.length || 4) * 10)} minutes / {activeRoutineExercisesWithTargets.reduce((sum, e) => sum + e.setsCount, 0)} working sets
+            </p>
+          </div>
+
+          {/* Numbered Exercise List with Prescribed Targets */}
+          <div className="divide-y divide-border/40 py-1">
+            {activeRoutineExercisesWithTargets.map((ex, idx) => (
+              <div key={idx} className="py-2.5 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-xs font-mono font-bold text-accent shrink-0">
+                    {String(idx + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-sm font-bold text-text-primary truncate font-sans">
+                    {ex.name}
+                  </span>
                 </div>
-              )}
-            </div>
-
-            {/* If completed today, show verified summary metrics */}
-            {todaySessionInfo.status === 'completed' && (
-              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-label tabular-nums">
-                {todaySessionInfo.volumeKg && todaySessionInfo.volumeKg > 0 ? (
-                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-primary font-semibold">
-                    {todaySessionInfo.volumeKg.toLocaleString()} kg volume
-                  </span>
-                ) : null}
-                {todaySessionInfo.durationMin && todaySessionInfo.durationMin > 0 ? (
-                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                    {todaySessionInfo.durationMin} min
-                  </span>
-                ) : todaySessionInfo.totalSets && todaySessionInfo.totalSets > 0 ? (
-                  <span className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border text-text-muted">
-                    {plural(todaySessionInfo.totalSets, 'set')}
-                  </span>
-                ) : null}
+                <div className="text-xs text-text-muted font-mono shrink-0 text-right">
+                  Target ~{ex.targetWeight} {userUnit} × {ex.targetReps} <span className="text-text-secondary font-medium">({ex.setsCount} sets)</span>
+                </div>
               </div>
-            )}
+            ))}
+          </div>
 
-            {/* Primary CTA & at most two choices */}
-            <div className="pt-1 space-y-3">
-              {todaySessionInfo.status === 'in_progress' ? (
-                <button
-                  type="button"
-                  onClick={handleResumeWorkout}
-                  className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4 fill-white stroke-white" />
-                  <span>Resume Workout</span>
-                </button>
-              ) : todaySessionInfo.status === 'completed' ? (
-                <button
-                  type="button"
-                  onClick={() => currentPlan && handleStartPlan(currentPlan)}
-                  className="btn-secondary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 border-border hover:border-accent/40 text-text-primary hover:text-accent transition-colors"
-                >
-                  <Play className="w-4 h-4 fill-text-primary stroke-text-primary" />
-                  <span>Log Additional Session</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => currentPlan && handleStartPlan(currentPlan)}
-                  className="btn-primary w-full py-3.5 px-4 text-sm font-bold shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  <Play className="w-4 h-4 fill-white stroke-white" />
-                  <span>Start Workout</span>
-                </button>
-              )}
+          {/* Primary Action Button */}
+          <div className="pt-1 space-y-2">
+            <button
+              type="button"
+              className="btn-primary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm"
+              onClick={() => handleStartPlan(activeRoutinePlan)}
+            >
+              <Play className="w-4 h-4 fill-stone-950 stroke-stone-950" />
+              <span>Start {activeRoutinePlan.name.replace(/^Builtin\s+/i, '')}</span>
+            </button>
 
-              {/* Clean secondary choices: at most 2 choices */}
-              <div className="flex items-center justify-between text-xs pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsChangeWorkoutOpen(true)}
-                  className="min-h-[44px] px-2 text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                  aria-label="Change current routine or split"
-                >
-                  <ArrowRightLeft className="w-4 h-4 text-accent" />
-                  <span>Change Routine / Split</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setIsLogPastModalOpen(true)}
-                  className="min-h-[44px] px-2 text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                  aria-label="Log past workout session"
-                >
-                  <Calendar className="w-4 h-4 text-accent" />
-                  <span>Log Past Session</span>
-                </button>
-              </div>
+            <div className="flex items-center justify-between text-xs pt-1 px-1">
+              <button
+                type="button"
+                onClick={() => setIsChangeWorkoutOpen(true)}
+                className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1 cursor-pointer"
+              >
+                <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
+                <span>Change Routine / Split</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsLogPastModalOpen(true)}
+                className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1 cursor-pointer"
+              >
+                <Calendar className="w-3.5 h-3.5 text-accent" />
+                <span>Log Past Session</span>
+              </button>
             </div>
-          </section>
-        );
-      })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Recent Workouts Section (Screen 4 Blueprint) ─────────────────── */}
+      <div className="space-y-2.5 pt-1">
+        <div className="flex items-center justify-between">
+          <h3 className="section-title text-xs font-bold text-text-primary uppercase tracking-wide font-mono">
+            RECENT WORKOUTS
+          </h3>
+          <button
+            type="button"
+            onClick={() => setTrainSubTab('history')}
+            className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+          >
+            <span>All history</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {sortedWorkouts.length > 0 ? (
+          <div className="space-y-2">
+            {sortedWorkouts.slice(0, 3).map((wk) => (
+              <div
+                key={wk.id}
+                onClick={() => {
+                  setTrainSubTab('history');
+                  toggleExpand(wk.id);
+                }}
+                className="p-3.5 rounded-xl bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between cursor-pointer shadow-xs group"
+              >
+                <div>
+                  <span className="text-sm font-bold text-text-primary group-hover:text-accent transition-colors block">
+                    {wk.name}
+                  </span>
+                  <span className="text-2xs text-text-muted font-mono mt-0.5 block">
+                    {formatRelativeWorkoutTime(wk.date)} • {wk.exercises.length} exercises
+                  </span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-text-muted italic py-1">No completed workouts logged yet.</p>
+        )}
+      </div>
 
       {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode - Progressive Disclosure) ── */}
       {userMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (

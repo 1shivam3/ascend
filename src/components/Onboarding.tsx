@@ -362,14 +362,15 @@ export default function OnboardingScreen() {
       <div className="w-full max-w-sm space-y-6">
         {/* Brand Header */}
         <div className="text-center space-y-1.5">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-bg-secondary border border-border/80 text-accent mb-1 shadow-sm">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-bg-secondary border border-border/80 text-[#FF6B1F] mb-1 shadow-sm">
             <Dumbbell className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-black tracking-tight font-sans text-text-primary">
-            ASCEND
+          <div className="text-[11px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">ASCEND</div>
+          <h1 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary">
+            STRONGER. BY DESIGN.
           </h1>
           <p className="text-text-muted text-xs font-medium">
-            Evidence-Based Training &amp; Nutrition System
+            Precise training logbook &amp; nutrition system
           </p>
         </div>
 
@@ -555,7 +556,8 @@ export default function OnboardingScreen() {
 
             <Card variant="default" padding="md" className="space-y-4">
               <div>
-                <h2 className="text-sm font-bold text-text-primary tracking-tight">Precision Calibration</h2>
+                <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">STEP 2 OF 2</div>
+                <h2 className="display-title font-display uppercase tracking-tight text-2xl text-text-primary">MAKE IT YOURS.</h2>
                 <p className="text-2xs text-text-muted mt-0.5">
                   Calibrate your strength standards, training split &amp; metabolic macro targets
                 </p>

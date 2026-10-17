@@ -3,35 +3,35 @@
 @tailwind utilities;
 
 :root {
-  /* Chalk (Light) — Warm Luxury Gallery Paper Logbook */
-  --bg-primary: 248 247 244;      /* #F8F7F4 warm luxury chalk */
-  --bg-secondary: 240 238 233;    /* #F0EEE9 sunken container */
+  /* Chalk (Light) — Warm Luxury Gallery Paper Logbook (Figma Reference) */
+  --bg-primary: 246 245 242;      /* #F6F5F2 warm chalk off-white */
+  --bg-secondary: 238 236 231;    /* #EEECE7 sunken container */
   --bg-tertiary: 230 227 220;     /* #E6E3DC */
   --bg-card: 255 255 255;         /* #FFFFFF pure crisp white surface */
   --bg-elevated: 255 255 255;     /* #FFFFFF */
-  --text-primary: 23 25 22;       /* #171916 deep graphite text */
-  --text-secondary: 92 96 90;     /* #5C605A refined body text */
+  --text-primary: 18 19 18;       /* #121312 near-black typography */
+  --text-secondary: 85 88 83;     /* #555853 refined body text */
   --text-muted: 130 134 128;      /* #828680 muted meta */
-  --border: 228 225 218;          /* #E4E1DA hairline subtle border */
+  --border: 229 227 221;          /* #E5E3DD hairline subtle border */
   --border-subtle: 238 236 230;   /* #EEECE6 */
   --border-hover: 160 156 148;    /* #A09C94 */
-  --accent: 196 68 39;            /* #C44427 — Vermilion from reference image 1 */
-  --accent-dim: 166 54 29;        /* #A6361D */
-  --accent-glow: rgba(196, 68, 39, 0.12);
+  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
+  --accent-dim: 224 88 18;        /* #E05812 */
+  --accent-glow: rgba(255, 107, 31, 0.16);
 
   /* Direct CSS Specification Tokens */
-  --bg: #F8F7F4;
+  --bg: #F6F5F2;
   --surface: #FFFFFF;
-  --sunken: #F0EEE9;
-  --border-hex: #E4E1DA;
+  --sunken: #EEECE7;
+  --border-hex: #E5E3DD;
   --border-control: #A09C94;
-  --text: #171916;
-  --text-2: #5C605A;
+  --text: #121312;
+  --text-2: #555853;
   --text-3: #828680;
-  --accent-hex: #C44427;
-  --accent-on: #FFFFFF;
-  --accent-subtle: #FDF0EC;
-  --accent-text: #A6361D;
+  --accent-hex: #FF6B1F;
+  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
+  --accent-subtle: #FFF3EB;
+  --accent-text: #E05812;
   --success: #1B6E45;
   --success-bg: #E3F1E9;
   --warning: #8A5A00;
@@ -39,50 +39,50 @@
   --danger: #B42318;
   --danger-bg: #FDE8E6;
   --scrim: rgba(18, 17, 16, 0.5);
-  --inverse: #171916;
-  --inverse-text: #F8F7F4;
+  --inverse: #121312;
+  --inverse-text: #F6F5F2;
 }
 
 .dark,
 :root[data-theme='dark'] {
-  /* Iron (Dark) — Deep Titanium Slate & Obsidian */
-  --bg-primary: 15 16 15;         /* #0F100F rich velvety graphite */
-  --bg-secondary: 23 25 23;       /* #171917 sunken */
-  --bg-tertiary: 32 35 32;        /* #202320 */
-  --bg-card: 23 25 23;            /* #171917 surface card */
-  --bg-elevated: 28 31 28;        /* #1C1F1C elevated */
-  --text-primary: 245 245 243;    /* #F5F5F3 crisp white text */
+  /* Charcoal (Dark) — Deep Athletic Cockpit (Figma Reference) */
+  --bg-primary: 18 19 18;         /* #121312 deep charcoal surface */
+  --bg-secondary: 27 28 26;       /* #1B1C1A sunken container */
+  --bg-tertiary: 35 37 34;        /* #232522 */
+  --bg-card: 27 28 26;            /* #1B1C1A card surface */
+  --bg-elevated: 34 36 33;        /* #222421 elevated */
+  --text-primary: 245 245 243;    /* #F5F5F3 readable warm-white */
   --text-secondary: 168 172 165;  /* #A8ACA5 secondary text */
   --text-muted: 115 120 113;      /* #737871 muted meta */
-  --border: 38 41 38;             /* #262926 hairline border */
-  --border-subtle: 28 31 28;
+  --border: 39 40 38;             /* #272826 hairline border */
+  --border-subtle: 30 31 29;
   --border-hover: 70 75 70;
-  --accent: 255 107 74;           /* #FF6B4A athletic vermilion */
-  --accent-dim: 226 82 50;        /* #E25232 */
-  --accent-glow: rgba(255, 107, 74, 0.15);
+  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
+  --accent-dim: 224 88 18;
+  --accent-glow: rgba(255, 107, 31, 0.2);
 
   /* Direct CSS Specification Tokens */
-  --bg: #0F100F;
-  --surface: #171917;
-  --sunken: #121312;
-  --border-hex: #262926;
+  --bg: #121312;
+  --surface: #1B1C1A;
+  --sunken: #0D0E0D;
+  --border-hex: #272826;
   --border-control: #464B46;
   --text: #F5F5F3;
   --text-2: #A8ACA5;
   --text-3: #737871;
-  --accent-hex: #FF6B4A;
-  --accent-on: #0F100F;
-  --accent-subtle: #2A140F;
-  --accent-text: #FF886E;
+  --accent-hex: #FF6B1F;
+  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
+  --accent-subtle: #2C1608;
+  --accent-text: #FFA066;
   --success: #34D399;
   --success-bg: #12281D;
   --warning: #FBBF24;
   --warning-bg: #2B2210;
   --danger: #F87171;
   --danger-bg: #3A1714;
-  --scrim: rgba(0, 0, 0, 0.65);
+  --scrim: rgba(0, 0, 0, 0.7);
   --inverse: #F5F5F3;
-  --inverse-text: #0F100F;
+  --inverse-text: #121312;
 }
 
 @layer base {
@@ -148,9 +148,9 @@
     @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
-  /* Solid vermilion primary CTA — exclusively for actionable intent */
+  /* Solid #FF6B1F primary CTA — verified AAA high contrast on orange */
   .btn-primary {
-    @apply bg-accent text-white dark:text-stone-950 font-bold px-4 py-2.5 rounded-xl text-sm;
+    @apply bg-accent text-stone-950 font-bold px-4 py-2.5 rounded-xl text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
     @apply hover:brightness-105 flex items-center justify-center gap-2;
     min-height: 48px;
@@ -176,6 +176,11 @@
     @apply border border-danger/20;
     @apply active:scale-[0.98] transition-all duration-150;
     min-height: 40px;
+  }
+
+  /* Figma Display Heading (Barlow Condensed, all-caps, athletic precision) */
+  .display-title {
+    @apply font-display uppercase tracking-tight text-2xl sm:text-3xl font-bold text-text-primary;
   }
 
   /* Section Title: disciplined 13-14px, sentence case or subtle uppercase */

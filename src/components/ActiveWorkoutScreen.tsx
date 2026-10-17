@@ -1627,7 +1627,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
-            className="bg-accent hover:brightness-105 active:scale-95 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm shadow-accent/25 transition-all flex items-center gap-1.5"
+            className="bg-[#FF6B1F] hover:bg-[#ff7d3b] active:scale-95 text-stone-950 font-bold text-xs px-3.5 py-1.5 rounded-lg shadow-sm shadow-[#FF6B1F]/25 transition-all flex items-center gap-1.5"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Finish</span>
@@ -1892,8 +1892,8 @@ export default function ActiveWorkoutScreen({
                   aria-label={`Change or rename exercise: ${currentExercise.name || 'Untitled Exercise'}`}
                   title="Tap to change or rename exercise"
                 >
-                  <h2 className="text-2xl sm:text-3xl font-black text-text-primary tracking-tight font-sans truncate group-hover:text-accent transition-colors">
-                    {currentExercise.name || 'Untitled Exercise'}
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#FF6B1F] transition-colors truncate">
+                    {(currentExercise.name || 'Untitled Exercise').toUpperCase()}.
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
                     <Edit2 className="w-3 h-3" />
@@ -1972,7 +1972,7 @@ export default function ActiveWorkoutScreen({
                     }}
                     className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
-                        ? 'bg-accent text-white shadow-xs'
+                        ? 'bg-[#FF6B1F] text-stone-950 font-black shadow-xs'
                         : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : s.status === 'skipped'
@@ -2250,7 +2250,7 @@ export default function ActiveWorkoutScreen({
                   className={`w-full py-4 rounded-xl text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
                     isActiveSetCompleted(currentExercise.sets[activeSetIdx])
                       ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                      : 'bg-accent hover:brightness-105 text-white shadow-accent/25'
+                      : 'bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-black shadow-[#FF6B1F]/25'
                   }`}
                 >
                   <Check className="w-5 h-5 stroke-[3]" />
@@ -2651,7 +2651,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={skipTimer}
-                  className="px-3 py-1 rounded-lg bg-accent text-white text-xs font-bold active:scale-95 transition-all shadow-xs"
+                  className="px-3 py-1 rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 text-xs font-bold active:scale-95 transition-all shadow-xs"
                 >
                   SKIP
                 </button>
@@ -2714,7 +2714,7 @@ export default function ActiveWorkoutScreen({
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                           isCurrent
-                            ? 'bg-accent text-white'
+                            ? 'bg-[#FF6B1F] text-stone-950'
                             : isDone
                             ? 'bg-emerald-500 text-white'
                             : 'bg-bg-secondary text-text-muted border border-border'
@@ -2734,7 +2734,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent text-white">
+                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#FF6B1F] text-stone-950">
                           Active
                         </span>
                       )}
@@ -3062,8 +3062,8 @@ export default function ActiveWorkoutScreen({
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-accent" />
-                <h3 className="font-bold text-text-primary">Workout Summary</h3>
+                <Trophy className="w-5 h-5 text-[#FF6B1F]" />
+                <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">WORKOUT COMPLETE.</h3>
               </div>
               <button
                 type="button"
