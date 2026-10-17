@@ -510,7 +510,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                         </Badge>
                       ))
                     ) : (
-                      <span className="text-2xs text-text-muted font-mono">Not configured</span>
+                      <span className="text-2xs text-text-muted font-mono">Not set</span>
                     )}
                   </div>
                 </div>

@@ -141,6 +141,9 @@ export default function WeeklyScheduleModal({
 
   const handleSave = () => {
     setWeeklySchedule(draft);
+    if (activeTrainingDays > 0) {
+      useStore.getState().setTrainingProfile({ daysPerWeek: activeTrainingDays });
+    }
     toast.success('Your weekly training schedule has been saved!', 'Schedule Updated');
     onClose();
   };

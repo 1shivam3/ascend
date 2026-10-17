@@ -329,7 +329,7 @@ export default function OnboardingScreen() {
 
     const [
       { getGoalAdaptiveSplitTemplates },
-      { buildDefaultWeeklySchedule },
+      { buildDefaultWeeklySchedule, generateSplitWeeklySchedule },
       { calculateRecommendedMacroGoals },
     ] = await Promise.all([
       import('@/lib/workout-engine'),
@@ -337,7 +337,22 @@ export default function OnboardingScreen() {
       import('@/lib/macros'),
     ]);
 
-    const generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
+    let preferredSplit: 'push_pull_legs' | 'bro_split' | 'upper_lower' | 'full_body' = 'upper_lower';
+    let generatedSplit;
+
+    if (daysPerWeek === 6) {
+      preferredSplit = 'push_pull_legs';
+      generatedSplit = generateSplitWeeklySchedule('push_pull_legs', unit).plans;
+    } else if (daysPerWeek === 5) {
+      preferredSplit = 'bro_split';
+      generatedSplit = generateSplitWeeklySchedule('bro_split', unit).plans;
+    } else if (daysPerWeek <= 3) {
+      preferredSplit = 'full_body';
+      generatedSplit = generateSplitWeeklySchedule('full_body', unit).plans;
+    } else {
+      preferredSplit = 'upper_lower';
+      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit);
+    }
 
     setTrainingProfile({
       goal: primaryGoal,
@@ -345,7 +360,7 @@ export default function OnboardingScreen() {
       daysPerWeek: daysPerWeek,
       preferredDurationMin: 45,
       equipment: 'full_gym',
-      preferredSplit: daysPerWeek <= 3 ? 'full_body' : 'upper_lower',
+      preferredSplit: preferredSplit,
       dislikedExercises: [],
       injuriesOrLimitations: [],
       coachingStyle: 'balanced',

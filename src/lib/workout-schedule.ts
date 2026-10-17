@@ -349,6 +349,65 @@ export function generateSplitWeeklySchedule(
     };
   }
 
+  if (splitType === 'full_body') {
+    const fullBodyA: PlannedWorkout = {
+      id: 'plan_full_body_a',
+      name: 'Full Body A (Squat & Press)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: isLbs ? 205 : 92.5, targetUnit: userUnit },
+        { name: 'Bench Press', targetSets: 4, targetReps: 6, targetWeight: isLbs ? 155 : 70, targetUnit: userUnit },
+        { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 95 : 42.5, targetUnit: userUnit },
+        { name: 'Dumbbell Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 25 : 12, targetUnit: userUnit },
+      ],
+    };
+
+    const fullBodyB: PlannedWorkout = {
+      id: 'plan_full_body_b',
+      name: 'Full Body B (Deadlift & Push)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: isLbs ? 245 : 110, targetUnit: userUnit },
+        { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: isLbs ? 135 : 60, targetUnit: userUnit },
+        { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 120 : 55, targetUnit: userUnit },
+        { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 350 : 160, targetUnit: userUnit },
+        { name: 'Tricep Pushdown', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 50 : 25, targetUnit: userUnit },
+      ],
+    };
+
+    const fullBodyC: PlannedWorkout = {
+      id: 'plan_full_body_c',
+      name: 'Full Body C (Front Squat & Pull)',
+      createdAt: new Date().toISOString(),
+      exercises: [
+        { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: userUnit },
+        { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
+        { name: 'Dumbbell Shoulder Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 45 : 20, targetUnit: userUnit },
+        { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 165 : 75, targetUnit: userUnit },
+        { name: 'Dumbbell Lateral Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 20 : 10, targetUnit: userUnit },
+      ],
+    };
+
+    const plans = [fullBodyA, fullBodyB, fullBodyC];
+    const schedule: WeeklySchedule = {
+      monday: { workoutPlanId: fullBodyA.id, customTitle: fullBodyA.name, bodyParts: getWorkoutBodyParts(fullBodyA.exercises) },
+      tuesday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      wednesday: { workoutPlanId: fullBodyB.id, customTitle: fullBodyB.name, bodyParts: getWorkoutBodyParts(fullBodyB.exercises) },
+      thursday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      friday: { workoutPlanId: fullBodyC.id, customTitle: fullBodyC.name, bodyParts: getWorkoutBodyParts(fullBodyC.exercises) },
+      saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
+      sunday: { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] },
+    };
+
+    return {
+      plans,
+      schedule,
+      daysPerWeek: 3,
+      splitName: 'Full Body (3-Day)',
+    };
+  }
+
   // Default: Upper / Lower (4-Day)
   const upperA: PlannedWorkout = {
     id: 'plan_upper_a',
@@ -423,7 +482,9 @@ export function buildDefaultWeeklySchedule(
   daysPerWeek: number = 4
 ): WeeklySchedule {
   if (!plans || plans.length === 0) {
-    const fallback = generateSplitWeeklySchedule(daysPerWeek === 6 ? 'ppl' : daysPerWeek === 5 ? 'bro_split' : 'upper_lower');
+    const fallback = generateSplitWeeklySchedule(
+      daysPerWeek === 6 ? 'ppl' : daysPerWeek === 5 ? 'bro_split' : daysPerWeek === 3 ? 'full_body' : 'upper_lower'
+    );
     return fallback.schedule;
   }
 
@@ -443,44 +504,81 @@ export function buildDefaultWeeklySchedule(
     bodyParts: getWorkoutBodyParts(plan.exercises),
   });
 
-  // 4-Day Upper / Lower (Mon/Tue/Thu/Fri)
-  if (daysPerWeek === 4 || plans.length === 4) {
-    schedule.monday = getPlanConfig(plans[0]);
-    schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
+  // 1. Explicit training frequency evaluation (strict adherence to daysPerWeek)
+  if (daysPerWeek === 7) {
+    schedule.monday = getPlanConfig(plans[0 % plans.length]);
+    schedule.tuesday = getPlanConfig(plans[1 % plans.length]);
+    schedule.wednesday = getPlanConfig(plans[2 % plans.length]);
+    schedule.thursday = getPlanConfig(plans[3 % plans.length]);
+    schedule.friday = getPlanConfig(plans[4 % plans.length]);
+    schedule.saturday = getPlanConfig(plans[5 % plans.length]);
+    schedule.sunday = getPlanConfig(plans[6 % plans.length]);
+    return schedule;
+  }
+
+  // 6-Day Split (Mon-Sat, Sunday Rest)
+  if (daysPerWeek === 6) {
+    schedule.monday = getPlanConfig(plans[0 % plans.length]);
+    schedule.tuesday = getPlanConfig(plans[1 % plans.length]);
+    schedule.wednesday = getPlanConfig(plans[2 % plans.length]);
+    schedule.thursday = getPlanConfig(plans[3 % plans.length]);
+    schedule.friday = getPlanConfig(plans[4 % plans.length]);
+    schedule.saturday = getPlanConfig(plans[5 % plans.length]);
+    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    return schedule;
+  }
+
+  // 5-Day Split (Mon-Fri, Weekend Rest)
+  if (daysPerWeek === 5) {
+    schedule.monday = getPlanConfig(plans[0 % plans.length]);
+    schedule.tuesday = getPlanConfig(plans[1 % plans.length]);
+    schedule.wednesday = getPlanConfig(plans[2 % plans.length]);
+    schedule.thursday = getPlanConfig(plans[3 % plans.length]);
+    schedule.friday = getPlanConfig(plans[4 % plans.length]);
+    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    return schedule;
+  }
+
+  // 4-Day Upper / Lower (Mon/Tue/Thu/Fri, Wed/Sat/Sun Rest)
+  if (daysPerWeek === 4) {
+    schedule.monday = getPlanConfig(plans[0 % plans.length]);
+    schedule.tuesday = getPlanConfig(plans[1 % plans.length]);
     schedule.wednesday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
-    schedule.thursday = getPlanConfig(plans[2] || plans[0]);
-    schedule.friday = getPlanConfig(plans[3] || plans[1] || plans[0]);
+    schedule.thursday = getPlanConfig(plans[2 % plans.length]);
+    schedule.friday = getPlanConfig(plans[3 % plans.length]);
     schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
-  // 3-Day Full Body or Push/Pull/Legs (Mon/Wed/Fri)
-  if (daysPerWeek === 3 || plans.length === 3) {
-    schedule.monday = getPlanConfig(plans[0]);
+  // 3-Day Full Body or Push/Pull/Legs (Mon/Wed/Fri, Tue/Thu/Sat/Sun Rest)
+  if (daysPerWeek === 3) {
+    schedule.monday = getPlanConfig(plans[0 % plans.length]);
     schedule.tuesday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.wednesday = getPlanConfig(plans[1] || plans[0]);
+    schedule.wednesday = getPlanConfig(plans[1 % plans.length]);
     schedule.thursday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.friday = getPlanConfig(plans[2] || plans[0]);
+    schedule.friday = getPlanConfig(plans[2 % plans.length]);
     schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
     return schedule;
   }
 
-  // 5-Day Split (Mon-Fri)
-  if (daysPerWeek === 5 || plans.length === 5) {
-    schedule.monday = getPlanConfig(plans[0]);
-    schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
-    schedule.wednesday = getPlanConfig(plans[2] || plans[0]);
-    schedule.thursday = getPlanConfig(plans[3] || plans[0]);
-    schedule.friday = getPlanConfig(plans[4] || plans[1] || plans[0]);
-    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
-    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+  // 2-Day Split (Tue/Thu)
+  if (daysPerWeek === 2) {
+    schedule.tuesday = getPlanConfig(plans[0 % plans.length]);
+    schedule.thursday = getPlanConfig(plans[1 % plans.length]);
     return schedule;
   }
 
-  // 6-Day Split (Mon-Sat)
-  if (daysPerWeek === 6 || plans.length >= 6) {
+  // 1-Day Split (Saturday)
+  if (daysPerWeek === 1) {
+    schedule.saturday = getPlanConfig(plans[0 % plans.length]);
+    return schedule;
+  }
+
+  // 2. Fallback heuristic based solely on template count when daysPerWeek is unprovided / outside 1-7
+  if (plans.length >= 6) {
     schedule.monday = getPlanConfig(plans[0]);
     schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
     schedule.wednesday = getPlanConfig(plans[2] || plans[0]);
@@ -491,9 +589,42 @@ export function buildDefaultWeeklySchedule(
     return schedule;
   }
 
+  if (plans.length === 5) {
+    schedule.monday = getPlanConfig(plans[0]);
+    schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
+    schedule.wednesday = getPlanConfig(plans[2] || plans[0]);
+    schedule.thursday = getPlanConfig(plans[3] || plans[0]);
+    schedule.friday = getPlanConfig(plans[4] || plans[1] || plans[0]);
+    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    return schedule;
+  }
+
+  if (plans.length === 4) {
+    schedule.monday = getPlanConfig(plans[0]);
+    schedule.tuesday = getPlanConfig(plans[1] || plans[0]);
+    schedule.wednesday = { workoutPlanId: 'rest', customTitle: 'Rest & Recovery', bodyParts: [] };
+    schedule.thursday = getPlanConfig(plans[2] || plans[0]);
+    schedule.friday = getPlanConfig(plans[3] || plans[1] || plans[0]);
+    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    return schedule;
+  }
+
+  if (plans.length === 3) {
+    schedule.monday = getPlanConfig(plans[0]);
+    schedule.tuesday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.wednesday = getPlanConfig(plans[1] || plans[0]);
+    schedule.thursday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.friday = getPlanConfig(plans[2] || plans[0]);
+    schedule.saturday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    schedule.sunday = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+    return schedule;
+  }
+
   // Fallback: assign plans sequentially to weekdays
   const weekdays: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-  for (let i = 0; i < Math.min(daysPerWeek, weekdays.length); i++) {
+  for (let i = 0; i < Math.min(daysPerWeek || 4, weekdays.length); i++) {
     const plan = plans[i % plans.length];
     schedule[weekdays[i]] = getPlanConfig(plan);
   }

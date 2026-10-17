@@ -862,7 +862,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         addMeal(newMeal);
         setNaturalQuery('');
-        const sourceBadge = data.source === 'gemini' ? 'Gemini AI' : 'Calibrated IFCT';
+        const sourceBadge = data.source === 'gemini' || data.source === 'groq' || data.source === 'openrouter'
+          ? 'Smart Macro Analysis'
+          : 'Calibrated IFCT';
         toast.success(
           `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
