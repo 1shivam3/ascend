@@ -222,6 +222,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const progressPhotos = useStore((state) => state.progressPhotos || []);
   const addProgressPhoto = useStore((state) => state.addProgressPhoto);
   const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
+  const trainingProfile = useStore((state) => state.trainingProfile);
   const toast = useToast();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
@@ -634,18 +635,17 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       }
     }
 
-    // This week (Monday to Sunday)
-    const dayOfWeek = (today.getDay() + 6) % 7; // Monday = 0
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - dayOfWeek);
-    monday.setHours(0, 0, 0, 0);
-
-    const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    // Last 7 days (rolling, ending today) — so the days counted in the
+    // streak are always visible and highlighted, unlike a calendar week
+    // which can show an empty new week while a streak is alive.
+    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     let thisWeekCompleted = 0;
-    const dayBars = weekDays.map((label, idx) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + idx);
+    const dayBars = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      d.setHours(0, 0, 0, 0);
       const dStr = getLocalDateStr(d);
+      const label = dayLabels[d.getDay()];
       const isCompleted = workoutDays.has(dStr);
       if (isCompleted) thisWeekCompleted++;
 
@@ -658,18 +658,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     });
 
     // 4 rolling weeks calculation
-    const weeklyTarget = 5;
+    const weeklyTarget = trainingProfile?.daysPerWeek || 5;
     let fourWeeksCompleted = 0;
     const fourWeeksBreakdown: { label: string; count: number; target: number; pct: number }[] = [];
 
     for (let w = 0; w < 4; w++) {
-      const wStart = new Date(monday);
-      wStart.setDate(monday.getDate() - (w * 7));
+      // Rolling 7-day windows ending today, consistent with the day bars above.
+      const wEnd = new Date(today);
+      wEnd.setDate(today.getDate() - w * 7);
+      wEnd.setHours(0, 0, 0, 0);
 
       let count = 0;
       for (let d = 0; d < 7; d++) {
-        const checkD = new Date(wStart);
-        checkD.setDate(wStart.getDate() + d);
+        const checkD = new Date(wEnd);
+        checkD.setDate(wEnd.getDate() - d);
         if (workoutDays.has(getLocalDateStr(checkD))) {
           count++;
         }
@@ -697,7 +699,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       dayBars,
       fourWeeksBreakdown,
     };
-  }, [workouts]);
+  }, [workouts, trainingProfile?.daysPerWeek]);
 
   // DOTS calculation for powerlifting modal
   const bigThreeStats = useMemo(() => getBigThreeStats(prs), [prs]);
@@ -1435,10 +1437,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               </div>
 
-              {/* Card 2: This Week (Bar Chart) */}
+              {/* Card 2: Last 7 Days (Bar Chart) */}
               <div className="card p-5 bg-bg-card border border-border space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-text-primary font-sans">This Week</h3>
+                  <h3 className="text-base font-bold text-text-primary font-sans">Last 7 Days</h3>
                   <span className="text-xs font-mono font-bold text-text-secondary">
                     {consistencyStats.thisWeekCompleted}/{consistencyStats.thisWeekTarget} workouts
                   </span>
