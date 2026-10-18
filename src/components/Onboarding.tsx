@@ -7,6 +7,7 @@ import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
+import { canContinueFromGoalStep } from '@/lib/onboarding';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 
@@ -478,7 +479,13 @@ export default function Onboarding() {
       <FitnessGoalsScreen
         selectedGoals={selectedGoals}
         onToggleGoal={handleToggleGoal}
-        onContinue={() => setCurrentScreen('experience')}
+        onContinue={() => {
+          if (!canContinueFromGoalStep(selectedGoals)) {
+            toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+            return;
+          }
+          setCurrentScreen('experience');
+        }}
         onSkip={() => {
           setSelectedGoals(['general_fitness']);
           toast.info('No goal selected — starting with General Fitness. You can change it anytime in Profile.', 'Goal Set');

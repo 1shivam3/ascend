@@ -242,3 +242,20 @@ describe('P0#1 — guest identity persists across reloads', () => {
     expect(store.get('ascend_guest_id')).toBe(id);
   });
 });
+
+describe('zero-goal Step 1 Continue is blocked at the goals screen', () => {
+  it('blocks Continue when no goals are selected', async () => {
+    const { canContinueFromGoalStep } = await import('../src/lib/onboarding');
+    expect(canContinueFromGoalStep([])).toBe(false);
+  });
+
+  it('allows Continue with one goal selected', async () => {
+    const { canContinueFromGoalStep } = await import('../src/lib/onboarding');
+    expect(canContinueFromGoalStep(['build_muscle'])).toBe(true);
+  });
+
+  it('allows Continue with multiple goals selected', async () => {
+    const { canContinueFromGoalStep } = await import('../src/lib/onboarding');
+    expect(canContinueFromGoalStep(['build_muscle', 'lose_fat'])).toBe(true);
+  });
+});
