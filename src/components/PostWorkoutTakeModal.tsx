@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake } from '@/lib/ai-coach';
+import { getNextSessionTarget } from '@/lib/workout-engine';
+import { formatDuration } from '@/lib/formatters';
 import {
   Trophy,
   X,
@@ -26,7 +28,7 @@ interface PostWorkoutTakeModalProps {
     durationSeconds?: number;
     exercises: Array<{
       name: string;
-      sets: Array<{ reps: number; weight?: number; unit: string; completed?: boolean; status?: string }>;
+      sets: Array<{ reps: number; weight?: number; unit: string; completed?: boolean; status?: string; rpe?: number }>;
     }>;
   };
 }
@@ -47,7 +49,31 @@ export default function PostWorkoutTakeModal({
       fetchPostWorkoutTake(store, completedWorkout)
         .then((res) => {
           if (isMounted) {
-            setTake(res);
+            // The next-session target always comes from the canonical
+            // getNextSessionTarget() — the same function the Training
+            // Adaptation Summary reads — so the two surfaces agree even
+            // when Gemini generates the rest of the take.
+            const primary = completedWorkout.exercises[0];
+            const primarySets = (primary?.sets || [])
+              .filter((s) => isSetCompleted(s as any))
+              .map((s) => ({
+                weight: parseFloat(String(s.weight)) || 0,
+                reps: parseInt(String(s.reps), 10) || 0,
+                rpe: typeof s.rpe === 'number' ? s.rpe : undefined,
+                unit: (s.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg',
+              }));
+            const canonical = primary
+              ? getNextSessionTarget(
+                  primary.name,
+                  primarySets,
+                  (primarySets[0]?.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg'
+                )
+              : null;
+            setTake(
+              canonical
+                ? { ...res, nextSessionTarget: `NEXT SESSION TARGET: ${canonical.summaryText}` }
+                : res
+            );
             setLoading(false);
           }
         })
@@ -145,13 +171,9 @@ export default function PostWorkoutTakeModal({
             <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.durationSeconds !== undefined
-                ? completedWorkout.durationSeconds < 60
-                  ? `${completedWorkout.durationSeconds}s`
-                  : `${Math.floor(completedWorkout.durationSeconds / 60)}m${completedWorkout.durationSeconds % 60 > 0 ? ` ${completedWorkout.durationSeconds % 60}s` : ''}`
+                ? formatDuration(completedWorkout.durationSeconds)
                 : completedWorkout.durationMinutes !== undefined
-                ? completedWorkout.durationMinutes === 0
-                  ? '<1m'
-                  : `${completedWorkout.durationMinutes}m`
+                ? formatDuration(completedWorkout.durationMinutes * 60)
                 : '--'}
             </span>
           </div>

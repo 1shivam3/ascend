@@ -10,6 +10,7 @@ import {
   LifterConfidenceTier,
   AthleteGoal,
   ATHLETE_GOAL_CONFIGS,
+  DEFAULT_GOALS,
   isSetCompleted,
 } from './types';
 import {
@@ -206,7 +207,7 @@ export function generateTrainingDecision(
   const hasMeasuredLoad = lastSession.sets.some((s) => typeof s.weight === 'number' && Number.isFinite(s.weight));
   if (!isBW && !hasMeasuredLoad) return null;
 
-  const activeGoals: AthleteGoal[] = goals && goals.length > 0 ? goals : ['get_stronger', 'build_muscle'];
+  const activeGoals: AthleteGoal[] = goals && goals.length > 0 ? goals : DEFAULT_GOALS;
   const hasStrength = activeGoals.includes('get_stronger');
   const hasMuscle = activeGoals.includes('build_muscle');
   const hasFatLoss = activeGoals.includes('lose_fat');

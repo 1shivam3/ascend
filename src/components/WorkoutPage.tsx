@@ -55,6 +55,7 @@ import {
   getGoalAdaptiveSplitTemplates,
   isSetCompleted,
   finalizeWorkoutExercises,
+  getExecutedExercises,
   createWorkoutExercisesFromPlan,
   getExercisePrescription,
 } from '@/lib/workout-engine';
@@ -65,7 +66,7 @@ import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus } from '@/lib/types';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
@@ -500,7 +501,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const activeWorkoutDraft = useStore((state) => state.activeWorkoutDraft);
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
-  const goals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+  const goals = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
   const trainingDecisions = useStore((state) => state.trainingDecisions);
   const policyDecisionRecords = useStore((state) => state.policyDecisionRecords);
   const userMode = useStore((state) => state.userMode) || 'beginner';
@@ -530,7 +531,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // Dynamic synergy / goals label
   const goalSynergyLabel = useMemo(() => {
-    const activeGoals = goals || ['get_stronger', 'build_muscle'];
+    const activeGoals = goals && goals.length > 0 ? goals : DEFAULT_GOALS;
     if (activeGoals.length === 0) return 'Set Goals';
     const isPowerbuilding = activeGoals.includes('get_stronger') && activeGoals.includes('build_muscle');
     const isRecomp = activeGoals.includes('lose_fat') && activeGoals.includes('build_muscle');
@@ -543,10 +544,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return activeGoals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(' + ');
   }, [goals]);
 
-  // Athlete goal personalization
-  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
-    ? (profile.goals[0] as AthleteGoal)
-    : (goals && goals.length > 0 ? (goals[0] as AthleteGoal) : 'build_muscle');
+  // Athlete goal personalization — single source of truth via resolvePrimaryGoal
+  const primaryGoal: AthleteGoal = resolvePrimaryGoal(
+    profile?.goals && profile.goals.length > 0 ? profile.goals : goals
+  );
   const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
 
   const defaultTargetReps = useMemo(() => {
@@ -555,8 +556,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [goalConfig.defaultRepRange]);
 
   const adaptiveSplitTemplates = useMemo(() => {
-    return getGoalAdaptiveSplitTemplates(primaryGoal, userUnit);
-  }, [primaryGoal, userUnit]);
+    return getGoalAdaptiveSplitTemplates(primaryGoal, userUnit, {
+      bodyweightKg: profile?.bodyweightKg,
+      experience: userMode,
+    });
+  }, [primaryGoal, userUnit, profile?.bodyweightKg, userMode]);
 
   // Goal-adaptive default rest period
   const defaultRestSeconds = useMemo(() => {
@@ -1282,14 +1286,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       ? crypto.randomUUID()
       : `w_${Date.now()}`;
 
-    const executedExercises = validExercises
-      .map((ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped'),
-      }))
-      .filter((ex) => ex.sets.length > 0);
-
-    const exercisesToSave = executedExercises.length > 0 ? executedExercises : validExercises;
+    // Record only what was actually performed or explicitly skipped.
+    // Never fall back to the full plan: an interrupted session with zero
+    // completed sets is saved with zero sets, not phantom planned ones.
+    const exercisesToSave = getExecutedExercises(validExercises);
 
     const sessionDurationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
     const durationMin = Math.round(sessionDurationSeconds / 60);

@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
 import {
   X,
@@ -32,7 +32,7 @@ const GOAL_ICONS: Record<AthleteGoal, React.ElementType> = {
 };
 
 export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModalProps) {
-  const currentGoals = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+  const currentGoals = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
   const setGoals = useStore((state) => state.setGoals);
   const profile = useStore((state) => state.profile);
   const setProfile = useStore((state) => state.setProfile);
@@ -42,6 +42,17 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(currentGoals);
   const [recalcMacros, setRecalcMacros] = useState(true);
+
+  // Re-sync local selection every time the modal opens. Without this, useState
+  // keeps the selection from the first mount and reopening the modal shows
+  // stale goals, making saved changes look like they "didn't stick".
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedGoals(currentGoals);
+      setRecalcMacros(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -61,7 +72,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
   const handleSave = () => {
     setGoals(selectedGoals);
-    const primaryGoal = selectedGoals[0] || 'build_muscle';
+    const primaryGoal = resolvePrimaryGoal(selectedGoals);
     if (profile) {
       setProfile({
         ...profile,

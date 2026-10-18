@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
@@ -27,6 +28,7 @@ type OnboardingScreenId =
 
 export default function Onboarding() {
   const toast = useToast();
+  const { navigate } = useAppNavigation();
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreenId>('splash');
   const [authOrigin, setAuthOrigin] = useState<'welcome' | 'create_account'>('welcome');
 
@@ -201,7 +203,11 @@ export default function Onboarding() {
   const handleToggleGoal = (goal: AthleteGoal) => {
     setSelectedGoals((prev) => {
       if (prev.includes(goal)) {
-        return prev.length > 1 ? prev.filter((g) => g !== goal) : prev;
+        if (prev.length <= 1) {
+          toast.info('Keep at least one goal selected — ASCEND calibrates your plan around it.', 'Goal Required');
+          return prev;
+        }
+        return prev.filter((g) => g !== goal);
       }
       return [...prev, goal];
     });
@@ -223,6 +229,7 @@ export default function Onboarding() {
     const bodyweightLbs =
       details.unit === 'kg' ? details.weight * 2.20462 : details.weight;
 
+    const finalGoals = selectedGoals.length > 0 ? [...selectedGoals] : [...DEFAULT_GOALS];
     const profileData = {
       id: authUser?.id || safeRandomId('user'),
       name: nameToSave,
@@ -234,12 +241,12 @@ export default function Onboarding() {
       unit: details.unit,
       dietPreference,
       createdAt: new Date().toISOString(),
-      goals: selectedGoals.length > 0 ? selectedGoals : (['build_muscle'] as AthleteGoal[]),
+      goals: finalGoals,
       userMode: experienceLevel,
     };
 
     setProfile(profileData);
-    setGoals(selectedGoals.length > 0 ? selectedGoals : (['build_muscle'] as AthleteGoal[]));
+    setGoals(finalGoals);
     setUserMode(experienceLevel);
 
     const [
@@ -252,7 +259,7 @@ export default function Onboarding() {
       import('@/lib/macros'),
     ]);
 
-    const primaryGoal = selectedGoals[0] || 'build_muscle';
+    const primaryGoal = resolvePrimaryGoal(finalGoals);
     let preferredSplit: 'push_pull_legs' | 'bro_split' | 'upper_lower' | 'full_body' =
       'upper_lower';
     let generatedSplit;
@@ -268,7 +275,12 @@ export default function Onboarding() {
       generatedSplit = generateSplitWeeklySchedule('full_body', details.unit).plans;
     } else {
       preferredSplit = 'upper_lower';
-      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, details.unit);
+      // Scale first-exposure loads to the athlete's bodyweight and experience
+      // so a light beginner is never prescribed an 85 kg lifter's weights.
+      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, details.unit, {
+        bodyweightKg,
+        experience: experienceLevel,
+      });
     }
 
     setTrainingProfile({
@@ -314,6 +326,11 @@ export default function Onboarding() {
       `Welcome to ASCEND, ${nameToSave.split(' ')[0]}!`,
       'Training Program Ready'
     );
+    // Land first-time athletes on the Today dashboard, not wherever the
+    // persisted tab pointer was left by a previous session.
+    try {
+      navigate('home', { clearHistory: true });
+    } catch {}
     setIsFinishing(false);
   };
 

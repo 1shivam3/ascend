@@ -34,6 +34,7 @@ import {
   isSetCompleted,
   TrainingDecisionRecord,
   CurrentPrescriptionTarget,
+  DEFAULT_GOALS,
   Unit,
   AthleteSafetyFlags,
   PolicyDecisionApplicationAudit,
@@ -41,6 +42,7 @@ import {
   ApplyPolicyDecisionResult,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
+import { purgeLocalAppData } from './storage';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
@@ -281,14 +283,14 @@ export const useAppStore = create<AppState>()(
       // Athlete Multi-Goal Selection
       goals: [],
       setGoals: (goals) => set((state) => {
-        const nextGoals = goals && goals.length > 0 ? goals : (['get_stronger'] as AthleteGoal[]);
+        const nextGoals = goals && goals.length > 0 ? [...goals] : [...DEFAULT_GOALS];
         return {
           goals: nextGoals,
           profile: state.profile ? { ...state.profile, goals: nextGoals } : null,
         };
       }),
       toggleGoal: (goal) => set((state) => {
-        const current: AthleteGoal[] = state.goals && state.goals.length > 0 ? state.goals : ['get_stronger', 'build_muscle'];
+        const current: AthleteGoal[] = state.goals && state.goals.length > 0 ? state.goals : [...DEFAULT_GOALS];
         const exists = current.includes(goal);
         let next: AthleteGoal[];
         if (exists) {
@@ -1508,11 +1510,8 @@ export const useAppStore = create<AppState>()(
           policyDecisionsLedgerHistory: [],
           policyDecisionApplications: [],
         });
-        if (typeof window !== 'undefined') {
-          try {
-            localStorage.removeItem('ascend_store');
-          } catch {}
-        }
+        // Truly purge everything the app stored (see purgeLocalAppData).
+        purgeLocalAppData();
       },
 
       logout: (options) => {

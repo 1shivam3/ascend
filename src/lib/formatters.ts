@@ -8,6 +8,18 @@ export const plural = (n: number, one: string, many = one + 's'): string =>
 export const formatKg = (kg: number): string => `${Math.round(kg * 10) / 10} kg`;
 
 /**
+ * Formats a real elapsed duration honestly — including sub-minute sessions.
+ * 10s stays "10s" (never rounded up to "1m" or shown as "0m").
+ */
+export const formatDuration = (totalSeconds: number): string => {
+  const s = Math.max(0, Math.floor(totalSeconds || 0));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r > 0 ? `${m}m ${r}s` : `${m}m`;
+};
+
+/**
  * Robust cross-platform ID generator with crypto.randomUUID fallback for non-secure / HTTP environments.
  */
 export const safeRandomId = (prefix = 'id'): string => {
