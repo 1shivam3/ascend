@@ -6,6 +6,7 @@ import type { AuthUser } from '@/lib/supabase/sync';
 import { AthleteGoal, Gender, Unit, UserMode, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { getOrCreateGuestId } from '@/lib/storage';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 
@@ -231,7 +232,7 @@ export default function Onboarding() {
 
     const finalGoals = selectedGoals.length > 0 ? [...selectedGoals] : [...DEFAULT_GOALS];
     const profileData = {
-      id: authUser?.id || safeRandomId('user'),
+      id: authUser?.id || getOrCreateGuestId(),
       name: nameToSave,
       gender: details.gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
@@ -307,14 +308,9 @@ export default function Onboarding() {
     );
     setMacroGoals(initialMacros);
 
-    const today = getLocalTodayStr();
-    addBodyMetric({
-      id: safeRandomId('bm'),
-      date: today,
-      weightKg: Math.round(bodyweightKg * 10) / 10,
-      heightCm: details.heightCm,
-      notes: 'Initial Calibration',
-    });
+    // Baseline bodyweight is written exactly once, with the stable id
+    // `initial_bw_<profileId>`, by setProfile's backfill above. Do NOT add a
+    // second entry here (previously caused duplicate log entries).
 
     if (typeof window !== 'undefined') {
       try {

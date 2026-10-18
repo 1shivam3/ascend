@@ -49,6 +49,31 @@ export function purgeLocalAppData(): string[] {
   return purgeable;
 }
 
+/**
+ * Stable guest identity. Minted once per device and reused for every guest
+ * onboarding, so a guest who logs out and onboards again keeps the SAME
+ * identity — their old data stays attributable instead of being orphaned
+ * under a fresh random id. Wiped by "Delete WebApp Data & Reset" (fresh
+ * start), preserved by logout.
+ */
+const GUEST_ID_KEY = 'ascend_guest_id';
+
+export function getOrCreateGuestId(): string {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
+    return 'guest_server';
+  }
+  try {
+    let id = localStorage.getItem(GUEST_ID_KEY);
+    if (!id) {
+      id = 'guest_' + generateId().replace(/-/g, '').slice(0, 16);
+      localStorage.setItem(GUEST_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    return 'guest_fallback';
+  }
+}
+
 export function generateId(): string {
   // Use the Web Crypto API for cryptographically strong IDs when available,
   // falling back to Math.random only in constrained environments.

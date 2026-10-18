@@ -362,16 +362,20 @@ export const useAppStore = create<AppState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
       setProfile: (profile) => set((state) => {
+        // Idempotent baseline: exactly one entry with the stable id
+        // `initial_bw_<profileId>`. Never fabricate additional entries.
         let nextMetrics = state.bodyMetrics;
-        if ((!nextMetrics || nextMetrics.length === 0) && profile.bodyweightKg) {
+        const baselineId = 'initial_bw_' + (profile.id || 'user');
+        const hasBaseline = (nextMetrics || []).some((m) => m.id === baselineId);
+        if (!hasBaseline && profile.bodyweightKg) {
           const entry: BodyMetricEntry = {
-            id: 'initial_bw_' + (profile.id || 'user'),
+            id: baselineId,
             date: profile.createdAt ? profile.createdAt.split('T')[0] : getLocalTodayStr(),
             weightKg: profile.bodyweightKg,
             heightCm: profile.heightCm,
             notes: 'Baseline calibration',
           };
-          nextMetrics = [entry];
+          nextMetrics = [...(nextMetrics || []), entry];
         }
         let nextFavorites = state.favoriteFoods;
         if (!nextFavorites || nextFavorites.length === 0) {
@@ -1893,17 +1897,21 @@ export const useAppStore = create<AppState>()(
                   }
                 }
 
-                // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
+                // Idempotent baseline backfill: only add when the stable
+                // `initial_bw_<profileId>` entry is missing. Never fabricate
+                // weight-log entries from the profile weight.
                 const currentState = useAppStore.getState();
-                if (currentState.profile?.bodyweightKg && (!currentState.bodyMetrics || currentState.bodyMetrics.length === 0)) {
+                const baselineId = 'initial_bw_' + (currentState.profile?.id || 'user');
+                const hasBaseline = (currentState.bodyMetrics || []).some((m) => m.id === baselineId);
+                if (currentState.profile?.bodyweightKg && !hasBaseline) {
                   const entry: BodyMetricEntry = {
-                    id: 'initial_bw_' + (currentState.profile.id || 'user'),
+                    id: baselineId,
                     date: currentState.profile.createdAt ? currentState.profile.createdAt.split('T')[0] : getLocalTodayStr(),
                     weightKg: currentState.profile.bodyweightKg,
                     heightCm: currentState.profile.heightCm,
                     notes: 'Baseline calibration',
                   };
-                  useAppStore.setState({ bodyMetrics: [entry] });
+                  useAppStore.setState({ bodyMetrics: [...(currentState.bodyMetrics || []), entry] });
                 } else if (currentState.bodyMetrics && currentState.bodyMetrics.length > 0) {
                   // Deduplicate existing bodyMetrics by date
                   const seenDates = new Set<string>();

@@ -440,8 +440,12 @@ export default function ActiveWorkoutScreen({
   }, [activeExerciseIdx]);
 
   // ── Auto-save In-Progress Session to Local Storage ────────────────────────
+  // Only snapshot once the athlete has genuinely started: at least one set
+  // explicitly completed. Saving on mere exercise names caused phantom
+  // "IN-PROGRESS WORKOUT DETECTED" banners for sessions the athlete never
+  // began (template exercises are pre-named on open).
   useEffect(() => {
-    if (exercises.some((e) => e.name.trim() || e.sets.some((s) => isActiveSetCompleted(s) || (parseFloat(String(s.weight)) || 0) > 0))) {
+    if (exercises.some((e) => e.sets.some((s) => isActiveSetCompleted(s)))) {
       saveWorkoutDraft({
         date: getLocalTodayStr(),
         name: workoutName,
