@@ -13,6 +13,7 @@ import {
 } from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
 import { buildCompactUserContext } from './ai-context';
+import { getNextSessionTarget } from './workout-engine';
 
 /**
  * Calculates total tonnage (volume in kg) for a workout session.
@@ -544,6 +545,26 @@ export function generateDeterministicPostWorkoutTake(
   const exercises = completedWorkout?.exercises || [];
   const primary = exercises[0]?.name || 'Primary lift';
 
+  // Next-session target from the canonical getNextSessionTarget() — the same
+  // function the Training Adaptation Summary reads, so the two surfaces can
+  // never contradict each other.
+  const primarySets = ((exercises[0]?.sets || []) as any[])
+    .filter((s) => isSetCompleted(s))
+    .map((s) => ({
+      weight: parseFloat(String(s.weight)) || 0,
+      reps: parseInt(String(s.reps), 10) || 0,
+      rpe: typeof s.rpe === 'number' ? s.rpe : undefined,
+      unit: (s.unit as 'kg' | 'lbs' | undefined) || 'kg',
+    }));
+  const canonicalTarget = getNextSessionTarget(
+    primary,
+    primarySets,
+    (primarySets[0]?.unit as 'kg' | 'lbs' | undefined) || 'kg'
+  );
+  const nextSessionTarget = canonicalTarget
+    ? `NEXT SESSION TARGET: ${canonicalTarget.summaryText}`
+    : `Repeat ${primary} next session and aim for +1 rep on your final working set before increasing load.`;
+
   return {
     headline: `Session Complete • ${primary} locked in`,
     volumeVsLastWeek: 'Volume stimulus successfully delivered to target muscle groups.',
@@ -551,7 +572,7 @@ export function generateDeterministicPostWorkoutTake(
       `Completed ${exercises.length} movements with consistent execution.`,
       `Session duration: ${completedWorkout?.durationMinutes || 45} minutes.`,
     ],
-    nextSessionTarget: `Repeat ${primary} next session and aim for +1 rep on your final working set before increasing load.`,
+    nextSessionTarget,
     source: 'offline_heuristic',
   };
 }

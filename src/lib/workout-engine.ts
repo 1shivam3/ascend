@@ -16,6 +16,7 @@ import {
   getSetExecutionStatus,
   isSetCompleted,
   isActiveSetCompleted,
+  UserMode,
 } from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise } from './strength-standards';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
@@ -84,6 +85,108 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
 export function shouldPreserveWorkoutSet(set: WorkoutSet): boolean {
   const hasPrescription = set.prescribedWeight !== undefined || set.prescribedReps !== undefined;
   return set.completed || set.status === 'skipped' || hasPrescription || (set.reps > 0);
+}
+
+export interface NextSessionTargetInput {
+  weight?: number;
+  reps: number;
+  rpe?: number;
+  unit?: Unit;
+}
+
+export interface NextSessionTarget {
+  exerciseName: string;
+  weight: number;
+  reps: number;
+  sets: number;
+  unit: Unit;
+  /** e.g. "Bench Press: 42.5kg × 8 next session" */
+  summaryText: string;
+  /** Why, including the RPE reasoning behind the directive. */
+  rationale: string;
+  directive: 'progress_load' | 'add_rep' | 'hold';
+}
+
+/**
+ * THE single function that computes a next-session target for an exercise.
+ * Both the Training Adaptation Summary and the Coach's Take read from this,
+ * so the two surfaces can never contradict each other again.
+ *
+ * RPE-aware rules (conservative):
+ * - avg RPE ≥ 9 → HOLD the load and consolidate (never add load after grinding).
+ * - avg RPE ≤ 7 across all sets → PROGRESS the load (small overload step).
+ * - otherwise (or no RPE logged) → ADD A REP at the same load (double progression).
+ */
+export function getNextSessionTarget(
+  exerciseName: string,
+  completedSets: NextSessionTargetInput[],
+  userUnit: Unit = 'kg'
+): NextSessionTarget | null {
+  const done = (completedSets || []).filter((s) => s.reps > 0);
+  if (done.length === 0) return null;
+
+  const step = userUnit === 'lbs' ? 5 : 2.5;
+  const maxW = Math.max(...done.map((s) => (typeof s.weight === 'number' && !isNaN(s.weight) ? s.weight : 0)));
+  const topReps = Math.max(...done.map((s) => s.reps));
+  const rpes = done.map((s) => s.rpe).filter((r): r is number => typeof r === 'number' && !isNaN(r));
+  const avgRpe = rpes.length > 0 ? rpes.reduce((a, b) => a + b, 0) / rpes.length : undefined;
+  const rpeStr = avgRpe !== undefined ? `avg RPE ${Math.round(avgRpe * 10) / 10}` : null;
+
+  const base = {
+    exerciseName,
+    sets: done.length,
+    unit: userUnit,
+  };
+
+  if (avgRpe !== undefined && avgRpe >= 9) {
+    return {
+      ...base,
+      weight: maxW,
+      reps: topReps,
+      directive: 'hold',
+      summaryText: `${exerciseName}: hold ${maxW}${userUnit} × ${topReps} next session`,
+      rationale: `${rpeStr} — hard session. Hold the load and consolidate before progressing.`,
+    };
+  }
+
+  if (avgRpe !== undefined && avgRpe <= 7) {
+    const nextW = Math.round((maxW + step) * 10) / 10;
+    return {
+      ...base,
+      weight: nextW,
+      reps: topReps,
+      directive: 'progress_load',
+      summaryText: `${exerciseName}: ${nextW}${userUnit} × ${topReps} next session`,
+      rationale: `${rpeStr} — moved with reserve. Small overload step (+${step}${userUnit}).`,
+    };
+  }
+
+  return {
+    ...base,
+    weight: maxW,
+    reps: topReps + 1,
+    directive: 'add_rep',
+    summaryText: `${exerciseName}: ${maxW}${userUnit} × ${topReps + 1} next session`,
+    rationale: rpeStr
+      ? `${rpeStr} — solid work. Add a rep before adding load.`
+      : 'Solid work. Add a rep before adding load.',
+  };
+}
+
+/**
+ * Keeps only sets the athlete actually performed (completed) or explicitly
+ * skipped, dropping unattempted planned sets. Every workout save path must
+ * use this so History records what was done — never the full plan.
+ * Skipped sets are preserved with their status so the record stays honest
+ * about what was attempted.
+ */
+export function getExecutedExercises(exercises: WorkoutExercise[]): WorkoutExercise[] {
+  return (exercises || [])
+    .map((ex) => ({
+      ...ex,
+      sets: (ex.sets || []).filter((s) => isSetCompleted(s) || s.status === 'skipped'),
+    }))
+    .filter((ex) => ex.sets.length > 0);
 }
 
 /**
@@ -1483,7 +1586,73 @@ export function getTodaySessionState(
  * Generates goal-adapted split templates (Upper A, Lower A, Upper B, Lower B)
  * calibrated to the athlete's specific training goal, rep brackets, and unit system.
  */
+export interface TemplateAthleteContext {
+  bodyweightKg?: number;
+  experience?: UserMode;
+}
+
+/**
+ * Reference athlete the built-in template loads were authored for
+ * (an ~85 kg intermediate lifter). Template loads scale with bodyweight
+ * relative to this reference; beginners additionally get a conservative
+ * factor so first exposures are safe rather than intimidating.
+ */
+const TEMPLATE_REFERENCE_BW_KG = 85;
+const BEGINNER_FIRST_EXPOSURE_FACTOR = 0.6;
+
+function scaleTemplateWeightForAthlete(
+  templateWeight: number | undefined,
+  isLbs: boolean,
+  ctx: TemplateAthleteContext
+): number | undefined {
+  if (templateWeight === undefined || templateWeight <= 0) return templateWeight;
+  const bw = ctx.bodyweightKg;
+  if (!bw || bw <= 0) return templateWeight;
+  const experienceFactor = ctx.experience === 'beginner' ? BEGINNER_FIRST_EXPOSURE_FACTOR : 1;
+  const scaled = templateWeight * (bw / TEMPLATE_REFERENCE_BW_KG) * experienceFactor;
+  const increment = isLbs ? 5 : 2.5;
+  const rounded = Math.max(increment, Math.round(scaled / increment) * increment);
+  // Beginners never get more than the template default on first exposure.
+  if (ctx.experience === 'beginner') return Math.min(rounded, templateWeight);
+  return rounded;
+}
+
+/**
+ * Scales built-in template loads to the athlete's bodyweight and experience.
+ * Pure function — unit-testable. Without a bodyweight the templates are
+ * returned unchanged (previous behavior).
+ */
+export function scaleSplitTemplatesForAthlete(
+  plans: PlannedWorkout[],
+  isLbs: boolean,
+  ctx: TemplateAthleteContext
+): PlannedWorkout[] {
+  if (!ctx.bodyweightKg || ctx.bodyweightKg <= 0) return plans;
+  return plans.map((plan) => ({
+    ...plan,
+    exercises: (plan.exercises || []).map((ex) => ({
+      ...ex,
+      targetWeight: scaleTemplateWeightForAthlete(ex.targetWeight, isLbs, ctx),
+    })),
+  }));
+}
+
+/**
+ * Goal-adaptive built-in split templates, optionally scaled to the athlete.
+ * Pass bodyweightKg + experience at onboarding/first-exposure so a 62 kg
+ * beginner is never prescribed an 85 kg lifter's loads.
+ */
 export function getGoalAdaptiveSplitTemplates(
+  goal: AthleteGoal = 'build_muscle',
+  unit: Unit = 'kg',
+  athlete?: TemplateAthleteContext
+): PlannedWorkout[] {
+  const plans = buildGoalAdaptiveSplitTemplates(goal, unit);
+  if (!athlete) return plans;
+  return scaleSplitTemplatesForAthlete(plans, unit === 'lbs', athlete);
+}
+
+function buildGoalAdaptiveSplitTemplates(
   goal: AthleteGoal = 'build_muscle',
   unit: Unit = 'kg'
 ): PlannedWorkout[] {

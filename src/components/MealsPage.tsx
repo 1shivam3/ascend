@@ -41,7 +41,7 @@ import {
   Leaf,
   Calendar,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import BarcodeScannerModal from '@/components/BarcodeScannerModal';
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
@@ -124,12 +124,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const hydrationConfig    = useStore((state) => state.hydrationConfig);
   const creatineConfig     = useStore((state) => state.creatineConfig);
   const creatineSupply     = useStore((state) => state.creatineSupply);
-  const goals              = useStore((state) => state.goals || ['get_stronger', 'build_muscle']);
+  const goals              = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
 
-  // Athlete goal personalization
-  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
-    ? (profile.goals[0] as AthleteGoal)
-    : (goals && goals.length > 0 ? (goals[0] as AthleteGoal) : 'build_muscle');
+  // Athlete goal personalization — single source of truth via resolvePrimaryGoal
+  const primaryGoal: AthleteGoal = resolvePrimaryGoal(
+    profile?.goals && profile.goals.length > 0 ? profile.goals : goals
+  );
   const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
   const dietPreference: DietPreference = profile?.dietPreference || 'non_vegetarian';
 
@@ -1899,6 +1899,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <span className="text-2xs font-semibold text-text-muted tabular-nums">
               of {macroGoals?.calories || 2400} daily target
             </span>
+            {macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
+              <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2">
+                {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} maintenance{' '}
+                {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
+                {macroGoals.calorieDelta < 0 ? 'deficit' : 'surplus'}
+                {macroGoals.calorieDelta < 0 && (
+                  <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} kg/week</>
+                )}
+                <span className="block text-4xs opacity-80">
+                  {macroGoals.calorieDelta < 0
+                    ? 'Targets stay above a 1,400 kcal safety floor. Weigh yourself weekly — the trend matters more than any single day.'
+                    : 'Fuel the surplus with protein first; extra calories build muscle only alongside training.'}
+                </span>
+              </span>
+            )}
 
             {/* 3 Macro Cards in 3 Columns */}
             <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-border/60">

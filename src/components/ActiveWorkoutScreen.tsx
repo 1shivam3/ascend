@@ -28,7 +28,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
-import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted } from '@/lib/types';
+import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted, DEFAULT_GOALS, resolvePrimaryGoal, Unit } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
   EXERCISE_LIBRARY,
@@ -44,6 +44,8 @@ import {
   getExercisePrescription,
   isActiveSetCompleted,
   finalizeWorkoutExercises,
+  getExecutedExercises,
+  getNextSessionTarget,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
@@ -52,7 +54,7 @@ import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatDuration } from '@/lib/formatters';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -101,10 +103,8 @@ export default function ActiveWorkoutScreen({
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
 
-  // Athlete goal personalization
-  const primaryGoal: AthleteGoal = (profile?.goals && profile.goals.length > 0)
-    ? (profile.goals[0] as AthleteGoal)
-    : 'build_muscle';
+  // Athlete goal personalization — single source of truth via resolvePrimaryGoal
+  const primaryGoal: AthleteGoal = resolvePrimaryGoal(profile?.goals);
   const goalConfig = ATHLETE_GOAL_CONFIGS[primaryGoal] || ATHLETE_GOAL_CONFIGS.build_muscle;
 
   // Beginner mode: one set at a time & exercise effort prompt
@@ -842,6 +842,9 @@ export default function ActiveWorkoutScreen({
   const [showFormCues, setShowFormCues] = useState(false);
   const [showWhyTarget, setShowWhyTarget] = useState(false);
 
+  // Training Adaptation Summary. Next-session targets come from the single
+  // canonical getNextSessionTarget() — the same function the Coach's Take
+  // reads — so the two surfaces can never contradict each other.
   const postWorkoutLedger = useMemo(() => {
     const improved: string[] = [];
     const steady: string[] = [];
@@ -851,17 +854,26 @@ export default function ActiveWorkoutScreen({
       if (!ex.name.trim()) continue;
       const validSets = ex.sets.filter(isActiveSetCompleted);
       if (validSets.length === 0) continue;
-      const allDone = validSets.every((s) => (s.rpe ?? 8) <= 8 && s.reps >= 8);
-      const pr = prs.find((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
-      const maxW = Math.max(...validSets.map((s) => parseFloat(String(s.weight)) || 0));
+      const target = getNextSessionTarget(
+        ex.name,
+        validSets.map((s) => ({
+          weight: parseFloat(String(s.weight)) || 0,
+          reps: parseInt(String(s.reps), 10) || 0,
+          rpe: s.rpe,
+          unit: (s.unit as Unit) || userUnit,
+        })),
+        userUnit
+      );
+      if (!target) continue;
 
-      if (allDone || (pr && maxW > (userUnit === 'lbs' ? (pr.weightLbs || pr.weightKg * 2.20462) : pr.weightKg))) {
-        improved.push(`${ex.name}: Solid volume & speed`);
-        nextRules.push(`${ex.name}: +${userUnit === 'lbs' ? 5 : 2.5}${userUnit} next exposure`);
+      if (target.directive === 'progress_load') {
+        improved.push(`${ex.name}: moved with reserve — ready for more load`);
+      } else if (target.directive === 'hold') {
+        steady.push(`${ex.name}: hard session — consolidating at ${target.weight}${userUnit}`);
       } else {
-        steady.push(`${ex.name}: Held load at ${maxW}${userUnit}`);
-        nextRules.push(`${ex.name}: Aim for +1 rep next session`);
+        steady.push(`${ex.name}: building reps at ${target.weight}${userUnit}`);
       }
+      nextRules.push(`${target.summaryText} — ${target.rationale}`);
     }
 
     return {
@@ -869,9 +881,13 @@ export default function ActiveWorkoutScreen({
       steady: steady.length > 0 ? steady.slice(0, 2) : ['Movement quality & baseline established'],
       nextRules: nextRules.length > 0 ? nextRules.slice(0, 2) : ['Follow prescribed target progression'],
     };
-  }, [exercises, prs, userUnit]);
+  }, [exercises, userUnit]);
 
   // Weight & Reps handlers (direct typing + steppers)
+  // A manual correction to one set carries forward to the remaining untouched
+  // sets of the same exercise: later sets that are not completed and still
+  // carry the edited set's previous value follow the correction. Sets the
+  // athlete already customized (or completed) are never overwritten.
   const handleSetWeightChange = (setIdx: number, val: string | number | undefined) => {
     let numericWeight: number | undefined = undefined;
     if (typeof val === 'number') {
@@ -888,11 +904,15 @@ export default function ActiveWorkoutScreen({
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
+        const oldWeight = ex.sets[setIdx]?.weight;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j !== setIdx) return s;
-            return { ...s, weight: numericWeight };
+            if (j === setIdx) return { ...s, weight: numericWeight };
+            if (j > setIdx && !isActiveSetCompleted(s) && s.weight === oldWeight) {
+              return { ...s, weight: numericWeight };
+            }
+            return s;
           }),
         };
       })
@@ -904,15 +924,20 @@ export default function ActiveWorkoutScreen({
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
+        const editedSet = ex.sets[setIdx];
+        const baseW = typeof editedSet?.weight === 'number' && !isNaN(editedSet.weight)
+          ? editedSet.weight
+          : (typeof editedSet?.prescribedWeight === 'number' && !isNaN(editedSet.prescribedWeight) ? editedSet.prescribedWeight : 0);
+        const newW = Math.max(0, Math.round((baseW + step) * 10) / 10);
+        const oldWeight = editedSet?.weight;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j !== setIdx) return s;
-            const baseW = typeof s.weight === 'number' && !isNaN(s.weight)
-              ? s.weight
-              : (typeof s.prescribedWeight === 'number' && !isNaN(s.prescribedWeight) ? s.prescribedWeight : 0);
-            const newW = Math.max(0, Math.round((baseW + step) * 10) / 10);
-            return { ...s, weight: newW };
+            if (j === setIdx) return { ...s, weight: newW };
+            if (j > setIdx && !isActiveSetCompleted(s) && s.weight === oldWeight) {
+              return { ...s, weight: newW };
+            }
+            return s;
           }),
         };
       })
@@ -923,11 +948,15 @@ export default function ActiveWorkoutScreen({
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
+        const oldReps = ex.sets[setIdx]?.reps;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j !== setIdx) return s;
-            return { ...s, reps: val as any };
+            if (j === setIdx) return { ...s, reps: val as any };
+            if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
+              return { ...s, reps: val as any };
+            }
+            return s;
           }),
         };
       })
@@ -938,13 +967,18 @@ export default function ActiveWorkoutScreen({
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
+        const editedSet = ex.sets[setIdx];
+        const currentR = parseInt(String(editedSet?.reps), 10) || 0;
+        const newR = Math.max(1, currentR + step);
+        const oldReps = editedSet?.reps;
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j !== setIdx) return s;
-            const currentR = parseInt(String(s.reps), 10) || 0;
-            const newR = Math.max(1, currentR + step);
-            return { ...s, reps: newR };
+            if (j === setIdx) return { ...s, reps: newR };
+            if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
+              return { ...s, reps: newR };
+            }
+            return s;
           }),
         };
       })
@@ -1415,17 +1449,13 @@ export default function ActiveWorkoutScreen({
       }
     }
 
-    const durationFormatted = elapsedSeconds < 60
-      ? `${elapsedSeconds}s`
-      : `${Math.floor(elapsedSeconds / 60)}m${elapsedSeconds % 60 > 0 ? ` ${elapsedSeconds % 60}s` : ''}`;
-
     return {
       totalVolumeKg: Math.round(totalVolumeKg),
       completedSetsCount,
       totalSetsCount,
       durationMinutes: Math.round(elapsedSeconds / 60),
       durationSeconds: elapsedSeconds,
-      durationFormatted,
+      durationFormatted: formatDuration(elapsedSeconds),
     };
   }, [exercises, elapsedSeconds]);
 
@@ -1547,15 +1577,10 @@ export default function ActiveWorkoutScreen({
       }
     }
 
-    // Only preserve exercises and sets that were actually performed or explicitly skipped
-    const executedExercises = validExercises
-      .map((ex) => ({
-        ...ex,
-        sets: ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped'),
-      }))
-      .filter((ex) => ex.sets.length > 0);
-
-    const exercisesToSave = executedExercises.length > 0 ? executedExercises : validExercises;
+    // Record only what was actually performed or explicitly skipped.
+    // Never fall back to the full plan: an interrupted session with zero
+    // completed sets is saved with zero sets, not 17 phantom ones.
+    const exercisesToSave = getExecutedExercises(validExercises);
 
     const workoutEntry: WorkoutEntry = {
       id: safeRandomId('wk'),
