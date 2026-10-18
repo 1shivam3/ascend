@@ -99,8 +99,12 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     }
 
     const parsedWeight = parseFloat(weight);
-    if (isNaN(parsedWeight) || parsedWeight <= 0) {
-      newErrors.weight = 'Valid bodyweight is required';
+    const parsedWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+    if (isNaN(parsedWeight) || parsedWeightKg < 30 || parsedWeightKg > 300) {
+      newErrors.weight =
+        unit === 'kg'
+          ? 'Please enter a realistic bodyweight between 30 kg and 300 kg.'
+          : 'Please enter a realistic bodyweight between 66 lbs and 660 lbs.';
     }
 
     let parsedAge: number | undefined = undefined;
@@ -114,11 +118,15 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     let parsedHeightCm: number | undefined = undefined;
     if (height.trim()) {
       const val = parseFloat(height);
-      if (!isNaN(val) && val > 0) {
-        parsedHeightCm = unit === 'lbs' ? Math.round(val * 2.54) : Math.round(val);
-        if (parsedHeightCm < 50 || parsedHeightCm > 260) {
-          newErrors.height = 'Height out of valid range';
-        }
+      const valCm = unit === 'lbs' ? val * 2.54 : val;
+      // Same bounds as onboarding — never silently keep the old value.
+      if (isNaN(val) || valCm < 100 || valCm > 250) {
+        newErrors.height =
+          unit === 'lbs'
+            ? 'Please enter a valid height between 39 in and 98 in.'
+            : 'Please enter a valid height between 100 cm and 250 cm.';
+      } else {
+        parsedHeightCm = Math.round(valCm);
       }
     }
 

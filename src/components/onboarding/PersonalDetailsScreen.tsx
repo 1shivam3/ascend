@@ -117,8 +117,12 @@ export default function PersonalDetailsScreen({
       }
       calculatedHeightCm = Math.round(parsedCm);
     } else {
-      const ft = parseInt(heightFt, 10) || 5;
-      const inch = parseInt(heightIn, 10) || 0;
+      const ft = parseInt(heightFt, 10);
+      const inch = parseInt(heightIn, 10);
+      if (isNaN(ft) || isNaN(inch) || ft < 1 || ft > 8 || inch < 0 || inch >= 12) {
+        setError('Please enter a valid height (e.g. 5 ft 9 in).');
+        return;
+      }
       const totalInches = ft * 12 + inch;
       const convertedCm = Math.round(totalInches * 2.54);
       if (convertedCm < 100 || convertedCm > 250) {

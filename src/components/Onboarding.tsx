@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
@@ -222,6 +222,12 @@ export default function Onboarding() {
     unit: Unit;
     heightCm: number;
   }) => {
+    // Never silently fall back to a default goal: the athlete must choose.
+    if (selectedGoals.length === 0) {
+      toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+      return;
+    }
+
     setIsFinishing(true);
 
     const nameToSave = details.name.trim() || athleteName.trim() || 'Athlete';
@@ -230,7 +236,7 @@ export default function Onboarding() {
     const bodyweightLbs =
       details.unit === 'kg' ? details.weight * 2.20462 : details.weight;
 
-    const finalGoals = selectedGoals.length > 0 ? [...selectedGoals] : [...DEFAULT_GOALS];
+    const finalGoals = [...selectedGoals];
     const profileData = {
       id: authUser?.id || getOrCreateGuestId(),
       name: nameToSave,
