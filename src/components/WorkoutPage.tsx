@@ -66,7 +66,7 @@ import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
@@ -75,6 +75,7 @@ import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import PlanVsActualReview from '@/components/PlanVsActualReview';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import {
   DAYS_OF_WEEK,
   DAY_DISPLAY_INFO,
@@ -178,7 +179,7 @@ function PlanModal({
   };
 
   const handleSave = () => {
-    const trimmedName = planName.trim();
+    const trimmedName = planName.trim().slice(0, MAX_PLAN_NAME_LENGTH);
     if (!trimmedName) {
       toast.error('Please give the plan a name.', 'Missing Name');
       return;
@@ -241,6 +242,7 @@ function PlanModal({
               placeholder='e.g. "Push Day", "Leg Day", "Full Body A"'
               value={planName}
               onChange={e => setPlanName(e.target.value)}
+              maxLength={MAX_PLAN_NAME_LENGTH}
               className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary focus:border-accent outline-none text-sm"
             />
           </div>
@@ -688,6 +690,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
@@ -1459,8 +1462,31 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   };
 
   const handleDeletePlan = (plan: PlannedWorkout) => {
+    // Ask for confirmation first (modal below); warn when a paused session
+    // draft references this plan.
+    setPlanToDelete(plan);
+  };
+
+  const confirmDeletePlan = () => {
+    if (!planToDelete) return;
+    const plan = planToDelete;
+    // Unlink the in-progress draft from the deleted plan so the resume banner
+    // never references a plan that no longer exists. The logged sets are kept.
+    if (
+      activeWorkoutDraft &&
+      (activeWorkoutDraft.startedFromPlanId === plan.id ||
+        activeWorkoutDraft.planId === plan.id)
+    ) {
+      saveWorkoutDraft({
+        ...activeWorkoutDraft,
+        startedFromPlan: null,
+        startedFromPlanId: null,
+        planId: undefined,
+      });
+    }
     deletePlannedWorkout(plan.id);
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
+    setPlanToDelete(null);
   };
 
   const handleDuplicatePlan = (plan: PlannedWorkout) => {
@@ -2496,6 +2522,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           }}
         />
       )}
+
+      {/* ── Plan Delete Confirmation ───────────────────────────────────────── */}
+      <ConfirmationModal
+        isOpen={!!planToDelete}
+        onClose={() => setPlanToDelete(null)}
+        onConfirm={confirmDeletePlan}
+        title="Delete this plan?"
+        message={
+          planToDelete &&
+          activeWorkoutDraft &&
+          (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
+            activeWorkoutDraft.planId === planToDelete.id)
+            ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+            : planToDelete
+              ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+              : ''
+        }
+        confirmText="Delete Plan"
+        cancelText="Keep"
+        variant="danger"
+      />
 
       {/* ── Plan Create/Edit Modal ───────────────────────────────────────── */}
       <PlanModal

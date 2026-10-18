@@ -45,6 +45,9 @@ export interface AthleteGoalConfig {
 /** Maximum athlete display-name length, enforced everywhere names are entered. */
 export const MAX_ATHLETE_NAME_LENGTH = 50;
 
+/** Maximum workout plan name length. */
+export const MAX_PLAN_NAME_LENGTH = 60;
+
 export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {  build_muscle: {
     id: 'build_muscle',
     label: 'Build Muscle',
