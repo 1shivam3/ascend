@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { formatHeightImperial } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -94,10 +95,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const displayHeight = () => {
     if (!profile?.heightCm) return '—';
     if (userUnit === 'lbs') {
-      const totalInches = Math.round(profile.heightCm / 2.54);
-      const feet = Math.floor(totalInches / 12);
-      const inches = totalInches % 12;
-      return `${feet}' ${inches}"`;
+      return formatHeightImperial(profile.heightCm);
     }
     return `${Math.round(profile.heightCm)} cm`;
   };

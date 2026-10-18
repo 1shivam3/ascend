@@ -72,3 +72,15 @@ export const formatLocalDate = (
   const d = parseLocalDate(dateStr);
   return d.toLocaleDateString(undefined, options);
 };
+
+/**
+ * Single source of truth for cm → imperial height display.
+ * 175 → `5' 9"`. Returns '—' for missing/invalid input.
+ */
+export const formatHeightImperial = (heightCm: number | undefined | null): string => {
+  if (typeof heightCm !== 'number' || !isFinite(heightCm) || heightCm <= 0) return '—';
+  const totalInches = Math.round(heightCm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}' ${inches}"`;
+};
