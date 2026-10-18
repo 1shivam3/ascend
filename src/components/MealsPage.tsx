@@ -11,6 +11,8 @@ import {
   getMacroCalorieDrift,
   parseNaturalMealOffline,
   getAbsurdQuantityWarning,
+  isJunkMealParse,
+  scaleFoodByQuantity,
 } from '@/lib/macros';
 import {
   Plus,
@@ -387,15 +389,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
           if (prevQty && prevItem.calories > 0 && rawQty) {
             // Proportional scaling preserves scanned or custom barcode macros!
-            const ratio = rawQty / prevQty;
-            next[index] = {
-              ...prevItem,
-              quantity: rawQty,
-              calories: Math.max(0, Math.round(prevItem.calories * ratio)),
-              proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
-              carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
-              fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
-            };
+            // scaleFoodByQuantity keeps the ratio math in one tested place.
+            next[index] = scaleFoodByQuantity(prevItem, rawQty);
           } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
             // User entered custom macros for an unmatched food; do not wipe them out!
             next[index] = {
@@ -889,12 +884,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (!q || isNaturalParsing) return;
 
     // Reject unrecognizable input: never silently log a phantom 0-calorie meal.
-    const isJunkParse = (foods: FoodItem[]) => {
-      if (!foods || foods.length === 0) return true;
-      const totals = calculateMealMacros(foods);
-      const allUnmatched = foods.every((f) => f.isUnmatched);
-      return allUnmatched && totals.calories === 0;
-    };
+    const isJunkParse = (foods: FoodItem[]) => isJunkMealParse(foods);
     const rejectJunk = () => {
       toast.error(
         `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal", or use Add Manually.`,

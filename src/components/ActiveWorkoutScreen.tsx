@@ -46,6 +46,7 @@ import {
   finalizeWorkoutExercises,
   getExecutedExercises,
   getNextSessionTarget,
+  applyExerciseEffortRating,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { useToast } from '@/components/ui/Toast';
@@ -1265,18 +1266,11 @@ export default function ActiveWorkoutScreen({
   const handleLogExerciseEffort = (rpe: number, label: 'easy' | 'good' | 'hard') => {
     setEffortChosen(label);
     effortAnsweredRef.current.add(activeExerciseIdx);
-    // Store the exercise-level rating SEPARATELY. Backfill only sets that have
-    // no logged per-set RPE — never overwrite a logged value (that corrupted
-    // History averages).
+    // Store the exercise-level rating SEPARATELY. applyExerciseEffortRating
+    // backfills only sets with no logged per-set RPE — never overwrites a
+    // logged value (that corrupted History averages).
     setExercises((prev) =>
-      prev.map((ex, i) => {
-        if (i !== activeExerciseIdx) return ex;
-        return {
-          ...ex,
-          effortRating: { rpe, label },
-          sets: ex.sets.map((s) => (s.rpe === undefined ? { ...s, rpe } : s)),
-        };
-      })
+      prev.map((ex, i) => (i === activeExerciseIdx ? applyExerciseEffortRating(ex, rpe, label) : ex))
     );
     toast.success(
       `Logged effort as ${label.toUpperCase()} (@${rpe} Effort)`,

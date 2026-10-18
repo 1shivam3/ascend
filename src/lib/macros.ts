@@ -524,6 +524,18 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
 }
 
 /**
+ * Detect a junk/gibberish meal parse: nothing recognized and zero calories.
+ * Callers must refuse to log and show an error, never silently record a
+ * 0-calorie phantom meal.
+ */
+export function isJunkMealParse(foods: FoodItem[]): boolean {
+  if (!foods || foods.length === 0) return true;
+  const totals = calculateMealMacros(foods);
+  const allUnmatched = foods.every((f) => f.isUnmatched);
+  return allUnmatched && totals.calories === 0;
+}
+
+/**
  * Flags a single food item whose quantity is implausible for one person in
  * one meal (e.g. "100 rotis" → 12,000 kcal). Returns a human-readable
  * warning, or null when the quantity looks sane. Callers should refuse to
@@ -640,5 +652,26 @@ export function calculateRecommendedMacroGoals(
     carbsG,
     maintenanceCalories: maintenance,
     calorieDelta: exactCalories - maintenance,
+  };
+}
+
+/**
+ * Scale a food item's calories/macros proportionally when its quantity
+ * changes. Regression guard: the manual builder once read the quantity from
+ * the already-updated row, making the ratio always 1 and silently dropping
+ * the scaling (200 g chicken saved as 100 g values).
+ */
+export function scaleFoodByQuantity(prevItem: FoodItem, newQty: number): FoodItem {
+  const prevQty =
+    typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
+  if (!prevQty || !(prevItem.calories > 0) || !(newQty > 0)) return prevItem;
+  const ratio = newQty / prevQty;
+  return {
+    ...prevItem,
+    quantity: newQty,
+    calories: Math.max(0, Math.round(prevItem.calories * ratio)),
+    proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
+    carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
+    fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
   };
 }
