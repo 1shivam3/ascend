@@ -2127,6 +2127,20 @@ export default function ActiveWorkoutScreen({
                 >
                   <Plus className="w-3.5 h-3.5" />
                 </button>
+                {currentExercise.sets.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleRemoveSet(currentExercise.sets.length - 1);
+                      setActiveSetIdx((prev) => Math.min(prev, currentExercise.sets.length - 2));
+                    }}
+                    className="h-8 px-2.5 rounded-full bg-bg-secondary text-text-muted border border-border/60 hover:text-danger hover:border-danger/40 flex items-center justify-center text-[11px] font-bold font-mono ml-1 cursor-pointer"
+                    title="Remove last set"
+                    aria-label="Remove last set"
+                  >
+                    − Set
+                  </button>
+                )}
               </div>
             </div>
 
