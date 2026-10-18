@@ -14,6 +14,7 @@ import {
   isDumbbellExercise,
   isMainCompoundLift,
   getExerciseEquipment,
+  MAX_PR_WEIGHT_KG,
 } from '@/lib/strength-standards';
 import {
   Plus,
@@ -767,6 +768,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         toast.error('Added weight must be a valid number.', 'Invalid Weight');
         return;
       }
+      if (addedWeightNum < 0) {
+        toast.error('Added weight cannot be negative.', 'Invalid Weight');
+        return;
+      }
 
       let addedKg = 0;
       let addedLbs = 0;
@@ -778,6 +783,13 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           addedKg = addedWeightNum;
           addedLbs = addedWeightNum * 2.20462;
         }
+      }
+      if (addedKg > MAX_PR_WEIGHT_KG) {
+        toast.error(
+          `Added weight is above the ${MAX_PR_WEIGHT_KG} kg sanity cap. Please check the value.`,
+          'Unlikely Weight'
+        );
+        return;
       }
 
       // 1RM for bodyweight exercise = bodyweight + added weight (for Epley)
@@ -823,6 +835,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       } else {
         weightKg = weightNum;
         weightLbs = weightNum * 2.20462;
+      }
+
+      if (weightKg > MAX_PR_WEIGHT_KG) {
+        toast.error(
+          `${weightNum} ${unit} (≈${Math.round(weightKg)} kg) is above the ${MAX_PR_WEIGHT_KG} kg sanity cap — no raw lift in history exceeds it. Please check the value.`,
+          'Unlikely Weight'
+        );
+        return;
       }
 
       const oneRepMaxKg = calculateOneRepMax(weightKg, repsNum);
@@ -1607,6 +1627,17 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   {selectedIsDumbbell && (
                     <p className="text-2xs text-text-muted mt-1 font-mono">Per-hand weight</p>
                   )}
+                  {weight.trim() !== '' && (() => {
+                    const wNum = parseFloat(weight);
+                    const wKg = unit === 'lbs' ? wNum * 0.453592 : wNum;
+                    const reason =
+                      isNaN(wNum) ? 'Enter a valid number.'
+                      : wNum <= 0 ? 'Weight must be greater than zero.'
+                      : wKg > MAX_PR_WEIGHT_KG ? `Above the ${MAX_PR_WEIGHT_KG} kg sanity cap — please check.` : null;
+                    return reason ? (
+                      <p className="text-2xs text-danger mt-1 font-mono">{reason}</p>
+                    ) : null;
+                  })()}
                 </div>
 
                 <div>

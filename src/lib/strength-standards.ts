@@ -1,6 +1,12 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 import { getAllExerciseNames } from './exercise-library';
 
+/**
+ * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
+ * powerlifting world record; anything above is a typo, not a PR.
+ */
+export const MAX_PR_WEIGHT_KG = 500;
+
 export function calculateOneRepMax(weight: number, reps: number): number {
   if (weight <= 0) return 0;
   if (reps <= 0) return weight;
