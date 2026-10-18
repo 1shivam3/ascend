@@ -554,13 +554,18 @@ export function getAbsurdQuantityWarning(food: { name?: string; calories?: numbe
  * primary goal, gender, and optional height.
  * Uses Mifflin-St Jeor / standard active gym-goer TDEE multipliers with zero Atwater drift.
  */
-export function calculateRecommendedMacroGoals(
+/**
+ * Mifflin-St Jeor maintenance estimate (×1.4 active-trainee factor).
+ * Single source of truth for maintenance — used by both the auto
+ * calibration and manual Edit Targets, so the deficit/surplus explanation
+ * line never goes stale.
+ */
+export function calculateMaintenanceCalories(
   bodyweightKg: number,
-  goal: AthleteGoal = 'build_muscle',
   gender: Gender = 'male',
   heightCm?: number,
   ageYears?: number
-): MacroGoals {
+): number {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
   const defaultHeight = gender === 'male' ? 175 : gender === 'female' ? 162 : 168.5;
   const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : defaultHeight;
@@ -573,7 +578,18 @@ export function calculateRecommendedMacroGoals(
   const genderOffset = gender === 'male' ? 5 : gender === 'female' ? -161 : -78;
   const bmr = 10 * bw + 6.25 * height - 5 * age + genderOffset;
   // Active trainee activity factor (~3-5 days/week resistance training)
-  const maintenance = Math.round(bmr * 1.4);
+  return Math.round(bmr * 1.4);
+}
+
+export function calculateRecommendedMacroGoals(
+  bodyweightKg: number,
+  goal: AthleteGoal = 'build_muscle',
+  gender: Gender = 'male',
+  heightCm?: number,
+  ageYears?: number
+): MacroGoals {
+  const bw = Math.max(35, Math.min(250, bodyweightKg));
+  const maintenance = calculateMaintenanceCalories(bodyweightKg, gender, heightCm, ageYears);
 
   let targetCalories = maintenance;
   let proteinPerKg = 1.8;

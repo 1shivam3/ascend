@@ -7,6 +7,7 @@ import {
   calculateMealMacros,
   getFoodSuggestions,
   calculateRecommendedMacroGoals,
+  calculateMaintenanceCalories,
   getMacroCalorieDrift,
   parseNaturalMealOffline,
   getAbsurdQuantityWarning,
@@ -814,22 +815,55 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       toast.error('Please enter valid target calories and protein.', 'Invalid Targets');
       return;
     }
+    // Honest range validation — never silently ignore or rebalance absurd input.
+    if (cal < 800 || cal > 10000) {
+      toast.error(`Daily calories must be between 800 and 10,000 kcal (you entered ${goalCalories}).`, 'Unlikely Target');
+      return;
+    }
+    if (prot < 10 || prot > 400) {
+      toast.error(`Protein target must be between 10 and 400 g (you entered ${goalProtein} g). Very high intakes offer no benefit past ~2.2 g/kg.`, 'Unlikely Target');
+      return;
+    }
+    if (!isNaN(fat) && (fat < 0 || fat > 300)) {
+      toast.error('Fat target must be between 0 and 300 g.', 'Unlikely Target');
+      return;
+    }
+    if (!isNaN(carb) && (carb < 0 || carb > 800)) {
+      toast.error('Carb target must be between 0 and 800 g.', 'Unlikely Target');
+      return;
+    }
 
     const targetFat = !isNaN(fat) && fat > 0 ? Math.round(fat) : Math.round((cal * 0.25) / 9);
-    const targetCarbs = !isNaN(carb) && carb > 0 ? Math.round(carb) : Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
-    const targetCalories = (!isNaN(carb) && carb > 0 && !isNaN(fat) && fat > 0)
-      ? Math.round(prot * 4 + targetCarbs * 4 + targetFat * 9)
-      : Math.round(cal);
+    // The typed calorie target is authoritative. Carbs are the filler macro:
+    // if the numbers don't add up, carbs absorb the difference (disclosed below),
+    // instead of silently overwriting the calorie target.
+    const targetCarbs = Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
+    const targetCalories = Math.round(cal);
+    const carbsAdjusted = (!isNaN(carb) && carb > 0 && Math.abs(carb - targetCarbs) >= 5);
 
     const newGoals: MacroGoals = {
       calories:  targetCalories,
       proteinG:  Math.round(prot),
       fatG:      targetFat,
       carbsG:    targetCarbs,
+      // Recompute maintenance from the athlete's stats so the
+      // deficit/surplus explanation line survives manual edits.
+      maintenanceCalories: calculateMaintenanceCalories(
+        profile?.bodyweightKg || 75,
+        profile?.gender || 'male',
+        profile?.heightCm,
+        profile?.age
+      ),
+      calorieDelta: 0, // set below
     };
+    newGoals.calorieDelta = newGoals.calories - (newGoals.maintenanceCalories as number);
 
     setMacroGoals(newGoals);
-    toast.success(`Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).`, 'Goals Saved');
+    toast.success(
+      `Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).` +
+      (carbsAdjusted ? ` Carbs adjusted to fit your calorie target.` : ''),
+      'Goals Saved'
+    );
     setIsGoalsModalOpen(false);
   };
 
