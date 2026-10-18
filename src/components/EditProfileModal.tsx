@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Check, Scale, Ruler } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
-import { Gender, Unit } from '@/lib/types';
-import { round1 } from '@/lib/formatters';
+import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 
 export interface EditProfileModalProps {
@@ -94,9 +94,11 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
-    const trimmedName = name.trim();
+    const trimmedName = sanitizeAthleteName(name.trim(), MAX_ATHLETE_NAME_LENGTH);
     if (!trimmedName) {
       newErrors.name = 'Full name is required';
+    } else if (trimmedName.length > MAX_ATHLETE_NAME_LENGTH) {
+      newErrors.name = `Please keep your name under ${MAX_ATHLETE_NAME_LENGTH} characters`;
     }
 
     const parsedWeight = parseFloat(weight);
@@ -203,6 +205,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 if (errors.name) setErrors((prev) => ({ ...prev, name: '' }));
               }}
               placeholder="Your name"
+              maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
             />
             {errors.name && <p className="text-2xs text-accent mt-0.5">{errors.name}</p>}

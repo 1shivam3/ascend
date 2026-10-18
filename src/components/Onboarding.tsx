@@ -3,9 +3,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
@@ -230,7 +230,7 @@ export default function Onboarding() {
 
     setIsFinishing(true);
 
-    const nameToSave = details.name.trim() || athleteName.trim() || 'Athlete';
+    const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim() || 'Athlete', MAX_ATHLETE_NAME_LENGTH);
     const bodyweightKg =
       details.unit === 'lbs' ? details.weight * 0.453592 : details.weight;
     const bodyweightLbs =

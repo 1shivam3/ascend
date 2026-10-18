@@ -25,6 +25,7 @@ const PostWorkoutTakeModal = dynamic(() => import('@/components/PostWorkoutTakeM
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
+import { getTimeGreeting } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, DayOfWeek } from '@/lib/types';
 import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
@@ -57,12 +58,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
 
   // Sentence-case personalized greeting matching Screen 8 & 9
-  const greeting = useMemo(() => {
-    const h = today.getHours();
-    if (h < 12) return 'Good morning,';
-    if (h < 17) return 'Good afternoon,';
-    return 'Good evening,';
-  }, [today]);
+  const greeting = useMemo(() => getTimeGreeting(today), [today]);
 
   const athleteDisplayName = useMemo(() => {
     if (!profile?.name || !profile.name.trim()) return 'Alex';

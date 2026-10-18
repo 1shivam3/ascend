@@ -42,8 +42,10 @@ export interface AthleteGoalConfig {
   defaultRestSeconds: number;
 }
 
-export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
-  build_muscle: {
+/** Maximum athlete display-name length, enforced everywhere names are entered. */
+export const MAX_ATHLETE_NAME_LENGTH = 50;
+
+export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {  build_muscle: {
     id: 'build_muscle',
     label: 'Build Muscle',
     tagline: 'Hypertrophy volume, exercise selection, progressive overload',

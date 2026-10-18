@@ -20,7 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
-import { formatHeightImperial } from '@/lib/formatters';
+import { formatHeightImperial, athleteNameToEmailSlug } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -88,7 +88,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
   const athleteName = profile?.name ? profile.name.trim() : 'Alex';
   const athleteInitial = athleteName.charAt(0).toUpperCase();
-  const athleteEmail = user?.email || profile?.name ? `${athleteName.toLowerCase().replace(/\s+/g, '.')}@athlete.local` : 'Local Guest Athlete';
+  const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : 'Local Guest Athlete';
   const userUnit = profile?.unit || 'lbs';
 
   // Format height display

@@ -96,3 +96,40 @@ export const round2 = (n: number): number => {
   if (typeof n !== 'number' || !isFinite(n)) return 0;
   return Math.round(n * 100) / 100;
 };
+
+/**
+ * Sanitizes an athlete display name: strips HTML tags / stray markup so it
+ * can never leak into derived strings (like the guest @athlete.local email),
+ * collapses whitespace, and caps length. Emoji are preserved.
+ */
+export const sanitizeAthleteName = (raw: string, maxLength = 50): string => {
+  if (typeof raw !== 'string') return '';
+  return raw
+    .replace(/<[^>]*>/g, '')
+    .replace(/[<>&"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+};
+
+/** Email-safe slug from a display name (for the local guest email). */
+export const athleteNameToEmailSlug = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\w\s.-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '.')
+    .replace(/\.+/g, '.')
+    .replace(/^[.-]+|[.-]+$/g, '');
+  return slug || 'athlete';
+};
+
+/** Time-of-day greeting. Late night (22–5) gets "Good night," never "Good morning,". */
+export const getTimeGreeting = (date: Date = new Date()): string => {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return 'Good morning,';
+  if (h >= 12 && h < 17) return 'Good afternoon,';
+  if (h >= 17 && h < 22) return 'Good evening,';
+  return 'Good night,';
+};
