@@ -96,7 +96,7 @@ export default function PostWorkoutTakeModal({
                 summary: 'Workout logged. Your next session targets are calculated from your completed sets.',
                 nextSessionTarget: '',
                 source: 'offline_heuristic',
-              } as AIPostWorkoutTake);
+              } as unknown as AIPostWorkoutTake);
             }
             setLoading(false);
           }

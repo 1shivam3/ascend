@@ -3177,7 +3177,7 @@ export default function ActiveWorkoutScreen({
       <ConfirmationModal
         isOpen={exerciseToRemove !== null}
         onClose={() => setExerciseToRemove(null)}
-        onConfirm={() => exerciseToRemove !== null && confirmRemoveExercise(exerciseToRemove)}
+        onConfirm={() => { if (exerciseToRemove !== null) confirmRemoveExercise(exerciseToRemove); }}
         title="Remove this exercise?"
         message={
           exerciseToRemove !== null
