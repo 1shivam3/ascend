@@ -36,7 +36,13 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           ? (currentWeightKg * 2.20462).toFixed(1)
           : currentWeightKg.toFixed(1);
       setWeightInput(displayWeight);
-      setHeightInput(profile?.heightCm ? String(profile.heightCm) : '');
+      setHeightInput(
+        profile?.heightCm
+          ? unit === 'lbs'
+            ? round1(profile.heightCm / 2.54).toFixed(1)
+            : String(round1(profile.heightCm))
+          : ''
+      );
       setDateInput(getLocalTodayStr());
       setSuccessMsg('');
 
@@ -84,6 +90,11 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     if (!isNaN(hVal) && hVal > 0) {
       setHipsInput(newUnit === 'lbs' ? (hVal / 2.54).toFixed(1) : (hVal * 2.54).toFixed(1));
     }
+    // Convert height input too
+    const htVal = parseFloat(heightInput);
+    if (!isNaN(htVal) && htVal > 0) {
+      setHeightInput(newUnit === 'lbs' ? (htVal / 2.54).toFixed(1) : (htVal * 2.54).toFixed(1));
+    }
     setUnit(newUnit);
   };
 
@@ -94,7 +105,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
     const finalWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
     const parsedHeight = parseFloat(heightInput);
-    const validHeight = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250 ? parsedHeight : profile?.heightCm;
+    const parsedHeightCm = unit === 'lbs' ? parsedHeight * 2.54 : parsedHeight;
+    const validHeight = !isNaN(parsedHeightCm) && parsedHeightCm >= 100 && parsedHeightCm <= 250 ? Math.round(parsedHeightCm) : profile?.heightCm;
 
     const parsedFat = parseFloat(bodyFatInput);
     const validFat = !isNaN(parsedFat) && parsedFat > 0 && parsedFat < 70 ? parsedFat : undefined;
@@ -219,7 +231,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           {/* Height Field */}
           <div>
             <label htmlFor="modal-height-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
-              HEIGHT (CM)
+              HEIGHT {unit === 'lbs' ? '(IN)' : '(CM)'}
             </label>
             <div className="relative">
               <input

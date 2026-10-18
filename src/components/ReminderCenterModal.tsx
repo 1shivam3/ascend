@@ -61,9 +61,9 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
   if (!isOpen) return null;
 
-  const handleRequestPermission = async (): Promise<boolean> => {
+  const handleRequestPermission = async (silent = false): Promise<boolean> => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.info('Notifications are not supported in this browser.', 'Not Supported');
+      if (!silent) toast.info('Notifications are not supported in this browser.', 'Not Supported');
       return false;
     }
     if (Notification.permission === 'granted') {
@@ -74,10 +74,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       const permission = await Notification.requestPermission();
       setPermissionState(permission);
       if (permission === 'granted') {
-        toast.success('Notification permission granted!', 'Reminders Enabled');
+        if (!silent) toast.success('Notification permission granted!', 'Reminders Enabled');
         return true;
       } else {
-        toast.info('Notification permission was denied or dismissed.', 'Permission Denied');
+        if (!silent) toast.info('Notification permission was denied or dismissed.', 'Permission Denied');
         return false;
       }
     } catch {
@@ -103,18 +103,19 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // If any reminder is turned on, ensure permission is requested
+      // If any reminder is turned on, ensure permission is requested (silently —
+      // exactly ONE outcome toast is shown at the end of the save).
       const hasAnyEnabled =
         prefs.waterReminders.enabled ||
         prefs.mealReminders.enabled ||
         prefs.workoutReminders.enabled ||
         prefs.weeklyReport.enabled;
 
+      let permissionNote = '';
       if (hasAnyEnabled && permissionState !== 'granted') {
-        const granted = await handleRequestPermission();
+        const granted = await handleRequestPermission(true);
         if (!granted) {
-          // Keep preferences saved locally even if OS permission is pending
-          toast.info('Preferences saved. Enable browser/app notification permissions to receive alerts.');
+          permissionNote = ' Enable notification permissions on your device to receive alerts.';
         }
       }
 
@@ -152,7 +153,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         console.warn('Push subscription toggle notice:', pushErr);
       }
 
-      toast.success('Reminder preferences updated successfully.', 'Reminders Saved');
+      toast.success(`Reminder preferences saved.${permissionNote}`, 'Reminders Saved');
       onClose();
     } catch (err: any) {
       toast.error(err?.message || 'Could not save reminder preferences.');
@@ -386,7 +387,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                 <div>
                   <span className="text-xs font-bold text-text-primary block">Workout Reminders</span>
                   <span className="text-2xs text-text-muted">
-                    Remind users on their selected training days.
+                    Remind you on your selected training days.
                   </span>
                 </div>
               </div>
@@ -534,9 +535,31 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-3xs text-text-muted">
-                <span>{prefs.quietHours.start}</span>
+                <input
+                  type="time"
+                  aria-label="Quiet hours start"
+                  value={prefs.quietHours.start}
+                  onChange={(e) =>
+                    setPrefs({
+                      ...prefs,
+                      quietHours: { ...prefs.quietHours, start: e.target.value },
+                    })
+                  }
+                  className="bg-bg-elevated border border-border rounded-lg px-1.5 py-1 text-3xs text-text-primary font-mono"
+                />
                 <span>to</span>
-                <span>{prefs.quietHours.end}</span>
+                <input
+                  type="time"
+                  aria-label="Quiet hours end"
+                  value={prefs.quietHours.end}
+                  onChange={(e) =>
+                    setPrefs({
+                      ...prefs,
+                      quietHours: { ...prefs.quietHours, end: e.target.value },
+                    })
+                  }
+                  className="bg-bg-elevated border border-border rounded-lg px-1.5 py-1 text-3xs text-text-primary font-mono"
+                />
               </div>
             </div>
 
