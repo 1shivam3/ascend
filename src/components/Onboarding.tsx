@@ -302,17 +302,24 @@ export default function Onboarding() {
       coachingStyle: 'balanced',
     });
 
-    setPlannedWorkouts(generatedSplit);
-    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
-
-    const initialMacros = calculateRecommendedMacroGoals(
-      bodyweightKg,
-      primaryGoal,
-      details.gender,
-      details.heightCm,
-      details.age
-    );
-    setMacroGoals(initialMacros);
+    // Preserve the athlete's existing plans/targets when re-onboarding after
+    // a logout — only seed generated ones for a truly fresh profile.
+    const { plannedWorkouts: existingPlans, macroGoals: existingGoals } = useStore.getState();
+    if (!existingPlans || existingPlans.length === 0) {
+      setPlannedWorkouts(generatedSplit);
+      setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+    }
+    if (!existingGoals) {
+      setMacroGoals(
+        calculateRecommendedMacroGoals(
+          bodyweightKg,
+          primaryGoal,
+          details.gender,
+          details.heightCm,
+          details.age
+        )
+      );
+    }
 
     // Baseline bodyweight is written exactly once, with the stable id
     // `initial_bw_<profileId>`, by setProfile's backfill above. Do NOT add a
