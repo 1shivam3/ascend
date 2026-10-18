@@ -5,6 +5,7 @@ import { X, User, Check, Scale, Ruler } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { Gender, Unit } from '@/lib/types';
+import { round1 } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 
 export interface EditProfileModalProps {
@@ -45,17 +46,17 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
       if (profile.unit === 'lbs') {
         const lbsVal = profile.bodyweightLbs || Math.round(profile.bodyweightKg * 2.20462);
-        setWeight(String(lbsVal));
+        setWeight(String(round1(lbsVal)));
       } else {
-        setWeight(String(profile.bodyweightKg));
+        setWeight(String(round1(profile.bodyweightKg)));
       }
 
       if (profile.heightCm) {
         if (profile.unit === 'lbs') {
           // Height in inches
-          setHeight((profile.heightCm / 2.54).toFixed(1));
+          setHeight(round1(profile.heightCm / 2.54).toFixed(1));
         } else {
-          setHeight(String(profile.heightCm));
+          setHeight(String(round1(profile.heightCm)));
         }
       } else {
         setHeight('');

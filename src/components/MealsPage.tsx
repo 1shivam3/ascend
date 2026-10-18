@@ -51,7 +51,7 @@ import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1 } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -3007,7 +3007,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.proteinG || ''}
+                                    value={food.proteinG ? round1(food.proteinG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'proteinG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
@@ -3020,7 +3020,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.carbsG || ''}
+                                    value={food.carbsG ? round1(food.carbsG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'carbsG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
@@ -3033,7 +3033,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.fatG || ''}
+                                    value={food.fatG ? round1(food.fatG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'fatG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"

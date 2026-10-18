@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, round1 } from '@/lib/formatters';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -45,15 +45,15 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
         : null;
 
       if (latest) {
-        setBodyFatInput(latest.bodyFatPct !== undefined ? String(latest.bodyFatPct) : '');
+        setBodyFatInput(latest.bodyFatPct !== undefined ? String(round1(latest.bodyFatPct)) : '');
         if (latest.chestIn !== undefined) {
-          setChestInput(unit === 'lbs' ? String(latest.chestIn) : (latest.chestIn * 2.54).toFixed(1));
+          setChestInput(unit === 'lbs' ? String(round1(latest.chestIn)) : (round1(latest.chestIn) * 2.54).toFixed(1));
         }
         if (latest.waistIn !== undefined) {
-          setWaistInput(unit === 'lbs' ? String(latest.waistIn) : (latest.waistIn * 2.54).toFixed(1));
+          setWaistInput(unit === 'lbs' ? String(round1(latest.waistIn)) : (round1(latest.waistIn) * 2.54).toFixed(1));
         }
         if (latest.hipsIn !== undefined) {
-          setHipsInput(unit === 'lbs' ? String(latest.hipsIn) : (latest.hipsIn * 2.54).toFixed(1));
+          setHipsInput(unit === 'lbs' ? String(round1(latest.hipsIn)) : (round1(latest.hipsIn) * 2.54).toFixed(1));
         }
       }
     }

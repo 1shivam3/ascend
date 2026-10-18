@@ -84,3 +84,15 @@ export const formatHeightImperial = (heightCm: number | undefined | null): strin
   const inches = totalInches % 12;
   return `${feet}' ${inches}"`;
 };
+
+/** Round to 1 decimal — use for all displayed/converted measurements to kill float artifacts. */
+export const round1 = (n: number): number => {
+  if (typeof n !== 'number' || !isFinite(n)) return 0;
+  return Math.round(n * 10) / 10;
+};
+
+/** Round to 2 decimals. */
+export const round2 = (n: number): number => {
+  if (typeof n !== 'number' || !isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+};
