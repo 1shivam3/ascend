@@ -9,6 +9,7 @@ import {
   calculateRecommendedMacroGoals,
   getMacroCalorieDrift,
   parseNaturalMealOffline,
+  getAbsurdQuantityWarning,
 } from '@/lib/macros';
 import {
   Plus,
@@ -730,6 +731,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       foods: cleanedFoods,
     };
 
+    const absurdWarning = cleanedFoods.map(getAbsurdQuantityWarning).find((w) => w !== null);
+    if (absurdWarning) {
+      toast.error(absurdWarning, 'Unlikely Quantity');
+      return;
+    }
+
     const mealMacros = calculateMealMacros(cleanedFoods);
 
     addMeal(newMeal);
@@ -837,6 +844,31 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const q = naturalQuery.trim();
     if (!q || isNaturalParsing) return;
 
+    // Reject unrecognizable input: never silently log a phantom 0-calorie meal.
+    const isJunkParse = (foods: FoodItem[]) => {
+      if (!foods || foods.length === 0) return true;
+      const totals = calculateMealMacros(foods);
+      const allUnmatched = foods.every((f) => f.isUnmatched);
+      return allUnmatched && totals.calories === 0;
+    };
+    const rejectJunk = () => {
+      toast.error(
+        `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal", or use Add Manually.`,
+        'Not Recognized'
+      );
+      setIsNaturalParsing(false);
+    };
+    // Refuse implausible quantities (e.g. "100 rotis") instead of logging junk.
+    const rejectAbsurd = (foods: FoodItem[]) => {
+      const warning = foods.map(getAbsurdQuantityWarning).find((w) => w !== null);
+      if (warning) {
+        toast.error(warning, 'Unlikely Quantity');
+        setIsNaturalParsing(false);
+        return true;
+      }
+      return false;
+    };
+
     setIsNaturalParsing(true);
     const today = getLocalTodayStr();
     try {
@@ -856,6 +888,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
+        if (isJunkParse(data.foods)) {
+          rejectJunk();
+          return;
+        }
+        if (rejectAbsurd(data.foods)) {
+          return;
+        }
         const newMeal: MealEntry = {
           id: safeRandomId('meal'),
           date: today,
@@ -880,6 +919,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       try {
         const offlineFoods = parseNaturalMealOffline(q);
         if (offlineFoods && offlineFoods.length > 0) {
+          if (isJunkParse(offlineFoods)) {
+            rejectJunk();
+            return;
+          }
+          if (rejectAbsurd(offlineFoods)) {
+            return;
+          }
           const totals = calculateMealMacros(offlineFoods);
           const newMeal: MealEntry = {
             id: safeRandomId('meal'),

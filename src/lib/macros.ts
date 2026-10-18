@@ -524,6 +524,32 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
 }
 
 /**
+ * Flags a single food item whose quantity is implausible for one person in
+ * one meal (e.g. "100 rotis" → 12,000 kcal). Returns a human-readable
+ * warning, or null when the quantity looks sane. Callers should refuse to
+ * log and ask the user to re-enter, rather than silently recording junk.
+ */
+export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): string | null {
+  const qty = typeof food.quantity === 'number' && isFinite(food.quantity) ? food.quantity : 0;
+  const cal = typeof food.calories === 'number' && isFinite(food.calories) ? food.calories : 0;
+  const unit = (food.unit || 'g').toLowerCase().trim();
+  const label = (food.name || 'This item').trim() || 'This item';
+  if (cal > 6000) {
+    return `${label}: ~${Math.round(cal).toLocaleString()} kcal in a single item looks wrong. Please check the quantity.`;
+  }
+  if ((unit === 'g' || unit === 'ml') && qty > 2500) {
+    return `${label}: ${qty.toLocaleString()} ${unit} in a single item looks wrong. Please check the quantity.`;
+  }
+  if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
+    return `${label}: ${qty} ${unit} in a single item looks wrong. Please check the quantity.`;
+  }
+  if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful'].includes(unit) && qty > 25) {
+    return `${label}: ${qty} ${unit}s in a single item looks wrong. Please check the quantity.`;
+  }
+  return null;
+}
+
+/**
  * Calculates evidence-based macro targets and caloric goals based on athlete bodyweight,
  * primary goal, gender, and optional height.
  * Uses Mifflin-St Jeor / standard active gym-goer TDEE multipliers with zero Atwater drift.
