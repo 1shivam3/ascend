@@ -20,7 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
-import { formatHeightImperial, athleteNameToEmailSlug } from '@/lib/formatters';
+import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';

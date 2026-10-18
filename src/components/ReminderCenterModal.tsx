@@ -214,7 +214,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <Button
               variant="primary"
               size="sm"
-              onClick={handleRequestPermission}
+              onClick={() => handleRequestPermission()}
               className="shrink-0 text-2xs px-2.5 py-1"
             >
               Grant

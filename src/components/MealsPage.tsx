@@ -51,7 +51,7 @@ import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1 } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
