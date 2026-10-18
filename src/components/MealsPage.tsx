@@ -372,7 +372,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'quantity') {
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
-          const prevItem = next[index];
+          // prevItem must come from `prev` (pre-update): next[index] already
+          // carries the NEW quantity, which made ratio = rawQty/prevQty = 1
+          // and silently skipped scaling.
+          const prevItem = prev[index];
           const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
           if (prevQty && prevItem.calories > 0 && rawQty) {
             // Proportional scaling preserves scanned or custom barcode macros!

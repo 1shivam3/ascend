@@ -2291,7 +2291,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                         : 'bg-bg-primary border-border'
                                     }`}
                                   >
-                                    <div className="truncate">
+                                    <div className="flex-1 min-w-0">
                                       Set {j + 1}:{' '}
                                       <span className={`tabular-nums ${isDone ? 'text-text-primary font-medium' : 'text-text-muted line-through'}`}>
                                         {set.weight} {set.unit}

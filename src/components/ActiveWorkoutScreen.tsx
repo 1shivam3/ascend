@@ -1224,12 +1224,16 @@ export default function ActiveWorkoutScreen({
 
   const handleLogExerciseEffort = (rpe: number, label: 'easy' | 'good' | 'hard') => {
     setEffortChosen(label);
+    // Store the exercise-level rating SEPARATELY. Backfill only sets that have
+    // no logged per-set RPE — never overwrite a logged value (that corrupted
+    // History averages).
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
         return {
           ...ex,
-          sets: ex.sets.map((s) => ({ ...s, rpe })),
+          effortRating: { rpe, label },
+          sets: ex.sets.map((s) => (s.rpe === undefined ? { ...s, rpe } : s)),
         };
       })
     );

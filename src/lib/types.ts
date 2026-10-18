@@ -259,6 +259,12 @@ export interface WorkoutExercise {
   name: string;
   sets: WorkoutSet[];
   notes?: string;
+  /**
+   * Post-exercise effort rating ("How hard was that exercise today?").
+   * Stored SEPARATELY from per-set RPEs — it must never overwrite them.
+   * Used as a fallback for sets that have no logged RPE.
+   */
+  effortRating?: { rpe: number; label: 'easy' | 'good' | 'hard' };
   /** Reference to the PlannedExercise ID from which this exercise was started */
   planExerciseId?: string;
   /** Reference to the applied PolicyDecision ID, set only when reliably established via application audit */
