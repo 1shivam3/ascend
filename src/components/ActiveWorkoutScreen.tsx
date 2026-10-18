@@ -60,6 +60,8 @@ interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
   workoutName?: string;
   planId?: string;
+  /** Epoch ms when the session originally started (restored on resume so the timer doesn't reset). */
+  initialSessionStartTime?: number;
   onFinish: (workout: WorkoutEntry, newPRsCount: number) => void;
   onCancel: () => void;
   onPause?: () => void;
@@ -93,6 +95,7 @@ export default function ActiveWorkoutScreen({
   initialExercises,
   workoutName = 'Workout Session',
   planId,
+  initialSessionStartTime,
   onFinish,
   onCancel,
   onPause,
@@ -244,7 +247,8 @@ export default function ActiveWorkoutScreen({
   });
 
   const [activeExerciseIdx, setActiveExerciseIdx] = useState<number>(0);
-  const [sessionStartTime] = useState<number>(() => Date.now());
+  // Restored from the draft on resume so the timer keeps counting instead of resetting to 0:00.
+  const [sessionStartTime] = useState<number>(() => initialSessionStartTime || Date.now());
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   // Modals & Panels
@@ -1477,7 +1481,7 @@ export default function ActiveWorkoutScreen({
       sessionStartTime,
       savedAt: new Date().toISOString(),
     });
-    toast.info('Workout saved! You can resume anytime from the Home screen.', 'Session Paused');
+    toast.info('Workout saved! You can resume anytime from the Train tab.', 'Session Paused');
     if (onPause) {
       onPause();
     } else {

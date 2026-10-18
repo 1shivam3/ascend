@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
-import { fetchPostWorkoutTake } from '@/lib/ai-coach';
+import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
 import { getNextSessionTarget } from '@/lib/workout-engine';
 import { formatDuration } from '@/lib/formatters';
 import {
@@ -45,8 +45,15 @@ export default function PostWorkoutTakeModal({
   useEffect(() => {
     if (isOpen) {
       let isMounted = true;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
       setLoading(true);
-      fetchPostWorkoutTake(store, completedWorkout)
+      setTake(null);
+      // Timeout guard: never leave the athlete stuck on "Generating...".
+      // After 20s, fall back to the deterministic local take.
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Coach take timed out')), 20000);
+      });
+      Promise.race([fetchPostWorkoutTake(store, completedWorkout), timeoutPromise])
         .then((res) => {
           if (isMounted) {
             // The next-session target always comes from the canonical
@@ -79,11 +86,25 @@ export default function PostWorkoutTakeModal({
         })
         .catch((err) => {
           console.error('Failed to get post-workout take:', err);
-          if (isMounted) setLoading(false);
+          if (isMounted) {
+            // Fallback: deterministic local take so the modal always has content.
+            try {
+              setTake(generateDeterministicPostWorkoutTake(completedWorkout));
+            } catch {
+              setTake({
+                headline: 'Session complete.',
+                summary: 'Workout logged. Your next session targets are calculated from your completed sets.',
+                nextSessionTarget: '',
+                source: 'offline_heuristic',
+              } as AIPostWorkoutTake);
+            }
+            setLoading(false);
+          }
         });
 
       return () => {
         isMounted = false;
+        if (timeoutId) clearTimeout(timeoutId);
       };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2482,6 +2482,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           initialExercises={exercises}
           workoutName={startedFromPlan || 'Workout Session'}
           planId={startedFromPlanId || undefined}
+          initialSessionStartTime={sessionStartTime}
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
