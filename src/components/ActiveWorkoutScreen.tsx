@@ -55,6 +55,7 @@ import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, formatDuration } from '@/lib/formatters';
+import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface ActiveWorkoutScreenProps {
   initialExercises: WorkoutExercise[];
@@ -113,7 +114,11 @@ export default function ActiveWorkoutScreen({
   // Beginner mode: one set at a time & exercise effort prompt
   const [activeSetIdx, setActiveSetIdx] = useState<number>(0);
   const [showEffortPrompt, setShowEffortPrompt] = useState<boolean>(false);
+  const [exerciseToRemove, setExerciseToRemove] = useState<number | null>(null);
   const [effortChosen, setEffortChosen] = useState<'easy' | 'good' | 'hard' | null>(null);
+  // Exercises for which the effort prompt was already answered — never re-show
+  // (e.g. after removing a different exercise shifts the indices).
+  const effortAnsweredRef = useRef<Set<number>>(new Set());
   const [showFirstTimeTips, setShowFirstTimeTips] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -431,6 +436,18 @@ export default function ActiveWorkoutScreen({
 
   const [activeRpePickerSetIdx, setActiveRpePickerSetIdx] = useState<number | null>(null);
 
+  // When the Set Complete overlay is dismissed and all sets are done, surface
+  // the effort prompt (it was deferred while the overlay was up).
+  useEffect(() => {
+    if (!completedSetSummary && !showEffortPrompt && !effortChosen && !effortAnsweredRef.current.has(activeExerciseIdx)) {
+      const currentSets = exercises[activeExerciseIdx]?.sets || [];
+      if (currentSets.length > 0 && currentSets.every(isActiveSetCompleted)) {
+        setShowEffortPrompt(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [completedSetSummary]);
+
   useEffect(() => {
     setIsEditingName(false);
     setLocalExerciseName(exercises[activeExerciseIdx]?.name || '');
@@ -438,7 +455,12 @@ export default function ActiveWorkoutScreen({
     const currentSets = exercises[activeExerciseIdx]?.sets || [];
     const firstIncomplete = currentSets.findIndex((s) => !isActiveSetCompleted(s));
     setActiveSetIdx(firstIncomplete !== -1 ? firstIncomplete : 0);
-    setShowEffortPrompt(currentSets.length > 0 && currentSets.every(isActiveSetCompleted));
+    // Never re-show the prompt for an exercise that was already answered —
+    // removing another exercise shifts indices and must not resurrect it.
+    const alreadyAnswered = effortAnsweredRef.current.has(activeExerciseIdx);
+    setShowEffortPrompt(
+      !alreadyAnswered && currentSets.length > 0 && currentSets.every(isActiveSetCompleted)
+    );
     setEffortChosen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeExerciseIdx]);
@@ -466,10 +488,22 @@ export default function ActiveWorkoutScreen({
       toast.error('Workout must have at least one exercise.', 'Cannot Remove');
       return;
     }
+    const target = exercises[idxToRemove];
+    const completedSets = target?.sets.filter(isActiveSetCompleted).length || 0;
+    if (completedSets > 0) {
+      // Confirm when logged work would be destroyed.
+      setExerciseToRemove(idxToRemove);
+      return;
+    }
+    confirmRemoveExercise(idxToRemove);
+  };
+
+  const confirmRemoveExercise = (idxToRemove: number) => {
     const removedName = exercises[idxToRemove]?.name || 'Exercise';
     setExercises((prev) => prev.filter((_, i) => i !== idxToRemove));
     setActiveExerciseIdx((prev) => (prev >= idxToRemove ? Math.max(0, prev - 1) : prev));
     toast.info(`Removed "${removedName}" from workout.`, 'Exercise Removed');
+    setExerciseToRemove(null);
   };
 
   // ── Change / Rename Exercise Autocomplete & Selection ─────────────────────
@@ -1205,7 +1239,9 @@ export default function ActiveWorkoutScreen({
           if (anyIncomplete !== -1) setActiveSetIdx(anyIncomplete);
         }
       } else {
-        setShowEffortPrompt(true);
+        // Defer the effort prompt until the Set Complete overlay is dismissed
+        // (it stacks above otherwise).
+        if (!completedSetSummary) setShowEffortPrompt(true);
       }
     }
   };
@@ -1228,6 +1264,7 @@ export default function ActiveWorkoutScreen({
 
   const handleLogExerciseEffort = (rpe: number, label: 'easy' | 'good' | 'hard') => {
     setEffortChosen(label);
+    effortAnsweredRef.current.add(activeExerciseIdx);
     // Store the exercise-level rating SEPARATELY. Backfill only sets that have
     // no logged per-set RPE — never overwrite a logged value (that corrupted
     // History averages).
@@ -3136,6 +3173,22 @@ export default function ActiveWorkoutScreen({
       />
 
       {/* ── Discard Confirmation Modal ───────────────────────────────────── */}
+      {/* ── Remove Exercise Confirmation (only when completed sets exist) ── */}
+      <ConfirmationModal
+        isOpen={exerciseToRemove !== null}
+        onClose={() => setExerciseToRemove(null)}
+        onConfirm={() => exerciseToRemove !== null && confirmRemoveExercise(exerciseToRemove)}
+        title="Remove this exercise?"
+        message={
+          exerciseToRemove !== null
+            ? `"${exercises[exerciseToRemove]?.name || 'Exercise'}" has ${exercises[exerciseToRemove]?.sets.filter(isActiveSetCompleted).length || 0} completed ${exercises[exerciseToRemove]?.sets.filter(isActiveSetCompleted).length === 1 ? 'set' : 'sets'}. Removing it will discard that logged work.`
+            : ''
+        }
+        confirmText="Remove"
+        cancelText="Keep"
+        variant="danger"
+      />
+
       {isDiscardConfirmOpen && (
         <div className="modal-overlay" onClick={() => setIsDiscardConfirmOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
