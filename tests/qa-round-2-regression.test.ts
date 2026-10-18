@@ -55,8 +55,7 @@ describe('P0#2 — exercise difficulty rating never overwrites logged per-set RP
 
 describe('P0#3 — manual meal builder scales by quantity', () => {
   it('doubles calories/macros when quantity doubles', () => {
-    const item: FoodItem = {
-      id: 'f1', name: 'Chicken Breast', quantity: 100, unit: 'g',
+    const item: FoodItem = { name: 'Chicken Breast', quantity: 100, unit: 'g',
       calories: 165, proteinG: 31, carbsG: 0, fatG: 3.6,
     };
     const out = scaleFoodByQuantity(item, 200);
@@ -67,8 +66,7 @@ describe('P0#3 — manual meal builder scales by quantity', () => {
   });
 
   it('is a no-op without a valid previous quantity', () => {
-    const item: FoodItem = {
-      id: 'f1', name: 'Chicken', quantity: 0, unit: 'g',
+    const item: FoodItem = { name: 'Chicken', quantity: 0, unit: 'g',
       calories: 165, proteinG: 31, carbsG: 0, fatG: 3.6,
     };
     expect(scaleFoodByQuantity(item, 200)).toBe(item);
@@ -78,8 +76,8 @@ describe('P0#3 — manual meal builder scales by quantity', () => {
 describe('P1#4 — gibberish meal input is rejected, never silently logged', () => {
   it('flags all-unmatched zero-calorie parses as junk', () => {
     const junk: FoodItem[] = [
-      { id: 'f1', name: 'asdfgh', quantity: 1, unit: 'serving', calories: 0, proteinG: 0, carbsG: 0, fatG: 0, isUnmatched: true },
-      { id: 'f2', name: 'jkl', quantity: 1, unit: 'serving', calories: 0, proteinG: 0, carbsG: 0, fatG: 0, isUnmatched: true },
+      { name: 'asdfgh', quantity: 1, unit: 'serving', calories: 0, proteinG: 0, carbsG: 0, fatG: 0, isUnmatched: true },
+      { name: 'jkl', quantity: 1, unit: 'serving', calories: 0, proteinG: 0, carbsG: 0, fatG: 0, isUnmatched: true },
     ];
     expect(isJunkMealParse(junk)).toBe(true);
   });
@@ -90,14 +88,14 @@ describe('P1#4 — gibberish meal input is rejected, never silently logged', () 
 
   it('accepts a parse with recognized food', () => {
     const ok: FoodItem[] = [
-      { id: 'f1', name: 'Roti', quantity: 2, unit: 'piece', calories: 240, proteinG: 6, carbsG: 50, fatG: 1 },
+      { name: 'Roti', quantity: 2, unit: 'piece', calories: 240, proteinG: 6, carbsG: 50, fatG: 1 },
     ];
     expect(isJunkMealParse(ok)).toBe(false);
   });
 
   it('accepts a partially matched parse with calories', () => {
     const partial: FoodItem[] = [
-      { id: 'f1', name: 'Mystery curry', quantity: 1, unit: 'bowl', calories: 300, proteinG: 10, carbsG: 20, fatG: 15, isUnmatched: true },
+      { name: 'Mystery curry', quantity: 1, unit: 'bowl', calories: 300, proteinG: 10, carbsG: 20, fatG: 15, isUnmatched: true },
     ];
     expect(isJunkMealParse(partial)).toBe(false);
   });
