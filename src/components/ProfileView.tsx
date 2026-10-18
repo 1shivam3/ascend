@@ -249,7 +249,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div>
                 <p className="text-xs font-bold text-text-primary">Fitness Goals</p>
                 <p className="text-3xs text-text-muted">
-                  {goals.length > 0 ? `${goals.length} active target goals` : 'Strength & Hypertrophy'}
+                  {goals.length > 0 ? `${goals.length} ${plural(goals.length, 'active target goal')}` : 'Strength & Hypertrophy'}
                 </p>
               </div>
             </div>

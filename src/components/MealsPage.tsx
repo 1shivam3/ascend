@@ -942,7 +942,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ? 'Smart Macro Analysis'
           : 'Calibrated IFCT';
         toast.success(
-          `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
+          `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
         );
         return;
@@ -970,7 +970,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           addMeal(newMeal);
           setNaturalQuery('');
           toast.success(
-            `Logged ${offlineFoods.length} items (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
+            `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
             'Meal Logged (Offline)'
           );
           return;

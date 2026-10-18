@@ -2014,7 +2014,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 : 'Upper / Lower Split'}
             </span>
             <span className="text-2xs text-text-muted block mt-0.5">
-              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} complete this week
+              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} completed this week
             </span>
           </div>
           <button
