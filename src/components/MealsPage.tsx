@@ -51,7 +51,7 @@ import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural, formatWaterMl } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -2207,7 +2207,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">WATER</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
-                  {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
+                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-3xs">/ {formatWaterMl(waterTargetMl)}</span>
                 </span>
               </div>
             </button>
@@ -3630,7 +3630,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration Tracker</h4>
                     <p className="text-2xs text-text-muted">
-                      Water target ({(waterTargetMl / 1000).toFixed(1)}L) &amp; daily water logs
+                      Water target ({formatWaterMl(waterTargetMl)}) &amp; daily water logs
                     </p>
                   </div>
                 </div>

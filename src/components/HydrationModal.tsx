@@ -203,7 +203,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               />
             </div>
             <div className="flex justify-between items-center text-[10px] text-text-muted font-mono font-medium">
-              <span>0.0 L</span>
+              <span>0 ml</span>
               <span>{pct}% saturated</span>
               <span>{formatWaterLiters(currentTargetMl)}</span>
             </div>

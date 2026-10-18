@@ -133,3 +133,11 @@ export const getTimeGreeting = (date: Date = new Date()): string => {
   if (h >= 17 && h < 22) return 'Good evening,';
   return 'Good night,';
 };
+
+/**
+ * Format a water volume: "250 ml" under 1 L, "1.5 L" at/above.
+ */
+export function formatWaterMl(ml: number): string {
+  if (ml < 1000) return `${Math.round(ml)} ml`;
+  return `${round1(ml / 1000)} L`;
+}

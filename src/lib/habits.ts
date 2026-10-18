@@ -50,8 +50,9 @@ export function calculateHydrationTarget(params: {
 }
 
 export function formatWaterLiters(ml: number): string {
+  if ((ml || 0) < 1000) return `${Math.round(ml || 0)} ml`;
   const val = (ml || 0) / 1000;
-  return `${val.toFixed(1)} L`;
+  return `${Math.round(val * 10) / 10} L`;
 }
 
 // ── 2. Creatine Consistency & Saturation ─────────────────────────────────────
