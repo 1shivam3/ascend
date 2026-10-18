@@ -66,12 +66,14 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
     const tabParam = params.get('tab') as TabId | null;
     const subParam = params.get('sub') as ProgressTabId | null;
 
-    if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(tabParam)) {
-      if (tabParam === 'prs') {
+    // 'today' is a supported deep-link alias for the home (Today) view.
+    const resolvedTab = tabParam === 'today' ? 'home' : tabParam;
+    if (resolvedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(resolvedTab)) {
+      if (resolvedTab === 'prs') {
         return { tab: 'progress', progressTab: 'prs' };
       }
       return {
-        tab: tabParam,
+        tab: resolvedTab,
         progressTab: subParam && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(subParam)
           ? subParam
           : 'overview',
