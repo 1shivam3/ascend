@@ -2,6 +2,53 @@ import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry } from './types';
 
 const PREFIX = 'ascend_';
 
+/**
+ * Keys that must survive a "Delete WebApp Data & Reset": the backend
+ * connection config the athlete entered, their theme preference, and the
+ * session flag. Everything else under the ascend_ namespace is athlete
+ * data and gets wiped.
+ */
+export const PRESERVED_LOCAL_KEYS: ReadonlySet<string> = new Set([
+  'ascend_supabase_url',
+  'ascend_supabase_anon_key',
+  'ascend_theme',
+  'ascend_has_custom_theme',
+  'ascend_logged_out',
+]);
+
+/**
+ * Returns the subset of localStorage keys a data reset must remove.
+ * Pure function — unit-testable without a DOM.
+ */
+export function getPurgeableLocalKeys(allKeys: readonly string[]): string[] {
+  return allKeys.filter((k) => k.startsWith(PREFIX) && !PRESERVED_LOCAL_KEYS.has(k));
+}
+
+/**
+ * Removes every purgeable ascend_* key from localStorage and returns the
+ * removed keys. This is what makes "Delete WebApp Data & Reset" honest:
+ * without it, discrete legacy mirrors (ascend_profile, ascend_prs,
+ * ascend_workouts, ascend_meals, emergency snapshots) are re-read on boot
+ * and resurrect supposedly deleted data.
+ */
+export function purgeLocalAppData(): string[] {
+  if (typeof window === 'undefined' || typeof localStorage === 'undefined') return [];
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k) keys.push(k);
+  }
+  const purgeable = getPurgeableLocalKeys(keys);
+  purgeable.forEach((k) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      // Best effort
+    }
+  });
+  return purgeable;
+}
+
 export function generateId(): string {
   // Use the Web Crypto API for cryptographically strong IDs when available,
   // falling back to Math.random only in constrained environments.

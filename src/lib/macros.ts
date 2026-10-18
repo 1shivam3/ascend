@@ -596,5 +596,7 @@ export function calculateRecommendedMacroGoals(
     proteinG,
     fatG,
     carbsG,
+    maintenanceCalories: maintenance,
+    calorieDelta: exactCalories - maintenance,
   };
 }

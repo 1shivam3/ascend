@@ -6,6 +6,32 @@ export type DietPreference = 'vegetarian' | 'eggitarian' | 'non_vegetarian' | 'v
 
 export type AthleteGoal = 'build_muscle' | 'get_stronger' | 'lose_fat' | 'stamina' | 'general_fitness';
 
+/**
+ * Canonical default goals used whenever an athlete has no goals recorded yet.
+ * Single source of truth — every fallback across the app must reference this
+ * instead of inventing its own default pair.
+ */
+export const DEFAULT_GOALS: AthleteGoal[] = ['build_muscle'];
+
+/**
+ * Deterministically resolves the single "primary" goal that drives the nutrition
+ * engine and goal-adaptive prescriptions when an athlete selects multiple goals.
+ *
+ * Priority is conservative by design: a fat-loss goal always wins, because a
+ * caloric surplus would directly sabotage weight loss, while a moderate deficit
+ * with elevated protein still serves muscle/strength goals. Among the remaining
+ * goals, hypertrophy outranks strength (larger surplus), then strength, stamina,
+ * and general fitness.
+ */
+export function resolvePrimaryGoal(goals?: AthleteGoal[] | null): AthleteGoal {
+  if (!goals || goals.length === 0) return DEFAULT_GOALS[0];
+  const priority: AthleteGoal[] = ['lose_fat', 'build_muscle', 'get_stronger', 'stamina', 'general_fitness'];
+  for (const g of priority) {
+    if (goals.includes(g)) return g;
+  }
+  return goals[0];
+}
+
 export interface AthleteGoalConfig {
   id: AthleteGoal;
   label: string;
@@ -327,6 +353,10 @@ export interface MacroGoals {
   proteinG: number;
   carbsG?: number;
   fatG?: number;
+  /** Estimated maintenance calories the target was derived from (optional, informational). */
+  maintenanceCalories?: number;
+  /** Target minus maintenance: negative = deficit, positive = surplus (optional, informational). */
+  calorieDelta?: number;
 }
 
 export interface PlannedExercise {
