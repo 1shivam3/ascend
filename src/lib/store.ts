@@ -816,7 +816,19 @@ export const useAppStore = create<AppState>()(
       }),
 
       addPlannedWorkout: (plan) => set((state) => {
-        const nextPlans = [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())];
+        // Never silently overwrite an existing plan: on a name collision,
+        // auto-rename to "X (Copy)" / "X (Copy 2)" instead of deleting the original.
+        const existingNames = new Set(state.plannedWorkouts.map(p => p.name.toLowerCase()));
+        let finalName = plan.name;
+        if (existingNames.has(finalName.toLowerCase())) {
+          let copyIdx = 2;
+          finalName = `${plan.name} (Copy)`;
+          while (existingNames.has(finalName.toLowerCase())) {
+            finalName = `${plan.name} (Copy ${copyIdx++})`;
+          }
+        }
+        const finalPlan = finalName === plan.name ? plan : { ...plan, name: finalName };
+        const nextPlans = [finalPlan, ...state.plannedWorkouts.filter(p => p.id !== finalPlan.id)];
         const currentSched = state.weeklySchedule;
         const todayDay = getTodayDayOfWeek();
         
@@ -827,9 +839,9 @@ export const useAppStore = create<AppState>()(
 
         // Always set today's day to the newly created/added plan so the user immediately sees their plan on Home & Train!
         baseSchedule[todayDay] = {
-          workoutPlanId: plan.id,
-          customTitle: plan.name,
-          bodyParts: getWorkoutBodyParts(plan.exercises),
+          workoutPlanId: finalPlan.id,
+          customTitle: finalPlan.name,
+          bodyParts: getWorkoutBodyParts(finalPlan.exercises),
         };
 
         // If the user has custom plans (non-builtin), replace any stale builtin_ templates in the weekly schedule

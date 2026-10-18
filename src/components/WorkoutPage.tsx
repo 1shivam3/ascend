@@ -140,6 +140,7 @@ function PlanModal({
 
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [targetExerciseIndex, setTargetExerciseIndex] = useState<number | null>(null);
+  const toast = useToast();
 
   const updateExercise = useCallback((idx: number, field: keyof PlannedExercise, value: unknown) => {
     setPlanExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
@@ -178,9 +179,32 @@ function PlanModal({
 
   const handleSave = () => {
     const trimmedName = planName.trim();
-    if (!trimmedName) return;
+    if (!trimmedName) {
+      toast.error('Please give the plan a name.', 'Missing Name');
+      return;
+    }
     const validExercises = planExercises.filter(e => e.name.trim());
-    if (validExercises.length === 0) return;
+    if (validExercises.length === 0) {
+      toast.error('Add at least one exercise to the plan.', 'No Exercises');
+      return;
+    }
+    for (const ex of validExercises) {
+      const sets = Number(ex.targetSets);
+      if (!Number.isFinite(sets) || sets < 1) {
+        toast.error(`"${ex.name.trim()}": sets must be at least 1.`, 'Invalid Sets');
+        return;
+      }
+      const reps = Number(ex.targetReps);
+      if (!Number.isFinite(reps) || reps < 1) {
+        toast.error(`"${ex.name.trim()}": reps must be at least 1.`, 'Invalid Reps');
+        return;
+      }
+      const weight = Number(ex.targetWeight);
+      if (!Number.isFinite(weight) || weight < 0) {
+        toast.error(`"${ex.name.trim()}": weight cannot be negative.`, 'Invalid Weight');
+        return;
+      }
+    }
     onSave({ name: trimmedName, exercises: validExercises });
     onClose();
   };
@@ -1394,6 +1418,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleSavePlan = (planData: Omit<PlannedWorkout, 'id' | 'createdAt'>) => {
     if (editingPlan) {
+      const clash = plannedWorkouts.some(
+        (p) => p.id !== editingPlan.id && p.name.toLowerCase() === planData.name.toLowerCase()
+      );
+      if (clash) {
+        toast.error(`A different plan is already named "${planData.name}". Please choose another name.`, 'Duplicate Name');
+        return;
+      }
       updatePlannedWorkout(editingPlan.id, {
         ...editingPlan,
         name: planData.name,
@@ -1407,8 +1438,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         name: planData.name,
         exercises: planData.exercises,
       };
+      // The store auto-renames on collision ("X (Copy)") instead of overwriting.
+      const nameTaken = plannedWorkouts.some(
+        (p) => p.name.toLowerCase() === planData.name.toLowerCase()
+      );
       addPlannedWorkout(newPlan);
-      toast.success(`Plan "${planData.name}" created!`, 'Plan Created');
+      toast.success(
+        nameTaken
+          ? `A plan named "${planData.name}" already exists — saved as "${planData.name} (Copy)".`
+          : `Plan "${planData.name}" created!`,
+        'Plan Created'
+      );
     }
     setEditingPlan(null);
   };
