@@ -534,6 +534,17 @@ export interface AIWeeklyReview {
 
 // ── Photo AI Meal Scanner Types ──────────────────────────────────────────────
 
+/** A user-uploaded progress photo, stored locally (downscaled JPEG data URL). */
+export interface ProgressPhoto {
+  id: string;
+  /** Downscaled JPEG data URL (max ~800px) so it fits in localStorage. */
+  dataUrl: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** Optional label, e.g. "Front", "Side", "Back". */
+  label?: string;
+}
+
 export interface ScannedFoodItem {
   name: string;
   quantity: string;

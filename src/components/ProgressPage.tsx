@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
 import {
@@ -31,8 +31,10 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
+import { useToast } from '@/components/ui/Toast';
+import { resizeAndCompressImage } from '@/lib/image-processing';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -210,6 +212,42 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const prs = useStore((state) => state.prs || []);
   const workouts = useStore((state) => state.workouts || []);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
+  const progressPhotos = useStore((state) => state.progressPhotos || []);
+  const addProgressPhoto = useStore((state) => state.addProgressPhoto);
+  const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
+  const toast = useToast();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handlePhotoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    try {
+      const processed = await resizeAndCompressImage(file, {
+        maxDimension: 800,
+        quality: 0.72,
+        format: 'image/jpeg',
+      });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Could not read the photo.'));
+        reader.readAsDataURL(processed.blob);
+      });
+      addProgressPhoto({
+        id: safeRandomId('photo'),
+        dataUrl,
+        date: getLocalTodayStr(),
+      });
+      toast.success('Progress photo saved locally.', 'Photo Added');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not add the photo.', 'Upload Failed');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const userUnit = profile?.unit || 'lbs';
 
@@ -1239,23 +1277,81 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </div>
           ) : (
             /* Photos Tab */
-            <div className="card p-8 bg-bg-card border border-border text-center space-y-4 shadow-xs">
-              <div className="w-12 h-12 rounded-2xl bg-accent/15 text-accent mx-auto flex items-center justify-center">
-                <Camera className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-text-primary font-sans">Progress Photos</h3>
-                <p className="text-xs text-text-muted max-w-xs mx-auto">
-                  Take front, side, and back photos to track muscular definition and body transformation over time.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Progress Photo</span>
-              </button>
+            <div className="space-y-4 animate-fade-in">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                aria-label="Add progress photo"
+                onChange={handlePhotoFileSelect}
+              />
+              {progressPhotos.length === 0 ? (
+                <div className="card p-8 bg-bg-card border border-border text-center space-y-4 shadow-xs">
+                  <div className="w-12 h-12 rounded-2xl bg-accent/15 text-accent mx-auto flex items-center justify-center">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-text-primary font-sans">Progress Photos</h3>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">
+                      Take front, side, and back photos to track muscular definition and body transformation over time.
+                      Photos stay on this device.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isUploadingPhoto ? 'Adding…' : 'Add Progress Photo'}</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-text-primary font-sans">
+                      Progress Photos <span className="text-text-muted font-mono text-xs">({progressPhotos.length})</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {progressPhotos.map((photo) => (
+                      <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border bg-bg-elevated">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo.dataUrl} alt={`Progress photo from ${photo.date}`} className="w-full aspect-[3/4] object-cover" />
+                        <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-[10px] font-mono text-white flex items-center justify-between">
+                          <span>{formatProgressDate(photo.date)}</span>
+                          <button
+                            type="button"
+                            aria-label={`Delete photo from ${photo.date}`}
+                            onClick={() => {
+                              removeProgressPhoto(photo.id);
+                              toast.info('Progress photo deleted.', 'Photo Removed');
+                            }}
+                            className="p-1 rounded hover:bg-white/20 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-2xs text-text-muted font-mono text-center">
+                    Photos are stored only on this device and never uploaded.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>

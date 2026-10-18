@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import {
   UserProfile,
   PersonalRecord,
+  ProgressPhoto,
   WorkoutEntry,
   WorkoutExercise,
   MealEntry,
@@ -78,6 +79,7 @@ export interface AppState {
   workouts: WorkoutEntry[];
   meals: MealEntry[];
   bodyMetrics: BodyMetricEntry[];
+  progressPhotos: ProgressPhoto[];
   theme: Theme;
   hasCustomTheme?: boolean;
   prTargets: Record<string, number>;
@@ -150,6 +152,8 @@ export interface AppState {
 
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
+  addProgressPhoto: (photo: ProgressPhoto) => void;
+  removeProgressPhoto: (id: string) => void;
   updateBodyMetrics: (
     weightKg: number,
     heightCm?: number,
@@ -271,6 +275,7 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       meals: [],
       bodyMetrics: [],
+      progressPhotos: [],
       theme: 'dark',
       hasCustomTheme: false,
       prTargets: {},
@@ -780,6 +785,12 @@ export const useAppStore = create<AppState>()(
         bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)]
       })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
+      // Progress photos are downscaled (~800px JPEG) before storage; cap the
+      // count so localStorage stays healthy.
+      addProgressPhoto: (photo) => set((state) => ({
+        progressPhotos: [photo, ...state.progressPhotos].slice(0, 24),
+      })),
+      removeProgressPhoto: (id) => set((state) => ({ progressPhotos: state.progressPhotos.filter(p => p.id !== id) })),
       updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn) => set((state) => {
         const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
@@ -1974,6 +1985,7 @@ export const useAppStore = create<AppState>()(
         workouts: state.workouts,
         meals: state.meals,
         bodyMetrics: state.bodyMetrics,
+        progressPhotos: state.progressPhotos,
         theme: state.theme,
         hasCustomTheme: state.hasCustomTheme,
         prTargets: state.prTargets,
