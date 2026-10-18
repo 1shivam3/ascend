@@ -286,7 +286,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">Data &amp; Storage</p>
-                <p className="text-3xs text-text-muted">Local device storage and cloud database telemetry</p>
+                <p className="text-3xs text-text-muted">Local device storage, export &amp; backup</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />

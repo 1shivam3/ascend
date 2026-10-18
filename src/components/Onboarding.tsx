@@ -481,6 +481,7 @@ export default function Onboarding() {
         onContinue={() => setCurrentScreen('experience')}
         onSkip={() => {
           setSelectedGoals(['general_fitness']);
+          toast.info('No goal selected — starting with General Fitness. You can change it anytime in Profile.', 'Goal Set');
           setCurrentScreen('experience');
         }}
         onBack={() => {

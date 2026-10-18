@@ -448,59 +448,56 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Selected exercise sessions for Screen 15
   const selectedExerciseSessions = useMemo(() => {
-    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit);
-    if (sessions && sessions.length > 0) {
-      return [...sessions].reverse().slice(0, 5).map((s, idx, arr) => {
-        let deltaStr = 'Completed';
-        if (idx < arr.length - 1) {
-          const prevE1RM = arr[idx + 1].bestE1RM;
-          if (prevE1RM > 0) {
-            const diffPct = Math.round(((s.bestE1RM - prevE1RM) / prevE1RM) * 100);
-            deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
-          }
-        }
-        return {
-          date: s.date,
-          bestWeight: s.bestWeight,
-          bestReps: s.bestReps,
-          bestE1RM: s.bestE1RM,
-          deltaStr,
-          hasData: true,
-        };
-      });
-    }
+    // Unified data source: workout sessions AND manually logged PRs, merged
+    // by date. PRs that duplicate a session (auto-detected from that session)
+    // are skipped so nothing appears twice.
+    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit) || [];
+    const prMatches = prs.filter((p) =>
+      p.exercise.toLowerCase().includes(selectedExercise.toLowerCase())
+    );
 
-    // Check if PR entries exist for this exercise
-    const prMatches = prs
-      .filter((p) => p.exercise.toLowerCase().includes(selectedExercise.toLowerCase()))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-
-    if (prMatches.length > 0) {
-      return prMatches.map((p, idx, arr) => {
-        const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
-        const e1rm = Math.round(calculateOneRepMax(val, p.reps) * 10) / 10;
-        let deltaStr = 'PR Log';
-        if (idx < arr.length - 1) {
-          const prevVal = userUnit === 'lbs' ? arr[idx + 1].weightLbs : arr[idx + 1].weightKg;
-          const prevE1RM = calculateOneRepMax(prevVal, arr[idx + 1].reps);
-          if (prevE1RM > 0) {
-            const diffPct = Math.round(((e1rm - prevE1RM) / prevE1RM) * 100);
-            deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
-          }
-        }
-        return {
+    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr' };
+    const rows: Row[] = sessions.map((s) => ({
+      date: s.date,
+      bestWeight: s.bestWeight,
+      bestReps: s.bestReps,
+      bestE1RM: s.bestE1RM,
+      source: 'session' as const,
+    }));
+    for (const p of prMatches) {
+      const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
+      const e1rm = Math.round(calculateOneRepMax(val, p.reps) * 10) / 10;
+      const dup = rows.some((r) => r.date === p.date && Math.abs(r.bestE1RM - e1rm) < 0.051);
+      if (!dup) {
+        rows.push({
           date: p.date,
           bestWeight: Math.round(val * 10) / 10,
           bestReps: p.reps,
           bestE1RM: e1rm,
-          deltaStr,
-          hasData: true,
-        };
-      });
+          source: 'pr' as const,
+        });
+      }
     }
+    rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return [];
+    return rows.slice(0, 5).map((s, idx, arr) => {
+      let deltaStr = s.source === 'pr' ? 'PR Log' : 'Completed';
+      if (idx < arr.length - 1) {
+        const prevE1RM = arr[idx + 1].bestE1RM;
+        if (prevE1RM > 0) {
+          const diffPct = Math.round(((s.bestE1RM - prevE1RM) / prevE1RM) * 100);
+          deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
+        }
+      }
+      return {
+        date: s.date,
+        bestWeight: s.bestWeight,
+        bestReps: s.bestReps,
+        bestE1RM: s.bestE1RM,
+        deltaStr,
+        hasData: true,
+      };
+    });
   }, [selectedExercise, workouts, prs, userUnit]);
 
   // Selected exercise 1RM and filtered progress chart for Screen 15

@@ -141,7 +141,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
             <div>
               <h2 className="font-bold text-base text-text-primary leading-tight">
-                Log Bodyweight
+                Log Measurement
               </h2>
               <p className="text-2xs text-text-muted font-mono">Calibrate Strength Standard Ratios &amp; Track Progress</p>
             </div>

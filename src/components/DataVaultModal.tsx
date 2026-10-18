@@ -425,7 +425,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             {/* Privacy Guarantee */}
             <div className="flex items-center gap-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/40 text-2xs text-text-muted font-mono">
               <Shield className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span>Your data stays 100% on your device. Backups are saved directly to your phone files.</span>
+              <span>Your data stays 100% on your device. Backups download as a file you keep.</span>
             </div>
 
             {/* Reset / Delete Danger Area */}
