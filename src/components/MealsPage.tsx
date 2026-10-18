@@ -196,7 +196,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   useEffect(() => {
     if (isModalOpen) {
-      return registerBackHandler(() => { setIsModalOpen(false); return true; }, 100);
+      return registerBackHandler(() => { resetBuilderForm(); setIsModalOpen(false); return true; }, 100);
     }
   }, [isModalOpen, registerBackHandler]);
 
@@ -278,6 +278,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Meal log form ─────────────────────────────────────────────────────────
   const [mealName, setMealName] = useState('');
   const [foods,    setFoods]    = useState<FoodItem[]>([]);
+
+  // Builder draft is always discarded on cancel/close — deterministic, never stale.
+  const resetBuilderForm = () => {
+    setMealName('');
+    setFoods([]);
+  };
 
   // ── Natural language meal logging ──────────────────────────────────────────
   const [naturalQuery, setNaturalQuery] = useState('');
@@ -703,8 +709,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
 
-    const defaultName = getDefaultMealName();
-    const finalMealName = mealName.trim() || defaultName;
+    // Require an explicit meal name — the old time-based default ("Late Meal")
+    // produced piles of indistinguishable duplicates.
+    const finalMealName = mealName.trim();
+    if (!finalMealName) {
+      toast.error('Please give this meal a name (e.g. "Post-Workout Shake").', 'Meal Name Required');
+      return;
+    }
 
     const cleanedFoods: FoodItem[] = validFoods.map((f) => {
       const q = typeof f.quantity === 'number' && !isNaN(f.quantity) && f.quantity > 0 ? f.quantity : 1;
@@ -745,9 +756,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       `Added ${finalMealName} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
       'Meal Logged'
     );
+    resetBuilderForm();
     setIsModalOpen(false);
-    setMealName('');
-    setFoods([]);
   };
 
   const handleOpenGoalsModal = () => {
@@ -3066,7 +3076,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}
                   className="btn-ghost flex-1 text-xs"
                 >
                   Cancel

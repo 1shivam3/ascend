@@ -472,7 +472,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
         {visibleExercises.map((ex, i) => (
           <span
             key={i}
-            className="text-2xs bg-bg-elevated border border-border rounded-md px-2 py-0.5 text-text-secondary font-mono truncate max-w-[140px]"
+            className="text-2xs bg-bg-elevated border border-border rounded-md px-2 py-0.5 text-text-secondary font-mono break-words"
             title={ex.name}
           >
             {ex.name || <span className="italic opacity-50">Unnamed</span>}

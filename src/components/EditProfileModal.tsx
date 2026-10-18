@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/Toast';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 export interface EditProfileModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ export interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);

@@ -21,6 +21,7 @@ import {
   formatWaterLiters,
   getDayType,
 } from '@/lib/habits';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface HydrationModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface HydrationModalProps {
 }
 
 export default function HydrationModal({ isOpen, onClose }: HydrationModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const toast = useToast();
   const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
   const todayStr = useMemo(() => toLocalDateString(new Date()), []);

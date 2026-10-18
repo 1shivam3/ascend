@@ -1663,7 +1663,7 @@ export default function ActiveWorkoutScreen({
             <X className="w-4 h-4" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[150px] sm:max-w-xs font-sans">
+            <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[200px] sm:max-w-md font-sans">
               {workoutName}
             </h1>
             <div className="flex items-center gap-1.5 text-3xs font-mono text-text-muted">

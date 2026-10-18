@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface BodyMetricsModalProps {
 }
 
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const updateBodyMetrics = useStore((state) => state.updateBodyMetrics);

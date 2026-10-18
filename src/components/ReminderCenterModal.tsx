@@ -22,6 +22,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { NotificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES } from '@/lib/types';
 import { subscribeToPush, unsubscribeFromPush } from '@/lib/push-notifications';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface ReminderCenterModalProps {
   isOpen: boolean;
@@ -39,6 +40,7 @@ const DAYS_OF_WEEK = [
 ];
 
 export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const toast = useToast();
   const notificationPreferences = useStore((state) => (state as any).notificationPreferences) || DEFAULT_NOTIFICATION_PREFERENCES;
   const setNotificationPreferences = useStore((state) => (state as any).setNotificationPreferences);
