@@ -42,7 +42,7 @@ import ProgressChart from '@/components/ProgressChart';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
-import { ExerciseRank, EquipmentType } from '@/lib/types';
+import { ExerciseRank, EquipmentType, Gender } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 
@@ -253,7 +253,7 @@ interface LevelModalProps {
   exercise: string;
   levelInfo: ReturnType<typeof getLiftLevel>;
   bodyweightKg: number;
-  gender: 'male' | 'female';
+  gender: Gender;
   userUnit: 'kg' | 'lbs';
   onClose: () => void;
 }
@@ -1041,7 +1041,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">PERSONAL BESTS</div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#E44427] uppercase">PERSONAL BESTS</div>
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">
               PERSONAL RECORDS.
             </h1>

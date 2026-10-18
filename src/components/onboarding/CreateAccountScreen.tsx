@@ -1,0 +1,215 @@
+'use client';
+
+import React, { useState } from 'react';
+import { ArrowLeft, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { syncEngine } from '@/lib/supabase/sync';
+import { useToast } from '@/components/ui/Toast';
+import SocialAuthButtons from './SocialAuthButtons';
+
+interface CreateAccountScreenProps {
+  onBack: () => void;
+  onSuccess: (name: string, email: string) => void;
+  onNavigateToLogin: () => void;
+}
+
+export default function CreateAccountScreen({
+  onBack,
+  onSuccess,
+  onNavigateToLogin,
+}: CreateAccountScreenProps) {
+  const toast = useToast();
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmedName = fullName.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      setError('Please enter your full name.');
+      return;
+    }
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await syncEngine.signUpWithPassword(trimmedEmail, password, trimmedName);
+      setLoading(false);
+
+      if (res.error) {
+        setError(res.error);
+        toast.error(res.error, 'Sign Up Failed');
+      } else {
+        if (res.requiresEmailVerification) {
+          toast.info(
+            'Account created! A confirmation email has been sent. You can proceed with calibrating your profile now.',
+            'Verification Sent'
+          );
+        } else {
+          toast.success('Account created successfully!', 'Welcome to ASCEND');
+        }
+        onSuccess(trimmedName, trimmedEmail);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || 'Could not create account');
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between p-6 sm:p-8 animate-fade-in">
+      {/* Top Navigation Row */}
+      <div className="w-full max-w-md mx-auto pt-2 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="Go back"
+          className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-white border border-[#E2DFD6] flex items-center justify-center text-[#171916] hover:bg-[#F3F0E7] active:scale-95 transition-all shadow-2xs cursor-pointer"
+        >
+          <ArrowLeft className="w-5 h-5 text-[#171916]" />
+        </button>
+        <span className="text-xs font-semibold tracking-wider text-[#858076] uppercase">
+          ASCEND
+        </span>
+        <div className="w-10 h-10" aria-hidden="true" />
+      </div>
+
+      {/* Main Elevated Form Card */}
+      <div className="w-full max-w-md mx-auto my-auto py-4">
+        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E2DFD6] shadow-xs space-y-6">
+          {/* Header */}
+          <div className="text-left space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
+              Create Account
+            </h1>
+            <p className="text-sm text-[#858076]">
+              Start your fitness journey today
+            </p>
+          </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2.5 animate-shake">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span className="leading-snug">{error}</span>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Full Name */}
+            <div>
+              <label htmlFor="create-full-name" className="block text-xs font-semibold text-[#171916] mb-1.5">
+                Full Name
+              </label>
+              <input
+                id="create-full-name"
+                type="text"
+                autoComplete="name"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="e.g. Alex Miller"
+                required
+                className="w-full px-4 py-3 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] placeholder:text-[#858076]/60 outline-none transition"
+              />
+            </div>
+
+            {/* Email */}
+            <div>
+              <label htmlFor="create-email" className="block text-xs font-semibold text-[#171916] mb-1.5">
+                Email
+              </label>
+              <input
+                id="create-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="alex@example.com"
+                required
+                className="w-full px-4 py-3 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] placeholder:text-[#858076]/60 outline-none transition"
+              />
+            </div>
+
+            {/* Password */}
+            <div>
+              <label htmlFor="create-password" className="block text-xs font-semibold text-[#171916] mb-1.5">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="create-password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 6 characters"
+                  required
+                  className="w-full pl-4 pr-11 py-3 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] placeholder:text-[#858076]/60 outline-none transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-[#858076] hover:text-[#171916] p-1 cursor-pointer transition"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Action Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3.5 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-white" />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                'Create Account'
+              )}
+            </button>
+          </form>
+
+          {/* Social Auth (Google) */}
+          <SocialAuthButtons />
+
+          {/* Footer Link */}
+          <div className="pt-2 text-center">
+            <p className="text-xs text-[#858076]">
+              Already have an account?{' '}
+              <button
+                type="button"
+                onClick={onNavigateToLogin}
+                className="font-semibold text-[#E44427] hover:underline cursor-pointer"
+              >
+                Log in
+              </button>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom spacer for balance */}
+      <div className="w-full max-w-md mx-auto pb-2" aria-hidden="true" />
+    </div>
+  );
+}

@@ -5,35 +5,19 @@ import { Home, Dumbbell, TrendingUp, UtensilsCrossed, Plus } from 'lucide-react'
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
+import SplashScreen from '@/components/onboarding/SplashScreen';
 
-function TabLoadingFallback({ label }: { label: string }) {
-  return (
-    <div className="min-h-[50vh] flex flex-col items-center justify-center gap-3 p-8 animate-fade-in text-center">
-      <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-      <span className="text-xs text-text-muted font-mono">{label}</span>
-    </div>
-  );
-}
+import LoadingState from '@/components/LoadingState';
+import ErrorState from '@/components/ErrorState';
+import OfflineState from '@/components/OfflineState';
 
-const HomePage = dynamic(() => import('@/components/HomePage'), {
-  loading: () => <TabLoadingFallback label="Loading dashboard..." />,
-  ssr: false,
-});
-
-const ProgressPage = dynamic(() => import('@/components/ProgressPage'), {
-  loading: () => <TabLoadingFallback label="Loading analytics & PRs..." />,
-  ssr: false,
-});
-
-const WorkoutPage = dynamic(() => import('@/components/WorkoutPage'), {
-  loading: () => <TabLoadingFallback label="Loading training engine..." />,
-  ssr: false,
-});
-
-const MealsPage = dynamic(() => import('@/components/MealsPage'), {
-  loading: () => <TabLoadingFallback label="Loading nutrition & macros..." />,
-  ssr: false,
-});
+import HomePage from '@/components/HomePage';
+import ProgressPage from '@/components/ProgressPage';
+import WorkoutPage from '@/components/WorkoutPage';
+import MealsPage from '@/components/MealsPage';
+import ProfileView from '@/components/ProfileView';
+import SettingsView from '@/components/SettingsView';
+import TabSkeleton from '@/components/TabSkeleton';
 
 const QuickActionSheetModal = dynamic(() => import('@/components/QuickActionSheetModal'), {
   ssr: false,
@@ -166,6 +150,26 @@ export default function AppPage() {
 
   const [mounted, setMounted] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+  const [forcedState, setForcedState] = useState<'error' | 'loading' | 'offline' | null>(null);
+  const [showOfflineModal, setShowOfflineModal] = useState(false);
+
+  // Check for test/debug states in URL (?state=error | loading | offline)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const stateParam = params.get('state');
+    if (stateParam === 'error' || stateParam === 'loading' || stateParam === 'offline') {
+      setForcedState(stateParam);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showOfflineModal) return;
+    return registerBackHandler(() => {
+      setShowOfflineModal(false);
+      return true;
+    }, 100);
+  }, [showOfflineModal, registerBackHandler]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -199,16 +203,47 @@ export default function AppPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Forced visual test states for Screen 25 (Error), Screen 26 (Loading), Screen 27 (Offline)
+  if (forcedState === 'error') {
+    return (
+      <main id="main-content" className="w-full min-h-[100dvh]">
+        <ErrorState
+          onHome={() => {
+            window.location.href = '/';
+          }}
+          reset={() => {
+            window.location.href = '/';
+          }}
+        />
+      </main>
+    );
+  }
+
+  if (forcedState === 'loading') {
+    return (
+      <main id="main-content" className="w-full min-h-[100dvh]">
+        <LoadingState fullScreen />
+      </main>
+    );
+  }
+
+  if (forcedState === 'offline') {
+    return (
+      <main id="main-content" className="w-full min-h-[100dvh]">
+        <OfflineState
+          onContinueOffline={() => {
+            window.location.href = '/';
+          }}
+        />
+      </main>
+    );
+  }
+
   // Branded splash/skeleton during SSR & storage hydration to prevent flashing the login screen to existing athletes
   if (!mounted || !_hasHydrated) {
     return (
-      <main id="main-content" className="w-full min-h-[100dvh] flex items-center justify-center bg-bg-primary">
-        <div className="flex flex-col items-center gap-3 animate-pulse">
-          <div className="w-12 h-12 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center shadow-lg">
-            <Dumbbell className="w-6 h-6 text-accent" />
-          </div>
-          <span className="text-xs font-mono font-bold tracking-widest text-text-muted uppercase">ASCEND</span>
-        </div>
+      <main id="main-content" className="w-full min-h-[100dvh]">
+        <SplashScreen isHydrating />
       </main>
     );
   }
@@ -228,10 +263,11 @@ export default function AppPage() {
         <aside
           role="status"
           aria-live="polite"
-          className="bg-amber-950/70 border-b border-amber-500/30 text-amber-200 text-xs px-3 py-1.5 flex items-center justify-center text-center sticky top-0 z-50 backdrop-blur"
+          onClick={() => setShowOfflineModal(true)}
+          className="bg-amber-950/70 border-b border-amber-500/30 text-amber-200 text-xs px-3 py-1.5 flex items-center justify-center text-center sticky top-0 z-50 backdrop-blur cursor-pointer hover:bg-amber-950/90 transition-colors"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2" />
-          <span>Offline Gym Mode Active &bull; All workouts, PRs, and meals are safely saved locally</span>
+          <span>Offline Gym Mode Active &bull; Tap for details</span>
         </aside>
       )}
       <main id="main-content" className="w-full">
@@ -265,6 +301,20 @@ export default function AppPage() {
             }}
           />
         )}
+        {activeTab === 'profile' && (
+          <ProfileView
+            onNavigate={(tab) => {
+              navigate(tab as TabId);
+            }}
+          />
+        )}
+        {activeTab === 'settings' && (
+          <SettingsView
+            onNavigate={(tab) => {
+              navigate(tab as TabId);
+            }}
+          />
+        )}
       </main>
 
       {/* Native 4-Destination Bottom Navigation (Part 5 Spec) */}
@@ -292,8 +342,8 @@ export default function AppPage() {
                 }`}
               >
                 {isActive && <div className="native-tab-indicator" />}
-                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-text-primary' : 'text-text-muted'} />
-                <span className={`text-[12px] mt-1 ${isActive ? 'text-text-primary font-semibold' : 'text-text-muted font-normal'}`}>
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                <span className={`text-[12px] mt-1 ${isActive ? 'text-accent font-semibold' : 'text-text-muted font-normal'}`}>
                   {tab.label}
                 </span>
               </button>
@@ -319,6 +369,16 @@ export default function AppPage() {
         onClose={() => setIsImportModalOpen(false)}
         onStartWorkout={handleStartSharedWorkout}
       />
+
+      {/* Screen 27: Offline Gym Mode Details Modal */}
+      {showOfflineModal && (
+        <div className="fixed inset-0 z-50 bg-bg-primary/95 backdrop-blur-md flex items-center justify-center p-4">
+          <OfflineState
+            fullScreen={false}
+            onContinueOffline={() => setShowOfflineModal(false)}
+          />
+        </div>
+      )}
     </div>
   );
 }

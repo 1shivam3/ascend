@@ -202,10 +202,21 @@ CREATE TABLE IF NOT EXISTS public.user_feedback (
 
 ALTER TABLE public.user_feedback ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL ON TABLE public.user_feedback FROM PUBLIC;
+REVOKE ALL ON TABLE public.user_feedback FROM anon;
+REVOKE ALL ON TABLE public.user_feedback FROM authenticated;
+REVOKE ALL ON TABLE public.user_feedback FROM service_role;
+
+GRANT SELECT, INSERT, UPDATE ON TABLE public.user_feedback TO service_role;
+
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Allow public feedback submissions" ON public.user_feedback;
-  CREATE POLICY "Allow public feedback submissions" ON public.user_feedback
-    FOR INSERT TO anon, authenticated WITH CHECK (true);
+  DROP POLICY IF EXISTS "Service role full access to user_feedback" ON public.user_feedback;
+
+  CREATE POLICY "Service role full access to user_feedback" ON public.user_feedback
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
 END $$;
 
 
@@ -226,12 +237,29 @@ CREATE INDEX IF NOT EXISTS idx_push_subscriptions_updated ON public.push_subscri
 
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL ON TABLE public.push_subscriptions FROM PUBLIC;
+REVOKE ALL ON TABLE public.push_subscriptions FROM anon;
+REVOKE ALL ON TABLE public.push_subscriptions FROM authenticated;
+REVOKE ALL ON TABLE public.push_subscriptions FROM service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.push_subscriptions TO service_role;
+
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Allow athletes and guests to manage push subscriptions" ON public.push_subscriptions;
-  CREATE POLICY "Allow athletes and guests to manage push subscriptions" ON public.push_subscriptions
-    FOR ALL TO anon, authenticated
-    USING (user_id IS NULL OR auth.uid() = user_id)
-    WITH CHECK (user_id IS NULL OR auth.uid() = user_id);
+  DROP POLICY IF EXISTS "Athletes can manage own push subscriptions" ON public.push_subscriptions;
+  DROP POLICY IF EXISTS "Service role full access to push subscriptions" ON public.push_subscriptions;
+
+  -- Authenticated athletes can only manage their own verified push subscriptions
+  CREATE POLICY "Athletes can manage own push subscriptions" ON public.push_subscriptions
+    FOR ALL TO authenticated
+    USING (auth.uid() IS NOT NULL AND auth.uid() = user_id)
+    WITH CHECK (auth.uid() IS NOT NULL AND auth.uid() = user_id);
+
+  -- Service role handles server-side dispatch and guest push subscription operations
+  CREATE POLICY "Service role full access to push subscriptions" ON public.push_subscriptions
+    FOR ALL TO service_role
+    USING (true)
+    WITH CHECK (true);
 END $$;
 
 -- 12. Notification Preferences Table (Reminder Center Settings)
@@ -275,6 +303,13 @@ CREATE INDEX IF NOT EXISTS idx_notification_deliveries_created_at ON public.noti
 
 ALTER TABLE public.notification_deliveries ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL ON TABLE public.notification_deliveries FROM PUBLIC;
+REVOKE ALL ON TABLE public.notification_deliveries FROM anon;
+REVOKE ALL ON TABLE public.notification_deliveries FROM authenticated;
+REVOKE ALL ON TABLE public.notification_deliveries FROM service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.notification_deliveries TO service_role;
+
 DO $$ BEGIN
   DROP POLICY IF EXISTS "Athletes can view own notification deliveries" ON public.notification_deliveries;
   CREATE POLICY "Athletes can view own notification deliveries" ON public.notification_deliveries
@@ -287,10 +322,33 @@ CREATE OR REPLACE FUNCTION public.claim_notification_delivery(
   p_endpoint TEXT,
   p_user_id UUID,
   p_notification_type TEXT
-) RETURNS BOOLEAN AS $$
+) RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
 DECLARE
-  v_claimed BOOLEAN := FALSE;
+  v_claimed        BOOLEAN := FALSE;
+  v_key            TEXT;
+  v_endpoint       TEXT;
+  v_notif_type     TEXT;
 BEGIN
+  -- Strict parameter validation
+  v_key := TRIM(COALESCE(p_idempotency_key, ''));
+  IF v_key = '' OR length(v_key) > 255 THEN
+    RAISE EXCEPTION 'Invalid idempotency_key: must be non-empty and <= 255 characters';
+  END IF;
+
+  v_endpoint := TRIM(COALESCE(p_endpoint, ''));
+  IF v_endpoint = '' OR length(v_endpoint) > 2048 THEN
+    RAISE EXCEPTION 'Invalid subscription_endpoint: must be non-empty and <= 2048 characters';
+  END IF;
+
+  v_notif_type := TRIM(COALESCE(p_notification_type, ''));
+  IF v_notif_type = '' OR length(v_notif_type) > 64 THEN
+    RAISE EXCEPTION 'Invalid notification_type: must be non-empty and <= 64 characters';
+  END IF;
+
   INSERT INTO public.notification_deliveries (
     idempotency_key,
     subscription_endpoint,
@@ -301,10 +359,10 @@ BEGIN
     created_at,
     updated_at
   ) VALUES (
-    p_idempotency_key,
-    p_endpoint,
+    v_key,
+    v_endpoint,
     p_user_id,
-    p_notification_type,
+    v_notif_type,
     'processing',
     1,
     now(),
@@ -327,7 +385,12 @@ BEGIN
 
   RETURN v_claimed;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_notification_delivery(TEXT, TEXT, UUID, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.claim_notification_delivery(TEXT, TEXT, UUID, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.claim_notification_delivery(TEXT, TEXT, UUID, TEXT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_notification_delivery(TEXT, TEXT, UUID, TEXT) TO service_role;
 
 
 -- ==============================================================================
@@ -359,10 +422,20 @@ CREATE TABLE IF NOT EXISTS public.api_rate_limits (
 CREATE INDEX IF NOT EXISTS idx_api_rate_limits_key ON public.api_rate_limits (key);
 CREATE INDEX IF NOT EXISTS idx_api_rate_limits_reset ON public.api_rate_limits (reset_at);
 
+-- Security: Enable RLS and restrict direct table access
+ALTER TABLE public.api_rate_limits ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.api_rate_limits FROM PUBLIC;
+REVOKE ALL ON TABLE public.api_rate_limits FROM anon;
+REVOKE ALL ON TABLE public.api_rate_limits FROM authenticated;
+REVOKE ALL ON TABLE public.api_rate_limits FROM service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.api_rate_limits TO service_role;
+
 -- Stored Procedure: ascend_check_rate_limit
 -- Atomically increments the rate limit counter for a given key within a sliding
 -- window. Returns a JSON object with: allowed, count, reset_ms.
 -- Uses INSERT ... ON CONFLICT to ensure atomicity within a single transaction.
+-- Hardened with SET search_path = public, pg_temp and strict input validation.
 CREATE OR REPLACE FUNCTION public.ascend_check_rate_limit(
   p_key           TEXT,
   p_window_ms     BIGINT,
@@ -375,48 +448,62 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_now_ms     BIGINT := EXTRACT(EPOCH FROM now()) * 1000;
-  v_window_ms  BIGINT := p_window_ms;
+  v_now_ms     BIGINT := EXTRACT(EPOCH FROM clock_timestamp()) * 1000;
+  v_window_ms  BIGINT;
+  v_max_req    INTEGER;
+  v_key        TEXT;
   v_count      INTEGER;
-  v_reset_ms   BIGINT := v_now_ms + v_window_ms;
+  v_reset_ms   BIGINT;
   v_allowed    BOOLEAN;
 BEGIN
+  -- Strict input validation
+  v_key := TRIM(COALESCE(p_key, ''));
+  IF v_key = '' OR length(v_key) > 255 THEN
+    RAISE EXCEPTION 'Invalid rate limit key: must be non-empty and <= 255 characters';
+  END IF;
+
+  IF p_window_ms IS NULL OR p_window_ms < 100 OR p_window_ms > 86400000 THEN
+    RAISE EXCEPTION 'Invalid window_ms: must be between 100ms and 86400000ms (24h)';
+  END IF;
+  v_window_ms := p_window_ms;
+
+  IF p_max_requests IS NULL OR p_max_requests < 1 OR p_max_requests > 100000 THEN
+    RAISE EXCEPTION 'Invalid max_requests: must be between 1 and 100000';
+  END IF;
+  v_max_req := p_max_requests;
+
+  v_reset_ms := v_now_ms + v_window_ms;
+
   -- Insert or update the rate limit row atomically
   INSERT INTO public.api_rate_limits (key, window_ms, count, reset_at)
-  VALUES (p_key, v_window_ms, 1, to_timestamp(v_reset_ms / 1000))
+  VALUES (v_key, v_window_ms, 1, to_timestamp(v_reset_ms / 1000.0))
   ON CONFLICT (key, window_ms) DO UPDATE
     SET count = CASE
-                  WHEN api_rate_limits.reset_at < now() THEN 1  -- window expired, reset
+                  WHEN api_rate_limits.reset_at < clock_timestamp() THEN 1  -- window expired, reset counter
                   ELSE api_rate_limits.count + 1
                 END,
         reset_at = CASE
-                     WHEN api_rate_limits.reset_at < now()
-                     THEN to_timestamp(v_reset_ms / 1000)
+                     WHEN api_rate_limits.reset_at < clock_timestamp()
+                     THEN to_timestamp((EXTRACT(EPOCH FROM clock_timestamp()) * 1000 + v_window_ms) / 1000.0)
                      ELSE api_rate_limits.reset_at
                    END
-  RETURNING api_rate_limits.count INTO v_count;
+  RETURNING api_rate_limits.count, (EXTRACT(EPOCH FROM api_rate_limits.reset_at) * 1000)::BIGINT
+  INTO v_count, v_reset_ms;
 
-  v_allowed := v_count <= p_max_requests;
+  v_allowed := v_count <= v_max_req;
 
-  IF v_allowed THEN
-    v_reset_ms := EXTRACT(EPOCH FROM (
-      (SELECT reset_at FROM public.api_rate_limits WHERE key = p_key AND window_ms = v_window_ms)
-    )) * 1000;
-  ELSE
-    v_reset_ms := EXTRACT(EPOCH FROM (
-      (SELECT reset_at FROM public.api_rate_limits WHERE key = p_key AND window_ms = v_window_ms)
-    )) * 1000;
-  END IF;
-
-  RETURN QUERY SELECT v_allowed, v_count, GREATEST(0, v_reset_ms - v_now_ms);
+  RETURN QUERY SELECT v_allowed, v_count, GREATEST(0::BIGINT, v_reset_ms - v_now_ms);
 END;
 $$;
 
--- Only authenticated/anon roles need to call this; revoke from PUBLIC for safety
+-- Restrict execution strictly to service_role (Least-Privilege)
 REVOKE ALL ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) TO anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) FROM anon;
+REVOKE ALL ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.ascend_check_rate_limit(TEXT, BIGINT, INTEGER) TO service_role;
 
 -- 15. Consumed Deletion Nonces Table (Durable Account Deletion Ledger)
 -- Prevents replay attacks across multiple serverless function instances and restarts.
@@ -441,21 +528,37 @@ CREATE INDEX IF NOT EXISTS idx_consumed_deletion_nonces_email
 -- Enable RLS: only service role can access this table
 ALTER TABLE public.consumed_deletion_nonces ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Service role full access to consumed_deletion_nonces"
-  ON public.consumed_deletion_nonces
-  FOR ALL
-  TO service_role
-  USING (true)
-  WITH CHECK (true);
+REVOKE ALL ON TABLE public.consumed_deletion_nonces FROM PUBLIC;
+REVOKE ALL ON TABLE public.consumed_deletion_nonces FROM anon;
+REVOKE ALL ON TABLE public.consumed_deletion_nonces FROM authenticated;
+REVOKE ALL ON TABLE public.consumed_deletion_nonces FROM service_role;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.consumed_deletion_nonces TO service_role;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Service role full access to consumed_deletion_nonces" ON public.consumed_deletion_nonces;
+  CREATE POLICY "Service role full access to consumed_deletion_nonces"
+    ON public.consumed_deletion_nonces
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+END $$;
 
 -- Retention policy: Purge nonces 48 hours after expiration (audit window buffer)
 CREATE OR REPLACE FUNCTION public.cleanup_expired_deletion_nonces()
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   DELETE FROM public.consumed_deletion_nonces
   WHERE expires_at < now() - INTERVAL '48 hours';
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM anon;
+REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.cleanup_expired_deletion_nonces() TO service_role;

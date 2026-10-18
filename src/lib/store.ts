@@ -148,7 +148,14 @@ export interface AppState {
 
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
-  updateBodyMetrics: (weightKg: number, heightCm?: number) => void;
+  updateBodyMetrics: (
+    weightKg: number,
+    heightCm?: number,
+    bodyFatPct?: number,
+    chestIn?: number,
+    waistIn?: number,
+    hipsIn?: number
+  ) => void;
 
   addPlannedWorkout: (plan: PlannedWorkout) => void;
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
@@ -272,7 +279,7 @@ export const useAppStore = create<AppState>()(
       _hasHydrated: false,
 
       // Athlete Multi-Goal Selection
-      goals: ['get_stronger', 'build_muscle'],
+      goals: [],
       setGoals: (goals) => set((state) => {
         const nextGoals = goals && goals.length > 0 ? goals : (['get_stronger'] as AthleteGoal[]);
         return {
@@ -767,13 +774,17 @@ export const useAppStore = create<AppState>()(
         bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)]
       })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
-      updateBodyMetrics: (weightKg, heightCm) => set((state) => {
+      updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn) => set((state) => {
         const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
           id: safeRandomId('bm'),
           date: todayDate,
           weightKg: Math.round(weightKg * 10) / 10,
           heightCm: heightCm ? Math.round(heightCm) : undefined,
+          bodyFatPct: typeof bodyFatPct === 'number' && !isNaN(bodyFatPct) ? Math.round(bodyFatPct * 10) / 10 : undefined,
+          chestIn: typeof chestIn === 'number' && !isNaN(chestIn) ? Math.round(chestIn * 10) / 10 : undefined,
+          waistIn: typeof waistIn === 'number' && !isNaN(waistIn) ? Math.round(waistIn * 10) / 10 : undefined,
+          hipsIn: typeof hipsIn === 'number' && !isNaN(hipsIn) ? Math.round(hipsIn * 10) / 10 : undefined,
         };
         const updatedProfile = state.profile ? {
           ...state.profile,

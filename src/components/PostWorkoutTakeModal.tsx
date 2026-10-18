@@ -22,10 +22,11 @@ interface PostWorkoutTakeModalProps {
   onClose: () => void;
   completedWorkout: {
     name: string;
-    durationMinutes: number;
+    durationMinutes?: number;
+    durationSeconds?: number;
     exercises: Array<{
       name: string;
-      sets: Array<{ reps: number; weight?: number; unit: string }>;
+      sets: Array<{ reps: number; weight?: number; unit: string; completed?: boolean; status?: string }>;
     }>;
   };
 }
@@ -143,7 +144,15 @@ export default function PostWorkoutTakeModal({
           <div>
             <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
-              {completedWorkout.durationMinutes || 45}m
+              {completedWorkout.durationSeconds !== undefined
+                ? completedWorkout.durationSeconds < 60
+                  ? `${completedWorkout.durationSeconds}s`
+                  : `${Math.floor(completedWorkout.durationSeconds / 60)}m${completedWorkout.durationSeconds % 60 > 0 ? ` ${completedWorkout.durationSeconds % 60}s` : ''}`
+                : completedWorkout.durationMinutes !== undefined
+                ? completedWorkout.durationMinutes === 0
+                  ? '<1m'
+                  : `${completedWorkout.durationMinutes}m`
+                : '--'}
             </span>
           </div>
           <div>
@@ -264,7 +273,8 @@ export default function PostWorkoutTakeModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-3.5 rounded-xl bg-[#FF6B1F] text-stone-950 font-bold text-xs hover:bg-[#ff7d3b] active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full py-3.5 rounded-xl bg-[#E44427] text-white font-bold text-xs hover:bg-[#d03b20] active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+            aria-label="Done and return to workouts"
           >
             <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
             <span>Done & Return to Workouts</span>

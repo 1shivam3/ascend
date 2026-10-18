@@ -342,7 +342,7 @@ export default function WeeklyScheduleModal({
         {/* Footer */}
         <footer className="p-4 border-t border-border bg-bg-card flex items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-text-secondary">
-            <span className="font-bold text-accent">{activeTrainingDays} days</span> scheduled
+            <span className="font-bold text-accent">{activeTrainingDays} {activeTrainingDays === 1 ? 'day' : 'days'}</span> scheduled
           </div>
           <div className="flex items-center gap-2">
             <button

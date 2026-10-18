@@ -400,6 +400,11 @@ export function getLiftLevel(
   } else {
     ratio = oneRepMaxKg / safeBW;
   }
+  // Female standards scale male ratios down (e.g. 0.65x).
+  // Male standards use unadjusted 1.0 multiplier.
+  // For 'other', standardized competitive division tables do not exist in powerlifting/weightlifting federations.
+  // We track progression against an unadjusted baseline (1.0) and explicitly label the standardized tier as unavailable.
+  const isOther = gender === 'other';
   const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
 
   let level = 1;
@@ -453,6 +458,10 @@ export function getLiftLevel(
     category: rank,
     rank,
     equipment,
+    isStandardUnavailable: isOther,
+    standardNote: isOther
+      ? 'Official competitive strength standards are calibrated exclusively for male and female divisions. Progression is tracked against an unadjusted baseline.'
+      : undefined,
   };
 }
 
@@ -496,6 +505,13 @@ export function getNextMilestone(current1RM: number, customTarget?: number): num
 }
 
 /**
+ * Checks whether published competitive strength standards exist for the given gender.
+ */
+export function isStrengthStandardAvailableForGender(gender?: Gender | null): boolean {
+  return gender === 'male' || gender === 'female';
+}
+
+/**
  * Returns what 1RM (in kg) is needed to reach the next level.
  * Also returns what the next tier rank boundary is.
  */
@@ -510,10 +526,13 @@ export function getNextLevelInfo(
   requiredRatioKg: number;   // 1RM in kg needed for next level
   currentRank: ExerciseRank;
   levelsToNextRank: number;
+  isStandardUnavailable?: boolean;
+  standardNote?: string;
 } {
   const normExercise = normalizeExerciseName(exercise);
   const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
+  const isOther = gender === 'other';
   const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
   const nextLevel = Math.min(100, currentLevel + 1);
 
@@ -551,5 +570,15 @@ export function getNextLevelInfo(
     }
   }
 
-  return { nextLevel, nextRank, requiredRatioKg, currentRank, levelsToNextRank };
+  return {
+    nextLevel,
+    nextRank,
+    requiredRatioKg,
+    currentRank,
+    levelsToNextRank,
+    isStandardUnavailable: isOther,
+    standardNote: isOther
+      ? 'Official competitive strength standards are calibrated exclusively for male and female divisions. Progression is tracked against an unadjusted baseline.'
+      : undefined,
+  };
 }

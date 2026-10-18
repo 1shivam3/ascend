@@ -3,93 +3,35 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useAppNavigation } from '@/lib/navigation';
 import {
-  Play,
-  Settings,
+  Bell,
   ChevronRight,
-  Flame,
-  Calendar,
-  ArrowRight,
-  Target,
-  Clock,
-  UtensilsCrossed,
-  Check,
-  TrendingUp,
-  Camera,
-  Sparkles,
+  Play,
   X,
-  Trash2,
+  Check,
+  Calendar,
+  Dumbbell,
+  Settings,
+  Sparkles,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
-import { suggestLoad, calculateOneRepMax } from '@/lib/strength-standards';
 
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
 const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
 const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
+const PostWorkoutTakeModal = dynamic(() => import('@/components/PostWorkoutTakeModal'), { ssr: false });
 
+import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
-import { PlannedWorkout, PlannedExercise, WorkoutExercise, ATHLETE_GOAL_CONFIGS, DayOfWeek } from '@/lib/types';
-import { getTodaySessionState, getExercisePrescription, createWorkoutDraftFromPlan, createWorkoutExercisesFromPlan } from '@/lib/workout-engine';
-import { getScheduledWorkoutForDay, DAY_DISPLAY_INFO, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
-import { Button } from '@/components/ui/Button';
-import { Card } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
+import { PlannedWorkout, PlannedExercise, DayOfWeek } from '@/lib/types';
+import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
+import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 
 interface HomePageProps {
-  onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress') => void;
-}
-
-function CircularRing({
-  size = 52,
-  strokeWidth = 4.5,
-  progress = 0,
-  strokeColor = '#f97316',
-  trackColor = '#27272a',
-  children,
-}: {
-  size?: number;
-  strokeWidth?: number;
-  progress: number;
-  strokeColor?: string;
-  trackColor?: string;
-  children?: React.ReactNode;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (Math.min(100, Math.max(0, progress)) / 100) * circumference;
-
-  return (
-    <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={trackColor}
-          strokeWidth={strokeWidth}
-          fill="transparent"
-        />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={strokeColor}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          fill="transparent"
-          className="transition-all duration-700 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        {children}
-      </div>
-    </div>
-  );
+  onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress' | 'profile' | 'settings') => void;
 }
 
 export default function HomePage({ onNavigate }: HomePageProps) {
@@ -104,16 +46,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     addPlannedWorkout,
     activeWorkoutDraft,
     saveWorkoutDraft,
-    clearWorkoutDraft,
-    goals,
     weeklySchedule,
     setDaySchedule,
-    trainingDecisions,
-    waterLogs,
-    hydrationConfig,
-    logWater,
-    creatineLogs,
-    toggleCreatine,
+    theme,
   } = useStore();
 
   const toast = useToast();
@@ -121,18 +56,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const todayStr = useMemo(() => toLocalDateString(today), [today]);
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
 
+  // Sentence-case personalized greeting matching Screen 8 & 9
   const greeting = useMemo(() => {
     const h = today.getHours();
-    if (h < 12) return 'Good Morning';
-    if (h < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    return 'Good evening,';
   }, [today]);
 
-  const userUnit = profile?.unit || 'kg';
+  const athleteDisplayName = useMemo(() => {
+    if (!profile?.name || !profile.name.trim()) return 'Alex';
+    const first = profile.name.trim().split(' ')[0];
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  }, [profile?.name]);
 
-  // Athlete Primary Goal
-  const primaryGoal = (goals && goals.length > 0) ? goals[0] : (profile?.goals?.[0] || 'build_muscle');
-  const goalLabel = ATHLETE_GOAL_CONFIGS[primaryGoal]?.label || 'Build Muscle';
+  const userUnit = profile?.unit || 'kg';
 
   // Today's workout session state (single source of truth matching weekly schedule)
   const sessionInfo = useMemo(() => {
@@ -146,161 +84,30 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     );
   }, [todayStr, workouts, plannedWorkouts, activeWorkoutDraft, userUnit, weeklySchedule]);
 
-  // Next scheduled workout session anchor
-  const nextScheduledSession = useMemo(() => {
-    const daysOrder: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const now = new Date();
-    const currentDayIdx = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-
-    for (let offset = 1; offset <= 7; offset++) {
-      const targetIdx = (currentDayIdx + offset) % 7;
-      const targetDay = daysOrder[targetIdx];
-      const sched = getScheduledWorkoutForDay(weeklySchedule, targetDay, plannedWorkouts);
-      if (!sched.isRest) {
-        const dayLabel = offset === 1 ? 'Tomorrow' : (DAY_DISPLAY_INFO[targetDay]?.label || targetDay);
-        const routineName = sched.plan?.name.replace('Builtin ', '') || sched.title;
-        const bodyParts = sched.bodyParts && sched.bodyParts.length > 0 ? sched.bodyParts.join(' • ') : '';
-        return {
-          dayLabel,
-          routineName,
-          bodyParts,
-        };
-      }
-    }
-    return null;
-  }, [weeklySchedule, plannedWorkouts]);
-
-  // Key lift / Next exercise spotlight driven by deterministic prescription engine
-  const keyLiftSpotlight = useMemo(() => {
-    if (sessionInfo.isRestDay || !sessionInfo.exercises || sessionInfo.exercises.length === 0) {
-      return null;
-    }
-    const mainExName = sessionInfo.exercises[0];
-    const bestPr = prs.find((p) => p.exercise.toLowerCase() === mainExName.toLowerCase());
-
-    const presc = getExercisePrescription(
-      mainExName,
-      workouts,
-      prs,
-      userUnit,
-      primaryGoal,
-      trainingDecisions
-    );
-
-    const lastPerformance = presc.lastPerformance
-      ? `${presc.lastPerformance.weight} ${userUnit} × ${presc.lastPerformance.reps} reps`
-      : (bestPr ? `PR: ${userUnit === 'lbs' ? (bestPr.weightLbs || Math.round(bestPr.weightKg * 2.20462)) : bestPr.weightKg} ${userUnit} × ${bestPr.reps}` : 'First exposure');
-
-    return {
-      name: mainExName,
-      target: `Target ~${presc.targetWeight} ${userUnit} × ${presc.targetReps} reps`,
-      whyThisWeight: presc.whyThisWeight,
-      nextSessionRule: presc.nextSessionRule,
-      lastPerformance,
-    };
-  }, [sessionInfo, prs, workouts, userUnit, primaryGoal, trainingDecisions]);
-
-  // Weekly consistency: accurately synchronized with scheduled training days
-  const weeklyStats = useMemo(() => {
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
-    const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
-
-    const now = new Date();
-    const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const weekWorkouts = workouts.filter((w) => {
-      const d = new Date(w.date);
-      return d >= startOfWeek;
-    });
-
-    const uniqueTrainedDates = new Set(
-      weekWorkouts.map((w) => w.date.split('T')[0])
-    );
-
-    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    const days = dayLabels.map((letter, i) => {
-      const d = new Date(startOfWeek);
-      d.setDate(startOfWeek.getDate() + i);
-      const dStr = toLocalDateString(d);
-      const isPastOrToday = d <= now;
-      const isToday = dStr === todayStr;
-      const isCompleted = uniqueTrainedDates.has(dStr);
-      return {
-        letter,
-        dateStr: dStr,
-        isCompleted,
-        isToday,
-        isPastOrToday,
-      };
-    });
-
-    return {
-      completedCount: uniqueTrainedDates.size,
-      targetDays,
-      days,
-    };
-  }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek, todayStr]);
-
-  // Today's Fuel summary
-  const fuelStats = useMemo(() => {
-    const todayMeals = meals.filter((m) => m.date === todayStr);
-    const macros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
-
-    const bwKg = profile?.bodyweightKg || 72;
-    const calTarget = macroGoals?.calories || 2400;
-    const protTarget = macroGoals?.proteinG || Math.round(bwKg * 2.0);
-
-    const carbsTarget = macroGoals?.carbsG || 250;
-    const fatTarget = macroGoals?.fatG || 65;
-
-    return {
-      calories: Math.round(macros.calories),
-      targetCalories: calTarget,
-      protein: Math.round(macros.proteinG),
-      targetProtein: protTarget,
-      carbs: Math.round(macros.carbsG),
-      targetCarbs: carbsTarget,
-      fat: Math.round(macros.fatG),
-      targetFat: fatTarget,
-      calPct: Math.min(100, Math.round((macros.calories / Math.max(1, calTarget)) * 100)),
-      protPct: Math.min(100, Math.round((macros.proteinG / Math.max(1, protTarget)) * 100)),
-      carbsPct: Math.min(100, Math.round((macros.carbsG / Math.max(1, carbsTarget)) * 100)),
-      fatPct: Math.min(100, Math.round((macros.fatG / Math.max(1, fatTarget)) * 100)),
-    };
-  }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
-
-  const waterStats = useMemo(() => {
-    const current = waterLogs?.[todayStr] || 0;
-    const target = hydrationConfig?.dailyTargetMl || 2500;
-    const pct = Math.min(100, Math.round((current / Math.max(1, target)) * 100));
-    return { currentL: (current / 1000).toFixed(1), targetL: (target / 1000).toFixed(1), pct };
-  }, [waterLogs, hydrationConfig, todayStr]);
-
-  const hasTakenCreatine = Boolean(creatineLogs?.[todayStr]?.taken);
-
-  const latestCoachDecision = useMemo(() => {
-    if (!trainingDecisions) return null;
-    const list = Object.values(trainingDecisions);
-    if (list.length === 0) return null;
-    return list[list.length - 1];
-  }, [trainingDecisions]);
+  // Latest completed workout for today (if any)
+  const completedWorkoutForToday = useMemo(() => {
+    const todayWks = workouts.filter((w) => w.date.split('T')[0] === todayStr);
+    return todayWks[todayWks.length - 1] || null;
+  }, [workouts, todayStr]);
 
   // Modal triggers
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
-  const [showDiscardDraftConfirm, setShowDiscardDraftConfirm] = useState(false);
+  const [isCompletedWorkoutModalOpen, setIsCompletedWorkoutModalOpen] = useState(false);
 
   const { registerBackHandler } = useAppNavigation();
 
   // Register Modal Back Handlers (Interconnected Navigation)
+  useEffect(() => {
+    if (isNotificationsOpen) {
+      return registerBackHandler(() => { setIsNotificationsOpen(false); return true; }, 100);
+    }
+  }, [isNotificationsOpen, registerBackHandler]);
+
   useEffect(() => {
     if (isSettingsOpen) {
       return registerBackHandler(() => { setIsSettingsOpen(false); return true; }, 100);
@@ -320,88 +127,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [isSuggestedModalOpen, registerBackHandler]);
 
   useEffect(() => {
-    if (isLogPastModalOpen) {
-      return registerBackHandler(() => { setIsLogPastModalOpen(false); return true; }, 100);
+    if (isCompletedWorkoutModalOpen) {
+      return registerBackHandler(() => { setIsCompletedWorkoutModalOpen(false); return true; }, 100);
     }
-  }, [isLogPastModalOpen, registerBackHandler]);
+  }, [isCompletedWorkoutModalOpen, registerBackHandler]);
 
-  useEffect(() => {
-    if (isScanMealModalOpen) {
-      return registerBackHandler(() => { setIsScanMealModalOpen(false); return true; }, 100);
-    }
-  }, [isScanMealModalOpen, registerBackHandler]);
-
-  // Missed workout catch-up
-  const [dismissedMissedWorkout, setDismissedMissedWorkout] = useState(false);
-
-  const missedWorkoutCatchUp = useMemo(() => {
-    if (dismissedMissedWorkout || activeWorkoutDraft || workouts.length === 0 || sessionInfo.status === 'completed') {
-      return null;
-    }
-
-    const yesterdayDate = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const yesterdayStr = toLocalDateString(yesterdayDate);
-    const loggedYesterday = workouts.some((w) => w.date.split('T')[0] === yesterdayStr);
-    if (loggedYesterday) return null;
-
-    const daysOrder: DayOfWeek[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const now = new Date();
-    const yesterdayDayIdx = (now.getDay() + 5) % 7;
-    const yesterdayDay = daysOrder[yesterdayDayIdx];
-
-    const yesterdaySched = getScheduledWorkoutForDay(weeklySchedule, yesterdayDay, plannedWorkouts);
-    if (yesterdaySched.isRest) return null;
-
-    const routineName = yesterdaySched.plan?.name.replace('Builtin ', '') || yesterdaySched.title;
-    const todayRoutineName = sessionInfo.title;
-
-    return {
-      yesterdaySched,
-      routineName,
-      todayRoutineName,
-    };
-  }, [dismissedMissedWorkout, activeWorkoutDraft, workouts, sessionInfo.status, sessionInfo.title, weeklySchedule, plannedWorkouts]);
-
-  const handleMakeUpMissedWorkout = () => {
-    if (!missedWorkoutCatchUp) return;
-    const { yesterdaySched, routineName } = missedWorkoutCatchUp;
-    let exercisesToDraft: WorkoutExercise[] = [];
-
-    if (yesterdaySched.plan?.exercises && yesterdaySched.plan.exercises.length > 0) {
-      exercisesToDraft = createWorkoutExercisesFromPlan(yesterdaySched.plan, {
-        userUnit,
-        userPrs: prs,
-      });
-    } else {
-      exercisesToDraft = [
-        {
-          name: 'Bench Press',
-          sets: [
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
-            { weight: userUnit === 'lbs' ? 135 : 60, reps: 8, unit: userUnit, rpe: 8, completed: false, status: 'pending' as const, prescribedWeight: userUnit === 'lbs' ? 135 : 60, prescribedReps: 8, prescribedRpe: 8, prescribedUnit: userUnit },
-          ],
-        },
-      ];
-    }
-
-    saveWorkoutDraft({
-      date: todayStr,
-      exercises: exercisesToDraft,
-      startedFromPlan: routineName,
-      sessionStartTime: Date.now(),
-      savedAt: new Date().toISOString(),
-    });
-
-    toast.info(`Loaded yesterday's ${routineName} for today. Let's get it!`, 'Missed Session Loaded');
-    onNavigate('workout');
-  };
-
-  const handleStickToSchedule = () => {
-    setDismissedMissedWorkout(true);
-    toast.info(`Sticking to today's schedule: ${sessionInfo.title}.`, 'On Schedule');
-  };
-
+  // Routine selection handler (satisfies plan-sync test contract)
   const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
     setDaySchedule(todayDayOfWeek, {
       workoutPlanId: plan.id,
@@ -412,6 +143,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     toast.success(`Set "${plan.name}" as today's workout!`, 'Routine Updated');
   };
 
+  // Launch or resume workout session
   const handleStartWorkoutFromHome = (targetPlan?: PlannedWorkout | null) => {
     if (sessionInfo.status === 'completed' && !targetPlan) {
       onNavigate('workout');
@@ -432,7 +164,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       });
 
       saveWorkoutDraft(draft);
-      toast.success(`Loaded "${planToStart.name}" with ${draft.exercises.length} movements. Let's lift!`, 'Session Started');
+      toast.success(`Loaded "${planToStart.name}". Let's lift!`, 'Session Started');
     }
     onNavigate('workout');
   };
@@ -449,10 +181,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     handleStartWorkoutFromHome(plannedWorkout);
   };
 
-  // Routine title and meta matching Screen 3 Figma
-  const routineRawName = activeWorkoutDraft?.startedFromPlan || activeWorkoutDraft?.name || sessionInfo.title || 'Workout Session';
+  // Display routine name and stats
+  const routineRawName = activeWorkoutDraft?.startedFromPlan || activeWorkoutDraft?.name || sessionInfo.title || 'Upper Body Strength';
   const routineDisplayName = routineRawName.replace(/^Builtin\s+/i, '');
-  const routineShortName = routineDisplayName.split('—')[0].split('-')[0].trim();
 
   const scheduledPlan = useMemo(() => {
     if (sessionInfo.plannedWorkoutId) {
@@ -461,483 +192,274 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return plannedWorkouts.find((p) => p.name.toLowerCase() === routineRawName.toLowerCase()) || plannedWorkouts[0];
   }, [sessionInfo.plannedWorkoutId, plannedWorkouts, routineRawName]);
 
-  const totalSetsCount = useMemo(() => {
+  const exerciseCount = useMemo(() => {
     if (activeWorkoutDraft?.exercises && activeWorkoutDraft.exercises.length > 0) {
-      return activeWorkoutDraft.exercises.reduce((sum, ex) => sum + (ex.sets?.length || 3), 0);
+      return activeWorkoutDraft.exercises.length;
     }
     if (scheduledPlan?.exercises && scheduledPlan.exercises.length > 0) {
-      return scheduledPlan.exercises.reduce((sum, ex) => sum + (ex.targetSets || 3), 0);
+      return scheduledPlan.exercises.length;
     }
-    return Math.max(9, (sessionInfo.exercises?.length || 4) * 3);
+    if (sessionInfo.exercises && sessionInfo.exercises.length > 0) {
+      return sessionInfo.exercises.length;
+    }
+    return 6;
   }, [activeWorkoutDraft, scheduledPlan, sessionInfo.exercises]);
 
-  const sessionNumber = Math.min(99, Math.max(1, weeklyStats.completedCount + 1));
-  const remainingCalories = Math.max(0, fuelStats.targetCalories - fuelStats.calories);
-  const remainingProtein = Math.max(0, fuelStats.targetProtein - fuelStats.protein);
-  const formattedToday = useMemo(() => {
-    return today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase();
-  }, [today]);
+  const durationMinutes = useMemo(() => {
+    if (sessionInfo.durationMin && sessionInfo.durationMin > 0) {
+      return sessionInfo.durationMin;
+    }
+    return Math.max(35, Math.min(65, exerciseCount * 8 || 45));
+  }, [sessionInfo.durationMin, exerciseCount]);
+
+  // Weekly consistency: accurately calculated from logged sessions in current week
+  const weeklyStats = useMemo(() => {
+    const scheduledDaysCount = weeklySchedule
+      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
+      : 0;
+    const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 5);
+
+    const now = new Date();
+    const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - dayOfWeek);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const weekWorkouts = workouts.filter((w) => {
+      const d = new Date(w.date);
+      return d >= startOfWeek;
+    });
+
+    const uniqueTrainedDates = new Set(
+      weekWorkouts.map((w) => w.date.split('T')[0])
+    );
+
+    return {
+      completedCount: uniqueTrainedDates.size,
+      targetDays,
+    };
+  }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek]);
+
+  const weeklyProgressPct = useMemo(() => {
+    return Math.min(100, Math.round((weeklyStats.completedCount / Math.max(1, weeklyStats.targetDays)) * 100));
+  }, [weeklyStats]);
+
+  // Today's Fuel summary: real calories and protein vs target
+  const fuelStats = useMemo(() => {
+    const todayMeals = meals.filter((m) => m.date === todayStr);
+    const macros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
+
+    const bwKg = profile?.bodyweightKg || 72;
+    const calTarget = macroGoals?.calories || 2400;
+    const protTarget = macroGoals?.proteinG || Math.round(bwKg * 2.0);
+
+    return {
+      calories: Math.round(macros.calories),
+      targetCalories: calTarget,
+      protein: Math.round(macros.proteinG),
+      targetProtein: protTarget,
+    };
+  }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
   return (
-    <div className="page animate-fade-in space-y-4 pb-24 max-w-md mx-auto px-4">
-      {/* ── 1. HEADER (Screen 3 Figma Blueprint) ─────────────────────────── */}
-      <header className="pt-2 flex justify-between items-start">
+    <div className="page animate-fade-in space-y-6 pb-24 max-w-md mx-auto px-5 pt-3">
+      {/* ── 1. HEADER (Screen 8 & Screen 9) ─────────────────────────────────── */}
+      <header className="flex items-center justify-between pt-1">
         <div>
-          <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-text-muted block">
-            {formattedToday}
-          </span>
-          <h1 className="display-title text-3xl sm:text-4xl text-text-primary mt-1 font-display leading-tight">
-            LET&apos;S BUILD, {profile?.name ? profile.name.trim().split(' ')[0].toUpperCase() : 'ATHLETE'}.
-          </h1>
-          <p className="text-xs text-text-secondary mt-1 font-medium">
-            {weeklyStats.targetDays - weeklyStats.completedCount > 0
-              ? `${weeklyStats.targetDays - weeklyStats.completedCount === 1 ? 'One session' : `${weeklyStats.targetDays - weeklyStats.completedCount} sessions`} to go.`
-              : 'All scheduled sessions complete.'}
-            <span className="text-text-muted mx-2">•</span>
-            <span className="font-semibold text-text-primary">{weeklyStats.completedCount} / {weeklyStats.targetDays} this week</span>
+          <p className="text-sm font-medium text-text-muted">
+            {greeting}
           </p>
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight mt-0.5">
+            {athleteDisplayName}
+          </h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsSettingsOpen(true)}
-          className="w-10 h-10 rounded-full bg-bg-card border border-border flex items-center justify-center font-bold text-sm text-text-primary hover:border-accent active:scale-95 transition-all shadow-xs cursor-pointer select-none shrink-0 mt-1"
-          title="Profile & Settings"
-          aria-label="Profile and Settings"
-        >
-          {profile?.name ? profile.name.trim()[0].toUpperCase() : 'A'}
-        </button>
-      </header>
-
-      {/* Empathetic Missed Workout Catch-Up Prompt */}
-      {missedWorkoutCatchUp && (
-        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs shadow-xs animate-scale-in space-y-2.5">
-          <div className="flex items-start gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center shrink-0 mt-0.5">
-              <Flame className="w-4 h-4" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <span className="text-3xs font-mono font-bold uppercase tracking-wider text-amber-500 block">
-                Schedule Catch-Up
-              </span>
-              <p className="font-semibold text-text-primary text-xs mt-0.5 leading-snug">
-                Missed yesterday&apos;s <span className="text-amber-400 font-bold">{missedWorkoutCatchUp.routineName}</span>. Make it up today, or stick to <span className="text-text-primary font-bold">{missedWorkoutCatchUp.todayRoutineName}</span>?
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 pt-0.5">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleMakeUpMissedWorkout}
-              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-              className="bg-amber-500 text-stone-950 font-bold hover:bg-amber-400 flex-1"
-            >
-              Make Up Yesterday
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleStickToSchedule}
-            >
-              Stick to Plan
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── 2. TODAY'S SESSION HERO CARD (Screen 3 Figma Blueprint) ────────── */}
-      <div className="card p-5 border border-border/80 bg-bg-card space-y-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                activeWorkoutDraft
-                  ? 'bg-accent animate-pulse'
-                  : sessionInfo.status === 'completed'
-                  ? 'bg-emerald-500'
-                  : sessionInfo.isRestDay
-                  ? 'bg-text-muted'
-                  : 'bg-accent'
-              }`}
-            />
-            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-              {activeWorkoutDraft
-                ? 'SESSION IN PROGRESS'
-                : sessionInfo.status === 'completed'
-                ? 'SESSION COMPLETED'
-                : sessionInfo.isRestDay
-                ? 'REST & RECOVERY'
-                : `TODAY'S SESSION • 0${sessionNumber}`}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="text-2xs font-semibold text-text-muted hover:text-accent flex items-center gap-1 transition-colors cursor-pointer"
-              title="Adaptive progression based on fatigue & recovery"
-            >
-              <Sparkles className="w-3 h-3 text-accent" />
-              <span>Adaptive Split</span>
-            </button>
-            <span className="text-border">•</span>
-            <button
-              type="button"
-              onClick={() => setIsChangeWorkoutOpen(true)}
-              className="text-2xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
-            >
-              <span>Change</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <h2 className="display-title text-2xl sm:text-3xl text-text-primary">
-            {routineShortName.toUpperCase()}.
-          </h2>
-
-          <div className="text-xs text-text-muted font-medium mt-1">
-            {sessionInfo.isRestDay && !activeWorkoutDraft
-              ? 'Scheduled recovery day / Rest & Muscle Adaptation'
-              : `${sessionInfo.exercises?.length || 4} exercises / ${totalSetsCount} sets / ~45 min`}
-          </div>
-
-          {sessionInfo.isRestDay && !activeWorkoutDraft ? (
-            <p className="mt-2 text-xs text-text-secondary leading-relaxed">
-              Scheduled rest day. Hit your protein target, stay hydrated, and let muscle tissue adapt.
-            </p>
-          ) : sessionInfo.exercises && sessionInfo.exercises.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {sessionInfo.exercises.map((ex, idx) => (
-                <span
-                  key={idx}
-                  className="px-2.5 py-1 rounded-lg bg-bg-secondary border border-border/70 text-xs text-text-secondary font-medium"
-                >
-                  {ex}
-                </span>
-              ))}
-            </div>
-          ) : null}
-
-          {/* Next Scheduled Session Anchor for Rest Days / Completed Sessions */}
-          {(sessionInfo.status === 'completed' || sessionInfo.isRestDay) && !activeWorkoutDraft && nextScheduledSession && (
-            <div className="mt-3 p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 flex items-center justify-between text-2xs animate-fade-in">
-              <div className="flex items-center gap-2 min-w-0">
-                <Calendar className="w-3.5 h-3.5 text-accent shrink-0" />
-                <div className="truncate">
-                  <span className="text-text-muted">Next up: </span>
-                  <span className="font-bold text-text-primary">{nextScheduledSession.dayLabel}</span>
-                  <span className="text-text-secondary"> — {nextScheduledSession.routineName}</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Primary Action Button (#FF6B1F with text-stone-950 font-bold) */}
-        <div className="pt-1 space-y-2">
-          {activeWorkoutDraft ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowDiscardDraftConfirm(true)}
-                className="px-3.5 py-3 rounded-xl border border-border/80 text-text-muted hover:text-danger text-xs font-semibold cursor-pointer min-h-[48px] flex items-center justify-center transition-colors"
-                aria-label="Discard ongoing workout draft"
-              >
-                Discard
-              </button>
-              <button
-                type="button"
-                className="btn-primary flex-1 py-3 px-4 text-sm font-bold flex items-center justify-center gap-2"
-                onClick={() => onNavigate('workout')}
-              >
-                <Play className="w-4 h-4 fill-stone-950 stroke-stone-950" />
-                <span>Resume {routineShortName}</span>
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="btn-primary w-full py-3 px-4 text-sm font-bold flex items-center justify-center gap-2"
-              onClick={() => handleStartWorkoutFromHome()}
-            >
-              <Play className="w-4 h-4 fill-stone-950 stroke-stone-950" />
-              <span>
-                {sessionInfo.status === 'completed'
-                  ? `View ${routineShortName} Log`
-                  : sessionInfo.isRestDay
-                  ? `Train Anyway • ${routineShortName}`
-                  : `Start ${routineShortName}`}
-              </span>
-            </button>
-          )}
-
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
           <button
             type="button"
-            onClick={() => setIsLogPastModalOpen(true)}
-            className="w-full py-1.5 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            onClick={() => setIsNotificationsOpen(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            title="Notifications"
+            aria-label="Notifications"
           >
-            <Calendar className="w-3 h-3 text-accent" />
-            <span>Log past workout manually</span>
+            <Bell className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onNavigate('profile')}
+            className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs"
+            title="Athlete Profile"
+            aria-label="Athlete Profile"
+          >
+            {athleteDisplayName.charAt(0).toUpperCase()}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── 3. WEEKLY CONSISTENCY STRIP (Screen 3 Reference) ─────────────── */}
-      <div className="card p-4 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-text-primary uppercase tracking-wide font-mono">
-            THIS WEEK
-          </span>
-          <span className="text-xs font-semibold text-text-muted">
-            {weeklyStats.completedCount} of {weeklyStats.targetDays} complete
-          </span>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1.5 pt-1">
-          {weeklyStats.days.map((day, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] text-text-muted font-mono font-semibold">
-                {day.letter}
-              </span>
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  day.isCompleted
-                    ? 'bg-accent text-stone-950 font-black shadow-xs'
-                    : day.isToday
-                    ? 'border-2 border-accent text-accent font-bold'
-                    : 'bg-bg-secondary text-text-muted border border-border/60'
-                }`}
-              >
-                {day.isCompleted ? (
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                ) : (
-                  <span className="text-[10px] font-mono text-text-muted">
-                    •
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 4. NUTRITION & FUEL (Screen 3 Reference) ─────────────────────── */}
-      <div className="card p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="display-title text-xl text-text-primary font-display">
-              FUEL FOR THE WORK.
-            </h3>
-            <span className="text-2xs text-text-muted font-mono">Daily nutrition targets & recovery balance</span>
-          </div>
-
+      {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs transition-all">
+        <div className="flex items-center justify-between text-xs text-text-muted mb-2">
+          <span className="font-medium text-text-muted">Today&apos;s Workout</span>
           <button
             type="button"
-            onClick={() => onNavigate('meals')}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+            onClick={() => setIsChangeWorkoutOpen(true)}
+            className="text-2xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
+            title="Change Today's Workout"
           >
-            <span>Open Fuel</span>
+            <span>Adaptive Split</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
 
-        {/* Calories & Protein Progress Bars */}
-        <div className="space-y-3.5 pt-1">
-          {/* Calories */}
-          <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-base font-extrabold tabular-nums text-text-primary font-mono">
-                  {fuelStats.calories.toLocaleString()}
-                </span>
-                <span className="text-xs text-text-muted font-medium ml-1">
-                  of {fuelStats.targetCalories.toLocaleString()} kcal
-                </span>
-              </div>
-              <span className="text-xs text-text-muted font-medium tabular-nums">
-                {remainingCalories > 0 ? `${remainingCalories.toLocaleString()} kcal left` : 'Target reached'}
-              </span>
-            </div>
-            <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-500"
-                style={{ width: `${fuelStats.calPct}%` }}
-              />
-            </div>
-          </div>
+        <h2 className="text-xl font-bold text-text-primary leading-tight">
+          {routineDisplayName}
+        </h2>
 
-          {/* Protein */}
-          <div className="space-y-1.5">
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-base font-extrabold tabular-nums text-text-primary font-mono">
-                  {fuelStats.protein} g
-                </span>
-                <span className="text-xs text-text-muted font-medium ml-1">
-                  of {fuelStats.targetProtein} g protein
-                </span>
-              </div>
-              <span className="text-xs font-semibold text-accent tabular-nums">
-                {remainingProtein > 0 ? `${remainingProtein} g left` : 'Target hit'}
-              </span>
-            </div>
-            <div className="w-full h-2 bg-bg-secondary rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent rounded-full transition-all duration-500"
-                style={{ width: `${fuelStats.protPct}%` }}
-              />
-            </div>
-          </div>
+        <p className="text-xs sm:text-sm text-text-muted mt-1 font-normal">
+          {durationMinutes} min • {exerciseCount} exercises
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            if (activeWorkoutDraft) {
+              onNavigate('workout');
+            } else if (sessionInfo.status === 'completed') {
+              if (completedWorkoutForToday) {
+                setIsCompletedWorkoutModalOpen(true);
+              } else {
+                onNavigate('workout');
+              }
+            } else {
+              handleStartWorkoutFromHome();
+            }
+          }}
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
+        >
+          {activeWorkoutDraft
+            ? 'Resume Workout'
+            : sessionInfo.status === 'completed'
+            ? 'View Completed Workout'
+            : 'Start Workout'}
+        </button>
+      </div>
+
+      {/* ── 3. THIS WEEK SECTION (Screen 8 & Screen 9) ─────────────────────── */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-bold text-text-primary">
+            This Week
+          </h3>
+          <span className="text-xs sm:text-sm font-medium text-text-muted tabular-nums">
+            {weeklyStats.completedCount}/{weeklyStats.targetDays} workouts
+          </span>
         </div>
 
-        {/* Recommendation Tip Banner (Screen 3 Blueprint) */}
-        <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/80 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1 space-y-0.5">
-            <span className="text-xs font-bold text-text-primary block font-sans">
-              {remainingProtein > 0 ? 'Plan a protein-rich meal.' : 'Target achieved for today.'}
+        <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
+            style={{ width: `${weeklyProgressPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* ── 4. NUTRITION SUMMARY (Screen 8 & Screen 9: 2-Column Grid) ──────── */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* Nutrition (Calories) Card */}
+        <div
+          onClick={() => onNavigate('meals')}
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-label="View Nutrition Details"
+        >
+          <span className="text-xs font-medium text-text-muted">Nutrition</span>
+          <div className="mt-3">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {fuelStats.calories.toLocaleString()} cal
             </span>
-            <p className="text-2xs text-text-muted leading-relaxed">
-              {remainingProtein > 0
-                ? `${remainingProtein}g remaining to hit your target. Greek yogurt or chicken breast recommended.`
-                : 'Great job fueling your recovery. Hydrate and get adequate sleep.'}
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsScanMealModalOpen(true)}
-              className="px-2.5 py-1.5 rounded-lg bg-bg-card border border-border text-text-primary text-2xs font-bold hover:border-accent flex items-center gap-1 cursor-pointer transition-colors"
-              title="Scan meal with camera"
-            >
-              <Camera className="w-3.5 h-3.5 text-accent" />
-              <span>Scan</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigate('meals')}
-              className="px-2.5 py-1.5 rounded-lg bg-accent text-stone-950 text-2xs font-bold hover:brightness-105 active:scale-95 transition-all cursor-pointer"
-            >
-              + Add
-            </button>
+            <span className="text-xs text-text-muted tabular-nums block mt-1">
+              / {fuelStats.targetCalories.toLocaleString()}
+            </span>
           </div>
         </div>
 
-        {/* Habits Row: Water & Creatine */}
-        <div className="pt-2 border-t border-border/50 grid grid-cols-2 gap-3 text-xs">
-          {/* Water */}
-          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-2xs font-semibold text-text-secondary">Water</span>
-              <span className="text-2xs font-bold tabular-nums text-text-primary font-mono">
-                {waterStats.currentL} / {waterStats.targetL} L
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  logWater(250, todayStr);
-                  toast.success('+250 ml logged', 'Hydration');
-                }}
-                className="flex-1 py-1 rounded-lg text-2xs font-bold bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer font-mono"
-              >
-                +250ml
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  logWater(500, todayStr);
-                  toast.success('+500 ml logged', 'Hydration');
-                }}
-                className="flex-1 py-1 rounded-lg text-2xs font-bold bg-bg-card hover:bg-bg-tertiary text-text-primary border border-border/60 active:scale-95 transition-all cursor-pointer font-mono"
-              >
-                +500ml
-              </button>
-            </div>
-          </div>
-
-          {/* Creatine */}
-          <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 flex items-center justify-between">
-            <div>
-              <span className="text-2xs font-semibold text-text-secondary block">Creatine</span>
-              <span className="text-3xs text-text-muted">5g daily dose</span>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={hasTakenCreatine}
-                onChange={() => {
-                  toggleCreatine(todayStr, 5);
-                  toast.success(hasTakenCreatine ? 'Creatine unmarked' : 'Creatine logged for today', 'Habit Synced');
-                }}
-                className="sr-only peer"
-              />
-              <div className={`w-9 h-5 rounded-full transition-colors peer-focus:outline-none ${
-                hasTakenCreatine ? 'bg-accent' : 'bg-bg-tertiary border border-border'
-              } after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all ${
-                hasTakenCreatine ? 'after:translate-x-4' : ''
-              }`} />
-            </label>
+        {/* Protein Card */}
+        <div
+          onClick={() => onNavigate('meals')}
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-label="View Protein Details"
+        >
+          <span className="text-xs font-medium text-text-muted">Protein</span>
+          <div className="mt-3">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {fuelStats.protein} g
+            </span>
+            <span className="text-xs text-text-muted tabular-nums block mt-1">
+              / {fuelStats.targetProtein} g
+            </span>
           </div>
         </div>
       </div>
 
-      {/* ── 5. COACH NOTE (S3 Spec: Appears when a decision exists) ────────── */}
-      {latestCoachDecision && (
-        <div className="p-4 rounded-2xl bg-accent-subtle/20 border border-accent/25 space-y-1.5 animate-fade-in">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
-            <span>Why today&apos;s weights changed</span>
+      {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
+      {isNotificationsOpen && (
+        <div className="modal-overlay" onClick={() => setIsNotificationsOpen(false)}>
+          <div
+            className="modal-content max-w-sm w-full p-5 space-y-4 rounded-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-border/70">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5 text-accent" />
+                <h3 className="text-base font-bold text-text-primary">Notifications</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen(false)}
+                className="p-1 rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
+                <p className="font-semibold text-text-primary">Today&apos;s Training</p>
+                <p className="text-text-muted mt-0.5">
+                  {routineDisplayName} is scheduled for today ({durationMinutes} min).
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
+                <p className="font-semibold text-text-primary">Weekly Target</p>
+                <p className="text-text-muted mt-0.5">
+                  {weeklyStats.completedCount} of {weeklyStats.targetDays} workouts completed this week.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsNotificationsOpen(false);
+                  setIsSettingsOpen(true);
+                }}
+                className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-xs font-semibold text-text-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Settings className="w-4 h-4 text-text-muted" />
+                <span>Open Settings</span>
+              </button>
+            </div>
           </div>
-          <p className="text-xs text-text-primary leading-relaxed">
-            {latestCoachDecision.explanation || latestCoachDecision.headline || `${latestCoachDecision.exerciseName}: load adjusted to ${latestCoachDecision.nextPrescription?.weight} kg based on recent performance.`}
-          </p>
         </div>
       )}
 
-
-      {/* ── MODALS ── */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
-
-      <LogPastWorkoutModal
-        isOpen={isLogPastModalOpen}
-        onClose={() => setIsLogPastModalOpen(false)}
-        onSaved={() => toast.success('Past workout logged and synced!', 'Workout Saved')}
-      />
-
-      <SuggestedWorkoutModal
-        isOpen={isSuggestedModalOpen}
-        onClose={() => setIsSuggestedModalOpen(false)}
-        userUnit={profile?.unit || 'kg'}
-        defaultIntensity={primaryGoal === 'get_stronger' ? 'high' : 'medium'}
-        onStartWorkout={handleStartSuggestedWorkout}
-        onSavePlan={(plan) => {
-          const newPlan: PlannedWorkout = {
-            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
-            name: plan.name,
-            createdAt: new Date().toISOString(),
-            exercises: plan.exercises,
-          };
-          addPlannedWorkout(newPlan);
-          toast.success(`Saved "${plan.name}" to Workout Plans`, 'Plan Created');
-        }}
-      />
-
-      <ScanMealModal
-        isOpen={isScanMealModalOpen}
-        onClose={() => setIsScanMealModalOpen(false)}
-        onMealSaved={() => {
-          toast.success('Meal scanned and logged!', 'Nutrition Updated');
-        }}
-      />
-
-      {/* ── Change Workout Modal on HomePage ───────────────────────────── */}
+      {/* ── CHANGE TODAY'S WORKOUT MODAL (Plan Sync Contract) ─────────────── */}
       {isChangeWorkoutOpen && (
         <div className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
           <div
@@ -961,7 +483,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
             {/* Content */}
             <div className="p-4 overflow-y-auto space-y-4 flex-1">
-              {/* My Plans */}
+              {/* Available Routines */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
@@ -1073,52 +595,54 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
-      {/* ── Discard Workout Draft Confirmation Dialog ── */}
-      {showDiscardDraftConfirm && (
-        <div className="modal-overlay z-50" onClick={() => setShowDiscardDraftConfirm(false)}>
-          <div
-            className="modal-content max-w-sm w-full p-5 space-y-4"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="discard-draft-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-danger/15 text-danger flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 id="discard-draft-title" className="text-sm font-bold text-text-primary">
-                  Discard Ongoing Workout?
-                </h3>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Are you sure you want to discard your workout draft? All completed sets in this session will be lost.
-                </p>
-              </div>
-            </div>
+      {/* ── SETTINGS MODAL ─────────────────────────────────────────────────── */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
 
-            <div className="flex items-center gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDiscardDraftConfirm(false)}
-                className="btn-secondary flex-1 py-2.5 text-xs font-bold min-h-[44px]"
-              >
-                Keep Workout
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  clearWorkoutDraft();
-                  setShowDiscardDraftConfirm(false);
-                  toast.info('Session draft discarded.');
-                }}
-                className="btn-danger flex-1 py-2.5 text-xs font-bold min-h-[44px]"
-              >
-                Discard Session
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* ── SUGGESTED WORKOUT MODAL ────────────────────────────────────────── */}
+      <SuggestedWorkoutModal
+        isOpen={isSuggestedModalOpen}
+        onClose={() => setIsSuggestedModalOpen(false)}
+        userUnit={userUnit}
+        onStartWorkout={handleStartSuggestedWorkout}
+        onSavePlan={(plan) => {
+          const newPlan: PlannedWorkout = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
+            name: plan.name,
+            createdAt: new Date().toISOString(),
+            exercises: plan.exercises,
+          };
+          addPlannedWorkout(newPlan);
+          toast.success(`Plan "${plan.name}" saved!`, 'Plan Saved');
+        }}
+      />
+
+      {/* ── LOG PAST WORKOUT MODAL ─────────────────────────────────────────── */}
+      <LogPastWorkoutModal
+        isOpen={isLogPastModalOpen}
+        onClose={() => setIsLogPastModalOpen(false)}
+      />
+
+      {/* ── SCAN MEAL MODAL ────────────────────────────────────────────────── */}
+      <ScanMealModal
+        isOpen={isScanMealModalOpen}
+        onClose={() => setIsScanMealModalOpen(false)}
+      />
+
+      {/* ── COMPLETED WORKOUT DETAIL MODAL ─────────────────────────────────── */}
+      {isCompletedWorkoutModalOpen && completedWorkoutForToday && (
+        <PostWorkoutTakeModal
+          isOpen={isCompletedWorkoutModalOpen}
+          onClose={() => setIsCompletedWorkoutModalOpen(false)}
+          completedWorkout={{
+            name: completedWorkoutForToday.name || routineDisplayName || 'Completed Session',
+            durationMinutes: completedWorkoutForToday.durationMinutes ?? 0,
+            durationSeconds: completedWorkoutForToday.durationSeconds,
+            exercises: completedWorkoutForToday.exercises,
+          }}
+        />
       )}
     </div>
   );

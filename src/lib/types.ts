@@ -1,7 +1,7 @@
-export type Gender = 'male' | 'female';
+export type Gender = 'male' | 'female' | 'other';
 export type Unit = 'kg' | 'lbs';
 export type Theme = 'dark' | 'light';
-export type UserMode = 'beginner' | 'advanced';
+export type UserMode = 'beginner' | 'intermediate' | 'advanced';
 export type DietPreference = 'vegetarian' | 'eggitarian' | 'non_vegetarian' | 'vegan';
 
 export type AthleteGoal = 'build_muscle' | 'get_stronger' | 'lose_fat' | 'stamina' | 'general_fitness';
@@ -90,6 +90,10 @@ export interface BodyMetricEntry {
   date: string; // YYYY-MM-DD
   weightKg: number;
   heightCm?: number;
+  bodyFatPct?: number;
+  chestIn?: number;
+  waistIn?: number;
+  hipsIn?: number;
   notes?: string;
 }
 
@@ -248,6 +252,7 @@ export interface WorkoutEntry {
   /** Source plan/template ID when started from or associated with a planned workout */
   planId?: string;
   durationMinutes?: number;
+  durationSeconds?: number;
   notes?: string;
   exercises: WorkoutExercise[];
   /** Explicit structured athlete pain/discomfort flag for entire session */
@@ -305,6 +310,8 @@ export interface LiftLevel {
   category: ExerciseRank;
   rank: ExerciseRank;
   equipment?: EquipmentType;
+  isStandardUnavailable?: boolean;
+  standardNote?: string;
 }
 
 export interface OverallLevel {

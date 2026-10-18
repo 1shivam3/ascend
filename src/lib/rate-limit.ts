@@ -10,7 +10,6 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { getSupabaseCredentials } from './supabase/config';
 
 interface RateLimitRecord {
   timestamps: number[];
@@ -44,11 +43,15 @@ function getRateLimiterSupabase() {
   if (supabaseCheckAttempted) return supabaseRateLimiter;
   supabaseCheckAttempted = true;
 
-  const { url, anonKey, isConfigured } = getSupabaseCredentials();
-  if (!isConfigured || !url || !anonKey) return null;
+  // Crucial security control: Only invoke the rate limiter RPC via the privileged service-role key.
+  // Never attempt to call the RPC with an anonymous or unprivileged key.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!url || !serviceKey) return null;
 
   try {
-    supabaseRateLimiter = createClient(url, anonKey, {
+    supabaseRateLimiter = createClient(url, serviceKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
   } catch {

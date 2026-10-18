@@ -2296,7 +2296,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               onClick={() => setFuelSubTab('meals')}
               className="text-xs font-semibold text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              <span>View full meal history ({groupedMeals.length} days recorded)</span>
+              <span>View full meal history ({groupedMeals.length} {groupedMeals.length === 1 ? 'day' : 'days'} recorded)</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>

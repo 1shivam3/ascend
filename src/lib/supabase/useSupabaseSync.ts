@@ -23,6 +23,13 @@ export function useSupabaseSync() {
     ...state,
     syncNow: () => syncEngine.triggerSyncNow(),
     signInWithGoogle: () => syncEngine.signInWithGoogle(),
+    signInWithApple: () => syncEngine.signInWithApple(),
+    signUpWithPassword: (email: string, password: string, fullName?: string) =>
+      syncEngine.signUpWithPassword(email, password, fullName),
+    signInWithPassword: (email: string, password: string) =>
+      syncEngine.signInWithPassword(email, password),
+    resetPasswordForEmail: (email: string) =>
+      syncEngine.resetPasswordForEmail(email),
     sendEmailOtp: (email: string) => syncEngine.sendEmailOtp(email),
     verifyEmailOtp: (email: string, token: string) => syncEngine.verifyEmailOtp(email, token),
     signOut: (options?: { clearLocalData?: boolean }) => syncEngine.signOut(options),

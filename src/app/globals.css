@@ -3,86 +3,104 @@
 @tailwind utilities;
 
 :root {
-  /* Chalk (Light) — Warm Luxury Gallery Paper Logbook (Figma Reference) */
-  --bg-primary: 246 245 242;      /* #F6F5F2 warm chalk off-white */
-  --bg-secondary: 238 236 231;    /* #EEECE7 sunken container */
-  --bg-tertiary: 230 227 220;     /* #E6E3DC */
-  --bg-card: 255 255 255;         /* #FFFFFF pure crisp white surface */
-  --bg-elevated: 255 255 255;     /* #FFFFFF */
-  --text-primary: 18 19 18;       /* #121312 near-black typography */
-  --text-secondary: 85 88 83;     /* #555853 refined body text */
-  --text-muted: 130 134 128;      /* #828680 muted meta */
-  --border: 229 227 221;          /* #E5E3DD hairline subtle border */
-  --border-subtle: 238 236 230;   /* #EEECE6 */
+  /* ── Reference Design Tokens: Chalk Light Palette ───────────────────────── */
+  /* Chalk: #F3F0E7, Graphite: #171916, Vermilion: #E44427, Sage: #858076 */
+  --bg-primary: 243 240 231;      /* #F3F0E7 warm Chalk off-white background */
+  --bg-secondary: 232 229 220;    /* #E8E5DC sunken container */
+  --bg-tertiary: 223 220 210;     /* #DFDCD2 tertiary container */
+  --bg-card: 255 255 255;         /* #FFFFFF pure crisp white card surface */
+  --bg-elevated: 255 255 255;     /* #FFFFFF elevated card */
+  --text-primary: 23 25 22;       /* #171916 Graphite primary typography */
+  --text-secondary: 94 97 90;     /* #5E615A refined secondary body text */
+  --text-muted: 133 128 118;      /* #858076 Sage / muted meta */
+  --border: 226 223 214;          /* #E2DFD6 hairline subtle border */
+  --border-subtle: 234 231 223;   /* #EAE7DF */
   --border-hover: 160 156 148;    /* #A09C94 */
-  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
-  --accent-dim: 224 88 18;        /* #E05812 */
-  --accent-glow: rgba(255, 107, 31, 0.16);
+  --accent: 228 68 39;            /* #E44427 — Exact ASCEND Vermilion Accent */
+  --accent-dim: 199 53 27;        /* #C7351B */
+  --accent-glow: rgba(228, 68, 39, 0.16);
 
   /* Direct CSS Specification Tokens */
-  --bg: #F6F5F2;
+  --brand-graphite: #171916;
+  --brand-chalk: #F3F0E7;
+  --brand-vermilion: #E44427;
+  --brand-sage: #858076;
+
+  --bg: #F3F0E7;
   --surface: #FFFFFF;
-  --sunken: #EEECE7;
-  --border-hex: #E5E3DD;
+  --sunken: #E8E5DC;
+  --border-hex: #E2DFD6;
   --border-control: #A09C94;
-  --text: #121312;
-  --text-2: #555853;
-  --text-3: #828680;
-  --accent-hex: #FF6B1F;
-  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
-  --accent-subtle: #FFF3EB;
-  --accent-text: #E05812;
-  --success: #1B6E45;
-  --success-bg: #E3F1E9;
+  --text: #171916;
+  --text-2: #5E615A;
+  --text-3: #858076;
+  --accent-hex: #E44427;
+  --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
+  --accent-subtle: #FDF1EE;
+  --accent-text: #E44427;
+  --sage: 133 128 118;
+  --sage-hex: #858076;
+  --sage-subtle: rgba(133, 128, 118, 0.15);
+  --success: #858076;
+  --success-bg: rgba(133, 128, 118, 0.15);
   --warning: #8A5A00;
   --warning-bg: #FBF0D3;
   --danger: #B42318;
   --danger-bg: #FDE8E6;
-  --scrim: rgba(18, 17, 16, 0.5);
-  --inverse: #121312;
-  --inverse-text: #F6F5F2;
+  --scrim: rgba(23, 25, 22, 0.5);
+  --inverse: #171916;
+  --inverse-text: #F3F0E7;
 }
 
 .dark,
 :root[data-theme='dark'] {
-  /* Charcoal (Dark) — Deep Athletic Cockpit (Figma Reference) */
-  --bg-primary: 18 19 18;         /* #121312 deep charcoal surface */
-  --bg-secondary: 27 28 26;       /* #1B1C1A sunken container */
-  --bg-tertiary: 35 37 34;        /* #232522 */
-  --bg-card: 27 28 26;            /* #1B1C1A card surface */
-  --bg-elevated: 34 36 33;        /* #222421 elevated */
-  --text-primary: 245 245 243;    /* #F5F5F3 readable warm-white */
-  --text-secondary: 168 172 165;  /* #A8ACA5 secondary text */
-  --text-muted: 115 120 113;      /* #737871 muted meta */
-  --border: 39 40 38;             /* #272826 hairline border */
-  --border-subtle: 30 31 29;
-  --border-hover: 70 75 70;
-  --accent: 255 107 31;           /* #FF6B1F — Exact ASCEND Brand Accent */
-  --accent-dim: 224 88 18;
-  --accent-glow: rgba(255, 107, 31, 0.2);
+  /* ── Reference Design Tokens: Graphite Dark Palette ──────────────────────── */
+  /* Chalk: #F3F0E7, Graphite: #171916, Vermilion: #E44427, Sage: #858076 */
+  --bg-primary: 23 25 22;         /* #171916 deep Graphite background */
+  --bg-secondary: 27 30 26;       /* #1B1E1A sunken container */
+  --bg-tertiary: 33 36 32;        /* #212420 */
+  --bg-card: 33 36 32;            /* #212420 elevated dark card surface */
+  --bg-elevated: 41 45 40;        /* #292D28 */
+  --text-primary: 243 240 231;    /* #F3F0E7 readable warm Chalk white */
+  --text-secondary: 165 169 161;  /* #A5A9A1 secondary text */
+  --text-muted: 122 126 118;      /* #7A7E76 muted meta */
+  --border: 44 48 43;             /* #2C302B hairline dark border */
+  --border-subtle: 36 39 35;      /* #242723 */
+  --border-hover: 71 78 69;       /* #474E45 */
+  --accent: 228 68 39;            /* #E44427 — Exact ASCEND Vermilion Accent */
+  --accent-dim: 199 53 27;        /* #C7351B */
+  --accent-glow: rgba(228, 68, 39, 0.22);
 
   /* Direct CSS Specification Tokens */
-  --bg: #121312;
-  --surface: #1B1C1A;
-  --sunken: #0D0E0D;
-  --border-hex: #272826;
-  --border-control: #464B46;
-  --text: #F5F5F3;
-  --text-2: #A8ACA5;
-  --text-3: #737871;
-  --accent-hex: #FF6B1F;
-  --accent-on: #0D0E0D;           /* AAA verified contrast on #FF6B1F */
-  --accent-subtle: #2C1608;
-  --accent-text: #FFA066;
-  --success: #34D399;
-  --success-bg: #12281D;
+  --brand-graphite: #171916;
+  --brand-chalk: #F3F0E7;
+  --brand-vermilion: #E44427;
+  --brand-sage: #858076;
+
+  --bg: #171916;
+  --surface: #212420;
+  --sunken: #1B1E1A;
+  --border-hex: #2C302B;
+  --border-control: #474E45;
+  --text: #F3F0E7;
+  --text-2: #A5A9A1;
+  --text-3: #7A7E76;
+  --accent-hex: #E44427;
+  --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
+  --accent-subtle: rgba(228, 68, 39, 0.15);
+  --accent-text: #FF7D66;
+  --sage: 133 128 118;
+  --sage-hex: #858076;
+  --sage-subtle: rgba(133, 128, 118, 0.20);
+  --success: #858076;
+  --success-bg: rgba(133, 128, 118, 0.20);
   --warning: #FBBF24;
   --warning-bg: #2B2210;
   --danger: #F87171;
   --danger-bg: #3A1714;
-  --scrim: rgba(0, 0, 0, 0.7);
-  --inverse: #F5F5F3;
-  --inverse-text: #121312;
+  --scrim: rgba(0, 0, 0, 0.75);
+  --inverse: #F3F0E7;
+  --inverse-text: #171916;
 }
 
 @layer base {
@@ -148,11 +166,11 @@
     @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
-  /* Solid #FF6B1F primary CTA — verified AAA high contrast on orange */
+  /* Solid Vermilion (#E44427) primary CTA with crisp white text */
   .btn-primary {
-    @apply bg-accent text-stone-950 font-bold px-4 py-2.5 rounded-xl text-sm;
+    @apply bg-accent text-white font-bold px-4 py-2.5 rounded-xl text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
-    @apply hover:brightness-105 flex items-center justify-center gap-2;
+    @apply hover:brightness-105 flex items-center justify-center gap-2 cursor-pointer;
     min-height: 48px;
   }
 
@@ -161,31 +179,68 @@
     @apply bg-bg-card text-text-primary font-medium px-4 py-2.5 rounded-xl text-sm;
     @apply border border-border/80 hover:border-border;
     @apply active:scale-[0.98] transition-all duration-150;
-    @apply hover:bg-bg-secondary flex items-center justify-center gap-2;
+    @apply hover:bg-bg-secondary flex items-center justify-center gap-2 cursor-pointer;
+    min-height: 44px;
+  }
+
+  /* Outline: Clean bordered action */
+  .btn-outline {
+    @apply bg-transparent text-text-primary border border-border font-medium px-4 py-2.5 rounded-xl text-sm;
+    @apply hover:bg-bg-secondary active:scale-[0.98] transition-all duration-150 cursor-pointer flex items-center justify-center gap-2;
     min-height: 44px;
   }
 
   .btn-ghost {
     @apply text-text-secondary font-medium px-3 py-2 rounded-xl text-sm;
-    @apply hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary transition-all duration-150 flex items-center justify-center gap-1.5;
+    @apply hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer;
     min-height: 40px;
   }
 
   .btn-danger {
     @apply bg-danger/10 text-danger font-medium px-3 py-2 rounded-xl text-sm;
     @apply border border-danger/20;
-    @apply active:scale-[0.98] transition-all duration-150;
+    @apply active:scale-[0.98] transition-all duration-150 cursor-pointer;
     min-height: 40px;
   }
 
-  /* Figma Display Heading (Barlow Condensed, all-caps, athletic precision) */
+  /* Reference Display Heading (clean, modern grotesque sans-serif, sentence-case) */
   .display-title {
-    @apply font-display uppercase tracking-tight text-2xl sm:text-3xl font-bold text-text-primary;
+    @apply font-sans tracking-tight text-2xl sm:text-3xl font-bold text-text-primary;
   }
 
-  /* Section Title: disciplined 13-14px, sentence case or subtle uppercase */
+  /* Typographic Hierarchy Classes */
+  .page-title {
+    @apply font-sans text-2xl sm:text-3xl font-bold tracking-tight text-text-primary;
+  }
+
+  .section-heading {
+    @apply font-sans text-sm sm:text-base font-semibold tracking-normal text-text-primary;
+  }
+
+  /* Section Title: disciplined 12-13px meta header */
   .section-title {
-    @apply text-[13px] font-semibold tracking-wide text-text-muted font-sans;
+    @apply text-[12px] sm:text-[13px] font-semibold tracking-wide text-text-muted font-sans;
+  }
+
+  .card-title {
+    @apply font-sans text-base sm:text-lg font-bold text-text-primary;
+  }
+
+  .metric-display {
+    @apply font-sans text-3xl sm:text-4xl font-bold tracking-tight text-text-primary tabular-nums;
+  }
+
+  .label-secondary {
+    @apply font-sans text-xs text-text-secondary;
+  }
+
+  .label-nav {
+    @apply font-sans text-[11px] font-medium tracking-normal;
+  }
+
+  /* Sage Supporting Status & Metric Badges (#858076) */
+  .badge-sage {
+    @apply bg-[#858076]/15 text-[#858076] dark:text-[#A5A096] border border-[#858076]/30 px-2 py-0.5 rounded-full text-2xs font-bold inline-flex items-center gap-1;
   }
 
   .level-bar {
@@ -206,13 +261,13 @@
   }
 
   .native-tab-item {
-    @apply relative flex-1 flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none;
+    @apply relative flex-1 flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none cursor-pointer;
     @apply text-text-muted hover:text-text-primary;
     min-height: 48px;
   }
 
   .native-tab-item.active {
-    @apply text-text-primary font-semibold;
+    @apply text-accent font-semibold;
   }
 
   .native-tab-indicator {

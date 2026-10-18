@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'ASCEND',
   webDir: 'public',
   server: {
-    url: 'https://ascend-reu004xr0-1shivam3s-projects.vercel.app',
+    url: 'https://ascendtonext.vercel.app',
     cleartext: false,
     androidScheme: 'https',
   },

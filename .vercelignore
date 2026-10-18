@@ -1,0 +1,26 @@
+# Mobile / Native builds
+/android/
+/ios/
+/capacitor.config.ts
+*.apk
+*.aab
+
+# Local development and tooling
+/.agents/
+/.agent/
+/agent/
+/.claude/
+/.tabnine/
+/.hermes/
+/.roo/
+/graphify-out/
+/tests/
+/supabase/
+
+# Environment files
+.env
+.env*.local
+
+# System & caches
+.DS_Store
+*.tsbuildinfo

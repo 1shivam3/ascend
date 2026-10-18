@@ -366,37 +366,45 @@ export async function POST(req: Request) {
     // ------------------------------------------------------------------
     // 4. Token Consumption & Partial Deletion Recovery (Requirement 4)
     // ------------------------------------------------------------------
-    const fullyDeleted =
+    let fullyDeleted =
       allTablesDeleted && (authPurgeError === null || authUserDeleted);
 
     if (validatedTokenPayload) {
       if (fullyDeleted) {
-        // Complete erasure: Mark nonce permanently consumed in durable ledger & cache
-        await consumeDeletionNonce(
-          validatedTokenPayload.jti,
-          validatedTokenPayload,
-          'consumed',
-          adminClient || supabase
-        );
+        try {
+          // Complete erasure: Mark nonce permanently consumed in durable ledger & cache
+          await consumeDeletionNonce(
+            validatedTokenPayload.jti,
+            validatedTokenPayload,
+            'consumed',
+            adminClient || supabase
+          );
 
-        // Clean up any lingering partial recovery records for this email (anonymizing PII)
-        if (adminClient || supabase) {
-          try {
-            await (adminClient || supabase)
-              .from('consumed_deletion_nonces')
-              .update({ status: 'consumed', email: null, user_id: null })
-              .eq('email', validatedTokenPayload.email)
-              .eq('status', 'partial');
-          } catch {}
+          // Clean up any lingering partial recovery records for this email (anonymizing PII)
+          if (adminClient || supabase) {
+            try {
+              await (adminClient || supabase)
+                .from('consumed_deletion_nonces')
+                .update({ status: 'consumed', email: null, user_id: null })
+                .eq('email', validatedTokenPayload.email)
+                .eq('status', 'partial');
+            } catch {}
+          }
+        } catch (nonceErr) {
+          // If durable ledger write fails (e.g. unexpected/missing DB columns),
+          // do NOT claim deletion fully succeeded without durable replay protection!
+          fullyDeleted = false;
         }
       } else {
-        // Partial deletion: Mark as partial recovery in durable ledger so retry can resume
-        await consumeDeletionNonce(
-          validatedTokenPayload.jti,
-          validatedTokenPayload,
-          'partial',
-          adminClient || supabase
-        );
+        try {
+          // Partial deletion: Mark as partial recovery in durable ledger so retry can resume
+          await consumeDeletionNonce(
+            validatedTokenPayload.jti,
+            validatedTokenPayload,
+            'partial',
+            adminClient || supabase
+          );
+        } catch {}
       }
     }
 

@@ -19,14 +19,31 @@ const DOTS_FEMALE = {
 };
 
 /**
+ * Checks whether the IPF DOTS formula provides standardized polynomial coefficients for the given gender.
+ * The International Powerlifting Federation (IPF) has published official formulas exclusively for male and female divisions.
+ */
+export function isDOTSSupportedForGender(gender?: Gender | null): boolean {
+  return gender === 'male' || gender === 'female';
+}
+
+export function getDOTSUnavailableReason(gender?: Gender | null): string {
+  if (gender === 'other') {
+    return 'DOTS coefficients are standardized by the International Powerlifting Federation (IPF) specifically for competitive male and female divisions. Score is unavailable for non-binary athlete profiles.';
+  }
+  return 'DOTS calculation requires valid athlete bodyweight and Big 3 total.';
+}
+
+/**
  * Calculates DOTS powerlifting coefficient given bodyweight and Big 3 Total (in kg).
  * Provides a standardized bodyweight-normalized comparison across weight classes.
+ * Returns 0 if calculation is unavailable or unsupported for the lifter's gender profile.
  */
 export function calculateDOTS(
   bodyweightKg: number,
   totalKg: number,
   gender: Gender = 'male'
 ): number {
+  if (!isDOTSSupportedForGender(gender)) return 0;
   if (!bodyweightKg || bodyweightKg <= 0 || !totalKg || totalKg <= 0) return 0;
 
   const c = gender === 'female' ? DOTS_FEMALE : DOTS_MALE;
@@ -49,7 +66,16 @@ export interface DOTSClassification {
   percentile: string;
 }
 
-export function getDOTSClassification(dots: number): DOTSClassification {
+export function getDOTSClassification(dots: number, gender?: Gender | null): DOTSClassification {
+  if (gender === 'other') {
+    return {
+      tier: 'UNAVAILABLE',
+      badge: 'N/A',
+      description: getDOTSUnavailableReason('other'),
+      percentile: 'N/A',
+    };
+  }
+
   if (dots >= 560) {
     return {
       tier: 'WORLD CLASS',

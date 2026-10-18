@@ -536,11 +536,16 @@ export function calculateRecommendedMacroGoals(
   ageYears?: number
 ): MacroGoals {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
-  const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : (gender === 'male' ? 175 : 162);
+  const defaultHeight = gender === 'male' ? 175 : gender === 'female' ? 162 : 168.5;
+  const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : defaultHeight;
   const age = ageYears && ageYears >= 14 && ageYears <= 90 ? ageYears : 25; // User age (default 25 if unspecified)
 
-  // Mifflin-St Jeor BMR
-  const bmr = 10 * bw + 6.25 * height - 5 * age + (gender === 'male' ? 5 : -161);
+  // Mifflin-St Jeor BMR:
+  // Male: +5, Female: -161.
+  // For 'other' (non-binary) athletes where biological sex assumptions do not apply,
+  // clinical exercise physiology applies the midpoint constant (-78) between male and female offsets.
+  const genderOffset = gender === 'male' ? 5 : gender === 'female' ? -161 : -78;
+  const bmr = 10 * bw + 6.25 * height - 5 * age + genderOffset;
   // Active trainee activity factor (~3-5 days/week resistance training)
   const maintenance = Math.round(bmr * 1.4);
 

@@ -34,7 +34,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variants = {
       primary:
-        'bg-accent text-stone-950 font-black shadow-sm shadow-accent/25 hover:brightness-105 active:bg-accent-dim',
+        'bg-accent text-white font-bold shadow-sm shadow-accent/25 hover:brightness-105 active:bg-accent-dim',
       secondary:
         'bg-bg-card hover:bg-bg-secondary text-text-primary border border-border/80 hover:border-border active:bg-bg-tertiary',
       ghost:

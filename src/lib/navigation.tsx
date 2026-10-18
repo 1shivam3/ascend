@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/Toast';
 
-export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs';
+export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings';
 export type ProgressTabId = 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training';
 
 export interface BackHandler {
@@ -66,7 +66,7 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
     const tabParam = params.get('tab') as TabId | null;
     const subParam = params.get('sub') as ProgressTabId | null;
 
-    if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs'].includes(tabParam)) {
+    if (tabParam && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(tabParam)) {
       if (tabParam === 'prs') {
         return { tab: 'progress', progressTab: 'prs' };
       }
@@ -81,7 +81,7 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
     // Secondary fallback: check localStorage for explicitly persisted tab
     const savedTab = localStorage.getItem('ascend_active_tab') as TabId | null;
     const savedSubTab = localStorage.getItem('ascend_progress_subtab') as ProgressTabId | null;
-    if (savedTab && ['home', 'workout', 'progress', 'meals', 'prs'].includes(savedTab)) {
+    if (savedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(savedTab)) {
       if (savedTab === 'prs') {
         return { tab: 'progress', progressTab: 'prs' };
       }

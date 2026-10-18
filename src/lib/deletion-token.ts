@@ -263,23 +263,22 @@ export async function consumeDeletionNonce(
 
   // 2. Persist to durable database store if available
   if (dbClient) {
-    try {
-      const isConsumed = status === 'consumed';
-      await dbClient.from('consumed_deletion_nonces').upsert(
-        {
-          jti,
-          // Anonymize personal identifiers upon successful deletion; preserve only for partial recovery
-          user_id: isConsumed ? null : payload.sub,
-          email: isConsumed ? null : payload.email,
-          status,
-          consumed_at: new Date().toISOString(),
-          expires_at: new Date(payload.exp).toISOString(),
-        },
-        { onConflict: 'jti' }
-      );
-    } catch (err) {
-      // Non-blocking log, in-memory was updated
-      console.warn('Failed to record deletion nonce to durable ledger:', err);
+    const isConsumed = status === 'consumed';
+    const { error } = await dbClient.from('consumed_deletion_nonces').upsert(
+      {
+        jti,
+        // Anonymize personal identifiers upon successful deletion; preserve only for partial recovery
+        user_id: isConsumed ? null : payload.sub,
+        email: isConsumed ? null : payload.email,
+        status,
+        consumed_at: new Date().toISOString(),
+        expires_at: new Date(payload.exp).toISOString(),
+      },
+      { onConflict: 'jti' }
+    );
+    if (error) {
+      console.warn('Failed to record deletion nonce to durable ledger:', error.message);
+      throw new Error(`Durable nonce ledger write failed: ${error.message}`);
     }
   }
 }

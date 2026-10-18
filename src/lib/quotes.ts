@@ -1,3 +1,5 @@
+import { Gender } from './types';
+
 export interface Quote {
   text: string;
   author: string;
@@ -129,7 +131,7 @@ const FEMALE_QUOTES: Quote[] = [
  * - `offset` allows manual "next quote" skipping without waiting for the timer
  */
 export function getDailyQuote(
-  gender?: 'male' | 'female' | null,
+  gender?: Gender | null,
   intervalHours = 4,
   offset = 0
 ): Quote {

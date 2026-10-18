@@ -68,6 +68,7 @@ import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import WorkoutDetailsView from '@/components/WorkoutDetailsView';
 import ShareProgramModal from '@/components/ShareProgramModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
@@ -651,6 +652,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
     name: string;
     durationMinutes: number;
+    durationSeconds?: number;
     exercises: WorkoutExercise[];
   } | null>(null);
   const [sessionStartTime, setSessionStartTime] = useState<number>(Date.now());
@@ -664,6 +666,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
   const [trainSubTab, setTrainSubTab] = useState<'workouts' | 'plans' | 'history'>('workouts');
+  const [selectedDetailsPlan, setSelectedDetailsPlan] = useState<PlannedWorkout | null>(null);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
@@ -673,13 +676,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // Sub-tab Back Handler: returning to workouts hub
   useEffect(() => {
+    if (selectedDetailsPlan) {
+      return registerBackHandler(() => {
+        setSelectedDetailsPlan(null);
+        return true;
+      }, 50);
+    }
     if (trainSubTab !== 'workouts') {
       return registerBackHandler(() => {
         setTrainSubTab('workouts');
         return true;
       }, 40);
     }
-  }, [trainSubTab, registerBackHandler]);
+  }, [selectedDetailsPlan, trainSubTab, registerBackHandler]);
 
   // ── Register Modal Back Handlers (Interconnected Navigation) ──────────────
   useEffect(() => {
@@ -1273,12 +1282,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       ? crypto.randomUUID()
       : `w_${Date.now()}`;
 
+    const executedExercises = validExercises
+      .map((ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped'),
+      }))
+      .filter((ex) => ex.sets.length > 0);
+
+    const exercisesToSave = executedExercises.length > 0 ? executedExercises : validExercises;
+
+    const sessionDurationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
+    const durationMin = Math.round(sessionDurationSeconds / 60);
+
     const newWorkout: WorkoutEntry = {
       id: workoutId,
       date,
       name: startedFromPlan || undefined,
       planId: startedFromPlanId || undefined,
-      exercises: validExercises,
+      durationMinutes: durationMin,
+      durationSeconds: sessionDurationSeconds,
+      exercises: exercisesToSave,
     };
     addWorkout(newWorkout);
 
@@ -1286,7 +1309,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     let newPRCount = 0;
     if (hasCompletedSets) {
       const userBW = profile?.bodyweightKg || 75;
-      for (const ex of validExercises) {
+      for (const ex of exercisesToSave) {
         const exName = ex.name.trim();
         const isBW = isBodyweightExercise(exName);
         const existingPRs = prs.filter(p => p.exercise.toLowerCase() === exName.toLowerCase());
@@ -1342,21 +1365,21 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       );
     } else if (hasCompletedSets) {
       toast.success(
-        `Logged workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''}!`,
+        `Logged workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''}!`,
         'Workout Saved'
       );
     } else {
       toast.info(
-        `Saved interrupted workout with ${validExercises.length} exercise${validExercises.length > 1 ? 's' : ''} (0 completed sets).`,
+        `Saved interrupted workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''} (0 completed sets).`,
         'Interrupted Session Saved'
       );
     }
 
-    const durationMin = Math.max(15, Math.round((Date.now() - sessionStartTime) / 60000));
     setPostWorkoutSummary({
       name: startedFromPlan || 'Workout Session',
       durationMinutes: durationMin,
-      exercises: validExercises,
+      durationSeconds: sessionDurationSeconds,
+      exercises: exercisesToSave,
     });
 
     clearWorkoutDraft();
@@ -1589,51 +1612,173 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
   };
 
+  const availableRoutines: PlannedWorkout[] = useMemo(() => {
+    const result: PlannedWorkout[] = [];
+    const seenNames = new Set<string>();
+
+    for (const p of plannedWorkouts) {
+      const clean = p.name.trim();
+      if (!seenNames.has(clean.toLowerCase())) {
+        seenNames.add(clean.toLowerCase());
+        result.push(p);
+      }
+    }
+
+    const templateTitles = [
+      'Upper Body Strength',
+      'Lower Body Strength',
+      'Full Body',
+      'Push Pull Legs',
+      'Mobility & Recovery',
+    ];
+
+    adaptiveSplitTemplates.forEach((template, idx) => {
+      const friendlyName = templateTitles[idx] || template.name.replace(/^Builtin\s+/i, '');
+      if (!seenNames.has(friendlyName.toLowerCase())) {
+        seenNames.add(friendlyName.toLowerCase());
+        result.push({
+          ...template,
+          name: friendlyName,
+        });
+      }
+    });
+
+    if (result.length < 5) {
+      const fallbackTemplates: PlannedWorkout[] = [
+        {
+          id: 'ref_upper_body',
+          name: 'Upper Body Strength',
+          createdAt: '2026-01-01',
+          description: 'Build strength and muscle with compound movements and focused accessory work.',
+          goalTag: 'Upper Body',
+          exercises: [
+            { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
+            { name: 'Bent Over Row', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 155 : 70, targetUnit: userUnit },
+            { name: 'Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 95 : 42.5, targetUnit: userUnit },
+            { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
+            { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 50 : 22, targetUnit: userUnit },
+            { name: 'Dumbbell Curl', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 30 : 14, targetUnit: userUnit },
+          ],
+        },
+        {
+          id: 'ref_lower_body',
+          name: 'Lower Body Strength',
+          createdAt: '2026-01-01',
+          description: 'Maximize quad, hamstring, and glute development with heavy foundational compound lifts.',
+          goalTag: 'Lower Body',
+          exercises: [
+            { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: userUnit === 'lbs' ? 225 : 100, targetUnit: userUnit },
+            { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
+            { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 360 : 160, targetUnit: userUnit },
+            { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 40 : 18, targetUnit: userUnit },
+            { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 110 : 50, targetUnit: userUnit },
+            { name: 'Calf Raise', targetSets: 4, targetReps: 15, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
+          ],
+        },
+        {
+          id: 'ref_full_body',
+          name: 'Full Body',
+          createdAt: '2026-01-01',
+          description: 'High-efficiency total body stimulus balancing anterior and posterior athletic movement patterns.',
+          goalTag: 'Full Body',
+          exercises: [
+            { name: 'Squat', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
+            { name: 'Bench Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 165 : 75, targetUnit: userUnit },
+            { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: userUnit === 'lbs' ? 245 : 110, targetUnit: userUnit },
+            { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 85 : 40, targetUnit: userUnit },
+            { name: 'Barbell Row', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
+            { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
+          ],
+        },
+        {
+          id: 'ref_push_pull_legs',
+          name: 'Push Pull Legs',
+          createdAt: '2026-01-01',
+          description: 'Comprehensive hypertrophy split targeting pressing, pulling, and lower chain power.',
+          goalTag: 'Split Routine',
+          exercises: [
+            { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 155 : 70, targetUnit: userUnit },
+            { name: 'Dips', targetSets: 3, targetReps: 10, targetWeight: 0, targetUnit: userUnit },
+            { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 95 : 42.5, targetUnit: userUnit },
+            { name: 'Lateral Raise', targetSets: 4, targetReps: 12, targetWeight: userUnit === 'lbs' ? 25 : 12, targetUnit: userUnit },
+            { name: 'Pull-ups', targetSets: 4, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
+            { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 145 : 65, targetUnit: userUnit },
+            { name: 'Leg Press', targetSets: 4, targetReps: 10, targetWeight: userUnit === 'lbs' ? 400 : 180, targetUnit: userUnit },
+            { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
+          ],
+        },
+        {
+          id: 'ref_mobility',
+          name: 'Mobility & Recovery',
+          createdAt: '2026-01-01',
+          description: 'Active recovery, joint decompression, and core stability to accelerate athletic regeneration.',
+          goalTag: 'Recovery',
+          exercises: [
+            { name: 'Goblet Squat', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 35 : 16, targetUnit: userUnit },
+            { name: 'Front Plank (Seconds)', targetSets: 3, targetReps: 45, targetWeight: 0, targetUnit: userUnit },
+            { name: 'Hanging Knee Raise', targetSets: 3, targetReps: 12, targetWeight: 0, targetUnit: userUnit },
+            { name: 'Incline Treadmill Walk', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: userUnit },
+            { name: 'Dumbbell Walking Lunge', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 20 : 10, targetUnit: userUnit },
+          ],
+        },
+      ];
+
+      for (const fb of fallbackTemplates) {
+        if (!seenNames.has(fb.name.toLowerCase())) {
+          seenNames.add(fb.name.toLowerCase());
+          result.push(fb);
+        }
+      }
+    }
+
+    return result;
+  }, [plannedWorkouts, adaptiveSplitTemplates, userUnit]);
+
+  if (selectedDetailsPlan && !isModalOpen) {
+    return (
+      <WorkoutDetailsView
+        plan={selectedDetailsPlan}
+        onBack={() => setSelectedDetailsPlan(null)}
+        onStart={(p) => {
+          setSelectedDetailsPlan(null);
+          handleStartPlan(p);
+        }}
+        onEdit={handleEditPlan}
+        onShare={(p) => setSharingPlan(p)}
+      />
+    );
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
+  // RENDER (Screen 10 — Workout List)
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="page animate-fade-in space-y-4">
-      {/* ── Screen 4 Header (Figma Reference) ───────────────────────────── */}
-      <header className="pt-2 space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-text-muted">
-            {splitLabel}
-          </span>
-          <button
-            type="button"
-            onClick={() => setIsScheduleModalOpen(true)}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <span>Adjust plan</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
+      {/* ── Screen 10 Header (Reference: Flow Board Screen 10) ───────────── */}
+      <header className="pt-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
                 type="button"
                 onClick={goBack}
-                className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-                aria-label="Go back to previous page"
-                title="Go back"
+                className="w-10 h-10 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
+                aria-label="Go back"
               >
                 <ChevronLeft className="w-5 h-5 text-accent" />
               </button>
             )}
-            <h1 className="display-title text-3xl sm:text-4xl text-text-primary font-display leading-tight">
-              YOUR TRAINING.
+            <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
+              Train
             </h1>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             {userMode === 'advanced' && (
               <button
                 type="button"
                 onClick={() => setIsPlateModalOpen(true)}
-                className="w-9 h-9 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+                className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
                 title="Plate Calculator"
                 aria-label="Plate Calculator"
               >
@@ -1643,12 +1788,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={() => setIsToolsMenuOpen(true)}
-              className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
+              className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
               title="Training Tools & Actions"
               aria-label="Training Tools"
             >
               <SlidersHorizontal className="w-4 h-4 text-accent" />
-              <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Tools</span>
             </button>
           </div>
         </div>
@@ -1724,176 +1868,146 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── Screen 4 Weekly Summary Strip (Figma Reference) ─────────────── */}
-      <div className="card p-4 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-text-primary uppercase tracking-wide font-mono">
-            {currentWeekDateRange}
-          </span>
-          <span className="text-xs font-semibold text-text-muted font-mono">
-            {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} complete
-          </span>
-        </div>
+      {/* ── Screen 10 Workout Routines List (Reference: Flow Board Screen 10) ── */}
+      <section className="space-y-3" aria-label="Available Workout Routines">
+        {availableRoutines.map((routine) => {
+          const exCount = routine.exercises?.length || 0;
+          const duration = Math.max(30, exCount * 8);
+          const cleanName = routine.name.replace(/^Builtin\s+/i, '');
 
-        <div className="grid grid-cols-7 gap-1.5 pt-1">
-          {weeklyScheduleStats.days.map((day, idx) => (
-            <div key={idx} className="flex flex-col items-center gap-1.5">
-              <span className="text-[10px] text-text-muted font-mono font-semibold">
-                {day.short}
-              </span>
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                  day.isCompleted
-                    ? 'bg-accent text-stone-950 font-black shadow-xs'
-                    : day.isToday
-                    ? 'border-2 border-accent text-accent font-bold'
-                    : 'bg-bg-secondary text-text-muted border border-border/60'
-                }`}
-              >
-                {day.isCompleted ? (
-                  <Check className="w-3.5 h-3.5 stroke-[3]" />
-                ) : (
-                  <span className="text-[10px] font-mono text-text-muted">
-                    •
-                  </span>
-                )}
+          return (
+            <div
+              key={routine.id}
+              onClick={() => setSelectedDetailsPlan(routine)}
+              className="card p-3.5 sm:p-4 bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-xs active:scale-[0.99]"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setSelectedDetailsPlan(routine);
+                }
+              }}
+              aria-label={`View details for ${cleanName}`}
+            >
+              <div className="flex items-center gap-3.5 min-w-0">
+                <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shrink-0 group-hover:bg-accent/15 transition-colors">
+                  <Dumbbell className="w-5 h-5 text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary tracking-tight truncate group-hover:text-accent transition-colors">
+                    {cleanName}
+                  </h3>
+                  <p className="text-xs text-text-muted font-sans mt-0.5">
+                    ~{duration} min · {exCount} exercises
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <ChevronRight className="w-5 h-5 text-text-muted group-hover:text-accent transition-colors" />
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Routine Selector Pills (Screen 4 Blueprint) ──────────────────── */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        {plannedWorkouts.map((plan) => {
-          const isSelected = activeRoutinePlan?.id === plan.id;
-          const cleanName = plan.name.replace(/^Builtin\s+/i, '');
-          return (
-            <button
-              key={plan.id}
-              type="button"
-              onClick={() => setSelectedRoutineId(plan.id)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer select-none ${
-                isSelected
-                  ? 'bg-accent text-stone-950 shadow-xs'
-                  : 'bg-bg-card border border-border text-text-muted hover:text-text-primary hover:border-border-hover'
-              }`}
-            >
-              {cleanName}
-            </button>
           );
         })}
-      </div>
+      </section>
 
-      {/* ── Scheduled Workout Card (Screen 4 Hero Card) ──────────────────── */}
-      {activeRoutinePlan && (
-        <div className="card p-5 border border-border/80 bg-bg-card space-y-4 shadow-sm">
-          <div>
-            <h2 className="display-title text-2xl sm:text-3xl text-text-primary font-display leading-tight">
-              {activeRoutinePlan.name.replace(/^Builtin\s+/i, '').toUpperCase()}.
-            </h2>
-            <p className="text-xs text-text-muted font-medium mt-1 font-mono">
-              ~{Math.max(30, (activeRoutinePlan.exercises?.length || 4) * 10)} minutes / {activeRoutineExercisesWithTargets.reduce((sum, e) => sum + e.setsCount, 0)} working sets
-            </p>
-          </div>
-
-          {/* Numbered Exercise List with Prescribed Targets */}
-          <div className="divide-y divide-border/40 py-1">
-            {activeRoutineExercisesWithTargets.map((ex, idx) => (
-              <div key={idx} className="py-2.5 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xs font-mono font-bold text-accent shrink-0">
-                    {String(idx + 1).padStart(2, '0')}
-                  </span>
-                  <span className="text-sm font-bold text-text-primary truncate font-sans">
-                    {ex.name}
-                  </span>
-                </div>
-                <div className="text-xs text-text-muted font-mono shrink-0 text-right">
-                  Target ~{ex.targetWeight} {userUnit} × {ex.targetReps} <span className="text-text-secondary font-medium">({ex.setsCount} sets)</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Primary Action Button */}
-          <div className="pt-1 space-y-2">
-            <button
-              type="button"
-              className="btn-primary w-full py-3.5 px-4 text-sm font-bold flex items-center justify-center gap-2 shadow-sm"
-              onClick={() => handleStartPlan(activeRoutinePlan)}
-            >
-              <Play className="w-4 h-4 fill-stone-950 stroke-stone-950" />
-              <span>Start {activeRoutinePlan.name.replace(/^Builtin\s+/i, '')}</span>
-            </button>
-
-            <div className="flex items-center justify-between text-xs pt-1 px-1">
-              <button
-                type="button"
-                onClick={() => setIsChangeWorkoutOpen(true)}
-                className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1 cursor-pointer"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
-                <span>Change Routine / Split</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLogPastModalOpen(true)}
-                className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors py-1 cursor-pointer"
-              >
-                <Calendar className="w-3.5 h-3.5 text-accent" />
-                <span>Log Past Session</span>
-              </button>
+      {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
+      {isRestRunning && (
+        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Timer className="w-4 h-4 text-accent shrink-0" />
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-bold text-text-primary font-mono">
+                {isTimerFinished ? (
+                  <span className="text-emerald-500">READY</span>
+                ) : (
+                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
+                )}
+              </span>
+              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
             </div>
           </div>
-        </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[60, 90, 120, 180, 300].map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => startTimer(s)}
+                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
+                  restTotalSeconds === s && restSecondsLeft > 0
+                    ? 'bg-accent text-white border-accent'
+                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {s >= 60 ? `${s / 60}m` : `${s}s`}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={togglePauseTimer}
+              className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
+              title={isRestRunning ? 'Pause' : 'Start'}
+            >
+              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
+            </button>
+          </div>
+        </section>
       )}
 
-      {/* ── Recent Workouts Section (Screen 4 Blueprint) ─────────────────── */}
-      <div className="space-y-2.5 pt-1">
-        <div className="flex items-center justify-between">
-          <h3 className="section-title text-xs font-bold text-text-primary uppercase tracking-wide font-mono">
-            RECENT WORKOUTS
-          </h3>
+      {/* ── Schedule Status Footer (Reference: Screen 10 Schedule Context) ── */}
+      <section className="card p-4 bg-bg-card border border-border/80 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <span className="text-2xs font-bold text-text-muted uppercase tracking-wider font-mono block">
+              Current Split
+            </span>
+            <span className="text-sm font-bold text-text-primary font-sans">
+              {trainingProfile?.preferredSplit
+                ? trainingProfile.preferredSplit === 'push_pull_legs'
+                  ? 'Push / Pull / Legs'
+                  : trainingProfile.preferredSplit === 'upper_lower'
+                  ? 'Upper / Lower Split'
+                  : trainingProfile.preferredSplit === 'full_body'
+                  ? 'Full Body Routine'
+                  : 'Body Part Split'
+                : 'Upper / Lower Split'}
+            </span>
+            <span className="text-2xs text-text-muted block mt-0.5">
+              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} complete this week
+            </span>
+          </div>
           <button
             type="button"
-            onClick={() => setTrainSubTab('history')}
-            className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+            onClick={() => setIsScheduleModalOpen(true)}
+            className="btn-secondary py-2 px-3 text-xs font-semibold rounded-lg shrink-0 cursor-pointer"
           >
-            <span>All history</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            Adjust plan
           </button>
         </div>
 
-        {sortedWorkouts.length > 0 ? (
-          <div className="space-y-2">
-            {sortedWorkouts.slice(0, 3).map((wk) => (
-              <div
-                key={wk.id}
-                onClick={() => {
-                  setTrainSubTab('history');
-                  toggleExpand(wk.id);
-                }}
-                className="p-3.5 rounded-xl bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between cursor-pointer shadow-xs group"
-              >
-                <div>
-                  <span className="text-sm font-bold text-text-primary group-hover:text-accent transition-colors block">
-                    {wk.name}
-                  </span>
-                  <span className="text-2xs text-text-muted font-mono mt-0.5 block">
-                    {formatRelativeWorkoutTime(wk.date)} • {wk.exercises.length} exercises
-                  </span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-text-muted italic py-1">No completed workouts logged yet.</p>
-        )}
-      </div>
+        {/* Quick Tools Row: Suggested Workout & Past Session */}
+        <div className="pt-2 border-t border-border/40 flex items-center justify-between text-xs">
+          <button
+            type="button"
+            onClick={() => setIsSuggestedModalOpen(true)}
+            className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-accent" />
+            <span>Suggested Workout</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsLogPastModalOpen(true)}
+            className="text-text-muted hover:text-accent font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <Calendar className="w-3.5 h-3.5 text-accent" />
+            <span>Log Past Session</span>
+          </button>
+        </div>
+      </section>
 
-      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode - Progressive Disclosure) ── */}
+      {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode) ── */}
       {userMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
         <section className="space-y-2" aria-label="Progression Policy Recommendation">
           <div
@@ -1954,164 +2068,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           )}
         </section>
       )}
-
-      {/* ── 2. CONTEXTUAL REST TIMER (Only visible while rest is actively running) ── */}
-      {isRestRunning && (
-        <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Timer className="w-4 h-4 text-accent shrink-0" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-bold text-text-primary font-mono">
-                {isTimerFinished ? (
-                  <span className="text-emerald-500">READY</span>
-                ) : (
-                  formatTimer(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)
-                )}
-              </span>
-              <span className="text-2xs text-text-muted hidden sm:inline">Rest Timer</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[60, 90, 120, 180, 300].map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => startTimer(s)}
-                className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
-                  restTotalSeconds === s && restSecondsLeft > 0
-                    ? 'bg-accent text-white border-accent'
-                    : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
-                }`}
-              >
-                {s >= 60 ? `${s / 60}m` : `${s}s`}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={togglePauseTimer}
-              className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
-              title={isRestRunning ? 'Pause' : 'Start'}
-            >
-              {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
-            </button>
-          </div>
-        </section>
-      )}
-
-      {/* Available Workout Routines (Reference: Screen 10 in Image 1 & Image 3) */}
-      <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="section-title text-[11px] mb-0 font-sans">AVAILABLE ROUTINES</h2>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 cursor-pointer bg-accent/10 hover:bg-accent/20 px-2.5 py-1 rounded-lg border border-accent/30 transition-colors"
-              title="Generate a workout plan from your daily routine or target muscle"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-accent" />
-              <span>Suggested Workout</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsScheduleModalOpen(true)}
-              className="text-xs font-semibold text-text-secondary hover:text-text-primary hover:underline flex items-center gap-1 cursor-pointer"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Weekly Split</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Suggested Workout Highlight Card */}
-        <div className="card p-3.5 sm:p-4 bg-gradient-to-r from-accent/15 via-bg-card to-accent/5 border border-accent/40 flex items-center justify-between gap-3 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-accent/20 text-accent flex items-center justify-center shrink-0">
-              <Sparkles className="w-4 h-4" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-text-primary">Suggested Workout</p>
-              <p className="text-2xs text-text-muted">
-                {todaySessionInfo?.title && !todaySessionInfo.isRestDay
-                  ? `Today's Split: ${todaySessionInfo.title}`
-                  : 'Tailored routine from your weekly split or choose what to train'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsSuggestedModalOpen(true)}
-            className="btn-primary py-2 px-3.5 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer shadow-sm shadow-accent/20"
-          >
-            <Sparkles className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
-            <span>Generate Plan</span>
-          </button>
-        </div>
-
-        <div className="space-y-3">
-          {adaptiveSplitTemplates.map((template) => {
-            const exNames = template.exercises.map((e) => e.name);
-            const duration = Math.max(30, exNames.length * 8);
-            const bodyParts = getWorkoutBodyParts(template.exercises);
-            return (
-              <div
-                key={template.id}
-                className="card p-4 sm:p-5 bg-bg-card border border-border/80 hover:border-accent/40 transition-all space-y-3 group"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="text-base font-bold text-text-primary tracking-tight font-sans group-hover:text-accent transition-colors">
-                      {template.name.replace('Builtin ', '')}
-                    </h3>
-                    <span className="text-2xs text-text-muted font-medium mt-0.5 block">
-                      {duration} min • {exNames.length} exercises
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {bodyParts.slice(0, 2).map((bp, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-0.5 rounded-full bg-bg-secondary text-text-secondary text-3xs font-semibold border border-border/60"
-                      >
-                        {bp}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Exercises preview */}
-                <div className="flex flex-wrap gap-1.5 pt-0.5">
-                  {template.exercises.slice(0, 3).map((ex, i) => (
-                    <span
-                      key={i}
-                      className="px-2 py-0.5 rounded-lg bg-bg-secondary/60 text-text-secondary text-2xs font-medium border border-border/50"
-                    >
-                      {ex.name} ({ex.targetSets} sets)
-                    </span>
-                  ))}
-                  {template.exercises.length > 3 && (
-                    <span className="text-3xs text-text-muted self-center font-medium">
-                      +{template.exercises.length - 3} more
-                    </span>
-                  )}
-                </div>
-
-                <div className="pt-1 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleStartPlan(template)}
-                    className="btn-primary py-2 px-4 text-xs font-bold flex-1 flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
-                    <span>Start Workout</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
         </div>
       )}
 
@@ -2231,7 +2187,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           <div className="flex flex-col gap-3">
             {((showAllHistory || historyFilter.trim()) ? filteredWorkouts : filteredWorkouts.slice(0, 3)).map(workout => {
               const isExpanded = expandedWorkouts.has(workout.id);
-              const totalSets = workout.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+              const completedSetsCount = workout.exercises.reduce(
+                (sum, e) => sum + e.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped').length,
+                0
+              );
+              const totalSets = completedSetsCount > 0
+                ? completedSetsCount
+                : workout.exercises.reduce((sum, e) => sum + e.sets.length, 0);
+              const performedExercises = workout.exercises.filter(
+                (e) => e.sets.some((s) => isSetCompleted(s) || s.status === 'skipped')
+              );
+              const displayExercises = performedExercises.length > 0 ? performedExercises : workout.exercises;
 
               return (
                 <div key={workout.id} className="card">
@@ -2252,7 +2218,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         })}
                       </h3>
                       <p className="text-label text-text-secondary mt-0.5 tabular-nums">
-                        {plural(workout.exercises.length, 'exercise')} • {plural(totalSets, 'set')}
+                        {plural(displayExercises.length, 'exercise')} • {plural(totalSets, 'set')}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
@@ -2264,7 +2230,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
                   {isExpanded && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4">
-                      {workout.exercises.map((ex, i) => {
+                      {displayExercises.map((ex, i) => {
                         const effortSummary = ex.sets.some((s) => s.rpe !== undefined)
                           ? calculateSetEffortDrift(ex.sets)
                           : null;
@@ -2300,7 +2266,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             </div>
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-text-secondary">
-                              {ex.sets.map((set, j) => {
+                              {(ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped').length > 0
+                                ? ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped')
+                                : ex.sets
+                              ).map((set, j) => {
                                 const rpeVal = set.rpe;
                                 const rirVal =
                                   rpeVal !== undefined
@@ -2450,10 +2419,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
-            const durationMin = Math.max(15, Math.round((Date.now() - sessionStartTime) / 60000));
+            const durationMin = workoutEntry.durationMinutes ?? Math.round((Date.now() - sessionStartTime) / 60000);
+            const durationSec = workoutEntry.durationSeconds ?? Math.round((Date.now() - sessionStartTime) / 1000);
             setPostWorkoutSummary({
               name: startedFromPlan || 'Workout Session',
               durationMinutes: durationMin,
+              durationSeconds: durationSec,
               exercises: workoutEntry.exercises,
             });
             setIsModalOpen(false);

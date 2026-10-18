@@ -216,6 +216,132 @@ class SupabaseSyncEngine {
     }
   }
 
+  public async signInWithApple(): Promise<{ error?: string }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
+    const supabase = getSupabase();
+    if (!supabase) {
+      return {
+        error: 'Cloud authentication is not configured. Please verify Supabase credentials in your environment.',
+      };
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
+        options: {
+          redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
+      if (error) return { error: error.message };
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Apple sign-in failed' };
+    }
+  }
+
+  public async signUpWithPassword(
+    email: string,
+    password: string,
+    fullName?: string
+  ): Promise<{ error?: string; user?: AuthUser; requiresEmailVerification?: boolean }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { error: 'Cloud authentication is not configured.' };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: fullName ? { full_name: fullName.trim() } : undefined,
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+        },
+      });
+      if (error) return { error: error.message };
+      if (data.user) {
+        this.currentUser = {
+          id: data.user.id,
+          email: data.user.email,
+          name: fullName?.trim() || extractUserName(data.user),
+          isAnonymous: false,
+        };
+        this.notify();
+        const requiresEmailVerification = !data.session;
+        if (data.session) {
+          await this.triggerSyncNow();
+        }
+        return { user: this.currentUser, requiresEmailVerification };
+      }
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Sign up failed' };
+    }
+  }
+
+  public async signInWithPassword(
+    email: string,
+    password: string
+  ): Promise<{ error?: string; user?: AuthUser }> {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.removeItem('ascend_logged_out');
+      } catch {}
+    }
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { error: 'Cloud authentication is not configured.' };
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      if (error) return { error: error.message };
+      if (data.user) {
+        this.currentUser = {
+          id: data.user.id,
+          email: data.user.email,
+          name: extractUserName(data.user),
+          isAnonymous: false,
+        };
+        this.notify();
+        await this.triggerSyncNow();
+        return { user: this.currentUser };
+      }
+      return {};
+    } catch (err: any) {
+      return { error: err?.message || 'Login failed' };
+    }
+  }
+
+  public async resetPasswordForEmail(email: string): Promise<{ error?: string; success?: boolean }> {
+    const supabase = getSupabase();
+    if (!supabase) {
+      return { error: 'Cloud authentication is not configured.' };
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: typeof window !== 'undefined' ? `${window.location.origin}#reset-password` : undefined,
+      });
+      if (error) return { error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { error: err?.message || 'Password reset request failed' };
+    }
+  }
+
   public async sendEmailOtp(email: string): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {

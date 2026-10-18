@@ -168,7 +168,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       cardY,
       cardW,
       cardH,
-      `${weeklyStats.workoutsCount} SESSIONS`,
+      `${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? 'SESSION' : 'SESSIONS'}`,
       'WORKOUTS LOGGED',
       '#f97316'
     );
@@ -305,7 +305,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     const text =
       `*ASCEND — Weekly Training Recap*\n` +
       `• *Total Volume Lifted*: ${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}\n` +
-      `• *Workouts Completed*: ${weeklyStats.workoutsCount} sessions (${weeklyStats.totalSets} sets)\n` +
+      `• *Workouts Completed*: ${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? 'session' : 'sessions'} (${weeklyStats.totalSets} ${weeklyStats.totalSets === 1 ? 'set' : 'sets'})\n` +
       (weeklyStats.dotsScore > 0 ? `• *DOTS Score*: ${weeklyStats.dotsScore} (${weeklyStats.tier})\n` : '') +
       `\nTracked with ASCEND Precision Training:\nhttps://ascendtonext.vercel.app/`;
 

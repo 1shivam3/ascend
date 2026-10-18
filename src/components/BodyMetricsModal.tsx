@@ -21,6 +21,10 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
   const [weightInput, setWeightInput] = useState<string>('');
   const [heightInput, setHeightInput] = useState<string>('');
+  const [bodyFatInput, setBodyFatInput] = useState<string>('');
+  const [chestInput, setChestInput] = useState<string>('');
+  const [waistInput, setWaistInput] = useState<string>('');
+  const [hipsInput, setHipsInput] = useState<string>('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>(preferredUnit);
   const [dateInput, setDateInput] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
@@ -35,8 +39,25 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       setHeightInput(profile?.heightCm ? String(profile.heightCm) : '');
       setDateInput(getLocalTodayStr());
       setSuccessMsg('');
+
+      const latest = bodyMetrics && bodyMetrics.length > 0
+        ? [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        : null;
+
+      if (latest) {
+        setBodyFatInput(latest.bodyFatPct !== undefined ? String(latest.bodyFatPct) : '');
+        if (latest.chestIn !== undefined) {
+          setChestInput(unit === 'lbs' ? String(latest.chestIn) : (latest.chestIn * 2.54).toFixed(1));
+        }
+        if (latest.waistIn !== undefined) {
+          setWaistInput(unit === 'lbs' ? String(latest.waistIn) : (latest.waistIn * 2.54).toFixed(1));
+        }
+        if (latest.hipsIn !== undefined) {
+          setHipsInput(unit === 'lbs' ? String(latest.hipsIn) : (latest.hipsIn * 2.54).toFixed(1));
+        }
+      }
     }
-  }, [isOpen, currentWeightKg, unit, profile?.heightCm]);
+  }, [isOpen, currentWeightKg, unit, profile?.heightCm, bodyMetrics]);
 
   if (!isOpen) return null;
 
@@ -50,6 +71,19 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
         setWeightInput((currentVal / 2.20462).toFixed(1));
       }
     }
+    // Convert circumference inputs
+    const cVal = parseFloat(chestInput);
+    if (!isNaN(cVal) && cVal > 0) {
+      setChestInput(newUnit === 'lbs' ? (cVal / 2.54).toFixed(1) : (cVal * 2.54).toFixed(1));
+    }
+    const wVal = parseFloat(waistInput);
+    if (!isNaN(wVal) && wVal > 0) {
+      setWaistInput(newUnit === 'lbs' ? (wVal / 2.54).toFixed(1) : (wVal * 2.54).toFixed(1));
+    }
+    const hVal = parseFloat(hipsInput);
+    if (!isNaN(hVal) && hVal > 0) {
+      setHipsInput(newUnit === 'lbs' ? (hVal / 2.54).toFixed(1) : (hVal * 2.54).toFixed(1));
+    }
     setUnit(newUnit);
   };
 
@@ -62,7 +96,25 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     const parsedHeight = parseFloat(heightInput);
     const validHeight = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250 ? parsedHeight : profile?.heightCm;
 
-    updateBodyMetrics(finalWeightKg, validHeight);
+    const parsedFat = parseFloat(bodyFatInput);
+    const validFat = !isNaN(parsedFat) && parsedFat > 0 && parsedFat < 70 ? parsedFat : undefined;
+
+    const parsedChest = parseFloat(chestInput);
+    const validChestIn = !isNaN(parsedChest) && parsedChest > 0
+      ? (unit === 'kg' ? parsedChest / 2.54 : parsedChest)
+      : undefined;
+
+    const parsedWaist = parseFloat(waistInput);
+    const validWaistIn = !isNaN(parsedWaist) && parsedWaist > 0
+      ? (unit === 'kg' ? parsedWaist / 2.54 : parsedWaist)
+      : undefined;
+
+    const parsedHips = parseFloat(hipsInput);
+    const validHipsIn = !isNaN(parsedHips) && parsedHips > 0
+      ? (unit === 'kg' ? parsedHips / 2.54 : parsedHips)
+      : undefined;
+
+    updateBodyMetrics(finalWeightKg, validHeight, validFat, validChestIn, validWaistIn, validHipsIn);
     setSuccessMsg('Body metrics saved successfully!');
     setTimeout(() => {
       setSuccessMsg('');
@@ -190,6 +242,79 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </p>
           </div>
 
+          {/* Circumference & Body Fat Fields (Optional) */}
+          <div className="pt-2 border-t border-border/50 space-y-3">
+            <span className="section-title text-2xs font-mono uppercase text-text-muted block">
+              BODY MEASUREMENTS (OPTIONAL)
+            </span>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="modal-fat-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                  BODY FAT (%)
+                </label>
+                <input
+                  id="modal-fat-input"
+                  type="number"
+                  step="0.1"
+                  min="3"
+                  max="60"
+                  value={bodyFatInput}
+                  onChange={(e) => setBodyFatInput(e.target.value)}
+                  placeholder="12.5"
+                  className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-chest-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                  CHEST ({unit === 'lbs' ? 'IN' : 'CM'})
+                </label>
+                <input
+                  id="modal-chest-input"
+                  type="number"
+                  step="0.5"
+                  min="20"
+                  max="200"
+                  value={chestInput}
+                  onChange={(e) => setChestInput(e.target.value)}
+                  placeholder={unit === 'lbs' ? '42' : '107'}
+                  className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-waist-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                  WAIST ({unit === 'lbs' ? 'IN' : 'CM'})
+                </label>
+                <input
+                  id="modal-waist-input"
+                  type="number"
+                  step="0.5"
+                  min="20"
+                  max="200"
+                  value={waistInput}
+                  onChange={(e) => setWaistInput(e.target.value)}
+                  placeholder={unit === 'lbs' ? '32' : '81'}
+                  className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+              <div>
+                <label htmlFor="modal-hips-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                  HIPS ({unit === 'lbs' ? 'IN' : 'CM'})
+                </label>
+                <input
+                  id="modal-hips-input"
+                  type="number"
+                  step="0.5"
+                  min="20"
+                  max="200"
+                  value={hipsInput}
+                  onChange={(e) => setHipsInput(e.target.value)}
+                  placeholder={unit === 'lbs' ? '38' : '96'}
+                  className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Date Field */}
           <div>
             <label htmlFor="modal-date-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
@@ -211,7 +336,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             className="btn-primary w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Save Bodyweight</span>
+            <span>Save Measurements</span>
           </button>
         </form>
 

@@ -7,6 +7,36 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Core Named Brand Reference Tokens
+        brand: {
+          graphite: '#171916',
+          chalk: '#F3F0E7',
+          vermilion: '#E44427',
+          sage: '#858076',
+        },
+        graphite: {
+          DEFAULT: '#171916',
+          surface: '#212420',
+          elevated: '#2A2E29',
+          border: '#2C302B',
+        },
+        chalk: {
+          DEFAULT: '#F3F0E7',
+          surface: '#FFFFFF',
+          sunken: '#E8E5DC',
+          border: '#E2DFD6',
+        },
+        vermilion: {
+          DEFAULT: '#E44427',
+          dim: '#C7351B',
+          glow: 'rgba(228, 68, 39, 0.20)',
+          subtle: 'rgba(228, 68, 39, 0.12)',
+        },
+        sage: {
+          DEFAULT: '#858076',
+          dim: '#6E6A61',
+          subtle: 'rgba(133, 128, 118, 0.15)',
+        },
         bg: {
           primary: 'rgb(var(--bg-primary) / <alpha-value>)',
           secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
@@ -28,6 +58,7 @@ module.exports = {
           DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
           dim: 'rgb(var(--accent-dim) / <alpha-value>)',
           glow: 'var(--accent-glow)',
+          vermilion: '#E44427',
         },
         border: {
           DEFAULT: 'rgb(var(--border) / <alpha-value>)',
@@ -39,7 +70,7 @@ module.exports = {
         protein: '#22C55E',
         creatine: '#F5B301',
         weight: '#A78BFA',
-        success: '#10b981',
+        success: '#858076',
         warning: '#f59e0b',
         danger: '#ef4444',
         error: '#ef4444',
@@ -47,7 +78,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['var(--font-display)', 'Barlow Condensed', 'Inter', 'sans-serif'],
+        display: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {

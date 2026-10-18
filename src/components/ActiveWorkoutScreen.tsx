@@ -348,6 +348,27 @@ export default function ActiveWorkoutScreen({
   const [isRestTimerEnabled, setIsRestTimerEnabled] = useState<boolean>(true);
   const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
+  // ── Screen 13: Dedicated Set Complete Transition state ────────────────────
+  const [completedSetSummary, setCompletedSetSummary] = useState<{
+    exerciseName: string;
+    setIndex: number;
+    totalSets: number;
+    weight: number;
+    reps: number;
+    unit: string;
+    isPR?: boolean;
+  } | null>(null);
+  const [isCompletingSet, setIsCompletingSet] = useState(false);
+
+  useEffect(() => {
+    if (completedSetSummary) {
+      return registerBackHandler(() => {
+        setCompletedSetSummary(null);
+        return true;
+      }, 105);
+    }
+  }, [completedSetSummary, registerBackHandler]);
+
   // Intensity metric preference: RPE vs RIR
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'rir'>(() => {
     if (typeof window !== 'undefined') {
@@ -1086,8 +1107,13 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleCompleteActiveSet = (setIdx: number) => {
+    if (isCompletingSet) return;
+    setIsCompletingSet(true);
+    setTimeout(() => setIsCompletingSet(false), 300);
+
     setWeightInputStr(null);
-    const wasCompleted = isActiveSetCompleted(currentExercise.sets[setIdx]);
+    const targetSet = currentExercise.sets[setIdx];
+    const wasCompleted = isActiveSetCompleted(targetSet);
     const isNowCompleted = !wasCompleted;
 
     setExercises((prev) =>
@@ -1113,10 +1139,18 @@ export default function ActiveWorkoutScreen({
       triggerHaptic('set_complete');
       // Auto start rest timer
       const restDuration = defaultRestDuration;
-      setRestTotalSeconds(restDuration);
-      setRestSecondsLeft(restDuration);
-      setIsRestRunning(true);
-      setIsRestFinished(false);
+      startTimer(restDuration);
+
+      const completedW = (targetSet.weight === undefined && isCurrentBodyweight) ? 0 : (targetSet.weight ?? 0);
+      setCompletedSetSummary({
+        exerciseName: currentExercise.name || 'Exercise',
+        setIndex: setIdx,
+        totalSets: currentExercise.sets.length,
+        weight: completedW,
+        reps: targetSet.reps,
+        unit: userUnit,
+        isPR: !!targetSet.isPR,
+      });
 
       // Check if there is another set to perform in this exercise
       const remainingSets = currentExercise.sets.filter((s, j) => j !== setIdx && !isActiveSetCompleted(s));
@@ -1131,6 +1165,22 @@ export default function ActiveWorkoutScreen({
       } else {
         setShowEffortPrompt(true);
       }
+    }
+  };
+
+  const handleProceedNextSet = () => {
+    setCompletedSetSummary(null);
+    const remainingSets = currentExercise.sets.filter((s) => !isActiveSetCompleted(s));
+    if (remainingSets.length > 0) {
+      const nextIncomplete = currentExercise.sets.findIndex((s) => !isActiveSetCompleted(s));
+      if (nextIncomplete !== -1) {
+        setActiveSetIdx(nextIncomplete);
+      }
+    } else if (activeExerciseIdx < exercises.length - 1) {
+      setActiveExerciseIdx((prev) => prev + 1);
+      setActiveSetIdx(0);
+    } else {
+      setIsFinishModalOpen(true);
     }
   };
 
@@ -1365,11 +1415,17 @@ export default function ActiveWorkoutScreen({
       }
     }
 
+    const durationFormatted = elapsedSeconds < 60
+      ? `${elapsedSeconds}s`
+      : `${Math.floor(elapsedSeconds / 60)}m${elapsedSeconds % 60 > 0 ? ` ${elapsedSeconds % 60}s` : ''}`;
+
     return {
       totalVolumeKg: Math.round(totalVolumeKg),
       completedSetsCount,
       totalSetsCount,
-      durationMinutes: Math.max(1, Math.round(elapsedSeconds / 60)),
+      durationMinutes: Math.round(elapsedSeconds / 60),
+      durationSeconds: elapsedSeconds,
+      durationFormatted,
     };
   }, [exercises, elapsedSeconds]);
 
@@ -1491,12 +1547,24 @@ export default function ActiveWorkoutScreen({
       }
     }
 
+    // Only preserve exercises and sets that were actually performed or explicitly skipped
+    const executedExercises = validExercises
+      .map((ex) => ({
+        ...ex,
+        sets: ex.sets.filter((s) => isSetCompleted(s) || s.status === 'skipped'),
+      }))
+      .filter((ex) => ex.sets.length > 0);
+
+    const exercisesToSave = executedExercises.length > 0 ? executedExercises : validExercises;
+
     const workoutEntry: WorkoutEntry = {
       id: safeRandomId('wk'),
       date: today,
       name: workoutName,
       planId,
-      exercises: validExercises,
+      durationMinutes: Math.round(elapsedSeconds / 60),
+      durationSeconds: elapsedSeconds,
+      exercises: exercisesToSave,
     };
 
     setIsFinishModalOpen(false);
@@ -1923,7 +1991,7 @@ export default function ActiveWorkoutScreen({
                   aria-label={`Change or rename exercise: ${currentExercise.name || 'Untitled Exercise'}`}
                   title="Tap to change or rename exercise"
                 >
-                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#FF6B1F] transition-colors truncate">
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#E44427] transition-colors truncate">
                     {(currentExercise.name || 'Untitled Exercise').toUpperCase()}.
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
@@ -2003,7 +2071,7 @@ export default function ActiveWorkoutScreen({
                     }}
                     className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
-                        ? 'bg-[#FF6B1F] text-stone-950 font-black shadow-xs'
+                        ? 'bg-[#E44427] text-white font-black shadow-xs'
                         : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : s.status === 'skipped'
@@ -2274,32 +2342,34 @@ export default function ActiveWorkoutScreen({
                   </button>
                 </div>
 
-                {/* Giant Done Button */}
-                <button
-                  type="button"
-                  onClick={() => handleCompleteActiveSet(activeSetIdx)}
-                  className={`w-full py-4 rounded-xl text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
-                    isActiveSetCompleted(currentExercise.sets[activeSetIdx])
-                      ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                      : 'bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-black shadow-[#FF6B1F]/25'
-                  }`}
-                >
-                  <Check className="w-5 h-5 stroke-[3]" />
-                  <span>{isActiveSetCompleted(currentExercise.sets[activeSetIdx]) ? `Set ${activeSetIdx + 1} Completed` : `Complete Set ${activeSetIdx + 1}`}</span>
-                </button>
+                {/* Screen 12 Action Buttons: Skip (~35%) and Complete Set (~65%) */}
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSkipSet(activeSetIdx)}
+                    className={`w-[35%] py-3.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer active:scale-95 ${
+                      currentExercise.sets[activeSetIdx]?.status === 'skipped'
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
+                        : 'bg-bg-secondary hover:bg-bg-tertiary border-border/80 text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    <span>{currentExercise.sets[activeSetIdx]?.status === 'skipped' ? 'Unskip' : 'Skip'}</span>
+                  </button>
 
-                {/* Skip Set button */}
-                <button
-                  type="button"
-                  onClick={() => handleSkipSet(activeSetIdx)}
-                  className={`w-full py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
-                    currentExercise.sets[activeSetIdx]?.status === 'skipped'
-                      ? 'bg-amber-500/15 border-amber-500/40 text-amber-400 hover:bg-amber-500/25'
-                      : 'bg-transparent border-border/60 text-text-muted hover:text-text-primary hover:border-border'
-                  }`}
-                >
-                  <span>{currentExercise.sets[activeSetIdx]?.status === 'skipped' ? `Unskip Set ${activeSetIdx + 1}` : `Skip Set ${activeSetIdx + 1}`}</span>
-                </button>
+                  <button
+                    type="button"
+                    disabled={isCompletingSet}
+                    onClick={() => handleCompleteActiveSet(activeSetIdx)}
+                    className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
+                      isActiveSetCompleted(currentExercise.sets[activeSetIdx])
+                        ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
+                        : 'bg-[#E44427] hover:bg-[#c9361e] text-white shadow-[#E44427]/25'
+                    }`}
+                  >
+                    <Check className="w-5 h-5 stroke-[3]" />
+                    <span>{isActiveSetCompleted(currentExercise.sets[activeSetIdx]) ? `Set ${activeSetIdx + 1} Done` : `Complete Set`}</span>
+                  </button>
+                </div>
               </div>
 
             )}
@@ -2615,7 +2685,7 @@ export default function ActiveWorkoutScreen({
                 skipTimer();
                 setIsRestPopoverOpen(false);
               }}
-              className="px-2.5 py-1 rounded-lg bg-[#FF6B1F] text-stone-950 text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2.5 py-1 rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               Skip
             </button>
@@ -2705,7 +2775,7 @@ export default function ActiveWorkoutScreen({
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                           isCurrent
-                            ? 'bg-[#FF6B1F] text-stone-950'
+                            ? 'bg-[#E44427] text-white'
                             : isDone
                             ? 'bg-emerald-500 text-white'
                             : 'bg-bg-secondary text-text-muted border border-border'
@@ -2725,7 +2795,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#FF6B1F] text-stone-950">
+                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
                           Active
                         </span>
                       )}
@@ -3053,7 +3123,7 @@ export default function ActiveWorkoutScreen({
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#FF6B1F]" />
+                <Trophy className="w-5 h-5 text-[#E44427]" />
                 <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">WORKOUT COMPLETE.</h3>
               </div>
               <button
@@ -3083,7 +3153,7 @@ export default function ActiveWorkoutScreen({
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
                   <span className="text-3xs uppercase font-mono text-text-muted block">TIME</span>
                   <span className="text-lg font-black font-mono text-text-primary block mt-0.5">
-                    {sessionStats.durationMinutes}m
+                    {sessionStats.durationFormatted}
                   </span>
                 </div>
               </div>
@@ -3246,6 +3316,117 @@ export default function ActiveWorkoutScreen({
           setExercises(adaptedExercises);
         }}
       />
+
+      {/* ── Screen 13: Set Complete! Transition View (Reference: Flow Board Screen 13) ── */}
+      {completedSetSummary && (
+        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in max-w-md mx-auto">
+          {/* Top Bar with subtle workout info */}
+          <div className="flex items-center justify-between pt-2">
+            <span className="text-xs font-mono font-bold tracking-wider uppercase text-[#858076]">
+              {workoutName}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCompletedSetSummary(null)}
+              className="w-9 h-9 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+              aria-label="Dismiss set complete screen"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Center Celebratory State */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 space-y-4">
+            {/* Sage Checkmark Circle */}
+            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#858076]/20 border-2 border-[#858076] text-[#858076] flex items-center justify-center shadow-lg shadow-[#858076]/10 animate-scale-in">
+              <Check className="w-10 h-10 sm:w-12 sm:h-12 stroke-[3] text-[#858076]" />
+            </div>
+
+            <div className="space-y-1">
+              <h2 className="text-2xl sm:text-3xl font-black text-[#F3F0E7] tracking-tight font-sans">
+                Set Complete!
+              </h2>
+              <p className="text-sm font-semibold text-[#858076]">
+                {completedSetSummary.exerciseName} · Set {completedSetSummary.setIndex + 1} of {completedSetSummary.totalSets}
+              </p>
+            </div>
+
+            {/* Performance Summary Pill */}
+            <div className="px-4 py-2 rounded-xl bg-[#212420] border border-[#2C302B] inline-flex items-center gap-2 shadow-xs">
+              <span className="text-base sm:text-lg font-bold font-mono text-[#F3F0E7]">
+                {completedSetSummary.weight > 0 ? `${completedSetSummary.weight} ${completedSetSummary.unit} × ` : ''}
+                {completedSetSummary.reps} reps
+              </span>
+              {completedSetSummary.isPR && (
+                <span className="px-2 py-0.5 rounded-full bg-[#E44427] text-white text-xs font-black uppercase tracking-wider">
+                  New PR
+                </span>
+              )}
+            </div>
+
+            {/* Live Rest Timer Countdown */}
+            <div className="pt-6 pb-2 space-y-2 w-full max-w-xs">
+              <span className="text-2xs font-bold uppercase tracking-wider text-[#858076] font-mono block">
+                Rest Timer
+              </span>
+              <div className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
+                {isRestFinished
+                  ? 'Ready!'
+                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+              </div>
+
+              {/* Timer Controls */}
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(-30)}
+                  className="px-3 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                >
+                  -30s
+                </button>
+                <button
+                  type="button"
+                  onClick={togglePauseTimer}
+                  className="px-4 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                  <span>{isRestRunning ? 'Pause' : 'Resume'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => adjustTimer(30)}
+                  className="px-3 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                >
+                  +30s
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Actions: Next Set & End Workout */}
+          <div className="w-full max-w-xs mx-auto space-y-2.5 pb-2">
+            <button
+              type="button"
+              onClick={handleProceedNextSet}
+              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#E44427]/25 cursor-pointer active:scale-[0.98]"
+            >
+              <span>Next Set</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCompletedSetSummary(null);
+                setIsFinishModalOpen(true);
+              }}
+              className="w-full py-2 text-xs font-semibold text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer text-center block"
+            >
+              End Workout
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Datalist for autocomplete */}
       <datalist id="active-exercises-list">

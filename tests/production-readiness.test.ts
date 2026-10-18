@@ -158,5 +158,12 @@ describe('Production Readiness & Security Hardening Suite', () => {
       expect(content).toContain('reset()');
       expect(content).toContain("window.location.href = '/'");
     });
+
+    it('verifies capacitor.config.ts references the canonical production domain https://ascendtonext.vercel.app', () => {
+      const capPath = path.join(process.cwd(), 'capacitor.config.ts');
+      const content = fs.readFileSync(capPath, 'utf-8');
+      expect(content).toContain("url: 'https://ascendtonext.vercel.app'");
+      expect(content).not.toContain('ascend-reu004xr0-1shivam3s-projects.vercel.app');
+    });
   });
 });
