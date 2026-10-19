@@ -59,6 +59,7 @@ import {
   createWorkoutExercisesFromPlan,
   getExercisePrescription,
 } from '@/lib/workout-engine';
+import { compareSetAdherence } from '@/lib/workout-adherence';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
@@ -1326,6 +1327,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     // completed sets is saved with zero sets, not phantom planned ones.
     const exercisesToSave = getExecutedExercises(validExercises);
 
+    // Honest denominator for adherence: count prescribed sets in the FULL
+    // session (before filtering to executed), so finishing 1 of 18 sets
+    // reports 1/18 — not a re-baselined 1/1 = 100%.
+    let plannedTotalSets: number | undefined;
+    {
+      let prescribed = 0;
+      for (const ex of validExercises) {
+        for (let idx = 0; idx < (ex.sets || []).length; idx++) {
+          try {
+            if (compareSetAdherence(ex.sets[idx], ex.name || '', idx).isPrescribed) prescribed++;
+          } catch { /* treat unparseable sets as unprescribed */ }
+        }
+      }
+      if (prescribed > 0) plannedTotalSets = prescribed;
+    }
+
     const sessionDurationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
     const durationMin = Math.round(sessionDurationSeconds / 60);
 
@@ -1334,6 +1351,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       date,
       name: startedFromPlan || undefined,
       planId: startedFromPlanId || undefined,
+      plannedTotalSets,
       durationMinutes: durationMin,
       durationSeconds: sessionDurationSeconds,
       exercises: exercisesToSave,

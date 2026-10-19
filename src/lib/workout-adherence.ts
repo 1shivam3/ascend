@@ -378,5 +378,20 @@ export function calculateWorkoutAdherenceFromExercises(
  * Calculates deterministic workout adherence metrics for a finalized WorkoutEntry.
  */
 export function calculateWorkoutAdherence(workout: WorkoutEntry): WorkoutAdherenceSummary {
-  return calculateWorkoutAdherenceFromExercises(workout?.exercises || [], workout?.id);
+  const summary = calculateWorkoutAdherenceFromExercises(workout?.exercises || [], workout?.id);
+  // Honest denominator: if the session was cut short, the saved exercises only
+  // contain executed sets. plannedTotalSets (recorded at save time from the
+  // full session) restores the true baseline so 1-of-18 doesn't read as 100%.
+  const planned = typeof workout?.plannedTotalSets === 'number' ? workout.plannedTotalSets : 0;
+  if (planned > summary.totalPrescribedSets) {
+    const missing = planned - summary.totalPrescribedSets;
+    summary.totalPrescribedSets = planned;
+    summary.notAttemptedPrescribedSets += missing;
+    summary.hasPrescriptionData = true;
+    summary.setCompletionRate =
+      Math.round((summary.completedPrescribedSets / planned) * 10000) / 10000;
+    summary.setCompletionPercentage =
+      summary.setCompletionRate !== null ? Math.round(summary.setCompletionRate * 1000) / 10 : null;
+  }
+  return summary;
 }

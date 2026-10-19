@@ -87,12 +87,17 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     }
   }, [onBack, canGoBack, goBack, onNavigate]);
 
+  // Register a system-back handler only in modal mode (onBack provided), where
+  // it safely closes the modal. In full-page mode the navigation stack already
+  // handles back; registering handleBack here would recurse
+  // (handleBack -> goBack -> runBackHandlers -> handleBack ...).
   useEffect(() => {
+    if (!onBack) return;
     return registerBackHandler(() => {
       handleBack();
       return true;
     }, 50);
-  }, [registerBackHandler, handleBack]);
+  }, [registerBackHandler, handleBack, onBack]);
 
   // Sync action
   const handleManualSync = async () => {
@@ -421,7 +426,12 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           </button>
 
           {/* Import JSON */}
-          <label className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+            aria-label="Import backup file"
+          >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
                 <Upload className="w-4 h-4" />
@@ -432,14 +442,16 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json"
-              onChange={handleRestoreFile}
-              className="hidden"
-            />
-          </label>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleRestoreFile}
+            className="hidden"
+            aria-hidden="true"
+            tabIndex={-1}
+          />
 
           {/* Privacy Policy */}
           <a

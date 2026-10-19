@@ -290,6 +290,12 @@ export interface WorkoutEntry {
   name?: string;
   /** Source plan/template ID when started from or associated with a planned workout */
   planId?: string;
+  /**
+   * Total prescribed sets in the source plan at save time (before filtering to
+   * executed sets). Lets adherence reporting show honest completion (e.g. 1/18)
+   * instead of re-baselining to logged sets (1/1 = 100%).
+   */
+  plannedTotalSets?: number;
   durationMinutes?: number;
   durationSeconds?: number;
   notes?: string;

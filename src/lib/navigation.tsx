@@ -134,20 +134,33 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     };
   }, []);
 
+  // Re-entrancy guard: a back handler must never re-trigger the handler chain
+  // (e.g. SettingsView/ProfileView register `handleBack` -> `goBack`, which
+  // would infinitely recurse and collapse via try/catch into a raw
+  // window.history.back(), escaping the app). While handlers are running,
+  // nested goBack() calls skip the chain and use the default stack behavior.
+  const isRunningHandlersRef = useRef(false);
+
   // Run back handlers from highest priority to lowest
   const runBackHandlers = useCallback((): boolean => {
-    const sorted = Array.from(handlersRef.current.values()).sort((a, b) => b.priority - a.priority);
-    for (const item of sorted) {
-      try {
-        const handled = item.fn();
-        if (handled !== false) {
-          return true; // Caught and handled (e.g. modal dismissed)
+    if (isRunningHandlersRef.current) return false;
+    isRunningHandlersRef.current = true;
+    try {
+      const sorted = Array.from(handlersRef.current.values()).sort((a, b) => b.priority - a.priority);
+      for (const item of sorted) {
+        try {
+          const handled = item.fn();
+          if (handled !== false) {
+            return true; // Caught and handled (e.g. modal dismissed)
+          }
+        } catch (err) {
+          console.error('Error executing back handler:', err);
         }
-      } catch (err) {
-        console.error('Error executing back handler:', err);
       }
+      return false;
+    } finally {
+      isRunningHandlersRef.current = false;
     }
-    return false;
   }, []);
 
   // Navigate between tabs

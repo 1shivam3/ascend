@@ -380,6 +380,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       }
 
       if (field === 'quantity') {
+        // Reject zero/negative quantities explicitly instead of silently blanking.
+        if (typeof value === 'number' && !isNaN(value) && value <= 0) {
+          toast.error('Quantity must be greater than 0.', 'Invalid Quantity');
+          return prev;
+        }
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
           // prevItem must come from `prev` (pre-update): next[index] already

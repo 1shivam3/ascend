@@ -610,50 +610,24 @@ export default function BarcodeScannerModal({
                   </div>
                 )}
 
-                {/* Camera Error / Fallback display */}
+                {/* Camera Error / Fallback display — compact: manual entry lives below */}
                 {cameraError && (
-                  <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10 overflow-y-auto">
+                  <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10">
                     <AlertCircle className="w-7 h-7 text-amber-500 mb-1.5 shrink-0" />
                     <p className="text-xs text-text-primary font-medium">{cameraError}</p>
-                    <p className="text-3xs text-text-muted mt-0.5 mb-3">
-                      Enter the barcode number manually to lookup nutrition facts:
-                    </p>
-                    <div className="w-full max-w-xs space-y-2">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="e.g. 8901491101907"
-                          value={manualBarcode}
-                          onChange={(e) => setManualBarcode(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
-                          }}
-                          className="w-full bg-bg-secondary border border-border rounded-xl px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent text-center"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleBarcodeFound(manualBarcode)}
-                          disabled={!manualBarcode.trim()}
-                          className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
-                        >
-                          <Search className="w-3.5 h-3.5" /> Lookup
-                        </button>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="w-full py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={startCamera}
+                      className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
+                    </button>
                   </div>
                 )}
               </div>
 
-              {/* Manual Barcode Input Fallback */}
-              {!cameraError && (
+              {/* Manual Barcode Input Fallback — always visible */}
+              {
                 <div className="p-3 rounded-2xl bg-bg-secondary/40 border border-border/70 space-y-2">
                   <span className="text-3xs font-mono text-text-muted uppercase font-semibold block">
                     Or Enter Barcode Manually
@@ -679,7 +653,7 @@ export default function BarcodeScannerModal({
                     </button>
                   </div>
                 </div>
-              )}
+              }
             </div>
           )}
 
