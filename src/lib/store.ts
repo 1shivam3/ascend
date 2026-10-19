@@ -1915,38 +1915,16 @@ export const useAppStore = create<AppState>()(
         if (state) {
           state.setHasHydrated(true);
 
-          // Progress photos: one-time migration out of the legacy persisted
-          // blob, then lazy async load so first paint never waits on base64.
+          // Progress photos: load synchronously from the dedicated key.
+          // (Excluded from the main persist blob so startup never parses
+          // base64 dataURLs out of the big state JSON — but localStorage
+          // reads are synchronous and fast, so there's no reason to defer.)
           try {
-            const hasNewKey =
-              typeof localStorage !== 'undefined' &&
-              localStorage.getItem(PROGRESS_PHOTOS_KEY) !== null;
-            if (!hasNewKey && state.progressPhotos && state.progressPhotos.length > 0) {
-              persistProgressPhotos(state.progressPhotos);
-            }
+            const photos = loadProgressPhotosFromDisk();
+            useAppStore.setState({ progressPhotos: photos });
           } catch {
             // Best effort; photos simply start empty.
-          }
-          // Drop anything merged from a legacy blob; the async load below
-          // restores from the dedicated key after first paint.
-          useAppStore.setState({ progressPhotos: [] });
-          let photosLoaded = false;
-          const loadPhotosAsync = () => {
-            if (photosLoaded) return;
-            photosLoaded = true;
-            // Race guard: if the user added photos after rehydration (before
-            // this ran), don't clobber them with stale disk data.
-            if (useAppStore.getState().progressPhotos.length > 0) return;
-            const photos = loadProgressPhotosFromDisk();
-            if (photos.length > 0) useAppStore.setState({ progressPhotos: photos });
-          };
-          if (typeof window !== 'undefined' && typeof (window as any).requestIdleCallback === 'function') {
-            // rIC can be throttled indefinitely in background tabs — the
-            // setTimeout backstop guarantees photos eventually load.
-            (window as any).requestIdleCallback(loadPhotosAsync);
-            setTimeout(loadPhotosAsync, 1500);
-          } else {
-            setTimeout(loadPhotosAsync, 0);
+            useAppStore.setState({ progressPhotos: [] });
           }
 
           if (state.activeWorkoutDraft) {
