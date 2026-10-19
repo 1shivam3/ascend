@@ -48,6 +48,7 @@ export default function BarcodeScannerModal({
   const labelInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number | null>(null);
   const videoTrackRef = useRef<MediaStreamTrack | null>(null);
+  const watchdogRef = useRef<number | null>(null);
 
   const [hasCamera, setHasCamera] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -98,6 +99,10 @@ export default function BarcodeScannerModal({
 
   // Hard stop camera and reader controls
   const stopCamera = useCallback(() => {
+    if (watchdogRef.current !== null) {
+      clearTimeout(watchdogRef.current);
+      watchdogRef.current = null;
+    }
     if (rafRef.current !== null) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -238,9 +243,30 @@ export default function BarcodeScannerModal({
       setTorchOn(false);
 
       if (videoRef.current) {
+        // Set as DOM properties (not just JSX attributes) — required for
+        // video.play() to be allowed on mobile browsers.
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+
+      // Watchdog: play() can resolve while no frames ever render (black box).
+      // If the video element still has no data after 2.5s, stop and surface a
+      // specific error so the user gets the manual-entry fallback + retry.
+      if (watchdogRef.current !== null) clearTimeout(watchdogRef.current);
+      watchdogRef.current = window.setTimeout(() => {
+        watchdogRef.current = null;
+        const v = videoRef.current;
+        if (!v || isProcessingRef.current) return;
+        if (v.readyState < 2 || v.videoWidth === 0) {
+          stopCamera();
+          setHasCamera(false);
+          setCameraError(
+            'Camera started but no video is coming through (another app may be using the camera). You can still type the barcode manually below.'
+          );
+        }
+      }, 2500);
 
       // Fast path: OS-level detector (Chromium / Android). Any failure falls
       // through to the ZXing JS decoder below.
@@ -303,8 +329,8 @@ export default function BarcodeScannerModal({
       setHasCamera(false);
       setCameraError(
         err.name === 'NotAllowedError'
-          ? 'Camera permission denied. Please allow camera access in browser settings, or enter barcode below.'
-          : 'Unable to access camera. You can still type the barcode manually below.'
+          ? `Camera permission denied (${err.name || 'error'}). Please allow camera access in browser settings, or enter barcode below.`
+          : `Camera error (${err.name || 'unknown'}). You can still type the barcode manually below.`
       );
     }
   }, [handleBarcodeFound, toast]);
