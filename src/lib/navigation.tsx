@@ -80,20 +80,11 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
       };
     }
 
-    // Secondary fallback: check localStorage for explicitly persisted tab
-    const savedTab = localStorage.getItem('ascend_active_tab') as TabId | null;
-    const savedSubTab = localStorage.getItem('ascend_progress_subtab') as ProgressTabId | null;
-    if (savedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(savedTab)) {
-      if (savedTab === 'prs') {
-        return { tab: 'progress', progressTab: 'prs' };
-      }
-      return {
-        tab: savedTab,
-        progressTab: savedSubTab && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(savedSubTab)
-          ? savedSubTab
-          : 'overview',
-      };
-    }
+    // Fresh app launch always starts on the home tab (URL deep-links above
+    // still win). The last-visited tab is no longer restored from storage —
+    // reopening the app always lands on Home. The persist below (navigate())
+    // is kept so mid-session refreshes still write state, but it is not read
+    // on launch.
   } catch {}
 
   return { tab: 'home', progressTab: 'overview' };
