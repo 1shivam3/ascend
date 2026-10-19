@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
@@ -40,6 +41,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
+  const prs = useStore((state) => state.prs || []);
   const goals = useStore((state) => state.goals || []);
   const logout = useStore((state) => state.logout);
   const toast = useToast();
@@ -88,6 +90,22 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
   const athleteName = profile?.name ? profile.name.trim() : 'Alex';
   const athleteInitial = athleteName.charAt(0).toUpperCase();
+
+  // Real athlete tier from the strength-level system (best 1RM per exercise →
+  // per-lift levels → overall title). Falls back to INITIATE with no PRs.
+  const athleteTier = useMemo(() => {
+    const bestByExercise = new Map<string, number>();
+    for (const pr of prs) {
+      if (pr.isBaseline) continue;
+      const key = pr.exercise.toLowerCase();
+      const prev = bestByExercise.get(key) || 0;
+      if (pr.weightKg > prev) bestByExercise.set(key, pr.weightKg);
+    }
+    const levels = Array.from(bestByExercise.entries()).map(([exercise, best1RMKg]) =>
+      getLiftLevel(exercise, best1RMKg, profile?.bodyweightKg || 70, profile?.gender || 'male')
+    );
+    return getOverallLevel(levels);
+  }, [prs, profile?.bodyweightKg, profile?.gender]);
   const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : 'Local Guest Athlete';
   const userUnit = profile?.unit || 'lbs';
 
@@ -149,9 +167,18 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Avatar Circle */}
-            <div className="w-16 h-16 rounded-full bg-accent/15 border-2 border-accent/40 flex items-center justify-center font-bold text-accent text-2xl font-mono shadow-xs select-none">
-              {athleteInitial}
-            </div>
+            {profile?.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.avatar}
+                alt="Profile"
+                className="w-16 h-16 rounded-full object-cover border-2 border-accent/40 shadow-xs select-none"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-accent/15 border-2 border-accent/40 flex items-center justify-center font-bold text-accent text-2xl font-mono shadow-xs select-none">
+                {athleteInitial}
+              </div>
+            )}
 
             {/* Name & Credentials */}
             <div className="space-y-0.5">
@@ -164,7 +191,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div className="pt-1">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
-                  Athlete Tier
+                  {athleteTier.title} · Lv {athleteTier.level}
                 </span>
               </div>
             </div>

@@ -385,11 +385,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('profile')}
-            className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs"
+            className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
             title="Athlete Profile"
             aria-label="Athlete Profile"
           >
-            {athleteDisplayName.charAt(0).toUpperCase()}
+            {profile?.avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              athleteDisplayName.charAt(0).toUpperCase()
+            )}
           </button>
         </div>
       </header>

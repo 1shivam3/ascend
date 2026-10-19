@@ -141,6 +141,8 @@ export interface UserProfile {
   goals?: AthleteGoal[];
   userMode?: UserMode;
   dietPreference?: DietPreference;
+  /** Small compressed profile photo (dataURL, ~256px). */
+  avatar?: string;
 }
 
 export interface PersonalRecord {
