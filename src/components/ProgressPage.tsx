@@ -1671,7 +1671,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <Award className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text-primary">What is the DOTS Score?</h3>
+                  <h3 className="text-sm font-bold text-text-primary">What is the Strength Score?</h3>
                   <p className="text-2xs text-text-muted">Standardized pound-for-pound strength formula</p>
                 </div>
               </div>
@@ -1679,7 +1679,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 type="button"
                 onClick={() => setIsDotsInfoOpen(false)}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
-                aria-label="Close DOTS info"
+                aria-label="Close Strength Score info"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1687,7 +1687,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
             <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
               <p>
-                The <strong>DOTS formula</strong> is the official standard used by the International Powerlifting Federation (IPF). It normalizes strength against bodyweight using a polynomial curve, allowing lifters of different bodyweights and genders to fairly compare strength.
+                Your <strong>Strength Score</strong> uses the DOTS formula — the official standard of the International Powerlifting Federation (IPF). It normalizes strength against bodyweight using a polynomial curve, allowing lifters of different bodyweights and genders to fairly compare strength.
               </p>
               <div className="card p-3 bg-bg-secondary/70 border border-border/80 space-y-1 text-2xs font-mono">
                 <div className="flex justify-between py-0.5 border-b border-border/40">
