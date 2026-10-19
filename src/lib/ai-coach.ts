@@ -12,6 +12,7 @@ import {
   isSetCompleted,
 } from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
+import { getWeekDateStrings } from './formatters';
 import { buildCompactUserContext } from './ai-context';
 import { getNextSessionTarget } from './workout-engine';
 
@@ -52,28 +53,23 @@ export function getVolumeComparison(
   bodyweightKg = 75,
   targetDate: Date = new Date()
 ): { thisWeekKg: number; lastWeekKg: number; diffPercent: number } {
+  // Calendar weeks: this Mon–Sun vs last Mon–Sun.
+  const thisWeekStrs = new Set(getWeekDateStrings(targetDate));
+  const lastWeekAnchor = new Date(targetDate);
+  lastWeekAnchor.setDate(lastWeekAnchor.getDate() - 7);
+  const lastWeekStrs = new Set(getWeekDateStrings(lastWeekAnchor));
+
   let thisWeekTonnage = 0;
   let lastWeekTonnage = 0;
 
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(targetDate);
-    d.setDate(d.getDate() - i);
-    const dStr = toLocalDateString(d);
-
-    const dayWorkouts = workouts.filter((w) => w.date && w.date.startsWith(dStr));
-    for (const w of dayWorkouts) {
-      thisWeekTonnage += calculateWorkoutTonnage(w, bodyweightKg);
-    }
-  }
-
-  for (let i = 7; i < 14; i++) {
-    const d = new Date(targetDate);
-    d.setDate(d.getDate() - i);
-    const dStr = toLocalDateString(d);
-
-    const dayWorkouts = workouts.filter((w) => w.date && w.date.startsWith(dStr));
-    for (const w of dayWorkouts) {
-      lastWeekTonnage += calculateWorkoutTonnage(w, bodyweightKg);
+  for (const w of workouts) {
+    if (!w.date) continue;
+    const dStr = w.date.split('T')[0];
+    const tonnage = calculateWorkoutTonnage(w, bodyweightKg);
+    if (thisWeekStrs.has(dStr)) {
+      thisWeekTonnage += tonnage;
+    } else if (lastWeekStrs.has(dStr)) {
+      lastWeekTonnage += tonnage;
     }
   }
 

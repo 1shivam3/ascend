@@ -85,6 +85,8 @@ export interface AppState {
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
+  /** Built-in routine template IDs the user has hidden from the Plans tab */
+  hiddenBuiltinRoutineIds: string[];
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
@@ -167,6 +169,8 @@ export interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
+  hideBuiltinRoutine: (id: string) => void;
+  unhideBuiltinRoutine: (id: string) => void;
 
   // Weekly Workout Schedule & Body Parts
   weeklySchedule: WeeklySchedule;
@@ -317,6 +321,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
+  hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
   favoriteFoods: state.favoriteFoods,
   hasCompletedOnboarding: state.hasCompletedOnboarding,
   waterLogs: state.waterLogs,
@@ -354,12 +359,16 @@ export const useAppStore = create<AppState>()(
       bodyMetrics: [],
       // Progress photos stay in memory only — they are persisted separately
       // (see PROGRESS_PHOTOS_KEY) so startup never parses base64 dataURLs.
-      progressPhotos: [],
+      // Initialized from disk synchronously on the client; the rehydration
+      // callback below must NOT clear this (partialize excludes photos, so
+      // the persisted state never overwrites them).
+      progressPhotos: typeof localStorage !== 'undefined' ? loadProgressPhotosFromDisk() : [],
       theme: 'dark',
       hasCustomTheme: false,
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
+      hiddenBuiltinRoutineIds: [],
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
@@ -1015,6 +1024,16 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
+      hideBuiltinRoutine: (id) => set((state) => ({
+        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.includes(id)
+          ? state.hiddenBuiltinRoutineIds
+          : [...state.hiddenBuiltinRoutineIds, id],
+      })),
+
+      unhideBuiltinRoutine: (id) => set((state) => ({
+        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.filter((x) => x !== id),
+      })),
+
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [
           {
@@ -1604,6 +1623,7 @@ export const useAppStore = create<AppState>()(
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
+          hiddenBuiltinRoutineIds: [],
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
           waterLogs: {},
@@ -1898,30 +1918,11 @@ export const useAppStore = create<AppState>()(
         if (state) {
           state.setHasHydrated(true);
 
-          // Progress photos: one-time migration out of the legacy persisted
-          // blob, then lazy async load so first paint never waits on base64.
-          try {
-            const hasNewKey =
-              typeof localStorage !== 'undefined' &&
-              localStorage.getItem(PROGRESS_PHOTOS_KEY) !== null;
-            if (!hasNewKey && state.progressPhotos && state.progressPhotos.length > 0) {
-              persistProgressPhotos(state.progressPhotos);
-            }
-          } catch {
-            // Best effort; photos simply start empty.
-          }
-          // Drop anything merged from a legacy blob; the async load below
-          // restores from the dedicated key after first paint.
-          useAppStore.setState({ progressPhotos: [] });
-          const loadPhotosAsync = () => {
-            const photos = loadProgressPhotosFromDisk();
-            if (photos.length > 0) useAppStore.setState({ progressPhotos: photos });
-          };
-          if (typeof window !== 'undefined' && typeof (window as any).requestIdleCallback === 'function') {
-            (window as any).requestIdleCallback(loadPhotosAsync);
-          } else {
-            setTimeout(loadPhotosAsync, 0);
-          }
+          // Progress photos: already initialized from disk at store creation
+          // (see above). The persisted state excludes them via partialize,
+          // so rehydration never overwrites them — nothing to do here.
+          // (Legacy: very old blobs might contain photos; the disk key is
+          // the source of truth and already loaded.)
 
           if (state.activeWorkoutDraft) {
             const sanitizedExercises = (state.activeWorkoutDraft.exercises || []).map((ex) => ({

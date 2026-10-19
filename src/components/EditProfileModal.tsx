@@ -93,6 +93,10 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
         reader.readAsDataURL(processed.blob);
       });
       setAvatar(dataUrl);
+      // Save immediately — don't wait for the modal's Save button. The toast
+      // says "Photo Set", so the photo must actually be set, even if the user
+      // closes the modal without saving other fields.
+      setProfile({ ...profile, avatar: dataUrl });
       toast.success('Profile photo updated.', 'Photo Set');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not set the photo.', 'Upload Failed');

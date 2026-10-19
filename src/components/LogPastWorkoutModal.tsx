@@ -72,6 +72,7 @@ export default function LogPastWorkoutModal({
   const [durationMinutes, setDurationMinutes] = useState('45');
   const [notes, setNotes] = useState('');
   const [isExerciseSelectorOpen, setIsExerciseSelectorOpen] = useState(false);
+  const [quickPlanId, setQuickPlanId] = useState('');
 
   const [exercises, setExercises] = useState<WorkoutExercise[]>([
     {
@@ -135,6 +136,53 @@ export default function LogPastWorkoutModal({
 
     setExercises(loaded);
     toast.info(`Loaded ${plan.name} (${loaded.length} exercises)`, 'Template Applied');
+  };
+
+  /**
+   * One-tap "mark as complete": logs the selected planned workout as a fully
+   * completed past session on the chosen date — all prescribed sets recorded
+   * as completed with prescribed weights/reps. No manual exercise entry.
+   */
+  const handleQuickLogPlan = () => {
+    const plan = plannedWorkouts.find((p) => p.id === quickPlanId);
+    if (!plan) {
+      toast.error('Pick a workout plan first.', 'No Plan Selected');
+      return;
+    }
+    const completedExercises: WorkoutExercise[] = plan.exercises.map((pEx) => {
+      const isBW = isBodyweightExercise(pEx.name);
+      const w = isBW ? 0 : (pEx.targetWeight || (userUnit === 'lbs' ? 115 : 50));
+      const r = pEx.targetReps || 8;
+      const count = Math.max(1, pEx.targetSets || 3);
+      const sets: WorkoutSet[] = [];
+      for (let i = 0; i < count; i++) {
+        sets.push({
+          weight: w,
+          reps: r,
+          unit: userUnit,
+          rpe: 8,
+          completed: true,
+          prescribedWeight: pEx.targetWeight,
+          prescribedReps: pEx.targetReps,
+        });
+      }
+      return { name: pEx.name, sets };
+    });
+
+    const entry: WorkoutEntry = {
+      id: safeRandomId('wk'),
+      date: new Date(`${date}T12:00:00`).toISOString(),
+      name: plan.name,
+      planId: plan.id,
+      plannedTotalSets: completedExercises.reduce((n, ex) => n + ex.sets.length, 0),
+      durationMinutes: parseInt(durationMinutes, 10) || 45,
+      exercises: completedExercises,
+    };
+
+    addWorkout(entry);
+    if (onSaved) onSaved(entry);
+    toast.success(`Logged "${plan.name}" as complete (${completedExercises.length} exercises).`, 'Workout Logged');
+    onClose();
   };
 
   const handleAddExerciseFromLibrary = (selected: { name: string; isBodyweight: boolean; defaultWeightKg?: number; defaultReps?: number }) => {
@@ -453,6 +501,40 @@ export default function LogPastWorkoutModal({
             {/* Meta Row: Date, Duration, Session Name */}
             <div className="p-3.5 rounded-2xl bg-bg-secondary/40 border border-border/60 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Quick Log: mark a planned workout complete in one tap */}
+                {plannedWorkouts.length > 0 && (
+                  <div className="sm:col-span-3 p-3 rounded-xl bg-accent/5 border border-accent/25 space-y-2">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent block">
+                      Quick Log — Mark Plan Complete
+                    </span>
+                    <div className="flex gap-2">
+                      <select
+                        value={quickPlanId}
+                        onChange={(e) => setQuickPlanId(e.target.value)}
+                        className="flex-1 bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-semibold text-text-primary outline-none focus:border-accent"
+                        aria-label="Choose a planned workout to log as complete"
+                      >
+                        <option value="">Choose a workout…</option>
+                        {plannedWorkouts.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} ({p.exercises.length} exercises)
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={handleQuickLogPlan}
+                        disabled={!quickPlanId}
+                        className="btn-primary px-4 py-2 text-xs font-bold disabled:opacity-40 shrink-0"
+                      >
+                        Log as Complete
+                      </button>
+                    </div>
+                    <p className="text-3xs text-text-muted">
+                      Logs every prescribed set as completed on the date above — no manual entry needed.
+                    </p>
+                  </div>
+                )}
                 {/* Date */}
                 <div>
                   <div className="flex items-center justify-between mb-1">

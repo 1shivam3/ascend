@@ -33,7 +33,7 @@ const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
-import { getTimeGreeting } from '@/lib/formatters';
+import { getTimeGreeting, getWeekDateStrings } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
 import { getDailyQuote } from '@/lib/quotes';
@@ -117,22 +117,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return days;
   }, [workouts, today]);
 
-  // Last-7-days consistency dots (rolling, ending today) — compact glanceable
-  // version of the Progress > Consistency view, reusing the same workout-days logic.
+  // Current-week consistency dots (Monday–Sunday) — compact glanceable version
+  // of the Progress > Consistency view, reusing the same workout-days logic.
   const last7Days = useMemo(() => {
     const workoutDays = new Set(workouts.map((w) => w.date.split('T')[0]));
-    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(d.getDate() - (6 - i));
-      const dStr = toLocalDateString(d);
-      return {
-        label: labels[d.getDay()],
-        dateStr: dStr,
-        isToday: dStr === todayStr,
-        completed: workoutDays.has(dStr),
-      };
-    });
+    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    return getWeekDateStrings(today).map((dStr, i) => ({
+      label: labels[i],
+      dateStr: dStr,
+      isToday: dStr === todayStr,
+      completed: workoutDays.has(dStr),
+    }));
   }, [workouts, today, todayStr]);
   const weekCompletedCount = last7Days.filter((d) => d.completed).length;
 
