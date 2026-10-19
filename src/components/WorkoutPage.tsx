@@ -1434,6 +1434,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         exercises: planData.exercises,
       });
       toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
+      // If the edited plan is open in the detail view, refresh it so the
+      // view reflects the saved changes instead of the stale snapshot.
+      if (selectedDetailsPlan && selectedDetailsPlan.id === editingPlan.id) {
+        const refreshed = useStore.getState().plannedWorkouts.find((p) => p.id === editingPlan.id);
+        if (refreshed) setSelectedDetailsPlan(refreshed);
+      }
     } else {
       const newPlan: PlannedWorkout = {
         id: safeRandomId('plan'),
@@ -1487,6 +1493,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     deletePlannedWorkout(plan.id);
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
     setPlanToDelete(null);
+    // If the deleted plan was open in the detail view, close that view too.
+    if (selectedDetailsPlan && selectedDetailsPlan.id === plan.id) {
+      setSelectedDetailsPlan(null);
+    }
   };
 
   const handleDuplicatePlan = (plan: PlannedWorkout) => {
@@ -1800,18 +1810,65 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return result;
   }, [plannedWorkouts, adaptiveSplitTemplates, userUnit]);
 
+  // NOTE: the plan detail view replaces the main list render, but the modals
+  // below MUST stay mounted — Share/Edit/Delete are all reachable from the
+  // detail view's top bar. (Previously the early return skipped them, so
+  // tapping Share/Edit silently armed the modal state and it popped open
+  // only after going Back — and Delete had no entry point at all.)
   if (selectedDetailsPlan && !isModalOpen) {
     return (
-      <WorkoutDetailsView
-        plan={selectedDetailsPlan}
-        onBack={() => setSelectedDetailsPlan(null)}
-        onStart={(p) => {
-          setSelectedDetailsPlan(null);
-          handleStartPlan(p);
-        }}
-        onEdit={handleEditPlan}
-        onShare={(p) => setSharingPlan(p)}
-      />
+      <>
+        <WorkoutDetailsView
+          plan={selectedDetailsPlan}
+          onBack={() => setSelectedDetailsPlan(null)}
+          onStart={(p) => {
+            setSelectedDetailsPlan(null);
+            handleStartPlan(p);
+          }}
+          onEdit={handleEditPlan}
+          onShare={(p) => setSharingPlan(p)}
+          onDelete={(p) => setPlanToDelete(p)}
+        />
+
+        {/* ── Plan Delete Confirmation (also reachable from detail view) ─── */}
+        <ConfirmationModal
+          isOpen={!!planToDelete}
+          onClose={() => setPlanToDelete(null)}
+          onConfirm={confirmDeletePlan}
+          title="Delete this plan?"
+          message={
+            planToDelete &&
+            activeWorkoutDraft &&
+            (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
+              activeWorkoutDraft.planId === planToDelete.id)
+              ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+              : planToDelete
+                ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+                : ''
+          }
+          confirmText="Delete Plan"
+          cancelText="Keep"
+          variant="danger"
+        />
+
+        {/* ── Plan Create/Edit Modal (also reachable from detail view) ───── */}
+        <PlanModal
+          isOpen={isPlanModalOpen}
+          onClose={() => { setIsPlanModalOpen(false); setEditingPlan(null); }}
+          initial={editingPlan}
+          availableExercises={availableExercises}
+          userUnit={userUnit}
+          defaultTargetReps={defaultTargetReps}
+          onSave={handleSavePlan}
+        />
+
+        {/* ── Share Program Modal (also reachable from detail view) ───────── */}
+        <ShareProgramModal
+          plan={sharingPlan}
+          isOpen={Boolean(sharingPlan)}
+          onClose={() => setSharingPlan(null)}
+        />
+      </>
     );
   }
 
