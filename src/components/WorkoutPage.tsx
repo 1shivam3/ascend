@@ -1520,6 +1520,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
     }
     deletePlannedWorkout(plan.id);
+    // If the deleted plan was a built-in template (onboarding saves templates
+    // as plans with their builtin_* ids), hide the template too — otherwise
+    // it would immediately reappear under BUILT-IN ROUTINES.
+    if (/^builtin_|^ref_/.test(plan.id)) {
+      hideBuiltinRoutine(plan.id);
+    }
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
     setPlanToDelete(null);
     // If the deleted plan was open in the detail view, close that view too.
