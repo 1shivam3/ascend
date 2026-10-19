@@ -12,6 +12,12 @@ import {
   Dumbbell,
   Settings,
   Sparkles,
+  Utensils,
+  Barcode,
+  Scale,
+  Trophy,
+  Flame,
+  Droplets,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
@@ -21,13 +27,16 @@ const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkou
 const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
 const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
 const PostWorkoutTakeModal = dynamic(() => import('@/components/PostWorkoutTakeModal'), { ssr: false });
+const BarcodeScannerModal = dynamic(() => import('@/components/BarcodeScannerModal'), { ssr: false });
+const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), { ssr: false });
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros } from '@/lib/macros';
 import { toLocalDateString } from '@/lib/habits';
 import { getTimeGreeting } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
-import { PlannedWorkout, PlannedExercise, DayOfWeek } from '@/lib/types';
+import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
+import { getDailyQuote } from '@/lib/quotes';
 import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 
@@ -50,6 +59,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     weeklySchedule,
     setDaySchedule,
     theme,
+    waterLogs,
+    hydrationConfig,
+    logWater,
+    addMeal,
   } = useStore();
 
   const toast = useToast();
@@ -86,12 +99,63 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return todayWks[todayWks.length - 1] || null;
   }, [workouts, todayStr]);
 
+  // Consecutive-day workout streak (counts back from today, or yesterday if
+  // today has no workout yet) — same logic as Progress consistency view.
+  const streakDays = useMemo(() => {
+    const workoutDays = new Set(workouts.map((w) => w.date.split('T')[0]));
+    let days = 0;
+    const d = new Date(today);
+    if (!workoutDays.has(toLocalDateString(d))) d.setDate(d.getDate() - 1);
+    while (days < 365) {
+      if (workoutDays.has(toLocalDateString(d))) {
+        days++;
+        d.setDate(d.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+    return days;
+  }, [workouts, today]);
+
+  // Rotating motivational quote, personalized by gender when known.
+  const dailyQuote = useMemo(() => getDailyQuote(profile?.gender ?? null), [profile?.gender]);
+
+  // Most recent personal record (hidden when the athlete has none).
+  const latestPr = useMemo(() => {
+    if (!prs || prs.length === 0) return null;
+    return [...prs].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+  }, [prs]);
+  const latestPrWeight = latestPr
+    ? userUnit === 'kg'
+      ? `${latestPr.weightKg} kg`
+      : `${latestPr.weightLbs} lbs`
+    : '';
+
+  // Hydration quick-add state for today.
+  const todayWaterMl = waterLogs?.[todayStr] || 0;
+  const hydrationTargetMl = hydrationConfig?.dailyTargetMl || 2700;
+  const hydrationPct = Math.min(100, Math.round((todayWaterMl / hydrationTargetMl) * 100));
+
+  // Scanned barcode food → logged straight to today's meals.
+  const handleAddScannedFoodFromHome = (scannedItem: FoodItem) => {
+    const newMeal: MealEntry = {
+      id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
+      date: todayStr,
+      name: scannedItem.name,
+      foods: [scannedItem],
+    };
+    addMeal(newMeal);
+    toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal)!`, 'Scanned Food Logged');
+  };
+
   // Modal triggers
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isCompletedWorkoutModalOpen, setIsCompletedWorkoutModalOpen] = useState(false);
 
@@ -127,6 +191,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsCompletedWorkoutModalOpen(false); return true; }, 100);
     }
   }, [isCompletedWorkoutModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isBarcodeModalOpen) {
+      return registerBackHandler(() => { setIsBarcodeModalOpen(false); return true; }, 100);
+    }
+  }, [isBarcodeModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isWeightModalOpen) {
+      return registerBackHandler(() => { setIsWeightModalOpen(false); return true; }, 100);
+    }
+  }, [isWeightModalOpen, registerBackHandler]);
 
   // Routine selection handler (satisfies plan-sync test contract)
   const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
@@ -401,6 +477,131 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
+      {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-4 gap-2.5">
+        <button
+          type="button"
+          onClick={() => onNavigate('meals')}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Utensils className="w-4 h-4" />
+          </span>
+          <span className="text-3xs font-semibold text-text-secondary">Log Meal</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsBarcodeModalOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Barcode className="w-4 h-4" />
+          </span>
+          <span className="text-3xs font-semibold text-text-secondary">Scan</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsWeightModalOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Scale className="w-4 h-4" />
+          </span>
+          <span className="text-3xs font-semibold text-text-secondary">Weight</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleStartWorkoutFromHome()}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Play className="w-4 h-4" />
+          </span>
+          <span className="text-3xs font-semibold text-text-secondary">Workout</span>
+        </button>
+      </div>
+
+      {/* ── 6. HYDRATION QUICK-ADD ───────────────────────────────────────── */}
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center">
+              <Droplets className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-xs font-bold text-text-primary">Hydration</p>
+              <p className="text-3xs text-text-muted tabular-nums">
+                {(todayWaterMl / 1000).toFixed(1)} / {(hydrationTargetMl / 1000).toFixed(1)} L today
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                logWater(250);
+                toast.success('+250 ml logged', 'Hydration Updated');
+              }}
+              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+            >
+              +250
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                logWater(500);
+                toast.success('+500 ml logged', 'Hydration Updated');
+              }}
+              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+            >
+              +500
+            </button>
+          </div>
+        </div>
+        <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-3">
+          <div
+            className="h-full rounded-full bg-sky-500 transition-all duration-500"
+            style={{ width: `${hydrationPct}%` }}
+          />
+        </div>
+      </div>
+
+      {/* ── 7. STREAK + QUOTE ────────────────────────────────────────────── */}
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Flame className="w-4 h-4" />
+          </span>
+          <p className="text-xs font-bold text-text-primary">
+            {streakDays > 0
+              ? `${streakDays} day${streakDays === 1 ? '' : 's'} streak — keep it burning`
+              : 'Start your streak with today\'s workout'}
+          </p>
+        </div>
+        <p className="text-xs text-text-muted italic mt-2 leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
+        <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
+      </div>
+
+      {/* ── 8. LATEST PR (hidden when none) ─────────────────────────────── */}
+      {latestPr && (
+        <button
+          type="button"
+          onClick={() => onNavigate('progress')}
+          className="w-full bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex items-center gap-3 text-left active:scale-[0.99] transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+            <Trophy className="w-4 h-4" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-3xs font-mono text-text-muted uppercase tracking-wider">Latest PR</p>
+            <p className="text-xs font-bold text-text-primary truncate">
+              {latestPr.exercise} · {latestPrWeight} × {latestPr.reps}
+            </p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
+        </button>
+      )}
+
       {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
       {isNotificationsOpen && (
         <div className="modal-overlay" onClick={() => setIsNotificationsOpen(false)}>
@@ -625,6 +826,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <ScanMealModal
         isOpen={isScanMealModalOpen}
         onClose={() => setIsScanMealModalOpen(false)}
+      />
+
+      {/* ── BARCODE SCANNER MODAL (Quick Action) ───────────────────────────── */}
+      {isBarcodeModalOpen && (
+        <BarcodeScannerModal
+          isOpen={isBarcodeModalOpen}
+          onClose={() => setIsBarcodeModalOpen(false)}
+          onAddFood={handleAddScannedFoodFromHome}
+        />
+      )}
+
+      {/* ── LOG WEIGHT MODAL (Quick Action) ────────────────────────────────── */}
+      <BodyMetricsModal
+        isOpen={isWeightModalOpen}
+        onClose={() => setIsWeightModalOpen(false)}
       />
 
       {/* ── COMPLETED WORKOUT DETAIL MODAL ─────────────────────────────────── */}
