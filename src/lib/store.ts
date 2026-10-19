@@ -359,7 +359,10 @@ export const useAppStore = create<AppState>()(
       bodyMetrics: [],
       // Progress photos stay in memory only — they are persisted separately
       // (see PROGRESS_PHOTOS_KEY) so startup never parses base64 dataURLs.
-      progressPhotos: [],
+      // Initialized from disk synchronously on the client; the rehydration
+      // callback below must NOT clear this (partialize excludes photos, so
+      // the persisted state never overwrites them).
+      progressPhotos: typeof localStorage !== 'undefined' ? loadProgressPhotosFromDisk() : [],
       theme: 'dark',
       hasCustomTheme: false,
       prTargets: {},
@@ -1915,17 +1918,11 @@ export const useAppStore = create<AppState>()(
         if (state) {
           state.setHasHydrated(true);
 
-          // Progress photos: load synchronously from the dedicated key.
-          // (Excluded from the main persist blob so startup never parses
-          // base64 dataURLs out of the big state JSON — but localStorage
-          // reads are synchronous and fast, so there's no reason to defer.)
-          try {
-            const photos = loadProgressPhotosFromDisk();
-            useAppStore.setState({ progressPhotos: photos });
-          } catch {
-            // Best effort; photos simply start empty.
-            useAppStore.setState({ progressPhotos: [] });
-          }
+          // Progress photos: already initialized from disk at store creation
+          // (see above). The persisted state excludes them via partialize,
+          // so rehydration never overwrites them — nothing to do here.
+          // (Legacy: very old blobs might contain photos; the disk key is
+          // the source of truth and already loaded.)
 
           if (state.activeWorkoutDraft) {
             const sanitizedExercises = (state.activeWorkoutDraft.exercises || []).map((ex) => ({
