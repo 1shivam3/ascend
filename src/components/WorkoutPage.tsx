@@ -413,9 +413,10 @@ interface PlanCardProps {
   onDelete: () => void;
   onShare: () => void;
   onDuplicate: () => void;
+  onOpen: () => void;
 }
 
-function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: PlanCardProps) {
+function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -424,7 +425,14 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
     <div className="card flex flex-col gap-3">
       {/* Card top row */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div
+          className="min-w-0 cursor-pointer"
+          onClick={onOpen}
+          role="button"
+          tabIndex={0}
+          aria-label={`View details for ${plan.name}`}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+        >
           <h3 className="font-bold text-text-primary line-clamp-2 leading-tight">{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
@@ -1831,43 +1839,52 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         />
 
         {/* ── Plan Delete Confirmation (also reachable from detail view) ─── */}
-        <ConfirmationModal
-          isOpen={!!planToDelete}
-          onClose={() => setPlanToDelete(null)}
-          onConfirm={confirmDeletePlan}
-          title="Delete this plan?"
-          message={
-            planToDelete &&
-            activeWorkoutDraft &&
-            (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
-              activeWorkoutDraft.planId === planToDelete.id)
-              ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
-              : planToDelete
-                ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
-                : ''
-          }
-          confirmText="Delete Plan"
-          cancelText="Keep"
-          variant="danger"
-        />
+        {/* NOTE: these overlays must sit above the detail view itself (z-[60]),
+            so each is wrapped in a z-[70] stacking context. Without this the
+            modals render *behind* the detail page. */}
+        <div className="relative z-[70]">
+          <ConfirmationModal
+            isOpen={!!planToDelete}
+            onClose={() => setPlanToDelete(null)}
+            onConfirm={confirmDeletePlan}
+            title="Delete this plan?"
+            message={
+              planToDelete &&
+              activeWorkoutDraft &&
+              (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
+                activeWorkoutDraft.planId === planToDelete.id)
+                ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+                : planToDelete
+                  ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+                  : ''
+            }
+            confirmText="Delete Plan"
+            cancelText="Keep"
+            variant="danger"
+          />
+        </div>
 
         {/* ── Plan Create/Edit Modal (also reachable from detail view) ───── */}
-        <PlanModal
-          isOpen={isPlanModalOpen}
-          onClose={() => { setIsPlanModalOpen(false); setEditingPlan(null); }}
-          initial={editingPlan}
-          availableExercises={availableExercises}
-          userUnit={userUnit}
-          defaultTargetReps={defaultTargetReps}
-          onSave={handleSavePlan}
-        />
+        <div className="relative z-[70]">
+          <PlanModal
+            isOpen={isPlanModalOpen}
+            onClose={() => { setIsPlanModalOpen(false); setEditingPlan(null); }}
+            initial={editingPlan}
+            availableExercises={availableExercises}
+            userUnit={userUnit}
+            defaultTargetReps={defaultTargetReps}
+            onSave={handleSavePlan}
+          />
+        </div>
 
         {/* ── Share Program Modal (also reachable from detail view) ───────── */}
-        <ShareProgramModal
-          plan={sharingPlan}
-          isOpen={Boolean(sharingPlan)}
-          onClose={() => setSharingPlan(null)}
-        />
+        <div className="relative z-[70]">
+          <ShareProgramModal
+            plan={sharingPlan}
+            isOpen={Boolean(sharingPlan)}
+            onClose={() => setSharingPlan(null)}
+          />
+        </div>
       </>
     );
   }
@@ -2258,6 +2275,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     onDelete={() => handleDeletePlan(plan)}
                     onShare={() => setSharingPlan(plan)}
                     onDuplicate={() => handleDuplicatePlan(plan)}
+                    onOpen={() => setSelectedDetailsPlan(plan)}
                   />
                 ))}
               </div>
