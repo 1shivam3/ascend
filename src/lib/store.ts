@@ -267,6 +267,83 @@ const DEFAULT_FAVORITE_FOODS: FavoriteFood[] = [
   { id: 'fav_eggs', name: 'Eggs', defaultQuantity: 2, unit: 'piece', calories: 155, proteinG: 13, carbsG: 1.1, fatG: 11 },
 ];
 
+/**
+ * Progress photos (base64 dataURLs, up to 24 × ~150KB) live OUTSIDE the
+ * zustand persist blob in their own localStorage key. The main `ascend_store`
+ * blob is parsed synchronously before first paint — keeping megabytes of
+ * photo data out of it is what keeps app startup fast. Photos load lazily
+ * after rehydration; components keep reading `useStore(s => s.progressPhotos)`
+ * unchanged. The key is under the `ascend_` prefix so "Delete WebApp Data &
+ * Reset" purges it like everything else.
+ */
+export const PROGRESS_PHOTOS_KEY = 'ascend_progress_photos_v1';
+const MAX_PROGRESS_PHOTOS = 24;
+
+function persistProgressPhotos(photos: ProgressPhoto[]): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(PROGRESS_PHOTOS_KEY, JSON.stringify(photos.slice(0, MAX_PROGRESS_PHOTOS)));
+  } catch {
+    // Quota exceeded: photos stay in memory for this session.
+  }
+}
+
+function loadProgressPhotosFromDisk(): ProgressPhoto[] {
+  if (typeof localStorage === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PROGRESS_PHOTOS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_PROGRESS_PHOTOS) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Fields written to the synchronous zustand persist blob.
+ * Progress photos are deliberately EXCLUDED (see PROGRESS_PHOTOS_KEY):
+ * their base64 dataURLs would make every startup JSON.parse megabytes.
+ */
+export function partializeAppState(state: AppState): Record<string, unknown> {
+  return {
+  profile: state.profile,
+  prs: state.prs,
+  workouts: state.workouts,
+  meals: state.meals,
+  bodyMetrics: state.bodyMetrics,
+  theme: state.theme,
+  hasCustomTheme: state.hasCustomTheme,
+  prTargets: state.prTargets,
+  macroGoals: state.macroGoals,
+  plannedWorkouts: state.plannedWorkouts,
+  favoriteFoods: state.favoriteFoods,
+  hasCompletedOnboarding: state.hasCompletedOnboarding,
+  waterLogs: state.waterLogs,
+  waterBatches: state.waterBatches,
+  hydrationConfig: state.hydrationConfig,
+  creatineLogs: state.creatineLogs,
+  creatineConfig: state.creatineConfig,
+  creatineSupply: state.creatineSupply,
+  dayTypeOverrides: state.dayTypeOverrides,
+  gymLogs: state.gymLogs,
+  aiInsightsCache: state.aiInsightsCache,
+  trainingProfile: state.trainingProfile,
+  todaysAIWorkoutPlan: state.todaysAIWorkoutPlan,
+  latestWeeklyReview: state.latestWeeklyReview,
+  trainingDecisions: state.trainingDecisions,
+  decisionsLedgerHistory: state.decisionsLedgerHistory,
+  lifterProfile: state.lifterProfile,
+  policyDecisionRecords: state.policyDecisionRecords,
+  policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
+  policyDecisionApplications: state.policyDecisionApplications,
+  goals: state.goals,
+  userMode: state.userMode,
+  weeklySchedule: state.weeklySchedule,
+  activeWorkoutDraft: state.activeWorkoutDraft,
+  };
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -275,6 +352,8 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       meals: [],
       bodyMetrics: [],
+      // Progress photos stay in memory only — they are persisted separately
+      // (see PROGRESS_PHOTOS_KEY) so startup never parses base64 dataURLs.
       progressPhotos: [],
       theme: 'dark',
       hasCustomTheme: false,
@@ -786,11 +865,18 @@ export const useAppStore = create<AppState>()(
       })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
       // Progress photos are downscaled (~800px JPEG) before storage; cap the
-      // count so localStorage stays healthy.
-      addProgressPhoto: (photo) => set((state) => ({
-        progressPhotos: [photo, ...state.progressPhotos].slice(0, 24),
-      })),
-      removeProgressPhoto: (id) => set((state) => ({ progressPhotos: state.progressPhotos.filter(p => p.id !== id) })),
+      // count so localStorage stays healthy. Persisted to their own key
+      // (not the zustand blob) — see PROGRESS_PHOTOS_KEY.
+      addProgressPhoto: (photo) => set((state) => {
+        const next = [photo, ...state.progressPhotos].slice(0, MAX_PROGRESS_PHOTOS);
+        persistProgressPhotos(next);
+        return { progressPhotos: next };
+      }),
+      removeProgressPhoto: (id) => set((state) => {
+        const next = state.progressPhotos.filter(p => p.id !== id);
+        persistProgressPhotos(next);
+        return { progressPhotos: next };
+      }),
       updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn) => set((state) => {
         const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
@@ -1514,6 +1600,7 @@ export const useAppStore = create<AppState>()(
           workouts: [],
           meals: [],
           bodyMetrics: [],
+          progressPhotos: [],
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
@@ -1811,6 +1898,31 @@ export const useAppStore = create<AppState>()(
         if (state) {
           state.setHasHydrated(true);
 
+          // Progress photos: one-time migration out of the legacy persisted
+          // blob, then lazy async load so first paint never waits on base64.
+          try {
+            const hasNewKey =
+              typeof localStorage !== 'undefined' &&
+              localStorage.getItem(PROGRESS_PHOTOS_KEY) !== null;
+            if (!hasNewKey && state.progressPhotos && state.progressPhotos.length > 0) {
+              persistProgressPhotos(state.progressPhotos);
+            }
+          } catch {
+            // Best effort; photos simply start empty.
+          }
+          // Drop anything merged from a legacy blob; the async load below
+          // restores from the dedicated key after first paint.
+          useAppStore.setState({ progressPhotos: [] });
+          const loadPhotosAsync = () => {
+            const photos = loadProgressPhotosFromDisk();
+            if (photos.length > 0) useAppStore.setState({ progressPhotos: photos });
+          };
+          if (typeof window !== 'undefined' && typeof (window as any).requestIdleCallback === 'function') {
+            (window as any).requestIdleCallback(loadPhotosAsync);
+          } else {
+            setTimeout(loadPhotosAsync, 0);
+          }
+
           if (state.activeWorkoutDraft) {
             const sanitizedExercises = (state.activeWorkoutDraft.exercises || []).map((ex) => ({
               ...ex,
@@ -1991,43 +2103,7 @@ export const useAppStore = create<AppState>()(
           }
         }
       },
-      partialize: (state) => ({ 
-        profile: state.profile,
-        prs: state.prs,
-        workouts: state.workouts,
-        meals: state.meals,
-        bodyMetrics: state.bodyMetrics,
-        progressPhotos: state.progressPhotos,
-        theme: state.theme,
-        hasCustomTheme: state.hasCustomTheme,
-        prTargets: state.prTargets,
-        macroGoals: state.macroGoals,
-        plannedWorkouts: state.plannedWorkouts,
-        favoriteFoods: state.favoriteFoods,
-        hasCompletedOnboarding: state.hasCompletedOnboarding,
-        waterLogs: state.waterLogs,
-        waterBatches: state.waterBatches,
-        hydrationConfig: state.hydrationConfig,
-        creatineLogs: state.creatineLogs,
-        creatineConfig: state.creatineConfig,
-        creatineSupply: state.creatineSupply,
-        dayTypeOverrides: state.dayTypeOverrides,
-        gymLogs: state.gymLogs,
-        aiInsightsCache: state.aiInsightsCache,
-        trainingProfile: state.trainingProfile,
-        todaysAIWorkoutPlan: state.todaysAIWorkoutPlan,
-        latestWeeklyReview: state.latestWeeklyReview,
-        trainingDecisions: state.trainingDecisions,
-        decisionsLedgerHistory: state.decisionsLedgerHistory,
-        lifterProfile: state.lifterProfile,
-        policyDecisionRecords: state.policyDecisionRecords,
-        policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
-        policyDecisionApplications: state.policyDecisionApplications,
-        goals: state.goals,
-        userMode: state.userMode,
-        weeklySchedule: state.weeklySchedule,
-        activeWorkoutDraft: state.activeWorkoutDraft,
-      })
+      partialize: partializeAppState,
     }
   )
 );
