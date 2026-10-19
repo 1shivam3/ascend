@@ -15,10 +15,12 @@ import {
   Barcode as BarcodeIcon,
   ChevronRight,
   Utensils,
+  Flashlight,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
+import { selectScannerEngine, NATIVE_BARCODE_FORMATS } from '@/lib/barcode-scanner';
 import { saveCustomBarcode } from '@/lib/storage';
 import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
@@ -44,10 +46,15 @@ export default function BarcodeScannerModal({
   const controlsRef = useRef<any>(null);
   const isProcessingRef = useRef<boolean>(false);
   const labelInputRef = useRef<HTMLInputElement>(null);
+  const rafRef = useRef<number | null>(null);
+  const videoTrackRef = useRef<MediaStreamTrack | null>(null);
 
   const [hasCamera, setHasCamera] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const [manualBarcode, setManualBarcode] = useState('');
   const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [isScanningLabel, setIsScanningLabel] = useState(false);
@@ -91,6 +98,10 @@ export default function BarcodeScannerModal({
 
   // Hard stop camera and reader controls
   const stopCamera = useCallback(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     if (controlsRef.current) {
       try {
         controlsRef.current.stop();
@@ -101,10 +112,14 @@ export default function BarcodeScannerModal({
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
+    videoTrackRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
     setIsScanning(false);
+    setIsStartingCamera(false);
+    setTorchOn(false);
+    setTorchSupported(false);
   }, []);
 
   // Handle scanned barcode lookup (ONE TIME scan trigger)
@@ -180,30 +195,87 @@ export default function BarcodeScannerModal({
   }, [playScanFeedback, stopCamera]);
 
 
-  // Start Camera with ZXing and capture scanner controls
+  // Toggle the camera flashlight (only when the track reports torch support)
+  const toggleTorch = useCallback(async () => {
+    const track = videoTrackRef.current;
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as unknown as MediaTrackConstraintSet],
+      });
+      setTorchOn(next);
+    } catch {
+      toast.error('Flashlight is not available on this camera.', 'Torch');
+    }
+  }, [torchOn, toast]);
+
+  // Start Camera: native BarcodeDetector fast path, ZXing fallback
   const startCamera = useCallback(async () => {
     if (typeof window === 'undefined') return;
     setCameraError(null);
     setScannedProduct(null);
     setIsNotFoundInDB(false);
+    setIsStartingCamera(true);
     isProcessingRef.current = false;
 
     try {
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
-
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
       streamRef.current = stream;
+
+      const track = stream.getVideoTracks()[0] || null;
+      videoTrackRef.current = track;
+      try {
+        const caps = track?.getCapabilities?.() as
+          | (MediaTrackCapabilities & { torch?: boolean })
+          | undefined;
+        setTorchSupported(!!caps?.torch);
+      } catch {
+        setTorchSupported(false);
+      }
+      setTorchOn(false);
 
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      setIsScanning(true);
-      setHasCamera(true);
+      // Fast path: OS-level detector (Chromium / Android). Any failure falls
+      // through to the ZXing JS decoder below.
+      if (selectScannerEngine() === 'native' && videoRef.current) {
+        try {
+          const DetectorCtor = window.BarcodeDetector;
+          if (!DetectorCtor) throw new Error('native detector unavailable');
+          const detector = new DetectorCtor({ formats: NATIVE_BARCODE_FORMATS });
+          const video = videoRef.current;
+          const loop = async () => {
+            if (isProcessingRef.current) return;
+            try {
+              const codes = await detector.detect(video);
+              const raw = codes?.[0]?.rawValue;
+              if (raw && raw.trim().length >= 5) {
+                handleBarcodeFound(raw);
+                return;
+              }
+            } catch {
+              // Transient frame errors are normal — keep scanning.
+            }
+            rafRef.current = requestAnimationFrame(loop);
+          };
+          setIsScanning(true);
+          setIsStartingCamera(false);
+          setHasCamera(true);
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        } catch (nativeErr) {
+          console.warn('Native BarcodeDetector failed, falling back to ZXing:', nativeErr);
+        }
+      }
 
+      // Fallback: ZXing JS decoder (iOS Safari and browsers without BarcodeDetector)
+      const { BrowserMultiFormatReader } = await import('@zxing/browser');
       const codeReader = new BrowserMultiFormatReader();
 
       // Store controls for stopping exactly after first read
@@ -222,8 +294,12 @@ export default function BarcodeScannerModal({
         }
       });
       controlsRef.current = controls;
+      setIsScanning(true);
+      setIsStartingCamera(false);
+      setHasCamera(true);
     } catch (err: any) {
       console.warn('Camera initialization error:', err);
+      setIsStartingCamera(false);
       setHasCamera(false);
       setCameraError(
         err.name === 'NotAllowedError'
@@ -231,7 +307,7 @@ export default function BarcodeScannerModal({
           : 'Unable to access camera. You can still type the barcode manually below.'
       );
     }
-  }, [handleBarcodeFound]);
+  }, [handleBarcodeFound, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -460,7 +536,7 @@ export default function BarcodeScannerModal({
           {/* Camera Viewport (Active only when no product is captured yet) */}
           {!scannedProduct && !isLoadingProduct && (
             <div className="space-y-3">
-              <div className="relative rounded-2xl overflow-hidden bg-black aspect-video border border-border/80 flex items-center justify-center shadow-inner">
+              <div className="relative rounded-2xl overflow-hidden bg-black aspect-[3/4] max-h-[52vh] border border-border/80 flex items-center justify-center shadow-inner">
                 <video
                   ref={videoRef}
                   className="w-full h-full object-cover"
@@ -468,10 +544,34 @@ export default function BarcodeScannerModal({
                   muted
                 />
 
+                {/* Camera starting state — never a black box */}
+                {isStartingCamera && !cameraError && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black z-10">
+                    <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                    <p className="text-xs font-semibold text-white/90 font-mono">Starting camera…</p>
+                  </div>
+                )}
+
+                {/* Flashlight toggle (only when the camera reports torch support) */}
+                {isScanning && torchSupported && (
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+                    className={`absolute top-3 right-3 z-10 p-2.5 rounded-full backdrop-blur-xs border transition-colors cursor-pointer ${
+                      torchOn
+                        ? 'bg-accent text-black border-accent'
+                        : 'bg-black/60 text-white border-white/25 hover:bg-black/80'
+                    }`}
+                  >
+                    <Flashlight className="w-5 h-5" />
+                  </button>
+                )}
+
                 {/* Viewport Reticle Overlay */}
                 {isScanning && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="relative w-64 h-32 border-2 border-accent rounded-xl overflow-hidden shadow-[0_0_24px_rgba(249,115,22,0.35)]">
+                    <div className="relative w-56 h-28 border-2 border-accent rounded-xl overflow-hidden shadow-[0_0_24px_rgba(249,115,22,0.35)]">
                       <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse" />
                       <span className="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-accent" />
                       <span className="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-accent" />
