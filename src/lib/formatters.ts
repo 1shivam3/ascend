@@ -45,6 +45,40 @@ export const getLocalTodayStr = (d: Date = new Date()): string => {
 };
 
 /**
+ * Monday-first week helpers. The app treats Monday as the start of the week
+ * (Sunday as the end) everywhere: consistency strips, weekly recap, training
+ * card, AI coach comparisons.
+ */
+
+/** Returns the Monday (local, midnight) of the week containing `d`. */
+export function getMondayOfWeek(d: Date = new Date()): Date {
+  const copy = new Date(d);
+  copy.setHours(0, 0, 0, 0);
+  const day = copy.getDay(); // 0=Sun .. 6=Sat
+  const daysSinceMonday = (day + 6) % 7;
+  copy.setDate(copy.getDate() - daysSinceMonday);
+  return copy;
+}
+
+/** Returns { start, end } as YYYY-MM-DD strings for the Mon–Sun week containing `d`. */
+export function getWeekRange(d: Date = new Date()): { start: string; end: string } {
+  const monday = getMondayOfWeek(d);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { start: getLocalTodayStr(monday), end: getLocalTodayStr(sunday) };
+}
+
+/** Returns the 7 YYYY-MM-DD strings (Mon..Sun) for the week containing `d`. */
+export function getWeekDateStrings(d: Date = new Date()): string[] {
+  const monday = getMondayOfWeek(d);
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    return getLocalTodayStr(day);
+  });
+}
+
+/**
  * Parses a YYYY-MM-DD string into a local Date object pinned at noon
  * to avoid timezone shifts and daylight savings transitions.
  */

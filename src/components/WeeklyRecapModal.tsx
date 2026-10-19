@@ -6,6 +6,7 @@ import { isSetCompleted } from '@/lib/types';
 import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
+import { getWeekRange, parseLocalDate } from '@/lib/formatters';
 
 interface WeeklyRecapModalProps {
   isOpen: boolean;
@@ -24,17 +25,20 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
   // Calculate past 7 days stats
   const weeklyStats = useMemo(() => {
-    const now = new Date();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(now.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+    // Calendar week: Monday to Sunday (not a rolling 7-day window).
+    const { start: weekStartStr, end: weekEndStr } = getWeekRange(new Date());
+    const monday = parseLocalDate(weekStartStr);
+    const sunday = parseLocalDate(weekEndStr);
 
-    const pastWeekWorkouts = workouts.filter((w) => w.date >= sevenDaysAgoStr);
+    const thisWeekWorkouts = workouts.filter((w) => {
+      const dStr = (w.date || '').split('T')[0];
+      return dStr >= weekStartStr && dStr <= weekEndStr;
+    });
 
     let totalVolume = 0;
     let totalSets = 0;
 
-    for (const w of pastWeekWorkouts) {
+    for (const w of thisWeekWorkouts) {
       for (const ex of w.exercises) {
         for (const set of ex.sets) {
           if (!isSetCompleted(set)) continue;
@@ -46,9 +50,12 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       }
     }
 
-    // Recent PRs in past 7 days
+    // Recent PRs this calendar week (Mon–Sun)
     const recentPRs = prs
-      .filter((p) => p.date >= sevenDaysAgoStr && !p.isBaseline)
+      .filter((p) => {
+        const dStr = (p.date || '').split('T')[0];
+        return dStr >= weekStartStr && dStr <= weekEndStr && !p.isBaseline;
+      })
       .slice(0, 3);
 
     // Big 3 lifts for DOTS
@@ -64,14 +71,14 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     const classification = getDOTSClassification(dotsScore);
 
     return {
-      workoutsCount: pastWeekWorkouts.length,
+      workoutsCount: thisWeekWorkouts.length,
       totalVolume: Math.round(totalVolume),
       totalSets,
       recentPRs,
       totalBig3: Math.round(totalBig3),
       dotsScore: Math.round(dotsScore),
       tier: classification.tier,
-      dateRange: `${sevenDaysAgo.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+      dateRange: `${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
     };
   }, [workouts, prs, profile]);
 

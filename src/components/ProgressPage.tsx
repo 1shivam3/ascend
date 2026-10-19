@@ -31,7 +31,7 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural, safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
 import { resizeAndCompressImage } from '@/lib/image-processing';
@@ -635,17 +635,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       }
     }
 
-    // Last 7 days (rolling, ending today) — so the days counted in the
-    // streak are always visible and highlighted, unlike a calendar week
-    // which can show an empty new week while a streak is alive.
-    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    // Current calendar week (Monday–Sunday) — the week always starts on Monday.
+    const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    const weekDates = getWeekDateStrings(today);
     let thisWeekCompleted = 0;
-    const dayBars = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() - (6 - i));
-      d.setHours(0, 0, 0, 0);
-      const dStr = getLocalDateStr(d);
-      const label = dayLabels[d.getDay()];
+    const dayBars = weekDates.map((dStr, i) => {
+      const label = dayLabels[i];
       const isCompleted = workoutDays.has(dStr);
       if (isCompleted) thisWeekCompleted++;
 
@@ -657,22 +652,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       };
     });
 
-    // 4 rolling weeks calculation
+    // 4 calendar weeks (Monday–Sunday), current week first.
     const weeklyTarget = trainingProfile?.daysPerWeek || 5;
     let fourWeeksCompleted = 0;
     const fourWeeksBreakdown: { label: string; count: number; target: number; pct: number }[] = [];
 
     for (let w = 0; w < 4; w++) {
-      // Rolling 7-day windows ending today, consistent with the day bars above.
-      const wEnd = new Date(today);
-      wEnd.setDate(today.getDate() - w * 7);
-      wEnd.setHours(0, 0, 0, 0);
+      // Monday of the target week, then its 7 Mon–Sun date strings.
+      const weekAnchor = new Date(today);
+      weekAnchor.setDate(today.getDate() - w * 7);
+      const weekStrs = getWeekDateStrings(weekAnchor);
 
       let count = 0;
-      for (let d = 0; d < 7; d++) {
-        const checkD = new Date(wEnd);
-        checkD.setDate(wEnd.getDate() - d);
-        if (workoutDays.has(getLocalDateStr(checkD))) {
+      for (const dStr of weekStrs) {
+        if (workoutDays.has(dStr)) {
           count++;
         }
       }
