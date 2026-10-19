@@ -533,6 +533,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
   const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
   const deletePlannedWorkout = useStore((state) => state.deletePlannedWorkout);
+  const hiddenBuiltinRoutineIds = useStore((state) => state.hiddenBuiltinRoutineIds);
+  const hideBuiltinRoutine = useStore((state) => state.hideBuiltinRoutine);
+  const unhideBuiltinRoutine = useStore((state) => state.unhideBuiltinRoutine);
   const activeWorkoutDraft = useStore((state) => state.activeWorkoutDraft);
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
@@ -705,7 +708,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
-  const [trainSubTab, setTrainSubTab] = useState<'workouts' | 'plans' | 'history'>('workouts');
+  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>('plans');
   const [selectedDetailsPlan, setSelectedDetailsPlan] = useState<PlannedWorkout | null>(null);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
@@ -722,9 +725,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         return true;
       }, 50);
     }
-    if (trainSubTab !== 'workouts') {
+    if (trainSubTab !== 'plans') {
       return registerBackHandler(() => {
-        setTrainSubTab('workouts');
+        setTrainSubTab('plans');
         return true;
       }, 40);
     }
@@ -1836,6 +1839,26 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return result;
   }, [plannedWorkouts, adaptiveSplitTemplates, userUnit]);
 
+  // Built-in routine templates (not the user's own plans), minus hidden ones.
+  // A routine is "built-in" when its id isn't one of the user's plannedWorkouts.
+  const builtinRoutines = useMemo(() => {
+    const ownIds = new Set(plannedWorkouts.map((p) => p.id));
+    return availableRoutines.filter(
+      (r) => !ownIds.has(r.id) && !hiddenBuiltinRoutineIds.includes(r.id)
+    );
+  }, [availableRoutines, plannedWorkouts, hiddenBuiltinRoutineIds]);
+
+  const hiddenBuiltinCount = useMemo(() => {
+    const ownIds = new Set(plannedWorkouts.map((p) => p.id));
+    return availableRoutines.filter(
+      (r) => !ownIds.has(r.id) && hiddenBuiltinRoutineIds.includes(r.id)
+    ).length;
+  }, [availableRoutines, plannedWorkouts, hiddenBuiltinRoutineIds]);
+
+  const restoreHiddenRoutines = useCallback(() => {
+    hiddenBuiltinRoutineIds.forEach((id) => unhideBuiltinRoutine(id));
+  }, [hiddenBuiltinRoutineIds, unhideBuiltinRoutine]);
+
   // NOTE: the plan detail view replaces the main list render, but the modals
   // below MUST stay mounted — Share/Edit/Delete are all reachable from the
   // detail view's top bar. (Previously the early return skipped them, so
@@ -1956,17 +1979,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       </header>
 
-      {/* ── Segmented Control (Reference: Screen 10 in Image 1 & Image 3) ── */}
+      {/* ── Segmented Control: Plans + History ── */}
       <div role="tablist" aria-label="Train navigation" className="segmented-control">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={trainSubTab === 'workouts'}
-          onClick={() => setTrainSubTab('workouts')}
-          className={`segmented-item ${trainSubTab === 'workouts' ? 'active' : ''}`}
-        >
-          Workouts
-        </button>
         <button
           type="button"
           role="tab"
@@ -1987,8 +2001,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </button>
       </div>
 
-      {/* ── TAB 1: WORKOUTS ── */}
-      {trainSubTab === 'workouts' && (
+      {/* ── TAB 1: PLANS (merged: your plans + built-in routines) ── */}
+      {trainSubTab === 'plans' && (
         <div className="space-y-4 animate-fade-in">
       {activeWorkoutDraft && !isModalOpen && (
         <div className="card p-3.5 bg-bg-card border border-accent/40 flex items-center justify-between shadow-xs">
@@ -2026,48 +2040,153 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── Screen 10 Workout Routines List (Reference: Flow Board Screen 10) ── */}
-      <section className="space-y-3" aria-label="Available Workout Routines">
-        {availableRoutines.map((routine) => {
-          const exCount = routine.exercises?.length || 0;
-          const duration = Math.max(30, exCount * 8);
-          const cleanName = routine.name.replace(/^Builtin\s+/i, '');
+      {/* ── Your Plans ── */}
+      <section className="space-y-2.5" aria-label="Your Workout Plans">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-[11px] mb-0">YOUR PLANS</h2>
+            {plannedWorkouts.length > 0 && (
+              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
+                {plannedWorkouts.length}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={openCreatePlan}
+            className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+            title="Create new workout plan"
+          >
+            <Plus className="w-3.5 h-3.5 text-accent" />
+            <span>New Plan</span>
+          </button>
+        </div>
 
-          return (
-            <div
-              key={routine.id}
-              onClick={() => setSelectedDetailsPlan(routine)}
-              className="card p-3.5 sm:p-4 bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between gap-3 cursor-pointer group shadow-xs active:scale-[0.99]"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  setSelectedDetailsPlan(routine);
-                }
-              }}
-              aria-label={`View details for ${cleanName}`}
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shrink-0 group-hover:bg-accent/15 transition-colors">
-                  <Dumbbell className="w-5 h-5 text-accent" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary tracking-tight truncate group-hover:text-accent transition-colors">
-                    {cleanName}
-                  </h3>
-                  <p className="text-xs text-text-muted font-sans mt-0.5">
-                    ~{duration} min · {exCount} exercises
-                  </p>
-                </div>
+        {plannedWorkouts.length === 0 ? (
+          <div className="card p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between border-dashed border-border gap-3 text-center sm:text-left">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                <BookOpen className="w-5 h-5" />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <ChevronRight className="w-5 h-5 text-text-muted group-hover:text-accent transition-colors" />
+              <div>
+                <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
+                <p className="text-2xs text-text-muted">Build your personalized routine or load a ready-made workout</p>
               </div>
             </div>
-          );
-        })}
+            <button
+              type="button"
+              onClick={openCreatePlan}
+              className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5 text-white" />
+              <span>Create My Own</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsSuggestedModalOpen(true)}
+              className="py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Browse Pre-made</span>
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {plannedWorkouts.map((plan) => (
+              <PlanCard
+                key={plan.id}
+                plan={plan}
+                onStart={() => handleStartPlan(plan)}
+                onEdit={() => handleEditPlan(plan)}
+                onDelete={() => handleDeletePlan(plan)}
+                onShare={() => setSharingPlan(plan)}
+                onDuplicate={() => handleDuplicatePlan(plan)}
+                onOpen={() => setSelectedDetailsPlan(plan)}
+              />
+            ))}
+          </div>
+        )}
       </section>
+
+      {/* ── Built-in Routines (visible, hideable) ── */}
+      {builtinRoutines.length > 0 && (
+        <section className="space-y-3" aria-label="Built-in Workout Routines">
+          <div className="flex items-center gap-2">
+            <Dumbbell className="w-4 h-4 text-accent" />
+            <h2 className="section-title text-[11px] mb-0">BUILT-IN ROUTINES</h2>
+            <span className="text-3xs font-mono text-text-muted">ready-made</span>
+          </div>
+          {builtinRoutines.map((routine) => {
+            const exCount = routine.exercises?.length || 0;
+            const duration = Math.max(30, exCount * 8);
+            const cleanName = routine.name.replace(/^Builtin\s+/i, '');
+
+            return (
+              <div
+                key={routine.id}
+                className="card p-3.5 sm:p-4 bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between gap-3 shadow-xs"
+              >
+                <div
+                  onClick={() => setSelectedDetailsPlan(routine)}
+                  className="flex items-center gap-3.5 min-w-0 cursor-pointer group flex-1"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedDetailsPlan(routine);
+                    }
+                  }}
+                  aria-label={`View details for ${cleanName}`}
+                >
+                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shrink-0 group-hover:bg-accent/15 transition-colors">
+                    <Dumbbell className="w-5 h-5 text-accent" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary tracking-tight truncate group-hover:text-accent transition-colors">
+                      {cleanName}
+                    </h3>
+                    <p className="text-xs text-text-muted font-sans mt-0.5">
+                      ~{duration} min · {exCount} exercises
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleStartPlan(routine)}
+                    className="p-2 rounded-lg text-accent hover:bg-accent/10 transition-colors"
+                    title={`Start ${cleanName}`}
+                    aria-label={`Start ${cleanName}`}
+                  >
+                    <Play className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => hideBuiltinRoutine(routine.id)}
+                    className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+                    title={`Hide ${cleanName}`}
+                    aria-label={`Hide ${cleanName}`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          {hiddenBuiltinCount > 0 && (
+            <button
+              type="button"
+              onClick={restoreHiddenRoutines}
+              className="text-2xs text-text-muted hover:text-accent font-medium flex items-center gap-1 transition-colors cursor-pointer mx-auto py-1"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Show {hiddenBuiltinCount} hidden {hiddenBuiltinCount === 1 ? 'routine' : 'routines'}</span>
+            </button>
+          )}
+        </section>
+      )}
 
       {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
       {isRestRunning && (
@@ -2229,80 +2348,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── TAB 2: PLANS ────────────────────────────────────────────────────── */}
-      {trainSubTab === 'plans' && (
-        <div className="space-y-4 animate-fade-in">
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-accent" />
-                <h2 className="section-title text-[11px] mb-0">CUSTOM WORKOUT PLANS</h2>
-                {plannedWorkouts.length > 0 && (
-                  <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
-                    {plannedWorkouts.length}
-                  </span>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={openCreatePlan}
-                className="text-text-secondary hover:text-text-primary text-xs font-semibold flex items-center gap-1 hover:underline cursor-pointer"
-                title="Create new workout plan"
-              >
-                <Plus className="w-3.5 h-3.5 text-accent" />
-                <span>New Plan</span>
-              </button>
-            </div>
-
-            {plannedWorkouts.length === 0 ? (
-              <div className="card p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between border-dashed border-border gap-3 text-center sm:text-left">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
-                    <BookOpen className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
-                    <p className="text-2xs text-text-muted">Build your personalized routine or load a ready-made workout</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={openCreatePlan}
-                  className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 text-white" />
-                  <span>Create My Own</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsSuggestedModalOpen(true)}
-                  className="py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Browse Pre-made</span>
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {plannedWorkouts.map((plan) => (
-                  <PlanCard
-                    key={plan.id}
-                    plan={plan}
-                    onStart={() => handleStartPlan(plan)}
-                    onEdit={() => handleEditPlan(plan)}
-                    onDelete={() => handleDeletePlan(plan)}
-                    onShare={() => setSharingPlan(plan)}
-                    onDuplicate={() => handleDuplicatePlan(plan)}
-                    onOpen={() => setSelectedDetailsPlan(plan)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      )}
-
-      {/* ── TAB 3: HISTORY ─────────────────────────────────────────────────── */}
+      {/* ── TAB 2: HISTORY ─────────────────────────────────────────────────── */}
       {trainSubTab === 'history' && (
         <div className="space-y-4 animate-fade-in">
 

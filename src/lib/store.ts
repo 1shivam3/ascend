@@ -85,6 +85,8 @@ export interface AppState {
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
+  /** Built-in routine template IDs the user has hidden from the Plans tab */
+  hiddenBuiltinRoutineIds: string[];
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
@@ -167,6 +169,8 @@ export interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
+  hideBuiltinRoutine: (id: string) => void;
+  unhideBuiltinRoutine: (id: string) => void;
 
   // Weekly Workout Schedule & Body Parts
   weeklySchedule: WeeklySchedule;
@@ -317,6 +321,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
+  hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
   favoriteFoods: state.favoriteFoods,
   hasCompletedOnboarding: state.hasCompletedOnboarding,
   waterLogs: state.waterLogs,
@@ -360,6 +365,7 @@ export const useAppStore = create<AppState>()(
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
+      hiddenBuiltinRoutineIds: [],
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
@@ -1015,6 +1021,16 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
+      hideBuiltinRoutine: (id) => set((state) => ({
+        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.includes(id)
+          ? state.hiddenBuiltinRoutineIds
+          : [...state.hiddenBuiltinRoutineIds, id],
+      })),
+
+      unhideBuiltinRoutine: (id) => set((state) => ({
+        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.filter((x) => x !== id),
+      })),
+
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [
           {
@@ -1604,6 +1620,7 @@ export const useAppStore = create<AppState>()(
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
+          hiddenBuiltinRoutineIds: [],
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
           waterLogs: {},
