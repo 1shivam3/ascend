@@ -64,6 +64,7 @@ export default function ExperienceLevelScreen({
 
         {/* Illustration */}
         <div className="flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/illustrations/onboarding-experience.webp"
             alt="Fitness journey from beginner to advanced"

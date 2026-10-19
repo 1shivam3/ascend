@@ -2402,6 +2402,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
         {sortedWorkouts.length === 0 ? (
           <div className="card text-center py-8 px-4 space-y-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/illustrations/empty-workouts.webp"
               alt="No workouts yet"
@@ -2411,7 +2412,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <div>
               <p className="text-sm font-bold text-text-primary">Your journey starts here.</p>
               <p className="text-xs text-text-muted mt-1 max-w-xs mx-auto">
-                Completed training sessions will appear here. Tap "Log Workout" to begin!
+                Completed training sessions will appear here. Tap &ldquo;Log Workout&rdquo; to begin!
               </p>
             </div>
           </div>

@@ -82,6 +82,7 @@ export default function FitnessGoalsScreen({
 
         {/* Illustration */}
         <div className="flex justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/illustrations/onboarding-goals.webp"
             alt="People pursuing different fitness goals"

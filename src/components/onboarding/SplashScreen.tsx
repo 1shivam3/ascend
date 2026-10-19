@@ -32,6 +32,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
       {/* Background Photograph with Vignette & Fallback */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none">
         {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/images/splash-athlete.jpg"
           alt=""
