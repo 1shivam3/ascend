@@ -274,7 +274,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       createdAt: new Date().toISOString(),
       exercises,
     };
-    addPlannedWorkout(plannedWorkout);
+    // Intentionally NOT saved to plannedWorkouts: starting a suggested workout
+    // no longer silently piles up saved plans. The user explicitly saves via
+    // the modal's "Save Plan" action if they want to keep it.
     handleStartWorkoutFromHome(plannedWorkout);
   };
 

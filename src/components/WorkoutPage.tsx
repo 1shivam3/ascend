@@ -2179,7 +2179,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5 text-white" />
-                  <span>Create Plan</span>
+                  <span>Create My Own</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSuggestedModalOpen(true)}
+                  className="py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Browse Pre-made</span>
                 </button>
               </div>
             ) : (
