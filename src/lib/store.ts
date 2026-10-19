@@ -1913,12 +1913,21 @@ export const useAppStore = create<AppState>()(
           // Drop anything merged from a legacy blob; the async load below
           // restores from the dedicated key after first paint.
           useAppStore.setState({ progressPhotos: [] });
+          let photosLoaded = false;
           const loadPhotosAsync = () => {
+            if (photosLoaded) return;
+            photosLoaded = true;
+            // Race guard: if the user added photos after rehydration (before
+            // this ran), don't clobber them with stale disk data.
+            if (useAppStore.getState().progressPhotos.length > 0) return;
             const photos = loadProgressPhotosFromDisk();
             if (photos.length > 0) useAppStore.setState({ progressPhotos: photos });
           };
           if (typeof window !== 'undefined' && typeof (window as any).requestIdleCallback === 'function') {
+            // rIC can be throttled indefinitely in background tabs — the
+            // setTimeout backstop guarantees photos eventually load.
             (window as any).requestIdleCallback(loadPhotosAsync);
+            setTimeout(loadPhotosAsync, 1500);
           } else {
             setTimeout(loadPhotosAsync, 0);
           }
