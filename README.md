@@ -16,7 +16,7 @@
   <a href="https://tailwindcss.com/"><img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-3-38bdf8?logo=tailwindcss" /></a>
   <a href="https://ai.google.dev/"><img alt="Google Gemini" src="https://img.shields.io/badge/Google_Gemini-AI-orange?logo=google" /></a>
   <a href="https://web.dev/progressive-web-apps/"><img alt="PWA" src="https://img.shields.io/badge/PWA-Installable-purple" /></a>
-  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-686%20Passed-emerald" /></a>
+  <a href="#automated-qa-testing"><img alt="Tests" src="https://img.shields.io/badge/Tests-697%20Passed-emerald" /></a>
   <a href="#license"><img alt="License" src="https://img.shields.io/badge/License-MIT-green" /></a>
 </p>
 
@@ -162,7 +162,7 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 | **Barcode Scanning** | [@zxing/browser](https://github.com/zxing-js/browser) + [Open Food Facts](https://world.openfoodfacts.org/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
 | **Offline Caching** | Native PWA Service Worker (`CacheStorage` API) + Web Push notifications |
-| **Testing** | [Vitest](https://vitest.dev/) (686 unit & integration tests) |
+| **Testing** | [Vitest](https://vitest.dev/) (697 unit & integration tests) |
 
 ---
 
@@ -177,7 +177,7 @@ npx tsc --noEmit
 # 2. Lint check (0 errors, 0 warnings)
 npm run lint
 
-# 3. Full Automated Test Suite (50 test files, 686 passed tests)
+# 3. Full Automated Test Suite (52 test files, 697 passed tests)
 npm test
 
 # 4. Production Next.js Build
