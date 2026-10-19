@@ -886,6 +886,23 @@ export default function ActiveWorkoutScreen({
   const [showFormCues, setShowFormCues] = useState(false);
   const [showWhyTarget, setShowWhyTarget] = useState(false);
 
+  // Close the form-cues / why-target sheets when the exercise changes, so
+  // they never show stale content for the wrong exercise.
+  useEffect(() => {
+    setShowFormCues(false);
+    setShowWhyTarget(false);
+  }, [activeExerciseIdx]);
+  useEffect(() => {
+    if (showFormCues) {
+      return registerBackHandler(() => { setShowFormCues(false); return true; }, 110);
+    }
+  }, [showFormCues, registerBackHandler]);
+  useEffect(() => {
+    if (showWhyTarget) {
+      return registerBackHandler(() => { setShowWhyTarget(false); return true; }, 110);
+    }
+  }, [showWhyTarget, registerBackHandler]);
+
   // Training Adaptation Summary. Next-session targets come from the single
   // canonical getNextSessionTarget() — the same function the Coach's Take
   // reads — so the two surfaces can never contradict each other.
@@ -2973,6 +2990,81 @@ export default function ActiveWorkoutScreen({
                   Insert Sets
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Form Cues Sheet ──────────────────────────────────────────────── */}
+      {showFormCues && formCues.length > 0 && (
+        <div className="modal-overlay" onClick={() => setShowFormCues(false)}>
+          <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-accent" />
+                <div>
+                  <h3 className="font-bold text-text-primary">Form Cues</h3>
+                  <p className="text-2xs text-text-muted">{currentExercise?.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFormCues(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close form cues"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2.5">
+              {formCues.map((cue, idx) => (
+                <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
+                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                    {idx + 1}
+                  </span>
+                  <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Why This Target Weight Sheet ─────────────────────────────────── */}
+      {showWhyTarget && prescription?.whyThisWeight && (
+        <div className="modal-overlay" onClick={() => setShowWhyTarget(false)}>
+          <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="w-5 h-5 text-accent" />
+                <div>
+                  <h3 className="font-bold text-text-primary">Why this target?</h3>
+                  <p className="text-2xs text-text-muted">{currentExercise?.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWhyTarget(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close prescription explanation"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="p-3 rounded-xl bg-accent/10 border border-accent/25">
+                <p className="text-xs font-bold text-accent font-mono">{targetDisplay.text}</p>
+              </div>
+              <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">
+                {prescription.whyThisWeight}
+              </p>
+              {prescription.lastPerformance && (
+                <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/60 text-2xs text-text-muted">
+                  Last time: <span className="font-bold text-text-primary font-mono">
+                    {prescription.lastPerformance.weight} {userUnit} × {prescription.lastPerformance.reps} reps
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
