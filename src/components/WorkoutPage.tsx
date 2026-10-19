@@ -529,6 +529,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const addWorkout = useStore((state) => state.addWorkout);
   const deleteWorkout = useStore((state) => state.deleteWorkout);
   const addPR = useStore((state) => state.addPR);
+  const awardXP = useStore((state) => state.awardXP);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
   const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
@@ -1429,6 +1430,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         `Saved interrupted workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''} (0 completed sets).`,
         'Interrupted Session Saved'
       );
+    }
+
+    // Award XP for completing a workout (100 XP, +50 per PR)
+    if (hasCompletedSets) {
+      const xpResult = awardXP(100, 'Workout completed');
+      if (newPRCount > 0) {
+        awardXP(newPRCount * 50, `${newPRCount} PR${newPRCount > 1 ? 's' : ''} hit`);
+      }
+      if (xpResult.leveledUp) {
+        toast.success(
+          `You reached Level ${xpResult.newLevel}! Keep the momentum going.`,
+          'Level Up!'
+        );
+      }
     }
 
     setPostWorkoutSummary({

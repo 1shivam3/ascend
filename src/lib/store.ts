@@ -58,6 +58,8 @@ import {
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
 import { isBodyweightExercise } from './strength-standards';
+import { awardXP as awardXPFromSystem } from './xp-system';
+import { getDefaultFreezeState, refreshWeeklyFreeze } from './streak-freeze';
 
 export * from './types';
 
@@ -90,6 +92,20 @@ export interface AppState {
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
+
+  // Gamification: XP System
+  totalXP: number;
+  xpTransactions: import('./xp-system').XPTransaction[];
+  awardXP: (amount: number, reason: string) => { leveledUp: boolean; newLevel: number };
+
+  // Gamification: Streak Freeze
+  streakFreeze: import('./streak-freeze').StreakFreezeState;
+  refreshStreakFreeze: () => void;
+
+  // Gamification: Challenges
+  challengeProgress: Record<string, import('./challenges').ChallengeProgress>;
+  setChallengeOptIn: (challengeId: string, optedIn: boolean) => void;
+  dismissChallenge: (challengeId: string) => void;
 
   // Athlete Multi-Goal Selection
   goals: AthleteGoal[];
@@ -346,6 +362,10 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   userMode: state.userMode,
   weeklySchedule: state.weeklySchedule,
   activeWorkoutDraft: state.activeWorkoutDraft,
+  totalXP: state.totalXP,
+  xpTransactions: state.xpTransactions,
+  streakFreeze: state.streakFreeze,
+  challengeProgress: state.challengeProgress,
   };
 }
 
@@ -372,6 +392,63 @@ export const useAppStore = create<AppState>()(
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
+
+      // Gamification: XP System
+      totalXP: 0,
+      xpTransactions: [],
+      awardXP: (amount, reason) => {
+        const state = get();
+        const result = awardXPFromSystem(state.totalXP, amount, reason);
+        set({
+          totalXP: result.newTotal,
+          xpTransactions: [...state.xpTransactions, result.transaction].slice(-100),
+        });
+        return { leveledUp: result.leveledUp, newLevel: result.newLevel };
+      },
+
+      // Gamification: Streak Freeze
+      streakFreeze: getDefaultFreezeState(),
+      refreshStreakFreeze: () => {
+        const state = get();
+        set({ streakFreeze: refreshWeeklyFreeze(state.streakFreeze) });
+      },
+
+      // Gamification: Challenges
+      challengeProgress: {},
+      setChallengeOptIn: (challengeId, optedIn) =>
+        set((state) => ({
+          challengeProgress: {
+            ...state.challengeProgress,
+            [challengeId]: {
+              ...(state.challengeProgress[challengeId] || {
+                challengeId,
+                current: 0,
+                target: 0,
+                completed: false,
+                completedAt: null,
+                dismissed: false,
+              }),
+              optedIn,
+            },
+          },
+        })),
+      dismissChallenge: (challengeId) =>
+        set((state) => ({
+          challengeProgress: {
+            ...state.challengeProgress,
+            [challengeId]: {
+              ...(state.challengeProgress[challengeId] || {
+                challengeId,
+                current: 0,
+                target: 0,
+                completed: false,
+                completedAt: null,
+                optedIn: false,
+              }),
+              dismissed: true,
+            },
+          },
+        })),
 
       // Athlete Multi-Goal Selection
       goals: [],
@@ -828,7 +905,15 @@ export const useAppStore = create<AppState>()(
         };
       }),
       
-      addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
+      addMeal: (meal) => {
+        const state = get();
+        const xpResult = awardXPFromSystem(state.totalXP, 20, 'Meal logged');
+        set((s) => ({
+          meals: [...s.meals, meal],
+          totalXP: xpResult.newTotal,
+          xpTransactions: [...s.xpTransactions, xpResult.transaction].slice(-100),
+        }));
+      },
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
       updateMeal: (id, updated) => set((state) => ({
         meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
@@ -1081,23 +1166,34 @@ export const useAppStore = create<AppState>()(
         return isAdded;
       },
 
-      logWater: (amountMl, date) => set((state) => {
-        const d = date || getLocalTodayStr();
-        const current = state.waterLogs[d] || 0;
-        const nextAmount = Math.max(0, current + amountMl);
-        const batch: WaterLogBatch = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `water_${Date.now()}`,
-          amountMl,
-          timestamp: new Date().toISOString(),
-        };
-        return {
-          waterLogs: { ...state.waterLogs, [d]: nextAmount },
-          waterBatches: {
-            ...state.waterBatches,
-            [d]: [...(state.waterBatches[d] || []), batch],
-          },
-        };
-      }),
+      logWater: (amountMl, date) => {
+        const state = get();
+        // Only award XP for positive amounts (not for corrections/removals)
+        const xpResult = amountMl > 0
+          ? awardXPFromSystem(state.totalXP, 5, 'Water logged')
+          : null;
+        return set((s) => {
+          const d = date || getLocalTodayStr();
+          const current = s.waterLogs[d] || 0;
+          const nextAmount = Math.max(0, current + amountMl);
+          const batch: WaterLogBatch = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `water_${Date.now()}`,
+            amountMl,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            waterLogs: { ...s.waterLogs, [d]: nextAmount },
+            waterBatches: {
+              ...s.waterBatches,
+              [d]: [...(s.waterBatches[d] || []), batch],
+            },
+            ...(xpResult ? {
+              totalXP: xpResult.newTotal,
+              xpTransactions: [...s.xpTransactions, xpResult.transaction].slice(-100),
+            } : {}),
+          };
+        });
+      },
 
       resetWater: (date) => set((state) => {
         const d = date || getLocalTodayStr();
@@ -1643,6 +1739,10 @@ export const useAppStore = create<AppState>()(
           policyDecisionRecords: {},
           policyDecisionsLedgerHistory: [],
           policyDecisionApplications: [],
+          totalXP: 0,
+          xpTransactions: [],
+          streakFreeze: getDefaultFreezeState(),
+          challengeProgress: {},
         });
         // Truly purge everything the app stored (see purgeLocalAppData).
         purgeLocalAppData();

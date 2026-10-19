@@ -1644,10 +1644,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
-                      DOTS Score &amp; Standards
+                      Strength Score
                     </h4>
                     <p className="text-2xs text-text-muted">
-                      {dotsScore > 0 ? `Current: ${Math.round(dotsScore)} (${dotsClassification.tier})` : 'Pound-for-pound strength formula'}
+                      {dotsScore > 0 ? `Current: ${Math.round(dotsScore)} (${dotsClassification.tier})` : 'How strong you are for your bodyweight'}
                     </p>
                   </div>
                 </div>

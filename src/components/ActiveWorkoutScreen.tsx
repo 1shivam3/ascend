@@ -2239,9 +2239,6 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-emerald-500/60'
                     }`}
                   >
-                    <span className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
-                      @7
-                    </span>
                     <span className="text-xs font-bold text-text-primary block">Easy</span>
                     <span className="text-3xs text-text-muted">Could do more</span>
                   </button>
@@ -2254,9 +2251,6 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-accent/60'
                     }`}
                   >
-                    <span className="w-7 h-7 rounded-lg bg-accent/15 text-accent flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
-                      @8
-                    </span>
                     <span className="text-xs font-bold text-accent block">Target</span>
                     <span className="text-3xs text-text-muted">Just right</span>
                   </button>
@@ -2269,9 +2263,6 @@ export default function ActiveWorkoutScreen({
                         : 'bg-bg-secondary border-border/80 hover:border-danger/60'
                     }`}
                   >
-                    <span className="w-7 h-7 rounded-lg bg-danger/15 text-danger flex items-center justify-center mx-auto mb-1.5 font-mono font-bold text-[11px]">
-                      @9.5
-                    </span>
                     <span className="text-xs font-bold text-text-primary block">Hard</span>
                     <span className="text-3xs text-text-muted">Near limit</span>
                   </button>
