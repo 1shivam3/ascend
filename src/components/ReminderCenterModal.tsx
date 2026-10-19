@@ -47,7 +47,6 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
   const [prefs, setPrefs] = useState<NotificationPreferences>(notificationPreferences);
   const [permissionState, setPermissionState] = useState<NotificationPermission>('default');
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -102,49 +101,52 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
     });
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const handleSave = () => {
+    const hasAnyEnabled =
+      prefs.waterReminders.enabled ||
+      prefs.mealReminders.enabled ||
+      prefs.workoutReminders.enabled ||
+      prefs.weeklyReport.enabled;
+
+    const prefsToSave = { ...prefs, enabled: hasAnyEnabled };
+
+    // 1. SYNCHRONOUS local write first — survives the user closing the app
+    //    instantly after tapping save. Nothing below this point can lose data.
     try {
-      // If any reminder is turned on, ensure permission is requested (silently —
-      // exactly ONE outcome toast is shown at the end of the save).
-      const hasAnyEnabled =
-        prefs.waterReminders.enabled ||
-        prefs.mealReminders.enabled ||
-        prefs.workoutReminders.enabled ||
-        prefs.weeklyReport.enabled;
-
-      let permissionNote = '';
-      if (hasAnyEnabled && permissionState !== 'granted') {
-        const granted = await handleRequestPermission(true);
-        if (!granted) {
-          permissionNote = ' Enable notification permissions on your device to receive alerts.';
-        }
-      }
-
       if (setNotificationPreferences) {
-        setNotificationPreferences({ ...prefs, enabled: hasAnyEnabled });
+        setNotificationPreferences(prefsToSave);
       }
-
-      // Save to localStorage
+    } catch { /* store action optional */ }
+    try {
       if (typeof window !== 'undefined') {
-        localStorage.setItem(
-          'ascend_notification_prefs',
-          JSON.stringify({ ...prefs, enabled: hasAnyEnabled })
-        );
+        localStorage.setItem('ascend_notification_prefs', JSON.stringify(prefsToSave));
       }
+    } catch { /* quota: in-memory prefs still apply this session */ }
 
-      // Try sending to server /api/notifications/preferences if logged in
+    // 2. Instant feedback — never block the UI on network/push.
+    toast.success('Reminder preferences saved.', 'Reminders Saved');
+    onClose();
+
+    // 3. Background: permission prompt, server sync, push subscription.
+    //    Fire-and-forget; failures only log.
+    (async () => {
+      try {
+        if (hasAnyEnabled && permissionState !== 'granted') {
+          const granted = await handleRequestPermission(true);
+          if (!granted) {
+            toast.info('Enable notification permissions on your device to receive alerts.', 'Permissions');
+          }
+        }
+      } catch { /* permission prompt dismissed */ }
       try {
         await fetch('/api/notifications/preferences', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...prefs, enabled: hasAnyEnabled }),
+          body: JSON.stringify(prefsToSave),
         });
       } catch {
         // Local-first: non-blocking
       }
-
-      // Manage Web Push subscription based on toggle state
       try {
         if (hasAnyEnabled) {
           await subscribeToPush();
@@ -154,14 +156,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       } catch (pushErr) {
         console.warn('Push subscription toggle notice:', pushErr);
       }
-
-      toast.success(`Reminder preferences saved.${permissionNote}`, 'Reminders Saved');
-      onClose();
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not save reminder preferences.');
-    } finally {
-      setIsSaving(false);
-    }
+    })();
   };
 
   const handleCopyExamplePrefs = () => {
@@ -601,7 +596,6 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
               variant="primary"
               size="sm"
               onClick={handleSave}
-              disabled={isSaving}
               leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
               className="text-2xs"
             >
