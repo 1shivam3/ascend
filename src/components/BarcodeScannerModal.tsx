@@ -506,7 +506,7 @@ export default function BarcodeScannerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay z-50" onClick={handleClose}>
+    <div className="modal-overlay-centered z-50" onClick={handleClose}>
       <div
         className="modal-content max-w-md w-full overflow-hidden p-0 bg-bg-card border border-border rounded-3xl shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}

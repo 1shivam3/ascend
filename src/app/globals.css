@@ -290,6 +290,13 @@
     @apply animate-fade-in;
   }
 
+  /* Centered variant: camera-style modals stay centered on all breakpoints */
+  .modal-overlay-centered {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50;
+    @apply flex items-center justify-center p-4;
+    @apply animate-fade-in;
+  }
+
   .modal-content {
     @apply bg-bg-card rounded-t-2xl sm:rounded-2xl w-full max-w-[520px] max-h-[90vh] sm:max-h-[85vh] overflow-y-auto;
     @apply border border-border shadow-2xl;
