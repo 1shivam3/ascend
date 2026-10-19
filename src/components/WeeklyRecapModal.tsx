@@ -75,6 +75,45 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     };
   }, [workouts, prs, profile]);
 
+  // ── Canvas helpers ─────────────────────────────────────────────────────
+  function roundRectPath(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    r: number
+  ) {
+    ctx.beginPath();
+    if (typeof (ctx as any).roundRect === 'function') {
+      (ctx as any).roundRect(x, y, w, h, r);
+    } else {
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+  }
+
+  function drawText(
+    ctx: CanvasRenderingContext2D,
+    text: string,
+    x: number,
+    y: number,
+    font: string,
+    color: string,
+    align: CanvasTextAlign = 'center',
+    maxWidth?: number
+  ) {
+    ctx.font = font;
+    ctx.fillStyle = color;
+    ctx.textAlign = align;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(text, x, y, maxWidth);
+  }
+
   // Generate the Canvas graphic (1080x1350 vertical high-res card)
   useEffect(() => {
     if (!isOpen) return;
@@ -91,161 +130,167 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     canvas.width = width;
     canvas.height = height;
 
-    // 1. Background (Dark Onyx with subtle gold radial glow)
-    ctx.fillStyle = '#0a0a0a';
+    const ACCENT = '#f97316';
+    const ACCENT_SOFT = 'rgba(249, 115, 22, 0.55)';
+    const INK = '#fafafa';
+    const MUTED = '#a1a1aa';
+    const FAINT = '#71717a';
+
+    // ── 1. Background: deep charcoal diagonal gradient + orange glow ──
+    const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+    bgGrad.addColorStop(0, '#17171c');
+    bgGrad.addColorStop(0.45, '#0e0e12');
+    bgGrad.addColorStop(1, '#070709');
+    ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, width, height);
 
-    const glowGradient = ctx.createRadialGradient(540, 400, 100, 540, 500, 700);
-    glowGradient.addColorStop(0, 'rgba(249, 115, 22, 0.15)');
-    glowGradient.addColorStop(0.6, 'rgba(249, 115, 22, 0.02)');
-    glowGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = glowGradient;
+    // Orange radial glow, top-right
+    const glow = ctx.createRadialGradient(880, 180, 40, 880, 180, 620);
+    glow.addColorStop(0, 'rgba(249, 115, 22, 0.28)');
+    glow.addColorStop(0.55, 'rgba(249, 115, 22, 0.06)');
+    glow.addColorStop(1, 'rgba(249, 115, 22, 0)');
+    ctx.fillStyle = glow;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. Outer Border Frame
-    ctx.strokeStyle = '#27272a';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(40, 40, width - 80, height - 80);
-
-    ctx.strokeStyle = 'rgba(249, 115, 22, 0.45)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(48, 48, width - 96, height - 96);
-
-    // 3. Brand Header
-    ctx.fillStyle = '#f97316';
-    ctx.font = '900 48px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('ASCEND', width / 2, 130);
-
-    ctx.fillStyle = '#a1a1aa';
-    ctx.font = 'bold 22px monospace';
-    ctx.fillText('WEEKLY TRAINING RECAP', width / 2, 175);
-
-    ctx.fillStyle = '#71717a';
-    ctx.font = '18px monospace';
-    ctx.fillText(weeklyStats.dateRange.toUpperCase(), width / 2, 210);
-
-    // Separator line
-    ctx.strokeStyle = 'rgba(249, 115, 22, 0.3)';
-    ctx.lineWidth = 2;
+    // Diagonal accent stripes (top-left, clipped)
+    ctx.save();
     ctx.beginPath();
-    ctx.moveTo(140, 240);
-    ctx.lineTo(width - 140, 240);
-    ctx.stroke();
+    ctx.rect(0, 0, width, 560);
+    ctx.clip();
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.10)';
+    for (let i = 0; i < 3; i++) {
+      ctx.save();
+      ctx.translate(-140 + i * 90, 0);
+      ctx.rotate(Math.PI / 7);
+      ctx.fillRect(0, -300, 34, 900);
+      ctx.restore();
+    }
+    ctx.restore();
 
-    // 4. Athlete Name & Bodyweight
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '800 36px sans-serif';
-    ctx.fillText(profile?.name || 'Athlete', width / 2, 305);
-
-    if (profile?.bodyweightKg) {
-      ctx.fillStyle = '#f97316';
-      ctx.font = 'bold 20px monospace';
-      ctx.fillText(`${profile.bodyweightKg} kg Bodyweight • ${weeklyStats.tier}`, width / 2, 345);
+    // Subtle dot texture on lower half
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+    for (let y = 700; y < height; y += 46) {
+      for (let x = 60; x < width; x += 46) {
+        ctx.beginPath();
+        ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // 5. Hero Stats Grid (2 x 2 cards)
-    const cardY = 410;
-    const cardW = 440;
-    const cardH = 170;
+    // ── 2. Header: brand + recap label ──
+    drawText(ctx, 'ASCEND', width / 2, 150, '900 84px system-ui, sans-serif', INK);
+    // Orange underline bar
+    ctx.fillStyle = ACCENT;
+    roundRectPath(ctx, width / 2 - 130, 172, 260, 8, 4);
+    ctx.fill();
+    drawText(ctx, 'WEEKLY TRAINING RECAP', width / 2, 226, '700 30px system-ui, sans-serif', MUTED);
+    drawText(ctx, weeklyStats.dateRange.toUpperCase(), width / 2, 268, '600 24px ui-monospace, monospace', FAINT);
 
-    // Card 1: Total Tonnage / Volume
-    drawMetricCard(
-      ctx,
-      80,
-      cardY,
-      cardW,
-      cardH,
-      `${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}`,
-      'TOTAL VOLUME LIFTED',
-      '#22c55e'
-    );
+    // ── 3. Athlete name + tier pill ──
+    const athleteName = (profile?.name || 'Athlete').toUpperCase();
+    drawText(ctx, athleteName, width / 2, 348, '800 44px system-ui, sans-serif', INK, 'center', 900);
+    const tierText = weeklyStats.dotsScore > 0
+      ? `${weeklyStats.tier} · ${weeklyStats.dotsScore} DOTS`
+      : weeklyStats.tier;
+    ctx.font = '700 22px ui-monospace, monospace';
+    const tierW = ctx.measureText(tierText).width + 56;
+    ctx.fillStyle = 'rgba(249, 115, 22, 0.14)';
+    ctx.strokeStyle = ACCENT_SOFT;
+    ctx.lineWidth = 2;
+    roundRectPath(ctx, width / 2 - tierW / 2, 372, tierW, 52, 26);
+    ctx.fill();
+    ctx.stroke();
+    drawText(ctx, tierText, width / 2, 407, '700 22px ui-monospace, monospace', ACCENT);
 
-    // Card 2: Workouts Completed
-    drawMetricCard(
-      ctx,
-      560,
-      cardY,
-      cardW,
-      cardH,
-      `${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? 'SESSION' : 'SESSIONS'}`,
-      'WORKOUTS LOGGED',
-      '#f97316'
-    );
+    // ── 4. Hero: giant total volume ──
+    const unit = profile?.unit || 'kg';
+    const heroValue = weeklyStats.totalVolume >= 1000
+      ? `${(weeklyStats.totalVolume / 1000).toFixed(1)}t`
+      : `${weeklyStats.totalVolume}`;
+    drawText(ctx, heroValue, width / 2, 640, '900 200px system-ui, sans-serif', INK);
+    drawText(ctx, `TOTAL VOLUME LIFTED · ${unit.toUpperCase()}`, width / 2, 690, '700 26px ui-monospace, monospace', MUTED);
 
-    // Card 3: Total Sets
-    drawMetricCard(
-      ctx,
-      80,
-      cardY + 200,
-      cardW,
-      cardH,
-      `${weeklyStats.totalSets} SETS`,
-      'INTENSITY & VOLUME',
-      '#38bdf8'
-    );
+    // ── 5. Stat tiles: sessions / sets / streak proxy (PR count) ──
+    const tiles = [
+      { value: `${weeklyStats.workoutsCount}`, label: 'SESSIONS' },
+      { value: `${weeklyStats.totalSets}`, label: 'SETS' },
+      { value: `${weeklyStats.recentPRs.length}`, label: 'NEW PRS' },
+    ];
+    const tileW = 300;
+    const tileH = 150;
+    const gap = 30;
+    const tilesTotalW = tiles.length * tileW + (tiles.length - 1) * gap;
+    const tilesX0 = (width - tilesTotalW) / 2;
+    const tilesY = 740;
+    tiles.forEach((t, i) => {
+      const x = tilesX0 + i * (tileW + gap);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.lineWidth = 2;
+      roundRectPath(ctx, x, tilesY, tileW, tileH, 22);
+      ctx.fill();
+      ctx.stroke();
+      // Accent top notch
+      ctx.fillStyle = ACCENT;
+      roundRectPath(ctx, x + tileW / 2 - 40, tilesY, 80, 6, 3);
+      ctx.fill();
+      drawText(ctx, t.value, x + tileW / 2, tilesY + 88, '900 64px system-ui, sans-serif', INK);
+      drawText(ctx, t.label, x + tileW / 2, tilesY + 122, '700 20px ui-monospace, monospace', MUTED);
+    });
 
-    // Card 4: DOTS / Big 3 Total
-    drawMetricCard(
-      ctx,
-      560,
-      cardY + 200,
-      cardW,
-      cardH,
-      weeklyStats.dotsScore > 0 ? `${weeklyStats.dotsScore} DOTS` : `${weeklyStats.totalBig3} kg`,
-      weeklyStats.dotsScore > 0 ? 'STRENGTH CLASSIFICATION' : 'BIG 3 TOTAL',
-      '#f97316'
-    );
-
-    // 6. Highlights / PRs Section
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 26px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText('WEEKLY HIGHLIGHTS', 90, 860);
-
-    ctx.strokeStyle = '#3f3f46';
-    ctx.lineWidth = 1;
+    // ── 6. Weekly highlights (PRs) ──
+    const hlY = 990;
+    drawText(ctx, 'WEEKLY HIGHLIGHTS', 90, hlY, '800 28px system-ui, sans-serif', INK, 'left');
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(90, 880);
-    ctx.lineTo(width - 90, 880);
+    ctx.moveTo(90, hlY + 18);
+    ctx.lineTo(width - 90, hlY + 18);
     ctx.stroke();
 
     if (weeklyStats.recentPRs.length > 0) {
       weeklyStats.recentPRs.forEach((pr, idx) => {
-        const rowY = 930 + idx * 75;
-
-        // PR Pill Background
-        ctx.fillStyle = '#18181b';
-        ctx.fillRect(90, rowY - 35, width - 180, 60);
-        ctx.strokeStyle = 'rgba(249, 115, 22, 0.35)';
-        ctx.strokeRect(90, rowY - 35, width - 180, 60);
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText(pr.exercise, 120, rowY + 3);
-
-        ctx.fillStyle = '#f97316';
-        ctx.font = 'bold 24px monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(`${profile?.unit === 'lbs' ? pr.weightLbs : pr.weightKg} ${profile?.unit || 'kg'} × ${pr.reps}`, width - 120, rowY + 3);
+        const rowY = hlY + 70 + idx * 72;
+        // Row card
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.045)';
+        ctx.strokeStyle = 'rgba(249, 115, 22, 0.30)';
+        ctx.lineWidth = 1.5;
+        roundRectPath(ctx, 90, rowY - 42, width - 180, 64, 16);
+        ctx.fill();
+        ctx.stroke();
+        // Gold dot
+        ctx.fillStyle = ACCENT;
+        ctx.beginPath();
+        ctx.arc(128, rowY - 10, 10, 0, Math.PI * 2);
+        ctx.fill();
+        drawText(ctx, pr.exercise, 156, rowY - 2, '700 26px system-ui, sans-serif', INK, 'left', 560);
+        drawText(
+          ctx,
+          `${profile?.unit === 'lbs' ? pr.weightLbs : pr.weightKg} ${unit} × ${pr.reps}`,
+          width - 120,
+          rowY - 2,
+          '800 26px ui-monospace, monospace',
+          ACCENT,
+          'right'
+        );
       });
     } else {
-      ctx.fillStyle = '#a1a1aa';
-      ctx.font = 'italic 22px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('"Consistency builds the foundation. Keep stacking sets."', width / 2, 970);
+      drawText(
+        ctx,
+        '"Consistency builds the foundation. Keep stacking sets."',
+        width / 2,
+        hlY + 90,
+        'italic 400 26px system-ui, sans-serif',
+        MUTED
+      );
     }
 
-    // 7. Footer Brand Seal
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(249, 115, 22, 0.9)';
-    ctx.font = 'bold 20px monospace';
-    ctx.fillText('TRACKED WITH ASCEND • PRECISION TRAINING SYSTEM', width / 2, 1230);
-
-    ctx.fillStyle = '#71717a';
-    ctx.font = '16px monospace';
-    ctx.fillText('ascendtonext.vercel.app', width / 2, 1265);
+    // ── 7. Footer: brand seal ──
+    ctx.fillStyle = ACCENT;
+    roundRectPath(ctx, width / 2 - 200, 1236, 400, 4, 2);
+    ctx.fill();
+    drawText(ctx, 'TRACKED WITH ASCEND', width / 2, 1280, '800 24px ui-monospace, monospace', 'rgba(249, 115, 22, 0.95)');
+    drawText(ctx, 'ascendtonext.vercel.app', width / 2, 1312, '500 20px ui-monospace, monospace', FAINT);
 
     // Convert to Image URL
     try {
@@ -256,41 +301,6 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     }
     setIsGenerating(false);
   }, [isOpen, weeklyStats, profile]);
-
-  function drawMetricCard(
-    ctx: CanvasRenderingContext2D,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-    value: string,
-    label: string,
-    accentColor: string
-  ) {
-    // Card background
-    ctx.fillStyle = '#121215';
-    ctx.fillRect(x, y, w, h);
-
-    // Border
-    ctx.strokeStyle = '#27272a';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, w, h);
-
-    // Accent line top
-    ctx.fillStyle = accentColor;
-    ctx.fillRect(x, y, w, 4);
-
-    // Value
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 36px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(value, x + w / 2, y + 80);
-
-    // Label
-    ctx.fillStyle = '#a1a1aa';
-    ctx.font = 'bold 16px monospace';
-    ctx.fillText(label, x + w / 2, y + 125);
-  }
 
   const handleDownload = () => {
     if (!imagePreviewUrl) return;
