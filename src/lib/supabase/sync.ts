@@ -159,6 +159,20 @@ class SupabaseSyncEngine {
         };
         this.notify();
         this.triggerSyncNow();
+        // Re-link push subscription to the signed-in user so server
+        // notifications work (guest subscriptions are skipped by dispatch).
+        // Fire-and-forget: never blocks sign-in.
+        if (event === 'SIGNED_IN' && !session.user.is_anonymous) {
+          (async () => {
+            try {
+              const { getExistingPushSubscription, subscribeToPush } = await import('@/lib/push-notifications');
+              const existing = await getExistingPushSubscription();
+              if (existing && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                await subscribeToPush();
+              }
+            } catch {}
+          })();
+        }
       } else {
         this.currentUser = null;
         this.notify();

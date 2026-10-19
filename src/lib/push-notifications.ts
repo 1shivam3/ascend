@@ -65,12 +65,22 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<PushSubs
       });
     }
 
-    // Persist subscription to backend
+    // Persist subscription to backend — include auth token so the server
+    // can link the subscription to the signed-in user (not a guest).
     try {
       const subJson = subscription.toJSON();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const { getSupabase } = await import('./supabase/client');
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase!.auth.getSession();
+        if (session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.access_token}`;
+        }
+      } catch {}
       await fetch('/api/notifications/subscribe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           subscription: subJson,
           userAgent: navigator.userAgent,

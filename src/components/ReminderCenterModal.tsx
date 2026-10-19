@@ -139,9 +139,18 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         }
       } catch { /* permission prompt dismissed */ }
       try {
+        const prefHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          const { getSupabase } = await import('@/lib/supabase/client');
+          const supabase = getSupabase();
+          const { data: { session } } = await supabase!.auth.getSession();
+          if (session?.access_token) {
+            prefHeaders['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch {}
         await fetch('/api/notifications/preferences', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: prefHeaders,
           body: JSON.stringify(prefsToSave),
         });
       } catch {

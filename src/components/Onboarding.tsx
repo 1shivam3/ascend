@@ -18,6 +18,7 @@ import LoginScreen from './onboarding/LoginScreen';
 import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
 import ExperienceLevelScreen from './onboarding/ExperienceLevelScreen';
 import PersonalDetailsScreen from './onboarding/PersonalDetailsScreen';
+import StepProgressBar from './onboarding/StepProgressBar';
 
 type OnboardingScreenId =
   | 'splash'
@@ -26,7 +27,8 @@ type OnboardingScreenId =
   | 'login'
   | 'goals'
   | 'experience'
-  | 'details';
+  | 'details'
+  | 'plan_offer';
 
 export default function Onboarding() {
   const toast = useToast();
@@ -51,6 +53,12 @@ export default function Onboarding() {
   const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
 
   const [isFinishing, setIsFinishing] = useState(false);
+
+  // Pending generated plans — shown on the plan_offer screen for user
+  // confirmation BEFORE any plans are added. Never auto-add without asking.
+  const [pendingPlans, setPendingPlans] = useState<any[] | null>(null);
+  const [pendingSchedule, setPendingSchedule] = useState<any | null>(null);
+  const [savedFirstName, setSavedFirstName] = useState('Athlete');
 
   // Local device snapshot detection
   const [backupSnapshot, setBackupSnapshot] = useState<any>(null);
@@ -77,7 +85,7 @@ export default function Onboarding() {
     const screenParam = searchParams.get('screen') as OnboardingScreenId;
     if (
       screenParam &&
-      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'details'].includes(
+      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'details', 'plan_offer'].includes(
         screenParam
       )
     ) {
@@ -304,11 +312,16 @@ export default function Onboarding() {
     });
 
     // Preserve the athlete's existing plans/targets when re-onboarding after
-    // a logout — only seed generated ones for a truly fresh profile.
+    // a logout — only offer generated ones for a truly fresh profile.
+    // NEVER auto-add plans: the user must explicitly accept on the plan_offer screen.
     const { plannedWorkouts: existingPlans, macroGoals: existingGoals } = useStore.getState();
     if (!existingPlans || existingPlans.length === 0) {
-      setPlannedWorkouts(generatedSplit);
-      setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+      setPendingPlans(generatedSplit);
+      setPendingSchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+    } else {
+      // User already has plans — skip the offer, complete directly.
+      setPendingPlans(null);
+      setPendingSchedule(null);
     }
     if (!existingGoals) {
       setMacroGoals(
@@ -332,16 +345,46 @@ export default function Onboarding() {
       } catch {}
     }
 
+    setIsFinishing(false);
+    setSavedFirstName(nameToSave.split(' ')[0] || 'Athlete');
+
+    // If we generated plans, ask the user BEFORE adding them.
+    // If they already had plans, complete directly.
+    // Note: use generatedSplit directly — setPendingPlans hasn't applied yet.
+    const hasNewPlans = !existingPlans || existingPlans.length === 0;
+    if (hasNewPlans && generatedSplit && generatedSplit.length > 0) {
+      setCurrentScreen('plan_offer');
+    } else {
+      completeOnboarding();
+    }
+  };
+
+  const completeOnboarding = () => {
     toast.success(
-      `Welcome to ASCEND, ${nameToSave.split(' ')[0]}!`,
-      'Training Program Ready'
+      `Welcome to ASCEND, ${savedFirstName}!`,
+      pendingPlans ? 'Training Program Ready' : 'You\'re All Set'
     );
-    // Land first-time athletes on the Today dashboard, not wherever the
-    // persisted tab pointer was left by a previous session.
     try {
       navigate('home', { clearHistory: true });
     } catch {}
-    setIsFinishing(false);
+  };
+
+  const handleAcceptPlans = () => {
+    if (pendingPlans && pendingPlans.length > 0) {
+      setPlannedWorkouts(pendingPlans);
+      if (pendingSchedule) {
+        setWeeklySchedule(pendingSchedule);
+      }
+    }
+    setPendingPlans(null);
+    setPendingSchedule(null);
+    completeOnboarding();
+  };
+
+  const handleDeclinePlans = () => {
+    setPendingPlans(null);
+    setPendingSchedule(null);
+    completeOnboarding();
   };
 
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -528,6 +571,43 @@ export default function Onboarding() {
         onBack={() => setCurrentScreen('experience')}
         loading={isFinishing}
       />
+    );
+  }
+
+  // ── SCREEN 8: PLAN OFFER — ask BEFORE adding any generated plans ──────────
+  if (currentScreen === 'plan_offer') {
+    const planCount = pendingPlans?.length || 0;
+    const planNames = (pendingPlans || []).slice(0, 4).map((p: any) => p.name || 'Workout').join(', ');
+    return (
+      <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
+        <StepProgressBar currentStep={3} onBack={() => setCurrentScreen('details')} />
+        <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
+          <div className="text-left space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+              Want your training plan?
+            </h1>
+            <p className="text-sm text-[#171916]/70">
+              Based on your goals, I put together {planCount} workouts{planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : ''}. Add {planCount === 1 ? 'it' : 'them'} to your training, or skip and build your own.
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleAcceptPlans}
+              className="w-full py-4 px-6 rounded-2xl bg-[#171916] text-[#F3F0E7] font-bold text-base active:scale-[0.98] transition-transform"
+            >
+              Yes, add my plan
+            </button>
+            <button
+              type="button"
+              onClick={handleDeclinePlans}
+              className="w-full py-4 px-6 rounded-2xl bg-transparent border-2 border-[#171916]/20 text-[#171916] font-semibold text-base active:scale-[0.98] transition-transform"
+            >
+              No thanks, I&apos;ll build my own
+            </button>
+          </div>
+        </div>
+      </div>
     );
   }
 

@@ -22,6 +22,7 @@ import {
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
+import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -273,7 +274,9 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div>
                 <p className="text-xs font-bold text-text-primary">Fitness Goals</p>
                 <p className="text-3xs text-text-muted">
-                  {goals.length > 0 ? `${goals.length} ${plural(goals.length, 'active target goal')}` : 'Strength & Hypertrophy'}
+                  {goals.length > 0
+                    ? goals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(', ')
+                    : 'Strength & Hypertrophy'}
                 </p>
               </div>
             </div>
