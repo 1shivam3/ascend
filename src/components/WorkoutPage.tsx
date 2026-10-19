@@ -59,6 +59,7 @@ import {
   createWorkoutExercisesFromPlan,
   getExercisePrescription,
 } from '@/lib/workout-engine';
+import { compareSetAdherence } from '@/lib/workout-adherence';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
@@ -413,9 +414,10 @@ interface PlanCardProps {
   onDelete: () => void;
   onShare: () => void;
   onDuplicate: () => void;
+  onOpen: () => void;
 }
 
-function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: PlanCardProps) {
+function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -424,7 +426,14 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
     <div className="card flex flex-col gap-3">
       {/* Card top row */}
       <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div
+          className="min-w-0 cursor-pointer"
+          onClick={onOpen}
+          role="button"
+          tabIndex={0}
+          aria-label={`View details for ${plan.name}`}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
+        >
           <h3 className="font-bold text-text-primary line-clamp-2 leading-tight">{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
@@ -1318,6 +1327,22 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     // completed sets is saved with zero sets, not phantom planned ones.
     const exercisesToSave = getExecutedExercises(validExercises);
 
+    // Honest denominator for adherence: count prescribed sets in the FULL
+    // session (before filtering to executed), so finishing 1 of 18 sets
+    // reports 1/18 — not a re-baselined 1/1 = 100%.
+    let plannedTotalSets: number | undefined;
+    {
+      let prescribed = 0;
+      for (const ex of validExercises) {
+        for (let idx = 0; idx < (ex.sets || []).length; idx++) {
+          try {
+            if (compareSetAdherence(ex.sets[idx], ex.name || '', idx).isPrescribed) prescribed++;
+          } catch { /* treat unparseable sets as unprescribed */ }
+        }
+      }
+      if (prescribed > 0) plannedTotalSets = prescribed;
+    }
+
     const sessionDurationSeconds = Math.max(1, Math.round((Date.now() - sessionStartTime) / 1000));
     const durationMin = Math.round(sessionDurationSeconds / 60);
 
@@ -1326,6 +1351,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       date,
       name: startedFromPlan || undefined,
       planId: startedFromPlanId || undefined,
+      plannedTotalSets,
       durationMinutes: durationMin,
       durationSeconds: sessionDurationSeconds,
       exercises: exercisesToSave,
@@ -1434,6 +1460,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         exercises: planData.exercises,
       });
       toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
+      // If the edited plan is open in the detail view, refresh it so the
+      // view reflects the saved changes instead of the stale snapshot.
+      if (selectedDetailsPlan && selectedDetailsPlan.id === editingPlan.id) {
+        const refreshed = useStore.getState().plannedWorkouts.find((p) => p.id === editingPlan.id);
+        if (refreshed) setSelectedDetailsPlan(refreshed);
+      }
     } else {
       const newPlan: PlannedWorkout = {
         id: safeRandomId('plan'),
@@ -1487,6 +1519,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     deletePlannedWorkout(plan.id);
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
     setPlanToDelete(null);
+    // If the deleted plan was open in the detail view, close that view too.
+    if (selectedDetailsPlan && selectedDetailsPlan.id === plan.id) {
+      setSelectedDetailsPlan(null);
+    }
   };
 
   const handleDuplicatePlan = (plan: PlannedWorkout) => {
@@ -1800,18 +1836,74 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return result;
   }, [plannedWorkouts, adaptiveSplitTemplates, userUnit]);
 
+  // NOTE: the plan detail view replaces the main list render, but the modals
+  // below MUST stay mounted — Share/Edit/Delete are all reachable from the
+  // detail view's top bar. (Previously the early return skipped them, so
+  // tapping Share/Edit silently armed the modal state and it popped open
+  // only after going Back — and Delete had no entry point at all.)
   if (selectedDetailsPlan && !isModalOpen) {
     return (
-      <WorkoutDetailsView
-        plan={selectedDetailsPlan}
-        onBack={() => setSelectedDetailsPlan(null)}
-        onStart={(p) => {
-          setSelectedDetailsPlan(null);
-          handleStartPlan(p);
-        }}
-        onEdit={handleEditPlan}
-        onShare={(p) => setSharingPlan(p)}
-      />
+      <>
+        <WorkoutDetailsView
+          plan={selectedDetailsPlan}
+          onBack={() => setSelectedDetailsPlan(null)}
+          onStart={(p) => {
+            setSelectedDetailsPlan(null);
+            handleStartPlan(p);
+          }}
+          onEdit={handleEditPlan}
+          onShare={(p) => setSharingPlan(p)}
+          onDelete={(p) => setPlanToDelete(p)}
+        />
+
+        {/* ── Plan Delete Confirmation (also reachable from detail view) ─── */}
+        {/* NOTE: these overlays must sit above the detail view itself (z-[60]),
+            so each is wrapped in a z-[70] stacking context. Without this the
+            modals render *behind* the detail page. */}
+        <div className="relative z-[70]">
+          <ConfirmationModal
+            isOpen={!!planToDelete}
+            onClose={() => setPlanToDelete(null)}
+            onConfirm={confirmDeletePlan}
+            title="Delete this plan?"
+            message={
+              planToDelete &&
+              activeWorkoutDraft &&
+              (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
+                activeWorkoutDraft.planId === planToDelete.id)
+                ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+                : planToDelete
+                  ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+                  : ''
+            }
+            confirmText="Delete Plan"
+            cancelText="Keep"
+            variant="danger"
+          />
+        </div>
+
+        {/* ── Plan Create/Edit Modal (also reachable from detail view) ───── */}
+        <div className="relative z-[70]">
+          <PlanModal
+            isOpen={isPlanModalOpen}
+            onClose={() => { setIsPlanModalOpen(false); setEditingPlan(null); }}
+            initial={editingPlan}
+            availableExercises={availableExercises}
+            userUnit={userUnit}
+            defaultTargetReps={defaultTargetReps}
+            onSave={handleSavePlan}
+          />
+        </div>
+
+        {/* ── Share Program Modal (also reachable from detail view) ───────── */}
+        <div className="relative z-[70]">
+          <ShareProgramModal
+            plan={sharingPlan}
+            isOpen={Boolean(sharingPlan)}
+            onClose={() => setSharingPlan(null)}
+          />
+        </div>
+      </>
     );
   }
 
@@ -2201,6 +2293,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     onDelete={() => handleDeletePlan(plan)}
                     onShare={() => setSharingPlan(plan)}
                     onDuplicate={() => handleDuplicatePlan(plan)}
+                    onOpen={() => setSelectedDetailsPlan(plan)}
                   />
                 ))}
               </div>

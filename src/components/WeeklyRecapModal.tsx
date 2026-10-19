@@ -212,9 +212,9 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
     // ── 5. Stat tiles: sessions / sets / streak proxy (PR count) ──
     const tiles = [
-      { value: `${weeklyStats.workoutsCount}`, label: 'SESSIONS' },
-      { value: `${weeklyStats.totalSets}`, label: 'SETS' },
-      { value: `${weeklyStats.recentPRs.length}`, label: 'NEW PRS' },
+      { value: `${weeklyStats.workoutsCount}`, label: weeklyStats.workoutsCount === 1 ? 'SESSION' : 'SESSIONS' },
+      { value: `${weeklyStats.totalSets}`, label: weeklyStats.totalSets === 1 ? 'SET' : 'SETS' },
+      { value: `${weeklyStats.recentPRs.length}`, label: weeklyStats.recentPRs.length === 1 ? 'NEW PR' : 'NEW PRS' },
     ];
     const tileW = 300;
     const tileH = 150;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -46,7 +46,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const logout = useStore((state) => state.logout);
   const toast = useToast();
 
-  const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
+  const { goBack, canGoBack } = useAppNavigation();
   const { user, signOut } = useSupabaseSync();
 
   // Modals
@@ -69,12 +69,9 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     }
   }, [onBack, canGoBack, goBack, onNavigate]);
 
-  useEffect(() => {
-    return registerBackHandler(() => {
-      handleBack();
-      return true;
-    }, 45);
-  }, [registerBackHandler, handleBack]);
+  // NOTE: no system-back handler is registered in page mode. Tab-level back is
+  // already handled by the navigation stack; registering handleBack here would
+  // recurse (handleBack -> goBack -> runBackHandlers -> handleBack ...).
 
   const handleConfirmLogout = async () => {
     setShowLogoutConfirm(false);

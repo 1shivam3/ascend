@@ -49,6 +49,7 @@ import {
   applyExerciseEffortRating,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
+import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
@@ -1625,11 +1626,28 @@ export default function ActiveWorkoutScreen({
     // completed sets is saved with zero sets, not 17 phantom ones.
     const exercisesToSave = getExecutedExercises(validExercises);
 
+    // Honest denominator for adherence: count prescribed sets in the FULL
+    // session (before filtering to executed), so finishing 1 of 17 sets
+    // reports 1/17 — not a re-baselined 1/1 = 100%.
+    let plannedTotalSets: number | undefined;
+    {
+      let prescribed = 0;
+      for (const ex of validExercises) {
+        for (let idx = 0; idx < (ex.sets || []).length; idx++) {
+          try {
+            if (compareSetAdherence(ex.sets[idx], ex.name || '', idx).isPrescribed) prescribed++;
+          } catch { /* treat unparseable sets as unprescribed */ }
+        }
+      }
+      if (prescribed > 0) plannedTotalSets = prescribed;
+    }
+
     const workoutEntry: WorkoutEntry = {
       id: safeRandomId('wk'),
       date: today,
       name: workoutName,
       planId,
+      plannedTotalSets,
       durationMinutes: Math.round(elapsedSeconds / 60),
       durationSeconds: elapsedSeconds,
       exercises: exercisesToSave,

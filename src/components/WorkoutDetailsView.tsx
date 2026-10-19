@@ -8,6 +8,7 @@ import {
   Play,
   Edit2,
   Share2,
+  Trash2,
   Clock,
   Flame,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ interface WorkoutDetailsViewProps {
   onStart: (plan: PlannedWorkout) => void;
   onEdit?: (plan: PlannedWorkout) => void;
   onShare?: (plan: PlannedWorkout) => void;
+  onDelete?: (plan: PlannedWorkout) => void;
 }
 
 export default function WorkoutDetailsView({
@@ -30,6 +32,7 @@ export default function WorkoutDetailsView({
   onStart,
   onEdit,
   onShare,
+  onDelete,
 }: WorkoutDetailsViewProps) {
   const { profile, workouts } = useStore();
   const userUnit = profile?.unit || 'kg';
@@ -84,6 +87,16 @@ export default function WorkoutDetailsView({
               className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Edit2 className="w-4 h-4 text-[#858076]" />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(plan)}
+              aria-label="Delete workout plan"
+              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+            >
+              <Trash2 className="w-4 h-4 text-[#858076]" />
             </button>
           )}
         </div>
