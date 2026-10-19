@@ -39,6 +39,7 @@ import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from 
 import { getDailyQuote } from '@/lib/quotes';
 import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
+import ReminderCenterModal from '@/components/ReminderCenterModal';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress' | 'profile' | 'settings') => void;
@@ -164,6 +165,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Modal triggers
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
@@ -700,12 +702,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 type="button"
                 onClick={() => {
                   setIsNotificationsOpen(false);
-                  setIsSettingsOpen(true);
+                  setIsReminderCenterOpen(true);
                 }}
                 className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-xs font-semibold text-text-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <Settings className="w-4 h-4 text-text-muted" />
-                <span>Open Settings</span>
+                <Bell className="w-4 h-4 text-text-muted" />
+                <span>Notification Settings</span>
               </button>
             </div>
           </div>
@@ -852,6 +854,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+
+      {/* ── NOTIFICATION SETTINGS (Reminder Center) ────────────────────────── */}
+      <ReminderCenterModal
+        isOpen={isReminderCenterOpen}
+        onClose={() => setIsReminderCenterOpen(false)}
       />
 
       {/* ── SUGGESTED WORKOUT MODAL ────────────────────────────────────────── */}
