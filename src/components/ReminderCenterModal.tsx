@@ -149,7 +149,16 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       }
       try {
         if (hasAnyEnabled) {
-          await subscribeToPush();
+          const result = await subscribeToPush();
+          if (!result.success && result.error) {
+            // Surface push setup failures — the user allowed permission but
+            // server push isn't configured. Local reminders still work.
+            console.warn('Push subscription notice:', result.error);
+            toast.info(
+              'Reminders will appear while the app is open. Background push is not configured on the server.',
+              'Local Reminders Active'
+            );
+          }
         } else {
           await unsubscribeFromPush();
         }
@@ -589,6 +598,23 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             Copy Preferences
           </Button>
           <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                const { sendTestNotification } = await import('@/lib/local-reminder-scheduler');
+                const ok = await sendTestNotification();
+                if (ok) {
+                  toast.success('Test notification sent! Check your notification tray.', 'Test Sent');
+                } else {
+                  toast.error('Could not send test notification. Please allow notification permission first.', 'Test Failed');
+                }
+              }}
+              className="text-2xs"
+              title="Send a test notification right now"
+            >
+              Test
+            </Button>
             <Button variant="secondary" size="sm" onClick={onClose} className="text-2xs">
               Cancel
             </Button>
