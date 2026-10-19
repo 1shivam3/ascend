@@ -56,44 +56,50 @@ export function buildTabUrl(tab: TabId, progressTab?: ProgressTabId): string {
   }
 }
 
+export /** True only for a genuine fresh navigation (typed URL, link, deep-link open) —
+ *  NOT for reloads or back/forward restores, which should land on Home. */
+function isFreshNavigation(): boolean {
+  try {
+    const nav = performance.getEntriesByType('navigation')[0] as
+      | PerformanceNavigationTiming
+      | undefined;
+    return !nav || nav.type === 'navigate';
+  } catch {
+    return true;
+  }
+}
+
 export function getInitialNavigationState(): { tab: TabId; progressTab: ProgressTabId } {
   if (typeof window === 'undefined') {
     return { tab: 'home', progressTab: 'overview' };
   }
 
   try {
-    const params = new URLSearchParams(window.location.search);
-    const tabParam = params.get('tab');
-    const subParam = params.get('sub') as ProgressTabId | null;
+    // URL deep-links (?tab=...) are honored only on a fresh navigation.
+    // Reloads / restored sessions always land on Home.
+    if (isFreshNavigation()) {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      const subParam = params.get('sub') as ProgressTabId | null;
 
-    // 'today' is a supported deep-link alias for the home (Today) view.
-    const resolvedTab = (tabParam === 'today' ? 'home' : tabParam) as TabId | null;
-    if (resolvedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(resolvedTab)) {
-      if (resolvedTab === 'prs') {
-        return { tab: 'progress', progressTab: 'prs' };
+      // 'today' is a supported deep-link alias for the home (Today) view.
+      const resolvedTab = (tabParam === 'today' ? 'home' : tabParam) as TabId | null;
+      if (resolvedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(resolvedTab)) {
+        if (resolvedTab === 'prs') {
+          return { tab: 'progress', progressTab: 'prs' };
+        }
+        return {
+          tab: resolvedTab,
+          progressTab: subParam && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(subParam)
+            ? subParam
+            : 'overview',
+        };
       }
-      return {
-        tab: resolvedTab,
-        progressTab: subParam && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(subParam)
-          ? subParam
-          : 'overview',
-      };
     }
 
-    // Secondary fallback: check localStorage for explicitly persisted tab
-    const savedTab = localStorage.getItem('ascend_active_tab') as TabId | null;
-    const savedSubTab = localStorage.getItem('ascend_progress_subtab') as ProgressTabId | null;
-    if (savedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(savedTab)) {
-      if (savedTab === 'prs') {
-        return { tab: 'progress', progressTab: 'prs' };
-      }
-      return {
-        tab: savedTab,
-        progressTab: savedSubTab && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(savedSubTab)
-          ? savedSubTab
-          : 'overview',
-      };
-    }
+    // Fresh app launch / reload always starts on the home tab. The
+    // last-visited tab is never restored from storage or the URL —
+    // reopening the app always lands on Home.
   } catch {}
 
   return { tab: 'home', progressTab: 'overview' };
@@ -171,7 +177,8 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
 
       const targetUrl = buildTabUrl(targetTab, targetProgressTab);
 
-      // Persist to localStorage immediately so refresh stays on this tab
+      // Persist to localStorage so mid-session state is written (read on launch
+      // is intentionally disabled — fresh launches always land on Home).
       if (typeof window !== 'undefined') {
         try {
           localStorage.setItem('ascend_active_tab', targetTab);
@@ -377,6 +384,28 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       window.removeEventListener('popstate', handlePopState);
     };
   }, [runBackHandlers, toast]);
+
+  // "Exited the app" behavior: when the page returns from being backgrounded
+  // for a while (app switcher / screen off), land on Home. Short hops away
+  // (checking a message mid-workout) keep the current tab.
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+    let hiddenAt = 0;
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        hiddenAt = Date.now();
+      } else if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000) {
+        hiddenAt = 0;
+        if (activeTabRef.current !== 'home') {
+          navigate('home', { clearHistory: true });
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [navigate]);
 
   const canGoBack = activeTab !== 'home' || historyStack.length > 1;
 

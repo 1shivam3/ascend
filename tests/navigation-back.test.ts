@@ -220,12 +220,12 @@ describe('Tab URL Synchronization & Refresh Persistence', () => {
     expect(initial.progressTab).toBe('prs');
   });
 
-  it('falls back to localStorage when URL search params are absent (PWA relaunch / refresh at root)', () => {
+  it('always starts on home on fresh launch even when localStorage has a saved tab', () => {
     window.history.replaceState({}, '', '/');
     localStorage.setItem('ascend_active_tab', 'meals');
 
     const initial = getInitialNavigationState();
-    expect(initial.tab).toBe('meals');
+    expect(initial.tab).toBe('home');
   });
 
   it('defaults to home when both URL params and localStorage are empty', () => {

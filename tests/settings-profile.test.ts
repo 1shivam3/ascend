@@ -189,6 +189,14 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
   });
 
   describe('3. Screen 23 — Settings View Preferences and Data Management', () => {
+    it('always renders a back button wired to onBack (regression: stuck-in-settings)', () => {
+      const html = renderWithProviders(
+        React.createElement(SettingsView, { onBack: () => {}, isModal: true })
+      );
+      // The back affordance must always exist — no dead ends.
+      expect(html).toContain('aria-label="Back"');
+    });
+
     it('renders all preference controls and sections', () => {
       const html = renderWithProviders(React.createElement(SettingsView, {}));
 

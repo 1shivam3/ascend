@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X, User, Check, Scale, Ruler } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
+import { resizeAndCompressImage } from '@/lib/image-processing';
 
 export interface EditProfileModalProps {
   isOpen: boolean;
@@ -30,6 +31,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
   const [weight, setWeight] = useState<string>('');
   const [height, setHeight] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -64,11 +68,38 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
         setHeight('');
       }
 
+      setAvatar(profile.avatar);
       setErrors({});
     }
   }, [isOpen, profile]);
 
   if (!isOpen || !profile) return null;
+
+  const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    try {
+      const processed = await resizeAndCompressImage(file, {
+        maxDimension: 256,
+        quality: 0.7,
+        format: 'image/jpeg',
+      });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Could not read the photo.'));
+        reader.readAsDataURL(processed.blob);
+      });
+      setAvatar(dataUrl);
+      toast.success('Profile photo updated.', 'Photo Set');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not set the photo.', 'Upload Failed');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleUnitToggle = (nextUnit: Unit) => {
     if (nextUnit === unit) return;
@@ -152,6 +183,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       bodyweightKg: weightKg,
       bodyweightLbs: weightLbs,
       heightCm: parsedHeightCm || profile.heightCm,
+      avatar,
     });
 
     // Also update body metrics entry
@@ -196,6 +228,62 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
         </div>
 
         <form onSubmit={handleSave} className="space-y-4">
+          {/* Profile Photo */}
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={avatar}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover border-2 border-accent/40"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-accent/15 border-2 border-accent/40 flex items-center justify-center font-bold text-accent text-2xl font-mono">
+                  {(name || profile.name || 'A').trim().charAt(0).toUpperCase()}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+                title="Change profile photo"
+                aria-label="Change profile photo"
+              >
+                <Camera className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="text-xs font-bold text-accent hover:underline text-left cursor-pointer disabled:opacity-50"
+              >
+                {isUploadingAvatar ? 'Uploading…' : avatar ? 'Change photo' : 'Add photo'}
+              </button>
+              {avatar && (
+                <button
+                  type="button"
+                  onClick={() => setAvatar(undefined)}
+                  className="text-2xs font-semibold text-text-muted hover:text-danger flex items-center gap-1 text-left cursor-pointer"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Remove photo
+                </button>
+              )}
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarSelect}
+              aria-label="Profile photo picker"
+            />
+          </div>
+
           {/* Full Name */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-text-secondary font-sans">Full Name</label>
