@@ -12,7 +12,7 @@ import {
   Dumbbell,
   Settings,
   Sparkles,
-  Utensils,
+  Camera,
   Barcode,
   Scale,
   Trophy,
@@ -117,6 +117,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return days;
   }, [workouts, today]);
 
+  // Last-7-days consistency dots (rolling, ending today) — compact glanceable
+  // version of the Progress > Consistency view, reusing the same workout-days logic.
+  const last7Days = useMemo(() => {
+    const workoutDays = new Set(workouts.map((w) => w.date.split('T')[0]));
+    const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      const dStr = toLocalDateString(d);
+      return {
+        label: labels[d.getDay()],
+        dateStr: dStr,
+        isToday: dStr === todayStr,
+        completed: workoutDays.has(dStr),
+      };
+    });
+  }, [workouts, today, todayStr]);
+  const weekCompletedCount = last7Days.filter((d) => d.completed).length;
+
   // Rotating motivational quote, personalized by gender when known.
   const dailyQuote = useMemo(() => getDailyQuote(profile?.gender ?? null), [profile?.gender]);
 
@@ -203,6 +222,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsWeightModalOpen(false); return true; }, 100);
     }
   }, [isWeightModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isScanMealModalOpen) {
+      return registerBackHandler(() => { setIsScanMealModalOpen(false); return true; }, 100);
+    }
+  }, [isScanMealModalOpen, registerBackHandler]);
 
   // Routine selection handler (satisfies plan-sync test contract)
   const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
@@ -478,16 +503,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </div>
 
       {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-3 gap-2.5">
         <button
           type="button"
-          onClick={() => onNavigate('meals')}
+          onClick={() => setIsScanMealModalOpen(true)}
           className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
         >
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Utensils className="w-4 h-4" />
+            <Camera className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">Log Meal</span>
+          <span className="text-3xs font-semibold text-text-secondary">Meal Scan</span>
         </button>
         <button
           type="button"
@@ -508,16 +533,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <Scale className="w-4 h-4" />
           </span>
           <span className="text-3xs font-semibold text-text-secondary">Weight</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => handleStartWorkoutFromHome()}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-        >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Play className="w-4 h-4" />
-          </span>
-          <span className="text-3xs font-semibold text-text-secondary">Workout</span>
         </button>
       </div>
 
@@ -581,6 +596,45 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <p className="text-xs text-text-muted italic mt-2 leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
         <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
       </div>
+
+      {/* ── 7b. CONSISTENCY STRIP (compact Progress > Consistency glance) ───── */}
+      <button
+        type="button"
+        onClick={() => onNavigate('progress')}
+        className="w-full bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs text-left active:scale-[0.99] transition-all cursor-pointer"
+        aria-label="View consistency details"
+      >
+        <div className="flex items-center justify-between mb-2.5">
+          <span className="text-xs font-bold text-text-primary">Consistency</span>
+          <span className="text-3xs font-mono text-text-muted tabular-nums">
+            {weekCompletedCount}/7 this week
+          </span>
+        </div>
+        <div className="flex items-center justify-between px-1">
+          {last7Days.map((d) => (
+            <div key={d.dateStr} className="flex flex-col items-center gap-1.5">
+              <span
+                className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
+                  d.completed
+                    ? 'bg-accent text-white'
+                    : d.isToday
+                    ? 'border-2 border-accent/60'
+                    : 'bg-border/50'
+                }`}
+              >
+                {d.completed && <Check className="w-3.5 h-3.5" />}
+              </span>
+              <span
+                className={`text-3xs font-mono ${
+                  d.isToday ? 'text-accent font-bold' : 'text-text-muted'
+                }`}
+              >
+                {d.label}
+              </span>
+            </div>
+          ))}
+        </div>
+      </button>
 
       {/* ── 8. LATEST PR (hidden when none) ─────────────────────────────── */}
       {latestPr && (
