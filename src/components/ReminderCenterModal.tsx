@@ -42,8 +42,8 @@ const DAYS_OF_WEEK = [
 export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterModalProps) {
   useEscapeToClose(isOpen, onClose);
   const toast = useToast();
-  const notificationPreferences = useStore((state) => (state as any).notificationPreferences) || DEFAULT_NOTIFICATION_PREFERENCES;
-  const setNotificationPreferences = useStore((state) => (state as any).setNotificationPreferences);
+  const notificationPreferences = useStore((state) => state.notificationPreferences) || DEFAULT_NOTIFICATION_PREFERENCES;
+  const setNotificationPreferences = useStore((state) => state.setNotificationPreferences);
 
   const [prefs, setPrefs] = useState<NotificationPreferences>(notificationPreferences);
   const [permissionState, setPermissionState] = useState<NotificationPermission>('default');

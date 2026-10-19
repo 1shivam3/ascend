@@ -8,6 +8,8 @@ import {
   WorkoutExercise,
   MealEntry,
   Theme,
+  NotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
   BodyMetricEntry,
   MacroGoals,
   PlannedWorkout,
@@ -109,6 +111,10 @@ export interface AppState {
   // Food Portion Memory
   userPortionPreferences: Record<string, number>;
   savePortionPreference: (foodName: string, grams: number) => void;
+
+  // Notification Preferences
+  notificationPreferences: NotificationPreferences;
+  setNotificationPreferences: (prefs: NotificationPreferences) => void;
 
   // AI Training Profile & Plans
   trainingProfile: AITrainingProfile;
@@ -339,6 +345,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   trainingDecisions: state.trainingDecisions,
   decisionsLedgerHistory: state.decisionsLedgerHistory,
   lifterProfile: state.lifterProfile,
+  notificationPreferences: state.notificationPreferences,
   policyDecisionRecords: state.policyDecisionRecords,
   policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
   policyDecisionApplications: state.policyDecisionApplications,
@@ -425,6 +432,20 @@ export const useAppStore = create<AppState>()(
 
       // Portion Preferences
       userPortionPreferences: {},
+
+      // Notification Preferences — loaded from localStorage if present
+      notificationPreferences: (() => {
+        try {
+          if (typeof localStorage !== 'undefined') {
+            const saved = localStorage.getItem('ascend_notification_prefs');
+            if (saved) return JSON.parse(saved);
+          }
+        } catch {}
+        return DEFAULT_NOTIFICATION_PREFERENCES;
+      })(),
+      setNotificationPreferences: (prefs) => set(() => ({
+        notificationPreferences: prefs,
+      })),
 
       // Habit State
       waterLogs: {},
