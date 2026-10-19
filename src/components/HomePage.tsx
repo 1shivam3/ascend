@@ -39,6 +39,7 @@ import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from 
 import { getDailyQuote } from '@/lib/quotes';
 import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
+import XPDisplay from '@/components/XPDisplay';
 
 interface HomePageProps {
   onNavigate: (tab: 'home' | 'prs' | 'workout' | 'meals' | 'progress' | 'profile' | 'settings') => void;
@@ -395,6 +396,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </header>
+
+      {/* ── XP LEVEL (Gamification) ─────────────────────────────────────────── */}
+      <XPDisplay />
 
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
       <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs transition-all">

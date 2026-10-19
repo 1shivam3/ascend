@@ -2402,13 +2402,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
         {sortedWorkouts.length === 0 ? (
           <div className="card text-center py-8 px-4 space-y-2.5">
-            <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center text-accent mx-auto">
-              <Dumbbell className="w-5 h-5" />
-            </div>
+            <img
+              src="/images/illustrations/empty-workouts.webp"
+              alt="No workouts yet"
+              className="w-32 h-32 object-contain mx-auto"
+              loading="lazy"
+            />
             <div>
               <p className="text-sm font-bold text-text-primary">Your journey starts here.</p>
               <p className="text-xs text-text-muted mt-1 max-w-xs mx-auto">
-                Completed training sessions, logged sets, and volume metrics will appear here.
+                Completed training sessions will appear here. Tap "Log Workout" to begin!
               </p>
             </div>
           </div>

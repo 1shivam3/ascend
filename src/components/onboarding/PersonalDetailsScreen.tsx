@@ -159,8 +159,18 @@ export default function PersonalDetailsScreen({
             Tell us about yourself
           </h1>
           <p className="text-sm text-[#858076]">
-            This helps us calculate your strength standards, nutrition targets, and workout progression.
+            We&apos;ll use this to personalize your targets.
           </p>
+        </div>
+
+        {/* Illustration */}
+        <div className="flex justify-center">
+          <img
+            src="/images/illustrations/onboarding-welcome.webp"
+            alt="Welcome to your fitness journey"
+            className="w-40 h-40 object-contain"
+            loading="eager"
+          />
         </div>
 
         {/* Error Banner */}

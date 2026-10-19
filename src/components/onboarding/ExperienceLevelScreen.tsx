@@ -58,8 +58,18 @@ export default function ExperienceLevelScreen({
             What&apos;s your experience level?
           </h1>
           <p className="text-sm text-[#858076]">
-            This customizes your starting training volume and progression rate.
+            We&apos;ll match your starting workouts to your level.
           </p>
+        </div>
+
+        {/* Illustration */}
+        <div className="flex justify-center">
+          <img
+            src="/images/illustrations/onboarding-experience.webp"
+            alt="Fitness journey from beginner to advanced"
+            className="w-48 h-48 object-contain"
+            loading="eager"
+          />
         </div>
 
         {/* 3 Single-Select Cards */}

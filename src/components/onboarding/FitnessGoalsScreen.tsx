@@ -12,37 +12,38 @@ interface GoalItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
-// Titles come from the canonical ATHLETE_GOAL_CONFIGS so onboarding,
-// Profile and every other surface name goals identically.
+// Titles and subtitles come from the canonical ATHLETE_GOAL_CONFIGS so onboarding,
+// Profile and every other surface name goals identically. Subtitles are plain
+// English — no jargon (novice-friendly).
 const GOAL_OPTIONS: GoalItem[] = [
   {
     id: 'build_muscle',
     title: ATHLETE_GOAL_CONFIGS.build_muscle.label,
-    subtitle: 'Hypertrophy volume & progressive overload',
+    subtitle: ATHLETE_GOAL_CONFIGS.build_muscle.tagline,
     icon: Dumbbell,
   },
   {
     id: 'lose_fat',
     title: ATHLETE_GOAL_CONFIGS.lose_fat.label,
-    subtitle: 'Calorie deficit & lean mass preservation',
+    subtitle: ATHLETE_GOAL_CONFIGS.lose_fat.tagline,
     icon: Flame,
   },
   {
     id: 'get_stronger',
     title: ATHLETE_GOAL_CONFIGS.get_stronger.label,
-    subtitle: 'Heavy compound lifts & raw power',
+    subtitle: ATHLETE_GOAL_CONFIGS.get_stronger.tagline,
     icon: Shield,
   },
   {
     id: 'stamina',
     title: ATHLETE_GOAL_CONFIGS.stamina.label,
-    subtitle: 'Work capacity, stamina & cardiovascular fitness',
+    subtitle: ATHLETE_GOAL_CONFIGS.stamina.tagline,
     icon: Activity,
   },
   {
     id: 'general_fitness',
     title: ATHLETE_GOAL_CONFIGS.general_fitness.label,
-    subtitle: 'Longevity, joint health & balanced training',
+    subtitle: ATHLETE_GOAL_CONFIGS.general_fitness.tagline,
     icon: CheckCircle2,
   },
 ];
@@ -77,6 +78,16 @@ export default function FitnessGoalsScreen({
           <p className="text-sm text-[#858076]">
             Select all that apply.
           </p>
+        </div>
+
+        {/* Illustration */}
+        <div className="flex justify-center">
+          <img
+            src="/images/illustrations/onboarding-goals.webp"
+            alt="People pursuing different fitness goals"
+            className="w-48 h-48 object-contain"
+            loading="eager"
+          />
         </div>
 
         {/* 5 Multi-Select Cards in exact order */}
