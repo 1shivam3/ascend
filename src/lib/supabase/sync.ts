@@ -626,7 +626,10 @@ class SupabaseSyncEngine {
       const updates: any = {};
 
       if (remoteProfile.data) {
-        // Authoritative cloud profile for the authenticated account
+        // Authoritative cloud profile for the authenticated account.
+        // NOTE: the avatar lives only on this device (no avatar column in
+        // cloud profiles) — always preserve the local one, otherwise every
+        // sync wipes the user's profile picture.
         const rp = remoteProfile.data;
         updates.profile = {
           id: rp.id,
@@ -639,6 +642,7 @@ class SupabaseSyncEngine {
           goals: rp.goals || ['build_muscle'],
           dietPreference: rp.diet_preference || 'non_vegetarian',
           createdAt: rp.created_at,
+          avatar: localState.profile?.avatar,
         };
         updates.hasCompletedOnboarding = true;
         needsLocalUpdate = true;
