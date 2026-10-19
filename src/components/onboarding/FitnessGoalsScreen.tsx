@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Dumbbell, Flame, Shield, Activity, CheckCircle2, Check } from 'lucide-react';
-import { AthleteGoal } from '@/lib/types';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
 
 interface GoalItem {
@@ -12,34 +12,36 @@ interface GoalItem {
   icon: React.ComponentType<{ className?: string }>;
 }
 
+// Titles come from the canonical ATHLETE_GOAL_CONFIGS so onboarding,
+// Profile and every other surface name goals identically.
 const GOAL_OPTIONS: GoalItem[] = [
   {
     id: 'build_muscle',
-    title: 'Build Muscle',
+    title: ATHLETE_GOAL_CONFIGS.build_muscle.label,
     subtitle: 'Hypertrophy volume & progressive overload',
     icon: Dumbbell,
   },
   {
     id: 'lose_fat',
-    title: 'Lose Weight',
+    title: ATHLETE_GOAL_CONFIGS.lose_fat.label,
     subtitle: 'Calorie deficit & lean mass preservation',
     icon: Flame,
   },
   {
     id: 'get_stronger',
-    title: 'Get Stronger',
+    title: ATHLETE_GOAL_CONFIGS.get_stronger.label,
     subtitle: 'Heavy compound lifts & raw power',
     icon: Shield,
   },
   {
     id: 'stamina',
-    title: 'Improve Endurance',
+    title: ATHLETE_GOAL_CONFIGS.stamina.label,
     subtitle: 'Work capacity, stamina & cardiovascular fitness',
     icon: Activity,
   },
   {
     id: 'general_fitness',
-    title: 'General Fitness',
+    title: ATHLETE_GOAL_CONFIGS.general_fitness.label,
     subtitle: 'Longevity, joint health & balanced training',
     icon: CheckCircle2,
   },

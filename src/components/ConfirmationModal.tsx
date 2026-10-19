@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { AlertTriangle, Trash2, LogOut, X, Loader2 } from 'lucide-react';
 import { useAppNavigation } from '@/lib/navigation';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 export interface ConfirmationModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export default function ConfirmationModal({
 }: ConfirmationModalProps) {
   const [typedValue, setTypedValue] = useState('');
   const { registerBackHandler } = useAppNavigation();
+  useEscapeToClose(isOpen, onClose);
 
   // Register Android / browser back handler to dismiss modal
   useEffect(() => {

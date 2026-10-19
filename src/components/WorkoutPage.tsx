@@ -66,7 +66,7 @@ import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
@@ -75,6 +75,7 @@ import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LogPastWorkoutModal from '@/components/LogPastWorkoutModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import PlanVsActualReview from '@/components/PlanVsActualReview';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import {
   DAYS_OF_WEEK,
   DAY_DISPLAY_INFO,
@@ -140,6 +141,7 @@ function PlanModal({
 
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
   const [targetExerciseIndex, setTargetExerciseIndex] = useState<number | null>(null);
+  const toast = useToast();
 
   const updateExercise = useCallback((idx: number, field: keyof PlannedExercise, value: unknown) => {
     setPlanExercises(prev => prev.map((ex, i) => i === idx ? { ...ex, [field]: value } : ex));
@@ -177,10 +179,33 @@ function PlanModal({
   };
 
   const handleSave = () => {
-    const trimmedName = planName.trim();
-    if (!trimmedName) return;
+    const trimmedName = planName.trim().slice(0, MAX_PLAN_NAME_LENGTH);
+    if (!trimmedName) {
+      toast.error('Please give the plan a name.', 'Missing Name');
+      return;
+    }
     const validExercises = planExercises.filter(e => e.name.trim());
-    if (validExercises.length === 0) return;
+    if (validExercises.length === 0) {
+      toast.error('Add at least one exercise to the plan.', 'No Exercises');
+      return;
+    }
+    for (const ex of validExercises) {
+      const sets = Number(ex.targetSets);
+      if (!Number.isFinite(sets) || sets < 1) {
+        toast.error(`"${ex.name.trim()}": sets must be at least 1.`, 'Invalid Sets');
+        return;
+      }
+      const reps = Number(ex.targetReps);
+      if (!Number.isFinite(reps) || reps < 1) {
+        toast.error(`"${ex.name.trim()}": reps must be at least 1.`, 'Invalid Reps');
+        return;
+      }
+      const weight = Number(ex.targetWeight);
+      if (!Number.isFinite(weight) || weight < 0) {
+        toast.error(`"${ex.name.trim()}": weight cannot be negative.`, 'Invalid Weight');
+        return;
+      }
+    }
     onSave({ name: trimmedName, exercises: validExercises });
     onClose();
   };
@@ -217,6 +242,7 @@ function PlanModal({
               placeholder='e.g. "Push Day", "Leg Day", "Full Body A"'
               value={planName}
               onChange={e => setPlanName(e.target.value)}
+              maxLength={MAX_PLAN_NAME_LENGTH}
               className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary focus:border-accent outline-none text-sm"
             />
           </div>
@@ -446,7 +472,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate }: Pla
         {visibleExercises.map((ex, i) => (
           <span
             key={i}
-            className="text-2xs bg-bg-elevated border border-border rounded-md px-2 py-0.5 text-text-secondary font-mono truncate max-w-[140px]"
+            className="text-2xs bg-bg-elevated border border-border rounded-md px-2 py-0.5 text-text-secondary font-mono break-words"
             title={ex.name}
           >
             {ex.name || <span className="italic opacity-50">Unnamed</span>}
@@ -664,6 +690,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
+  const [planToDelete, setPlanToDelete] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
@@ -1394,6 +1421,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const handleSavePlan = (planData: Omit<PlannedWorkout, 'id' | 'createdAt'>) => {
     if (editingPlan) {
+      const clash = plannedWorkouts.some(
+        (p) => p.id !== editingPlan.id && p.name.toLowerCase() === planData.name.toLowerCase()
+      );
+      if (clash) {
+        toast.error(`A different plan is already named "${planData.name}". Please choose another name.`, 'Duplicate Name');
+        return;
+      }
       updatePlannedWorkout(editingPlan.id, {
         ...editingPlan,
         name: planData.name,
@@ -1407,8 +1441,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         name: planData.name,
         exercises: planData.exercises,
       };
+      // The store auto-renames on collision ("X (Copy)") instead of overwriting.
+      const nameTaken = plannedWorkouts.some(
+        (p) => p.name.toLowerCase() === planData.name.toLowerCase()
+      );
       addPlannedWorkout(newPlan);
-      toast.success(`Plan "${planData.name}" created!`, 'Plan Created');
+      toast.success(
+        nameTaken
+          ? `A plan named "${planData.name}" already exists — saved as "${planData.name} (Copy)".`
+          : `Plan "${planData.name}" created!`,
+        'Plan Created'
+      );
     }
     setEditingPlan(null);
   };
@@ -1419,8 +1462,31 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   };
 
   const handleDeletePlan = (plan: PlannedWorkout) => {
+    // Ask for confirmation first (modal below); warn when a paused session
+    // draft references this plan.
+    setPlanToDelete(plan);
+  };
+
+  const confirmDeletePlan = () => {
+    if (!planToDelete) return;
+    const plan = planToDelete;
+    // Unlink the in-progress draft from the deleted plan so the resume banner
+    // never references a plan that no longer exists. The logged sets are kept.
+    if (
+      activeWorkoutDraft &&
+      (activeWorkoutDraft.startedFromPlanId === plan.id ||
+        activeWorkoutDraft.planId === plan.id)
+    ) {
+      saveWorkoutDraft({
+        ...activeWorkoutDraft,
+        startedFromPlan: null,
+        startedFromPlanId: null,
+        planId: undefined,
+      });
+    }
     deletePlannedWorkout(plan.id);
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
+    setPlanToDelete(null);
   };
 
   const handleDuplicatePlan = (plan: PlannedWorkout) => {
@@ -1974,7 +2040,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 : 'Upper / Lower Split'}
             </span>
             <span className="text-2xs text-text-muted block mt-0.5">
-              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} complete this week
+              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} completed this week
             </span>
           </div>
           <button
@@ -2291,7 +2357,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                         : 'bg-bg-primary border-border'
                                     }`}
                                   >
-                                    <div className="truncate">
+                                    <div className="flex-1 min-w-0">
                                       Set {j + 1}:{' '}
                                       <span className={`tabular-nums ${isDone ? 'text-text-primary font-medium' : 'text-text-muted line-through'}`}>
                                         {set.weight} {set.unit}
@@ -2416,6 +2482,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           initialExercises={exercises}
           workoutName={startedFromPlan || 'Workout Session'}
           planId={startedFromPlanId || undefined}
+          initialSessionStartTime={sessionStartTime}
           onFinish={(workoutEntry, newPRsCount) => {
             addWorkout(workoutEntry);
             clearWorkoutDraft();
@@ -2456,6 +2523,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           }}
         />
       )}
+
+      {/* ── Plan Delete Confirmation ───────────────────────────────────────── */}
+      <ConfirmationModal
+        isOpen={!!planToDelete}
+        onClose={() => setPlanToDelete(null)}
+        onConfirm={confirmDeletePlan}
+        title="Delete this plan?"
+        message={
+          planToDelete &&
+          activeWorkoutDraft &&
+          (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
+            activeWorkoutDraft.planId === planToDelete.id)
+            ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+            : planToDelete
+              ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+              : ''
+        }
+        confirmText="Delete Plan"
+        cancelText="Keep"
+        variant="danger"
+      />
 
       {/* ── Plan Create/Edit Modal ───────────────────────────────────────── */}
       <PlanModal

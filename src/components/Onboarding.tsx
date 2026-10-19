@@ -3,9 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
+import { getOrCreateGuestId } from '@/lib/storage';
+import { canContinueFromGoalStep } from '@/lib/onboarding';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 
@@ -221,17 +223,23 @@ export default function Onboarding() {
     unit: Unit;
     heightCm: number;
   }) => {
+    // Never silently fall back to a default goal: the athlete must choose.
+    if (selectedGoals.length === 0) {
+      toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+      return;
+    }
+
     setIsFinishing(true);
 
-    const nameToSave = details.name.trim() || athleteName.trim() || 'Athlete';
+    const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim() || 'Athlete', MAX_ATHLETE_NAME_LENGTH);
     const bodyweightKg =
       details.unit === 'lbs' ? details.weight * 0.453592 : details.weight;
     const bodyweightLbs =
       details.unit === 'kg' ? details.weight * 2.20462 : details.weight;
 
-    const finalGoals = selectedGoals.length > 0 ? [...selectedGoals] : [...DEFAULT_GOALS];
+    const finalGoals = [...selectedGoals];
     const profileData = {
-      id: authUser?.id || safeRandomId('user'),
+      id: authUser?.id || getOrCreateGuestId(),
       name: nameToSave,
       gender: details.gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
@@ -295,26 +303,28 @@ export default function Onboarding() {
       coachingStyle: 'balanced',
     });
 
-    setPlannedWorkouts(generatedSplit);
-    setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+    // Preserve the athlete's existing plans/targets when re-onboarding after
+    // a logout — only seed generated ones for a truly fresh profile.
+    const { plannedWorkouts: existingPlans, macroGoals: existingGoals } = useStore.getState();
+    if (!existingPlans || existingPlans.length === 0) {
+      setPlannedWorkouts(generatedSplit);
+      setWeeklySchedule(buildDefaultWeeklySchedule(generatedSplit, daysPerWeek));
+    }
+    if (!existingGoals) {
+      setMacroGoals(
+        calculateRecommendedMacroGoals(
+          bodyweightKg,
+          primaryGoal,
+          details.gender,
+          details.heightCm,
+          details.age
+        )
+      );
+    }
 
-    const initialMacros = calculateRecommendedMacroGoals(
-      bodyweightKg,
-      primaryGoal,
-      details.gender,
-      details.heightCm,
-      details.age
-    );
-    setMacroGoals(initialMacros);
-
-    const today = getLocalTodayStr();
-    addBodyMetric({
-      id: safeRandomId('bm'),
-      date: today,
-      weightKg: Math.round(bodyweightKg * 10) / 10,
-      heightCm: details.heightCm,
-      notes: 'Initial Calibration',
-    });
+    // Baseline bodyweight is written exactly once, with the stable id
+    // `initial_bw_<profileId>`, by setProfile's backfill above. Do NOT add a
+    // second entry here (previously caused duplicate log entries).
 
     if (typeof window !== 'undefined') {
       try {
@@ -469,9 +479,16 @@ export default function Onboarding() {
       <FitnessGoalsScreen
         selectedGoals={selectedGoals}
         onToggleGoal={handleToggleGoal}
-        onContinue={() => setCurrentScreen('experience')}
+        onContinue={() => {
+          if (!canContinueFromGoalStep(selectedGoals)) {
+            toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+            return;
+          }
+          setCurrentScreen('experience');
+        }}
         onSkip={() => {
           setSelectedGoals(['general_fitness']);
+          toast.info('No goal selected — starting with General Fitness. You can change it anytime in Profile.', 'Goal Set');
           setCurrentScreen('experience');
         }}
         onBack={() => {

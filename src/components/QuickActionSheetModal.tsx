@@ -17,7 +17,7 @@ import { useToast } from '@/components/ui/Toast';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import { MealEntry } from '@/lib/types';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, plural } from '@/lib/formatters';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { useAppNavigation } from '@/lib/navigation';
 
@@ -111,7 +111,7 @@ export default function QuickActionSheetModal({
         addMeal(newMeal);
         setQuickFoodQuery('');
         toast.success(
-          `Logged ${data.foods.length} items (~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P)!`,
+          `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P)!`,
           'Meal Logged'
         );
         onClose();
@@ -133,7 +133,7 @@ export default function QuickActionSheetModal({
           addMeal(newMeal);
           setQuickFoodQuery('');
           toast.success(
-            `Logged ${offlineFoods.length} items (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
+            `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
             'Meal Logged (Offline)'
           );
           onClose();

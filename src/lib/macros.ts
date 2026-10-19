@@ -524,17 +524,60 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
 }
 
 /**
+ * Detect a junk/gibberish meal parse: nothing recognized and zero calories.
+ * Callers must refuse to log and show an error, never silently record a
+ * 0-calorie phantom meal.
+ */
+export function isJunkMealParse(foods: FoodItem[]): boolean {
+  if (!foods || foods.length === 0) return true;
+  const totals = calculateMealMacros(foods);
+  const allUnmatched = foods.every((f) => f.isUnmatched);
+  return allUnmatched && totals.calories === 0;
+}
+
+/**
+ * Flags a single food item whose quantity is implausible for one person in
+ * one meal (e.g. "100 rotis" → 12,000 kcal). Returns a human-readable
+ * warning, or null when the quantity looks sane. Callers should refuse to
+ * log and ask the user to re-enter, rather than silently recording junk.
+ */
+export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): string | null {
+  const qty = typeof food.quantity === 'number' && isFinite(food.quantity) ? food.quantity : 0;
+  const cal = typeof food.calories === 'number' && isFinite(food.calories) ? food.calories : 0;
+  const unit = (food.unit || 'g').toLowerCase().trim();
+  const label = (food.name || 'This item').trim() || 'This item';
+  if (cal > 6000) {
+    return `${label}: ~${Math.round(cal).toLocaleString()} kcal in a single item looks wrong. Please check the quantity.`;
+  }
+  if ((unit === 'g' || unit === 'ml') && qty > 2500) {
+    return `${label}: ${qty.toLocaleString()} ${unit} in a single item looks wrong. Please check the quantity.`;
+  }
+  if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
+    return `${label}: ${qty} ${unit} in a single item looks wrong. Please check the quantity.`;
+  }
+  if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful'].includes(unit) && qty > 25) {
+    return `${label}: ${qty} ${unit}s in a single item looks wrong. Please check the quantity.`;
+  }
+  return null;
+}
+
+/**
  * Calculates evidence-based macro targets and caloric goals based on athlete bodyweight,
  * primary goal, gender, and optional height.
  * Uses Mifflin-St Jeor / standard active gym-goer TDEE multipliers with zero Atwater drift.
  */
-export function calculateRecommendedMacroGoals(
+/**
+ * Mifflin-St Jeor maintenance estimate (×1.4 active-trainee factor).
+ * Single source of truth for maintenance — used by both the auto
+ * calibration and manual Edit Targets, so the deficit/surplus explanation
+ * line never goes stale.
+ */
+export function calculateMaintenanceCalories(
   bodyweightKg: number,
-  goal: AthleteGoal = 'build_muscle',
   gender: Gender = 'male',
   heightCm?: number,
   ageYears?: number
-): MacroGoals {
+): number {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
   const defaultHeight = gender === 'male' ? 175 : gender === 'female' ? 162 : 168.5;
   const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : defaultHeight;
@@ -547,7 +590,18 @@ export function calculateRecommendedMacroGoals(
   const genderOffset = gender === 'male' ? 5 : gender === 'female' ? -161 : -78;
   const bmr = 10 * bw + 6.25 * height - 5 * age + genderOffset;
   // Active trainee activity factor (~3-5 days/week resistance training)
-  const maintenance = Math.round(bmr * 1.4);
+  return Math.round(bmr * 1.4);
+}
+
+export function calculateRecommendedMacroGoals(
+  bodyweightKg: number,
+  goal: AthleteGoal = 'build_muscle',
+  gender: Gender = 'male',
+  heightCm?: number,
+  ageYears?: number
+): MacroGoals {
+  const bw = Math.max(35, Math.min(250, bodyweightKg));
+  const maintenance = calculateMaintenanceCalories(bodyweightKg, gender, heightCm, ageYears);
 
   let targetCalories = maintenance;
   let proteinPerKg = 1.8;
@@ -598,5 +652,26 @@ export function calculateRecommendedMacroGoals(
     carbsG,
     maintenanceCalories: maintenance,
     calorieDelta: exactCalories - maintenance,
+  };
+}
+
+/**
+ * Scale a food item's calories/macros proportionally when its quantity
+ * changes. Regression guard: the manual builder once read the quantity from
+ * the already-updated row, making the ratio always 1 and silently dropping
+ * the scaling (200 g chicken saved as 100 g values).
+ */
+export function scaleFoodByQuantity(prevItem: FoodItem, newQty: number): FoodItem {
+  const prevQty =
+    typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
+  if (!prevQty || !(prevItem.calories > 0) || !(newQty > 0)) return prevItem;
+  const ratio = newQty / prevQty;
+  return {
+    ...prevItem,
+    quantity: newQty,
+    calories: Math.max(0, Math.round(prevItem.calories * ratio)),
+    proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
+    carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
+    fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
   };
 }

@@ -42,8 +42,13 @@ export interface AthleteGoalConfig {
   defaultRestSeconds: number;
 }
 
-export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {
-  build_muscle: {
+/** Maximum athlete display-name length, enforced everywhere names are entered. */
+export const MAX_ATHLETE_NAME_LENGTH = 50;
+
+/** Maximum workout plan name length. */
+export const MAX_PLAN_NAME_LENGTH = 60;
+
+export const ATHLETE_GOAL_CONFIGS: Record<AthleteGoal, AthleteGoalConfig> = {  build_muscle: {
     id: 'build_muscle',
     label: 'Build Muscle',
     tagline: 'Hypertrophy volume, exercise selection, progressive overload',
@@ -259,6 +264,12 @@ export interface WorkoutExercise {
   name: string;
   sets: WorkoutSet[];
   notes?: string;
+  /**
+   * Post-exercise effort rating ("How hard was that exercise today?").
+   * Stored SEPARATELY from per-set RPEs — it must never overwrite them.
+   * Used as a fallback for sets that have no logged RPE.
+   */
+  effortRating?: { rpe: number; label: 'easy' | 'good' | 'hard' };
   /** Reference to the PlannedExercise ID from which this exercise was started */
   planExerciseId?: string;
   /** Reference to the applied PolicyDecision ID, set only when reliably established via application audit */
@@ -527,6 +538,17 @@ export interface AIWeeklyReview {
 }
 
 // ── Photo AI Meal Scanner Types ──────────────────────────────────────────────
+
+/** A user-uploaded progress photo, stored locally (downscaled JPEG data URL). */
+export interface ProgressPhoto {
+  id: string;
+  /** Downscaled JPEG data URL (max ~800px) so it fits in localStorage. */
+  dataUrl: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** Optional label, e.g. "Front", "Side", "Back". */
+  label?: string;
+}
 
 export interface ScannedFoodItem {
   name: string;

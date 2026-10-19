@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
-import { getLocalTodayStr } from '@/lib/formatters';
+import { getLocalTodayStr, round1 } from '@/lib/formatters';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface BodyMetricsModalProps {
 }
 
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const updateBodyMetrics = useStore((state) => state.updateBodyMetrics);
@@ -36,7 +38,13 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           ? (currentWeightKg * 2.20462).toFixed(1)
           : currentWeightKg.toFixed(1);
       setWeightInput(displayWeight);
-      setHeightInput(profile?.heightCm ? String(profile.heightCm) : '');
+      setHeightInput(
+        profile?.heightCm
+          ? unit === 'lbs'
+            ? round1(profile.heightCm / 2.54).toFixed(1)
+            : String(round1(profile.heightCm))
+          : ''
+      );
       setDateInput(getLocalTodayStr());
       setSuccessMsg('');
 
@@ -45,15 +53,15 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
         : null;
 
       if (latest) {
-        setBodyFatInput(latest.bodyFatPct !== undefined ? String(latest.bodyFatPct) : '');
+        setBodyFatInput(latest.bodyFatPct !== undefined ? String(round1(latest.bodyFatPct)) : '');
         if (latest.chestIn !== undefined) {
-          setChestInput(unit === 'lbs' ? String(latest.chestIn) : (latest.chestIn * 2.54).toFixed(1));
+          setChestInput(unit === 'lbs' ? String(round1(latest.chestIn)) : (round1(latest.chestIn) * 2.54).toFixed(1));
         }
         if (latest.waistIn !== undefined) {
-          setWaistInput(unit === 'lbs' ? String(latest.waistIn) : (latest.waistIn * 2.54).toFixed(1));
+          setWaistInput(unit === 'lbs' ? String(round1(latest.waistIn)) : (round1(latest.waistIn) * 2.54).toFixed(1));
         }
         if (latest.hipsIn !== undefined) {
-          setHipsInput(unit === 'lbs' ? String(latest.hipsIn) : (latest.hipsIn * 2.54).toFixed(1));
+          setHipsInput(unit === 'lbs' ? String(round1(latest.hipsIn)) : (round1(latest.hipsIn) * 2.54).toFixed(1));
         }
       }
     }
@@ -84,6 +92,11 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     if (!isNaN(hVal) && hVal > 0) {
       setHipsInput(newUnit === 'lbs' ? (hVal / 2.54).toFixed(1) : (hVal * 2.54).toFixed(1));
     }
+    // Convert height input too
+    const htVal = parseFloat(heightInput);
+    if (!isNaN(htVal) && htVal > 0) {
+      setHeightInput(newUnit === 'lbs' ? (htVal / 2.54).toFixed(1) : (htVal * 2.54).toFixed(1));
+    }
     setUnit(newUnit);
   };
 
@@ -94,7 +107,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
     const finalWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
     const parsedHeight = parseFloat(heightInput);
-    const validHeight = !isNaN(parsedHeight) && parsedHeight >= 100 && parsedHeight <= 250 ? parsedHeight : profile?.heightCm;
+    const parsedHeightCm = unit === 'lbs' ? parsedHeight * 2.54 : parsedHeight;
+    const validHeight = !isNaN(parsedHeightCm) && parsedHeightCm >= 100 && parsedHeightCm <= 250 ? Math.round(parsedHeightCm) : profile?.heightCm;
 
     const parsedFat = parseFloat(bodyFatInput);
     const validFat = !isNaN(parsedFat) && parsedFat > 0 && parsedFat < 70 ? parsedFat : undefined;
@@ -141,7 +155,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
             <div>
               <h2 className="font-bold text-base text-text-primary leading-tight">
-                Log Bodyweight
+                Log Measurement
               </h2>
               <p className="text-2xs text-text-muted font-mono">Calibrate Strength Standard Ratios &amp; Track Progress</p>
             </div>
@@ -219,7 +233,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           {/* Height Field */}
           <div>
             <label htmlFor="modal-height-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
-              HEIGHT (CM)
+              HEIGHT {unit === 'lbs' ? '(IN)' : '(CM)'}
             </label>
             <div className="relative">
               <input

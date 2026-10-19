@@ -4,8 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { X, User, Check, Scale, Ruler } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
-import { Gender, Unit } from '@/lib/types';
+import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 export interface EditProfileModalProps {
   isOpen: boolean;
@@ -13,6 +15,7 @@ export interface EditProfileModalProps {
 }
 
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
+  useEscapeToClose(isOpen, onClose);
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
@@ -45,17 +48,17 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
       if (profile.unit === 'lbs') {
         const lbsVal = profile.bodyweightLbs || Math.round(profile.bodyweightKg * 2.20462);
-        setWeight(String(lbsVal));
+        setWeight(String(round1(lbsVal)));
       } else {
-        setWeight(String(profile.bodyweightKg));
+        setWeight(String(round1(profile.bodyweightKg)));
       }
 
       if (profile.heightCm) {
         if (profile.unit === 'lbs') {
           // Height in inches
-          setHeight((profile.heightCm / 2.54).toFixed(1));
+          setHeight(round1(profile.heightCm / 2.54).toFixed(1));
         } else {
-          setHeight(String(profile.heightCm));
+          setHeight(String(round1(profile.heightCm)));
         }
       } else {
         setHeight('');
@@ -93,14 +96,20 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
-    const trimmedName = name.trim();
+    const trimmedName = sanitizeAthleteName(name.trim(), MAX_ATHLETE_NAME_LENGTH);
     if (!trimmedName) {
       newErrors.name = 'Full name is required';
+    } else if (trimmedName.length > MAX_ATHLETE_NAME_LENGTH) {
+      newErrors.name = `Please keep your name under ${MAX_ATHLETE_NAME_LENGTH} characters`;
     }
 
     const parsedWeight = parseFloat(weight);
-    if (isNaN(parsedWeight) || parsedWeight <= 0) {
-      newErrors.weight = 'Valid bodyweight is required';
+    const parsedWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+    if (isNaN(parsedWeight) || parsedWeightKg < 30 || parsedWeightKg > 300) {
+      newErrors.weight =
+        unit === 'kg'
+          ? 'Please enter a realistic bodyweight between 30 kg and 300 kg.'
+          : 'Please enter a realistic bodyweight between 66 lbs and 660 lbs.';
     }
 
     let parsedAge: number | undefined = undefined;
@@ -114,11 +123,15 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     let parsedHeightCm: number | undefined = undefined;
     if (height.trim()) {
       const val = parseFloat(height);
-      if (!isNaN(val) && val > 0) {
-        parsedHeightCm = unit === 'lbs' ? Math.round(val * 2.54) : Math.round(val);
-        if (parsedHeightCm < 50 || parsedHeightCm > 260) {
-          newErrors.height = 'Height out of valid range';
-        }
+      const valCm = unit === 'lbs' ? val * 2.54 : val;
+      // Same bounds as onboarding — never silently keep the old value.
+      if (isNaN(val) || valCm < 100 || valCm > 250) {
+        newErrors.height =
+          unit === 'lbs'
+            ? 'Please enter a valid height between 39 in and 98 in.'
+            : 'Please enter a valid height between 100 cm and 250 cm.';
+      } else {
+        parsedHeightCm = Math.round(valCm);
       }
     }
 
@@ -194,6 +207,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 if (errors.name) setErrors((prev) => ({ ...prev, name: '' }));
               }}
               placeholder="Your name"
+              maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
             />
             {errors.name && <p className="text-2xs text-accent mt-0.5">{errors.name}</p>}

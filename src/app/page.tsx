@@ -51,9 +51,25 @@ export default function AppPage() {
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
   const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft } = useStore();
 
+  // True zustand-persist hydration (distinct from the _hasHydrated splash
+  // fallback, which can fire before the persisted state is merged). Theme
+  // effects must wait for this, otherwise a slow rehydration lets the
+  // device-theme sync overwrite the athlete's saved theme with the OS theme.
+  const [persistHydrated, setPersistHydrated] = useState(
+    () => typeof window !== 'undefined' && useStore.persist.hasHydrated()
+  );
+  useEffect(() => {
+    if (useStore.persist.hasHydrated()) {
+      setPersistHydrated(true);
+      return;
+    }
+    const unsub = useStore.persist.onFinishHydration(() => setPersistHydrated(true));
+    return unsub;
+  }, []);
+
   // Dynamic device theme synchronization (when not manually overridden in Settings)
   useEffect(() => {
-    if (typeof window === 'undefined' || !_hasHydrated) return;
+    if (typeof window === 'undefined' || !_hasHydrated || !persistHydrated) return;
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -74,7 +90,7 @@ export default function AppPage() {
 
     mediaQuery.addEventListener('change', handleDeviceChange);
     return () => mediaQuery.removeEventListener('change', handleDeviceChange);
-  }, [_hasHydrated, hasCustomTheme, theme, setTheme]);
+  }, [_hasHydrated, persistHydrated, hasCustomTheme, theme, setTheme]);
 
   // Listen for shared program links (#plan=...) in URL
   useEffect(() => {
@@ -118,7 +134,7 @@ export default function AppPage() {
   };
 
   useEffect(() => {
-    if (typeof document === 'undefined' || !_hasHydrated) return;
+    if (typeof document === 'undefined' || !_hasHydrated || !persistHydrated) return;
     const activeTheme = theme || 'dark';
     if (activeTheme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -129,7 +145,7 @@ export default function AppPage() {
       document.documentElement.classList.add('light');
       document.documentElement.setAttribute('data-theme', 'light');
     }
-  }, [theme, _hasHydrated]);
+  }, [theme, _hasHydrated, persistHydrated]);
 
   // Dismiss root modals when Back is pressed
   useEffect(() => {

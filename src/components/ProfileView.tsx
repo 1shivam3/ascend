@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
+import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
@@ -87,17 +88,14 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
   const athleteName = profile?.name ? profile.name.trim() : 'Alex';
   const athleteInitial = athleteName.charAt(0).toUpperCase();
-  const athleteEmail = user?.email || profile?.name ? `${athleteName.toLowerCase().replace(/\s+/g, '.')}@athlete.local` : 'Local Guest Athlete';
+  const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : 'Local Guest Athlete';
   const userUnit = profile?.unit || 'lbs';
 
   // Format height display
   const displayHeight = () => {
     if (!profile?.heightCm) return '—';
     if (userUnit === 'lbs') {
-      const totalInches = Math.round(profile.heightCm / 2.54);
-      const feet = Math.floor(totalInches / 12);
-      const inches = totalInches % 12;
-      return `${feet}' ${inches}"`;
+      return formatHeightImperial(profile.heightCm);
     }
     return `${Math.round(profile.heightCm)} cm`;
   };
@@ -251,7 +249,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div>
                 <p className="text-xs font-bold text-text-primary">Fitness Goals</p>
                 <p className="text-3xs text-text-muted">
-                  {goals.length > 0 ? `${goals.length} active target goals` : 'Strength & Hypertrophy'}
+                  {goals.length > 0 ? `${goals.length} ${plural(goals.length, 'active target goal')}` : 'Strength & Hypertrophy'}
                 </p>
               </div>
             </div>
@@ -288,7 +286,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">Data &amp; Storage</p>
-                <p className="text-3xs text-text-muted">Local device storage and cloud database telemetry</p>
+                <p className="text-3xs text-text-muted">Local device storage, export &amp; backup</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -431,7 +429,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleConfirmLogout}
         title="Log Out of ASCEND?"
-        message="Your local workout sessions, personal records, and meal history will remain preserved on this device."
+        message={
+          user
+            ? "Your account stays intact — your sessions, PRs and meal history remain saved and synced."
+            : "Logging out clears your profile from this device. Your sessions, PRs, meals, plans and targets stay saved on this device and return when you set up your profile again."
+        }
         confirmText="Log Out"
         cancelText="Cancel"
         variant="default"

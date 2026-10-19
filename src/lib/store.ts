@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import {
   UserProfile,
   PersonalRecord,
+  ProgressPhoto,
   WorkoutEntry,
   WorkoutExercise,
   MealEntry,
@@ -78,6 +79,7 @@ export interface AppState {
   workouts: WorkoutEntry[];
   meals: MealEntry[];
   bodyMetrics: BodyMetricEntry[];
+  progressPhotos: ProgressPhoto[];
   theme: Theme;
   hasCustomTheme?: boolean;
   prTargets: Record<string, number>;
@@ -150,6 +152,8 @@ export interface AppState {
 
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
+  addProgressPhoto: (photo: ProgressPhoto) => void;
+  removeProgressPhoto: (id: string) => void;
   updateBodyMetrics: (
     weightKg: number,
     heightCm?: number,
@@ -271,6 +275,7 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       meals: [],
       bodyMetrics: [],
+      progressPhotos: [],
       theme: 'dark',
       hasCustomTheme: false,
       prTargets: {},
@@ -362,16 +367,20 @@ export const useAppStore = create<AppState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
       
       setProfile: (profile) => set((state) => {
+        // Idempotent baseline: exactly one entry with the stable id
+        // `initial_bw_<profileId>`. Never fabricate additional entries.
         let nextMetrics = state.bodyMetrics;
-        if ((!nextMetrics || nextMetrics.length === 0) && profile.bodyweightKg) {
+        const baselineId = 'initial_bw_' + (profile.id || 'user');
+        const hasBaseline = (nextMetrics || []).some((m) => m.id === baselineId);
+        if (!hasBaseline && profile.bodyweightKg) {
           const entry: BodyMetricEntry = {
-            id: 'initial_bw_' + (profile.id || 'user'),
+            id: baselineId,
             date: profile.createdAt ? profile.createdAt.split('T')[0] : getLocalTodayStr(),
             weightKg: profile.bodyweightKg,
             heightCm: profile.heightCm,
             notes: 'Baseline calibration',
           };
-          nextMetrics = [entry];
+          nextMetrics = [...(nextMetrics || []), entry];
         }
         let nextFavorites = state.favoriteFoods;
         if (!nextFavorites || nextFavorites.length === 0) {
@@ -776,6 +785,12 @@ export const useAppStore = create<AppState>()(
         bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)]
       })),
       deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
+      // Progress photos are downscaled (~800px JPEG) before storage; cap the
+      // count so localStorage stays healthy.
+      addProgressPhoto: (photo) => set((state) => ({
+        progressPhotos: [photo, ...state.progressPhotos].slice(0, 24),
+      })),
+      removeProgressPhoto: (id) => set((state) => ({ progressPhotos: state.progressPhotos.filter(p => p.id !== id) })),
       updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn) => set((state) => {
         const todayDate = getLocalTodayStr();
         const entry: BodyMetricEntry = {
@@ -801,7 +816,19 @@ export const useAppStore = create<AppState>()(
       }),
 
       addPlannedWorkout: (plan) => set((state) => {
-        const nextPlans = [plan, ...state.plannedWorkouts.filter(p => p.id !== plan.id && p.name.toLowerCase() !== plan.name.toLowerCase())];
+        // Never silently overwrite an existing plan: on a name collision,
+        // auto-rename to "X (Copy)" / "X (Copy 2)" instead of deleting the original.
+        const existingNames = new Set(state.plannedWorkouts.map(p => p.name.toLowerCase()));
+        let finalName = plan.name;
+        if (existingNames.has(finalName.toLowerCase())) {
+          let copyIdx = 2;
+          finalName = `${plan.name} (Copy)`;
+          while (existingNames.has(finalName.toLowerCase())) {
+            finalName = `${plan.name} (Copy ${copyIdx++})`;
+          }
+        }
+        const finalPlan = finalName === plan.name ? plan : { ...plan, name: finalName };
+        const nextPlans = [finalPlan, ...state.plannedWorkouts.filter(p => p.id !== finalPlan.id)];
         const currentSched = state.weeklySchedule;
         const todayDay = getTodayDayOfWeek();
         
@@ -812,9 +839,9 @@ export const useAppStore = create<AppState>()(
 
         // Always set today's day to the newly created/added plan so the user immediately sees their plan on Home & Train!
         baseSchedule[todayDay] = {
-          workoutPlanId: plan.id,
-          customTitle: plan.name,
-          bodyParts: getWorkoutBodyParts(plan.exercises),
+          workoutPlanId: finalPlan.id,
+          customTitle: finalPlan.name,
+          bodyParts: getWorkoutBodyParts(finalPlan.exercises),
         };
 
         // If the user has custom plans (non-builtin), replace any stale builtin_ templates in the weekly schedule
@@ -1893,17 +1920,21 @@ export const useAppStore = create<AppState>()(
                   }
                 }
 
-                // If profile exists with bodyweight but bodyMetrics is empty, backfill baseline
+                // Idempotent baseline backfill: only add when the stable
+                // `initial_bw_<profileId>` entry is missing. Never fabricate
+                // weight-log entries from the profile weight.
                 const currentState = useAppStore.getState();
-                if (currentState.profile?.bodyweightKg && (!currentState.bodyMetrics || currentState.bodyMetrics.length === 0)) {
+                const baselineId = 'initial_bw_' + (currentState.profile?.id || 'user');
+                const hasBaseline = (currentState.bodyMetrics || []).some((m) => m.id === baselineId);
+                if (currentState.profile?.bodyweightKg && !hasBaseline) {
                   const entry: BodyMetricEntry = {
-                    id: 'initial_bw_' + (currentState.profile.id || 'user'),
+                    id: baselineId,
                     date: currentState.profile.createdAt ? currentState.profile.createdAt.split('T')[0] : getLocalTodayStr(),
                     weightKg: currentState.profile.bodyweightKg,
                     heightCm: currentState.profile.heightCm,
                     notes: 'Baseline calibration',
                   };
-                  useAppStore.setState({ bodyMetrics: [entry] });
+                  useAppStore.setState({ bodyMetrics: [...(currentState.bodyMetrics || []), entry] });
                 } else if (currentState.bodyMetrics && currentState.bodyMetrics.length > 0) {
                   // Deduplicate existing bodyMetrics by date
                   const seenDates = new Set<string>();
@@ -1966,6 +1997,7 @@ export const useAppStore = create<AppState>()(
         workouts: state.workouts,
         meals: state.meals,
         bodyMetrics: state.bodyMetrics,
+        progressPhotos: state.progressPhotos,
         theme: state.theme,
         hasCustomTheme: state.hasCustomTheme,
         prTargets: state.prTargets,

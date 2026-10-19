@@ -536,7 +536,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleExecuteSignOut}
         title="Sign Out of ASCEND?"
-        message="Your local workout data, personal records, and meals will remain safely preserved on this device."
+        message={
+          user
+            ? "Your account stays intact — your workout data, personal records, and meals remain safely preserved and synced."
+            : "Signing out clears your profile from this device. Your sessions, PRs, meals, plans and targets stay saved on this device and return when you set up your profile again."
+        }
         confirmText="Sign Out"
         cancelText="Cancel"
         variant="default"

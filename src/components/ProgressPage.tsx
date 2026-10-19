@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
 import {
@@ -31,8 +31,10 @@ import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
 import WeeklyRecapModal from '@/components/WeeklyRecapModal';
-import { plural } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
+import { useToast } from '@/components/ui/Toast';
+import { resizeAndCompressImage } from '@/lib/image-processing';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -118,10 +120,11 @@ function computeChartGeometry(
   });
 
   if (points.length === 1) {
+    // A single data point is a DOT, not a full-width flat line (which
+    // dishonestly implies a stable trend). Paths stay empty; the render
+    // draws the point's circle.
     const p = points[0];
-    const pathD = `M ${padX} ${p.y} L ${width - padX} ${p.y}`;
-    const areaD = `M ${padX} ${p.y} L ${width - padX} ${p.y} L ${width - padX} ${height} L ${padX} ${height} Z`;
-    return { pathD, areaD, points, min, max };
+    return { pathD: '', areaD: '', points, min, max };
   }
 
   let pathD = `M ${points[0].x} ${points[0].y}`;
@@ -139,22 +142,28 @@ function computeChartGeometry(
   return { pathD, areaD, points, min, max };
 }
 
-function getMonthLabelsForRange(range: '1M' | '3M' | '6M' | '1Y'): string[] {
-  const now = new Date();
+/**
+ * Date-based axis labels derived from the ACTUAL data points, not the
+ * selected range. Returns up to 4 evenly-spaced "12 Oct" labels so the axis
+ * never claims a window the data doesn't cover.
+ */
+function getDataDateLabels(dates: string[]): string[] {
+  if (dates.length === 0) return [];
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  if (range === '1M') {
-    return ['Week 1', 'Week 2', 'Week 3', 'Today'];
-  }
-  const count = range === '3M' ? 3 : range === '6M' ? 6 : 12;
-  const result: string[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    result.push(months[d.getMonth()]);
-  }
-  if (count === 12) {
-    return [result[0], result[2], result[4], result[6], result[8], result[11]];
-  }
-  return result;
+  const fmt = (d: string) => {
+    const parts = d.split('T')[0].split('-');
+    if (parts.length === 3) {
+      const mIdx = parseInt(parts[1], 10) - 1;
+      return `${parseInt(parts[2], 10)} ${months[mIdx] || parts[1]}`;
+    }
+    return d;
+  };
+  if (dates.length === 1) return [fmt(dates[0])];
+  const idxs =
+    dates.length <= 4
+      ? dates.map((_, i) => i)
+      : [0, Math.floor(dates.length / 3), Math.floor((2 * dates.length) / 3), dates.length - 1];
+  return idxs.map((i) => fmt(dates[i]));
 }
 
 interface ProgressPageProps {
@@ -210,6 +219,43 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const prs = useStore((state) => state.prs || []);
   const workouts = useStore((state) => state.workouts || []);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
+  const progressPhotos = useStore((state) => state.progressPhotos || []);
+  const addProgressPhoto = useStore((state) => state.addProgressPhoto);
+  const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
+  const trainingProfile = useStore((state) => state.trainingProfile);
+  const toast = useToast();
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  const handlePhotoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setIsUploadingPhoto(true);
+    try {
+      const processed = await resizeAndCompressImage(file, {
+        maxDimension: 800,
+        quality: 0.72,
+        format: 'image/jpeg',
+      });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error('Could not read the photo.'));
+        reader.readAsDataURL(processed.blob);
+      });
+      addProgressPhoto({
+        id: safeRandomId('photo'),
+        dataUrl,
+        date: getLocalTodayStr(),
+      });
+      toast.success('Progress photo saved locally.', 'Photo Added');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not add the photo.', 'Upload Failed');
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
 
   const userUnit = profile?.unit || 'lbs';
 
@@ -403,59 +449,56 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Selected exercise sessions for Screen 15
   const selectedExerciseSessions = useMemo(() => {
-    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit);
-    if (sessions && sessions.length > 0) {
-      return [...sessions].reverse().slice(0, 5).map((s, idx, arr) => {
-        let deltaStr = 'Completed';
-        if (idx < arr.length - 1) {
-          const prevE1RM = arr[idx + 1].bestE1RM;
-          if (prevE1RM > 0) {
-            const diffPct = Math.round(((s.bestE1RM - prevE1RM) / prevE1RM) * 100);
-            deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
-          }
-        }
-        return {
-          date: s.date,
-          bestWeight: s.bestWeight,
-          bestReps: s.bestReps,
-          bestE1RM: s.bestE1RM,
-          deltaStr,
-          hasData: true,
-        };
-      });
-    }
+    // Unified data source: workout sessions AND manually logged PRs, merged
+    // by date. PRs that duplicate a session (auto-detected from that session)
+    // are skipped so nothing appears twice.
+    const sessions = getExerciseHistorySessions(selectedExercise, workouts, userUnit) || [];
+    const prMatches = prs.filter((p) =>
+      p.exercise.toLowerCase().includes(selectedExercise.toLowerCase())
+    );
 
-    // Check if PR entries exist for this exercise
-    const prMatches = prs
-      .filter((p) => p.exercise.toLowerCase().includes(selectedExercise.toLowerCase()))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 5);
-
-    if (prMatches.length > 0) {
-      return prMatches.map((p, idx, arr) => {
-        const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
-        const e1rm = Math.round(calculateOneRepMax(val, p.reps) * 10) / 10;
-        let deltaStr = 'PR Log';
-        if (idx < arr.length - 1) {
-          const prevVal = userUnit === 'lbs' ? arr[idx + 1].weightLbs : arr[idx + 1].weightKg;
-          const prevE1RM = calculateOneRepMax(prevVal, arr[idx + 1].reps);
-          if (prevE1RM > 0) {
-            const diffPct = Math.round(((e1rm - prevE1RM) / prevE1RM) * 100);
-            deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
-          }
-        }
-        return {
+    type Row = { date: string; bestWeight: number; bestReps: number; bestE1RM: number; source: 'session' | 'pr' };
+    const rows: Row[] = sessions.map((s) => ({
+      date: s.date,
+      bestWeight: s.bestWeight,
+      bestReps: s.bestReps,
+      bestE1RM: s.bestE1RM,
+      source: 'session' as const,
+    }));
+    for (const p of prMatches) {
+      const val = userUnit === 'lbs' ? p.weightLbs : p.weightKg;
+      const e1rm = Math.round(calculateOneRepMax(val, p.reps) * 10) / 10;
+      const dup = rows.some((r) => r.date === p.date && Math.abs(r.bestE1RM - e1rm) < 0.051);
+      if (!dup) {
+        rows.push({
           date: p.date,
           bestWeight: Math.round(val * 10) / 10,
           bestReps: p.reps,
           bestE1RM: e1rm,
-          deltaStr,
-          hasData: true,
-        };
-      });
+          source: 'pr' as const,
+        });
+      }
     }
+    rows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    return [];
+    return rows.slice(0, 5).map((s, idx, arr) => {
+      let deltaStr = s.source === 'pr' ? 'PR Log' : 'Completed';
+      if (idx < arr.length - 1) {
+        const prevE1RM = arr[idx + 1].bestE1RM;
+        if (prevE1RM > 0) {
+          const diffPct = Math.round(((s.bestE1RM - prevE1RM) / prevE1RM) * 100);
+          deltaStr = `${diffPct >= 0 ? '+' : ''}${diffPct}%`;
+        }
+      }
+      return {
+        date: s.date,
+        bestWeight: s.bestWeight,
+        bestReps: s.bestReps,
+        bestE1RM: s.bestE1RM,
+        deltaStr,
+        hasData: true,
+      };
+    });
   }, [selectedExercise, workouts, prs, userUnit]);
 
   // Selected exercise 1RM and filtered progress chart for Screen 15
@@ -592,18 +635,17 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       }
     }
 
-    // This week (Monday to Sunday)
-    const dayOfWeek = (today.getDay() + 6) % 7; // Monday = 0
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - dayOfWeek);
-    monday.setHours(0, 0, 0, 0);
-
-    const weekDays = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    // Last 7 days (rolling, ending today) — so the days counted in the
+    // streak are always visible and highlighted, unlike a calendar week
+    // which can show an empty new week while a streak is alive.
+    const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     let thisWeekCompleted = 0;
-    const dayBars = weekDays.map((label, idx) => {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + idx);
+    const dayBars = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - (6 - i));
+      d.setHours(0, 0, 0, 0);
       const dStr = getLocalDateStr(d);
+      const label = dayLabels[d.getDay()];
       const isCompleted = workoutDays.has(dStr);
       if (isCompleted) thisWeekCompleted++;
 
@@ -616,18 +658,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     });
 
     // 4 rolling weeks calculation
-    const weeklyTarget = 5;
+    const weeklyTarget = trainingProfile?.daysPerWeek || 5;
     let fourWeeksCompleted = 0;
     const fourWeeksBreakdown: { label: string; count: number; target: number; pct: number }[] = [];
 
     for (let w = 0; w < 4; w++) {
-      const wStart = new Date(monday);
-      wStart.setDate(monday.getDate() - (w * 7));
+      // Rolling 7-day windows ending today, consistent with the day bars above.
+      const wEnd = new Date(today);
+      wEnd.setDate(today.getDate() - w * 7);
+      wEnd.setHours(0, 0, 0, 0);
 
       let count = 0;
       for (let d = 0; d < 7; d++) {
-        const checkD = new Date(wStart);
-        checkD.setDate(wStart.getDate() + d);
+        const checkD = new Date(wEnd);
+        checkD.setDate(wEnd.getDate() - d);
         if (workoutDays.has(getLocalDateStr(checkD))) {
           count++;
         }
@@ -655,7 +699,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       dayBars,
       fourWeeksBreakdown,
     };
-  }, [workouts]);
+  }, [workouts, trainingProfile?.daysPerWeek]);
 
   // DOTS calculation for powerlifting modal
   const bigThreeStats = useMemo(() => getBigThreeStats(prs), [prs]);
@@ -820,16 +864,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </linearGradient>
                 </defs>
                 <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
-                {heroChartGeometry.pathD ? (
+                {heroChartGeometry.points.length > 0 ? (
                   <>
-                    <path d={heroChartGeometry.areaD} fill="url(#strengthGradient)" />
-                    <path
-                      d={heroChartGeometry.pathD}
-                      fill="none"
-                      stroke="#E44427"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
+                    {heroChartGeometry.pathD ? (
+                      <>
+                        <path d={heroChartGeometry.areaD} fill="url(#strengthGradient)" />
+                        <path
+                          d={heroChartGeometry.pathD}
+                          fill="none"
+                          stroke="#E44427"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                        />
+                      </>
+                    ) : null}
                     {heroChartGeometry.points.map((pt, i) => (
                       <circle
                         key={i}
@@ -848,9 +896,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </text>
                 )}
               </svg>
-              {/* Dynamic 6-month axis labels */}
+              {/* Date-based axis labels (from actual data, not the range) */}
               <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
-                {getMonthLabelsForRange('6M').map((m, i) => (
+                {getDataDateLabels(heroLiftAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                   <span key={i}>{m}</span>
                 ))}
               </div>
@@ -991,16 +1039,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
                     <line x1="0" y1="70" x2="320" y2="70" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
                     <line x1="0" y1="110" x2="320" y2="110" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    {strengthChartGeometry.pathD ? (
+                    {strengthChartGeometry.points.length > 0 ? (
                       <>
-                        <path d={strengthChartGeometry.areaD} fill="url(#analyticsGradient)" />
-                        <path
-                          d={strengthChartGeometry.pathD}
-                          fill="none"
-                          stroke="#E44427"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
+                        {strengthChartGeometry.pathD ? (
+                          <>
+                            <path d={strengthChartGeometry.areaD} fill="url(#analyticsGradient)" />
+                            <path
+                              d={strengthChartGeometry.pathD}
+                              fill="none"
+                              stroke="#E44427"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                            />
+                          </>
+                        ) : null}
                         {strengthChartGeometry.points.map((pt, i) => (
                           <circle
                             key={i}
@@ -1020,7 +1072,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     )}
                   </svg>
                   <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
-                    {getMonthLabelsForRange(strengthTimeRange).map((m, i) => (
+                    {getDataDateLabels(selectedExerciseAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
                   </div>
@@ -1147,16 +1199,20 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </defs>
                     <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
                     <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
-                    {bodyChartGeometry.pathD ? (
+                    {bodyChartGeometry.points.length > 0 ? (
                       <>
-                        <path d={bodyChartGeometry.areaD} fill="url(#bodyWeightGradient)" />
-                        <path
-                          d={bodyChartGeometry.pathD}
-                          fill="none"
-                          stroke="#858076"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
+                        {bodyChartGeometry.pathD ? (
+                          <>
+                            <path d={bodyChartGeometry.areaD} fill="url(#bodyWeightGradient)" />
+                            <path
+                              d={bodyChartGeometry.pathD}
+                              fill="none"
+                              stroke="#858076"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                            />
+                          </>
+                        ) : null}
                         {bodyChartGeometry.points.map((pt, i) => (
                           <circle
                             key={i}
@@ -1176,7 +1232,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     )}
                   </svg>
                   <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
-                    {getMonthLabelsForRange(bodyTimeRange).map((m, i) => (
+                    {getDataDateLabels(bodyweightAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
                   </div>
@@ -1239,23 +1295,81 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             </div>
           ) : (
             /* Photos Tab */
-            <div className="card p-8 bg-bg-card border border-border text-center space-y-4 shadow-xs">
-              <div className="w-12 h-12 rounded-2xl bg-accent/15 text-accent mx-auto flex items-center justify-center">
-                <Camera className="w-6 h-6" />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-text-primary font-sans">Progress Photos</h3>
-                <p className="text-xs text-text-muted max-w-xs mx-auto">
-                  Take front, side, and back photos to track muscular definition and body transformation over time.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add Progress Photo</span>
-              </button>
+            <div className="space-y-4 animate-fade-in">
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                aria-label="Add progress photo"
+                onChange={handlePhotoFileSelect}
+              />
+              {progressPhotos.length === 0 ? (
+                <div className="card p-8 bg-bg-card border border-border text-center space-y-4 shadow-xs">
+                  <div className="w-12 h-12 rounded-2xl bg-accent/15 text-accent mx-auto flex items-center justify-center">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div className="space-y-1">
+                    <h3 className="text-base font-bold text-text-primary font-sans">Progress Photos</h3>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">
+                      Take front, side, and back photos to track muscular definition and body transformation over time.
+                      Photos stay on this device.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={isUploadingPhoto}
+                    className="btn-primary py-2.5 px-5 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>{isUploadingPhoto ? 'Adding…' : 'Add Progress Photo'}</span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-bold text-text-primary font-sans">
+                      Progress Photos <span className="text-text-muted font-mono text-xs">({progressPhotos.length})</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isUploadingPhoto}
+                      className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {progressPhotos.map((photo) => (
+                      <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border bg-bg-elevated">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={photo.dataUrl} alt={`Progress photo from ${photo.date}`} className="w-full aspect-[3/4] object-cover" />
+                        <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-[10px] font-mono text-white flex items-center justify-between">
+                          <span>{formatProgressDate(photo.date)}</span>
+                          <button
+                            type="button"
+                            aria-label={`Delete photo from ${photo.date}`}
+                            onClick={() => {
+                              removeProgressPhoto(photo.id);
+                              toast.info('Progress photo deleted.', 'Photo Removed');
+                            }}
+                            className="p-1 rounded hover:bg-white/20 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-2xs text-text-muted font-mono text-center">
+                    Photos are stored only on this device and never uploaded.
+                  </p>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1323,10 +1437,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               </div>
 
-              {/* Card 2: This Week (Bar Chart) */}
+              {/* Card 2: Last 7 Days (Bar Chart) */}
               <div className="card p-5 bg-bg-card border border-border space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-text-primary font-sans">This Week</h3>
+                  <h3 className="text-base font-bold text-text-primary font-sans">Last 7 Days</h3>
                   <span className="text-xs font-mono font-bold text-text-secondary">
                     {consistencyStats.thisWeekCompleted}/{consistencyStats.thisWeekTarget} workouts
                   </span>

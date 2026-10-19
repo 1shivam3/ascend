@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { Gender, Unit } from '@/lib/types';
+import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
 
 interface PersonalDetailsData {
@@ -83,10 +83,14 @@ export default function PersonalDetailsScreen({
       setError('Please enter your name or athlete nickname.');
       return;
     }
+    if (athleteName.length > MAX_ATHLETE_NAME_LENGTH) {
+      setError(`Please keep your name under ${MAX_ATHLETE_NAME_LENGTH} characters.`);
+      return;
+    }
 
     const parsedAge = parseInt(age, 10);
-    if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 100) {
-      setError('Please enter a valid age between 13 and 100.');
+    if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+      setError('Please enter a valid age between 13 and 120.');
       return;
     }
 
@@ -117,8 +121,12 @@ export default function PersonalDetailsScreen({
       }
       calculatedHeightCm = Math.round(parsedCm);
     } else {
-      const ft = parseInt(heightFt, 10) || 5;
-      const inch = parseInt(heightIn, 10) || 0;
+      const ft = parseInt(heightFt, 10);
+      const inch = parseInt(heightIn, 10);
+      if (isNaN(ft) || isNaN(inch) || ft < 1 || ft > 8 || inch < 0 || inch >= 12) {
+        setError('Please enter a valid height (e.g. 5 ft 9 in).');
+        return;
+      }
       const totalInches = ft * 12 + inch;
       const convertedCm = Math.round(totalInches * 2.54);
       if (convertedCm < 100 || convertedCm > 250) {
@@ -177,6 +185,7 @@ export default function PersonalDetailsScreen({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Alex"
               required
+              maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition"
             />
           </div>

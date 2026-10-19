@@ -7,8 +7,12 @@ import {
   calculateMealMacros,
   getFoodSuggestions,
   calculateRecommendedMacroGoals,
+  calculateMaintenanceCalories,
   getMacroCalorieDrift,
   parseNaturalMealOffline,
+  getAbsurdQuantityWarning,
+  isJunkMealParse,
+  scaleFoodByQuantity,
 } from '@/lib/macros';
 import {
   Plus,
@@ -49,7 +53,7 @@ import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural, formatWaterMl } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -194,7 +198,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   useEffect(() => {
     if (isModalOpen) {
-      return registerBackHandler(() => { setIsModalOpen(false); return true; }, 100);
+      return registerBackHandler(() => { resetBuilderForm(); setIsModalOpen(false); return true; }, 100);
     }
   }, [isModalOpen, registerBackHandler]);
 
@@ -276,6 +280,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Meal log form ─────────────────────────────────────────────────────────
   const [mealName, setMealName] = useState('');
   const [foods,    setFoods]    = useState<FoodItem[]>([]);
+
+  // Builder draft is always discarded on cancel/close — deterministic, never stale.
+  const resetBuilderForm = () => {
+    setMealName('');
+    setFoods([]);
+  };
 
   // ── Natural language meal logging ──────────────────────────────────────────
   const [naturalQuery, setNaturalQuery] = useState('');
@@ -372,19 +382,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'quantity') {
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
-          const prevItem = next[index];
+          // prevItem must come from `prev` (pre-update): next[index] already
+          // carries the NEW quantity, which made ratio = rawQty/prevQty = 1
+          // and silently skipped scaling.
+          const prevItem = prev[index];
           const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
           if (prevQty && prevItem.calories > 0 && rawQty) {
             // Proportional scaling preserves scanned or custom barcode macros!
-            const ratio = rawQty / prevQty;
-            next[index] = {
-              ...prevItem,
-              quantity: rawQty,
-              calories: Math.max(0, Math.round(prevItem.calories * ratio)),
-              proteinG: Math.max(0, Math.round((prevItem.proteinG || 0) * ratio * 10) / 10),
-              carbsG: Math.max(0, Math.round((prevItem.carbsG || 0) * ratio * 10) / 10),
-              fatG: Math.max(0, Math.round((prevItem.fatG || 0) * ratio * 10) / 10),
-            };
+            // scaleFoodByQuantity keeps the ratio math in one tested place.
+            next[index] = scaleFoodByQuantity(prevItem, rawQty);
           } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
             // User entered custom macros for an unmatched food; do not wipe them out!
             next[index] = {
@@ -698,8 +704,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
 
-    const defaultName = getDefaultMealName();
-    const finalMealName = mealName.trim() || defaultName;
+    // Require an explicit meal name — the old time-based default ("Late Meal")
+    // produced piles of indistinguishable duplicates.
+    const finalMealName = mealName.trim();
+    if (!finalMealName) {
+      toast.error('Please give this meal a name (e.g. "Post-Workout Shake").', 'Meal Name Required');
+      return;
+    }
 
     const cleanedFoods: FoodItem[] = validFoods.map((f) => {
       const q = typeof f.quantity === 'number' && !isNaN(f.quantity) && f.quantity > 0 ? f.quantity : 1;
@@ -727,6 +738,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       foods: cleanedFoods,
     };
 
+    const absurdWarning = cleanedFoods.map(getAbsurdQuantityWarning).find((w) => w !== null);
+    if (absurdWarning) {
+      toast.error(absurdWarning, 'Unlikely Quantity');
+      return;
+    }
+
     const mealMacros = calculateMealMacros(cleanedFoods);
 
     addMeal(newMeal);
@@ -734,9 +751,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       `Added ${finalMealName} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
       'Meal Logged'
     );
+    resetBuilderForm();
     setIsModalOpen(false);
-    setMealName('');
-    setFoods([]);
   };
 
   const handleOpenGoalsModal = () => {
@@ -804,22 +820,55 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       toast.error('Please enter valid target calories and protein.', 'Invalid Targets');
       return;
     }
+    // Honest range validation — never silently ignore or rebalance absurd input.
+    if (cal < 800 || cal > 10000) {
+      toast.error(`Daily calories must be between 800 and 10,000 kcal (you entered ${goalCalories}).`, 'Unlikely Target');
+      return;
+    }
+    if (prot < 10 || prot > 400) {
+      toast.error(`Protein target must be between 10 and 400 g (you entered ${goalProtein} g). Very high intakes offer no benefit past ~2.2 g/kg.`, 'Unlikely Target');
+      return;
+    }
+    if (!isNaN(fat) && (fat < 0 || fat > 300)) {
+      toast.error('Fat target must be between 0 and 300 g.', 'Unlikely Target');
+      return;
+    }
+    if (!isNaN(carb) && (carb < 0 || carb > 800)) {
+      toast.error('Carb target must be between 0 and 800 g.', 'Unlikely Target');
+      return;
+    }
 
     const targetFat = !isNaN(fat) && fat > 0 ? Math.round(fat) : Math.round((cal * 0.25) / 9);
-    const targetCarbs = !isNaN(carb) && carb > 0 ? Math.round(carb) : Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
-    const targetCalories = (!isNaN(carb) && carb > 0 && !isNaN(fat) && fat > 0)
-      ? Math.round(prot * 4 + targetCarbs * 4 + targetFat * 9)
-      : Math.round(cal);
+    // The typed calorie target is authoritative. Carbs are the filler macro:
+    // if the numbers don't add up, carbs absorb the difference (disclosed below),
+    // instead of silently overwriting the calorie target.
+    const targetCarbs = Math.max(0, Math.round((cal - prot * 4 - targetFat * 9) / 4));
+    const targetCalories = Math.round(cal);
+    const carbsAdjusted = (!isNaN(carb) && carb > 0 && Math.abs(carb - targetCarbs) >= 5);
 
     const newGoals: MacroGoals = {
       calories:  targetCalories,
       proteinG:  Math.round(prot),
       fatG:      targetFat,
       carbsG:    targetCarbs,
+      // Recompute maintenance from the athlete's stats so the
+      // deficit/surplus explanation line survives manual edits.
+      maintenanceCalories: calculateMaintenanceCalories(
+        profile?.bodyweightKg || 75,
+        profile?.gender || 'male',
+        profile?.heightCm,
+        profile?.age
+      ),
+      calorieDelta: 0, // set below
     };
+    newGoals.calorieDelta = newGoals.calories - (newGoals.maintenanceCalories as number);
 
     setMacroGoals(newGoals);
-    toast.success(`Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).`, 'Goals Saved');
+    toast.success(
+      `Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).` +
+      (carbsAdjusted ? ` Carbs adjusted to fit your calorie target.` : ''),
+      'Goals Saved'
+    );
     setIsGoalsModalOpen(false);
   };
 
@@ -833,6 +882,26 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     e.preventDefault();
     const q = naturalQuery.trim();
     if (!q || isNaturalParsing) return;
+
+    // Reject unrecognizable input: never silently log a phantom 0-calorie meal.
+    const isJunkParse = (foods: FoodItem[]) => isJunkMealParse(foods);
+    const rejectJunk = () => {
+      toast.error(
+        `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal", or use Add Manually.`,
+        'Not Recognized'
+      );
+      setIsNaturalParsing(false);
+    };
+    // Refuse implausible quantities (e.g. "100 rotis") instead of logging junk.
+    const rejectAbsurd = (foods: FoodItem[]) => {
+      const warning = foods.map(getAbsurdQuantityWarning).find((w) => w !== null);
+      if (warning) {
+        toast.error(warning, 'Unlikely Quantity');
+        setIsNaturalParsing(false);
+        return true;
+      }
+      return false;
+    };
 
     setIsNaturalParsing(true);
     const today = getLocalTodayStr();
@@ -853,6 +922,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
+        if (isJunkParse(data.foods)) {
+          rejectJunk();
+          return;
+        }
+        if (rejectAbsurd(data.foods)) {
+          return;
+        }
         const newMeal: MealEntry = {
           id: safeRandomId('meal'),
           date: today,
@@ -866,7 +942,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ? 'Smart Macro Analysis'
           : 'Calibrated IFCT';
         toast.success(
-          `Logged ${data.foods.length} items (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
+          `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
         );
         return;
@@ -877,6 +953,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       try {
         const offlineFoods = parseNaturalMealOffline(q);
         if (offlineFoods && offlineFoods.length > 0) {
+          if (isJunkParse(offlineFoods)) {
+            rejectJunk();
+            return;
+          }
+          if (rejectAbsurd(offlineFoods)) {
+            return;
+          }
           const totals = calculateMealMacros(offlineFoods);
           const newMeal: MealEntry = {
             id: safeRandomId('meal'),
@@ -887,7 +970,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           addMeal(newMeal);
           setNaturalQuery('');
           toast.success(
-            `Logged ${offlineFoods.length} items (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
+            `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
             'Meal Logged (Offline)'
           );
           return;
@@ -2124,7 +2207,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">WATER</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
-                  {(waterToday / 1000).toFixed(1)} <span className="text-text-muted font-normal text-3xs">/ {(waterTargetMl / 1000).toFixed(1)}L</span>
+                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-3xs">/ {formatWaterMl(waterTargetMl)}</span>
                 </span>
               </div>
             </button>
@@ -2924,7 +3007,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.proteinG || ''}
+                                    value={food.proteinG ? round1(food.proteinG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'proteinG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
@@ -2937,7 +3020,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.carbsG || ''}
+                                    value={food.carbsG ? round1(food.carbsG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'carbsG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
@@ -2950,7 +3033,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <input
                                     type="number"
                                     step="0.1"
-                                    value={food.fatG || ''}
+                                    value={food.fatG ? round1(food.fatG) : ''}
                                     placeholder="0"
                                     onChange={(e) => handleFoodChange(i, 'fatG', Number(e.target.value))}
                                     className="w-full bg-transparent text-text-primary text-xs font-mono font-semibold p-0 border-none outline-none"
@@ -2983,7 +3066,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}
                   className="btn-ghost flex-1 text-xs"
                 >
                   Cancel
@@ -3547,7 +3630,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration Tracker</h4>
                     <p className="text-2xs text-text-muted">
-                      Water target ({(waterTargetMl / 1000).toFixed(1)}L) &amp; daily water logs
+                      Water target ({formatWaterMl(waterTargetMl)}) &amp; daily water logs
                     </p>
                   </div>
                 </div>

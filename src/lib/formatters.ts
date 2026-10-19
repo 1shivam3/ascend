@@ -72,3 +72,72 @@ export const formatLocalDate = (
   const d = parseLocalDate(dateStr);
   return d.toLocaleDateString(undefined, options);
 };
+
+/**
+ * Single source of truth for cm → imperial height display.
+ * 175 → `5' 9"`. Returns '—' for missing/invalid input.
+ */
+export const formatHeightImperial = (heightCm: number | undefined | null): string => {
+  if (typeof heightCm !== 'number' || !isFinite(heightCm) || heightCm <= 0) return '—';
+  const totalInches = Math.round(heightCm / 2.54);
+  const feet = Math.floor(totalInches / 12);
+  const inches = totalInches % 12;
+  return `${feet}' ${inches}"`;
+};
+
+/** Round to 1 decimal — use for all displayed/converted measurements to kill float artifacts. */
+export const round1 = (n: number): number => {
+  if (typeof n !== 'number' || !isFinite(n)) return 0;
+  return Math.round(n * 10) / 10;
+};
+
+/** Round to 2 decimals. */
+export const round2 = (n: number): number => {
+  if (typeof n !== 'number' || !isFinite(n)) return 0;
+  return Math.round(n * 100) / 100;
+};
+
+/**
+ * Sanitizes an athlete display name: strips HTML tags / stray markup so it
+ * can never leak into derived strings (like the guest @athlete.local email),
+ * collapses whitespace, and caps length. Emoji are preserved.
+ */
+export const sanitizeAthleteName = (raw: string, maxLength = 50): string => {
+  if (typeof raw !== 'string') return '';
+  return raw
+    .replace(/<[^>]*>/g, '')
+    .replace(/[<>&"']/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+};
+
+/** Email-safe slug from a display name (for the local guest email). */
+export const athleteNameToEmailSlug = (name: string): string => {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\w\s.-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '.')
+    .replace(/\.+/g, '.')
+    .replace(/^[.-]+|[.-]+$/g, '');
+  return slug || 'athlete';
+};
+
+/** Time-of-day greeting. Late night (22–5) gets "Good night," never "Good morning,". */
+export const getTimeGreeting = (date: Date = new Date()): string => {
+  const h = date.getHours();
+  if (h >= 5 && h < 12) return 'Good morning,';
+  if (h >= 12 && h < 17) return 'Good afternoon,';
+  if (h >= 17 && h < 22) return 'Good evening,';
+  return 'Good night,';
+};
+
+/**
+ * Format a water volume: "250 ml" under 1 L, "1.5 L" at/above.
+ */
+export function formatWaterMl(ml: number): string {
+  if (ml < 1000) return `${Math.round(ml)} ml`;
+  return `${round1(ml / 1000)} L`;
+}

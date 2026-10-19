@@ -1955,3 +1955,21 @@ function buildGoalAdaptiveSplitTemplates(
   ];
 }
 
+
+/**
+ * Apply an exercise-level difficulty rating to a workout exercise WITHOUT
+ * overwriting per-set RPEs that were explicitly logged. Sets with no logged
+ * RPE are backfilled with the rating; sets with a logged RPE keep it.
+ * (Regression guard for the History "Avg RPE" corruption bug.)
+ */
+export function applyExerciseEffortRating(
+  exercise: WorkoutExercise,
+  rpe: number,
+  label: 'easy' | 'good' | 'hard'
+): WorkoutExercise {
+  return {
+    ...exercise,
+    effortRating: { rpe, label },
+    sets: exercise.sets.map((s) => (s.rpe === undefined ? { ...s, rpe } : s)),
+  };
+}
