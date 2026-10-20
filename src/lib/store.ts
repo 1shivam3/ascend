@@ -230,6 +230,13 @@ export interface UiPreferences {
    * Old blobs lack the field and resolve to 'weekly' via sanitize.
    */
   defaultMatrixView: 'weekly' | 'monthly';
+  /**
+   * On-device food scan in the meal scanner (Android app only).
+   * Default ON; old saves lack the field, so consumers check
+   * `!== false`. Turning it off restores the pure server-AI flow.
+   * Has no effect on web/PWA, where the feature does not exist.
+   */
+  offlineScan: boolean;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -249,6 +256,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   workoutModeOverride: null,
   pinnedProgressChart: null,
   defaultMatrixView: 'weekly',
+  offlineScan: true,
 };
 
 export interface AppState {
