@@ -169,6 +169,11 @@ export function getWholeDayAdaptation(input: {
 
   const remainingKcal = Math.round(calorieTarget - caloriesLogged);
   if (remainingKcal <= 0) return null;
+  // R3 finding: at 95% logged this cheerfully suggested "a dinner near
+  // 120 kcal" — not a meal anyone can or should plan. Below ~250 kcal
+  // of remaining budget there is no lighter dinner to suggest; the
+  // day-status cards already cover near/over-target states.
+  if (remainingKcal < 250) return null;
 
   const consumedPct = Math.round(pct * 100);
   return {
@@ -201,13 +206,13 @@ export function getDayKindTargets(
       return {
         calories: goals.calories,
         proteinG: goals.proteinG,
-        note: 'Fasting day (no grains): protein can still come from paneer, curd, milk, nuts and sabudana/fruit meals. Targets stay the same — treat them as guidance, not rules.',
+        note: 'Fasting day (no grains): protein can still come from paneer, curd, milk, nuts and sabudana/fruit meals. Targets stay the same — treat them as guidance, not rules. If you have diabetes or take glucose-lowering medication, check with your doctor before fasting days.',
       };
     case 'one_meal_fast':
       return {
         calories: Math.round(goals.calories * 0.7),
         proteinG: goals.proteinG,
-        note: 'One-meal day: calories are guided ~30% lower and protein stays at target — try to get most of it into that one meal.',
+        note: 'One-meal day: calories are guided ~30% lower and protein stays at target — try to get most of it into that one meal. If you have diabetes or take glucose-lowering medication, check with your doctor before one-meal days — long gaps between meals can be risky on that medication.',
       };
     case 'festival_feast':
       return {

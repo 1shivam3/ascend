@@ -120,6 +120,16 @@ describe('whole-day adaptation', () => {
       getWholeDayAdaptation({ caloriesLogged: 1300, calorieTarget: 2000, hour: 14 })
     ).not.toBeNull();
   });
+
+  it('R3: no absurd micro-dinner — under 250 kcal remaining stays quiet', () => {
+    expect(
+      getWholeDayAdaptation({ caloriesLogged: 2280, calorieTarget: 2400, hour: 15 })
+    ).toBeNull();
+    // 250 kcal remaining exactly is a plausible light dinner: fires.
+    expect(
+      getWholeDayAdaptation({ caloriesLogged: 1750, calorieTarget: 2000, hour: 15 })
+    ).not.toBeNull();
+  });
 });
 
 describe('fast / festival day targets', () => {
@@ -135,6 +145,14 @@ describe('fast / festival day targets', () => {
     const t = getDayKindTargets('one_meal_fast', goals);
     expect(t!.calories).toBe(1400);
     expect(t!.proteinG).toBe(130);
+  });
+
+  it('R3: both fast modes carry a diabetes/medication caution (Meera safety)', () => {
+    expect(getDayKindTargets('no_grain_fast', goals)!.note).toMatch(/diabetes/i);
+    expect(getDayKindTargets('one_meal_fast', goals)!.note).toMatch(/doctor/i);
+    // The festival buffer is a user-chosen feast day, not a fast — no
+    // fasting caution needed there.
+    expect(getDayKindTargets('festival_feast', goals)!.note).not.toMatch(/diabetes/i);
   });
 
   it('festival day adds a +400 kcal buffer', () => {
