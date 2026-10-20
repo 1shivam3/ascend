@@ -125,6 +125,10 @@ export const INDIAN_FOOD_VALUES: Record<string, V> = {
   'puri': { calories: 330, proteinG: 6.5, carbsG: 44, fatG: 14 },
 
   // ── South Indian tiffin ─────────────────────────────────────────────
+  // The base DB carried idli's classic PER-PIECE macros (58 kcal, 2P/12C)
+  // in the per-100g slot, so 3 idlis logged ~70 kcal instead of ~175.
+  // Per-100g values below reproduce 58 kcal for one 40 g piece.
+  'idli': { calories: 145, proteinG: 4.5, carbsG: 30, fatG: 0.7 },
   'appam': { calories: 120, proteinG: 2.2, carbsG: 24, fatG: 1.8 },
   'puttu': { calories: 235, proteinG: 4, carbsG: 45, fatG: 4.5 },
   'uttapam': { calories: 170, proteinG: 4.5, carbsG: 26, fatG: 5.4 },

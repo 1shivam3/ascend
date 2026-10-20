@@ -68,6 +68,13 @@ describe('household unit conversion math', () => {
     expect(est.calories).toBe(Math.round(FOOD_DB['sambar'].calories * 3));
   });
 
+  it('R3: idli is valued per 100g — 3 pieces log ~174 kcal, not ~70', () => {
+    expect(FOOD_DB['idli'].calories).toBe(145);
+    const est = estimateMacros('idli', 3, 'piece');
+    expect(est.calories).toBe(174); // 3 × 40 g pieces × 145/100 g = 58 each
+    expect(est.proteinG).toBeCloseTo(5.4, 1);
+  });
+
   it('non-Indian foods keep the legacy generic katori (150g)', () => {
     const est = estimateMacros('oats', 1, 'katori');
     expect(est.calories).toBe(Math.round(FOOD_DB['oats'].calories * 1.5));
