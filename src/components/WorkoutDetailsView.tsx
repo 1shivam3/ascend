@@ -15,6 +15,7 @@ import {
 import { PlannedWorkout } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { getLastExercisePerformance, estimateSessionMinutes } from '@/lib/workout-engine';
+import { buildPercentSuggestions } from '@/lib/percent-1rm';
 import { getWorkoutBodyParts } from '@/lib/workout-schedule';
 import { applyPackedSwapsToPlan } from '@/lib/crowded-gym';
 import { useTranslation } from '@/lib/i18n';
@@ -37,6 +38,7 @@ export default function WorkoutDetailsView({
   onDelete,
 }: WorkoutDetailsViewProps) {
   const { profile, workouts } = useStore();
+  const prs = useStore((state) => state.prs);
   const trainingProfile = useStore((state) => state.trainingProfile);
   const { t } = useTranslation();
   const userUnit = profile?.unit || 'kg';
@@ -57,6 +59,17 @@ export default function WorkoutDetailsView({
     [gymPacked, plan, isLbs, trainingProfile?.dislikedExercises]
   );
   const displayPlan = packedResult?.plan ?? plan;
+
+  // %1RM suggestions for the ORIGINAL plan (percent mode only). Keyed
+  // by exercise index; packed-gym swaps change the exercise list, so
+  // suggestions are shown only when the packed view is off.
+  const percentSuggestions = React.useMemo(
+    () =>
+      !gymPacked && plan.intensityMode === 'percent'
+        ? buildPercentSuggestions(plan, prs || [], workouts || [], userUnit)
+        : {},
+    [gymPacked, plan, prs, workouts, userUnit]
+  );
 
   const exerciseCount = displayPlan.exercises?.length || 0;
   const estimatedDuration = estimateSessionMinutes(displayPlan);
@@ -234,6 +247,19 @@ export default function WorkoutDetailsView({
                           {targetSets} sets · {targetReps} reps
                           {targetW ? ` @ ${targetW} ${ex.targetUnit || userUnit}` : ''}
                         </span>
+                        {!targetW && percentSuggestions[idx] && (
+                          <span className="text-2xs text-[#E44427] font-mono">
+                            {t('plan.suggestedFrom1rm', {
+                              weight: percentSuggestions[idx].weights[0],
+                              unit: percentSuggestions[idx].unit,
+                              pct: 80,
+                              e1rm:
+                                percentSuggestions[idx].unit === 'lbs'
+                                  ? Math.round(percentSuggestions[idx].e1rmKg * 2.20462)
+                                  : Math.round(percentSuggestions[idx].e1rmKg),
+                            })}
+                          </span>
+                        )}
                         {lastPerf && lastPerf.bestWeight > 0 && (
                           <span className="text-2xs text-[#858076]/80 font-mono">
                             • Prev: {lastPerf.bestWeight} {userUnit} × {lastPerf.bestReps}

@@ -111,6 +111,49 @@ export const en = {
   'settings.gamification': 'Gamification',
   'settings.coach': 'Coach',
 
+  // ── Permission help (denied-permission guidance) ────────────────────
+  'perm.title': 'Permission is off',
+  'perm.openSettings': 'Open Settings',
+  'perm.tryAgain': 'Try again',
+  'perm.notificationsWhy': 'Reminders need notification permission to reach you.',
+  'perm.notificationsWebPath': 'Allow Notifications for ASCEND in your browser\u2019s site settings, then reopen this screen.',
+  'perm.microphoneWhy': 'Voice logging needs the microphone to hear your sets.',
+  'perm.microphoneWebPath': 'Allow microphone access for this site in your browser\u2019s site settings, then tap Try again.',
+  'perm.cameraWhy': 'Scanning needs the camera to see barcodes and food photos.',
+  'perm.cameraWebPath': 'Allow camera access for this site in your browser\u2019s site settings, then tap Try again.',
+  'perm.healthWhy': 'Health Connect access lets ASCEND read your steps, sleep and weight.',
+  'perm.healthWebPath': 'Health Connect is only available in the Android app.',
+
+  // ── Health Connect ──────────────────────────────────────────────────
+  'health.title': 'Health Connect sync',
+  'health.hint': 'Reads steps, sleep and weight from Health Connect into readiness and body metrics. Off until you connect.',
+  'health.connect': 'Connect',
+  'health.lastSynced': 'Last synced {time}',
+  'health.neverSynced': 'Not synced yet',
+  'health.stepsToday': 'Steps today',
+  'health.unavailable': 'Health Connect is not available on this device.',
+
+  // ── Progress: muscle volume & recovery ──────────────────────────────
+  'progress.muscleVolume': 'Muscle Volume',
+  'progress.setsThisWeek': 'sets this week',
+  'progress.recoveryMap': 'Recovery',
+  'progress.recoveryFresh': 'Fresh',
+  'progress.recoveryRecent': 'Recent',
+  'progress.recoveryFatigued': 'Fatigued',
+  'progress.recoveryNever': 'Not trained yet',
+  'progress.daysAgo': '{days}d ago',
+  'progress.volumeWhyLabel': 'How is this calculated?',
+
+  // ── Data export ─────────────────────────────────────────────────────
+  'settings.exportCsv': 'Export CSV',
+  'settings.exportCsvHint': 'Workouts, meals and body metrics in spreadsheet-friendly CSV',
+
+  // ── %1RM programming ────────────────────────────────────────────────
+  'plan.intensityPercent': 'Use % of 1RM',
+  'plan.intensityPercentHint': 'Main lifts get suggested loads from your estimated 1RM (top set 80%, back-offs 70%). RPE stays the default.',
+  'plan.intensityNoData': 'Log a heavy set or a PR for a main lift to enable % suggestions.',
+  'plan.suggestedFrom1rm': '≈ {weight} {unit} top set · {pct}% of {e1rm} {unit} est. 1RM',
+
   // ── Crowded-gym mode ────────────────────────────────────────────────
   'packed.toggle': 'Gym packed?',
   'packed.tryInstead': 'Packed gym: try {name} instead',

@@ -32,6 +32,7 @@ export default function ImportProgramModal({
       exercises: program.exercises,
       description: program.description,
       goalTag: program.goalTag,
+      intensityMode: program.intensityMode,
       createdAt: new Date().toISOString(),
     };
   };

@@ -24,6 +24,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
+import { buildCombinedCsvExport } from '@/lib/csv-export';
 import type { DietPreference } from '@/lib/types';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
@@ -32,7 +33,15 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LanguagePicker from '@/components/ui/LanguagePicker';
+import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation } from '@/lib/i18n';
+import {
+  isHealthConnectAvailable,
+  isHealthConnectSupported,
+  openHealthConnectSettings,
+  requestHealthAuthorization,
+} from '@/lib/health-connect';
+import { syncHealthConnectIfEnabled } from '@/lib/health-sync';
 
 function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
@@ -94,6 +103,46 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  // Health Connect (Android only — the whole block renders only where
+  // the capability exists; web/PWA never sees dead UI).
+  const healthSupported = isHealthConnectSupported();
+  const healthConnectLastSyncedAt = useStore((state) => state.healthConnectLastSyncedAt);
+  const [healthStatus, setHealthStatus] = useState<'idle' | 'connecting' | 'denied' | 'unavailable'>('idle');
+
+  const handleHealthConnectToggle = async () => {
+    if (uiPreferences.healthConnectEnabled === true) {
+      setUiPreferences({ healthConnectEnabled: false });
+      setHealthStatus('idle');
+      toast.info('Health Connect sync is off. Data already imported stays in your metrics.', 'Health Connect');
+      return;
+    }
+    setHealthStatus('connecting');
+    const available = await isHealthConnectAvailable();
+    if (!available) {
+      setHealthStatus('unavailable');
+      return;
+    }
+    const auth = await requestHealthAuthorization();
+    if (auth === 'granted') {
+      setUiPreferences({ healthConnectEnabled: true });
+      setHealthStatus('idle');
+      const outcome = await syncHealthConnectIfEnabled();
+      toast.success(
+        outcome === 'synced'
+          ? 'Health Connect is syncing steps, sleep and weight.'
+          : 'Health Connect connected. Your latest data will appear shortly.',
+        'Health Connect'
+      );
+    } else if (auth === 'denied') {
+      // Same denied-permission pattern as everywhere else (Item 0):
+      // purpose line + button into Health Connect's own settings.
+      setHealthStatus('denied');
+    } else {
+      setHealthStatus('idle');
+      toast.error('Could not connect to Health Connect on this device.', 'Health Connect');
+    }
+  };
   const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
 
   useEffect(() => {
@@ -166,6 +215,32 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       toast.success('Downloaded full JSON backup! Keep it safe.', 'Backup Saved');
     } catch {
       toast.error('Failed to export backup.', 'Export Error');
+    }
+  };
+
+  // Export CSV (workouts + meals + body metrics in one file, same
+  // download mechanism as the JSON backup so it works in the WebView).
+  const handleExportCsv = () => {
+    try {
+      const state = useStore.getState();
+      const csv = buildCombinedCsvExport({
+        workouts: state.workouts || [],
+        meals: state.meals || [],
+        bodyMetrics: state.bodyMetrics || [],
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `ascend_export_${dateStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Downloaded CSV export — workouts, meals and body metrics.', 'CSV Exported');
+    } catch {
+      toast.error('Failed to export CSV.', 'Export Error');
     }
   };
 
@@ -594,6 +669,59 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               onToggle={() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix })}
             />
           </div>
+
+          {/* Muscle volume toggle (Progress) */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div>
+              <p className="text-xs font-bold text-text-primary">{t('progress.muscleVolume')}</p>
+              <p className="text-3xs text-text-muted leading-relaxed">Per-muscle weekly sets and the recovery map on Progress</p>
+            </div>
+            <SettingsToggle
+              label="Toggle muscle volume on Progress"
+              on={uiPreferences.showMuscleVolume !== false}
+              onToggle={() => setUiPreferences({ showMuscleVolume: uiPreferences.showMuscleVolume === false })}
+            />
+          </div>
+
+          {/* Health Connect sync (Android only — absent elsewhere) */}
+          {healthSupported && (
+            <div className="pt-3 border-t border-border/60 space-y-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-bold text-text-primary">{t('health.title')}</p>
+                  <p className="text-3xs text-text-muted leading-relaxed">{t('health.hint')}</p>
+                </div>
+                <SettingsToggle
+                  label="Toggle Health Connect sync"
+                  on={uiPreferences.healthConnectEnabled === true}
+                  onToggle={handleHealthConnectToggle}
+                />
+              </div>
+              {uiPreferences.healthConnectEnabled === true && (
+                <p className="text-3xs text-text-muted">
+                  {healthConnectLastSyncedAt
+                    ? t('health.lastSynced', {
+                        time: new Date(healthConnectLastSyncedAt).toLocaleString(),
+                      })
+                    : t('health.neverSynced')}
+                </p>
+              )}
+              {healthStatus === 'connecting' && (
+                <p className="text-3xs text-text-muted">Opening Health Connect…</p>
+              )}
+              {healthStatus === 'unavailable' && (
+                <p className="text-3xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
+              )}
+              {healthStatus === 'denied' && (
+                <PermissionHelp
+                  permission="health"
+                  isNative
+                  onOpenSettings={openHealthConnectSettings}
+                  onRetry={handleHealthConnectToggle}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -624,6 +752,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div>
                 <p className="text-xs font-bold text-text-primary">Export JSON Backup</p>
                 <p className="text-3xs text-text-muted">Download all workouts, PRs, and meals</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted" />
+          </button>
+
+          {/* Export CSV */}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('settings.exportCsv')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.exportCsvHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />

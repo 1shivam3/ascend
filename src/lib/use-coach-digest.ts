@@ -17,6 +17,7 @@ import {
 } from './coach-engine';
 import type { Unit } from './types';
 import { getWeekRange, getLocalTodayStr } from './formatters';
+import { buildHealthSignals } from './health-connect';
 import { resolvePrimaryGoal } from './types';
 import { calculateStreak, buildActiveDays } from './streak-freeze';
 import { getLevel, progressToNext, getLevelName } from './xp-system';
@@ -41,10 +42,17 @@ export function useCoachDigest() {
   const weeklySchedule = useStore((s) => s.weeklySchedule);
   const plannedWorkouts = useStore((s) => s.plannedWorkouts);
   const dailyCheckins = useStore((s) => s.dailyCheckins);
+  const healthSummary = useStore((s) => s.healthSummary);
 
   const readiness = useMemo(
-    () => calculateReadiness(workouts, bodyMetrics, dailyCheckins?.[getLocalTodayStr()]),
-    [workouts, bodyMetrics, dailyCheckins]
+    () =>
+      calculateReadiness(
+        workouts,
+        bodyMetrics,
+        dailyCheckins?.[getLocalTodayStr()],
+        buildHealthSignals(healthSummary)
+      ),
+    [workouts, bodyMetrics, dailyCheckins, healthSummary]
   );
 
   const stalls = useMemo(

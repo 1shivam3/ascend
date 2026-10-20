@@ -489,6 +489,20 @@ export interface ReadinessResult {
   factors: string[];
 }
 
+/**
+ * Optional device signals (Health Connect). Every field is optional
+ * and the engine behaves identically when this is absent — these only
+ * refine the score when the user has connected a device. Sleep is
+ * applied ONLY when there is no manual check-in (the user's own
+ * report wins, and the two must never double-count).
+ */
+export interface HealthReadinessSignals {
+  /** Last night's sleep in minutes (sessions ending this morning). */
+  sleepMinutesLastNight?: number;
+  /** Yesterday's full-day step count. */
+  stepsYesterday?: number;
+}
+
 const READINESS_START = 100;
 
 /**
@@ -562,29 +576,69 @@ function manualCheckinAdjustment(checkin: ManualCheckin): { delta: number; facto
 export function calculateReadiness(
   workouts: WorkoutEntry[],
   bodyMetrics: BodyMetricEntry[],
-  manualCheckin?: ManualCheckin
+  manualCheckin?: ManualCheckin,
+  healthSignals?: HealthReadinessSignals
 ): ReadinessResult {
   const factors: string[] = [];
   const today = getLocalTodayStr();
   const sorted = [...(workouts || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
 
+  // Health Connect signals (optional): device sleep + yesterday's
+  // steps. Sleep counts only without a manual check-in (never
+  // double-count), and steps use YESTERDAY's full day so a
+  // half-finished today can't look sedentary.
+  const applyHealthSignals = (startScore: number): number => {
+    if (!healthSignals) return startScore;
+    let score = startScore;
+    const sleepMin = healthSignals.sleepMinutesLastNight;
+    if (!manualCheckin && typeof sleepMin === 'number' && sleepMin > 0) {
+      const hours = sleepMin / 60;
+      const hoursLabel = `${Math.floor(hours)}h ${Math.round(sleepMin % 60)}m`;
+      if (sleepMin < 360) {
+        score -= 10;
+        factors.push(
+          `Your device logged only about ${hoursLabel} of sleep last night. ` +
+          `Short sleep blunts strength and focus — keep today technical and skip the max attempts.`
+        );
+      } else if (sleepMin < 420) {
+        score -= 5;
+        factors.push(
+          `Sleep came in light last night (about ${hoursLabel} from your device). ` +
+          `Train as planned, but leave a rep in reserve on the top sets.`
+        );
+      } else if (sleepMin >= 450) {
+        score = Math.min(100, score + 2);
+      }
+    }
+    const steps = healthSignals.stepsYesterday;
+    if (typeof steps === 'number' && steps > 0 && steps < 2000) {
+      score -= 5;
+      factors.push(
+        `Yesterday was a very low-movement day (${steps.toLocaleString()} steps). ` +
+        `Blood flow is recovery — an easy warm-up and some walking between sets will help more than usual today.`
+      );
+    }
+    return score;
+  };
+  const bandFor = (s: number): ReadinessResult['band'] =>
+    s >= 80 ? 'primed' : s >= 60 ? 'ready' : s >= 40 ? 'caution' : 'rest';
+
   if (sorted.length === 0) {
-    // No training history: a flat baseline, but the manual check-in still
-    // applies — the sheet must never be decorative. Conservative cap: with
-    // zero load data the score can rise toward 'ready', never to 'primed'.
+    // No training history: a flat baseline, but the manual check-in and any
+    // Health Connect signals still apply — the sheet must never be
+    // decorative. Conservative cap: with zero load data the score can rise
+    // toward 'ready', never to 'primed'. applyHealthSignals skips device
+    // sleep when a manual check-in exists, so the two never double-count.
+    factors.push('No recent training logged, so there is no fatigue to recover from. Start at a comfortable effort and let the first week set your baseline.');
     let score = 70;
-    const emptyFactors = ['No recent training logged, so there is no fatigue to recover from. Start at a comfortable effort and let the first week set your baseline.'];
     if (manualCheckin) {
       const adj = manualCheckinAdjustment(manualCheckin);
       score += adj.delta;
-      if (adj.factor) emptyFactors.push(adj.factor);
+      if (adj.factor) factors.push(adj.factor);
     }
-    score = Math.max(1, Math.min(79, score));
-    return {
-      score,
-      band: score >= 60 ? 'ready' : score >= 40 ? 'caution' : 'rest',
-      factors: emptyFactors,
-    };
+    score = applyHealthSignals(score);
+    score = Math.max(1, Math.min(79, Math.round(score)));
+    return { score, band: bandFor(score), factors: factors.slice(0, 5) };
   }
 
   const latest = [...(bodyMetrics || [])].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
@@ -694,6 +748,9 @@ export function calculateReadiness(
     score += adj.delta;
     if (adj.factor) factors.push(adj.factor);
   }
+
+  // (e) Health Connect signals — optional, device-measured.
+  score = applyHealthSignals(score);
 
   // Rapid weight loss can mask under-recovery.
   const trend = analyzeWeightTrend(bodyMetrics);

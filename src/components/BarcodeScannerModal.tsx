@@ -27,6 +27,7 @@ import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
 import { Capacitor } from '@capacitor/core';
+import PermissionHelp from '@/components/ui/PermissionHelp';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ export default function BarcodeScannerModal({
 
   const [hasCamera, setHasCamera] = useState(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [cameraDenied, setCameraDenied] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [torchSupported, setTorchSupported] = useState(false);
@@ -220,6 +222,7 @@ export default function BarcodeScannerModal({
   const startCamera = useCallback(async () => {
     if (typeof window === 'undefined') return;
     setCameraError(null);
+    setCameraDenied(false);
     setScannedProduct(null);
     setIsNotFoundInDB(false);
     setIsStartingCamera(true);
@@ -328,11 +331,11 @@ export default function BarcodeScannerModal({
       console.warn('Camera initialization error:', err);
       setIsStartingCamera(false);
       setHasCamera(false);
+      const denied = err.name === 'NotAllowedError';
+      setCameraDenied(denied);
       setCameraError(
-        err.name === 'NotAllowedError'
-          ? Capacitor.isNativePlatform()
-            ? `Camera permission denied (${err.name || 'error'}). Enable camera access in App info → Permissions, or enter barcode below.`
-            : `Camera permission denied (${err.name || 'error'}). Please allow camera access in your browser site settings, or enter barcode below.`
+        denied
+          ? 'Camera permission denied. You can still enter the barcode manually below.'
           : `Camera error (${err.name || 'unknown'}). You can still type the barcode manually below.`
       );
     }
@@ -634,16 +637,26 @@ export default function BarcodeScannerModal({
 
                 {/* Camera Error / Fallback display — compact: manual entry lives below */}
                 {cameraError && (
-                  <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10">
+                  <div className="absolute inset-0 p-4 bg-bg-card/95 flex flex-col items-center justify-center text-center z-10 overflow-y-auto">
                     <AlertCircle className="w-7 h-7 text-amber-500 mb-1.5 shrink-0" />
                     <p className="text-xs text-text-primary font-medium">{cameraError}</p>
-                    <button
-                      type="button"
-                      onClick={startCamera}
-                      className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
-                    </button>
+                    {cameraDenied ? (
+                      <div className="mt-3 w-full max-w-xs text-left">
+                        <PermissionHelp
+                          permission="camera"
+                          isNative={Capacitor.isNativePlatform()}
+                          onRetry={startCamera}
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

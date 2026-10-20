@@ -94,6 +94,7 @@ Data is **encrypted in transit** (TLS everywhere). Users can request deletion: *
 | `INTERNET` | Cloud sync, AI features, Open Food Facts barcode lookup | No |
 | `CAMERA` | Live barcode scanning + meal photo capture, only while the feature is in use | No (no background use). If asked: "Core functionality — user-initiated scanning." |
 | `POST_NOTIFICATIONS` | User-configured workout / meal / water reminders | No declaration form; runtime prompt handled by the WebView/browser. |
+| `health.READ_STEPS` / `health.READ_SLEEP` / `health.READ_WEIGHT` | Optional Health Connect sync (off by default; user connects in Settings). **Read-only** — the app manifest strips every other health permission the plugin declares, including all writes | **Yes — Health Connect permissions declaration form** in Play Console: justify each type (steps → activity/readiness, sleep → readiness score, weight → body-metrics auto-fill). Privacy policy §4 discloses this. |
 
 ## Health apps declaration (Play Console → App content → Health apps)
 

@@ -8,6 +8,7 @@ export interface DecodedProgram {
   notes?: string;
   description?: string;
   goalTag?: string;
+  intensityMode?: 'rpe' | 'percent';
 }
 
 /**
@@ -78,6 +79,7 @@ export function encodeProgramForSharing(
     // Plan-level context used to be silently dropped in transit.
     d: plan.description || undefined,
     g: plan.goalTag || undefined,
+    im: plan.intensityMode === 'percent' ? 'percent' : undefined,
     ex: plan.exercises.map((e) => ({
       n: e.name,
       s: e.targetSets,
@@ -157,6 +159,7 @@ export function decodeProgramFromHash(hashString: string): DecodedProgram | null
       notes: parsed.nt ? String(parsed.nt).slice(0, 500).trim() : undefined,
       description: parsed.d ? String(parsed.d).slice(0, 500).trim() : undefined,
       goalTag: parsed.g ? String(parsed.g).slice(0, 50).trim() : undefined,
+      intensityMode: parsed.im === 'percent' ? ('percent' as const) : undefined,
       exercises,
     };
   } catch (err) {

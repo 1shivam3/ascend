@@ -18,6 +18,7 @@ import {
   Flame,
   Droplets,
   Snowflake,
+  Footprints,
   MessageCircleHeart,
   TrendingUp,
   Leaf,
@@ -30,6 +31,8 @@ import { useTranslation } from '@/lib/i18n';
 import { getLevel, getLevelName, progressToNext, summarizeXpInRange } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { calculateReadiness } from '@/lib/coach-engine';
+import { buildHealthSignals } from '@/lib/health-connect';
+import { buildPercentSuggestions } from '@/lib/percent-1rm';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import {
   monthlyChallenges,
@@ -174,11 +177,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [normalizedWorkouts, meals, streak.freezesAvailable, todayStr]);
 
   // Readiness, computed on render from the coach engine — including
-  // today's feel check-in when the user has given one.
+  // today's feel check-in when the user has given one, plus Health
+  // Connect device signals when the user has connected them.
+  const healthSummary = useStore((state) => state.healthSummary);
   const todayCheckin = dailyCheckins?.[todayStr];
   const readiness = useMemo(
-    () => calculateReadiness(normalizedWorkouts, bodyMetrics || [], todayCheckin),
-    [normalizedWorkouts, bodyMetrics, todayCheckin]
+    () =>
+      calculateReadiness(
+        normalizedWorkouts,
+        bodyMetrics || [],
+        todayCheckin,
+        buildHealthSignals(healthSummary)
+      ),
+    [normalizedWorkouts, bodyMetrics, todayCheckin, healthSummary]
   );
 
   // Coach digest: missed-session check-in + weight-trend nutrition advice.
@@ -381,11 +392,20 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
     if (planToStart && planToStart.exercises && planToStart.exercises.length > 0) {
       const applications = useStore.getState().policyDecisionApplications || [];
+      // %1RM mode (opt-in per plan): suggested loads for main compounds.
+      const percentWeightsByIndex: Record<number, number[]> = {};
+      if (planToStart.intensityMode === 'percent') {
+        const suggestions = buildPercentSuggestions(planToStart, prs, workouts, userUnit);
+        for (const [idx, s] of Object.entries(suggestions)) {
+          percentWeightsByIndex[Number(idx)] = s.weights;
+        }
+      }
       const draft = createWorkoutDraftFromPlan(planToStart, {
         userUnit,
         userPrs: prs,
         applications,
         date: todayStr,
+        percentWeightsByIndex,
       });
 
       saveWorkoutDraft(draft);
@@ -958,6 +978,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </p>
         )}
       </div>
+      )}
+
+      {/* ── 8a2. STEPS (Health Connect, only when synced data exists) ──── */}
+      {healthSummary && healthSummary.date === todayStr && healthSummary.stepsToday > 0 && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl px-4 py-3 shadow-xs flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+            <Footprints className="w-4 h-4 text-accent" />
+          </div>
+          <div className="min-w-0">
+            <span className="text-xs font-bold text-text-primary block">
+              {t('health.stepsToday')}
+            </span>
+            <span className="text-3xs text-text-muted block">Health Connect</span>
+          </div>
+          <span className="ml-auto text-sm font-black font-mono text-text-primary tabular-nums">
+            {healthSummary.stepsToday.toLocaleString()}
+          </span>
+        </div>
       )}
 
       {/* ── 8b. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}

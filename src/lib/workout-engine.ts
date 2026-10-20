@@ -330,6 +330,14 @@ export interface CreateWorkoutExercisesFromPlanOptions {
   userUnit?: Unit;
   userPrs?: PersonalRecord[];
   applications?: PolicyDecisionApplicationAudit[];
+  /**
+   * %1RM suggestions (lib/percent-1rm), keyed by plan exercise index:
+   * per-set loads in that exercise's target unit. Applied ONLY where
+   * the plan exercise has no explicit targetWeight — an explicit plan
+   * weight always wins. Callers pass this only for plans that opted
+   * into intensityMode 'percent', so the default path is untouched.
+   */
+  percentWeightsByIndex?: Record<number, number[]>;
 }
 
 export interface CreateWorkoutDraftFromPlanOptions extends CreateWorkoutExercisesFromPlanOptions {
@@ -435,23 +443,31 @@ export function createWorkoutExercisesFromPlan(
       ? matchingAudit.decisionId
       : undefined;
 
+    // %1RM suggestion for this exercise (opt-in plans only; explicit
+    // plan weight always wins because hasConfiguredWeight skips it).
+    const percentWeights =
+      !hasConfiguredWeight && !isBW ? options?.percentWeightsByIndex?.[idx] : undefined;
+
     return {
       name: pe.name,
       planExerciseId: pe.id,
       appliedDecisionId,
-      sets: Array.from({ length: Math.max(1, pe.targetSets || 1) }, () => ({
-        weight: assignedWeight,
-        reps: pe.targetReps ?? 8,
-        unit: targetUnit,
-        rpe: hasConfiguredRpe ? (pe.targetRpe as number) : 8,
-        completed: false,
-        status: 'pending' as const,
-        prescribedWeight,
-        prescribedReps,
-        prescribedRpe,
-        prescribedUnit,
-        appliedDecisionId,
-      })),
+      sets: Array.from({ length: Math.max(1, pe.targetSets || 1) }, (_, setIdx) => {
+        const suggested = percentWeights?.[setIdx];
+        return {
+          weight: suggested !== undefined ? suggested : assignedWeight,
+          reps: pe.targetReps ?? 8,
+          unit: targetUnit,
+          rpe: hasConfiguredRpe ? (pe.targetRpe as number) : 8,
+          completed: false,
+          status: 'pending' as const,
+          prescribedWeight: suggested !== undefined ? suggested : prescribedWeight,
+          prescribedReps,
+          prescribedRpe,
+          prescribedUnit: suggested !== undefined ? targetUnit : prescribedUnit,
+          appliedDecisionId,
+        };
+      }),
     };
   });
 }

@@ -10,6 +10,7 @@ import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useAppNavigation } from '@/lib/navigation';
 import {
   Camera,
@@ -54,6 +55,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   // In-app live camera state (bypasses Android OS camera intent to eliminate low-memory crash completely)
   const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
+  const [cameraDenied, setCameraDenied] = useState(false);
   const [cameraFacingMode, setCameraFacingMode] = useState<'environment' | 'user'>('environment');
   const [isCapturingFrame, setIsCapturingFrame] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -127,6 +129,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       }
 
       setScanError(null);
+      setCameraDenied(false);
       setIsLiveCameraActive(true);
       setCameraFacingMode(facing);
 
@@ -149,11 +152,14 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         console.warn('Camera stream error:', err);
         stopLiveCamera();
         if (err.name === 'NotAllowedError') {
-          toast.info('Camera permission not granted. You can select a photo from your gallery.', 'Camera Notice');
+          // Denied: show the PermissionHelp panel instead of silently
+          // bouncing to the gallery — the user can still pick a photo
+          // from the upload area below whenever they want.
+          setCameraDenied(true);
         } else {
           toast.info('Direct camera stream unavailable. Please choose an image.', 'Camera Notice');
+          fileInputRef.current?.click();
         }
-        fileInputRef.current?.click();
       }
     },
     [stopLiveCamera, toast]
@@ -207,6 +213,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     }
     setPreviewUrl(null);
     setProcessedBlob(null);
+    setCameraDenied(false);
   }, [stopLiveCamera]);
 
   // Ensure object URLs and camera streams are released on unmount
@@ -757,6 +764,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   </button>
                 </div>
               </div>
+            )}
+
+            {cameraDenied && !isLiveCameraActive && (
+              <PermissionHelp
+                permission="camera"
+                onRetry={() => startLiveCamera()}
+              />
             )}
 
             {/* Upload Area / Live In-App Camera Viewfinder / Processing State */}

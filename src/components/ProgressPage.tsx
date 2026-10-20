@@ -27,6 +27,7 @@ import { getBigThreeStats, calculateDOTS, getDOTSClassification } from '@/lib/do
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
+import MuscleVolumeSection from '@/components/MuscleVolumeSection';
 import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
@@ -1497,6 +1498,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   ))}
                 </div>
               </div>
+
+              {/* Card 3b: Muscle Volume + Recovery (toggleable in Settings) */}
+              <MuscleVolumeSection workouts={workouts} />
 
               {/* Card 3: Last 4 Weeks */}
               <div className="card p-5 bg-bg-card border border-border space-y-3.5 shadow-xs">

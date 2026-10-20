@@ -120,6 +120,13 @@ export interface BodyMetricEntry {
   id: string;
   date: string; // YYYY-MM-DD
   weightKg: number;
+  /**
+   * Where this entry came from. 'health-connect' entries are created by
+   * Health Connect sync and may be refreshed by later syncs; a manual
+   * weigh-in for the same date is never overwritten by sync.
+   * Absent = manual (all pre-existing entries).
+   */
+  source?: 'manual' | 'health-connect';
   heightCm?: number;
   bodyFatPct?: number;
   chestIn?: number;
@@ -444,6 +451,12 @@ export interface PlannedWorkout {
   createdAt: string;
   description?: string;
   goalTag?: string;
+  /**
+   * Intensity prescription mode. 'percent' = main compound lifts get
+   * suggested loads from the user's estimated 1RM (see lib/percent-1rm).
+   * Absent/'rpe' = the long-standing default; nothing changes.
+   */
+  intensityMode?: 'rpe' | 'percent';
 }
 
 export interface FavoriteFood {
