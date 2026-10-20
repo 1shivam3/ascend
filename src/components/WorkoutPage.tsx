@@ -44,6 +44,8 @@ import {
   MoreVertical,
   SlidersHorizontal,
   Info,
+  Footprints,
+  Trophy,
 } from 'lucide-react';
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExercise } from '@/lib/store';
 import {
@@ -81,6 +83,13 @@ import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAU
 import { useToast } from '@/components/ui/Toast';
 
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import RunSessionScreen from '@/components/RunSessionScreen';
+import {
+  getRunProgramProgress,
+  describeSession,
+  sessionTotalSeconds,
+  type RunSession,
+} from '@/lib/run-program';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
 import ShareProgramModal from '@/components/ShareProgramModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
@@ -639,6 +648,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // User's weekly-target override from Settings (null = automatic, 0 = off).
   const weeklyTargetOverride = useStore((state) => state.uiPreferences?.weeklyTargetDays ?? null);
   const coachEnabled = useStore((state) => state.uiPreferences?.coachEnabled ?? true);
+  // Run program (opt-in): enrollment from the store, progress from logs.
+  const runProgram = useStore((state) => state.runProgram);
+  const enrollRunProgram = useStore((state) => state.enrollRunProgram);
+  const leaveRunProgram = useStore((state) => state.leaveRunProgram);
+  const runProgress = useMemo(
+    () => getRunProgramProgress(workouts, runProgram),
+    [workouts, runProgram],
+  );
+  const [activeRunSession, setActiveRunSession] = useState<RunSession | null>(null);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
@@ -2063,6 +2081,107 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         )}
       </section>
 
+      {/* ── Running (opt-in Couch to 5K program) ── */}
+      <section className="space-y-2.5" aria-label={t('run.title')}>
+        <div className="flex items-center gap-2">
+          <Footprints className="w-4 h-4 text-accent" />
+          <h2 className="section-title text-[11px] mb-0">{t('run.title').toUpperCase()}</h2>
+        </div>
+        <div className="card p-4 sm:p-5 space-y-3">
+          {!runProgram ? (
+            <>
+              <div>
+                <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
+                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{t('run.programDesc')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => enrollRunProgram(getLocalTodayStr())}
+                className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 fill-white" />
+                <span>{t('run.startProgram')}</span>
+              </button>
+            </>
+          ) : runProgress.complete ? (
+            <>
+              <div className="flex items-center gap-2.5">
+                <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                  <Trophy className="w-4 h-4" />
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
+                  <p className="text-2xs text-text-muted">{t('run.programComplete')}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => enrollRunProgram(getLocalTodayStr())}
+                  className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>{t('run.restartProgram')}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => leaveRunProgram()}
+                  className="py-2 px-4 text-xs font-semibold text-text-muted hover:text-text-primary cursor-pointer"
+                >
+                  {t('run.leaveProgram')}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
+                  <p className="text-2xs text-text-muted mt-0.5">
+                    {t('run.weekOf', { week: runProgress.currentWeek })} ·{' '}
+                    {t('run.sessionsDone', { done: runProgress.completedCount, total: runProgress.totalCount })}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => leaveRunProgram()}
+                  className="text-2xs font-semibold text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                >
+                  {t('run.leaveProgram')}
+                </button>
+              </div>
+              <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-accent transition-all duration-500"
+                  style={{ width: `${Math.round((runProgress.completedCount / runProgress.totalCount) * 100)}%` }}
+                />
+              </div>
+              {runProgress.nextSession && (
+                <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-bg-secondary border border-border/60">
+                  <div className="min-w-0">
+                    <p className="text-3xs font-bold text-text-muted uppercase tracking-wide">{t('run.nextRun')}</p>
+                    <p className="text-xs font-semibold text-text-primary mt-0.5">
+                      {t('run.sessionLabel', { week: runProgress.nextSession.week, day: runProgress.nextSession.day })}
+                      {' · '}
+                      {Math.round(sessionTotalSeconds(runProgress.nextSession) / 60)} min
+                    </p>
+                    <p className="text-2xs text-text-muted truncate">{describeSession(runProgress.nextSession)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRunSession(runProgress.nextSession)}
+                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>{t('run.startRun')}</span>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </section>
+
       {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
       {isRestRunning && (
         <section className="px-3.5 py-2.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3">
@@ -2498,6 +2617,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         )}
       </section>
         </div>
+      )}
+
+      {/* ── Run Session Player ─────────────────────────────────────────── */}
+      {activeRunSession && (
+        <RunSessionScreen
+          session={activeRunSession}
+          onFinish={(entry) => {
+            addWorkout(entry);
+            setActiveRunSession(null);
+            toast.success(t('run.saved'), entry.name);
+          }}
+          onCancel={() => setActiveRunSession(null)}
+        />
       )}
 
       {/* ── Dedicated Fullscreen Active Workout Experience ──────────────── */}
