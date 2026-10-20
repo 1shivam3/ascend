@@ -884,17 +884,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="text-xs font-medium text-text-muted">Next session — coach&apos;s calls</span>
           <div className="mt-2 space-y-2">
             {coachDigest.nextAdjustments.map((adj) => (
-              <div key={adj.exercise} className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div key={adj.exercise}>
+                <div className="flex items-start justify-between gap-3">
                   <p className="text-xs font-bold text-text-primary truncate">{adj.exercise}</p>
-                  <p className="text-2xs text-text-muted leading-relaxed">
-                    {adj.reason.split('. ')[0]}.
-                  </p>
+                  <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
+                    {adj.oldTarget.weight} → {adj.newTarget.weight}
+                    {adj.newTarget.unit}
+                  </span>
                 </div>
-                <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
-                  {adj.oldTarget.weight} → {adj.newTarget.weight}
-                  {adj.newTarget.unit}
-                </span>
+                {/* The reasoning is one tap away, never auto-shown. */}
+                <CollapsibleDetails label="Why?">
+                  <p>{adj.reason}</p>
+                </CollapsibleDetails>
               </div>
             ))}
           </div>
