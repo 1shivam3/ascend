@@ -91,6 +91,17 @@ import {
   getInitialXState as getInitialChallengesXState,
 } from './challenges';
 import {
+  type FriendChallengesState,
+  type FriendChallengeDef,
+  type FriendScoreEntry,
+  getInitialFriendChallengesState,
+  addFriendChallenge as addFriendChallengeState,
+  removeFriendChallenge as removeFriendChallengeState,
+  mergeFriendScore as mergeFriendScoreState,
+  markFriendRewardGranted as markFriendRewardGrantedState,
+  sanitizeFriendChallengesState,
+} from './friend-challenges';
+import {
   CoachPersistedState,
   CalorieAdjustmentRecord,
   ReadinessHistoryEntry,
@@ -257,6 +268,13 @@ export interface AppState {
   optOutChallenge: (key: string) => void;
   dismissChallenge: (key: string) => void;
   grantChallengeReward: (key: string) => void;
+
+  // Friend Challenges (local-first, code exchange — no server table)
+  friendChallenges: FriendChallengesState;
+  addFriendChallenge: (def: FriendChallengeDef) => void;
+  removeFriendChallenge: (id: string) => void;
+  applyFriendScore: (challengeId: string, entry: FriendScoreEntry) => void;
+  grantFriendChallengeReward: (id: string) => void;
 
   // Coach Engine (adaptive coaching state)
   coach: CoachPersistedState;
@@ -628,6 +646,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   xp: state.xp,
   streak: state.streak,
   challenges: state.challenges,
+  friendChallenges: state.friendChallenges,
   coach: state.coach,
   dailyCheckins: state.dailyCheckins,
   healthSummary: state.healthSummary,
@@ -830,6 +849,21 @@ export const useAppStore = create<AppState>()(
             [key]: { ...(state.challenges.instances[key] || { optedIn: false, dismissed: false, rewardGranted: false }), rewardGranted: true },
           },
         },
+      })),
+
+      // Friend Challenges — local-first code exchange (see lib/friend-challenges)
+      friendChallenges: getInitialFriendChallengesState(),
+      addFriendChallenge: (def) => set((state) => ({
+        friendChallenges: addFriendChallengeState(state.friendChallenges, def),
+      })),
+      removeFriendChallenge: (id) => set((state) => ({
+        friendChallenges: removeFriendChallengeState(state.friendChallenges, id),
+      })),
+      applyFriendScore: (challengeId, entry) => set((state) => ({
+        friendChallenges: mergeFriendScoreState(state.friendChallenges, challengeId, entry),
+      })),
+      grantFriendChallengeReward: (id) => set((state) => ({
+        friendChallenges: markFriendRewardGrantedState(state.friendChallenges, id),
       })),
 
       // Coach Engine
@@ -2296,6 +2330,7 @@ export const useAppStore = create<AppState>()(
           xp: getInitialXpState(),
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
+          friendChallenges: getInitialFriendChallengesState(),
           coach: getInitialCoachState(),
           healthSummary: null,
           healthConnectLastSyncedAt: null,
@@ -2645,6 +2680,10 @@ export const useAppStore = create<AppState>()(
               data.dailyCheckins && typeof data.dailyCheckins === 'object'
                 ? { ...state.dailyCheckins, ...data.dailyCheckins }
                 : state.dailyCheckins,
+            friendChallenges:
+              data.friendChallenges !== undefined
+                ? sanitizeFriendChallengesState(data.friendChallenges)
+                : state.friendChallenges,
             progressPhotos: (() => {
               if (!Array.isArray(data.progressPhotos)) return state.progressPhotos;
               const valid = data.progressPhotos
