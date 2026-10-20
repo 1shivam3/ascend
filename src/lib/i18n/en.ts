@@ -216,6 +216,17 @@ export const en = {
   'packed.keep': 'Keep',
   'packed.previewHint': 'Pre-swap to dumbbell & bodyweight moves you can do anywhere.',
   'packed.swappedCount': '{count} exercises swapped to dumbbell / bodyweight',
+
+  // ── Offline food scan (Android app) ─────────────────────────────────
+  'settings.offlineScan': 'Offline food scan',
+  'settings.offlineScanHint': 'Recognizes dishes right on your phone — no internet needed. The photo never leaves the device.',
+  'scan.offlineNote': 'Offline scan — works without internet, knows 15 dishes for now',
+  'scan.offlineCta': 'Recognize Dish — Offline',
+  'scan.recognizingOffline': 'Recognizing the dish on your phone…',
+  'scan.didYouMean': 'Did you mean…?',
+  'scan.useAiInstead': 'Use AI scan instead',
+  'scan.offlineChoicesTitle': 'Not fully sure about this one',
+  'scan.offlineChoicesHint': 'These are the closest matches from the offline scan. Tap the right dish — or use the AI scan.',
 } as const;
 
 export type StringKey = keyof typeof en;
