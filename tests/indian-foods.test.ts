@@ -75,6 +75,23 @@ describe('household unit conversion math', () => {
     expect(est.proteinG).toBeCloseTo(5.4, 1);
   });
 
+  it('R3: sabudana khichdi is its own entry, not a fuzzy match on moong khichdi', () => {
+    expect(FOOD_DB['sabudana khichdi']).toBeDefined();
+    const est = estimateMacros('sabudana khichdi', 1, 'katori');
+    expect(est.calories).toBe(255);
+    // Starch dish: protein must stay low (moong khichdi would claim 6.8 g)
+    expect(est.proteinG).toBeCloseTo(3.8, 1);
+    expect(est.carbsG).toBeCloseTo(42, 1);
+  });
+
+  it('R3: a veg thali is loggable as one plate (~700 kcal, ~22 g protein)', () => {
+    expect(FOOD_DB['veg thali']).toBeDefined();
+    const est = estimateMacros('veg thali', 1, 'plate');
+    expect(est.calories).toBe(702);
+    expect(est.proteinG).toBeCloseTo(22.1, 1);
+    expect(isIndianDish('veg thali')).toBe(true);
+  });
+
   it('non-Indian foods keep the legacy generic katori (150g)', () => {
     const est = estimateMacros('oats', 1, 'katori');
     expect(est.calories).toBe(Math.round(FOOD_DB['oats'].calories * 1.5));

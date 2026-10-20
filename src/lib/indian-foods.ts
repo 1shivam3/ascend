@@ -95,6 +95,13 @@ export const INDIAN_FOOD_VALUES: Record<string, V> = {
   'bisibelebath': { calories: 120, proteinG: 4, carbsG: 19, fatG: 3.2 },
   'ven pongal': { calories: 135, proteinG: 4.5, carbsG: 20, fatG: 4.2 },
   'moong dal khichdi': { calories: 115, proteinG: 5, carbsG: 19, fatG: 2.2 },
+  // Sabudana khichdi silently fuzzy-matched moong khichdi before this
+  // entry existed (protein claimed 6.8 g/katori vs ~3.8 real) — it is a
+  // near-pure-starch vrat dish with peanuts, nothing like dal khichdi.
+  'sabudana khichdi': { calories: 170, proteinG: 2.5, carbsG: 28, fatG: 5.5 },
+  // Composite plate, blended per-100g of the standard composition in
+  // the meta assumption (plate ≈ 650 g → ~700 kcal, ~22 g protein).
+  'veg thali': { calories: 108, proteinG: 3.4, carbsG: 17, fatG: 3 },
 
   // ── Sabzis (dry vegetable curries) ──────────────────────────────────
   'baingan bharta': { calories: 85, proteinG: 1.8, carbsG: 8, fatG: 5.2 },
@@ -192,6 +199,8 @@ export const INDIAN_FOOD_META: Record<string, IndianFoodMeta> = {
   'ven pongal': M('Assumes 1.5 tsp ghee, rice + moong dal, pepper-cumin tadka.', 1.5, RICE_UNITS, { region: 'South' }),
   'khichdi': M('Assumes 1 tsp ghee, rice + moong dal. Many homes add a spoon of ghee on top — count it with the selector.', 1, RICE_UNITS, { region: 'Pan-India' }),
   'moong dal khichdi': M('Light khichdi, assumes a 1/2 tsp ghee tadka.', 0.5, RICE_UNITS, { region: 'Pan-India' }),
+  'sabudana khichdi': M('Assumes peanuts + a little potato, 1.5 tsp ghee/oil tadka per katori. A vrat staple — mostly starch, so protein stays low.', 1.5, [katori(150), plate(200)], { region: 'West' }),
+  'veg thali': M('Standard veg thali: 2 roti, 1 katori dal, 1 katori sabzi, 1 katori rice, a little curd + 1 papad. Mess and restaurant thalis vary — swap in the parts if yours was different.', 2.5, [plate(650)], { region: 'Pan-India' }),
   'biryani': M('Assumes 1.5 tsp ghee/oil per serving, layered rice with masala.', 1.5, RICE_UNITS, { region: 'Pan-India' }),
   'chicken biryani': M('Assumes 1.5 tsp ghee/oil per serving, chicken pieces with bone-in average.', 1.5, RICE_UNITS, { region: 'Pan-India' }),
   'veg biryani': M('Assumes 1.5 tsp ghee/oil per serving, mixed vegetables.', 1.5, RICE_UNITS, { region: 'Pan-India' }),
