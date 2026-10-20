@@ -518,128 +518,48 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* ── 2b. COACH CHECK-IN (missed sessions) — hideable in Settings ──── */}
-      {uiPreferences.coachEnabled && checkIn && (
-        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                <MessageCircleHeart className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-text-primary leading-relaxed">
-                  {checkIn.sessions.length === 1
-                    ? `${checkIn.sessions[0].name} didn't get logged this week`
-                    : `${checkIn.sessions.length} planned sessions didn't get logged this week`}
-                </p>
-                <CollapsibleDetails label="Details">
-                  <p className="whitespace-pre-line">{checkIn.message}</p>
-                </CollapsibleDetails>
-                {(() => {
-                  // "Do it today": actually start the most recent missed
-                  // session's plan — the check-in copy promises a moved
-                  // session, so the button has to exist and work.
-                  const latest = checkIn.sessions[checkIn.sessions.length - 1];
-                  const plan =
-                    (latest.planId && plannedWorkouts.find((p) => p.id === latest.planId)) ||
-                    plannedWorkouts.find(
-                      (p) => p.name.trim().toLowerCase() === latest.name.trim().toLowerCase()
-                    );
-                  if (!plan) return null;
-                  return (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
-                        handleStartWorkoutFromHome(plan);
-                      }}
-                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
-                    >
-                      Do it today — start {plan.name}
-                    </button>
-                  );
-                })()}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
-                toast.info("Check-in snoozed — it won't repeat this week.", 'Snoozed');
-              }}
-              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
-              aria-label="Dismiss check-in"
-            >
-              <X className="w-4 h-4" />
-            </button>
+      {/* ── 3. NUTRITION SUMMARY (Screen 8 & Screen 9: 2-Column Grid) ──────── */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* Nutrition (Calories) Card */}
+        <div
+          onClick={() => onNavigate('meals')}
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-label="View Nutrition Details"
+        >
+          <span className="text-xs font-medium text-text-muted">Nutrition</span>
+          <div className="mt-3">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {fuelStats.calories.toLocaleString()} cal
+            </span>
+            <span className="text-xs text-text-muted tabular-nums block mt-1">
+              / {fuelStats.targetCalories.toLocaleString()}
+            </span>
           </div>
         </div>
-      )}
 
-      {/* ── 2c. COACH NUTRITION SUGGESTION (weight trend → calorie target) ──── */}
-      {uiPreferences.coachEnabled && nutritionSuggestion && nutritionSuggestion.action !== 'hold' && (
-        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2.5 min-w-0">
-              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
-                <TrendingUp className="w-4 h-4" />
-              </span>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-text-primary leading-relaxed">
-                  Coach suggests {nutritionSuggestion.deltaKcal > 0 ? '+' : ''}{nutritionSuggestion.deltaKcal} kcal → {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
-                </p>
-                <CollapsibleDetails label="Why?">
-                  <p>{nutritionSuggestion.reason}</p>
-                  <p className="mt-1">General training guidance, not medical advice. If you have a medical condition (e.g. diabetes), check with your doctor before changing calorie targets.</p>
-                </CollapsibleDetails>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const current = useStore.getState().macroGoals;
-                    const record: CalorieAdjustmentRecord = {
-                      appliedAt: todayStr,
-                      appliedTargetKcal: nutritionSuggestion.newCalories,
-                      basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
-                      basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
-                    };
-                    // Rescale the WHOLE goal set — calories only left protein/
-                    // carbs/fat, maintenance and the delta stale, breaking the
-                    // zero-Atwater-drift guarantee the Meals page relies on.
-                    if (current) {
-                      setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
-                    }
-                    recordCalorieAdjustment(record);
-                    toast.success(`Target updated to ${nutritionSuggestion.newCalories.toLocaleString()} kcal/day.`, 'Calories Adjusted');
-                  }}
-                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
-                >
-                  Apply {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
-                </button>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                const current = useStore.getState().macroGoals;
-                recordCalorieAdjustment({
-                  appliedAt: todayStr,
-                  appliedTargetKcal: Math.round(current?.calories ?? 0),
-                  basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
-                  basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
-                  dismissed: true,
-                });
-                toast.info("Suggestion dismissed — I'll reassess in two weeks.", 'Dismissed');
-              }}
-              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
-              aria-label="Dismiss calorie suggestion"
-            >
-              <X className="w-4 h-4" />
-            </button>
+        {/* Protein Card */}
+        <div
+          onClick={() => onNavigate('meals')}
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          role="button"
+          tabIndex={0}
+          aria-label="View Protein Details"
+        >
+          <span className="text-xs font-medium text-text-muted">Protein</span>
+          <div className="mt-3">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {fuelStats.protein} g
+            </span>
+            <span className="text-xs text-text-muted tabular-nums block mt-1">
+              / {fuelStats.targetProtein} g
+            </span>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* ── 3b. READINESS + LEVEL (each hideable in Settings) ────────────── */}
+      {/* ── 4. READINESS + LEVEL (each hideable in Settings) ────────────── */}
       {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
         {/* Readiness Card (coach engine) */}
@@ -731,70 +651,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </div>
       )}
 
-      {/* ── 3c. NEXT-SESSION ADJUSTMENTS (auto-regulation) ───────────────── */}
-      {uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
-        <div className="bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-xs font-medium text-text-muted">Next session — coach&apos;s calls</span>
-          <div className="mt-2 space-y-2">
-            {coachDigest.nextAdjustments.map((adj) => (
-              <div key={adj.exercise} className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-bold text-text-primary truncate">{adj.exercise}</p>
-                  <p className="text-2xs text-text-muted leading-relaxed">
-                    {adj.reason.split('. ')[0]}.
-                  </p>
-                </div>
-                <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
-                  {adj.oldTarget.weight} → {adj.newTarget.weight}
-                  {adj.newTarget.unit}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── 4. NUTRITION SUMMARY (Screen 8 & Screen 9: 2-Column Grid) ──────── */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* Nutrition (Calories) Card */}
-        <div
-          onClick={() => onNavigate('meals')}
-          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
-          role="button"
-          tabIndex={0}
-          aria-label="View Nutrition Details"
-        >
-          <span className="text-xs font-medium text-text-muted">Nutrition</span>
-          <div className="mt-3">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
-              {fuelStats.calories.toLocaleString()} cal
-            </span>
-            <span className="text-xs text-text-muted tabular-nums block mt-1">
-              / {fuelStats.targetCalories.toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        {/* Protein Card */}
-        <div
-          onClick={() => onNavigate('meals')}
-          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
-          role="button"
-          tabIndex={0}
-          aria-label="View Protein Details"
-        >
-          <span className="text-xs font-medium text-text-muted">Protein</span>
-          <div className="mt-3">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
-              {fuelStats.protein} g
-            </span>
-            <span className="text-xs text-text-muted tabular-nums block mt-1">
-              / {fuelStats.targetProtein} g
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-2.5">
         <button
@@ -874,7 +730,151 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* ── 7. STREAK (hidden when gamification is off; the quote now lives at the page bottom) ─ */}
+      {/* ── 7a. COACH CHECK-IN (missed sessions) — hideable in Settings ──── */}
+      {uiPreferences.coachEnabled && checkIn && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <MessageCircleHeart className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-primary leading-relaxed">
+                  {checkIn.sessions.length === 1
+                    ? `${checkIn.sessions[0].name} didn't get logged this week`
+                    : `${checkIn.sessions.length} planned sessions didn't get logged this week`}
+                </p>
+                <CollapsibleDetails label="Details">
+                  <p className="whitespace-pre-line">{checkIn.message}</p>
+                </CollapsibleDetails>
+                {(() => {
+                  // "Do it today": actually start the most recent missed
+                  // session's plan — the check-in copy promises a moved
+                  // session, so the button has to exist and work.
+                  const latest = checkIn.sessions[checkIn.sessions.length - 1];
+                  const plan =
+                    (latest.planId && plannedWorkouts.find((p) => p.id === latest.planId)) ||
+                    plannedWorkouts.find(
+                      (p) => p.name.trim().toLowerCase() === latest.name.trim().toLowerCase()
+                    );
+                  if (!plan) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
+                        handleStartWorkoutFromHome(plan);
+                      }}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      Do it today — start {plan.name}
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
+                toast.info("Check-in snoozed — it won't repeat this week.", 'Snoozed');
+              }}
+              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              aria-label="Dismiss check-in"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7b. COACH NUTRITION SUGGESTION (weight trend → calorie target) ──── */}
+      {uiPreferences.coachEnabled && nutritionSuggestion && nutritionSuggestion.action !== 'hold' && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <TrendingUp className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-primary leading-relaxed">
+                  Coach suggests {nutritionSuggestion.deltaKcal > 0 ? '+' : ''}{nutritionSuggestion.deltaKcal} kcal → {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                </p>
+                <CollapsibleDetails label="Why?">
+                  <p>{nutritionSuggestion.reason}</p>
+                  <p className="mt-1">General training guidance, not medical advice. If you have a medical condition (e.g. diabetes), check with your doctor before changing calorie targets.</p>
+                </CollapsibleDetails>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = useStore.getState().macroGoals;
+                    const record: CalorieAdjustmentRecord = {
+                      appliedAt: todayStr,
+                      appliedTargetKcal: nutritionSuggestion.newCalories,
+                      basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
+                      basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
+                    };
+                    // Rescale the WHOLE goal set — calories only left protein/
+                    // carbs/fat, maintenance and the delta stale, breaking the
+                    // zero-Atwater-drift guarantee the Meals page relies on.
+                    if (current) {
+                      setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
+                    }
+                    recordCalorieAdjustment(record);
+                    toast.success(`Target updated to ${nutritionSuggestion.newCalories.toLocaleString()} kcal/day.`, 'Calories Adjusted');
+                  }}
+                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                >
+                  Apply {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const current = useStore.getState().macroGoals;
+                recordCalorieAdjustment({
+                  appliedAt: todayStr,
+                  appliedTargetKcal: Math.round(current?.calories ?? 0),
+                  basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
+                  basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
+                  dismissed: true,
+                });
+                toast.info("Suggestion dismissed — I'll reassess in two weeks.", 'Dismissed');
+              }}
+              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              aria-label="Dismiss calorie suggestion"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 7c. NEXT-SESSION ADJUSTMENTS (auto-regulation) ───────────────── */}
+      {uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs">
+          <span className="text-xs font-medium text-text-muted">Next session — coach&apos;s calls</span>
+          <div className="mt-2 space-y-2">
+            {coachDigest.nextAdjustments.map((adj) => (
+              <div key={adj.exercise} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-text-primary truncate">{adj.exercise}</p>
+                  <p className="text-2xs text-text-muted leading-relaxed">
+                    {adj.reason.split('. ')[0]}.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
+                  {adj.oldTarget.weight} → {adj.newTarget.weight}
+                  {adj.newTarget.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 8. STREAK (hidden when gamification is off; the quote now lives at the page bottom) ─ */}
       {uiPreferences.gamificationEnabled && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center gap-2.5">
@@ -901,7 +901,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </div>
       )}
 
-      {/* ── 7c. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}
+      {/* ── 8b. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}
       {uiPreferences.showHabitMatrix && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
@@ -934,7 +934,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </div>
       )}
 
-      {/* ── 7d. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
+      {/* ── 8c. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
       {uiPreferences.gamificationEnabled && homeChallenge && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
           <div className="flex items-start justify-between gap-3">
