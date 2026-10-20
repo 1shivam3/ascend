@@ -9,6 +9,7 @@ import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/forma
 import { getOrCreateGuestId } from '@/lib/storage';
 import { estimateSessionMinutes } from '@/lib/workout-engine';
 import { canContinueFromGoalStep } from '@/lib/onboarding';
+import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ type OnboardingScreenId =
   | 'plan_offer';
 
 export default function Onboarding() {
+  const { t } = useTranslation();
   const toast = useToast();
   const { navigate } = useAppNavigation();
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreenId>('splash');
@@ -671,7 +673,7 @@ export default function Onboarding() {
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
           <div className="text-left space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-              Want your training plan?
+              {t('onboarding.planOfferTitle')}
             </h1>
             <p className="text-sm text-[#171916]/70">
               Based on your goals, I put together {planCount} workouts{planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : ''}. Add {planCount === 1 ? 'it' : 'them'} to your training, or skip and build your own.
@@ -720,14 +722,14 @@ export default function Onboarding() {
               onClick={handleAcceptPlans}
               className="w-full py-4 px-6 rounded-2xl bg-[#171916] text-[#F3F0E7] font-bold text-base active:scale-[0.98] transition-transform"
             >
-              Yes, add my plan
+              {t('onboarding.acceptPlan')}
             </button>
             <button
               type="button"
               onClick={handleDeclinePlans}
               className="w-full py-4 px-6 rounded-2xl bg-transparent border-2 border-[#171916]/20 text-[#171916] font-semibold text-base active:scale-[0.98] transition-transform"
             >
-              No thanks, I&apos;ll build my own
+              {t('onboarding.declinePlan')}
             </button>
           </div>
         </div>

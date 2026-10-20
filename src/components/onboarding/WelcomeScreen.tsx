@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { Dumbbell, RotateCcw } from 'lucide-react';
+import LanguagePicker from '@/components/ui/LanguagePicker';
+import { useTranslation } from '@/lib/i18n';
 
 interface WelcomeScreenProps {
   onGetStarted: () => void;
@@ -18,10 +20,11 @@ export default function WelcomeScreen({
   backupFound,
   onRestoreBackup,
 }: WelcomeScreenProps) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between p-6 sm:p-8 animate-fade-in">
       {/* Top spacer / subtle branding */}
-      <div className="w-full max-w-md mx-auto pt-6 flex justify-center">
+      <div className="w-full max-w-md mx-auto pt-6 flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-xl bg-white border border-[#E2DFD6] flex items-center justify-center shadow-2xs">
             <Dumbbell className="w-5 h-5 text-[#E44427]" strokeWidth={2.4} />
@@ -30,15 +33,22 @@ export default function WelcomeScreen({
             ASCEND
           </span>
         </div>
+        {/* Language choice — first screen, optional, English by default */}
+        <div className="w-52">
+          <span className="block text-center text-2xs font-semibold text-[#858076] mb-1.5">
+            {t('onboarding.language')} · भाषा
+          </span>
+          <LanguagePicker variant="light" />
+        </div>
       </div>
 
       {/* Hero Content */}
       <div className="w-full max-w-md mx-auto my-auto text-center py-8">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-[#171916] tracking-tight leading-tight">
-          Build a stronger you, one day at a time.
+          {t('onboarding.welcomeTitle')}
         </h1>
         <p className="mt-4 text-base text-[#858076] leading-relaxed max-w-sm mx-auto font-normal">
-          Track your workouts, nutrition, and progress — all in one place.
+          {t('onboarding.welcomeSubtitle')}
         </p>
 
         {/* Previous local backup banner if detected */}
@@ -73,7 +83,7 @@ export default function WelcomeScreen({
           onClick={onGetStarted}
           className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-base transition-all shadow-md cursor-pointer text-center"
         >
-          Get Started
+          {t('onboarding.getStarted')}
         </button>
 
         <button
@@ -81,7 +91,7 @@ export default function WelcomeScreen({
           onClick={onLogin}
           className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-[#F3F0E7]/60 active:scale-[0.99] text-[#171916] border border-[#171916]/20 font-semibold text-base transition-all shadow-2xs cursor-pointer text-center"
         >
-          I already have an account
+          {t('onboarding.haveAccount')}
         </button>
 
         {/* Discreet Guest Access Option */}
@@ -91,7 +101,7 @@ export default function WelcomeScreen({
             onClick={onContinueAsGuest}
             className="text-xs text-[#858076] hover:text-[#171916] transition-colors underline underline-offset-4 cursor-pointer"
           >
-            Continue as Guest
+            {t('onboarding.continueAsGuest')}
           </button>
         </div>
       </div>

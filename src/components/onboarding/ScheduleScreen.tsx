@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 import StepProgressBar from './StepProgressBar';
+import { useTranslation } from '@/lib/i18n';
 import { AITrainingProfile } from '@/lib/types';
 import type { ActivityLevel } from '@/lib/macros';
 
@@ -40,6 +41,7 @@ const ACTIVITY_OPTIONS: { id: ActivityLevel; title: string; description: string 
 ];
 
 export default function ScheduleScreen({ initialDays, initialEquipment, initialActivity, initialLimitations, onContinue, onBack }: ScheduleScreenProps) {
+  const { t } = useTranslation();
   const [days, setDays] = useState<number>(initialDays);
   const [equipment, setEquipment] = useState<EquipmentChoice>(initialEquipment);
   const [activity, setActivity] = useState<ActivityLevel>(initialActivity);
@@ -64,7 +66,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-bold">How many days can you lift each week?</p>
+          <p className="text-sm font-bold">{t('onboarding.scheduleDaysTitle')}</p>
           <p className="text-xs text-[#858076] -mt-1.5">These are your weight-training days — runs, walks and cardio can happen on any day.</p>
           <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="Training days per week">
             {DAY_OPTIONS.map((d) => (
@@ -94,7 +96,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-bold">What equipment do you have?</p>
+          <p className="text-sm font-bold">{t('onboarding.equipmentTitle')}</p>
           <div className="space-y-2.5" role="radiogroup" aria-label="Available equipment">
             {EQUIPMENT_OPTIONS.map((opt) => (
               <button
@@ -187,7 +189,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
           onClick={() => onContinue(days, equipment, activity, limitations)}
           className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
-          Continue
+          {t('common.continue')}
         </button>
       </div>
     </div>
