@@ -114,4 +114,5 @@ export const hi: Partial<Record<StringKey, string>> = {
   'packed.swap': 'बदलें',
   'packed.keep': 'यही रखें',
   'packed.previewHint': 'डंबल और बॉडीवेट विकल्प पहले से चुन लें, जो कहीं भी हो सकते हैं।',
+  'packed.swappedCount': '{count} एक्सरसाइज़ डंबल / बॉडीवेट में बदले गए',
 };

@@ -117,6 +117,7 @@ export const en = {
   'packed.swap': 'Swap',
   'packed.keep': 'Keep',
   'packed.previewHint': 'Pre-swap to dumbbell & bodyweight moves you can do anywhere.',
+  'packed.swappedCount': '{count} exercises swapped to dumbbell / bodyweight',
 } as const;
 
 export type StringKey = keyof typeof en;

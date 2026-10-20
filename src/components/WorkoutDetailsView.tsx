@@ -16,6 +16,8 @@ import { PlannedWorkout } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import { getLastExercisePerformance, estimateSessionMinutes } from '@/lib/workout-engine';
 import { getWorkoutBodyParts } from '@/lib/workout-schedule';
+import { applyPackedSwapsToPlan } from '@/lib/crowded-gym';
+import { useTranslation } from '@/lib/i18n';
 
 interface WorkoutDetailsViewProps {
   plan: PlannedWorkout;
@@ -35,17 +37,36 @@ export default function WorkoutDetailsView({
   onDelete,
 }: WorkoutDetailsViewProps) {
   const { profile, workouts } = useStore();
+  const trainingProfile = useStore((state) => state.trainingProfile);
+  const { t } = useTranslation();
   const userUnit = profile?.unit || 'kg';
 
-  const exerciseCount = plan.exercises?.length || 0;
-  const estimatedDuration = estimateSessionMinutes(plan);
+  // Crowded-gym pre-swap: a single toggle swaps the WHOLE session to
+  // dumbbell/bodyweight equivalents on a copy — the saved plan is never
+  // touched, and toggling OFF restores the original view. Start passes
+  // whichever version is on screen.
+  const [gymPacked, setGymPacked] = React.useState(false);
+  const isLbs = (plan.exercises?.[0]?.targetUnit || userUnit) === 'lbs';
+  const packedResult = React.useMemo(
+    () =>
+      gymPacked
+        ? applyPackedSwapsToPlan(plan, isLbs, {
+            exclusions: trainingProfile?.dislikedExercises || [],
+          })
+        : null,
+    [gymPacked, plan, isLbs, trainingProfile?.dislikedExercises]
+  );
+  const displayPlan = packedResult?.plan ?? plan;
+
+  const exerciseCount = displayPlan.exercises?.length || 0;
+  const estimatedDuration = estimateSessionMinutes(displayPlan);
 
   const bodyParts = React.useMemo(() => {
-    const detected = getWorkoutBodyParts(plan.exercises || []);
+    const detected = getWorkoutBodyParts(displayPlan.exercises || []);
     if (detected.length > 0) return detected.slice(0, 2);
-    if (plan.goalTag) return [plan.goalTag];
+    if (displayPlan.goalTag) return [displayPlan.goalTag];
     return ['Strength', 'Full Body'];
-  }, [plan]);
+  }, [displayPlan]);
 
   const defaultDescription =
     plan.description ||
@@ -153,15 +174,43 @@ export default function WorkoutDetailsView({
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-[#F3F0E7] tracking-tight">
-              Exercises
+              {t('train.exercises')}
             </h2>
             <span className="text-xs text-[#858076]">
               {exerciseCount} total
             </span>
           </div>
 
+          {/* Crowded-gym pre-swap toggle */}
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[#212420] border border-[#2C302B]">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#F3F0E7]">{t('packed.toggle')}</p>
+              <p className="text-xs text-[#858076] mt-0.5 leading-relaxed">
+                {gymPacked && packedResult
+                  ? t('packed.swappedCount', { count: packedResult.swappedCount })
+                  : t('packed.previewHint')}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={gymPacked}
+              aria-label={t('packed.toggle')}
+              onClick={() => setGymPacked((v) => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
+                gymPacked ? 'bg-[#E44427]' : 'bg-[#2A2E29] border border-[#2C302B]'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-[#F3F0E7] shadow transition-all ${
+                  gymPacked ? 'left-[22px]' : 'left-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
           <div className="space-y-2.5">
-            {plan.exercises?.map((ex, idx) => {
+            {displayPlan.exercises?.map((ex, idx) => {
               const lastPerf = getLastExercisePerformance(ex.name, workouts);
               const targetSets = ex.targetSets || 3;
               const targetReps = ex.targetReps || 8;
@@ -191,6 +240,9 @@ export default function WorkoutDetailsView({
                           </span>
                         )}
                       </div>
+                      {gymPacked && ex.notes && (
+                        <p className="text-2xs text-[#E44427] mt-0.5">{ex.notes}</p>
+                      )}
                     </div>
                   </div>
 
@@ -206,11 +258,11 @@ export default function WorkoutDetailsView({
       <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gradient-to-t from-[#171916] via-[#171916]/95 to-transparent z-[70]">
         <button
           type="button"
-          onClick={() => onStart(plan)}
+          onClick={() => onStart(displayPlan)}
           className="w-full py-4 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-bold text-base shadow-lg shadow-[#E44427]/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <Play className="w-4 h-4 fill-white" />
-          <span>Start Workout</span>
+          <span>{t('train.startWorkout')}</span>
         </button>
       </div>
     </div>
