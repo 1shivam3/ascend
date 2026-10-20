@@ -282,16 +282,24 @@ export function resolveIndianMeta(
 
   let bestKey = '';
   let bestScore = 0;
+  let bestReverse = false;
   for (const key of Object.keys(INDIAN_FOOD_META)) {
     if (n.includes(key)) {
       const score = key.length / n.length;
-      if (score > bestScore) { bestScore = score; bestKey = key; }
+      if (score > bestScore) { bestScore = score; bestKey = key; bestReverse = false; }
     } else if (n.length >= 3 && key.includes(n)) {
       const score = n.length / key.length;
-      if (score > bestScore) { bestScore = score; bestKey = key; }
+      if (score > bestScore) { bestScore = score; bestKey = key; bestReverse = true; }
     }
   }
-  if (bestKey && bestScore >= 0.25) {
+  // The reverse direction (typed name is a substring of a dish key) is
+  // dangerous for short generic ingredient names: "rice" matched curd
+  // rice and "paneer" matched palak paneer, attaching the wrong recipe
+  // assumption and a ghee prompt to plain ingredients (R3 finding).
+  // Require a strong overlap there; "pongal" → ven pongal (0.6) still
+  // resolves, "rice" (0.44) and "paneer" (0.5) no longer do.
+  const threshold = bestReverse ? 0.6 : 0.25;
+  if (bestKey && bestScore >= threshold) {
     return { key: bestKey, meta: INDIAN_FOOD_META[bestKey] };
   }
   return null;

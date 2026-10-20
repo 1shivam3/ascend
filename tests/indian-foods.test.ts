@@ -90,6 +90,16 @@ describe('meta resolution', () => {
     expect(meta.assumedOilTsp).toBe(1);
   });
 
+  it('R3: short generic ingredients do not inherit a specific dish\u2019s meta', () => {
+    // Plain steamed rice is not curd rice; raw paneer is not palak paneer.
+    expect(resolveIndianMeta('rice')).toBeNull();
+    expect(resolveIndianMeta('Rice')).toBeNull();
+    expect(resolveIndianMeta('paneer')).toBeNull();
+    // Strong substring matches still resolve.
+    expect(resolveIndianMeta('pongal')?.key).toBe('ven pongal');
+    expect(resolveIndianMeta('dal')?.key).toBe('dal');
+  });
+
   it('steamed/fried-through dishes are not oil-selector relevant', () => {
     expect(resolveIndianMeta('idli')!.meta.oilRelevant).toBe(false);
     expect(resolveIndianMeta('bhatura')!.meta.oilRelevant).toBe(false);
