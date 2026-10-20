@@ -28,6 +28,8 @@ import {
   Search,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { getDemoForExercise } from '@/lib/exercise-media';
+import ExerciseDemo from '@/components/ExerciseDemo';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, AthleteGoal, ATHLETE_GOAL_CONFIGS, SetExecutionStatus, isSetCompleted, DEFAULT_GOALS, resolvePrimaryGoal, Unit } from '@/lib/types';
 import { isMainCompoundLift, calculateOneRepMax, getEquipmentType, getExerciseList, isBodyweightExercise, isDumbbellExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import {
@@ -998,6 +1000,15 @@ export default function ActiveWorkoutScreen({
     return getExerciseFormCues(currentExercise.name);
   }, [currentExercise?.name]);
 
+  // Animated demo (original SVG artwork — see lib/exercise-media). Most
+  // exercises have none; the Form affordance then stays exactly as it was,
+  // driven by cues alone. No demo → no extra UI, never a placeholder.
+  const currentDemo = useMemo(() => {
+    if (!currentExercise?.name) return null;
+    return getDemoForExercise(currentExercise.name);
+  }, [currentExercise?.name]);
+  const hasFormSurface = formCues.length > 0 || currentDemo !== null;
+
   const [showFormCues, setShowFormCues] = useState(false);
   const [showWhyTarget, setShowWhyTarget] = useState(false);
 
@@ -1856,7 +1867,7 @@ export default function ActiveWorkoutScreen({
           {/* Form cues + Warm-up: the two things a beginner needs MOST
               were buried 4th/6th in the overflow menu. They get visible
               header buttons (the menu entries stay for discoverability). */}
-          {formCues.length > 0 && (
+          {hasFormSurface && (
             <button
               type="button"
               onClick={() => setShowFormCues((prev) => !prev)}
@@ -1924,7 +1935,7 @@ export default function ActiveWorkoutScreen({
                   <Dumbbell className="w-3.5 h-3.5 text-accent" />
                   <span>Plate helper</span>
                 </button>
-                {formCues.length > 0 && (
+                {hasFormSurface && (
                   <button
                     type="button"
                     onClick={() => setShowFormCues((prev) => !prev)}
@@ -3211,7 +3222,7 @@ export default function ActiveWorkoutScreen({
       )}
 
       {/* ── Form Cues Sheet ──────────────────────────────────────────────── */}
-      {showFormCues && formCues.length > 0 && (
+      {showFormCues && hasFormSurface && (
         <div className="modal-overlay" onClick={() => setShowFormCues(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
@@ -3232,6 +3243,9 @@ export default function ActiveWorkoutScreen({
               </button>
             </div>
             <div className="p-4 space-y-2.5">
+              {currentDemo && currentExercise?.name && (
+                <ExerciseDemo name={currentExercise.name} />
+              )}
               {formCues.map((cue, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
                   <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
