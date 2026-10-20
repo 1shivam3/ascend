@@ -624,6 +624,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
    * 1-Tap Add Favorite Food into current meal
    */
   const handleAddFavoriteToMeal = (fav: FavoriteFood) => {
+    // Favorites don't persist ghee/oil state — re-attach the dish's DB
+    // default so the oil prompt stays reachable from this path too.
+    const oil = defaultOilForFood(fav.name);
     const item: FoodItem = {
       name: fav.name,
       quantity: fav.defaultQuantity,
@@ -632,6 +635,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       proteinG: fav.proteinG,
       carbsG: fav.carbsG,
       fatG: fav.fatG,
+      oilAssumedTsp: oil?.assumedTsp,
+      oilLevel: oil?.level,
     };
 
     if (isModalOpen) {
@@ -756,14 +761,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAddFoodFromHistory = (food: FoodItem) => {
+    // Older/history items may predate ghee/oil state — attach the DB
+    // default when missing so the prompt is reachable; items that carry
+    // their own oil answer keep it untouched.
+    const oil = food.oilAssumedTsp === undefined ? defaultOilForFood(food.name) : null;
+    const item: FoodItem = oil
+      ? { ...food, oilAssumedTsp: oil.assumedTsp, oilLevel: food.oilLevel ?? oil.level }
+      : food;
     if (isModalOpen) {
-      setFoods((prev) => [...prev, food]);
-      toast.success(`Added ${food.name} to current meal!`);
+      setFoods((prev) => [...prev, item]);
+      toast.success(`Added ${item.name} to current meal!`);
     } else {
       setMealName('Quick Meal');
-      setFoods([food]);
+      setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${food.name}. Tap Save when done!`);
+      toast.info(`Started meal with ${item.name}. Tap Save when done!`);
     }
   };
 
