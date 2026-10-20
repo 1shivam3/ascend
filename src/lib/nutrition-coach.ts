@@ -124,10 +124,20 @@ export function getProteinGapSuggestion(input: {
     covering[0] ??
     eligible.slice().sort((a, b) => b.proteinG - a.proteinG)[0];
 
+  // Honest coverage wording (R3 finding): the old copy claimed any
+  // anchor "would close most of the gap" — a 24 g scoop against a 50 g
+  // gap covers less than half, and the user deserves the real picture.
+  const remainingAfter = Math.max(0, gapG - Math.round(anchor.proteinG));
+  const closing =
+    remainingAfter <= 2
+      ? 'would close the gap'
+      : anchor.proteinG >= gapG / 2
+        ? 'would close most of the gap'
+        : `is a strong start — about ${remainingAfter} g would still be left, so pair it with another protein food at your next meal`;
   return {
     gapG,
     anchor,
-    message: `Protein is tracking low today — about ${gapG} g to go. Adding ${anchor.detail} (~${anchor.proteinG} g protein) would close most of the gap.`,
+    message: `Protein is tracking low today — about ${gapG} g to go. Adding ${anchor.detail} (~${anchor.proteinG} g protein) ${closing}.`,
   };
 }
 

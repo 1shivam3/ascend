@@ -75,6 +75,28 @@ describe('vegetarian protein coach', () => {
     const s = getProteinGapSuggestion({ ...base, diet: 'vegetarian' });
     expect(s!.message).toMatch(/Adding .+ \(~\d+(\.\d+)? g protein\)/);
   });
+
+  it('R3: message never overclaims — a small anchor against a big gap says what remains', () => {
+    // Gap 50 g; the biggest veg anchor (whey, ~24 g) covers under half.
+    const s = getProteinGapSuggestion({
+      diet: 'vegetarian',
+      proteinLoggedG: 70,
+      proteinTargetG: 120,
+      hour: 18,
+    });
+    expect(s).not.toBeNull();
+    expect(s!.anchor.proteinG).toBeLessThan(s!.gapG / 2 + 1);
+    expect(s!.message).not.toContain('close most of the gap');
+    expect(s!.message).toContain('still be left');
+    // A gap the anchor genuinely covers may say so.
+    const s2 = getProteinGapSuggestion({
+      diet: 'vegetarian',
+      proteinLoggedG: 97,
+      proteinTargetG: 120,
+      hour: 19,
+    });
+    expect(s2!.message).toContain('close the gap');
+  });
 });
 
 describe('whole-day adaptation', () => {
