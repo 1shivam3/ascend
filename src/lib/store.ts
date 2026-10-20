@@ -164,6 +164,13 @@ export interface UiPreferences {
    * old saves lack the field, so consumers check `!== false`.
    */
   showMuscleVolume: boolean;
+  /**
+   * On-device food scan in the meal scanner (Android app only).
+   * Default ON; old saves lack the field, so consumers check
+   * `!== false`. Turning it off restores the pure server-AI flow.
+   * Has no effect on web/PWA, where the feature does not exist.
+   */
+  offlineScan: boolean;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -174,6 +181,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   language: 'en',
   healthConnectEnabled: false,
   showMuscleVolume: true,
+  offlineScan: true,
 };
 
 export interface AppState {
