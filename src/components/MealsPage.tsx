@@ -13,6 +13,7 @@ import {
   getAbsurdQuantityWarning,
   isJunkMealParse,
   scaleFoodByQuantity,
+  getSafeMinCalories,
 } from '@/lib/macros';
 import {
   Plus,
@@ -46,12 +47,20 @@ import {
   Calendar,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
-import BarcodeScannerModal from '@/components/BarcodeScannerModal';
+import dynamic from 'next/dynamic';
+
+// The barcode scanner (camera + ZXing glue) is one of the heaviest
+// leaves in the meals chunk and is only needed when the user actually
+// taps Scan — load it on demand instead of at tab open.
+const BarcodeScannerModal = dynamic(() => import('@/components/BarcodeScannerModal'), {
+  ssr: false,
+});
 import ScanMealModal from '@/components/ScanMealModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
+
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural, formatWaterMl } from '@/lib/formatters';
 
@@ -749,6 +758,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
 
+    // Save-time guard: an item with NO nutrition data at all (unmatched and
+    // never given custom macros) would save as a silent 0-kcal hole in the
+    // day. The inline banner warns, but saving must not go through quietly.
+    const zeroDataItems = cleanedFoods.filter(
+      (f) => f.calories === 0 && f.proteinG === 0 && f.carbsG === 0 && f.fatG === 0
+    );
+    if (zeroDataItems.length > 0) {
+      toast.error(
+        `${zeroDataItems.map((f) => `"${f.name}"`).join(', ')} has no nutrition values yet. Enter its calories/macros (tap the item) or remove it before saving.`,
+        'Missing Nutrition Data'
+      );
+      return;
+    }
+
     const mealMacros = calculateMealMacros(cleanedFoods);
 
     addMeal(newMeal);
@@ -826,8 +849,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       return;
     }
     // Honest range validation — never silently ignore or rebalance absurd input.
-    if (cal < 800 || cal > 10000) {
-      toast.error(`Daily calories must be between 800 and 10,000 kcal (you entered ${goalCalories}).`, 'Unlikely Target');
+    // The lower bound is the SAME safe floor the prescription and the coach
+    // use (gendered, from macros.ts). It used to be 800 here — every safety
+    // floor in the app was bypassable through this editor, and sub-floor
+    // days were then praised as "Deficit Preserved".
+    const safeFloor = getSafeMinCalories(profile?.gender || 'male');
+    if (cal < safeFloor || cal > 10000) {
+      toast.error(
+        `Daily calories must be between ${safeFloor.toLocaleString()} and 10,000 kcal (you entered ${goalCalories}). Below ${safeFloor.toLocaleString()} kcal/day risks muscle, hormones and health — ASCEND won't set a target there.`,
+        'Unsafe Target'
+      );
       return;
     }
     if (prot < 10 || prot > 400) {
@@ -862,7 +893,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         profile?.bodyweightKg || 75,
         profile?.gender || 'male',
         profile?.heightCm,
-        profile?.age
+        profile?.age,
+        useStore.getState().trainingProfile?.activityLevel || 'light'
       ),
       calorieDelta: 0, // set below
     };
@@ -896,6 +928,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         'Not Recognized'
       );
       setIsNaturalParsing(false);
+    };
+    // Warn when SOME items couldn't be matched: a mixed parse like
+    // "2 rotis and 1 slice pizza" logs the pizza at 0 kcal, silently
+    // understating the meal and flattering the deficit badge.
+    const warnUnmatched = (foods: FoodItem[]) => {
+      const unmatched = (foods || []).filter((f) => f.isUnmatched);
+      if (unmatched.length > 0) {
+        const names = unmatched.map((f) => `"${f.name}"`).join(', ');
+        toast.info(
+          `Couldn't identify ${names} — logged at 0 kcal, so totals may be understated. Add it manually for accurate numbers.`,
+          'Some Foods Unmatched'
+        );
+      }
     };
     // Refuse implausible quantities (e.g. "100 rotis") instead of logging junk.
     const rejectAbsurd = (foods: FoodItem[]) => {
@@ -946,6 +991,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         const sourceBadge = data.source === 'gemini' || data.source === 'groq' || data.source === 'openrouter'
           ? 'Smart Macro Analysis'
           : 'Calibrated IFCT';
+        warnUnmatched(data.foods);
         toast.success(
           `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
           'Meal Logged'
@@ -974,6 +1020,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           };
           addMeal(newMeal);
           setNaturalQuery('');
+          warnUnmatched(offlineFoods);
           toast.success(
             `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
             'Meal Logged (Offline)'
@@ -1016,6 +1063,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     switch (primaryGoal) {
       case 'lose_fat': {
         const isDeficitKept = calDelta <= 0;
+        // Legacy targets below the safe floor (set before the floor was
+        // enforced in the editor) must never be praised as a kept deficit.
+        if (macroGoals.calories < getSafeMinCalories(profile?.gender || 'male')) {
+          return {
+            isPositive: false,
+            badgeText: 'Target Below Safe Minimum',
+            subtext: `Your daily target is under the ${getSafeMinCalories(profile?.gender || 'male').toLocaleString()} kcal safety floor. Raise it via Edit Targets — eating this low risks muscle, hormones and health.`,
+            protStatus: protDelta >= 0 ? 'Protein target met (anti-catabolic)' : `${Math.abs(protDelta)}g protein needed to spare lean mass`,
+          };
+        }
         return {
           isPositive: isDeficitKept,
           badgeText: isDeficitKept
@@ -1695,6 +1752,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const waterRemaining = Math.max(0, waterTargetMl - waterToday);
   const creatineToday = creatineLogs[todayDate];
   const creatineTaken = !!creatineToday?.taken;
+  // Creatine is an adult supplement in this app's guidance: never surface
+  // the daily-dose row to minors, and respect the config's enabled flag.
+  const showCreatine =
+    creatineConfig?.enabled !== false &&
+    !(typeof profile?.age === 'number' && profile.age < 18);
   const dailyCreatineTarget = creatineConfig?.dailyTargetG || 5;
   const creatineAmountG = creatineToday?.amountG || dailyCreatineTarget;
 
@@ -1997,7 +2059,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 )}
                 <span className="block text-4xs opacity-80">
                   {macroGoals.calorieDelta < 0
-                    ? 'Targets stay above a 1,400 kcal safety floor. Weigh yourself weekly — the trend matters more than any single day.'
+                    ? `Targets stay above a ${getSafeMinCalories(profile?.gender || 'male').toLocaleString()} kcal safety floor. Weigh yourself weekly — the trend matters more than any single day. General guidance, not medical advice.`
                     : 'Fuel the surplus with protein first; extra calories build muscle only alongside training.'}
                 </span>
               </span>
@@ -2038,6 +2100,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </span>
               </div>
             </div>
+
+            {/* Sugar — shown only when at least one logged food carried
+                label sugar data (barcode/packaged foods). Never shown as
+                0: unknown is not zero, especially for diabetics. */}
+            {typeof todayMacros.sugarG === 'number' && (
+              <p className="w-full text-center text-3xs text-text-muted pt-1">
+                Sugar from packaged foods logged today:{' '}
+                <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
+                (foods without label data aren&apos;t counted)
+              </p>
+            )}
           </section>
 
           {/* Dual Scanner Action Tiles (Reference: Screen 19 "Add Food" in Image 1) */}
@@ -2243,19 +2316,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           </div>
 
           {/* Creatine row */}
-          <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
+          {showCreatine && (
+          <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-bg-secondary/60 border border-border/70">
             <button
               type="button"
-              className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-purple-400 rounded-lg p-1 transition-opacity hover:opacity-90"
+              className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-purple-400 rounded-lg p-1 transition-opacity hover:opacity-90"
               onClick={() => setIsCreatineModalOpen(true)}
               aria-label="View creatine details"
             >
               <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
                 <Sparkles className="w-4 h-4" />
               </div>
-              <div className="truncate">
-                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">CREATINE</span>
-                <span className={`text-xs font-bold font-mono block ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
+              <div className="min-w-0 flex-1">
+                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono truncate">CREATINE</span>
+                <span className={`text-xs font-bold font-mono block truncate ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
                   {creatineTaken ? `${creatineAmountG}g Taken Today` : `${dailyCreatineTarget}g Daily Target`}
                 </span>
               </div>
@@ -2277,9 +2351,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               }`}
               aria-label={creatineTaken ? "Mark creatine not taken" : `Log ${dailyCreatineTarget}g creatine`}
             >
-              {creatineTaken ? '✓ Taken' : `+ Log ${dailyCreatineTarget}g`}
+              {creatineTaken ? 'Taken' : `+ Log ${dailyCreatineTarget}g`}
             </button>
           </div>
+          )}
         </div>
       </section>
 
@@ -3217,7 +3292,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           ({delta > 0 ? `+${delta}` : `${delta}`} kcal)
                         </span>
                       ) : (
-                        <span className="ml-1.5 text-2xs font-semibold text-emerald-400">✓ Balanced</span>
+                        <span className="ml-1.5 text-2xs font-semibold text-emerald-400">Balanced</span>
                       )}
                     </div>
                     {Math.abs(delta) > 5 && calVal > 0 && (

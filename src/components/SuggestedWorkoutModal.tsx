@@ -28,6 +28,7 @@ import {
 import { getExerciseList, getExerciseEquipment } from '@/lib/strength-standards';
 import { PlannedExercise, PlannedWorkout, useStore } from '@/lib/store';
 import { generateSplitWeeklySchedule } from '@/lib/workout-schedule';
+import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { EquipmentType } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
 
@@ -139,7 +140,7 @@ const INTENSITIES: { id: IntensityOption; label: string; tag: string; descriptio
     id: 'medium',
     label: 'Medium',
     tag: 'Hypertrophy & Muscle Growth',
-    description: '5 exercises • 3–4 sets • 8–10 reps • Balanced progressive overload',
+    description: '5 exercises • 3–4 sets • 8–10 reps • Weights rise gradually as you get stronger',
     badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   {
@@ -345,6 +346,7 @@ export default function SuggestedWorkoutModal({
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const trainingProfile = useStore((state) => state.trainingProfile);
   const setTrainingProfile = useStore((state) => state.setTrainingProfile);
+  const profile = useStore((state) => state.profile);
 
   const todayDayName = useMemo(() => {
     const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -532,6 +534,19 @@ export default function SuggestedWorkoutModal({
 
   const handleApplySplitSchedule = () => {
     const result = generateSplitWeeklySchedule(selectedSplitId, userUnit);
+    // Generated plans pass through the SAME pipeline as onboarding:
+    // athlete-scaled loads + equipment/exclusion/injury adaptation.
+    // Installing raw templates here used to hand beginners unscaled
+    // loads and exercises their equipment/exclusions forbade.
+    result.plans = prepareGeneratedPlans(result.plans, {
+      unit: userUnit,
+      bodyweightKg: profile?.bodyweightKg,
+      experience: profile?.userMode,
+      ageYears: profile?.age,
+      equipment: trainingProfile?.equipment || 'full_gym',
+      exclusions: trainingProfile?.dislikedExercises || [],
+      limitations: trainingProfile?.injuriesOrLimitations || [],
+    });
     const existing = useStore.getState().plannedWorkouts || [];
     const nonSplit = existing.filter((p) => !result.plans.some((rp) => rp.id === p.id));
     setPlannedWorkouts([...result.plans, ...nonSplit]);

@@ -12,12 +12,32 @@ import ErrorState from '@/components/ErrorState';
 import OfflineState from '@/components/OfflineState';
 
 import HomePage from '@/components/HomePage';
-import ProgressPage from '@/components/ProgressPage';
-import WorkoutPage from '@/components/WorkoutPage';
-import MealsPage from '@/components/MealsPage';
-import ProfileView from '@/components/ProfileView';
-import SettingsView from '@/components/SettingsView';
 import TabSkeleton from '@/components/TabSkeleton';
+
+// Non-home tabs are code-split: on a 2 GB phone the old single chunk
+// (~1.1 MB) paid the full parse cost for screens the user may never
+// open. Home stays static for first paint; the rest load on first tap
+// with the tab skeleton as fallback.
+const ProgressPage = dynamic(() => import('@/components/ProgressPage'), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const WorkoutPage = dynamic(() => import('@/components/WorkoutPage'), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const MealsPage = dynamic(() => import('@/components/MealsPage'), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const ProfileView = dynamic(() => import('@/components/ProfileView'), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
+const SettingsView = dynamic(() => import('@/components/SettingsView'), {
+  ssr: false,
+  loading: () => <TabSkeleton />,
+});
 
 const QuickActionSheetModal = dynamic(() => import('@/components/QuickActionSheetModal'), {
   ssr: false,
@@ -208,6 +228,11 @@ export default function AppPage() {
     if (typeof window !== 'undefined') {
       import('@/lib/supabase/sync').then(({ syncEngine }) => {
         syncEngine.init();
+      });
+      // Native-only: schedule on-device reminders — web push cannot reach
+      // the Android WebView when the app is closed. No-op in browsers.
+      import('@/lib/local-notifications').then(({ initLocalNotifications }) => {
+        initLocalNotifications();
       });
     }
     // Safety fallback: if Zustand storage rehydration takes longer than 600ms, unlock

@@ -128,6 +128,13 @@ export const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
   'mutton curry': { calories: 235, proteinG: 20, carbsG: 4, fatG: 16 },
   'fish curry': { calories: 135, proteinG: 15, carbsG: 3, fatG: 7 },
   'dahi': { calories: 61, proteinG: 3.5, carbsG: 4.7, fatG: 3.3 },
+  // Hindi household names for the same staples — a Hindi-first user
+  // types what she says: chawal (rice), anda (egg), doodh (milk),
+  // sabzi (mixed vegetable curry).
+  'chawal': { calories: 130, proteinG: 2.7, carbsG: 28, fatG: 0.3 },
+  'anda': { calories: 155, proteinG: 13, carbsG: 1.1, fatG: 11 },
+  'doodh': { calories: 50, proteinG: 3.4, carbsG: 4.8, fatG: 2 },
+  'sabzi': { calories: 85, proteinG: 2.5, carbsG: 8, fatG: 4.5 },
   'raita': { calories: 75, proteinG: 3, carbsG: 6, fatG: 4 },
   'samosa': { calories: 260, proteinG: 4, carbsG: 28, fatG: 14 },
   'pakora': { calories: 280, proteinG: 6, carbsG: 25, fatG: 18 },
@@ -904,7 +911,7 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
       const q = parseFloat(prefixMatch[1]);
       const potentialU = (prefixMatch[2] || '').toLowerCase();
       const rest = prefixMatch[3].trim();
-      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful'];
+      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful', 'katori', 'glass'];
       if (knownUnits.includes(potentialU)) {
         effectiveQty = q;
         effectiveUnit = potentialU.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g').replace(/pc$/, 'piece');
@@ -969,6 +976,10 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     grams = safeQty * 240;
   } else if (u === 'bowl' || u === 'bowls') {
     grams = safeQty * 200;
+  } else if (u === 'katori') {
+    grams = safeQty * 150;
+  } else if (u === 'glass' || u === 'glas') {
+    grams = safeQty * 200;
   } else if (u === 'plate' || u === 'plates' || u === 'serving') {
     grams = safeQty * 250;
   } else if (u === 'handful') {
@@ -1013,7 +1024,7 @@ export function calculateMealMacros(foods: FoodItem[]): MacroTotals {
     return { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
   }
 
-  return foods.reduce(
+  const totals: MacroTotals = foods.reduce(
     (acc, food) => {
       const p = Math.max(0, Number(food.proteinG) || 0);
       const c = Math.max(0, Number(food.carbsG) || 0);
@@ -1034,6 +1045,16 @@ export function calculateMealMacros(foods: FoodItem[]): MacroTotals {
     },
     { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }
   );
+
+  // Sugar totals only when at least one item actually carries sugar data
+  // (barcode scans do; most DB entries don't). Unknown stays unknown.
+  const sugarItems = foods.filter((f) => typeof f.sugarG === 'number');
+  if (sugarItems.length > 0) {
+    totals.sugarG = Number(
+      sugarItems.reduce((sum, f) => sum + Math.max(0, Number(f.sugarG) || 0), 0).toFixed(1)
+    );
+  }
+  return totals;
 }
 
 /** Returns food names from DB for autocomplete */
@@ -1050,18 +1071,41 @@ export function getFoodSuggestions(query: string): string[] {
  * Natural language food parser for offline and fast local processing.
  * Parses input strings like "2 roti, 1 bowl dal, 100g paneer", "oats about 100gm", or "1 scoop whey, 400ml milk"
  */
+// Hindi number words a Hindi-first user actually types ("do roti",
+// "ek katori dal"). Mapped before the numeric quantity parsing runs.
+const HINDI_NUMBER_WORDS: Record<string, number> = {
+  ek: 1,
+  do: 2,
+  teen: 3,
+  char: 4,
+  chaar: 4,
+  paanch: 5,
+  chhe: 6,
+  saat: 7,
+  aath: 8,
+  nau: 9,
+  das: 10,
+  aadha: 0.5,
+  adha: 0.5,
+};
+
 export function parseNaturalMealOffline(input: string): FoodItem[] {
   if (!input || !input.trim()) return [];
 
-  // Split by commas, plus signs, newlines, or " and "
+  // Split by commas, plus signs, newlines, " and ", or Hindi " aur "
   const tokens = input
-    .split(/,|\n|\+|\band\b/i)
+    .split(/,|\n|\+|\band\b|\baur\b/i)
     .map((t) => t.trim())
     .filter((t) => t.length > 0);
 
   const parsedItems: FoodItem[] = [];
 
   for (let rawToken of tokens) {
+    // Leading Hindi number word → digits ("do roti" → "2 roti")
+    rawToken = rawToken.replace(
+      /^(ek|do|teen|char|chaar|paanch|chhe|saat|aath|nau|das|aadha|adha)\b/i,
+      (m) => String(HINDI_NUMBER_WORDS[m.toLowerCase()] ?? m)
+    );
     // Strip filler phrases like "i ate", "had", "about", "around", "of"
     let token = rawToken
       .replace(/\b(i ate|i had|ate|had|having|about|around|approx|approximately|some|of|a plate of|a bowl of|a cup of)\b/gi, ' ')
@@ -1082,7 +1126,7 @@ export function parseNaturalMealOffline(input: string): FoodItem[] {
       const potentialUnit = (qtyUnitMatch[2] || '').toLowerCase();
       const rest = qtyUnitMatch[3].trim();
 
-      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful'];
+      const knownUnits = ['g', 'gm', 'gram', 'grams', 'ml', 'oz', 'lb', 'lbs', 'kg', 'scoop', 'scoops', 'cup', 'cups', 'bowl', 'bowls', 'plate', 'plates', 'slice', 'slices', 'piece', 'pieces', 'pc', 'pcs', 'handful', 'katori', 'glass'];
       if (knownUnits.includes(potentialUnit)) {
         unit = potentialUnit.replace(/s$/, '').replace(/gm$/, 'g').replace(/gram$/, 'g').replace(/pc$/, 'piece');
         foodName = rest;
@@ -1145,7 +1189,7 @@ export function getAbsurdQuantityWarning(food: { name?: string; calories?: numbe
   if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
     return `${label}: ${qty} ${unit} in a single item looks wrong. Please check the quantity.`;
   }
-  if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful'].includes(unit) && qty > 25) {
+  if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful', 'katori', 'glass'].includes(unit) && qty > 25) {
     return `${label}: ${qty} ${unit}s in a single item looks wrong. Please check the quantity.`;
   }
   return null;
@@ -1157,7 +1201,43 @@ export function getAbsurdQuantityWarning(food: { name?: string; calories?: numbe
  * Uses Mifflin-St Jeor / standard active gym-goer TDEE multipliers with zero Atwater drift.
  */
 /**
- * Mifflin-St Jeor maintenance estimate (×1.4 active-trainee factor).
+ * Daily activity OUTSIDE training drives the maintenance multiplier.
+ * A hardcoded 1.4 ("active trainee") overestimates a desk worker who lifts
+ * 4x/week by ~150-250 kcal/day — for a fat-loss user that silently eats the
+ * entire intended deficit. Asked once at onboarding, editable via targets.
+ */
+export type ActivityLevel = 'sedentary' | 'light' | 'active' | 'very_active';
+
+export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  active: 1.55,
+  very_active: 1.725,
+};
+
+export const DEFAULT_ACTIVITY_LEVEL: ActivityLevel = 'light';
+
+/**
+ * Safe minimum daily calorie intake by gender — the floor below which the
+ * app never prescribes, suggests, or accepts a target. SINGLE SOURCE OF
+ * TRUTH: the initial prescription (below), the coach engine's adjustment
+ * suggestions, the manual target editor, and the AI coach prompt copy all
+ * derive from this table. (Previously five different floors — 1400 flat,
+ * M1500/F1200, "1400" UI copy, 800 in the manual editor, 1200 in the AI
+ * prompt — let every guard be bypassed by walking to a different door.)
+ */
+export const SAFE_MIN_CALORIES: Record<Gender, number> = {
+  male: 1500,
+  female: 1200,
+  other: 1400,
+};
+
+export function getSafeMinCalories(gender: Gender = 'male'): number {
+  return SAFE_MIN_CALORIES[gender] ?? SAFE_MIN_CALORIES.male;
+}
+
+/**
+ * Mifflin-St Jeor maintenance estimate.
  * Single source of truth for maintenance — used by both the auto
  * calibration and manual Edit Targets, so the deficit/surplus explanation
  * line never goes stale.
@@ -1166,12 +1246,13 @@ export function calculateMaintenanceCalories(
   bodyweightKg: number,
   gender: Gender = 'male',
   heightCm?: number,
-  ageYears?: number
+  ageYears?: number,
+  activityLevel: ActivityLevel = DEFAULT_ACTIVITY_LEVEL
 ): number {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
   const defaultHeight = gender === 'male' ? 175 : gender === 'female' ? 162 : 168.5;
   const height = heightCm && heightCm >= 100 && heightCm <= 250 ? heightCm : defaultHeight;
-  const age = ageYears && ageYears >= 14 && ageYears <= 90 ? ageYears : 25; // User age (default 25 if unspecified)
+  const age = ageYears && ageYears >= 13 && ageYears <= 90 ? ageYears : 25; // User age (default 25 if unspecified). Onboarding admits 13+ (under-13 guard), so the clamp must start at 13 — a 13-year-old was silently BMR-costed as a 25-year-old.
 
   // Mifflin-St Jeor BMR:
   // Male: +5, Female: -161.
@@ -1179,8 +1260,8 @@ export function calculateMaintenanceCalories(
   // clinical exercise physiology applies the midpoint constant (-78) between male and female offsets.
   const genderOffset = gender === 'male' ? 5 : gender === 'female' ? -161 : -78;
   const bmr = 10 * bw + 6.25 * height - 5 * age + genderOffset;
-  // Active trainee activity factor (~3-5 days/week resistance training)
-  return Math.round(bmr * 1.4);
+  const multiplier = ACTIVITY_MULTIPLIERS[activityLevel] ?? ACTIVITY_MULTIPLIERS[DEFAULT_ACTIVITY_LEVEL];
+  return Math.round(bmr * multiplier);
 }
 
 export function calculateRecommendedMacroGoals(
@@ -1188,10 +1269,11 @@ export function calculateRecommendedMacroGoals(
   goal: AthleteGoal = 'build_muscle',
   gender: Gender = 'male',
   heightCm?: number,
-  ageYears?: number
+  ageYears?: number,
+  activityLevel: ActivityLevel = DEFAULT_ACTIVITY_LEVEL
 ): MacroGoals {
   const bw = Math.max(35, Math.min(250, bodyweightKg));
-  const maintenance = calculateMaintenanceCalories(bodyweightKg, gender, heightCm, ageYears);
+  const maintenance = calculateMaintenanceCalories(bodyweightKg, gender, heightCm, ageYears, activityLevel);
 
   let targetCalories = maintenance;
   let proteinPerKg = 1.8;
@@ -1205,10 +1287,27 @@ export function calculateRecommendedMacroGoals(
       targetCalories = maintenance + 150; // Performance slight surplus
       proteinPerKg = 1.8;
       break;
-    case 'lose_fat':
-      targetCalories = Math.max(1400, maintenance - 450); // Moderate deficit
+    case 'lose_fat': {
       proteinPerKg = 2.2; // Elevated protein to preserve lean mass
+      const floor = getSafeMinCalories(gender);
+      const isMinor = typeof ageYears === 'number' && ageYears > 0 && ageYears < 18;
+      // Deficit scales with maintenance (20%, capped at 450 kcal): a flat
+      // −450 is a gentle cut for a large athlete but a 27% crash for a
+      // small sedentary one, which pinned her exactly at the floor.
+      const deficit = Math.min(450, Math.round(maintenance * 0.2));
+      if (isMinor) {
+        // Never prescribe an energy deficit to a minor — growth comes first.
+        targetCalories = maintenance;
+      } else if (maintenance - deficit < floor) {
+        // Small athletes: the gendered floor would erase (or invert) the
+        // deficit. Prescribe the floor — but never ABOVE maintenance,
+        // which used to label a surplus as fat loss.
+        targetCalories = Math.min(floor, maintenance);
+      } else {
+        targetCalories = maintenance - deficit;
+      }
       break;
+    }
     case 'stamina':
       targetCalories = maintenance; // Energy balance
       proteinPerKg = 1.6;
@@ -1242,6 +1341,83 @@ export function calculateRecommendedMacroGoals(
     carbsG,
     maintenanceCalories: maintenance,
     calorieDelta: exactCalories - maintenance,
+  };
+}
+
+/**
+ * Re-derive a full MacroGoals at a new calorie target. Used when the coach's
+ * calorie suggestion is applied: protein grams are preserved (they are
+ * bodyweight-driven, not calorie-driven), remaining calories are split
+ * between fat and carbs in the current ratio, and maintenance/delta are
+ * carried through — so the saved goals stay Atwater-consistent instead of
+ * leaving protein/carbs/fat and the deficit explanation stale at the old
+ * target (which broke the app's zero-drift guarantee and made the Meals
+ * explanation line print arithmetic that didn't add up).
+ */
+export function scaleMacroGoalsToCalories(current: MacroGoals, newCalories: number): MacroGoals {
+  const target = Math.max(0, Math.round(newCalories));
+  const maintenance = current.maintenanceCalories ?? current.calories;
+  const proteinG = Math.max(0, Math.round(current.proteinG || 0));
+  const proteinCalories = proteinG * 4;
+
+  let fatG: number;
+  let carbsG: number;
+  if (target <= proteinCalories) {
+    // Degenerate target: scale everything proportionally instead.
+    const ratio = current.calories > 0 ? target / current.calories : 0;
+    fatG = Math.round((current.fatG || 0) * ratio);
+    carbsG = Math.round((current.carbsG || 0) * ratio);
+    const scaledProtein = Math.round(proteinG * ratio);
+    const exact = scaledProtein * 4 + carbsG * 4 + fatG * 9;
+    return {
+      calories: exact,
+      proteinG: scaledProtein,
+      fatG,
+      carbsG,
+      maintenanceCalories: maintenance,
+      calorieDelta: exact - maintenance,
+    };
+  }
+
+  const remaining = target - proteinCalories;
+  const fatShare = (current.fatG || 0) * 9;
+  const carbShare = (current.carbsG || 0) * 4;
+  const shareTotal = fatShare + carbShare;
+  const fatCalories = shareTotal > 0 ? Math.round(remaining * (fatShare / shareTotal)) : Math.round(remaining * 0.25);
+  fatG = Math.round(fatCalories / 9);
+  carbsG = Math.max(0, Math.round((remaining - fatG * 9) / 4));
+  const exact = proteinCalories + carbsG * 4 + fatG * 9;
+  return {
+    calories: exact,
+    proteinG,
+    fatG,
+    carbsG,
+    maintenanceCalories: maintenance,
+    calorieDelta: exact - maintenance,
+  };
+}
+
+export interface MealFoodsValidation {
+  /** Every item unrecognized — the parse is junk and must be rejected. */
+  junk: boolean;
+  /** Names of items that couldn't be matched (logged at 0 kcal). */
+  unmatchedNames: string[];
+  /** First implausible-quantity warning, if any (e.g. "100 rotis"). */
+  absurdWarning: string | null;
+}
+
+/**
+ * Shared guards for EVERY natural-language meal-logging entry point.
+ * Round 1 added these checks to the Meals page only; the Quick Action
+ * sheet kept logging phantom 0-kcal meals and 11,880-kcal "100 rotis"
+ * with a success toast. One validator, all doors.
+ */
+export function validateMealFoods(foods: FoodItem[]): MealFoodsValidation {
+  const list = foods || [];
+  return {
+    junk: isJunkMealParse(list),
+    unmatchedNames: list.filter((f) => f.isUnmatched).map((f) => f.name),
+    absurdWarning: list.map(getAbsurdQuantityWarning).find((w) => w !== null) ?? null,
   };
 }
 

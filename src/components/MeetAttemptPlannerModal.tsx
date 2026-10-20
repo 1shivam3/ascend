@@ -15,34 +15,46 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
   const { profile, prs } = useStore();
   const userUnit = profile?.unit || 'kg';
 
+  // PR oneRepMax values are canonical KG, but everything in this modal is
+  // displayed and edited in the user's unit. Seeding kg numbers under an
+  // "lbs" label (and feeding the mixed total to DOTS) produced attempts
+  // that were wrong by 2.2× for lbs users.
+  const toUserUnit = (kg: number) =>
+    userUnit === 'lbs' ? Math.round(kg * 2.20462 * 10) / 10 : kg;
+
   // Find user's best 1RMs for Squat, Bench, Deadlift
   const defaultSquat = useMemo(() => {
     const match = prs.filter((p) => p.exercise.toLowerCase().includes('squat'));
-    return match.length > 0 ? Math.max(...match.map((p) => p.oneRepMax)) : 140;
-  }, [prs]);
+    return match.length > 0 ? toUserUnit(Math.max(...match.map((p) => p.oneRepMax))) : userUnit === 'lbs' ? 315 : 140;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prs, userUnit]);
 
   const defaultBench = useMemo(() => {
     const match = prs.filter((p) => p.exercise.toLowerCase().includes('bench'));
-    return match.length > 0 ? Math.max(...match.map((p) => p.oneRepMax)) : 100;
-  }, [prs]);
+    return match.length > 0 ? toUserUnit(Math.max(...match.map((p) => p.oneRepMax))) : userUnit === 'lbs' ? 225 : 100;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prs, userUnit]);
 
   const defaultDeadlift = useMemo(() => {
     const match = prs.filter((p) => p.exercise.toLowerCase().includes('deadlift'));
-    return match.length > 0 ? Math.max(...match.map((p) => p.oneRepMax)) : 180;
-  }, [prs]);
+    return match.length > 0 ? toUserUnit(Math.max(...match.map((p) => p.oneRepMax))) : userUnit === 'lbs' ? 405 : 180;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prs, userUnit]);
 
   const [squatMax, setSquatMax] = useState<number>(defaultSquat);
   const [benchMax, setBenchMax] = useState<number>(defaultBench);
   const [deadliftMax, setDeadliftMax] = useState<number>(defaultDeadlift);
   const [thirdAttemptPercent, setThirdAttemptPercent] = useState<number>(100);
 
-  const roundTo2point5 = (num: number) => Math.round(num / 2.5) * 2.5;
+  // Plate-loadable steps differ by unit: 2.5 kg vs 5 lb.
+  const stepSize = userUnit === 'lbs' ? 5 : 2.5;
+  const roundToStep = (num: number) => Math.round(num / stepSize) * stepSize;
 
   const plan = useMemo(() => {
     const calculateAttempts = (projectedMax: number) => {
-      const opener = roundTo2point5(projectedMax * 0.90);
-      const second = roundTo2point5(projectedMax * 0.95);
-      const third = roundTo2point5(projectedMax * (thirdAttemptPercent / 100));
+      const opener = roundToStep(projectedMax * 0.90);
+      const second = roundToStep(projectedMax * 0.95);
+      const third = roundToStep(projectedMax * (thirdAttemptPercent / 100));
       return { opener, second, third };
     };
 
@@ -53,7 +65,9 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
     const projectedTotal = squat.third + bench.third + deadlift.third;
     const bodyweightKg = profile?.bodyweightKg || 75;
     const gender = profile?.gender || 'male';
-    const projectedDots = calculateDOTS(bodyweightKg, projectedTotal, gender);
+    // DOTS is defined on kilograms — convert the user-unit total back.
+    const projectedTotalKg = userUnit === 'lbs' ? projectedTotal * 0.453592 : projectedTotal;
+    const projectedDots = calculateDOTS(bodyweightKg, projectedTotalKg, gender);
 
     return {
       squat,
@@ -126,7 +140,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                 <span className="text-text-muted">Max:</span>
                 <input
                   type="number"
-                  step="2.5"
+                  step={stepSize}
                   value={squatMax}
                   onChange={(e) => setSquatMax(Math.max(20, Number(e.target.value)))}
                   className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
@@ -165,7 +179,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                 <span className="text-text-muted">Max:</span>
                 <input
                   type="number"
-                  step="2.5"
+                  step={stepSize}
                   value={benchMax}
                   onChange={(e) => setBenchMax(Math.max(20, Number(e.target.value)))}
                   className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
@@ -204,7 +218,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                 <span className="text-text-muted">Max:</span>
                 <input
                   type="number"
-                  step="2.5"
+                  step={stepSize}
                   value={deadliftMax}
                   onChange={(e) => setDeadliftMax(Math.max(20, Number(e.target.value)))}
                   className="w-16 bg-bg-secondary border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"

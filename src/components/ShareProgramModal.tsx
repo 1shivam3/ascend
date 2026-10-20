@@ -22,16 +22,22 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
   const toast = useToast();
 
   const [coachName, setCoachName] = useState(profile?.name || '');
+  const [notes, setNotes] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'whatsapp' | 'qrcode'>('whatsapp');
 
+  // Seed the note from the plan description whenever a new plan opens.
+  useEffect(() => {
+    if (isOpen && plan) setNotes(plan.description || '');
+  }, [isOpen, plan]);
+
   useEffect(() => {
     if (!plan || !isOpen) return;
 
     try {
-      const hash = encodeProgramForSharing(plan, coachName.trim() || undefined);
+      const hash = encodeProgramForSharing(plan, coachName.trim() || undefined, notes.trim() || undefined);
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ascendtonext.vercel.app';
       const fullUrl = `${origin}/#plan=${hash}`;
       setShareUrl(fullUrl);
@@ -41,7 +47,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
     } catch (err) {
       console.error('Failed to generate share link:', err);
     }
-  }, [plan, isOpen, coachName]);
+  }, [plan, isOpen, coachName, notes]);
 
   if (!isOpen || !plan) return null;
 
@@ -59,7 +65,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
   };
 
   const handleOpenWhatsApp = () => {
-    const text = formatWhatsAppShareText(plan, shareUrl, coachName.trim() || undefined);
+    const text = formatWhatsAppShareText(plan, shareUrl, coachName.trim() || undefined, notes.trim() || undefined);
     const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(waUrl, '_blank', 'noopener,noreferrer');
   };
@@ -120,6 +126,20 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
             value={coachName}
             onChange={(e) => setCoachName(e.target.value)}
             placeholder="e.g. Coach Shivam"
+            className="w-full text-xs font-semibold px-3 py-2 rounded-lg bg-bg-secondary border border-border text-text-primary outline-none focus:border-accent"
+          />
+        </div>
+
+        {/* Note for the receiver — travels inside the share link */}
+        <div>
+          <label className="text-2xs font-bold text-text-muted uppercase block mb-1 font-mono">
+            Note for the Receiver (Optional)
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Week 3 — add weight only if all reps are clean"
             className="w-full text-xs font-semibold px-3 py-2 rounded-lg bg-bg-secondary border border-border text-text-primary outline-none focus:border-accent"
           />
         </div>

@@ -127,11 +127,12 @@ ASCEND is engineered to meet all guidelines for mobile app store publication:
 * **External Web Deletion Portal:** In strict compliance with Google Play Data Safety policies, users can request account and data deletion without reinstalling the app via [`/delete-account`](https://ascendtonext.vercel.app/delete-account).
 * **Guest Local Wiping:** Guest users can instantly wipe all local device storage via **Settings $\rightarrow$ Data Vault $\rightarrow$ "Wipe All Data"**.
 * **Zero Retention Guarantee:** Deletion results in immediate 0-day purging across cloud databases and authentication directories.
-* **Support Contact:** Trainees can contact `support@ascendfit.app` for privacy questions or manual verification.
+* **Support Contact:** Trainees can contact `shivamvats744@gmail.com` for privacy questions or manual verification.
 
 ### 5. Hardware Permissions
 * **Camera:** Used strictly for barcode scanning (Open Food Facts) and meal photo capture. Video streams are analyzed in real-time and never recorded.
 * **Microphone:** Used strictly for speech-to-text workout dictation. Audio is transcribed via browser speech recognition and never recorded or transmitted.
+* **Notifications:** Reminder delivery is platform-split — web push (VAPID) in browsers/PWA, and on-device **local notifications** (`@capacitor/local-notifications`) inside the Android app, where web push cannot reach the closed WebView. Local reminders are scheduled from the same preference model and fire even with the app closed.
 
 ### 6. Age & Child Safety
 * Formally declared as suitable for users aged **13 and older** (COPPA & GDPR-K compliant).

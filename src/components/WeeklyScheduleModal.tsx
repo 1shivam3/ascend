@@ -27,6 +27,7 @@ import {
   getTodayDayOfWeek,
 } from '@/lib/workout-schedule';
 import { useStore } from '@/lib/store';
+import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { useToast } from '@/components/ui/Toast';
 
 interface WeeklyScheduleModalProps {
@@ -46,6 +47,7 @@ export default function WeeklyScheduleModal({
   const currentWeeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  const profileUnit = useStore((state) => state.profile?.unit || 'kg');
 
   const [draft, setDraft] = useState<WeeklySchedule>(() => {
     if (
@@ -129,9 +131,24 @@ export default function WeeklyScheduleModal({
     else if (daysCount === 3) splitKey = 'full_body';
     else splitKey = 'upper_lower';
 
-    const result = generateSplitWeeklySchedule(splitKey, 'kg');
+    const result = generateSplitWeeklySchedule(splitKey, profileUnit);
+    // Presets get the same treatment as onboarding plans: calibrated first-
+    // exposure loads + the athlete's equipment constraint.
+    const profile = useStore.getState().profile;
+    let plans = result.plans;
+    try {
+      plans = prepareGeneratedPlans(plans, {
+        unit: profileUnit,
+        bodyweightKg: profile?.bodyweightKg,
+        experience: profile?.userMode,
+        ageYears: profile?.age,
+        equipment: trainingProfile?.equipment || 'full_gym',
+        exclusions: trainingProfile?.dislikedExercises || [],
+        limitations: trainingProfile?.injuriesOrLimitations || [],
+      });
+    } catch { /* adaptation is best-effort */ }
     const existing = plannedWorkouts || [];
-    const missing = result.plans.filter((p) => !existing.some((ep) => ep.id === p.id));
+    const missing = plans.filter((p) => !existing.some((ep) => ep.id === p.id));
     if (missing.length > 0) {
       useStore.getState().setPlannedWorkouts([...existing, ...missing]);
     }
@@ -207,6 +224,22 @@ export default function WeeklyScheduleModal({
               {p.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => {
+              setDraft(() => {
+                const cleared = {} as WeeklySchedule;
+                for (const day of DAYS_OF_WEEK) {
+                  cleared[day] = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+                }
+                return cleared;
+              });
+              toast.info('All days set to rest. Save to clear your week.', 'Schedule Cleared');
+            }}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border border-border/80 bg-bg-card text-text-secondary hover:border-danger/50 hover:text-danger transition-all ml-auto"
+          >
+            Clear all
+          </button>
         </div>
 
         {/* Days List (Monday to Sunday) */}

@@ -70,6 +70,7 @@ const TABLES_TO_DELETE: Array<{ table: string; idCol: string }> = [
   { table: 'notification_deliveries', idCol: 'user_id' },
   { table: 'push_subscriptions', idCol: 'user_id' },
   { table: 'notification_preferences', idCol: 'user_id' },
+  { table: 'user_feedback', idCol: 'user_id' },
   { table: 'profiles', idCol: 'id' },
 ];
 

@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useAppNavigation } from '@/lib/navigation';
 import {
   Bell,
   ChevronRight,
   Play,
   X,
-  Check,
   Calendar,
   Dumbbell,
   Settings,
@@ -18,9 +17,33 @@ import {
   Trophy,
   Flame,
   Droplets,
+  Snowflake,
+  MessageCircleHeart,
+  TrendingUp,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
+import { useToday } from '@/lib/use-today';
+
+import { getLevel, getLevelName, progressToNext } from '@/lib/xp-system';
+import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
+import { calculateReadiness } from '@/lib/coach-engine';
+import { useCoachDigest } from '@/lib/use-coach-digest';
+import {
+  monthlyChallenges,
+  evaluateChallenge,
+  shouldShowChallengeCard,
+  challengeInstanceKey,
+  getChallengeMonth,
+} from '@/lib/challenges';
+import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
+
+const READINESS_LABEL: Record<string, string> = {
+  primed: 'Primed',
+  ready: 'Ready',
+  caution: 'Easy day',
+  rest: 'Rest',
+};
 
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
@@ -31,13 +54,15 @@ const BarcodeScannerModal = dynamic(() => import('@/components/BarcodeScannerMod
 const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), { ssr: false });
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
-import { calculateMealMacros } from '@/lib/macros';
-import { toLocalDateString } from '@/lib/habits';
-import { getTimeGreeting, getWeekDateStrings } from '@/lib/formatters';
+import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
+import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
+import { getTimeGreeting } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
+import { CalorieAdjustmentRecord } from '@/lib/coach-engine';
 import { getDailyQuote } from '@/lib/quotes';
-import { getTodaySessionState, createWorkoutDraftFromPlan } from '@/lib/workout-engine';
+import { getTodaySessionState, createWorkoutDraftFromPlan, estimateSessionMinutes } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
 
@@ -64,11 +89,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     hydrationConfig,
     logWater,
     addMeal,
+    bodyMetrics,
+    creatineLogs,
+    creatineConfig,
+    dailyCheckins,
+    setDailyCheckin,
+    xp,
+    streak,
+    challenges: challengesState,
+    optInChallenge,
+    dismissChallenge,
+    uiPreferences,
   } = useStore();
 
   const toast = useToast();
-  const today = useMemo(() => new Date(), []);
-  const todayStr = useMemo(() => toLocalDateString(today), [today]);
+  // Live today: rolls over at midnight / on resume instead of freezing
+  // at mount (an app left open overnight kept showing yesterday).
+  const todayStr = useToday();
+  const today = useMemo(() => new Date(), [todayStr]);
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
 
   // Sentence-case personalized greeting matching Screen 8 & 9
@@ -100,51 +138,74 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return todayWks[todayWks.length - 1] || null;
   }, [workouts, todayStr]);
 
-  // Consecutive-day workout streak (counts back from today, or yesterday if
-  // today has no workout yet) — same logic as Progress consistency view.
-  const streakDays = useMemo(() => {
-    const workoutDays = new Set(workouts.map((w) => w.date.split('T')[0]));
-    let days = 0;
-    const d = new Date(today);
-    if (!workoutDays.has(toLocalDateString(d))) d.setDate(d.getDate() - 1);
-    while (days < 365) {
-      if (workoutDays.has(toLocalDateString(d))) {
-        days++;
-        d.setDate(d.getDate() - 1);
-      } else {
-        break;
+  // Forgiving streak (streak-freeze system): active days = real workouts or
+  // 3+ logged meals; one missed day auto-consumes a freeze, silently.
+  const normalizedWorkouts = useMemo(
+    () => workouts.map((w) => ({ ...w, date: w.date.split('T')[0] })),
+    [workouts]
+  );
+  const streakInfo = useMemo(() => {
+    const activeDays = buildActiveDays(normalizedWorkouts, meals);
+    return calculateStreak({
+      dailyActivity: activeDays,
+      freezesAvailable: streak.freezesAvailable,
+      todayStr,
+    });
+  }, [normalizedWorkouts, meals, streak.freezesAvailable, todayStr]);
+
+  // Readiness, computed on render from the coach engine — including
+  // today's feel check-in when the user has given one.
+  const todayCheckin = dailyCheckins?.[todayStr];
+  const readiness = useMemo(
+    () => calculateReadiness(normalizedWorkouts, bodyMetrics || [], todayCheckin),
+    [normalizedWorkouts, bodyMetrics, todayCheckin]
+  );
+
+  // Coach digest: missed-session check-in + weight-trend nutrition advice.
+  const coachDigest = useCoachDigest();
+  const dismissCheckIn = useStore((state) => state.dismissCheckIn);
+  const recordCalorieAdjustment = useStore((state) => state.recordCalorieAdjustment);
+  const setMacroGoals = useStore((state) => state.setMacroGoals);
+  const nutritionSuggestion = coachDigest.nutrition.suggestion;
+  const checkIn = coachDigest.checkIn;
+
+  // XP / level.
+  const levelInfo = useMemo(() => {
+    const total = xp?.totalXp || 0;
+    const level = getLevel(total);
+    return { total, level, name: getLevelName(level), progress: progressToNext(total) };
+  }, [xp]);
+
+  // Monthly challenge: first challenge of the month that is opted-in or
+  // still showable (not dismissed). Logic lives in lib/challenges.
+  const homeChallenge = useMemo(() => {
+    const month = getChallengeMonth(todayStr);
+    const defs = monthlyChallenges(month);
+    const data = {
+      workouts: normalizedWorkouts,
+      meals,
+      prs: (prs || []).map((p) => ({ date: (p.date || '').split('T')[0] })),
+      currentStreak: streakInfo.currentStreak,
+      waterDays: Object.keys(waterLogs || {}).filter((d) => (waterLogs?.[d] || 0) > 0),
+    };
+    for (const def of defs) {
+      const key = challengeInstanceKey(def);
+      const inst = challengesState?.instances?.[key];
+      if (inst?.optedIn) {
+        return { def, key, optedIn: true, evaluation: evaluateChallenge(def, data) };
       }
     }
-    return days;
-  }, [workouts, today]);
-
-  // Current-week consistency dots (Monday–Sunday) — compact glanceable version
-  // of the Progress > Consistency view, reusing the same workout-days logic.
-  const last7Days = useMemo(() => {
-    const workoutDays = new Set(workouts.map((w) => w.date.split('T')[0]));
-    const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-    return getWeekDateStrings(today).map((dStr, i) => ({
-      label: labels[i],
-      dateStr: dStr,
-      isToday: dStr === todayStr,
-      completed: workoutDays.has(dStr),
-    }));
-  }, [workouts, today, todayStr]);
-  const weekCompletedCount = last7Days.filter((d) => d.completed).length;
+    for (const def of defs) {
+      if (shouldShowChallengeCard(challengesState, def)) {
+        return { def, key: challengeInstanceKey(def), optedIn: false, evaluation: evaluateChallenge(def, data) };
+      }
+    }
+    return null;
+  }, [todayStr, normalizedWorkouts, meals, prs, streakInfo.currentStreak, waterLogs, challengesState]);
 
   // Rotating motivational quote, personalized by gender when known.
+  // Rendered at the very bottom of the page.
   const dailyQuote = useMemo(() => getDailyQuote(profile?.gender ?? null), [profile?.gender]);
-
-  // Most recent personal record (hidden when the athlete has none).
-  const latestPr = useMemo(() => {
-    if (!prs || prs.length === 0) return null;
-    return [...prs].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
-  }, [prs]);
-  const latestPrWeight = latestPr
-    ? userUnit === 'kg'
-      ? `${latestPr.weightKg} kg`
-      : `${latestPr.weightLbs} lbs`
-    : '';
 
   // Hydration quick-add state for today.
   const todayWaterMl = waterLogs?.[todayStr] || 0;
@@ -305,8 +366,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     if (sessionInfo.durationMin && sessionInfo.durationMin > 0) {
       return sessionInfo.durationMin;
     }
+    if (scheduledPlan) return estimateSessionMinutes(scheduledPlan);
     return Math.max(35, Math.min(65, exerciseCount * 8 || 45));
-  }, [sessionInfo.durationMin, exerciseCount]);
+  }, [sessionInfo.durationMin, exerciseCount, scheduledPlan]);
 
   // Weekly consistency: accurately calculated from logged sessions in current week
   const weeklyStats = useMemo(() => {
@@ -335,10 +397,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       targetDays,
     };
   }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek]);
-
-  const weeklyProgressPct = useMemo(() => {
-    return Math.min(100, Math.round((weeklyStats.completedCount / Math.max(1, weeklyStats.targetDays)) * 100));
-  }, [weeklyStats]);
 
   // Today's Fuel summary: real calories and protein vs target
   const fuelStats = useMemo(() => {
@@ -418,7 +476,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </h2>
 
         <p className="text-xs sm:text-sm text-text-muted mt-1 font-normal">
-          {durationMinutes} min • {exerciseCount} exercises
+          {/^rest day/i.test(routineDisplayName)
+            ? 'Recovery is training too — sleep well, eat well, come back stronger tomorrow.'
+            : `${durationMinutes} min • ${exerciseCount} exercises`}
         </p>
 
         <button
@@ -427,9 +487,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             if (activeWorkoutDraft) {
               onNavigate('workout');
             } else if (sessionInfo.status === 'completed') {
-              if (completedWorkoutForToday) {
+              if (completedWorkoutForToday && uiPreferences.coachEnabled) {
                 setIsCompletedWorkoutModalOpen(true);
               } else {
+                // Coach off: the Take modal is a coach surface — go to
+                // the training history instead of a dead tap.
                 onNavigate('workout');
               }
             } else {
@@ -444,26 +506,252 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             ? 'View Completed Workout'
             : 'Start Workout'}
         </button>
-      </div>
-
-      {/* ── 3. THIS WEEK SECTION (Screen 8 & Screen 9) ─────────────────────── */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-text-primary">
-            This Week
-          </h3>
-          <span className="text-xs sm:text-sm font-medium text-text-muted tabular-nums">
-            {weeklyStats.completedCount}/{weeklyStats.targetDays} workouts
-          </span>
-        </div>
-
-        <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden">
-          <div
-            className="h-full rounded-full bg-accent transition-all duration-500 ease-out"
-            style={{ width: `${weeklyProgressPct}%` }}
-          />
+        {/* Quick Log — one tap to log a session that already happened. */}
+        <div className="text-center mt-3">
+          <button
+            type="button"
+            onClick={() => setIsLogPastModalOpen(true)}
+            className="text-xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+          >
+            Already trained? Quick log a past session
+          </button>
         </div>
       </div>
+
+      {/* ── 2b. COACH CHECK-IN (missed sessions) — hideable in Settings ──── */}
+      {uiPreferences.coachEnabled && checkIn && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <MessageCircleHeart className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-primary leading-relaxed">
+                  {checkIn.sessions.length === 1
+                    ? `${checkIn.sessions[0].name} didn't get logged this week`
+                    : `${checkIn.sessions.length} planned sessions didn't get logged this week`}
+                </p>
+                <CollapsibleDetails label="Details">
+                  <p className="whitespace-pre-line">{checkIn.message}</p>
+                </CollapsibleDetails>
+                {(() => {
+                  // "Do it today": actually start the most recent missed
+                  // session's plan — the check-in copy promises a moved
+                  // session, so the button has to exist and work.
+                  const latest = checkIn.sessions[checkIn.sessions.length - 1];
+                  const plan =
+                    (latest.planId && plannedWorkouts.find((p) => p.id === latest.planId)) ||
+                    plannedWorkouts.find(
+                      (p) => p.name.trim().toLowerCase() === latest.name.trim().toLowerCase()
+                    );
+                  if (!plan) return null;
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
+                        handleStartWorkoutFromHome(plan);
+                      }}
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
+                    >
+                      Do it today — start {plan.name}
+                    </button>
+                  );
+                })()}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
+                toast.info("Check-in snoozed — it won't repeat this week.", 'Snoozed');
+              }}
+              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              aria-label="Dismiss check-in"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 2c. COACH NUTRITION SUGGESTION (weight trend → calorie target) ──── */}
+      {uiPreferences.coachEnabled && nutritionSuggestion && nutritionSuggestion.action !== 'hold' && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                <TrendingUp className="w-4 h-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-text-primary leading-relaxed">
+                  Coach suggests {nutritionSuggestion.deltaKcal > 0 ? '+' : ''}{nutritionSuggestion.deltaKcal} kcal → {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                </p>
+                <CollapsibleDetails label="Why?">
+                  <p>{nutritionSuggestion.reason}</p>
+                  <p className="mt-1">General training guidance, not medical advice. If you have a medical condition (e.g. diabetes), check with your doctor before changing calorie targets.</p>
+                </CollapsibleDetails>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const current = useStore.getState().macroGoals;
+                    const record: CalorieAdjustmentRecord = {
+                      appliedAt: todayStr,
+                      appliedTargetKcal: nutritionSuggestion.newCalories,
+                      basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
+                      basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
+                    };
+                    // Rescale the WHOLE goal set — calories only left protein/
+                    // carbs/fat, maintenance and the delta stale, breaking the
+                    // zero-Atwater-drift guarantee the Meals page relies on.
+                    if (current) {
+                      setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
+                    }
+                    recordCalorieAdjustment(record);
+                    toast.success(`Target updated to ${nutritionSuggestion.newCalories.toLocaleString()} kcal/day.`, 'Calories Adjusted');
+                  }}
+                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                >
+                  Apply {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const current = useStore.getState().macroGoals;
+                recordCalorieAdjustment({
+                  appliedAt: todayStr,
+                  appliedTargetKcal: Math.round(current?.calories ?? 0),
+                  basedOnWeightLogCount: coachDigest.nutrition.weightLogCount,
+                  basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
+                  dismissed: true,
+                });
+                toast.info("Suggestion dismissed — I'll reassess in two weeks.", 'Dismissed');
+              }}
+              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              aria-label="Dismiss calorie suggestion"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── 3b. READINESS + LEVEL (each hideable in Settings) ────────────── */}
+      {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
+        {/* Readiness Card (coach engine) */}
+        {uiPreferences.coachEnabled && (
+        <div className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}>
+          <span className="text-xs font-medium text-text-muted">Readiness</span>
+          <div className="mt-1.5">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
+            </span>
+            {readiness.factors && readiness.factors.length > 0 && (
+              <CollapsibleDetails label="Details" className="mt-0.5">
+                {readiness.factors.join(' ')}
+              </CollapsibleDetails>
+            )}
+            {/* Daily feel check-in: feeds the readiness score above.
+                The engine supported this input for months with no UI. */}
+            <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
+              {(
+                [
+                  ['sleep', 'Sleep'],
+                  ['soreness', 'Soreness'],
+                  ['energy', 'Energy'],
+                ] as const
+              ).map(([key, label]) => (
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <span className="text-3xs font-semibold text-text-muted">{label}</span>
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((v) => {
+                      const current = todayCheckin?.[key] ?? 0;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          aria-label={`${label}: ${v} of 5`}
+                          onClick={() => {
+                            const next = {
+                              sleep: todayCheckin?.sleep ?? 3,
+                              soreness: todayCheckin?.soreness ?? 3,
+                              energy: todayCheckin?.energy,
+                            };
+                            if (key === 'sleep') next.sleep = v;
+                            else if (key === 'soreness') next.soreness = v;
+                            else next.energy = v;
+                            setDailyCheckin(todayStr, next);
+                          }}
+                          className={`w-6 h-6 rounded-full text-3xs font-bold transition-all cursor-pointer ${
+                            current === v
+                              ? 'bg-accent text-white'
+                              : 'bg-bg-secondary text-text-muted hover:text-text-primary border border-border/60'
+                          }`}
+                        >
+                          {v}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              <p className="text-3xs text-text-muted">
+                {todayCheckin ? 'Checked in — readiness updated.' : 'How do you feel? It adjusts readiness.'}
+              </p>
+            </div>
+          </div>
+        </div>
+        )}
+
+        {/* Level Card (XP system) */}
+        {uiPreferences.gamificationEnabled && (
+        <div className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}>
+          <span className="text-xs font-medium text-text-muted">Level {levelInfo.level} · {levelInfo.name}</span>
+          <div className="mt-1.5">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+              {levelInfo.total.toLocaleString()} XP
+            </span>
+            <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${levelInfo.progress.pct}%` }}
+              />
+            </div>
+            <span className="text-xs text-text-muted tabular-nums block mt-1">
+              {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} to Level {levelInfo.level + 1}
+            </span>
+          </div>
+        </div>
+        )}
+      </div>
+      )}
+
+      {/* ── 3c. NEXT-SESSION ADJUSTMENTS (auto-regulation) ───────────────── */}
+      {uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs">
+          <span className="text-xs font-medium text-text-muted">Next session — coach&apos;s calls</span>
+          <div className="mt-2 space-y-2">
+            {coachDigest.nextAdjustments.map((adj) => (
+              <div key={adj.exercise} className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-text-primary truncate">{adj.exercise}</p>
+                  <p className="text-2xs text-text-muted leading-relaxed">
+                    {adj.reason.split('. ')[0]}.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
+                  {adj.oldTarget.weight} → {adj.newTarget.weight}
+                  {adj.newTarget.unit}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── 4. NUTRITION SUMMARY (Screen 8 & Screen 9: 2-Column Grid) ──────── */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -585,79 +873,116 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* ── 7. STREAK + QUOTE ────────────────────────────────────────────── */}
+      {/* ── 7. STREAK (hidden when gamification is off; the quote now lives at the page bottom) ─ */}
+      {uiPreferences.gamificationEnabled && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Flame className="w-4 h-4" />
           </span>
           <p className="text-xs font-bold text-text-primary">
-            {streakDays > 0
-              ? `${streakDays} day${streakDays === 1 ? '' : 's'} streak — keep it burning`
+            {streakInfo.currentStreak > 0
+              ? `${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? '' : 's'} streak — keep it burning`
               : 'Start your streak with today\'s workout'}
           </p>
+          {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
+            <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+              <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
+              {streak.freezesAvailable} freeze{streak.freezesAvailable === 1 ? '' : 's'} ready
+            </span>
+          )}
         </div>
-        <p className="text-xs text-text-muted italic mt-2 leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
-        <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
+        {streakInfo.freezeConsumed && (
+          <p className="text-3xs text-text-muted mt-1.5">
+            A streak freeze covered a missed day this run — no harm done.
+          </p>
+        )}
       </div>
+      )}
 
-      {/* ── 7b. CONSISTENCY STRIP (compact Progress > Consistency glance) ───── */}
-      <button
-        type="button"
-        onClick={() => onNavigate('progress')}
-        className="w-full bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs text-left active:scale-[0.99] transition-all cursor-pointer"
-        aria-label="View consistency details"
-      >
-        <div className="flex items-center justify-between mb-2.5">
-          <span className="text-xs font-bold text-text-primary">Consistency</span>
-          <span className="text-3xs font-mono text-text-muted tabular-nums">
-            {weekCompletedCount}/7 this week
-          </span>
+      {/* ── 7c. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}
+      {uiPreferences.showHabitMatrix && (
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-bold text-text-primary">Habits This Week</span>
+          <span className="text-3xs font-mono text-text-muted">MON — SUN</span>
         </div>
-        <div className="flex items-center justify-between px-1">
-          {last7Days.map((d) => (
-            <div key={d.dateStr} className="flex flex-col items-center gap-1.5">
-              <span
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-colors ${
-                  d.completed
-                    ? 'bg-accent text-white'
-                    : d.isToday
-                    ? 'border-2 border-accent/60'
-                    : 'bg-border/50'
-                }`}
-              >
-                {d.completed && <Check className="w-3.5 h-3.5" />}
+        <WeeklyHabitMatrix
+          compact
+          workouts={workouts}
+          waterLogs={waterLogs}
+          creatineLogs={creatineLogs}
+          showCreatine={
+            creatineConfig?.enabled !== false &&
+            !(typeof profile?.age === 'number' && profile.age < 18)
+          }
+          meals={meals}
+          waterTargetMl={calculateHydrationTarget({
+            bodyweightKg: profile?.bodyweightKg || 75,
+            customTargetMl: hydrationConfig?.dailyTargetMl,
+            isCustomTarget: hydrationConfig?.isCustomTarget,
+          })}
+          proteinTargetG={macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140)}
+          weekStart={(() => {
+            const d = new Date(today);
+            d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+            d.setHours(0, 0, 0, 0);
+            return d;
+          })()}
+        />
+      </div>
+      )}
+
+      {/* ── 7d. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
+      {uiPreferences.gamificationEnabled && homeChallenge && (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
+                <Trophy className="w-4 h-4" />
               </span>
-              <span
-                className={`text-3xs font-mono ${
-                  d.isToday ? 'text-accent font-bold' : 'text-text-muted'
-                }`}
-              >
-                {d.label}
-              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-text-primary">{homeChallenge.def.title}</p>
+                <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.description}</p>
+              </div>
             </div>
-          ))}
-        </div>
-      </button>
-
-      {/* ── 8. LATEST PR (hidden when none) ─────────────────────────────── */}
-      {latestPr && (
-        <button
-          type="button"
-          onClick={() => onNavigate('progress')}
-          className="w-full bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex items-center gap-3 text-left active:scale-[0.99] transition-all cursor-pointer"
-        >
-          <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
-            <Trophy className="w-4 h-4" />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-3xs font-mono text-text-muted uppercase tracking-wider">Latest PR</p>
-            <p className="text-xs font-bold text-text-primary truncate">
-              {latestPr.exercise} · {latestPrWeight} × {latestPr.reps}
-            </p>
+            {!homeChallenge.optedIn && (
+              <button
+                type="button"
+                onClick={() => dismissChallenge(homeChallenge.key)}
+                className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                aria-label="Dismiss challenge"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
-        </button>
+          {homeChallenge.optedIn ? (
+            <div className="mt-3">
+              <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                  style={{ width: `${homeChallenge.evaluation.pct}%` }}
+                />
+              </div>
+              <p className="text-3xs text-text-muted tabular-nums mt-1.5">
+                {homeChallenge.evaluation.progress} of {homeChallenge.evaluation.target} · {homeChallenge.evaluation.pct}%
+                {homeChallenge.evaluation.completed ? ' · Complete — 200 XP earned' : ''}
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                optInChallenge(homeChallenge.key);
+                toast.success('Challenge joined. Good luck!', 'Challenge Accepted');
+              }}
+              className="mt-3 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            >
+              Join challenge
+            </button>
+          )}
+        </div>
       )}
 
       {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
@@ -692,7 +1017,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
                 <p className="font-semibold text-text-primary">Weekly Target</p>
                 <p className="text-text-muted mt-0.5">
-                  {weeklyStats.completedCount} of {weeklyStats.targetDays} workouts completed this week.
+                  {uiPreferences.weeklyTargetDays === 0
+                    ? `${weeklyStats.completedCount} workouts completed this week.`
+                    : `${weeklyStats.completedCount} of ${uiPreferences.weeklyTargetDays ?? weeklyStats.targetDays} workouts completed this week.`}
                 </p>
               </div>
             </div>
@@ -907,8 +1234,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onClose={() => setIsWeightModalOpen(false)}
       />
 
-      {/* ── COMPLETED WORKOUT DETAIL MODAL ─────────────────────────────────── */}
-      {isCompletedWorkoutModalOpen && completedWorkoutForToday && (
+      {/* ── COMPLETED WORKOUT DETAIL MODAL (Coach's Take surface) ────────── */}
+      {uiPreferences.coachEnabled && isCompletedWorkoutModalOpen && completedWorkoutForToday && (
         <PostWorkoutTakeModal
           isOpen={isCompletedWorkoutModalOpen}
           onClose={() => setIsCompletedWorkoutModalOpen(false)}
@@ -920,6 +1247,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           }}
         />
       )}
+
+      {/* ── DAILY QUOTE — always the last element on the page ──────────────── */}
+      <div className="text-center pt-1 pb-2">
+        <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
+        <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
+      </div>
     </div>
   );
 }

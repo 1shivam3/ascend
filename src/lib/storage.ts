@@ -1,4 +1,7 @@
-import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry } from './types';
+import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, ProgressPhoto } from './types';
+
+/** Mirrors PROGRESS_PHOTOS_KEY in store.ts (duplicated to avoid an import cycle). */
+const PROGRESS_PHOTOS_STORAGE_KEY = 'ascend_progress_photos_v1';
 
 const PREFIX = 'ascend_';
 
@@ -191,7 +194,95 @@ export interface FullAppBackup {
   workouts?: WorkoutEntry[];
   meals?: MealEntry[];
   customBarcodes?: Record<string, CustomBarcodeItem>;
+  progressPhotos?: ProgressPhoto[];
   [key: string]: any;
+}
+
+/**
+ * THE backup field list — every exporter (Data Vault modal, storage
+ * helper, emergency snapshot) builds from this one function. Two
+ * divergent exporters used to write the same filename with different
+ * contents: the modal's 11-field payload silently dropped the weekly
+ * schedule, training profile, UI preferences, water/creatine logs,
+ * custom barcodes AND all progress photos, and restore defaulted them.
+ */
+const BACKUP_STATE_FIELDS = [
+  'profile',
+  'prs',
+  'workouts',
+  'meals',
+  'bodyMetrics',
+  'plannedWorkouts',
+  'deletedPlanIds',
+  'favoriteFoods',
+  'prTargets',
+  'macroGoals',
+  'theme',
+  'hasCustomTheme',
+  'hasCompletedOnboarding',
+  'weeklySchedule',
+  'uiPreferences',
+  'trainingProfile',
+  'goals',
+  'userMode',
+  'waterLogs',
+  'waterBatches',
+  'hydrationConfig',
+  'creatineLogs',
+  'creatineConfig',
+  'creatineSupply',
+  'dayTypeOverrides',
+  'gymLogs',
+  'aiInsightsCache',
+  'todaysAIWorkoutPlan',
+  'latestWeeklyReview',
+  'trainingDecisions',
+  'decisionsLedgerHistory',
+  'lifterProfile',
+  'notificationPreferences',
+  'xp',
+  'streak',
+  'challenges',
+  'coach',
+  'policyDecisionRecords',
+  'policyDecisionsLedgerHistory',
+  'policyDecisionApplications',
+  'customExerciseMuscles',
+  'dailyCheckins',
+] as const;
+
+const SENSITIVE_BACKUP_KEYS = ['customGeminiKey', 'apiKey', 'token', 'password', 'secret'];
+
+export function buildFullBackup(
+  state: Record<string, any>,
+  extras?: {
+    customBarcodes?: Record<string, CustomBarcodeItem>;
+    progressPhotos?: ProgressPhoto[];
+  }
+): FullAppBackup {
+  const backup: Record<string, any> = {
+    version: '2.0.0',
+    exportedAt: new Date().toISOString(),
+    source: 'ASCEND Strength Tracker',
+  };
+  for (const field of BACKUP_STATE_FIELDS) {
+    if (state && state[field] !== undefined) backup[field] = state[field];
+  }
+  for (const key of SENSITIVE_BACKUP_KEYS) delete backup[key];
+  if (extras?.customBarcodes !== undefined) backup.customBarcodes = extras.customBarcodes;
+  if (extras?.progressPhotos !== undefined) backup.progressPhotos = extras.progressPhotos;
+  return backup as FullAppBackup;
+}
+
+function readProgressPhotosFromDisk(): ProgressPhoto[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(PROGRESS_PHOTOS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 const DISALLOWED_IMPORT_KEYS = new Set([
@@ -238,23 +329,10 @@ export function exportFullBackupJSON(): string {
       } catch {}
     }
 
-    // Strip sensitive keys from export to prevent leaking credentials in exported backups
-    const sanitizedStore = { ...storeData };
-    delete sanitizedStore.customGeminiKey;
-    delete sanitizedStore.apiKey;
-    delete sanitizedStore.token;
-    delete sanitizedStore.password;
-    delete sanitizedStore.secret;
-
-    const customBarcodes = getCustomBarcodes();
-
-    const backup: FullAppBackup = {
-      version: '2.0.0',
-      exportedAt: new Date().toISOString(),
-      source: 'ASCEND Strength Tracker',
-      ...sanitizedStore,
-      customBarcodes,
-    };
+    const backup = buildFullBackup(storeData, {
+      customBarcodes: getCustomBarcodes(),
+      progressPhotos: readProgressPhotosFromDisk(),
+    });
     return JSON.stringify(backup, null, 2);
   } catch (err) {
     console.error('Error generating full backup JSON', err);
@@ -282,6 +360,26 @@ export function importFullBackupJSON(jsonString: string): boolean {
       const safeBarcodes = sanitizeImportObject(data.customBarcodes);
       const merged = { ...current, ...safeBarcodes };
       save('custom_barcodes', merged);
+    }
+
+    // Restore progress photos to their dedicated key if present (they
+    // live outside the store blob by design).
+    if (Array.isArray(data.progressPhotos)) {
+      const validPhotos = data.progressPhotos.filter(
+        (p: any) =>
+          p &&
+          typeof p === 'object' &&
+          typeof p.id === 'string' &&
+          typeof p.dataUrl === 'string' &&
+          p.dataUrl.startsWith('data:image/')
+      );
+      try {
+        window.localStorage.setItem(
+          PROGRESS_PHOTOS_STORAGE_KEY,
+          JSON.stringify(validPhotos.slice(0, 24))
+        );
+      } catch {}
+      delete data.progressPhotos;
     }
 
     // Restore main ascend_store

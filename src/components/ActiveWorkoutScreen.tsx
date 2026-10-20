@@ -40,7 +40,7 @@ import {
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
-  getQuickSubstitutes,
+  getFilteredSubstitutes,
   getExercisePrescription,
   isActiveSetCompleted,
   finalizeWorkoutExercises,
@@ -266,6 +266,10 @@ export default function ActiveWorkoutScreen({
   const [warmupWorkingWeight, setWarmupWorkingWeight] = useState<number>(60);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
+  const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const [swapReason, setSwapReason] = useState<'equipment' | 'hurts' | 'too_hard' | 'prefer_other'>('equipment');
+  const trainingProfile = useStore((state) => state.trainingProfile);
+  const setTrainingProfile = useStore((state) => state.setTrainingProfile);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -379,32 +383,6 @@ export default function ActiveWorkoutScreen({
       }, 105);
     }
   }, [completedSetSummary, registerBackHandler]);
-
-  // Intensity metric preference: RPE vs RIR
-  const [intensityMode, setIntensityMode] = useState<'rpe' | 'rir'>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        return (localStorage.getItem('ascend_intensity_mode') as 'rpe' | 'rir') || 'rpe';
-      } catch {
-        return 'rpe';
-      }
-    }
-    return 'rpe';
-  });
-
-  const toggleIntensityMode = () => {
-    setIntensityMode((prev) => {
-      const next = prev === 'rpe' ? 'rir' : 'rpe';
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('ascend_intensity_mode', next);
-        } catch {
-          // ignore storage error
-        }
-      }
-      return next;
-    });
-  };
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
@@ -549,6 +527,41 @@ export default function ActiveWorkoutScreen({
       toast.success(`Exercise changed to "${trimmed}"`, 'Exercise Updated');
     },
     [activeExerciseIdx, currentExercise?.name, userUnit, toast]
+  );
+
+  // Guided swap: replaces the current exercise with a same-pattern substitute.
+  // "Hurts" swaps additionally (a) flag pain on the session entry so the
+  // SAFETY-01 policy locks progression, and (b) persist the exercise in
+  // dislikedExercises so future generated plans never prescribe it again.
+  const handleApplySwap = useCallback(
+    (subName: string) => {
+      const original = currentExercise?.name;
+      if (swapReason === 'hurts' && original) {
+        setExercises((prev) =>
+          prev.map((ex, i) =>
+            i === activeExerciseIdx
+              ? {
+                  ...ex,
+                  reportsPain: true,
+                  // The rename below changes this entry into the substitute —
+                  // painfulExerciseName keeps the pain attributed to the
+                  // ORIGINAL exercise so SAFETY-01 locks the right lift.
+                  painfulExerciseName: original,
+                  athleteFlags: { ...(ex.athleteFlags || {}), reportsPain: true },
+                }
+              : ex
+          )
+        );
+        const existing = trainingProfile?.dislikedExercises || [];
+        if (!existing.includes(original)) {
+          setTrainingProfile({ dislikedExercises: [...existing, original] });
+        }
+        toast.info(`${original} flagged as painful — progression on it is paused and it won't be prescribed again.`, 'Pain Noted');
+      }
+      handleSelectNewExerciseName(subName);
+      setIsSwapModalOpen(false);
+    },
+    [activeExerciseIdx, currentExercise?.name, swapReason, trainingProfile?.dislikedExercises, setTrainingProfile, handleSelectNewExerciseName, toast]
   );
 
   // Autocomplete suggestions when renaming / changing current exercise
@@ -923,7 +936,15 @@ export default function ActiveWorkoutScreen({
           rpe: s.rpe,
           unit: (s.unit as Unit) || userUnit,
         })),
-        userUnit
+        userUnit,
+        {
+          // Pain flagged on THIS movement holds its progression. When the
+          // entry is a pain-swap substitute, the pain belongs to the
+          // original (painfulExerciseName) — the substitute progresses.
+          hadPain:
+            (ex.reportsPain === true || ex.athleteFlags?.reportsPain === true) &&
+            (!ex.painfulExerciseName || ex.painfulExerciseName === ex.name),
+        }
       );
       if (!target) continue;
 
@@ -1607,6 +1628,7 @@ export default function ActiveWorkoutScreen({
         }
 
         if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          const isFirstExposure = existingPRs.length === 0;
           const prId = safeRandomId('pr');
           addPR({
             id: prId,
@@ -1616,10 +1638,12 @@ export default function ActiveWorkoutScreen({
             reps: topSet.reps,
             oneRepMax: topSet.e1RMKg,
             date: today,
-            notes: 'All-Time 1RM PR',
+            notes: isFirstExposure ? 'Baseline established from first session' : 'All-Time 1RM PR',
             prType: '1rm',
           });
-          newPRsCount++;
+          if (!isFirstExposure) {
+            newPRsCount++;
+          }
         } else if (bestRepPR) {
           const prId = safeRandomId('pr_rep');
           addPR({
@@ -1724,6 +1748,32 @@ export default function ActiveWorkoutScreen({
             <span className="hidden sm:inline">Finish</span>
           </button>
 
+          {/* Form cues + Warm-up: the two things a beginner needs MOST
+              were buried 4th/6th in the overflow menu. They get visible
+              header buttons (the menu entries stay for discoverability). */}
+          {formCues.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowFormCues((prev) => !prev)}
+              className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+              title="How to do this exercise — form cues"
+              aria-label="Form cues for this exercise"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Form</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsWarmupModalOpen(true)}
+            className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            title="Generate warm-up sets"
+            aria-label="Warm-up sets"
+          >
+            <Flame className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Warm-up</span>
+          </button>
+
           {/* Secondary ⋯ Tools Menu (Available for quick tools & helper sheets) */}
           <div className="relative">
             <button
@@ -1820,6 +1870,14 @@ export default function ActiveWorkoutScreen({
                 >
                   <Plus className="w-3.5 h-3.5 text-text-muted" />
                   <span>Add exercise</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsSwapModalOpen(true)}
+                  className="w-full px-3 py-2 rounded-lg text-left text-xs font-semibold text-text-primary hover:bg-bg-secondary transition-colors flex items-center gap-2 cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-accent" />
+                  <span>Swap this exercise</span>
                 </button>
               </div>
             )}
@@ -2172,7 +2230,7 @@ export default function ActiveWorkoutScreen({
                       setActiveSetIdx(idx);
                       setShowEffortPrompt(false);
                     }}
-                    className={`w-7 h-7 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
+                    className={`w-9 h-9 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
                         ? 'bg-[#E44427] text-white font-black shadow-xs'
                         : isActiveSetCompleted(s)
@@ -2191,7 +2249,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleAddSet}
-                  className="w-8 h-8 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
                   title="Add set"
                   aria-label="Add set"
                 >
@@ -2393,7 +2451,7 @@ export default function ActiveWorkoutScreen({
                           type="button"
                           onClick={() => handleWeightStep(activeSetIdx, delta)}
                           aria-label={`Adjust weight by ${delta > 0 ? `+${delta}` : delta} ${userUnit}`}
-                          className="px-2.5 py-1 min-h-[32px] rounded-lg bg-bg-card hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                          className="px-2.5 py-1 min-h-[40px] rounded-lg bg-bg-card hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
                         >
                           {delta > 0 ? `+${delta}` : delta}
                         </button>
@@ -2558,7 +2616,7 @@ export default function ActiveWorkoutScreen({
                   <div className="flex items-center gap-1 sm:gap-2">
                     {/* Weight Input */}
                     <div className="flex flex-col items-center">
-                      <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
+                      <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[40px] border border-border/60 focus-within:border-accent w-[78px] sm:w-[92px] shrink-0">
                         <input
                           type="text"
                           inputMode="decimal"
@@ -2579,12 +2637,12 @@ export default function ActiveWorkoutScreen({
                               : Math.max(0, Math.round(parsed * 10) / 10);
                             handleSetWeightChange(sIdx, finalW !== undefined ? finalW : '');
                           }}
-                          className="w-full min-w-0 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
+                          className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
                         <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
                       </div>
                       {isCurrentDumbbell && (
-                        <span className="text-[9px] font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
+                        <span className="text-3xs font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
                           / db
                         </span>
                       )}
@@ -2593,7 +2651,7 @@ export default function ActiveWorkoutScreen({
                           const w = typeof set.weight === 'number' && !isNaN(set.weight) ? set.weight : 0;
                           const plates = w > 0 ? getPlateSummary(w, userUnit) : null;
                           return plates ? (
-                            <span className="text-[9px] font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
+                            <span className="text-3xs font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
                               {plates}
                             </span>
                           ) : null;
@@ -2604,7 +2662,7 @@ export default function ActiveWorkoutScreen({
                     <span className="text-text-muted font-medium text-xs shrink-0">×</span>
 
                     {/* Reps Input */}
-                    <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 border border-border/60 focus-within:border-accent w-[60px] sm:w-[74px] shrink-0">
+                    <div className="flex items-center bg-bg-secondary rounded-xl px-1.5 sm:px-2 py-1.5 min-h-[40px] border border-border/60 focus-within:border-accent w-[60px] sm:w-[74px] shrink-0">
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2622,7 +2680,7 @@ export default function ActiveWorkoutScreen({
                           const parsed = parseInt(String(set.reps), 10);
                           handleSetRepsChange(sIdx, isNaN(parsed) ? 1 : Math.max(1, parsed));
                         }}
-                        className="w-full min-w-0 p-0 text-center font-mono font-bold text-sm sm:text-base text-text-primary bg-transparent outline-none tabular-nums"
+                        className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                       />
                       <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
                         <span className="sm:hidden">r</span>
@@ -2634,10 +2692,10 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => setActiveRpePickerSetIdx(sIdx)}
-                      className="min-w-[34px] sm:min-w-[42px] px-1 sm:px-2 py-1.5 text-2xs sm:text-xs font-mono font-bold rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
-                      title="Tap to select effort (RPE)"
+                      className="min-w-[42px] px-2 py-2 min-h-[40px] text-2xs sm:text-xs font-mono font-bold rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
+                      title="Tap to rate the effort (RPE) — how hard the set felt"
                     >
-                      @{set.rpe || 8}
+                      {set.rpe ? `@${set.rpe}` : 'RPE'}
                     </button>
                   </div>
 
@@ -2646,7 +2704,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleSkipSet(sIdx)}
-                      className={`px-1.5 sm:px-2 py-1 rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
+                      className={`px-2.5 sm:px-3 py-2 min-h-[36px] rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
                         set.status === 'skipped'
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                           : 'text-text-muted hover:text-text-primary border-transparent hover:border-border/60'
@@ -2659,7 +2717,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleToggleSetComplete(sIdx)}
-                      className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
                         isActiveSetCompleted(set)
                           ? 'bg-emerald-500 text-white shadow-sm'
                           : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
@@ -3205,6 +3263,82 @@ export default function ActiveWorkoutScreen({
         </div>
       )}
 
+      {/* ── Swap Exercise Modal (guided substitutes, pain reporting) ──────── */}
+      {isSwapModalOpen && currentExercise && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+          <div
+            className="w-full max-w-sm bg-bg-card border border-border/80 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 animate-slide-up max-h-[85vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Swap this exercise"
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="font-bold text-text-primary text-sm">Swap {currentExercise.name}</h3>
+                <p className="text-3xs text-text-muted mt-0.5">Same movement, different tool. Your completed sets stay logged.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSwapModalOpen(false)}
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary"
+                aria-label="Close swap"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <p className="text-2xs font-bold uppercase tracking-wide text-text-muted">Why are you swapping?</p>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { id: 'equipment', label: 'Equipment unavailable / busy' },
+                  { id: 'hurts', label: 'Hurts / joint discomfort' },
+                  { id: 'too_hard', label: 'Too hard today' },
+                  { id: 'prefer_other', label: 'Just prefer another' },
+                ] as const).map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setSwapReason(r.id)}
+                    className={`px-2.5 py-1.5 rounded-full text-2xs font-bold cursor-pointer transition-all ${swapReason === r.id ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              {swapReason === 'hurts' && (
+                <p className="text-2xs text-amber-400 leading-relaxed pt-1">
+                  Swapping because it hurts also pauses progression on {currentExercise.name} and removes it from your future plans. Pain that lingers past a week deserves a professional look.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              {getFilteredSubstitutes(currentExercise.name, {
+                equipment: trainingProfile?.equipment || 'full_gym',
+                exclusions: trainingProfile?.dislikedExercises || [],
+                // "Hurts" swaps must leave the painful movement family
+                // entirely — the raw table offered hinge-for-hinge swaps.
+                avoidSameFamilyAs: swapReason === 'hurts' ? currentExercise.name : undefined,
+              }).map((sub) => (
+                  <button
+                    key={sub.name}
+                    type="button"
+                    onClick={() => handleApplySwap(sub.name)}
+                    className="w-full text-left p-3 rounded-xl bg-bg-secondary border border-border/70 hover:border-accent/60 transition-all cursor-pointer"
+                  >
+                    <span className="block text-sm font-bold text-text-primary">{sub.name}</span>
+                    <span className="block text-2xs text-text-muted mt-0.5">{sub.reason}</span>
+                  </button>
+                ))}
+              <p className="text-2xs text-text-muted text-center pt-1">
+                Need something else? Use “Add exercise” to pick any movement from the library.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Add Exercise Modal (With muscle categories & search) ──────────── */}
       <ExerciseSelectorModal
         isOpen={isAddExerciseModalOpen}
@@ -3302,7 +3436,7 @@ export default function ActiveWorkoutScreen({
               </div>
               <h3 className="text-base font-bold text-text-primary">Discard Active Workout?</h3>
               <p className="text-xs text-text-secondary leading-relaxed">
-                Are you sure you want to quit? Unsaved sets from this workout session will be lost.
+                End this workout and discard it? Unsaved sets from this session will be lost — finished sets you already saved stay in your history.
               </p>
               <div className="flex gap-2 pt-2">
                 <button
@@ -3326,13 +3460,19 @@ export default function ActiveWorkoutScreen({
       )}
 
       {/* ── Finish Workout Summary Modal ─────────────────────────────────── */}
-      {isFinishModalOpen && (
+      {isFinishModalOpen && (() => {
+        const doneRatio = sessionStats.totalSetsCount > 0
+          ? sessionStats.completedSetsCount / sessionStats.totalSetsCount
+          : 1;
+        const isPartial = doneRatio < 0.8;
+        return (
         <div className="modal-overlay" onClick={() => setIsFinishModalOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Trophy className="w-5 h-5 text-[#E44427]" />
-                <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">WORKOUT COMPLETE.</h3>
+                {/* Honest title: a 2-of-17 bail is "SESSION SAVED.", not a trophy ceremony. */}
+                <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{isPartial ? 'SESSION SAVED.' : 'WORKOUT COMPLETE.'}</h3>
               </div>
               <button
                 type="button"
@@ -3431,7 +3571,8 @@ export default function ActiveWorkoutScreen({
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* 1-Tap RPE / Effort Picker Modal */}
       {activeRpePickerSetIdx !== null && (
@@ -3444,10 +3585,11 @@ export default function ActiveWorkoutScreen({
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div>
                 <h3 className="font-bold text-text-primary text-sm font-sans">
-                  Select Effort (RPE)
+                  How hard was that set?
                 </h3>
                 <p className="text-3xs text-text-muted">
-                  Set {activeRpePickerSetIdx + 1} • Rate of Perceived Exertion
+                  Set {activeRpePickerSetIdx + 1} • Effort score (RPE): 10 = you could not
+                  do one more rep, 8 = two good reps left in the tank, 6 = easy.
                 </p>
               </div>
               <button
@@ -3462,16 +3604,16 @@ export default function ActiveWorkoutScreen({
 
             <div className="grid grid-cols-2 gap-2 max-h-[60vh] overflow-y-auto pr-1">
               {[
-                { rpe: 6, label: 'Warm-up / Light', rir: '4+ RIR', desc: 'Could do 4+ more' },
-                { rpe: 7, label: 'Moderate', rir: '3 RIR', desc: 'Fast bar speed' },
-                { rpe: 7.5, label: 'Moderate+', rir: '2-3 RIR', desc: 'Crisp & strong' },
-                { rpe: 8, label: 'Sweet Spot', rir: '2 RIR', desc: 'Standard target' },
-                { rpe: 8.5, label: 'Heavy', rir: '1-2 RIR', desc: 'Challenging' },
-                { rpe: 9, label: 'Very Heavy', rir: '1 RIR', desc: 'Could do 1 more' },
-                { rpe: 9.5, label: 'Near Limit', rir: '<1 RIR', desc: 'Grind / Almost max' },
-                { rpe: 10, label: 'Maximum Effort', rir: '0 RIR', desc: 'Absolute limit' },
+                { rpe: 6, label: 'Warm-up / Light', rir: '4+ reps left', desc: 'Could do 4+ more' },
+                { rpe: 7, label: 'Moderate', rir: '3 reps left', desc: 'Fast bar speed' },
+                { rpe: 7.5, label: 'Moderate+', rir: '2-3 reps left', desc: 'Crisp & strong' },
+                { rpe: 8, label: 'Sweet Spot', rir: '2 reps left', desc: 'Standard target' },
+                { rpe: 8.5, label: 'Heavy', rir: '1-2 reps left', desc: 'Challenging' },
+                { rpe: 9, label: 'Very Heavy', rir: '1 rep left', desc: 'Could do 1 more' },
+                { rpe: 9.5, label: 'Near Limit', rir: '<1 rep left', desc: 'Grind / Almost max' },
+                { rpe: 10, label: 'Maximum Effort', rir: 'Nothing left', desc: 'Absolute limit' },
               ].map((item) => {
-                const currentVal = currentExercise?.sets[activeRpePickerSetIdx]?.rpe || 8;
+                const currentVal = currentExercise?.sets[activeRpePickerSetIdx]?.rpe ?? -1;
                 const isSelected = currentVal === item.rpe;
                 return (
                   <button

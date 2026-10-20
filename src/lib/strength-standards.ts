@@ -1,5 +1,5 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
-import { getAllExerciseNames } from './exercise-library';
+import { getAllExerciseNames, EXERCISE_LIBRARY, getExerciseMuscle } from './exercise-library';
 
 /**
  * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
@@ -205,6 +205,19 @@ export function isMachineExercise(exercise: string): boolean {
 }
 
 export function getExerciseEquipment(exerciseName: string): EquipmentType {
+  // Hanging movements need a bar/rig — they are NOT no-equipment work,
+  // however the library labels them. Classing them 'other' keeps home
+  // adaptation from prescribing them to users with nothing to hang from.
+  if (/^\s*hanging\b/i.test(exerciseName)) return 'other';
+  // The exercise library is ground truth for its own entries (e.g. Bulgarian
+  // Split Squat is a dumbbell lift, Back Hyperextension is bodyweight).
+  const libraryMatch =
+    EXERCISE_LIBRARY.find((e) => e.name === exerciseName) ||
+    EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === exerciseName.toLowerCase());
+  if (libraryMatch) {
+    return libraryMatch.equipment.toLowerCase() as EquipmentType;
+  }
+
   if (BODYWEIGHT_EXERCISES.has(exerciseName)) return 'bodyweight';
   if (DUMBBELL_EXERCISES.has(exerciseName)) return 'dumbbell';
   if (CABLE_EXERCISES.has(exerciseName)) return 'cable';
@@ -214,13 +227,18 @@ export function getExerciseEquipment(exerciseName: string): EquipmentType {
   if (name.includes('pull-up') || name.includes('dip') || name.includes('push-up') || name.includes('chin-up') || name.includes('bodyweight')) {
     return 'bodyweight';
   }
+  // A generic "Calf Raise" is a standing bodyweight movement; explicitly
+  // named machine variants are handled by the library lookup above.
+  if (name.includes('calf')) {
+    return 'bodyweight';
+  }
   if (name.includes('dumbbell') || name.includes('db ') || name.includes('goblet') || name.includes('arnold')) {
     return 'dumbbell';
   }
   if (name.includes('cable') || name.includes('pulldown') || name.includes('pushdown') || name.includes('face pull')) {
     return 'cable';
   }
-  if (name.includes('machine') || name.includes('press machine') || name.includes('smith') || name.includes('hack') || name.includes('leg press') || name.includes('leg curl') || name.includes('leg extension')) {
+  if (name.includes('machine') || name.includes('press machine') || name.includes('smith') || name.includes('hack') || name.includes('leg press') || name.includes('leg curl') || name.includes('leg extension') || name.includes('pec deck')) {
     return 'machine';
   }
   return 'barbell';
@@ -377,6 +395,59 @@ export function getExerciseRank(level: number): ExerciseRank {
 }
 
 /**
+ * Proxy standards by muscle group. An exercise without its own published
+ * standard may only be estimated against a standard for the SAME muscle
+ * group — the old equipment-only mapping ranked every machine lift
+ * (including Pec Deck, a chest fly) against LEG PRESS ratios, unflagged.
+ * When no same-muscle standard exists, the level is marked unavailable
+ * instead of borrowing an unrelated table.
+ */
+const MUSCLE_PROXY_STANDARD: Record<string, string> = {
+  Chest: 'Bench Press',
+  Back: 'Barbell Row',
+  Legs: 'Squat',
+  Shoulders: 'Overhead Press',
+  Arms: 'Dumbbell Curl',
+};
+
+interface ResolvedStandard {
+  standards: { [key: number]: number } | null;
+  standardName: string | null;
+  isProxy: boolean;
+  /** The proxy's muscle differs from the exercise's — unusable. */
+  muscleMismatch: boolean;
+}
+
+function resolveStandardFor(exercise: string, normExercise: string): ResolvedStandard {
+  const explicit = MALE_STANDARDS[normExercise];
+  if (explicit) {
+    return { standards: explicit, standardName: normExercise, isProxy: false, muscleMismatch: false };
+  }
+  const muscle = getExerciseMuscle(exercise);
+  const equipment = getExerciseEquipment(normExercise);
+  let proxyName = MUSCLE_PROXY_STANDARD[muscle];
+  // Same-muscle equipment refinements.
+  if (muscle === 'Chest' && equipment === 'dumbbell') proxyName = 'Dumbbell Press';
+  if (muscle === 'Chest' && equipment === 'machine') proxyName = 'Chest Fly';
+  if (muscle === 'Back' && equipment === 'cable') proxyName = 'Cable Row';
+  if (muscle === 'Legs' && equipment === 'machine') proxyName = 'Leg Press';
+  if (muscle === 'Shoulders' && equipment === 'dumbbell') proxyName = 'Dumbbell Shoulder Press';
+  if (muscle === 'Arms' && equipment === 'cable') proxyName = 'Tricep Pushdown';
+  if (!proxyName || !MALE_STANDARDS[proxyName]) {
+    return { standards: null, standardName: null, isProxy: true, muscleMismatch: true };
+  }
+  // 'Dumbbell Press' is the chest-press standard despite its ambiguous
+  // name; every other proxy must verify against its own muscle group.
+  const proxyMuscle = proxyName === 'Dumbbell Press' ? 'Chest' : getExerciseMuscle(proxyName);
+  return {
+    standards: MALE_STANDARDS[proxyName],
+    standardName: proxyName,
+    isProxy: true,
+    muscleMismatch: proxyMuscle !== muscle,
+  };
+}
+
+/**
  * Calculates the exact strength level (1-100+) using smooth continuous interpolation
  */
 export function getLiftLevel(
@@ -386,15 +457,19 @@ export function getLiftLevel(
   gender: Gender
 ): LiftLevel {
   const normExercise = normalizeExerciseName(exercise);
-  const explicitStandard = MALE_STANDARDS[normExercise];
   const equipment = getExerciseEquipment(normExercise);
-  const standards = explicitStandard || (
-    equipment === 'dumbbell' ? MALE_STANDARDS['Dumbbell Press'] :
-    equipment === 'cable' ? MALE_STANDARDS['Cable Row'] :
-    equipment === 'machine' ? MALE_STANDARDS['Leg Press'] :
-    equipment === 'bodyweight' ? MALE_STANDARDS['Push-ups'] :
-    MALE_STANDARDS['Barbell Row']
+  // An exercise with no published standard of its own is ranked against a
+  // similar lift's table — an estimate, and it must be labeled as one. A
+  // custom "Power Clean" silently ranked against Barbell Row norms is how
+  // confident, wrong data ends up on the PR page.
+  const isKnownExercise = EXERCISE_LIBRARY.some(
+    (e) => e.name.toLowerCase() === exercise.toLowerCase() || e.name.toLowerCase() === normExercise.toLowerCase()
   );
+  const resolved = resolveStandardFor(exercise, normExercise);
+  const usesProxyStandard = resolved.isProxy;
+  // No usable standard: keep a decorative level from the bench table but
+  // flag it unavailable so it is excluded from the overall level.
+  const standards = resolved.standards || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
   
   // For bodyweight exercises (Pull-ups, Dips, etc.), the standard ratios are based on added weight / bodyweight.
@@ -456,6 +531,8 @@ export function getLiftLevel(
   level = Math.max(1, level);
   const rank = getExerciseRank(level);
 
+  const standardUnavailable =
+    isOther || resolved.muscleMismatch || (usesProxyStandard && !isKnownExercise);
   return {
     exercise,
     level,
@@ -464,10 +541,14 @@ export function getLiftLevel(
     category: rank,
     rank,
     equipment,
-    isStandardUnavailable: isOther,
+    isStandardUnavailable: standardUnavailable,
     standardNote: isOther
       ? 'Official competitive strength standards are calibrated exclusively for male and female divisions. Progression is tracked against an unadjusted baseline.'
-      : undefined,
+      : resolved.muscleMismatch
+        ? 'No published strength standard exists for this exercise — no same-muscle standard could be matched, so this level is a rough estimate and excluded from your overall level.'
+        : standardUnavailable
+          ? 'No published strength standard exists for this exercise — this level is estimated from a similar lift and excluded from your overall level.'
+          : undefined,
   };
 }
 
@@ -476,9 +557,14 @@ export function getOverallLevel(liftLevels: LiftLevel[]): OverallLevel {
     return { level: 1, title: 'INITIATE', averageRatio: 0, isMainLiftsOnly: false, mainLiftsCount: 0 };
   }
 
+  // Exercises ranked against a proxy standard are estimates — they must not
+  // inflate the athlete's overall level.
+  const ranked = liftLevels.filter((l) => !l.isStandardUnavailable);
+  const pool = ranked.length > 0 ? ranked : liftLevels;
+
   // Count main compound lifts first to reflect true athletic & strength capacity
-  const mainLifts = liftLevels.filter((l) => isMainCompoundLift(l.exercise));
-  const targetLifts = mainLifts.length > 0 ? mainLifts : liftLevels;
+  const mainLifts = pool.filter((l) => isMainCompoundLift(l.exercise));
+  const targetLifts = mainLifts.length > 0 ? mainLifts : pool;
 
   const avgLevel = Math.round(
     targetLifts.reduce((sum, l) => sum + l.level, 0) / targetLifts.length
@@ -536,7 +622,10 @@ export function getNextLevelInfo(
   standardNote?: string;
 } {
   const normExercise = normalizeExerciseName(exercise);
-  const standards = MALE_STANDARDS[normExercise] || MALE_STANDARDS['Bench Press'];
+  // Same resolution as getLiftLevel — never silently borrow the Bench
+  // Press table for an unrelated lift.
+  const resolved = resolveStandardFor(exercise, normExercise);
+  const standards = resolved.standards || MALE_STANDARDS['Bench Press'];
   const safeBW = Math.max(20, bodyweightKg || 75);
   const isOther = gender === 'other';
   const genderMultiplier = gender === 'female' ? getFemaleMultiplier(normExercise) : 1.0;
@@ -582,9 +671,13 @@ export function getNextLevelInfo(
     requiredRatioKg,
     currentRank,
     levelsToNextRank,
-    isStandardUnavailable: isOther,
+    isStandardUnavailable: isOther || resolved.muscleMismatch,
     standardNote: isOther
       ? 'Official competitive strength standards are calibrated exclusively for male and female divisions. Progression is tracked against an unadjusted baseline.'
-      : undefined,
+      : resolved.muscleMismatch
+        ? 'No published strength standard exists for this exercise — the requirement below is a rough estimate only.'
+        : resolved.isProxy
+          ? `Estimated from the ${resolved.standardName} standard — this exercise has no published standard of its own.`
+          : undefined,
   };
 }

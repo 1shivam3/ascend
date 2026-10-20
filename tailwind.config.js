@@ -82,6 +82,9 @@ module.exports = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
+        // text-3xs is used in 100+ places but was never defined — those
+        // labels silently fell back to inherited sizes. 10px/14px.
+        '3xs': ['0.625rem', { lineHeight: '0.875rem' }],
         '2xs': ['0.65rem', { lineHeight: '0.875rem' }],
         label:   ['12px', '16px'],
         body:    ['14px', '20px'],

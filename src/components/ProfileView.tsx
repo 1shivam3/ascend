@@ -57,7 +57,23 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
-  const [isShareProgramOpen, setIsShareProgramOpen] = useState(false);
+  const [sharePlan, setSharePlan] = useState<(typeof plannedWorkouts)[number] | null>(null);
+  const [isSharePickerOpen, setIsSharePickerOpen] = useState(false);
+
+  // Sharing must never silently pick the first plan — a coach sharing
+  // from here sent clients the WRONG program. Ask which plan, unless
+  // there is exactly one.
+  const handleShareSplit = () => {
+    if (plannedWorkouts.length === 0) {
+      toast.info('Create a workout plan first — there is nothing to share yet.', 'No Plans');
+      return;
+    }
+    if (plannedWorkouts.length === 1) {
+      setSharePlan(plannedWorkouts[0]);
+      return;
+    }
+    setIsSharePickerOpen(true);
+  };
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleBack = useCallback(() => {
@@ -102,7 +118,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     const levels = Array.from(bestByExercise.entries()).map(([exercise, best1RMKg]) =>
       getLiftLevel(exercise, best1RMKg, profile?.bodyweightKg || 70, profile?.gender || 'male')
     );
-    return getOverallLevel(levels);
+    // Lifts with no published standard are estimates and are excluded
+    // from the overall level — the profile must SAY so (the PR page
+    // does; this page silently showed the blended number).
+    const estimatedCount = levels.filter((l) => l.isStandardUnavailable).length;
+    return { ...getOverallLevel(levels), estimatedCount, totalLifts: levels.length };
   }, [prs, profile?.bodyweightKg, profile?.gender]);
   const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : 'Local Guest Athlete';
   const userUnit = profile?.unit || 'lbs';
@@ -191,6 +211,12 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
                   {athleteTier.title} · Lv {athleteTier.level}
                 </span>
+                {athleteTier.estimatedCount > 0 && (
+                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                    {athleteTier.estimatedCount} of {athleteTier.totalLifts} lifts have no published
+                    standard — estimated and excluded from this level.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -348,7 +374,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           {/* Share Workout Routine */}
           <button
             type="button"
-            onClick={() => setIsShareProgramOpen(true)}
+            onClick={handleShareSplit}
             className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
           >
             <div className="flex items-center gap-3">
@@ -444,10 +470,53 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         onClose={() => setIsWeeklyRecapOpen(false)}
       />
 
+      {/* Plan picker: which program to share (never silently the first) */}
+      {isSharePickerOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setIsSharePickerOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose a plan to share"
+        >
+          <div
+            className="modal-content max-w-md w-full p-5 space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="font-bold text-text-primary text-sm">Share which plan?</h3>
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {plannedWorkouts.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setSharePlan(p);
+                    setIsSharePickerOpen(false);
+                  }}
+                  className="w-full text-left p-3 rounded-xl bg-bg-secondary border border-border/70 hover:border-accent/60 transition-all cursor-pointer"
+                >
+                  <span className="block text-sm font-bold text-text-primary">{p.name}</span>
+                  <span className="block text-2xs text-text-muted mt-0.5">
+                    {p.exercises.length} exercises
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsSharePickerOpen(false)}
+              className="w-full py-2.5 rounded-xl bg-bg-secondary text-text-secondary text-sm font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <ShareProgramModal
-        plan={plannedWorkouts[0] || null}
-        isOpen={isShareProgramOpen}
-        onClose={() => setIsShareProgramOpen(false)}
+        plan={sharePlan}
+        isOpen={Boolean(sharePlan)}
+        onClose={() => setSharePlan(null)}
       />
 
       {/* Screen 24: Log Out Confirmation Modal */}

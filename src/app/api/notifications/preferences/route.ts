@@ -20,7 +20,15 @@ function getSupabaseServerClient() {
 }
 
 const VALID_DAYS = [0, 1, 2, 3, 4, 5, 6];
-const VALID_REPORT_DAYS = ['saturday', 'sunday', 'monday'];
+const VALID_REPORT_DAYS = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
 const TIME_REGEX = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 /**
@@ -76,6 +84,9 @@ function validatePreferences(raw: any): NotificationPreferences {
       if (validDays.length > 0 && validDays.length <= 7) {
         prefs.workoutReminders.daysOfWeek = validDays.map(Number);
       }
+    }
+    if (typeof raw.workoutReminders.daysCustomized === 'boolean') {
+      prefs.workoutReminders.daysCustomized = raw.workoutReminders.daysCustomized;
     }
   }
 

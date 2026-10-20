@@ -110,10 +110,10 @@ export async function POST(req: Request) {
 
     if (resendApiKey && recipientEmail) {
       const categoryBadge = {
-        bug: '🐛 BUG REPORT',
-        feature: '💡 FEATURE REQUEST',
-        review: '⭐ USER REVIEW',
-        general: '💬 FEEDBACK',
+        bug: 'BUG REPORT',
+        feature: 'FEATURE REQUEST',
+        review: 'USER REVIEW',
+        general: 'FEEDBACK',
       }[category];
 
       const starsDisplay = rating ? '⭐'.repeat(rating) : 'No rating given';

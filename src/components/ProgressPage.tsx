@@ -35,6 +35,8 @@ import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/li
 import { useAppNavigation } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
 import { resizeAndCompressImage } from '@/lib/image-processing';
+import ConfirmationModal from '@/components/ConfirmationModal';
+import type { ProgressPhoto } from '@/lib/types';
 
 function formatProgressDate(dateStr: string): string {
   try {
@@ -226,6 +228,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const toast = useToast();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoPose, setPhotoPose] = useState<'Front' | 'Side' | 'Back'>('Front');
+  const [photoPendingDelete, setPhotoPendingDelete] = useState<ProgressPhoto | null>(null);
 
   const handlePhotoFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -244,12 +248,28 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         reader.onerror = () => reject(new Error('Could not read the photo.'));
         reader.readAsDataURL(processed.blob);
       });
-      addProgressPhoto({
+      const persisted = addProgressPhoto({
         id: safeRandomId('photo'),
         dataUrl,
         date: getLocalTodayStr(),
+        // Pose label so front/side/back shots stay distinguishable and a
+        // future compare view can pair them.
+        label: photoPose,
       });
-      toast.success('Progress photo saved locally.', 'Photo Added');
+      if (!persisted) {
+        // Storage is full: the photo shows now but will NOT survive a
+        // restart. Never claim it was saved.
+        toast.error(
+          'Device storage is full — this photo is kept for this session only and will be gone when the app restarts. Free up space or delete older photos.',
+          'Photo Not Saved'
+        );
+      } else if (progressPhotos.length >= 24) {
+        // The store keeps the newest 24 — say so instead of silently
+        // evicting the oldest check-in photo.
+        toast.info('Photo saved. Your oldest photo was removed — 24 photos are kept on this device.', 'Photo Limit');
+      } else {
+        toast.success('Progress photo saved locally.', 'Photo Added');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not add the photo.', 'Upload Failed');
     } finally {
@@ -901,7 +921,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           {/* Card 2: Personal Records List */}
           <div className="card p-5 bg-bg-card border border-border space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-text-primary">Personal Records</h2>
+              <div>
+                <h2 className="text-base font-bold text-text-primary">Personal Records</h2>
+                <p className="text-3xs text-text-muted mt-0.5">
+                  Your best-ever lifts. &ldquo;1RM&rdquo; = the most weight you could lift once;
+                  when you haven&apos;t tested it, we estimate it from your best sets.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setStrengthSubView('records')}
@@ -1293,7 +1319,6 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 ref={photoInputRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 aria-label="Add progress photo"
                 onChange={handlePhotoFileSelect}
@@ -1322,19 +1347,35 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h3 className="text-base font-bold text-text-primary font-sans">
-                      Progress Photos <span className="text-text-muted font-mono text-xs">({progressPhotos.length})</span>
+                      Progress Photos <span className="text-text-muted font-mono text-xs">({progressPhotos.length}/24)</span>
                     </h3>
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      disabled={isUploadingPhoto}
-                      className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <div className="flex rounded-full bg-bg-secondary p-0.5" role="radiogroup" aria-label="Pose for next photo">
+                        {(['Front', 'Side', 'Back'] as const).map((pose) => (
+                          <button
+                            key={pose}
+                            type="button"
+                            role="radio"
+                            aria-checked={photoPose === pose}
+                            onClick={() => setPhotoPose(pose)}
+                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-white' : 'text-text-muted hover:text-text-primary'}`}
+                          >
+                            {pose}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={isUploadingPhoto}
+                        className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>{isUploadingPhoto ? 'Adding…' : 'Add Photo'}</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {progressPhotos.map((photo) => (
@@ -1342,14 +1383,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={photo.dataUrl} alt={`Progress photo from ${photo.date}`} className="w-full aspect-[3/4] object-cover" />
                         <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-[10px] font-mono text-white flex items-center justify-between">
-                          <span>{formatProgressDate(photo.date)}</span>
+                          <span>{formatProgressDate(photo.date)}{photo.label ? ` · ${photo.label}` : ''}</span>
                           <button
                             type="button"
                             aria-label={`Delete photo from ${photo.date}`}
-                            onClick={() => {
-                              removeProgressPhoto(photo.id);
-                              toast.info('Progress photo deleted.', 'Photo Removed');
-                            }}
+                            onClick={() => setPhotoPendingDelete(photo)}
                             className="p-1 rounded hover:bg-white/20 cursor-pointer"
                           >
                             <X className="w-3.5 h-3.5" />
@@ -1506,6 +1544,25 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       <BodyMetricsModal isOpen={isWeightModalOpen} onClose={() => setIsWeightModalOpen(false)} />
       <MeetAttemptPlannerModal isOpen={isMeetModalOpen} onClose={() => setIsMeetModalOpen(false)} />
       <WeeklyRecapModal isOpen={isWeeklyRecapOpen} onClose={() => setIsWeeklyRecapOpen(false)} />
+
+      {/* Progress photo deletion always asks first — never instant */}
+      <ConfirmationModal
+        isOpen={photoPendingDelete !== null}
+        onClose={() => setPhotoPendingDelete(null)}
+        onConfirm={() => {
+          if (photoPendingDelete) {
+            removeProgressPhoto(photoPendingDelete.id);
+            toast.info('Progress photo deleted.', 'Photo Removed');
+          }
+          setPhotoPendingDelete(null);
+        }}
+        title="Delete this photo?"
+        message="This progress photo will be permanently removed from this device. This can't be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        icon="trash"
+      />
 
       {/* Tools Drawer */}
       {isToolsMenuOpen && (

@@ -36,15 +36,17 @@ export default function PlateCalculatorModal({
     }
   }, [isOpen, initialWeight, initialUnit]);
 
-  // Sync bar weight default when unit switches
+  // Sync bar weight default when unit switches. Convert at 0.1 precision —
+  // whole-number rounding made 100 kg come back as 99.8 kg after a
+  // kg→lbs→kg round trip.
   const handleUnitChange = (nextUnit: 'kg' | 'lbs') => {
     setUnit(nextUnit);
     if (nextUnit === 'kg') {
       setBarWeight(20);
-      setTargetWeight(Math.round(targetWeight * 0.453592) || 100);
+      setTargetWeight(Math.round(targetWeight * 0.453592 * 10) / 10 || 100);
     } else {
       setBarWeight(45);
-      setTargetWeight(Math.round(targetWeight * 2.20462) || 225);
+      setTargetWeight(Math.round(targetWeight * 2.20462 * 10) / 10 || 225);
     }
   };
 

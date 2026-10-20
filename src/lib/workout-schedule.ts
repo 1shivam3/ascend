@@ -477,6 +477,18 @@ export function generateSplitWeeklySchedule(
 /**
  * Constructs an intelligent default weekly schedule based on available planned workouts and days per week.
  */
+/**
+ * The plan OFFER must match the schedule that will actually run: a 2-day
+ * user shown 3 generated workouts gets one installed-but-never-scheduled
+ * plan. Slicing to daysPerWeek aligns offer and buildDefaultWeeklySchedule
+ * (which consumes plans in order).
+ */
+export function limitPlansToDays(plans: PlannedWorkout[], daysPerWeek: number): PlannedWorkout[] {
+  if (!plans || plans.length === 0) return plans || [];
+  const n = Math.max(1, Math.min(plans.length, Math.floor(daysPerWeek) || 1));
+  return plans.slice(0, n);
+}
+
 export function buildDefaultWeeklySchedule(
   plans: PlannedWorkout[],
   daysPerWeek: number = 4

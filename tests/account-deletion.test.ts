@@ -786,7 +786,7 @@ describe('Account Deletion & Data Safety Specification', () => {
     expect(html).toContain('data-testid="status-partial"');
     expect(html).toContain('Partial Deletion (207 Multi-Status)');
     expect(html).toContain('data-testid="retry-cleanup-btn"');
-    expect(html).toContain('support@ascendfit.app');
+    expect(html).toContain('shivamvats744@gmail.com');
     expect(html).not.toContain('Account &amp; Cloud Data Permanently Purged');
   });
 

@@ -383,6 +383,9 @@ export async function GET(req: Request) {
           const prot100 = Number((n['proteins_100g'] ?? n['proteins'] ?? 0).toFixed(1));
           const carbs100 = Number((n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0).toFixed(1));
           const fat100 = Number((n['fat_100g'] ?? n['fat'] ?? 0).toFixed(1));
+          // Sugar was fetched and silently dropped — it matters (diabetes,
+          // added-sugar awareness), so pass it through when OFF provides it.
+          const sugar100 = n['sugars_100g'] !== undefined ? Number((n['sugars_100g'] ?? 0).toFixed(1)) : undefined;
 
           let perServing = undefined;
           if (n['energy-kcal_serving'] !== undefined || n['proteins_serving'] !== undefined) {
@@ -394,6 +397,9 @@ export async function GET(req: Request) {
               proteinG: Number((n['proteins_serving'] ?? 0).toFixed(1)),
               carbsG: Number((n['carbohydrates_serving'] ?? 0).toFixed(1)),
               fatG: Number((n['fat_serving'] ?? 0).toFixed(1)),
+              ...(n['sugars_serving'] !== undefined
+                ? { sugarG: Number((n['sugars_serving'] ?? 0).toFixed(1)) }
+                : {}),
             };
           }
 
@@ -410,6 +416,7 @@ export async function GET(req: Request) {
               proteinG: Math.max(0, prot100),
               carbsG: Math.max(0, carbs100),
               fatG: Math.max(0, fat100),
+              ...(sugar100 !== undefined ? { sugarG: Math.max(0, sugar100) } : {}),
             },
             perServing,
           });
@@ -445,6 +452,9 @@ export async function GET(req: Request) {
               proteinG: Number((n['proteins_100g'] ?? 0).toFixed(1)),
               carbsG: Number((n['carbohydrates_100g'] ?? 0).toFixed(1)),
               fatG: Number((n['fat_100g'] ?? 0).toFixed(1)),
+              ...(n['sugars_100g'] !== undefined
+                ? { sugarG: Number((n['sugars_100g'] ?? 0).toFixed(1)) }
+                : {}),
             },
           });
         }

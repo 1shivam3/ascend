@@ -13,12 +13,14 @@ export interface ScannedProduct {
     proteinG: number;
     carbsG: number;
     fatG: number;
+    sugarG?: number;
   };
   perServing?: {
     calories: number;
     proteinG: number;
     carbsG: number;
     fatG: number;
+    sugarG?: number;
   };
 }
 
@@ -90,6 +92,9 @@ export function scannedProductToFoodItem(
       proteinG: Number((product.perServing.proteinG * qty).toFixed(1)),
       carbsG: Number((product.perServing.carbsG * qty).toFixed(1)),
       fatG: Number((product.perServing.fatG * qty).toFixed(1)),
+      ...(typeof product.perServing.sugarG === 'number'
+        ? { sugarG: Number((product.perServing.sugarG * qty).toFixed(1)) }
+        : {}),
       quantity: qty,
       unit: product.servingQuantity ? 'serving' : 'piece',
     };
@@ -104,6 +109,9 @@ export function scannedProductToFoodItem(
     proteinG: Number((product.per100g.proteinG * multiplier).toFixed(1)),
     carbsG: Number((product.per100g.carbsG * multiplier).toFixed(1)),
     fatG: Number((product.per100g.fatG * multiplier).toFixed(1)),
+    ...(typeof product.per100g.sugarG === 'number'
+      ? { sugarG: Number((product.per100g.sugarG * multiplier).toFixed(1)) }
+      : {}),
     quantity: qty,
     unit: 'g',
   };

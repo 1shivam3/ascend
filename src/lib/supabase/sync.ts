@@ -1,6 +1,7 @@
 import { getSupabase } from './client';
-import { useStore } from '../store';
+import { useStore, resolveAvatar } from '../store';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
+import { mergeRemotePlans, prunableTombstones } from './reconcile';
 
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -643,9 +644,13 @@ class SupabaseSyncEngine {
         // Authoritative cloud profile for the authenticated account.
         // NOTE: the avatar lives only on this device (no avatar column in
         // cloud profiles) — always preserve the local one, otherwise every
-        // sync wipes the user's profile picture.
+        // sync wipes the user's profile picture. Same-account rebuilds also
+        // spread the local profile first so any other device-local fields
+        // survive; cross-account rebuilds start clean (no field leakage
+        // from the previous account on this device).
         const rp = remoteProfile.data;
         updates.profile = {
+          ...(isCrossAccountSwitch ? {} : localState.profile || {}),
           id: rp.id,
           name: rp.name,
           gender: rp.gender,
@@ -656,7 +661,9 @@ class SupabaseSyncEngine {
           goals: rp.goals || ['build_muscle'],
           dietPreference: rp.diet_preference || 'non_vegetarian',
           createdAt: rp.created_at,
-          avatar: localState.profile?.avatar,
+          avatar: isCrossAccountSwitch
+            ? undefined
+            : resolveAvatar(localState.profile?.avatar),
         };
         updates.hasCompletedOnboarding = true;
         needsLocalUpdate = true;
@@ -829,23 +836,23 @@ class SupabaseSyncEngine {
           }
         }
 
-        // Merge Planned Workouts (Routines & Templates)
+        // Merge Planned Workouts (Routines & Templates) — tombstone-aware:
+        // a plan the user deleted locally is never resurrected by a stale
+        // server copy.
         if (remotePlans.data && remotePlans.data.length > 0) {
-          const localPMap = new Map((localState.plannedWorkouts || []).map((p) => [p.id, p]));
-          let pMerged = false;
-          for (const r of remotePlans.data) {
-            if (!localPMap.has(r.id)) {
-              localPMap.set(r.id, {
-                id: r.id,
-                name: r.name,
-                exercises: r.exercises || [],
-                createdAt: r.created_at || new Date().toISOString(),
-              });
-              pMerged = true;
-            }
-          }
-          if (pMerged) {
-            updates.plannedWorkouts = Array.from(localPMap.values());
+          const remoteMapped = remotePlans.data.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            exercises: r.exercises || [],
+            createdAt: r.created_at || new Date().toISOString(),
+          }));
+          const { merged, changed } = mergeRemotePlans(
+            localState.plannedWorkouts || [],
+            remoteMapped,
+            localState.deletedPlanIds || []
+          );
+          if (changed) {
+            updates.plannedWorkouts = merged;
             needsLocalUpdate = true;
           }
         }
@@ -974,6 +981,52 @@ class SupabaseSyncEngine {
         updated_at: new Date().toISOString(),
       }));
       await supabase.from('planned_workouts').upsert(planRows, { onConflict: 'id' });
+    }
+
+    // 7. Plan-deletion propagation: the push path historically only upserted,
+    // so a locally deleted plan stayed on the server forever and the
+    // union pull-merge resurrected it on the next sync. Delete exactly the
+    // tombstoned plans (explicit user deletions) — a full local reset does
+    // NOT reach this path, so a "reset" never wipes the cloud copy.
+    await this.propagatePlanDeletions(userId);
+  }
+
+  /**
+   * Delete server-side plans the user explicitly deleted locally
+   * (tracked as tombstones). Fail-safe: on any uncertainty, delete nothing.
+   */
+  private async propagatePlanDeletions(userId: string): Promise<void> {
+    try {
+      const tombstones = useStore.getState().deletedPlanIds || [];
+      if (tombstones.length === 0) return;
+      const supabase = getSupabase();
+      if (!supabase) return;
+      const { data, error } = await supabase
+        .from('planned_workouts')
+        .select('id')
+        .eq('user_id', userId);
+      if (error) return;
+      const remoteIds = new Set((data || []).map((r: any) => r.id));
+      const toDelete = tombstones.filter((id) => remoteIds.has(id));
+      if (toDelete.length > 0) {
+        const { error: delError } = await supabase
+          .from('planned_workouts')
+          .delete()
+          .eq('user_id', userId)
+          .in('id', toDelete);
+        if (delError) return;
+      }
+      // Server confirms the deletions — prune those tombstones (a tombstone
+      // for an id no longer on the server and not local is dead weight).
+      const localIds = new Set((useStore.getState().plannedWorkouts || []).map((p) => p.id));
+      const pruned = prunableTombstones(
+        tombstones,
+        localIds,
+        (data || []).map((r: any) => r.id).filter((id) => !toDelete.includes(id))
+      );
+      if (pruned.length > 0) useStore.getState().clearDeletedPlanIds(pruned);
+    } catch {
+      // Offline or unexpected — never block the push on this.
     }
   }
 

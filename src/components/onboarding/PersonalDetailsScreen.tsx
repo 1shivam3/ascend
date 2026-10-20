@@ -89,7 +89,13 @@ export default function PersonalDetailsScreen({
     }
 
     const parsedAge = parseInt(age, 10);
-    if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
+    if (!isNaN(parsedAge) && parsedAge < 13) {
+      // Minimum-age guard: ASCEND is 13+. Nothing is stored in this case —
+      // onContinue is never called, so no profile data is created.
+      setError('ASCEND is designed for athletes aged 13 and older. If you are under 13, please do not create a profile — no information has been saved.');
+      return;
+    }
+    if (isNaN(parsedAge) || parsedAge > 120) {
       setError('Please enter a valid age between 13 and 120.');
       return;
     }
@@ -149,7 +155,7 @@ export default function PersonalDetailsScreen({
   return (
     <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 3 of 3) */}
-      <StepProgressBar currentStep={3} onBack={onBack} />
+      <StepProgressBar currentStep={4} onBack={onBack} />
 
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">

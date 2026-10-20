@@ -92,15 +92,28 @@ RULES FOR PRECISION:
 
       const parsed = execResult.data;
       if (parsed && Array.isArray(parsed.foods) && parsed.foods.length > 0) {
-        const validatedFoods: FoodItem[] = parsed.foods.map((f: any) => ({
-          name: String(f.name || 'Food'),
-          quantity: typeof f.quantity === 'number' ? f.quantity : 1,
-          unit: String(f.unit || 'g'),
-          calories: Math.round(Number(f.calories) || 0),
-          proteinG: Math.round((Number(f.proteinG) || 0) * 10) / 10,
-          carbsG: Math.round((Number(f.carbsG) || 0) * 10) / 10,
-          fatG: Math.round((Number(f.fatG) || 0) * 10) / 10,
-        }));
+        const validatedFoods: FoodItem[] = parsed.foods.map((f: any) => {
+          const calories = Math.round(Number(f.calories) || 0);
+          const proteinG = Math.round((Number(f.proteinG) || 0) * 10) / 10;
+          const carbsG = Math.round((Number(f.carbsG) || 0) * 10) / 10;
+          const fatG = Math.round((Number(f.fatG) || 0) * 10) / 10;
+          return {
+            name: String(f.name || 'Food'),
+            quantity: typeof f.quantity === 'number' ? f.quantity : 1,
+            unit: String(f.unit || 'g'),
+            calories,
+            proteinG,
+            carbsG,
+            fatG,
+            // A food the model could not estimate at all (all zeros) is
+            // UNMATCHED, exactly like the offline parser marks DB misses —
+            // without this flag the client's unmatched warning never fires
+            // online and the item silently understates the meal.
+            ...(calories === 0 && proteinG === 0 && carbsG === 0 && fatG === 0
+              ? { isUnmatched: true }
+              : {}),
+          };
+        });
 
         const totals = calculateMealMacros(validatedFoods);
 

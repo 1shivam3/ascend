@@ -149,7 +149,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             {stats.takenToday ? (
               <>
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>{targetDoseG}G TAKEN TODAY ✓</span>
+                <span>{targetDoseG}G TAKEN TODAY</span>
               </>
             ) : (
               <>
@@ -284,14 +284,12 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                    Reminder Time
+                    Dose Reminder
                   </label>
-                  <input
-                    type="time"
-                    value={reminderTimeInput}
-                    onChange={(e) => setReminderTimeInput(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded-lg bg-bg-card border border-border text-xs text-text-primary focus:outline-none focus:border-accent"
-                  />
+                  <p className="text-[11px] text-text-muted leading-relaxed pt-1.5">
+                    Creatine reminders aren&apos;t sent yet — use the water &amp; meal
+                    reminders in the Notification Center for daily nudges.
+                  </p>
                 </div>
               </div>
 

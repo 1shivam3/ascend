@@ -77,8 +77,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Pinch zoom stays ENABLED: blocking it (maximumScale/userScalable)
+  // locks out low-vision users entirely — a WCAG failure and the single
+  // biggest accessibility blocker for senior users.
   viewportFit: 'cover',
   themeColor: '#171916',
   interactiveWidget: 'resizes-content',
@@ -96,13 +97,6 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                // Prevent gesture/pinch zoom on iOS WebKit
-                if (typeof document !== 'undefined') {
-                  document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
-                  document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
-                  document.addEventListener('gestureend', function(e) { e.preventDefault(); });
-                }
-
                 var theme = null;
                 var hasCustom = false;
                 var customFlag = localStorage.getItem('ascend_has_custom_theme');

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
-import { getNextSessionTarget } from '@/lib/workout-engine';
+import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration } from '@/lib/formatters';
 import {
   Trophy,
@@ -73,7 +73,8 @@ export default function PostWorkoutTakeModal({
               ? getNextSessionTarget(
                   primary.name,
                   primarySets,
-                  (primarySets[0]?.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg'
+                  (primarySets[0]?.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg',
+                  { hadPain: exerciseHadPain(completedWorkout, primary.name) }
                 )
               : null;
             setTake(

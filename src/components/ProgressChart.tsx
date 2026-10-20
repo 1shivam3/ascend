@@ -99,7 +99,7 @@ export default function ProgressChart() {
         reps: pr.reps,
         oneRepMax: Math.round(e1RM * 10) / 10,
         setsCount: 1,
-        avgRpe: 8,
+        avgRpe: undefined,
         rpeDrift: 0,
         effortTrend: 'moderate' as const,
         hasEffortSpike: false,
@@ -150,7 +150,7 @@ export default function ProgressChart() {
         reps: pr.reps,
         oneRepMax: Math.round(e1RM * 10) / 10,
         setsCount: 1,
-        avgRpe: 8,
+        avgRpe: undefined,
         rpeDrift: 0,
         effortTrend: 'moderate' as const,
         hasEffortSpike: false,
@@ -171,9 +171,10 @@ export default function ProgressChart() {
     const valDelta = latest.value - previous.value;
 
     if (latest.effortTrend === 'high' || latest.hasEffortSpike || (latest.rpeDrift !== undefined && latest.rpeDrift >= 1.5)) {
+      const rpeRef = latest.avgRpe !== undefined ? ` (Avg @${latest.avgRpe} RPE)` : '';
       return {
         headline: 'Fatigue Accumulation Detected',
-        explanation: `Latest session logged high within-session effort drift (+${latest.rpeDrift ?? 1.5} RPE, Avg @${latest.avgRpe} RPE). Central nervous system exertion is elevated. Maintain current load or take a deload buffer before pushing volume.`,
+        explanation: `Latest session logged high within-session effort drift (+${latest.rpeDrift ?? 1.5} RPE${rpeRef}). Central nervous system exertion is elevated. Maintain current load or take a deload buffer before pushing volume.`,
       };
     }
 
