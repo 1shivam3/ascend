@@ -579,7 +579,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         {/* Nutrition (Calories) Card */}
         <div
           onClick={() => onNavigate('meals')}
-          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors pressable"
           role="button"
           tabIndex={0}
           aria-label="View Nutrition Details"
@@ -598,7 +598,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         {/* Protein Card */}
         <div
           onClick={() => onNavigate('meals')}
-          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors"
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors pressable"
           role="button"
           tabIndex={0}
           aria-label="View Protein Details"
@@ -626,7 +626,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           type="button"
           onClick={() => setIsReadinessSheetOpen(true)}
           aria-label="View readiness details"
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
         >
           <span className="text-xs font-medium text-text-muted">Readiness</span>
           <span className="mt-1.5 block">
@@ -648,7 +648,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           type="button"
           onClick={() => setIsLevelSheetOpen(true)}
           aria-label="View level details"
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
         >
           <span className="text-xs font-medium text-text-muted">Level {levelInfo.level} · {levelInfo.name}</span>
           <span className="mt-1.5 block">
@@ -957,7 +957,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 8c. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
       {uiPreferences.gamificationEnabled && homeChallenge && (
         <div
-          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-amber-500/40 transition-colors"
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-amber-500/40 transition-colors pressable"
           onClick={() => setIsChallengesSheetOpen(true)}
           role="button"
           tabIndex={0}

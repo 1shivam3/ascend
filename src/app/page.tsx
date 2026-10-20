@@ -299,6 +299,10 @@ export default function AppPage() {
         </aside>
       )}
       <main id="main-content" className="w-full">
+        {/* Keyed by tab: every tab switch replays one consistent enter
+            animation (fade + rise). Pages already mount/unmount per tab,
+            so this adds motion without changing mount behavior. */}
+        <div key={activeTab} className="animate-tab-enter">
         {activeTab === 'home' && (
           <HomePage
             onNavigate={(tab) => {
@@ -343,6 +347,7 @@ export default function AppPage() {
             }}
           />
         )}
+        </div>
       </main>
 
       {/* Native 4-Destination Bottom Navigation (Part 5 Spec) */}

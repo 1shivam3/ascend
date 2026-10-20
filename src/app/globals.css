@@ -192,8 +192,14 @@
 
   .btn-ghost {
     @apply text-text-secondary font-medium px-3 py-2 rounded-xl text-sm;
-    @apply hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer;
+    @apply hover:text-text-primary hover:bg-bg-secondary/70 active:bg-bg-secondary active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer;
     min-height: 40px;
+  }
+
+  /* Uniform press feedback for tappable cards/tiles that aren't btn-* —
+     a subtle scale on press, matching the btn-primary/secondary response. */
+  .pressable {
+    @apply transition-transform duration-150 ease-out active:scale-[0.98];
   }
 
   .btn-danger {
@@ -262,7 +268,7 @@
 
   .native-tab-item {
     @apply relative flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none cursor-pointer;
-    @apply text-text-muted hover:text-text-primary;
+    @apply text-text-muted hover:text-text-primary active:scale-95;
     min-height: 48px;
     min-width: 0;
   }
@@ -311,7 +317,7 @@
   }
 
   .segmented-item {
-    @apply flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none;
+    @apply flex-1 py-2 px-3 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center cursor-pointer select-none active:scale-[0.97];
   }
 
   .segmented-item.active {
@@ -355,6 +361,20 @@ input[type="number"]::-webkit-outer-spin-button {
   display: none;
 }
 
+
+/* ── Reduced motion ──────────────────────────────────────────────────── */
+/* Users who ask their OS for less motion get instant state changes —
+   every animation/transition in the app collapses to ~0ms. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 
 /* ── Dark-mode depth polish ────────────────────────────────────────────── */
 /* Subtle top highlight gives cards physical lift on dark backgrounds, */
