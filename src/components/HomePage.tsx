@@ -650,13 +650,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
               {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
             </span>
-            {readiness.factors && readiness.factors.length > 0 && (
-              <CollapsibleDetails label="Details" className="mt-0.5">
-                {readiness.factors.join(' ')}
-              </CollapsibleDetails>
-            )}
-            {/* Daily feel check-in: feeds the readiness score above.
-                The engine supported this input for months with no UI. */}
+            {/* Card stays minimal: score + Details. The factor explanation AND
+                the optional feel check-in both live inside the dropdown —
+                readiness is computed internally; the check-in only fine-tunes. */}
+            <CollapsibleDetails label="Details" className="mt-0.5">
+              {readiness.factors && readiness.factors.length > 0 && (
+                <p>{readiness.factors.join(' ')}</p>
+              )}
             <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
               {(
                 [
@@ -703,6 +703,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 {todayCheckin ? 'Checked in — readiness updated.' : 'How do you feel? It adjusts readiness.'}
               </p>
             </div>
+            </CollapsibleDetails>
           </div>
         </div>
         )}
