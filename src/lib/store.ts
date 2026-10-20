@@ -91,6 +91,21 @@ import {
   getInitialXState as getInitialChallengesXState,
 } from './challenges';
 import {
+  type FriendChallengesState,
+  type FriendChallengeDef,
+  type FriendScoreEntry,
+  getInitialFriendChallengesState,
+  addFriendChallenge as addFriendChallengeState,
+  removeFriendChallenge as removeFriendChallengeState,
+  mergeFriendScore as mergeFriendScoreState,
+  markFriendRewardGranted as markFriendRewardGrantedState,
+  sanitizeFriendChallengesState,
+} from './friend-challenges';
+import {
+  type RunProgramState,
+  sanitizeRunProgramState,
+} from './run-program';
+import {
   CoachPersistedState,
   CalorieAdjustmentRecord,
   ReadinessHistoryEntry,
@@ -257,6 +272,19 @@ export interface AppState {
   optOutChallenge: (key: string) => void;
   dismissChallenge: (key: string) => void;
   grantChallengeReward: (key: string) => void;
+
+  // Friend Challenges (local-first, code exchange — no server table)
+  friendChallenges: FriendChallengesState;
+  addFriendChallenge: (def: FriendChallengeDef) => void;
+  removeFriendChallenge: (id: string) => void;
+  applyFriendScore: (challengeId: string, entry: FriendScoreEntry) => void;
+  grantFriendChallengeReward: (id: string) => void;
+
+  // Run Program (Couch to 5K) — enrollment only; progress derives from
+  // logged runs, so there is no separate progress counter to persist.
+  runProgram: RunProgramState | null;
+  enrollRunProgram: (dateStr: string) => void;
+  leaveRunProgram: () => void;
 
   // Coach Engine (adaptive coaching state)
   coach: CoachPersistedState;
@@ -628,6 +656,8 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   xp: state.xp,
   streak: state.streak,
   challenges: state.challenges,
+  friendChallenges: state.friendChallenges,
+  runProgram: state.runProgram,
   coach: state.coach,
   dailyCheckins: state.dailyCheckins,
   healthSummary: state.healthSummary,
@@ -831,6 +861,26 @@ export const useAppStore = create<AppState>()(
           },
         },
       })),
+
+      // Friend Challenges — local-first code exchange (see lib/friend-challenges)
+      friendChallenges: getInitialFriendChallengesState(),
+      addFriendChallenge: (def) => set((state) => ({
+        friendChallenges: addFriendChallengeState(state.friendChallenges, def),
+      })),
+      removeFriendChallenge: (id) => set((state) => ({
+        friendChallenges: removeFriendChallengeState(state.friendChallenges, id),
+      })),
+      applyFriendScore: (challengeId, entry) => set((state) => ({
+        friendChallenges: mergeFriendScoreState(state.friendChallenges, challengeId, entry),
+      })),
+      grantFriendChallengeReward: (id) => set((state) => ({
+        friendChallenges: markFriendRewardGrantedState(state.friendChallenges, id),
+      })),
+
+      // Run Program enrollment (opt-in; progress derives from logged runs)
+      runProgram: null,
+      enrollRunProgram: (dateStr) => set({ runProgram: { enrolledDate: dateStr } }),
+      leaveRunProgram: () => set({ runProgram: null }),
 
       // Coach Engine
       coach: getInitialCoachState(),
@@ -2296,6 +2346,8 @@ export const useAppStore = create<AppState>()(
           xp: getInitialXpState(),
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
+          friendChallenges: getInitialFriendChallengesState(),
+          runProgram: null,
           coach: getInitialCoachState(),
           healthSummary: null,
           healthConnectLastSyncedAt: null,
@@ -2645,6 +2697,14 @@ export const useAppStore = create<AppState>()(
               data.dailyCheckins && typeof data.dailyCheckins === 'object'
                 ? { ...state.dailyCheckins, ...data.dailyCheckins }
                 : state.dailyCheckins,
+            friendChallenges:
+              data.friendChallenges !== undefined
+                ? sanitizeFriendChallengesState(data.friendChallenges)
+                : state.friendChallenges,
+            runProgram:
+              data.runProgram !== undefined
+                ? sanitizeRunProgramState(data.runProgram)
+                : state.runProgram,
             progressPhotos: (() => {
               if (!Array.isArray(data.progressPhotos)) return state.progressPhotos;
               const valid = data.progressPhotos

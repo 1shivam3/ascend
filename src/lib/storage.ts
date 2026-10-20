@@ -243,6 +243,8 @@ const BACKUP_STATE_FIELDS = [
   'xp',
   'streak',
   'challenges',
+  'friendChallenges',
+  'runProgram',
   'coach',
   'policyDecisionRecords',
   'policyDecisionsLedgerHistory',
