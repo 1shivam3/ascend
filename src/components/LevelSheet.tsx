@@ -1,0 +1,220 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import { X, Trophy, Dumbbell, Utensils, Zap, Droplets, Target, Check } from 'lucide-react';
+import {
+  xpForLevel,
+  getLevelName,
+  XP_WORKOUT,
+  XP_MEAL,
+  XP_PR,
+  XP_WATER,
+  XP_CHALLENGE_COMPLETE,
+  type LevelProgress,
+  type XpActivitySummary,
+} from '@/lib/xp-system';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
+
+interface LevelSheetProps {
+  isOpen: boolean;
+  onClose: () => void;
+  total: number;
+  level: number;
+  name: string;
+  progress: LevelProgress;
+  /** XP attributable to this week's logged activity, per source. */
+  weekXp: XpActivitySummary;
+}
+
+/** Named tiers on the level curve (levels where getLevelName changes). */
+const TIER_LEVELS = [0, 1, 5, 10, 15, 20, 25, 30];
+
+/** How XP is earned — values read straight from the XP ledger constants so
+ *  this list can never drift from what the app actually awards. */
+const EARN_ROWS = [
+  { icon: Dumbbell, label: 'Complete a workout', detail: 'At least one finished set', xp: XP_WORKOUT },
+  { icon: Utensils, label: 'Log a meal', detail: 'Any meal with food in it', xp: XP_MEAL },
+  { icon: Zap, label: 'Set a personal record', detail: 'Any lift, any rep range', xp: XP_PR },
+  { icon: Droplets, label: 'Log water', detail: 'Once a day', xp: XP_WATER },
+  { icon: Target, label: 'Complete a monthly challenge', detail: 'Opt-in side quests', xp: XP_CHALLENGE_COMPLETE },
+];
+
+/**
+ * LevelSheet — everything behind the compact Level card: progress to the
+ * next level, how XP is earned, this week's XP from logged activity, and
+ * the level ladder. Informational only — XP is a record of what already
+ * happened, never a quota to hit.
+ */
+export default function LevelSheet({
+  isOpen,
+  onClose,
+  total,
+  level,
+  name,
+  progress,
+  weekXp,
+}: LevelSheetProps) {
+  useEscapeToClose(isOpen, onClose);
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    setAnimated(false);
+    const t = setTimeout(() => setAnimated(true), 60);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const remaining = progress.needed - progress.current;
+  const ladderLevels = Array.from(new Set([...TIER_LEVELS, level])).sort((a, b) => a - b);
+  const weekRows = [
+    { label: 'Workouts', xp: weekXp.workoutXp },
+    { label: 'Meals', xp: weekXp.mealXp },
+    { label: 'Personal records', xp: weekXp.prXp },
+    { label: 'Water days', xp: weekXp.waterXp },
+  ].filter((r) => r.xp > 0);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className="modal-content max-w-md w-full p-5 space-y-5"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Level details"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+              <Trophy className="w-4 h-4" />
+            </span>
+            <h3 className="text-base font-bold text-text-primary">Your Level</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            aria-label="Close level details"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Current level + progress */}
+        <div>
+          <span className="text-4xl font-bold text-text-primary tabular-nums leading-none">
+            Level {level}
+            <span className="text-base font-semibold text-text-muted ml-2">{name}</span>
+          </span>
+          <p className="text-xs text-text-muted tabular-nums mt-2">
+            {total.toLocaleString()} XP total · {remaining.toLocaleString()} XP to Level {level + 1}
+          </p>
+          <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden mt-3">
+            <div
+              className="h-full rounded-full bg-accent transition-all duration-700"
+              style={{ width: animated ? `${progress.pct}%` : '0%' }}
+            />
+          </div>
+          <p className="text-3xs text-text-muted tabular-nums mt-1.5">
+            {progress.current.toLocaleString()} of {progress.needed.toLocaleString()} XP in this level
+          </p>
+        </div>
+
+        {/* How to earn XP */}
+        <div className="space-y-2">
+          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+            How XP is earned
+          </span>
+          <div className="space-y-1.5">
+            {EARN_ROWS.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60"
+              >
+                <span className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
+                  <row.icon className="w-4 h-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-text-primary">{row.label}</p>
+                  <p className="text-3xs text-text-muted">{row.detail}</p>
+                </div>
+                <span className="text-xs font-bold text-accent tabular-nums shrink-0">+{row.xp} XP</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-3xs text-text-muted leading-relaxed">
+            XP never expires and is never taken away. It simply adds up as you train.
+          </p>
+        </div>
+
+        {/* This week's XP from logged activity */}
+        <div className="space-y-2">
+          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+            This week
+          </span>
+          {weekXp.total > 0 ? (
+            <div className="p-3 rounded-xl bg-bg-secondary border border-border/60 space-y-1">
+              {weekRows.map((r) => (
+                <div key={r.label} className="flex items-center justify-between text-xs">
+                  <span className="text-text-secondary">{r.label}</span>
+                  <span className="font-bold text-text-primary tabular-nums">+{r.xp.toLocaleString()} XP</span>
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-border/60">
+                <span className="font-bold text-text-primary">Total this week</span>
+                <span className="font-bold text-accent tabular-nums">+{weekXp.total.toLocaleString()} XP</span>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-text-muted leading-relaxed">
+              Nothing logged yet this week — XP shows up here as you train, eat, and log.
+            </p>
+          )}
+        </div>
+
+        {/* Level ladder */}
+        <div className="space-y-2">
+          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
+            Level ladder
+          </span>
+          <div className="space-y-1.5">
+            {ladderLevels.map((lvl) => {
+              const isCurrent = lvl === level;
+              const reached = lvl < level;
+              return (
+                <div
+                  key={lvl}
+                  className={`flex items-center gap-2.5 p-2.5 rounded-xl border ${
+                    isCurrent
+                      ? 'bg-accent/10 border-accent/40'
+                      : reached
+                        ? 'bg-bg-secondary border-border/60'
+                        : 'bg-bg-secondary/50 border-border/40 opacity-60'
+                  }`}
+                >
+                  <span
+                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${
+                      reached || isCurrent ? 'bg-accent text-white' : 'bg-bg-card text-text-muted border border-border/60'
+                    }`}
+                  >
+                    {reached ? <Check className="w-3.5 h-3.5" /> : lvl}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-text-primary">
+                      Level {lvl} · {getLevelName(lvl)}
+                      {isCurrent && <span className="text-accent font-semibold"> · You are here</span>}
+                    </p>
+                  </div>
+                  <span className="text-3xs text-text-muted tabular-nums shrink-0">
+                    {xpForLevel(lvl).toLocaleString()} XP
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

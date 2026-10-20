@@ -25,17 +25,22 @@ import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
 
-import { getLevel, getLevelName, progressToNext } from '@/lib/xp-system';
+import { getLevel, getLevelName, progressToNext, summarizeXpInRange } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { calculateReadiness } from '@/lib/coach-engine';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import {
   monthlyChallenges,
   evaluateChallenge,
+  evaluateChallengeReward,
   shouldShowChallengeCard,
   challengeInstanceKey,
+  challengeXpEventId,
   getChallengeMonth,
 } from '@/lib/challenges';
+import ReadinessSheet from '@/components/ReadinessSheet';
+import LevelSheet from '@/components/LevelSheet';
+import ChallengesSheet from '@/components/ChallengesSheet';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
 
 const READINESS_LABEL: Record<string, string> = {
@@ -56,7 +61,7 @@ const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
-import { getTimeGreeting } from '@/lib/formatters';
+import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
@@ -99,6 +104,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     challenges: challengesState,
     optInChallenge,
     dismissChallenge,
+    grantChallengeReward,
+    awardXpEvents,
     uiPreferences,
   } = useStore();
 
@@ -176,6 +183,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     return { total, level, name: getLevelName(level), progress: progressToNext(total) };
   }, [xp]);
 
+  // XP attributable to this week's (Mon–Sun) logged activity — shown in the
+  // Level sheet. Derived from the ledger's own award rules, not a fake feed.
+  const weekXp = useMemo(() => {
+    const { start, end } = getWeekRange(today);
+    return summarizeXpInRange(
+      { workouts: normalizedWorkouts, meals, prs: prs || [], waterLogs: waterLogs || {} },
+      start,
+      end,
+    );
+  }, [today, normalizedWorkouts, meals, prs, waterLogs]);
+
   // Monthly challenge: first challenge of the month that is opted-in or
   // still showable (not dismissed). Logic lives in lib/challenges.
   const homeChallenge = useMemo(() => {
@@ -202,6 +220,31 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }
     return null;
   }, [todayStr, normalizedWorkouts, meals, prs, streakInfo.currentStreak, waterLogs, challengesState]);
+
+  // Challenge completion payout. The XP ledger + grant action existed but
+  // nothing ever called them, while the card claimed "200 XP earned" — this
+  // effect closes that loop. Idempotent twice over: the ledger dedupes by
+  // event id, and rewardGranted stops re-evaluation.
+  useEffect(() => {
+    if (!challengesState) return;
+    const month = getChallengeMonth(todayStr);
+    const data = {
+      workouts: normalizedWorkouts,
+      meals,
+      prs: (prs || []).map((p) => ({ date: (p.date || '').split('T')[0] })),
+      currentStreak: streakInfo.currentStreak,
+      waterDays: Object.keys(waterLogs || {}).filter((d) => (waterLogs?.[d] || 0) > 0),
+    };
+    for (const def of monthlyChallenges(month)) {
+      const { rewardDue } = evaluateChallengeReward(def, data, challengesState);
+      if (rewardDue) {
+        awardXpEvents([{ id: challengeXpEventId(def), type: 'challenge' }]);
+        grantChallengeReward(challengeInstanceKey(def));
+        toast.success(`${def.title} complete — 200 XP earned.`, 'Challenge Complete');
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [challengesState, normalizedWorkouts, meals, prs, streakInfo.currentStreak, waterLogs, todayStr]);
 
   // Rotating motivational quote, personalized by gender when known.
   // Rendered at the very bottom of the page.
@@ -235,6 +278,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
   const [isCompletedWorkoutModalOpen, setIsCompletedWorkoutModalOpen] = useState(false);
+  const [isReadinessSheetOpen, setIsReadinessSheetOpen] = useState(false);
+  const [isLevelSheetOpen, setIsLevelSheetOpen] = useState(false);
+  const [isChallengesSheetOpen, setIsChallengesSheetOpen] = useState(false);
 
   const { registerBackHandler } = useAppNavigation();
 
@@ -286,6 +332,24 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsScanMealModalOpen(false); return true; }, 100);
     }
   }, [isScanMealModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isReadinessSheetOpen) {
+      return registerBackHandler(() => { setIsReadinessSheetOpen(false); return true; }, 100);
+    }
+  }, [isReadinessSheetOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isLevelSheetOpen) {
+      return registerBackHandler(() => { setIsLevelSheetOpen(false); return true; }, 100);
+    }
+  }, [isLevelSheetOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isChallengesSheetOpen) {
+      return registerBackHandler(() => { setIsChallengesSheetOpen(false); return true; }, 100);
+    }
+  }, [isChallengesSheetOpen, registerBackHandler]);
 
   // Routine selection handler (satisfies plan-sync test contract)
   const handleSelectWorkoutForToday = (plan: PlannedWorkout) => {
@@ -562,91 +626,54 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 4. READINESS + LEVEL (each hideable in Settings) ────────────── */}
       {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
       <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
-        {/* Readiness Card (coach engine) */}
+        {/* Readiness Card (coach engine) — compact; the whole card opens
+            the Readiness sheet (factors + optional feel check-in live there).
+            Readiness is computed internally; the card shows the score only. */}
         {uiPreferences.coachEnabled && (
-        <div className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}>
+        <button
+          type="button"
+          onClick={() => setIsReadinessSheetOpen(true)}
+          aria-label="View readiness details"
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
+        >
           <span className="text-xs font-medium text-text-muted">Readiness</span>
-          <div className="mt-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+          <span className="mt-1.5 block">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
             </span>
-            {/* Card stays minimal: score + Details. The factor explanation AND
-                the optional feel check-in both live inside the dropdown —
-                readiness is computed internally; the check-in only fine-tunes. */}
-            <CollapsibleDetails label="Details" className="mt-0.5">
-              {readiness.factors && readiness.factors.length > 0 && (
-                <p>{readiness.factors.join(' ')}</p>
-              )}
-            <div className="mt-2 pt-2 border-t border-border/50 space-y-1">
-              {(
-                [
-                  ['sleep', 'Sleep'],
-                  ['soreness', 'Soreness'],
-                  ['energy', 'Energy'],
-                ] as const
-              ).map(([key, label]) => (
-                <div key={key} className="flex items-center justify-between gap-2">
-                  <span className="text-3xs font-semibold text-text-muted">{label}</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((v) => {
-                      const current = todayCheckin?.[key] ?? 0;
-                      return (
-                        <button
-                          key={v}
-                          type="button"
-                          aria-label={`${label}: ${v} of 5`}
-                          onClick={() => {
-                            const next = {
-                              sleep: todayCheckin?.sleep ?? 3,
-                              soreness: todayCheckin?.soreness ?? 3,
-                              energy: todayCheckin?.energy,
-                            };
-                            if (key === 'sleep') next.sleep = v;
-                            else if (key === 'soreness') next.soreness = v;
-                            else next.energy = v;
-                            setDailyCheckin(todayStr, next);
-                          }}
-                          className={`w-6 h-6 rounded-full text-3xs font-bold transition-all cursor-pointer ${
-                            current === v
-                              ? 'bg-accent text-white'
-                              : 'bg-bg-secondary text-text-muted hover:text-text-primary border border-border/60'
-                          }`}
-                        >
-                          {v}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-              <p className="text-3xs text-text-muted">
-                {todayCheckin ? 'Checked in — readiness updated.' : 'How do you feel? It adjusts readiness.'}
-              </p>
-            </div>
-            </CollapsibleDetails>
-          </div>
-        </div>
+            <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
+              Details
+              <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+            </span>
+          </span>
+        </button>
         )}
 
-        {/* Level Card (XP system) */}
+        {/* Level Card (XP system) — compact; the whole card opens the Level
+            sheet (how XP is earned, this week, the level ladder). */}
         {uiPreferences.gamificationEnabled && (
-        <div className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}>
+        <button
+          type="button"
+          onClick={() => setIsLevelSheetOpen(true)}
+          aria-label="View level details"
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
+        >
           <span className="text-xs font-medium text-text-muted">Level {levelInfo.level} · {levelInfo.name}</span>
-          <div className="mt-1.5">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
+          <span className="mt-1.5 block">
+            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {levelInfo.total.toLocaleString()} XP
             </span>
-            <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2">
-              <div
-                className="h-full rounded-full bg-accent transition-all duration-500"
+            <span className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2 block">
+              <span
+                className="h-full rounded-full bg-accent transition-all duration-500 block"
                 style={{ width: `${levelInfo.progress.pct}%` }}
               />
-            </div>
+            </span>
             <span className="text-xs text-text-muted tabular-nums block mt-1">
               {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} to Level {levelInfo.level + 1}
             </span>
-          </div>
-        </div>
+          </span>
+        </button>
         )}
       </div>
       )}
@@ -936,7 +963,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       {/* ── 8c. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
       {uiPreferences.gamificationEnabled && homeChallenge && (
-        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+        <div
+          className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-amber-500/40 transition-colors"
+          onClick={() => setIsChallengesSheetOpen(true)}
+          role="button"
+          tabIndex={0}
+          aria-label="View all challenges"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsChallengesSheetOpen(true);
+            }
+          }}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5 min-w-0">
               <span className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-500 flex items-center justify-center shrink-0">
@@ -950,7 +989,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             {!homeChallenge.optedIn && (
               <button
                 type="button"
-                onClick={() => dismissChallenge(homeChallenge.key)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  dismissChallenge(homeChallenge.key);
+                }}
                 className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 aria-label="Dismiss challenge"
               >
@@ -974,7 +1016,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           ) : (
             <button
               type="button"
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 optInChallenge(homeChallenge.key);
                 toast.success('Challenge joined. Good luck!', 'Challenge Accepted');
               }}
@@ -1248,6 +1291,33 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           }}
         />
       )}
+
+      {/* ── READINESS DETAIL SHEET ─────────────────────────────────────────── */}
+      <ReadinessSheet
+        isOpen={isReadinessSheetOpen}
+        onClose={() => setIsReadinessSheetOpen(false)}
+        readiness={readiness}
+        todayCheckin={todayCheckin}
+        todayStr={todayStr}
+        onCheckin={setDailyCheckin}
+      />
+
+      {/* ── LEVEL DETAIL SHEET ─────────────────────────────────────────────── */}
+      <LevelSheet
+        isOpen={isLevelSheetOpen}
+        onClose={() => setIsLevelSheetOpen(false)}
+        total={levelInfo.total}
+        level={levelInfo.level}
+        name={levelInfo.name}
+        progress={levelInfo.progress}
+        weekXp={weekXp}
+      />
+
+      {/* ── CHALLENGES SHEET ───────────────────────────────────────────────── */}
+      <ChallengesSheet
+        isOpen={isChallengesSheetOpen}
+        onClose={() => setIsChallengesSheetOpen(false)}
+      />
 
       {/* ── DAILY QUOTE — always the last element on the page ──────────────── */}
       <div className="text-center pt-1 pb-2">
