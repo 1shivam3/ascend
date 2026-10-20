@@ -28,6 +28,7 @@ import {
   syncLocalNotifications,
 } from '@/lib/local-notifications';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
+import PermissionHelp from '@/components/ui/PermissionHelp';
 
 interface ReminderCenterModalProps {
   isOpen: boolean;
@@ -366,17 +367,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           </div>
         )}
         {permissionState === 'denied' && (
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-            <div className="text-2xs text-amber-200 leading-relaxed">
-              <span className="font-bold block">Notifications are blocked</span>
-              <span>
-                {isNative
-                  ? 'Android has notifications turned off for ASCEND. Open Settings → Apps → ASCEND → Notifications and allow them, then reopen this screen.'
-                  : 'Your browser has blocked notifications for this site. Open your browser\u2019s site settings for ASCEND and allow Notifications, then reopen this screen.'}
-              </span>
-            </div>
-          </div>
+          <PermissionHelp
+            permission="notifications"
+            isNative={isNative}
+            onRetry={handleEnablePermission}
+          />
         )}
         {(permissionState === 'default') && (
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2">

@@ -108,6 +108,49 @@ export const hi: Partial<Record<StringKey, string>> = {
   'settings.gamification': 'गेमिफ़िकेशन',
   'settings.coach': 'कोच',
 
+  // ── Permission help (denied-permission guidance) ────────────────────
+  'perm.title': 'परमिशन बंद है',
+  'perm.openSettings': 'सेटिंग्स खोलें',
+  'perm.tryAgain': 'फिर से कोशिश करें',
+  'perm.notificationsWhy': 'रिमाइंडर आप तक पहुँचने के लिए नोटिफ़िकेशन परमिशन ज़रूरी है।',
+  'perm.notificationsWebPath': 'अपने ब्राउज़र की साइट सेटिंग्स में ASCEND के लिए नोटिफ़िकेशन की अनुमति दें, फिर यह स्क्रीन दोबारा खोलें।',
+  'perm.microphoneWhy': 'वॉइस लॉगिंग को आपके सेट सुनने के लिए माइक्रोफ़ोन चाहिए।',
+  'perm.microphoneWebPath': 'अपने ब्राउज़र की साइट सेटिंग्स में इस साइट के लिए माइक्रोफ़ोन की अनुमति दें, फिर "फिर से कोशिश करें" दबाएं।',
+  'perm.cameraWhy': 'स्कैनिंग को बारकोड और खाने की फ़ोटो देखने के लिए कैमरा चाहिए।',
+  'perm.cameraWebPath': 'अपने ब्राउज़र की साइट सेटिंग्स में इस साइट के लिए कैमरा की अनुमति दें, फिर "फिर से कोशिश करें" दबाएं।',
+  'perm.healthWhy': 'Health Connect एक्सेस से ASCEND आपके स्टेप्स, नींद और वज़न पढ़ सकता है।',
+  'perm.healthWebPath': 'Health Connect सिर्फ़ Android ऐप में उपलब्ध है।',
+
+  // ── Health Connect ──────────────────────────────────────────────────
+  'health.title': 'Health Connect सिंक',
+  'health.hint': 'Health Connect से स्टेप्स, नींद और वज़न पढ़कर रेडीनेस और बॉडी मेट्रिक्स में जोड़ता है। कनेक्ट करने तक बंद रहता है।',
+  'health.connect': 'कनेक्ट करें',
+  'health.lastSynced': 'आख़िरी सिंक {time}',
+  'health.neverSynced': 'अभी तक सिंक नहीं हुआ',
+  'health.stepsToday': 'आज के स्टेप्स',
+  'health.unavailable': 'इस डिवाइस पर Health Connect उपलब्ध नहीं है।',
+
+  // ── Progress: muscle volume & recovery ──────────────────────────────
+  'progress.muscleVolume': 'मसल वॉल्यूम',
+  'progress.setsThisWeek': 'इस हफ़्ते के सेट',
+  'progress.recoveryMap': 'रिकवरी',
+  'progress.recoveryFresh': 'फ्रेश',
+  'progress.recoveryRecent': 'हाल ही में',
+  'progress.recoveryFatigued': 'थका हुआ',
+  'progress.recoveryNever': 'अभी ट्रेन नहीं हुआ',
+  'progress.daysAgo': '{days} दिन पहले',
+  'progress.volumeWhyLabel': 'यह कैसे गिना जाता है?',
+
+  // ── Data export ─────────────────────────────────────────────────────
+  'settings.exportCsv': 'CSV एक्सपोर्ट',
+  'settings.exportCsvHint': 'वर्कआउट, खाना और बॉडी मेट्रिक्स — स्प्रेडशीट के लिए CSV',
+
+  // ── %1RM programming ────────────────────────────────────────────────
+  'plan.intensityPercent': '1RM के % का उपयोग करें',
+  'plan.intensityPercentHint': 'मुख्य लिफ़्ट्स के लिए आपके अनुमानित 1RM से सुझाए गए वज़न मिलेंगे (टॉप सेट 80%, बैक-ऑफ़ 70%)। RPE ही डिफ़ॉल्ट रहता है।',
+  'plan.intensityNoData': '% सुझाव चालू करने के लिए किसी मुख्य लिफ़्ट का भारी सेट या PR लॉग करें।',
+  'plan.suggestedFrom1rm': '≈ {weight} {unit} टॉप सेट · {e1rm} {unit} अनुमानित 1RM का {pct}%',
+
   // ── Crowded-gym mode ────────────────────────────────────────────────
   'packed.toggle': 'जिम में भीड़ है?',
   'packed.tryInstead': 'जिम में भीड़ है — {name} आज़माएं',

@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
+import PermissionHelp from './ui/PermissionHelp';
 
 interface VoiceWorkoutLoggerModalProps {
   isOpen: boolean;
@@ -353,31 +354,23 @@ export default function VoiceWorkoutLoggerModal({
               This browser doesn&apos;t support speech recognition. Please use <strong>Google Chrome</strong> for hands-free voice logging in the gym.
             </p>
           </div>
+        ) : voiceError === 'denied' ? (
+          <div className="py-4">
+            <PermissionHelp
+              permission="microphone"
+              isNative={isNativePlatform()}
+              onRetry={startListening}
+            />
+          </div>
         ) : voiceError ? (
           <div className="py-4 space-y-2.5 text-text-muted">
             <MicOff className="w-9 h-9 mx-auto text-rose-400" />
             <p className="text-xs font-mono font-semibold text-text-primary">
-              {voiceError === 'denied'
-                ? 'Microphone permission is off'
-                : 'Voice recognition not available on this device'}
+              Voice recognition not available on this device
             </p>
             <p className="text-3xs font-mono text-text-secondary leading-relaxed">
-              {voiceError === 'denied'
-                ? isNativePlatform()
-                  ? 'Voice logging needs the microphone. Enable it in Settings → Apps → ASCEND → Permissions → Microphone, then tap Retry.'
-                  : 'Voice logging needs the microphone. Allow mic access in your browser\u2019s site settings for this site, then tap Retry.'
-                : 'This device has no speech recognition service, so voice logging can\u2019t run here. You can still log sets manually.'}
+              This device has no speech recognition service, so voice logging can&rsquo;t run here. You can still log sets manually.
             </p>
-            {voiceError === 'denied' && (
-              <button
-                type="button"
-                onClick={startListening}
-                className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Retry</span>
-              </button>
-            )}
           </div>
         ) : (
           <div className="space-y-3">
