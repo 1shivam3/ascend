@@ -411,6 +411,11 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                       </div>
                       <span className="text-2xs font-mono text-text-muted block mt-0.5">
                         {entry.date}
+                        {entry.source === 'health-connect' && (
+                          <span className="ml-1.5 px-1.5 py-0.5 rounded bg-accent/10 text-accent font-semibold">
+                            Health Connect
+                          </span>
+                        )}
                       </span>
                     </div>
 
