@@ -102,6 +102,10 @@ import {
   sanitizeFriendChallengesState,
 } from './friend-challenges';
 import {
+  type RunProgramState,
+  sanitizeRunProgramState,
+} from './run-program';
+import {
   CoachPersistedState,
   CalorieAdjustmentRecord,
   ReadinessHistoryEntry,
@@ -275,6 +279,12 @@ export interface AppState {
   removeFriendChallenge: (id: string) => void;
   applyFriendScore: (challengeId: string, entry: FriendScoreEntry) => void;
   grantFriendChallengeReward: (id: string) => void;
+
+  // Run Program (Couch to 5K) — enrollment only; progress derives from
+  // logged runs, so there is no separate progress counter to persist.
+  runProgram: RunProgramState | null;
+  enrollRunProgram: (dateStr: string) => void;
+  leaveRunProgram: () => void;
 
   // Coach Engine (adaptive coaching state)
   coach: CoachPersistedState;
@@ -647,6 +657,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   streak: state.streak,
   challenges: state.challenges,
   friendChallenges: state.friendChallenges,
+  runProgram: state.runProgram,
   coach: state.coach,
   dailyCheckins: state.dailyCheckins,
   healthSummary: state.healthSummary,
@@ -865,6 +876,11 @@ export const useAppStore = create<AppState>()(
       grantFriendChallengeReward: (id) => set((state) => ({
         friendChallenges: markFriendRewardGrantedState(state.friendChallenges, id),
       })),
+
+      // Run Program enrollment (opt-in; progress derives from logged runs)
+      runProgram: null,
+      enrollRunProgram: (dateStr) => set({ runProgram: { enrolledDate: dateStr } }),
+      leaveRunProgram: () => set({ runProgram: null }),
 
       // Coach Engine
       coach: getInitialCoachState(),
@@ -2331,6 +2347,7 @@ export const useAppStore = create<AppState>()(
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
           friendChallenges: getInitialFriendChallengesState(),
+          runProgram: null,
           coach: getInitialCoachState(),
           healthSummary: null,
           healthConnectLastSyncedAt: null,
@@ -2684,6 +2701,10 @@ export const useAppStore = create<AppState>()(
               data.friendChallenges !== undefined
                 ? sanitizeFriendChallengesState(data.friendChallenges)
                 : state.friendChallenges,
+            runProgram:
+              data.runProgram !== undefined
+                ? sanitizeRunProgramState(data.runProgram)
+                : state.runProgram,
             progressPhotos: (() => {
               if (!Array.isArray(data.progressPhotos)) return state.progressPhotos;
               const valid = data.progressPhotos

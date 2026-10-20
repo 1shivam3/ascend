@@ -7,7 +7,9 @@
  *
  * Rules:
  * - A day counts as active if: a workout with >= 1 completed set was logged,
- *   OR 3+ meals were logged. (Simple, checkable, no steps/hardware needed.)
+ *   OR a run session was logged (runs carry no sets — a finished run is a
+ *   training day in its own right), OR 3+ meals were logged.
+ *   (Simple, checkable, no steps/hardware needed.)
  * - The streak is consecutive active days ending today or yesterday — so
  *   opening the app in the morning doesn't show a broken streak for a day
  *   that hasn't happened yet.
@@ -33,7 +35,8 @@ function shiftDate(dateStr: string, days: number): string {
   return getLocalTodayStr(dt);
 }
 
-/** True when the day has real logged effort: a workout (>=1 completed set) or 3+ meals. */
+/** True when the day has real logged effort: a workout (>=1 completed set),
+ *  a logged run session, or 3+ meals. */
 export function dayIsActive(
   dateStr: string,
   workouts: WorkoutEntry[],
@@ -44,6 +47,7 @@ export function dayIsActive(
     w.exercises.some((ex) => ex.sets.some((s) => isSetCompleted(s))),
   );
   if (realWorkout) return true;
+  if (dayWorkouts.some((w) => w.kind === 'run')) return true;
   const mealCount = meals.filter(
     (m) => m.date === dateStr && m.foods.length > 0,
   ).length;

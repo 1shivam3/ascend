@@ -306,6 +306,17 @@ export interface WorkoutEntry {
   /** Source plan/template ID when started from or associated with a planned workout */
   planId?: string;
   /**
+   * Entry kind. Absent = a gym workout (the long-standing default).
+   * 'run' = a running session from the run program (see lib/run-program):
+   * it carries no sets — its summary lives in the exercise notes — and it
+   * counts toward streaks/habits as a training day (streak-freeze).
+   */
+  kind?: 'run';
+  /** Run program session id ('c25k-w3d2') when kind is 'run'. */
+  runSessionId?: string;
+  /** Optional user-entered distance for a run, in kilometres. */
+  distanceKm?: number;
+  /**
    * Total prescribed sets in the source plan at save time (before filtering to
    * executed sets). Lets adherence reporting show honest completion (e.g. 1/18)
    * instead of re-baselining to logged sets (1/1 = 100%).
