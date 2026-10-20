@@ -5,7 +5,6 @@ import { useStore } from '@/lib/store';
 import {
   estimateMacros,
   calculateMealMacros,
-  getFoodSuggestions,
   calculateRecommendedMacroGoals,
   calculateMaintenanceCalories,
   getMacroCalorieDrift,
@@ -46,7 +45,18 @@ import {
   Leaf,
   Calendar,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, MealDayKind, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { resolveIndianMeta } from '@/lib/indian-foods';
+import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
+import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
+import {
+  getProteinGapSuggestion,
+  getWholeDayAdaptation,
+  getDayKindTargets,
+  isHintDismissed,
+  dismissHint,
+} from '@/lib/nutrition-coach';
+import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -121,6 +131,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
+  const uiPreferences      = useStore((state) => state.uiPreferences);
+  const mealDayKinds       = useStore((state) => state.mealDayKinds || {});
+  const setMealDayKind     = useStore((state) => state.setMealDayKind);
+  const customFoods        = useStore((state) => state.customFoods || []);
+  const addCustomFood      = useStore((state) => state.addCustomFood);
+  const updateCustomFood   = useStore((state) => state.updateCustomFood);
+  const deleteCustomFood   = useStore((state) => state.deleteCustomFood);
   const toggleFavoriteFood    = useStore((state) => state.toggleFavoriteFood);
   const updateFavoriteFood    = useStore((state) => state.updateFavoriteFood);
   const deleteFavoriteFood    = useStore((state) => state.deleteFavoriteFood);
@@ -299,7 +316,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isNaturalParsing, setIsNaturalParsing] = useState(false);
 
   // ── Autocomplete state ────────────────────────────────────────────────────
-  const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, string[]>>({});
+  const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, FoodSearchResult[]>>({});
   const [activeSuggestionIndex,   setActiveSuggestionIndex]   = useState<Record<number, number>>({});
   const [showSuggestions,         setShowSuggestions]         = useState<Record<number, boolean>>({});
 
@@ -354,6 +371,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setActiveSuggestionIndex({});
   };
 
+  /** Ghee/oil selector: adjust this item's fat/calories relative to the
+   *  amount the database already assumed for the dish. */
+  const handleOilChange = (index: number, level: OilLevelId) => {
+    setFoods((prev) => prev.map((f, i) => (i === index ? withOilLevel(f, level) : f)));
+  };
+
   /**
    * Central handler for all food field changes.
    */
@@ -365,7 +388,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'name') {
         const name = (value as string).trim();
         if (name.length >= 1) {
-          const suggestions = getFoodSuggestions(name);
+          const suggestions = searchFoods(name, useStore.getState().customFoods || []);
           setFoodSuggestions((s) => ({ ...s, [index]: suggestions }));
           setShowSuggestions((s) => ({ ...s, [index]: suggestions.length > 0 }));
         } else {
@@ -375,6 +398,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         if (name.length > 1 && next[index].quantity !== undefined && (next[index].quantity as number) > 0) {
           const est = estimateMacros(name, next[index].quantity, next[index].unit);
+          // New food identity → reset the ghee/oil state to this dish's
+          // database assumption (undefined for non-Indian dishes).
+          const oil = defaultOilForFood(name);
           next[index] = {
             ...next[index],
             calories: est.calories,
@@ -382,6 +408,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            customFoodId: undefined,
+            oilAssumedTsp: oil?.assumedTsp,
+            oilLevel: oil?.level,
           };
         }
       }
@@ -464,13 +493,50 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     });
   }, []);
 
-  const handleSelectSuggestion = (index: number, suggestion: string) => {
+  const handleSelectSuggestion = (index: number, result: FoodSearchResult) => {
+    // "My version" — the user's own saved food: fill the exact portion
+    // snapshot they saved (quantity changes scale it proportionally).
+    if (result.kind === 'custom' && result.customFood) {
+      const cf = result.customFood;
+      const oil = defaultOilForFood(cf.name);
+      setFoods((prev) => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          name: cf.name,
+          quantity: cf.defaultQuantity ?? 1,
+          unit: cf.unit || 'g',
+          calories: cf.calories,
+          proteinG: cf.proteinG,
+          carbsG: cf.carbsG,
+          fatG: cf.fatG,
+          isUnmatched: false,
+          customFoodId: cf.id,
+          oilAssumedTsp: oil?.assumedTsp,
+          oilLevel: cf.oilLevel ?? oil?.level,
+        };
+        return next;
+      });
+      setShowSuggestions((s) => ({ ...s, [index]: false }));
+      setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+      return;
+    }
+
+    const suggestion = result.name;
     let currentQty = foods[index]?.quantity;
-    const currentUnit = foods[index]?.unit || 'g';
+    let currentUnit = foods[index]?.unit || 'g';
     if (!currentQty || currentQty <= 0) {
       currentQty = ['piece', 'pieces', 'scoop', 'slice', 'bowl', 'cup', 'serving', 'handful'].includes(currentUnit) ? 1 : 100;
     }
+    // Indian dishes default to their household unit — "1 katori dal",
+    // not "100 g dal" — when the user hasn't picked a unit themselves.
+    const indianMeta = resolveIndianMeta(suggestion);
+    if (indianMeta && currentUnit === 'g') {
+      currentUnit = indianMeta.meta.units[0].id;
+      currentQty = 1;
+    }
     const est = estimateMacros(suggestion, currentQty, currentUnit);
+    const oil = defaultOilForFood(suggestion);
 
     setFoods((prev) => {
       const next = [...prev];
@@ -484,12 +550,53 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG:   est.carbsG,
         fatG:     est.fatG,
         isUnmatched: est.isUnmatched,
+        customFoodId: undefined,
+        oilAssumedTsp: oil?.assumedTsp,
+        oilLevel: oil?.level,
       };
       return next;
     });
 
     setShowSuggestions((s) => ({ ...s, [index]: false }));
     setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+  };
+
+  /** Household recipe learning: save this row's exact portion + values
+   *  as the user's own version of the food. */
+  const handleSaveMyVersion = (index: number) => {
+    const food = foods[index];
+    if (!food || !food.name.trim()) return;
+    const snapshot = {
+      name: food.name.trim(),
+      calories: food.calories || 0,
+      proteinG: food.proteinG || 0,
+      carbsG: food.carbsG || 0,
+      fatG: food.fatG || 0,
+      defaultQuantity: food.quantity,
+      unit: food.unit || 'g',
+      baseFoodKey: resolveIndianMeta(food.name)?.key,
+      oilLevel: food.oilLevel,
+    };
+    if (food.customFoodId) {
+      updateCustomFood(food.customFoodId, snapshot);
+      toast.success(`Updated your version of ${snapshot.name}.`, 'My Version');
+    } else {
+      const created = addCustomFood(snapshot);
+      setFoods((prev) =>
+        prev.map((f, i) => (i === index ? { ...f, customFoodId: created.id } : f))
+      );
+      toast.success(`Saved "${snapshot.name}" as your version — it will top search results.`, 'My Version');
+    }
+  };
+
+  const handleDeleteCustomSuggestion = (index: number, result: FoodSearchResult) => {
+    if (!result.customFood) return;
+    deleteCustomFood(result.customFood.id);
+    setFoodSuggestions((s) => ({
+      ...s,
+      [index]: (s[index] || []).filter((r) => r.customFood?.id !== result.customFood!.id),
+    }));
+    toast.info(`Deleted your version of ${result.name}.`, 'My Version');
   };
 
   /**
@@ -517,6 +624,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
    * 1-Tap Add Favorite Food into current meal
    */
   const handleAddFavoriteToMeal = (fav: FavoriteFood) => {
+    // Favorites don't persist ghee/oil state — re-attach the dish's DB
+    // default so the oil prompt stays reachable from this path too.
+    const oil = defaultOilForFood(fav.name);
     const item: FoodItem = {
       name: fav.name,
       quantity: fav.defaultQuantity,
@@ -525,6 +635,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       proteinG: fav.proteinG,
       carbsG: fav.carbsG,
       fatG: fav.fatG,
+      oilAssumedTsp: oil?.assumedTsp,
+      oilLevel: oil?.level,
     };
 
     if (isModalOpen) {
@@ -649,14 +761,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   };
 
   const handleAddFoodFromHistory = (food: FoodItem) => {
+    // Older/history items may predate ghee/oil state — attach the DB
+    // default when missing so the prompt is reachable; items that carry
+    // their own oil answer keep it untouched.
+    const oil = food.oilAssumedTsp === undefined ? defaultOilForFood(food.name) : null;
+    const item: FoodItem = oil
+      ? { ...food, oilAssumedTsp: oil.assumedTsp, oilLevel: food.oilLevel ?? oil.level }
+      : food;
     if (isModalOpen) {
-      setFoods((prev) => [...prev, food]);
-      toast.success(`Added ${food.name} to current meal!`);
+      setFoods((prev) => [...prev, item]);
+      toast.success(`Added ${item.name} to current meal!`);
     } else {
       setMealName('Quick Meal');
-      setFoods([food]);
+      setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${food.name}. Tap Save when done!`);
+      toast.info(`Started meal with ${item.name}. Tap Save when done!`);
     }
   };
 
@@ -1042,6 +1161,32 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
+  // ── Fast/festival day pattern + nutrition coach ──────────────────────
+  const dayKind = mealDayKinds[todayDate];
+  const dayTargets = macroGoals ? getDayKindTargets(dayKind, macroGoals) : null;
+  const displayGoals = macroGoals && dayTargets
+    ? { ...macroGoals, calories: dayTargets.calories, proteinG: dayTargets.proteinG ?? macroGoals.proteinG }
+    : macroGoals;
+  const [, setHintTick] = useState(0);
+  const currentHour = new Date().getHours();
+  const proteinSuggestion = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'protein')
+    ? getProteinGapSuggestion({
+        diet: dietPreference,
+        proteinLoggedG: todayMacros.proteinG,
+        proteinTargetG: displayGoals?.proteinG || proteinTargetG,
+        hour: currentHour,
+      })
+    : null;
+  const dayAdaptation = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'adaptation')
+    ? getWholeDayAdaptation({
+        caloriesLogged: todayMacros.calories,
+        calorieTarget: displayGoals?.calories || 0,
+        hour: currentHour,
+      })
+    : null;
+  const dismissProteinHint = () => { dismissHint(todayDate, 'protein'); setHintTick((t) => t + 1); };
+  const dismissAdaptationHint = () => { dismissHint(todayDate, 'adaptation'); setHintTick((t) => t + 1); };
+
   // Calorie drift between sum of foods and Atwater formula
   const todayAtwaterDrift = useMemo(() => {
     return getMacroCalorieDrift(
@@ -1419,7 +1564,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   stroke="rgb(var(--accent))"
                   strokeWidth={10}
                   strokeDasharray={339.29}
-                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, macroGoals ? (todayMacros.calories / macroGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
+                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, displayGoals ? (todayMacros.calories / displayGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
                   strokeLinecap="round"
                   fill="transparent"
                   className="transition-all duration-700 ease-out"
@@ -1435,9 +1580,44 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             </div>
             <span className="text-2xs font-semibold text-text-muted tabular-nums">
-              of {macroGoals?.calories || 2400} daily target
+              of {displayGoals?.calories || 2400} daily target
             </span>
-            {macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
+
+            {/* Fast / festival day pattern — per-date, targets are guidance */}
+            <div className="w-full space-y-1.5">
+              <div className="flex flex-wrap justify-center gap-1">
+                {(
+                  [
+                    { kind: undefined, label: 'Normal day' },
+                    { kind: 'no_grain_fast', label: 'Fasting · no grain' },
+                    { kind: 'one_meal_fast', label: 'One-meal fast' },
+                    { kind: 'festival_feast', label: 'Festival day' },
+                  ] as { kind: MealDayKind | undefined; label: string }[]
+                ).map((opt) => {
+                  const active = dayKind === opt.kind;
+                  return (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setMealDayKind(todayDate, opt.kind ?? null)}
+                      className={`px-2 py-1 rounded-full text-3xs font-semibold transition-all cursor-pointer ${
+                        active
+                          ? 'bg-accent text-white'
+                          : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {dayTargets && (
+                <p className="text-3xs text-text-muted text-center leading-relaxed px-2">
+                  {dayTargets.note}
+                </p>
+              )}
+            </div>
+            {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
               <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2">
                 {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} maintenance{' '}
                 {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
@@ -1462,7 +1642,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {Math.round(todayMacros.proteinG)}g
                 </span>
                 <span className="text-3xs text-text-muted block">
-                  / {macroGoals?.proteinG || proteinTargetG}g
+                  / {displayGoals?.proteinG || proteinTargetG}g
                 </span>
               </div>
 
@@ -1500,6 +1680,62 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </p>
             )}
           </section>
+
+          {/* Nutrition coach — quiet, dismissible suggestions (never guilt) */}
+          {proteinSuggestion && (
+            <section className="card p-4 bg-bg-card border border-border/80">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Leaf className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                    Protein coach
+                  </span>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
+                    {proteinSuggestion.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissProteinHint}
+                  aria-label="Dismiss protein suggestion"
+                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {dayAdaptation && (
+            <section className="card p-4 bg-bg-card border border-border/80">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                    Lighter dinner today
+                  </span>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
+                    A dinner near {dayAdaptation.suggestedDinnerKcal.toLocaleString()} kcal keeps today on target.
+                  </p>
+                  <CollapsibleDetails label="Why?" className="mt-0.5">
+                    {dayAdaptation.reason}
+                  </CollapsibleDetails>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissAdaptationHint}
+                  aria-label="Dismiss dinner suggestion"
+                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* Dual Scanner Action Tiles (Reference: Screen 19 "Add Food" in Image 1) */}
           <div className="grid grid-cols-2 gap-3">
@@ -2330,6 +2566,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       const suggestions = foodSuggestions[i] || [];
                       const isDropdownOpen = showSuggestions[i] && suggestions.length > 0;
                       const favorited = isItemFavorited(food.name);
+                      const indianMeta = resolveIndianMeta(food.name);
+                      // Household units for this dish (katori/piece/plate)
+                      // join the generic unit list in the selector.
+                      const rowUnitOptions = [
+                        ...UNIT_OPTIONS,
+                        ...(indianMeta
+                          ? indianMeta.meta.units
+                              .filter((u) => !UNIT_OPTIONS.some((o) => o.value === u.id))
+                              .map((u) => ({ value: u.id, label: u.label }))
+                          : []),
+                      ];
 
                       return (
                         <div
@@ -2383,18 +2630,43 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {isDropdownOpen && (
                               <div className="absolute left-0 right-0 top-full mt-1 bg-bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                                 {suggestions.map((sugg) => (
-                                  <button
-                                    key={sugg}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      handleSelectSuggestion(i, sugg);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent flex items-center justify-between border-b border-border/40 last:border-b-0 font-medium"
+                                  <div
+                                    key={`${sugg.kind}:${sugg.name}`}
+                                    className="w-full flex items-center border-b border-border/40 last:border-b-0"
                                   >
-                                    <span>{sugg}</span>
-                                    <ChevronRight className="w-3 h-3 text-text-muted" />
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelectSuggestion(i, sugg);
+                                      }}
+                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent flex items-center justify-between font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        {sugg.name}
+                                        {sugg.kind === 'custom' && (
+                                          <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                                            My version
+                                          </span>
+                                        )}
+                                      </span>
+                                      <ChevronRight className="w-3 h-3 text-text-muted" />
+                                    </button>
+                                    {sugg.kind === 'custom' && (
+                                      <button
+                                        type="button"
+                                        aria-label={`Delete my version of ${sugg.name}`}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleDeleteCustomSuggestion(i, sugg);
+                                        }}
+                                        className="px-2 py-2 text-text-muted hover:text-danger cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -2418,13 +2690,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               onChange={(e) => handleFoodChange(i, 'unit', e.target.value)}
                               className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent min-w-[90px]"
                             >
-                              {UNIT_OPTIONS.map((opt) => (
+                              {rowUnitOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
                               ))}
                             </select>
                           </div>
+
+                          {/* Recipe assumption — what the DB values already
+                              count for this dish (muted, honest). */}
+                          {indianMeta && hasName && (
+                            <p className="text-3xs text-text-muted leading-relaxed">
+                              {indianMeta.meta.assumption}
+                            </p>
+                          )}
 
                           {/* Macro breakdown indicators / manual override */}
                           {hasName && (
@@ -2508,6 +2788,46 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                               </div>
+
+                              {/* Household recipe learning — save this
+                                  exact portion/values as "my version". */}
+                              {isQtySet && food.calories > 0 && (
+                                <div className="flex justify-end pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveMyVersion(i)}
+                                    className="text-2xs font-semibold text-accent hover:underline cursor-pointer"
+                                  >
+                                    {food.customFoodId ? 'Update my version' : 'Save as my version'}
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Ghee/oil honesty prompt — one tap, adjusts
+                                  fat/calories against the DB assumption. */}
+                              {food.oilAssumedTsp !== undefined && (
+                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
+                                  <span className="text-2xs text-text-muted font-mono shrink-0">
+                                    GHEE/OIL IN THIS?
+                                  </span>
+                                  <div className="flex gap-1">
+                                    {OIL_LEVELS.map((level) => (
+                                      <button
+                                        key={level.id}
+                                        type="button"
+                                        onClick={() => handleOilChange(i, level.id)}
+                                        className={`px-2 py-1 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
+                                          (food.oilLevel || 'none') === level.id
+                                            ? 'bg-accent text-white'
+                                            : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
+                                        }`}
+                                      >
+                                        {level.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

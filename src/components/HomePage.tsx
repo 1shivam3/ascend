@@ -20,6 +20,7 @@ import {
   Snowflake,
   MessageCircleHeart,
   TrendingUp,
+  Leaf,
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
@@ -66,6 +67,7 @@ import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import { PlannedWorkout, PlannedExercise, DayOfWeek, FoodItem, MealEntry } from '@/lib/types';
 import { CalorieAdjustmentRecord } from '@/lib/coach-engine';
 import { getDailyQuote } from '@/lib/quotes';
+import { getProteinGapSuggestion, isHintDismissed } from '@/lib/nutrition-coach';
 import { getTodaySessionState, createWorkoutDraftFromPlan, estimateSessionMinutes } from '@/lib/workout-engine';
 import { getScheduledWorkoutForDay, getTodayDayOfWeek, getWorkoutBodyParts } from '@/lib/workout-schedule';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
@@ -471,6 +473,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     };
   }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
+  // Quiet protein-coach line for veg/eggitarian users tracking low —
+  // one line under the nutrition cards, dismissible from the Meals tab.
+  const homeProteinHint =
+    uiPreferences.coachEnabled && !isHintDismissed(todayStr, 'protein')
+      ? getProteinGapSuggestion({
+          diet: profile?.dietPreference || 'non_vegetarian',
+          proteinLoggedG: fuelStats.protein,
+          proteinTargetG: fuelStats.targetProtein,
+          hour: new Date().getHours(),
+        })
+      : null;
+
   return (
     <div className="page animate-fade-in space-y-6 pb-24 max-w-md mx-auto px-5 pt-3">
       {/* ── 1. HEADER (Screen 8 & Screen 9) ─────────────────────────────────── */}
@@ -614,6 +628,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       </div>
+
+      {homeProteinHint && (
+        <button
+          type="button"
+          onClick={() => onNavigate('meals')}
+          className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-bg-card border border-border/60 text-left cursor-pointer hover:border-accent/40 transition-colors pressable"
+        >
+          <Leaf className="w-3.5 h-3.5 text-accent shrink-0" aria-hidden="true" />
+          <span className="text-xs text-text-secondary leading-relaxed">
+            {homeProteinHint.message}
+          </span>
+        </button>
+      )}
 
       {/* ── 4. READINESS + LEVEL (each hideable in Settings) ────────────── */}
       {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (

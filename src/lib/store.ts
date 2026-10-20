@@ -16,6 +16,8 @@ import {
   PlannedExercise,
   FavoriteFood,
   FoodItem,
+  CustomFood,
+  MealDayKind,
   DayType,
   HydrationConfig,
   WaterLogBatch,
@@ -162,6 +164,16 @@ export interface AppState {
   /** Remove tombstones (sync calls this once deletions are server-confirmed). */
   clearDeletedPlanIds: (ids: string[]) => void;
   favoriteFoods: FavoriteFood[];
+  /** Household recipe learning — the user's own versions of foods.
+   *  Local-persisted (partialize + backup import/export); no server
+   *  table exists for these, custom_barcodes is barcode-only. */
+  customFoods: CustomFood[];
+  addCustomFood: (food: Omit<CustomFood, 'id' | 'createdAt'>) => CustomFood;
+  updateCustomFood: (id: string, updated: Partial<CustomFood>) => void;
+  deleteCustomFood: (id: string) => void;
+  /** Per-date fasting/festival meal pattern. Absent date = normal day. */
+  mealDayKinds: Record<string, MealDayKind>;
+  setMealDayKind: (date: string, kind: MealDayKind | null) => void;
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
 
@@ -559,6 +571,8 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   customExerciseMuscles: state.customExerciseMuscles,
   deletedPlanIds: state.deletedPlanIds,
   favoriteFoods: state.favoriteFoods,
+  customFoods: state.customFoods,
+  mealDayKinds: state.mealDayKinds,
   hasCompletedOnboarding: state.hasCompletedOnboarding,
   waterLogs: state.waterLogs,
   waterBatches: state.waterBatches,
@@ -627,6 +641,8 @@ export const useAppStore = create<AppState>()(
       },
       deletedPlanIds: [],
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
+      customFoods: [],
+      mealDayKinds: {},
       hasCompletedOnboarding: false,
       _hasHydrated: false,
 
@@ -1580,6 +1596,40 @@ export const useAppStore = create<AppState>()(
 
       clearAllFavoriteFoods: () => set({ favoriteFoods: [] }),
 
+      addCustomFood: (food) => {
+        const created: CustomFood = {
+          ...food,
+          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `custom_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({
+          // Same name (case-insensitive) replaces the older version —
+          // "my dal" should evolve, not duplicate.
+          customFoods: [
+            created,
+            ...state.customFoods.filter(
+              (f) => f.name.toLowerCase() !== food.name.toLowerCase()
+            ),
+          ],
+        }));
+        return created;
+      },
+
+      updateCustomFood: (id, updated) => set((state) => ({
+        customFoods: state.customFoods.map((f) => (f.id === id ? { ...f, ...updated } : f)),
+      })),
+
+      deleteCustomFood: (id) => set((state) => ({
+        customFoods: state.customFoods.filter((f) => f.id !== id),
+      })),
+
+      setMealDayKind: (date, kind) => set((state) => {
+        const next = { ...state.mealDayKinds };
+        if (kind === null) delete next[date];
+        else next[date] = kind;
+        return { mealDayKinds: next };
+      }),
+
       toggleFavoriteFood: (food) => {
         let isAdded = false;
         set((state) => {
@@ -2162,6 +2212,8 @@ export const useAppStore = create<AppState>()(
           lastProgressSubTab: 'overview',
           lastTrainSubTab: 'plans',
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
+          customFoods: [],
+          mealDayKinds: {},
           hasCompletedOnboarding: false,
           waterLogs: {},
           waterBatches: {},
@@ -2209,6 +2261,8 @@ export const useAppStore = create<AppState>()(
             macroGoals: null,
             plannedWorkouts: [],
             favoriteFoods: DEFAULT_FAVORITE_FOODS,
+            customFoods: [],
+            mealDayKinds: {},
             hasCompletedOnboarding: false,
             waterLogs: {},
             waterBatches: {},
@@ -2360,6 +2414,54 @@ export const useAppStore = create<AppState>()(
               ? state.deletedPlanIds.filter((d) => !data.plannedWorkouts.some((p: any) => p.id === d))
               : state.deletedPlanIds,
             favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
+            customFoods: (() => {
+              if (!Array.isArray(data.customFoods)) return state.customFoods;
+              const num = (v: any) => (typeof v === 'number' && !isNaN(v) && v >= 0 ? v : 0);
+              return data.customFoods
+                .filter(
+                  (f: any) =>
+                    f &&
+                    typeof f === 'object' &&
+                    typeof f.id === 'string' &&
+                    typeof f.name === 'string' &&
+                    f.name.trim().length > 0
+                )
+                .slice(0, 300)
+                .map((f: any) => ({
+                  id: f.id,
+                  name: f.name.trim().slice(0, 120),
+                  calories: num(f.calories),
+                  proteinG: num(f.proteinG),
+                  carbsG: num(f.carbsG),
+                  fatG: num(f.fatG),
+                  defaultQuantity:
+                    typeof f.defaultQuantity === 'number' && f.defaultQuantity > 0
+                      ? f.defaultQuantity
+                      : undefined,
+                  unit: typeof f.unit === 'string' ? f.unit.slice(0, 20) : 'g',
+                  baseFoodKey: typeof f.baseFoodKey === 'string' ? f.baseFoodKey : undefined,
+                  oilLevel:
+                    f.oilLevel === 'none' || f.oilLevel === 'tsp' || f.oilLevel === 'tbsp' || f.oilLevel === 'tbsp2'
+                      ? f.oilLevel
+                      : undefined,
+                  createdAt: typeof f.createdAt === 'string' ? f.createdAt : new Date().toISOString(),
+                }));
+            })(),
+            mealDayKinds: (() => {
+              if (!data.mealDayKinds || typeof data.mealDayKinds !== 'object') {
+                return state.mealDayKinds;
+              }
+              const restored: Record<string, MealDayKind> = {};
+              for (const [date, kind] of Object.entries(data.mealDayKinds)) {
+                if (
+                  /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+                  (kind === 'no_grain_fast' || kind === 'one_meal_fast' || kind === 'festival_feast')
+                ) {
+                  restored[date] = kind as MealDayKind;
+                }
+              }
+              return restored;
+            })(),
             waterLogs: data.waterLogs && typeof data.waterLogs === 'object' ? data.waterLogs : state.waterLogs,
             waterBatches: data.waterBatches && typeof data.waterBatches === 'object' ? data.waterBatches : state.waterBatches,
             hydrationConfig: data.hydrationConfig || state.hydrationConfig,
@@ -2756,6 +2858,8 @@ if (typeof window !== 'undefined') {
             macroGoals: state.macroGoals,
             plannedWorkouts: state.plannedWorkouts,
             favoriteFoods: state.favoriteFoods,
+            customFoods: state.customFoods,
+            mealDayKinds: state.mealDayKinds,
             policyDecisionRecords: state.policyDecisionRecords,
             policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
             policyDecisionApplications: state.policyDecisionApplications,

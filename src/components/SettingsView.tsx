@@ -24,6 +24,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
+import type { DietPreference } from '@/lib/types';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
@@ -402,6 +403,46 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               >
                 KG / CENTIMETERS
               </button>
+            </div>
+          </div>
+
+          {/* Diet Preference */}
+          <div className="space-y-2 pt-1">
+            <div>
+              <span className="text-xs font-bold text-text-primary block">Diet Preference</span>
+              <span className="text-3xs text-text-muted block mt-0.5">
+                Used by the protein coach for suggestions that fit how you eat.
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {(
+                [
+                  { id: 'vegetarian', label: 'Vegetarian' },
+                  { id: 'eggitarian', label: 'Eggetarian' },
+                  { id: 'non_vegetarian', label: 'Non-Vegetarian' },
+                  { id: 'vegan', label: 'Vegan' },
+                ] as { id: DietPreference; label: string }[]
+              ).map((opt) => {
+                const active = (profile?.dietPreference || 'non_vegetarian') === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      if (!profile) return;
+                      setProfile({ ...profile, dietPreference: opt.id });
+                      toast.success(`Diet preference set to ${opt.label}.`, 'Preferences');
+                    }}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
+                      active
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
