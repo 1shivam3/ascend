@@ -89,7 +89,8 @@ $$\text{OPEN ASCEND} \longrightarrow \text{KNOW WHAT TO DO TODAY} \longrightarro
   * **Get Stronger:** Performance surplus (+150 kcal, high complex carbohydrates).
   * **Stamina:** High-glycogen energy balance.
 * **Real-Time Goal Pacing Bar:** Live monitoring on the Nutrition dashboard showing remaining deficit preservation or surplus progress.
-* **Offline Staples & Scanners:** 80+ offline food database with instant 1-tap logging, live barcode scanning (Open Food Facts), and optional Google Gemini Vision meal photo scanning.
+* **Offline Staples & Scanners:** 500+ offline food database with instant 1-tap logging, live barcode scanning (Open Food Facts), and optional Google Gemini Vision meal photo scanning.
+* **India-First Food Logging:** Curated Indian dishes with IFCT-consistent values are logged the way India eats — katori, roti and plate units with gram equivalents, a visible recipe assumption on every dish ("assumes 1 tsp ghee tadka"), a one-tap ghee/oil correction (None / 1 tsp / 1 tbsp / 2 tbsp) applied with real fat math in both the meal builder and photo-scan review, household recipe learning ("Save as my version" — your family's dal tops search results), a vegetarian protein coach, whole-day lighter-dinner adaptation, and per-day fasting/festival target patterns.
 
 ### 📱 7. Offline Gym Resilience & PWA Architecture
 * **PWA Service Worker (`/sw.js`):** Employs **Stale-While-Revalidate** for static bundles and **Network-First with Cache Fallback** for navigation. Works reliably in underground basement gyms with zero cellular signal.

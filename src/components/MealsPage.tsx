@@ -45,10 +45,18 @@ import {
   Leaf,
   Calendar,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, MealDayKind, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { resolveIndianMeta } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
+import {
+  getProteinGapSuggestion,
+  getWholeDayAdaptation,
+  getDayKindTargets,
+  isHintDismissed,
+  dismissHint,
+} from '@/lib/nutrition-coach';
+import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -123,6 +131,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
+  const uiPreferences      = useStore((state) => state.uiPreferences);
+  const mealDayKinds       = useStore((state) => state.mealDayKinds || {});
+  const setMealDayKind     = useStore((state) => state.setMealDayKind);
   const customFoods        = useStore((state) => state.customFoods || []);
   const addCustomFood      = useStore((state) => state.addCustomFood);
   const updateCustomFood   = useStore((state) => state.updateCustomFood);
@@ -1138,6 +1149,32 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
+  // ── Fast/festival day pattern + nutrition coach ──────────────────────
+  const dayKind = mealDayKinds[todayDate];
+  const dayTargets = macroGoals ? getDayKindTargets(dayKind, macroGoals) : null;
+  const displayGoals = macroGoals && dayTargets
+    ? { ...macroGoals, calories: dayTargets.calories, proteinG: dayTargets.proteinG ?? macroGoals.proteinG }
+    : macroGoals;
+  const [, setHintTick] = useState(0);
+  const currentHour = new Date().getHours();
+  const proteinSuggestion = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'protein')
+    ? getProteinGapSuggestion({
+        diet: dietPreference,
+        proteinLoggedG: todayMacros.proteinG,
+        proteinTargetG: displayGoals?.proteinG || proteinTargetG,
+        hour: currentHour,
+      })
+    : null;
+  const dayAdaptation = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'adaptation')
+    ? getWholeDayAdaptation({
+        caloriesLogged: todayMacros.calories,
+        calorieTarget: displayGoals?.calories || 0,
+        hour: currentHour,
+      })
+    : null;
+  const dismissProteinHint = () => { dismissHint(todayDate, 'protein'); setHintTick((t) => t + 1); };
+  const dismissAdaptationHint = () => { dismissHint(todayDate, 'adaptation'); setHintTick((t) => t + 1); };
+
   // Calorie drift between sum of foods and Atwater formula
   const todayAtwaterDrift = useMemo(() => {
     return getMacroCalorieDrift(
@@ -1515,7 +1552,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   stroke="rgb(var(--accent))"
                   strokeWidth={10}
                   strokeDasharray={339.29}
-                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, macroGoals ? (todayMacros.calories / macroGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
+                  strokeDashoffset={339.29 - (Math.min(100, Math.max(0, displayGoals ? (todayMacros.calories / displayGoals.calories) * 100 : (todayMacros.calories / 2400) * 100)) / 100) * 339.29}
                   strokeLinecap="round"
                   fill="transparent"
                   className="transition-all duration-700 ease-out"
@@ -1531,9 +1568,44 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             </div>
             <span className="text-2xs font-semibold text-text-muted tabular-nums">
-              of {macroGoals?.calories || 2400} daily target
+              of {displayGoals?.calories || 2400} daily target
             </span>
-            {macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
+
+            {/* Fast / festival day pattern — per-date, targets are guidance */}
+            <div className="w-full space-y-1.5">
+              <div className="flex flex-wrap justify-center gap-1">
+                {(
+                  [
+                    { kind: undefined, label: 'Normal day' },
+                    { kind: 'no_grain_fast', label: 'Fasting · no grain' },
+                    { kind: 'one_meal_fast', label: 'One-meal fast' },
+                    { kind: 'festival_feast', label: 'Festival day' },
+                  ] as { kind: MealDayKind | undefined; label: string }[]
+                ).map((opt) => {
+                  const active = dayKind === opt.kind;
+                  return (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setMealDayKind(todayDate, opt.kind ?? null)}
+                      className={`px-2 py-1 rounded-full text-3xs font-semibold transition-all cursor-pointer ${
+                        active
+                          ? 'bg-accent text-white'
+                          : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {dayTargets && (
+                <p className="text-3xs text-text-muted text-center leading-relaxed px-2">
+                  {dayTargets.note}
+                </p>
+              )}
+            </div>
+            {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
               <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2">
                 {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} maintenance{' '}
                 {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
@@ -1558,7 +1630,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {Math.round(todayMacros.proteinG)}g
                 </span>
                 <span className="text-3xs text-text-muted block">
-                  / {macroGoals?.proteinG || proteinTargetG}g
+                  / {displayGoals?.proteinG || proteinTargetG}g
                 </span>
               </div>
 
@@ -1596,6 +1668,62 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </p>
             )}
           </section>
+
+          {/* Nutrition coach — quiet, dismissible suggestions (never guilt) */}
+          {proteinSuggestion && (
+            <section className="card p-4 bg-bg-card border border-border/80">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Leaf className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                    Protein coach
+                  </span>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
+                    {proteinSuggestion.message}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissProteinHint}
+                  aria-label="Dismiss protein suggestion"
+                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+          )}
+
+          {dayAdaptation && (
+            <section className="card p-4 bg-bg-card border border-border/80">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                    Lighter dinner today
+                  </span>
+                  <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
+                    A dinner near {dayAdaptation.suggestedDinnerKcal.toLocaleString()} kcal keeps today on target.
+                  </p>
+                  <CollapsibleDetails label="Why?" className="mt-0.5">
+                    {dayAdaptation.reason}
+                  </CollapsibleDetails>
+                </div>
+                <button
+                  type="button"
+                  onClick={dismissAdaptationHint}
+                  aria-label="Dismiss dinner suggestion"
+                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* Dual Scanner Action Tiles (Reference: Screen 19 "Add Food" in Image 1) */}
           <div className="grid grid-cols-2 gap-3">
