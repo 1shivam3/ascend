@@ -99,6 +99,12 @@ import {
   calculateReadiness,
   type ManualCheckin,
 } from './coach-engine';
+import {
+  mergeHealthWeights,
+  buildHealthSignals,
+  type HealthDaySummary,
+  type HealthFetchResult,
+} from './health-connect';
 
 export * from './types';
 
@@ -132,6 +138,17 @@ export interface UiPreferences {
    * resolve to English in the i18n layer.
    */
   language: Language;
+  /**
+   * Health Connect sync consent (Android). DEFAULT OFF — nothing is
+   * read until the user connects in Settings. Old saves lack the
+   * field; consumers must check `=== true`.
+   */
+  healthConnectEnabled: boolean;
+  /**
+   * The Muscle Volume + Recovery section on Progress. Default ON;
+   * old saves lack the field, so consumers check `!== false`.
+   */
+  showMuscleVolume: boolean;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -140,6 +157,8 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   showHabitMatrix: true,
   weeklyTargetDays: null,
   language: 'en',
+  healthConnectEnabled: false,
+  showMuscleVolume: true,
 };
 
 export interface AppState {
@@ -246,6 +265,13 @@ export interface AppState {
    *  ever collected them, so the input was permanently dead. */
   dailyCheckins: Record<string, ManualCheckin>;
   setDailyCheckin: (dateStr: string, checkin: ManualCheckin) => void;
+
+  // Health Connect (Android) — latest synced day summary + when it ran.
+  // healthSummary feeds readiness (sleep, steps) and the Home steps
+  // line; synced weights merge into bodyMetrics via applyHealthSync.
+  healthSummary: HealthDaySummary | null;
+  healthConnectLastSyncedAt: string | null;
+  applyHealthSync: (result: HealthFetchResult) => void;
   dismissCheckIn: (id: string) => void;
   recordCalorieAdjustment: (record: CalorieAdjustmentRecord) => void;
   acknowledgeStall: (exercise: string) => void;
@@ -604,6 +630,8 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   challenges: state.challenges,
   coach: state.coach,
   dailyCheckins: state.dailyCheckins,
+  healthSummary: state.healthSummary,
+  healthConnectLastSyncedAt: state.healthConnectLastSyncedAt,
   policyDecisionRecords: state.policyDecisionRecords,
   policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
   policyDecisionApplications: state.policyDecisionApplications,
@@ -810,6 +838,29 @@ export const useAppStore = create<AppState>()(
       setDailyCheckin: (dateStr, checkin) => set((state) => ({
         dailyCheckins: { ...state.dailyCheckins, [dateStr]: checkin },
       })),
+
+      // Health Connect sync results. Weights merge under the rules in
+      // lib/health-connect (manual weigh-ins are never overwritten;
+      // HC entries refresh in place and stay user-editable/deletable).
+      healthSummary: null,
+      healthConnectLastSyncedAt: null,
+      applyHealthSync: (result) => set((state) => {
+        const { upserts } = mergeHealthWeights(state.bodyMetrics || [], result.weights || []);
+        let nextMetrics = state.bodyMetrics || [];
+        if (upserts.length > 0) {
+          const byId = new Map(upserts.map((u) => [u.id, u]));
+          const existingIds = new Set(nextMetrics.map((m) => m.id));
+          nextMetrics = [
+            ...upserts.filter((u) => !existingIds.has(u.id)),
+            ...nextMetrics.map((m) => byId.get(m.id) ?? m),
+          ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        }
+        return {
+          healthSummary: result.summary,
+          healthConnectLastSyncedAt: new Date().toISOString(),
+          bodyMetrics: nextMetrics,
+        };
+      }),
       dismissCheckIn: (id) => set((state) => ({
         coach: { ...state.coach, dismissedCheckIns: [...state.coach.dismissedCheckIns, id] },
       })),
@@ -849,7 +900,12 @@ export const useAppStore = create<AppState>()(
             }
           }
           // Readiness: calculate and record today's score
-          const readiness = calculateReadiness(state.workouts, state.bodyMetrics);
+          const readiness = calculateReadiness(
+            state.workouts,
+            state.bodyMetrics,
+            undefined,
+            buildHealthSignals(state.healthSummary)
+          );
           set((s) => ({
             coach: {
               ...s.coach,
@@ -2241,6 +2297,8 @@ export const useAppStore = create<AppState>()(
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
           coach: getInitialCoachState(),
+          healthSummary: null,
+          healthConnectLastSyncedAt: null,
           policyDecisionRecords: {},
           policyDecisionsLedgerHistory: [],
           policyDecisionApplications: [],

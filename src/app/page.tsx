@@ -225,6 +225,11 @@ export default function AppPage() {
       import('@/lib/local-notifications').then(({ initLocalNotifications }) => {
         initLocalNotifications();
       });
+      // Native-only: Health Connect foreground sync (consent-gated in
+      // Settings; no-op on web and until the user connects).
+      import('@/lib/health-sync').then(({ initHealthConnectSync }) => {
+        initHealthConnectSync();
+      });
     }
     // Safety fallback: if Zustand storage rehydration takes longer than 600ms, unlock
     const timer = setTimeout(() => {

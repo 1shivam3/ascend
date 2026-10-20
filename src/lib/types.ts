@@ -120,6 +120,13 @@ export interface BodyMetricEntry {
   id: string;
   date: string; // YYYY-MM-DD
   weightKg: number;
+  /**
+   * Where this entry came from. 'health-connect' entries are created by
+   * Health Connect sync and may be refreshed by later syncs; a manual
+   * weigh-in for the same date is never overwritten by sync.
+   * Absent = manual (all pre-existing entries).
+   */
+  source?: 'manual' | 'health-connect';
   heightCm?: number;
   bodyFatPct?: number;
   chestIn?: number;
