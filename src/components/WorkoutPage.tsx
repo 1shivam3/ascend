@@ -65,7 +65,6 @@ import {
 } from '@/lib/voice-logger';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
-import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
@@ -710,11 +709,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ── Voice State ────────────────────────────────────────────────────────────
   const [isListening, setIsListening] = useState(false);
-  const [expandedRationaleIndex, setExpandedRationaleIndex] = useState<number | null>(null);
 
   // ── Exercise Library & AI State ───────────────────────────────────────────
   const [isExerciseLibraryOpen, setIsExerciseLibraryOpen] = useState(false);
-  const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState(false);
   const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
     name: string;
     durationMinutes: number;
@@ -732,12 +729,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
-  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>('plans');
+  // Restore the sub-view (Plans vs History) the user was last in, and keep
+  // it persisted so a refresh lands back on the same sub-view.
+  const setLastTrainSubTab = useStore((state) => state.setLastTrainSubTab);
+  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>(
+    () => useStore.getState().lastTrainSubTab ?? 'plans'
+  );
   const [selectedDetailsPlan, setSelectedDetailsPlan] = useState<PlannedWorkout | null>(null);
+
+  useEffect(() => {
+    setLastTrainSubTab(trainSubTab);
+  }, [trainSubTab, setLastTrainSubTab]);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
-  const [isScheduleExpanded, setIsScheduleExpanded] = useState(false);
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [isDecisionExpanded, setIsDecisionExpanded] = useState(false);
 
@@ -841,15 +846,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       }, 80);
     }
   }, [expandedWorkouts, registerBackHandler]);
-
-  useEffect(() => {
-    if (isCoachDrawerOpen) {
-      return registerBackHandler(() => {
-        setIsCoachDrawerOpen(false);
-        return true;
-      }, 100);
-    }
-  }, [isCoachDrawerOpen, registerBackHandler]);
 
   useEffect(() => {
     if (confirmDeleteId) {
@@ -1030,11 +1026,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     } catch {
       setIsListening(false);
     }
-  };
-
-  const handleApplyModifiedWorkout = (modifiedExercises: WorkoutExercise[]) => {
-    setExercises(modifiedExercises);
-    toast.success('Workout updated according to Coach directive.', 'Workout Adapted');
   };
 
   // ─── Workout logger helpers ────────────────────────────────────────────────
@@ -1623,9 +1614,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     );
   }, [sortedWorkouts, historyFilter]);
 
-  // ─── Screen 4 Figma Blueprint State & Helpers ─────────────────────────────
-  const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
-
+  // ─── Screen 4 Figma Blueprint Helpers ─────────────────────────────────────
   const splitLabel = useMemo(() => {
     const scheduledDaysCount = weeklySchedule
       ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
@@ -1701,16 +1690,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // The active routine is always one of the USER's own plans — never a
   // template. Templates only appear when the user explicitly browses them.
   const activeRoutinePlan = useMemo(() => {
-    if (selectedRoutineId) {
-      const found = plannedWorkouts.find((p) => p.id === selectedRoutineId);
-      if (found) return found;
-    }
     if (todaySessionInfo.plannedWorkoutId) {
       const found = plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId);
       if (found) return found;
     }
     return plannedWorkouts[0] || null;
-  }, [selectedRoutineId, todaySessionInfo.plannedWorkoutId, plannedWorkouts]);
+  }, [todaySessionInfo.plannedWorkoutId, plannedWorkouts]);
 
   const activeRoutineExercisesWithTargets = useMemo(() => {
     if (!activeRoutinePlan?.exercises) return [];
@@ -2544,17 +2529,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onClose={() => setIsPlateModalOpen(false)}
         initialUnit={userUnit}
         initialWeight={userUnit === 'kg' ? 100 : 225}
-      />
-
-      {/* In-Workout Ask Coach Drawer */}
-      <WorkoutCoachDrawer
-        isOpen={isCoachDrawerOpen && coachEnabled}
-        onClose={() => setIsCoachDrawerOpen(false)}
-        activeWorkout={{
-          name: startedFromPlan || 'Current Workout',
-          exercises,
-        }}
-        onApplyModifiedWorkout={handleApplyModifiedWorkout}
       />
 
       {/* Post-Workout Coach's Take Modal — a coach surface: with Coach

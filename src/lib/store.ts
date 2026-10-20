@@ -201,6 +201,17 @@ export interface AppState {
   uiPreferences: UiPreferences;
   setUiPreferences: (patch: Partial<UiPreferences>) => void;
 
+  // Navigation persistence — a refresh or relaunch restores the tab and
+  // sub-view the user was on instead of dumping them back on Home.
+  // Tab ids mirror TabId/ProgressTabId in lib/navigation (kept as plain
+  // strings here to avoid a store <-> navigation import cycle; the
+  // navigation layer validates values before using them).
+  lastActiveTab: string;
+  lastProgressSubTab: string;
+  lastTrainSubTab: 'plans' | 'history';
+  setLastActiveTab: (tab: string, progressSubTab?: string) => void;
+  setLastTrainSubTab: (subTab: 'plans' | 'history') => void;
+
   // Monthly Challenges (opt-in, dismissible)
   challenges: ChallengesXState;
   optInChallenge: (key: string) => void;
@@ -578,6 +589,9 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   userMode: state.userMode,
   weeklySchedule: state.weeklySchedule,
   activeWorkoutDraft: state.activeWorkoutDraft,
+  lastActiveTab: state.lastActiveTab,
+  lastProgressSubTab: state.lastProgressSubTab,
+  lastTrainSubTab: state.lastTrainSubTab,
   };
 }
 
@@ -720,6 +734,16 @@ export const useAppStore = create<AppState>()(
       setUiPreferences: (patch) => set((state) => ({
         uiPreferences: { ...state.uiPreferences, ...patch },
       })),
+
+      // Navigation persistence (refresh/relaunch restores the last tab)
+      lastActiveTab: 'home',
+      lastProgressSubTab: 'overview',
+      lastTrainSubTab: 'plans',
+      setLastActiveTab: (tab, progressSubTab) => set((state) => ({
+        lastActiveTab: tab,
+        lastProgressSubTab: progressSubTab !== undefined ? progressSubTab : state.lastProgressSubTab,
+      })),
+      setLastTrainSubTab: (lastTrainSubTab) => set({ lastTrainSubTab }),
 
       // Challenges
       challenges: getInitialChallengesXState(),
@@ -2134,6 +2158,9 @@ export const useAppStore = create<AppState>()(
           hiddenBuiltinRoutineIds: [],
           deletedPlanIds: [],
           uiPreferences: { ...DEFAULT_UI_PREFERENCES },
+          lastActiveTab: 'home',
+          lastProgressSubTab: 'overview',
+          lastTrainSubTab: 'plans',
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
           waterLogs: {},

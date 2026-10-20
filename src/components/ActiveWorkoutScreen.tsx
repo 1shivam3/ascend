@@ -264,7 +264,6 @@ export default function ActiveWorkoutScreen({
   const [plateTargetWeight, setPlateTargetWeight] = useState<number>(60);
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
-  const [warmupWorkingWeight, setWarmupWorkingWeight] = useState<number>(60);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
@@ -275,7 +274,6 @@ export default function ActiveWorkoutScreen({
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isExerciseJumpOpen, setIsExerciseJumpOpen] = useState(false);
-  const [newExerciseName, setNewExerciseName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
   const renameContainerRef = useRef<HTMLDivElement>(null);
@@ -360,8 +358,6 @@ export default function ActiveWorkoutScreen({
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
-  const [isRestTimerDismissed, setIsRestTimerDismissed] = useState<boolean>(false);
-  const [isRestTimerEnabled, setIsRestTimerEnabled] = useState<boolean>(true);
   const [isRestPopoverOpen, setIsRestPopoverOpen] = useState<boolean>(false);
 
   // ── Screen 13: Dedicated Set Complete Transition state ────────────────────

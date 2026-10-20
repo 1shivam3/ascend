@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildTabUrl, getInitialNavigationState } from '@/lib/navigation';
+import { useStore, partializeAppState } from '@/lib/store';
 
 describe('Android & Browser Back Navigation (Task 2)', () => {
   let handlers: Map<string, { fn: () => boolean | void; priority: number }>;
@@ -177,6 +178,8 @@ describe('Tab URL Synchronization & Refresh Persistence', () => {
   beforeEach(() => {
     mockStorage.clear();
     setupBrowserEnvironment('/');
+    // Reset the live store's saved tab so tests stay independent.
+    useStore.setState({ lastActiveTab: 'home', lastProgressSubTab: 'overview', lastTrainSubTab: 'plans' });
   });
 
   it('builds clean URL for home tab', () => {
@@ -220,12 +223,76 @@ describe('Tab URL Synchronization & Refresh Persistence', () => {
     expect(initial.progressTab).toBe('prs');
   });
 
-  it('always starts on home on fresh launch even when localStorage has a saved tab', () => {
+  it('restores the saved tab from the persisted store on a bare launch (refresh/relaunch)', () => {
     window.history.replaceState({}, '', '/');
-    localStorage.setItem('ascend_active_tab', 'meals');
+    localStorage.setItem(
+      'ascend_store',
+      JSON.stringify({ state: { lastActiveTab: 'meals', lastProgressSubTab: 'overview' }, version: 0 })
+    );
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('meals');
+  });
+
+  it('restores the saved progress sub-tab from the persisted store', () => {
+    window.history.replaceState({}, '', '/');
+    localStorage.setItem(
+      'ascend_store',
+      JSON.stringify({ state: { lastActiveTab: 'progress', lastProgressSubTab: 'strength' }, version: 0 })
+    );
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('progress');
+    expect(initial.progressTab).toBe('strength');
+  });
+
+  it('migrates the legacy standalone saved-tab key from older builds', () => {
+    window.history.replaceState({}, '', '/');
+    localStorage.setItem('ascend_active_tab', 'workout');
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('workout');
+  });
+
+  it('restores the saved tab from live store state when storage has no blob', () => {
+    window.history.replaceState({}, '', '/');
+    useStore.setState({ lastActiveTab: 'meals', lastProgressSubTab: 'overview' });
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('meals');
+  });
+
+  it('URL tab wins over the saved tab (deep links stay authoritative)', () => {
+    window.history.replaceState({}, '', '/?tab=workout');
+    localStorage.setItem(
+      'ascend_store',
+      JSON.stringify({ state: { lastActiveTab: 'meals', lastProgressSubTab: 'overview' }, version: 0 })
+    );
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('workout');
+  });
+
+  it('ignores a corrupted saved tab and falls back to home', () => {
+    window.history.replaceState({}, '', '/');
+    localStorage.setItem(
+      'ascend_store',
+      JSON.stringify({ state: { lastActiveTab: 'not-a-tab', lastProgressSubTab: 'nope' }, version: 0 })
+    );
 
     const initial = getInitialNavigationState();
     expect(initial.tab).toBe('home');
+    expect(initial.progressTab).toBe('overview');
+  });
+
+  it('persists nav state through partialize so it survives a reload', () => {
+    useStore.getState().setLastActiveTab('progress', 'strength');
+    useStore.getState().setLastTrainSubTab('history');
+
+    const persisted = partializeAppState(useStore.getState()) as Record<string, unknown>;
+    expect(persisted.lastActiveTab).toBe('progress');
+    expect(persisted.lastProgressSubTab).toBe('strength');
+    expect(persisted.lastTrainSubTab).toBe('history');
   });
 
   it('defaults to home when both URL params and localStorage are empty', () => {
