@@ -41,7 +41,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Runtime permission required for notifications on Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Runtime permission for native speech recognition (voice workout logging) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Required for navigator.vibrate haptics inside the WebView -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Camera is used for barcode / meal scanning only; the app works fully without one -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- Microphone is used for voice logging only; the app works fully without one -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 </manifest>
