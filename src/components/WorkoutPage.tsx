@@ -60,6 +60,14 @@ import {
 } from '@/lib/workout-engine';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import {
+  buildPercentSuggestions,
+  estimateE1rmKg,
+  isMainCompound,
+  mainCompoundKey,
+  percentSetWeights,
+  TOP_SET_PCT,
+} from '@/lib/percent-1rm';
+import {
   createSpeechRecognizer,
   isSpeechRecognitionSupported,
   isNativePlatform,
@@ -127,8 +135,12 @@ function PlanModal({
   defaultTargetReps = 8,
   onSave,
 }: PlanModalProps) {
+  const { t } = useTranslation();
+  const prs = useStore((state) => state.prs);
+  const workouts = useStore((state) => state.workouts);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
+  const [intensityMode, setIntensityMode] = useState<'rpe' | 'percent'>('rpe');
 
   // Sync state when opening or switching between create/edit
   useEffect(() => {
@@ -136,9 +148,11 @@ function PlanModal({
       if (initial) {
         setPlanName(initial.name);
         setPlanExercises(initial.exercises.length > 0 ? initial.exercises : [emptyPlanExercise(userUnit, defaultTargetReps)]);
+        setIntensityMode(initial.intensityMode === 'percent' ? 'percent' : 'rpe');
       } else {
         setPlanName('');
         setPlanExercises([emptyPlanExercise(userUnit, defaultTargetReps)]);
+        setIntensityMode('rpe');
       }
     }
   }, [isOpen, initial, userUnit, defaultTargetReps]);
@@ -210,7 +224,7 @@ function PlanModal({
         return;
       }
     }
-    onSave({ name: trimmedName, exercises: validExercises });
+    onSave({ name: trimmedName, exercises: validExercises, intensityMode });
     onClose();
   };
 
@@ -249,6 +263,36 @@ function PlanModal({
               maxLength={MAX_PLAN_NAME_LENGTH}
               className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary focus:border-accent outline-none text-sm"
             />
+          </div>
+
+          {/* Intensity mode — RPE (default) or % of estimated 1RM */}
+          <div className="border border-border rounded-xl p-3.5 bg-bg-elevated/40 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold text-text-primary">{t('plan.intensityPercent')}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={intensityMode === 'percent'}
+                aria-label={t('plan.intensityPercent')}
+                onClick={() => setIntensityMode(intensityMode === 'percent' ? 'rpe' : 'percent')}
+                className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
+                  intensityMode === 'percent' ? 'bg-accent' : 'bg-bg-secondary border border-border'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                    intensityMode === 'percent' ? 'left-[22px]' : 'left-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="text-3xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
+            {intensityMode === 'percent' &&
+              !planExercises.some(
+                (ex) => isMainCompound(ex.name) && estimateE1rmKg(ex.name, prs, workouts) !== null
+              ) && (
+                <p className="text-3xs text-amber-400 leading-relaxed">{t('plan.intensityNoData')}</p>
+              )}
           </div>
 
           {/* Exercises */}
@@ -363,6 +407,25 @@ function PlanModal({
                       </select>
                     </div>
                   </div>
+
+                  {/* %1RM suggestion preview (percent mode, main lifts) */}
+                  {intensityMode === 'percent' && typeof ex.targetWeight !== 'number' && (() => {
+                    const e1rmKg = mainCompoundKey(ex.name) ? estimateE1rmKg(ex.name, prs, workouts) : null;
+                    if (!e1rmKg) return null;
+                    const unit = (ex.targetUnit as 'kg' | 'lbs') || userUnit;
+                    const weights = percentSetWeights(e1rmKg, ex.targetSets || 1, unit);
+                    const e1rmDisplay = unit === 'lbs' ? Math.round(e1rmKg * 2.20462) : Math.round(e1rmKg);
+                    return (
+                      <p className="mt-2 text-3xs font-mono text-accent">
+                        {t('plan.suggestedFrom1rm', {
+                          weight: weights[0],
+                          unit,
+                          pct: Math.round(TOP_SET_PCT * 100),
+                          e1rm: e1rmDisplay,
+                        })}
+                      </p>
+                    );
+                  })()}
 
                   {/* Target RPE — the plan schema carries it and sharing
                       now preserves it, but this editor never exposed it */}
@@ -1199,10 +1262,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setSessionStartTime(Date.now());
     const userPrs = useStore.getState().prs;
     const applications = useStore.getState().policyDecisionApplications || [];
+    // %1RM mode (opt-in per plan): suggested loads for main compounds.
+    const percentSuggestions =
+      plan.intensityMode === 'percent'
+        ? buildPercentSuggestions(plan, userPrs, useStore.getState().workouts, userUnit)
+        : {};
+    const percentWeightsByIndex: Record<number, number[]> = {};
+    for (const [idx, s] of Object.entries(percentSuggestions)) {
+      percentWeightsByIndex[Number(idx)] = s.weights;
+    }
     const preFilledExercises = createWorkoutExercisesFromPlan(plan, {
       userUnit,
       userPrs,
       applications,
+      percentWeightsByIndex,
     });
     setExercises(preFilledExercises);
     setDate(getLocalTodayStr());
@@ -1484,6 +1557,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         ...editingPlan,
         name: planData.name,
         exercises: planData.exercises,
+        intensityMode: planData.intensityMode,
       });
       toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
       // If the edited plan is open in the detail view, refresh it so the
@@ -1498,6 +1572,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         createdAt: new Date().toISOString(),
         name: planData.name,
         exercises: planData.exercises,
+        intensityMode: planData.intensityMode,
       };
       // The store auto-renames on collision ("X (Copy)") instead of overwriting.
       const nameTaken = plannedWorkouts.some(

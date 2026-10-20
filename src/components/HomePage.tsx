@@ -32,6 +32,7 @@ import { getLevel, getLevelName, progressToNext, summarizeXpInRange } from '@/li
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { calculateReadiness } from '@/lib/coach-engine';
 import { buildHealthSignals } from '@/lib/health-connect';
+import { buildPercentSuggestions } from '@/lib/percent-1rm';
 import { useCoachDigest } from '@/lib/use-coach-digest';
 import {
   monthlyChallenges,
@@ -391,11 +392,20 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
     if (planToStart && planToStart.exercises && planToStart.exercises.length > 0) {
       const applications = useStore.getState().policyDecisionApplications || [];
+      // %1RM mode (opt-in per plan): suggested loads for main compounds.
+      const percentWeightsByIndex: Record<number, number[]> = {};
+      if (planToStart.intensityMode === 'percent') {
+        const suggestions = buildPercentSuggestions(planToStart, prs, workouts, userUnit);
+        for (const [idx, s] of Object.entries(suggestions)) {
+          percentWeightsByIndex[Number(idx)] = s.weights;
+        }
+      }
       const draft = createWorkoutDraftFromPlan(planToStart, {
         userUnit,
         userPrs: prs,
         applications,
         date: todayStr,
+        percentWeightsByIndex,
       });
 
       saveWorkoutDraft(draft);

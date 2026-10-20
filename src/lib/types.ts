@@ -451,6 +451,12 @@ export interface PlannedWorkout {
   createdAt: string;
   description?: string;
   goalTag?: string;
+  /**
+   * Intensity prescription mode. 'percent' = main compound lifts get
+   * suggested loads from the user's estimated 1RM (see lib/percent-1rm).
+   * Absent/'rpe' = the long-standing default; nothing changes.
+   */
+  intensityMode?: 'rpe' | 'percent';
 }
 
 export interface FavoriteFood {
