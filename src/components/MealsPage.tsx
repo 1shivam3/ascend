@@ -5,7 +5,6 @@ import { useStore } from '@/lib/store';
 import {
   estimateMacros,
   calculateMealMacros,
-  getFoodSuggestions,
   calculateRecommendedMacroGoals,
   calculateMaintenanceCalories,
   getMacroCalorieDrift,
@@ -49,6 +48,7 @@ import {
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { resolveIndianMeta } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
+import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -123,6 +123,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
+  const customFoods        = useStore((state) => state.customFoods || []);
+  const addCustomFood      = useStore((state) => state.addCustomFood);
+  const updateCustomFood   = useStore((state) => state.updateCustomFood);
+  const deleteCustomFood   = useStore((state) => state.deleteCustomFood);
   const toggleFavoriteFood    = useStore((state) => state.toggleFavoriteFood);
   const updateFavoriteFood    = useStore((state) => state.updateFavoriteFood);
   const deleteFavoriteFood    = useStore((state) => state.deleteFavoriteFood);
@@ -301,7 +305,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [isNaturalParsing, setIsNaturalParsing] = useState(false);
 
   // ── Autocomplete state ────────────────────────────────────────────────────
-  const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, string[]>>({});
+  const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, FoodSearchResult[]>>({});
   const [activeSuggestionIndex,   setActiveSuggestionIndex]   = useState<Record<number, number>>({});
   const [showSuggestions,         setShowSuggestions]         = useState<Record<number, boolean>>({});
 
@@ -373,7 +377,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'name') {
         const name = (value as string).trim();
         if (name.length >= 1) {
-          const suggestions = getFoodSuggestions(name);
+          const suggestions = searchFoods(name, useStore.getState().customFoods || []);
           setFoodSuggestions((s) => ({ ...s, [index]: suggestions }));
           setShowSuggestions((s) => ({ ...s, [index]: suggestions.length > 0 }));
         } else {
@@ -393,6 +397,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            customFoodId: undefined,
             oilAssumedTsp: oil?.assumedTsp,
             oilLevel: oil?.level,
           };
@@ -477,7 +482,36 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     });
   }, []);
 
-  const handleSelectSuggestion = (index: number, suggestion: string) => {
+  const handleSelectSuggestion = (index: number, result: FoodSearchResult) => {
+    // "My version" — the user's own saved food: fill the exact portion
+    // snapshot they saved (quantity changes scale it proportionally).
+    if (result.kind === 'custom' && result.customFood) {
+      const cf = result.customFood;
+      const oil = defaultOilForFood(cf.name);
+      setFoods((prev) => {
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          name: cf.name,
+          quantity: cf.defaultQuantity ?? 1,
+          unit: cf.unit || 'g',
+          calories: cf.calories,
+          proteinG: cf.proteinG,
+          carbsG: cf.carbsG,
+          fatG: cf.fatG,
+          isUnmatched: false,
+          customFoodId: cf.id,
+          oilAssumedTsp: oil?.assumedTsp,
+          oilLevel: cf.oilLevel ?? oil?.level,
+        };
+        return next;
+      });
+      setShowSuggestions((s) => ({ ...s, [index]: false }));
+      setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+      return;
+    }
+
+    const suggestion = result.name;
     let currentQty = foods[index]?.quantity;
     let currentUnit = foods[index]?.unit || 'g';
     if (!currentQty || currentQty <= 0) {
@@ -505,6 +539,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG:   est.carbsG,
         fatG:     est.fatG,
         isUnmatched: est.isUnmatched,
+        customFoodId: undefined,
         oilAssumedTsp: oil?.assumedTsp,
         oilLevel: oil?.level,
       };
@@ -513,6 +548,44 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     setShowSuggestions((s) => ({ ...s, [index]: false }));
     setFoodSuggestions((s) => ({ ...s, [index]: [] }));
+  };
+
+  /** Household recipe learning: save this row's exact portion + values
+   *  as the user's own version of the food. */
+  const handleSaveMyVersion = (index: number) => {
+    const food = foods[index];
+    if (!food || !food.name.trim()) return;
+    const snapshot = {
+      name: food.name.trim(),
+      calories: food.calories || 0,
+      proteinG: food.proteinG || 0,
+      carbsG: food.carbsG || 0,
+      fatG: food.fatG || 0,
+      defaultQuantity: food.quantity,
+      unit: food.unit || 'g',
+      baseFoodKey: resolveIndianMeta(food.name)?.key,
+      oilLevel: food.oilLevel,
+    };
+    if (food.customFoodId) {
+      updateCustomFood(food.customFoodId, snapshot);
+      toast.success(`Updated your version of ${snapshot.name}.`, 'My Version');
+    } else {
+      const created = addCustomFood(snapshot);
+      setFoods((prev) =>
+        prev.map((f, i) => (i === index ? { ...f, customFoodId: created.id } : f))
+      );
+      toast.success(`Saved "${snapshot.name}" as your version — it will top search results.`, 'My Version');
+    }
+  };
+
+  const handleDeleteCustomSuggestion = (index: number, result: FoodSearchResult) => {
+    if (!result.customFood) return;
+    deleteCustomFood(result.customFood.id);
+    setFoodSuggestions((s) => ({
+      ...s,
+      [index]: (s[index] || []).filter((r) => r.customFood?.id !== result.customFood!.id),
+    }));
+    toast.info(`Deleted your version of ${result.name}.`, 'My Version');
   };
 
   /**
@@ -2417,18 +2490,43 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {isDropdownOpen && (
                               <div className="absolute left-0 right-0 top-full mt-1 bg-bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden">
                                 {suggestions.map((sugg) => (
-                                  <button
-                                    key={sugg}
-                                    type="button"
-                                    onMouseDown={(e) => {
-                                      e.preventDefault();
-                                      handleSelectSuggestion(i, sugg);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent flex items-center justify-between border-b border-border/40 last:border-b-0 font-medium"
+                                  <div
+                                    key={`${sugg.kind}:${sugg.name}`}
+                                    className="w-full flex items-center border-b border-border/40 last:border-b-0"
                                   >
-                                    <span>{sugg}</span>
-                                    <ChevronRight className="w-3 h-3 text-text-muted" />
-                                  </button>
+                                    <button
+                                      type="button"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleSelectSuggestion(i, sugg);
+                                      }}
+                                      className="flex-1 text-left px-3 py-2 text-xs text-text-primary hover:bg-bg-elevated hover:text-accent flex items-center justify-between font-medium"
+                                    >
+                                      <span className="flex items-center gap-2">
+                                        {sugg.name}
+                                        {sugg.kind === 'custom' && (
+                                          <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                                            My version
+                                          </span>
+                                        )}
+                                      </span>
+                                      <ChevronRight className="w-3 h-3 text-text-muted" />
+                                    </button>
+                                    {sugg.kind === 'custom' && (
+                                      <button
+                                        type="button"
+                                        aria-label={`Delete my version of ${sugg.name}`}
+                                        onMouseDown={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          handleDeleteCustomSuggestion(i, sugg);
+                                        }}
+                                        className="px-2 py-2 text-text-muted hover:text-danger cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             )}
@@ -2550,6 +2648,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                               </div>
+
+                              {/* Household recipe learning — save this
+                                  exact portion/values as "my version". */}
+                              {isQtySet && food.calories > 0 && (
+                                <div className="flex justify-end pt-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveMyVersion(i)}
+                                    className="text-2xs font-semibold text-accent hover:underline cursor-pointer"
+                                  >
+                                    {food.customFoodId ? 'Update my version' : 'Save as my version'}
+                                  </button>
+                                </div>
+                              )}
 
                               {/* Ghee/oil honesty prompt — one tap, adjusts
                                   fat/calories against the DB assumption. */}
