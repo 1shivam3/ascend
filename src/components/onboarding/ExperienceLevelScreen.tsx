@@ -3,6 +3,7 @@
 import React from 'react';
 import { UserMode } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
+import { useTranslation } from '@/lib/i18n';
 
 interface ExperienceOption {
   id: UserMode;
@@ -45,6 +46,7 @@ export default function ExperienceLevelScreen({
   onContinue,
   onBack,
 }: ExperienceLevelScreenProps) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 2 of 3) */}
@@ -55,7 +57,7 @@ export default function ExperienceLevelScreen({
         {/* Header */}
         <div className="text-left space-y-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
-            What&apos;s your experience level?
+            {t('onboarding.experienceTitle')}
           </h1>
           <p className="text-sm text-[#858076]">
             This customizes your starting training volume and progression rate.
@@ -121,7 +123,7 @@ export default function ExperienceLevelScreen({
           onClick={onContinue}
           className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
-          Continue
+          {t('common.continue')}
         </button>
 
         <button
@@ -129,7 +131,7 @@ export default function ExperienceLevelScreen({
           onClick={onBack}
           className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-[#F3F0E7]/60 active:scale-[0.99] text-[#171916] border border-[#171916]/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
         >
-          Back
+          {t('common.back')}
         </button>
       </div>
     </div>

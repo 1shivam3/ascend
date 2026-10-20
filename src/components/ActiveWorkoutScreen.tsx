@@ -52,6 +52,8 @@ import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calcula
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import { getPackedGymSwapsForNames } from '@/lib/crowded-gym';
+import { useTranslation } from '@/lib/i18n';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
@@ -93,6 +95,49 @@ function triggerHaptic(type: 'set_complete' | 'rest_done' | 'pr_hit') {
   } catch {
     // Ignore unsupported vibration
   }
+}
+
+/** Compact crowded-gym swap banner: one line, Swap / Keep. */
+function PackedSwapBanner({
+  text,
+  swapLabel,
+  keepLabel,
+  onSwap,
+  onKeep,
+  compact = false,
+}: {
+  text: string;
+  swapLabel: string;
+  keepLabel: string;
+  onSwap: () => void;
+  onKeep: () => void;
+  compact?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-accent/10 border border-accent/30 animate-fade-in ${
+        compact ? '' : 'mb-4'
+      }`}
+    >
+      <span className="text-xs font-semibold text-text-primary leading-snug">{text}</span>
+      <span className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={onSwap}
+          className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-3xs font-bold active:scale-95 transition-all cursor-pointer"
+        >
+          {swapLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onKeep}
+          className="px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-3xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
+        >
+          {keepLabel}
+        </button>
+      </span>
+    </div>
+  );
 }
 
 export default function ActiveWorkoutScreen({
@@ -274,6 +319,12 @@ export default function ActiveWorkoutScreen({
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isExerciseJumpOpen, setIsExerciseJumpOpen] = useState(false);
+  // Crowded-gym mode — per session, never persisted. When ON, every
+  // remaining exercise gets a one-tap dumbbell/bodyweight swap banner;
+  // accepted swaps are real session changes and stay when it's OFF.
+  const [gymPacked, setGymPacked] = useState(false);
+  const [packedDismissed, setPackedDismissed] = useState<Set<string>>(new Set());
+  const { t } = useTranslation();
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
   const renameContainerRef = useRef<HTMLDivElement>(null);
@@ -559,6 +610,60 @@ export default function ActiveWorkoutScreen({
       setIsSwapModalOpen(false);
     },
     [activeExerciseIdx, currentExercise?.name, swapReason, trainingProfile?.dislikedExercises, setTrainingProfile, handleSelectNewExerciseName, toast]
+  );
+
+  // ── Crowded-gym suggestions (aligned by exercise index) ──────────────
+  const packedSwaps = useMemo(
+    () =>
+      gymPacked
+        ? getPackedGymSwapsForNames(
+            exercises.map((e) => e.name),
+            { exclusions: trainingProfile?.dislikedExercises || [] }
+          )
+        : [],
+    [gymPacked, exercises, trainingProfile?.dislikedExercises]
+  );
+
+  const dismissPackedFor = useCallback((name: string) => {
+    setPackedDismissed((prev) => new Set(prev).add(name));
+  }, []);
+
+  // Accept a packed swap at any index. The ACTIVE exercise goes through
+  // the existing swap path (handleSelectNewExerciseName); other indices
+  // get the same rename semantics — bodyweight <-> weighted set-weight
+  // adaptation on uncompleted sets only.
+  const applyPackedSwapAt = useCallback(
+    (idx: number) => {
+      const swap = packedSwaps[idx];
+      if (!swap) return;
+      if (idx === activeExerciseIdx) {
+        handleSelectNewExerciseName(swap.name);
+        return;
+      }
+      const target = exercises[idx];
+      if (!target) return;
+      const isBodyweight = isBodyweightExercise(swap.name);
+      const wasBodyweight = isBodyweightExercise(target.name);
+      setExercises((prev) =>
+        prev.map((ex, i) => {
+          if (i !== idx) return ex;
+          let updatedSets = ex.sets;
+          if (isBodyweight && !wasBodyweight) {
+            updatedSets = ex.sets.map((s) => (isActiveSetCompleted(s) ? s : { ...s, weight: 0 }));
+          } else if (!isBodyweight && wasBodyweight) {
+            const defaultWeight = userUnit === 'lbs' ? 115 : 50;
+            updatedSets = ex.sets.map((s) =>
+              isActiveSetCompleted(s)
+                ? s
+                : { ...s, weight: (parseFloat(String(s.weight)) || 0) === 0 ? defaultWeight : s.weight }
+            );
+          }
+          return { ...ex, name: swap.name, sets: updatedSets };
+        })
+      );
+      toast.success(`Exercise changed to "${swap.name}"`, 'Exercise Updated');
+    },
+    [packedSwaps, activeExerciseIdx, exercises, handleSelectNewExerciseName, userUnit, toast]
   );
 
   // Autocomplete suggestions when renaming / changing current exercise
@@ -1950,8 +2055,46 @@ export default function ActiveWorkoutScreen({
         </div>
       </nav>
 
+      {/* ── Crowded-gym toggle (per session) ──────────────────────────── */}
+      <div className="bg-bg-card border-b border-border/80 px-4 py-1.5 shrink-0">
+        <div className="max-w-[480px] mx-auto flex items-center justify-between">
+          <span className="text-xs font-semibold text-text-secondary">{t('packed.toggle')}</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={gymPacked}
+            aria-label={t('packed.toggle')}
+            onClick={() => setGymPacked((v) => !v)}
+            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
+              gymPacked ? 'bg-accent' : 'bg-border'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                gymPacked ? 'left-[22px]' : 'left-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* ── Main Exercise Focus Workspace (Radically simplified) ───────── */}
       <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 max-w-[480px] mx-auto w-full pb-16">
+        {/* Crowded-gym swap banner for the current exercise */}
+        {gymPacked &&
+          currentExercise &&
+          packedSwaps[activeExerciseIdx] &&
+          !packedDismissed.has(currentExercise.name) &&
+          currentExercise.sets.some((s) => !isActiveSetCompleted(s)) && (
+            <PackedSwapBanner
+              text={t('packed.tryInstead', { name: packedSwaps[activeExerciseIdx]!.name })}
+              swapLabel={t('packed.swap')}
+              keepLabel={t('packed.keep')}
+              onSwap={() => applyPackedSwapAt(activeExerciseIdx)}
+              onKeep={() => dismissPackedFor(currentExercise.name)}
+            />
+          )}
+
         {/* First-time guidance tips (Idea 9) */}
         {showFirstTimeTips && (
           <div className="mb-4 p-3.5 rounded-xl bg-accent/10 border border-accent/30 space-y-2 animate-fade-in">
@@ -2929,10 +3072,13 @@ export default function ActiveWorkoutScreen({
                 const completedCount = ex.sets.filter(isActiveSetCompleted).length;
                 const totalCount = ex.sets.length;
                 const isDone = totalCount > 0 && completedCount === totalCount;
+                const packedSwap = gymPacked ? packedSwaps[idx] : null;
+                const showPacked =
+                  !!packedSwap && !isDone && !packedDismissed.has(ex.name);
 
                 return (
+                  <div key={idx} className="space-y-1.5">
                   <button
-                    key={idx}
                     type="button"
                     onClick={() => {
                       setActiveExerciseIdx(idx);
@@ -2977,6 +3123,17 @@ export default function ActiveWorkoutScreen({
                       <ChevronRight className="w-4 h-4 text-text-muted" />
                     </div>
                   </button>
+                  {showPacked && packedSwap && (
+                    <PackedSwapBanner
+                      compact
+                      text={t('packed.tryInstead', { name: packedSwap.name })}
+                      swapLabel={t('packed.swap')}
+                      keepLabel={t('packed.keep')}
+                      onSwap={() => applyPackedSwapAt(idx)}
+                      onKeep={() => dismissPackedFor(ex.name)}
+                    />
+                  )}
+                  </div>
                 );
               })}
             </div>

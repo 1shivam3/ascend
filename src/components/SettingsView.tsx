@@ -31,6 +31,8 @@ import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_C
 import ConfirmationModal from '@/components/ConfirmationModal';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
+import LanguagePicker from '@/components/ui/LanguagePicker';
+import { useTranslation } from '@/lib/i18n';
 
 function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
@@ -71,6 +73,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const setUiPreferences = useStore((state) => state.setUiPreferences);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const toast = useToast();
+  const { t } = useTranslation();
 
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -238,7 +241,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <ChevronLeft className="w-5 h-5 text-accent" />
           </button>
           <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
-            Settings
+            {t('settings.title')}
           </h1>
         </div>
       </header>
@@ -406,10 +409,21 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </div>
           </div>
 
+          {/* Language */}
+          <div className="space-y-2 pt-1">
+            <div>
+              <span className="text-xs font-bold text-text-primary block">{t('settings.language')}</span>
+              <span className="text-3xs text-text-muted block mt-0.5">
+                {t('settings.languageHint')}
+              </span>
+            </div>
+            <LanguagePicker />
+          </div>
+
           {/* Diet Preference */}
           <div className="space-y-2 pt-1">
             <div>
-              <span className="text-xs font-bold text-text-primary block">Diet Preference</span>
+              <span className="text-xs font-bold text-text-primary block">{t('settings.dietPreference')}</span>
               <span className="text-3xs text-text-muted block mt-0.5">
                 Used by the protein coach for suggestions that fit how you eat.
               </span>
@@ -478,13 +492,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       {/* ── SECTION 2b: CUSTOMIZATION ──────────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          Customization
+          {t('settings.customization')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           {/* Weekly workout target */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">Weekly workout target</span>
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.weeklyWorkoutTarget')}</span>
               <span className="text-2xs font-mono text-text-muted">
                 {uiPreferences.weeklyTargetDays === null
                   ? 'AUTO'
@@ -545,7 +559,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Gamification toggle */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
-              <p className="text-xs font-bold text-text-primary">Gamification</p>
+              <p className="text-xs font-bold text-text-primary">{t('settings.gamification')}</p>
               <p className="text-3xs text-text-muted leading-relaxed">XP, levels, streaks and monthly challenges on Home</p>
             </div>
             <SettingsToggle
@@ -558,7 +572,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Coach toggle */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
-              <p className="text-xs font-bold text-text-primary">Coach</p>
+              <p className="text-xs font-bold text-text-primary">{t('settings.coach')}</p>
               <p className="text-3xs text-text-muted leading-relaxed">Check-in cards, calorie suggestions and the readiness score on Home, plus the post-workout Coach&apos;s Take</p>
             </div>
             <SettingsToggle

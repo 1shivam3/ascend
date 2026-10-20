@@ -45,12 +45,14 @@ const ImportProgramModal = dynamic(() => import('@/components/ImportProgramModal
 import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
 import { PlannedWorkout } from '@/lib/types';
 import { useAppNavigation, TabId } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 const tabs = [
-  { id: 'home', label: 'Today', icon: Home },
-  { id: 'workout', label: 'Train', icon: Dumbbell },
-  { id: 'progress', label: 'Progress', icon: TrendingUp },
-  { id: 'meals', label: 'Fuel', icon: UtensilsCrossed },
+  { id: 'home', labelKey: 'nav.today', icon: Home },
+  { id: 'workout', labelKey: 'nav.train', icon: Dumbbell },
+  { id: 'progress', labelKey: 'nav.progress', icon: TrendingUp },
+  { id: 'meals', labelKey: 'nav.fuel', icon: UtensilsCrossed },
 ] as const;
 
 export default function AppPage() {
@@ -60,6 +62,8 @@ export default function AppPage() {
     navigate,
     registerBackHandler,
   } = useAppNavigation();
+
+  const { t } = useTranslation();
 
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -366,7 +370,7 @@ export default function AppPage() {
                 key={tab.id}
                 type="button"
                 aria-current={isActive ? 'page' : undefined}
-                aria-label={tab.label}
+                aria-label={t(tab.labelKey as StringKey)}
                 onClick={() => {
                   navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined });
                 }}
@@ -377,7 +381,7 @@ export default function AppPage() {
                 {isActive && <div className="native-tab-indicator" />}
                 <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-accent' : 'text-text-muted'} />
                 <span className={`text-[12px] mt-1 ${isActive ? 'text-accent font-semibold' : 'text-text-muted font-normal'}`}>
-                  {tab.label}
+                  {t(tab.labelKey as StringKey)}
                 </span>
               </button>
             );

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
+import { useTranslation } from '@/lib/i18n';
 
 interface PersonalDetailsData {
   name: string;
@@ -37,6 +38,7 @@ export default function PersonalDetailsScreen({
   onBack,
   loading = false,
 }: PersonalDetailsScreenProps) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
   const [genderSelection, setGenderSelection] = useState<'male' | 'female' | 'other'>(
     initialGender || 'male'
@@ -162,7 +164,7 @@ export default function PersonalDetailsScreen({
         {/* Header */}
         <div className="text-left space-y-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
-            Tell us about yourself
+            {t('onboarding.detailsTitle')}
           </h1>
           <p className="text-sm text-[#858076]">
             This helps us calculate your strength standards, nutrition targets, and workout progression.
@@ -367,7 +369,7 @@ export default function PersonalDetailsScreen({
               <span>Calibrating Program...</span>
             </>
           ) : (
-            'Continue'
+            t('common.continue')
           )}
         </button>
 
@@ -376,7 +378,7 @@ export default function PersonalDetailsScreen({
           onClick={onBack}
           className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-[#F3F0E7]/60 active:scale-[0.99] text-[#171916] border border-[#171916]/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
         >
-          Back
+          {t('common.back')}
         </button>
       </div>
     </div>

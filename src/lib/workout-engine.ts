@@ -1546,10 +1546,10 @@ const MACHINE_CARDIO_PATTERN =
 const MAX_HOME_DUMBBELL_TOTAL_KG = 60;
 const MAX_HOME_DUMBBELL_TOTAL_LBS = 130;
 
-const isPlaceholderSubstitute = (name: string) =>
+export const isPlaceholderSubstitute = (name: string) =>
   /alternative|equivalent|variation/i.test(name);
 
-function adaptedLoadFor(
+export function adaptedLoadFor(
   ex: PlannedExercise,
   replacementName: string,
   isLbs: boolean

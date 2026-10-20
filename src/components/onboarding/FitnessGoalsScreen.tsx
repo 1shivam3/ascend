@@ -4,6 +4,7 @@ import React from 'react';
 import { Dumbbell, Flame, Shield, Activity, CheckCircle2, Check } from 'lucide-react';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
+import { useTranslation } from '@/lib/i18n';
 
 interface GoalItem {
   id: AthleteGoal;
@@ -62,6 +63,7 @@ export default function FitnessGoalsScreen({
   onSkip,
   onBack,
 }: FitnessGoalsScreenProps) {
+  const { t } = useTranslation();
   return (
     <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 1 of 3) */}
@@ -72,10 +74,10 @@ export default function FitnessGoalsScreen({
         {/* Header */}
         <div className="text-left space-y-1">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
-            What are your fitness goals?
+            {t('onboarding.goalsTitle')}
           </h1>
           <p className="text-sm text-[#858076]">
-            Select all that apply.
+            {t('onboarding.goalsSubtitle')}
           </p>
         </div>
 
@@ -142,7 +144,7 @@ export default function FitnessGoalsScreen({
           onClick={onContinue}
           className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
-          Continue
+          {t('common.continue')}
         </button>
 
         <div className="text-center">

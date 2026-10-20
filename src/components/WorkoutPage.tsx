@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n';
 import { useToday } from '@/lib/use-today';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
@@ -444,6 +445,7 @@ interface PlanCardProps {
 }
 
 function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
+  const { t } = useTranslation();
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -540,7 +542,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
         className="btn-primary w-full flex items-center justify-center gap-2 py-2"
       >
         <Play className="w-4 h-4" />
-        Start Workout
+        {t('train.startWorkout')}
       </button>
     </div>
   );
@@ -549,6 +551,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPageProps = {}) {
+  const { t } = useTranslation();
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -1862,7 +1865,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           onClick={() => setTrainSubTab('plans')}
           className={`segmented-item ${trainSubTab === 'plans' ? 'active' : ''}`}
         >
-          Plans {plannedWorkouts.length > 0 && `(${plannedWorkouts.length})`}
+          {t('train.plans')} {plannedWorkouts.length > 0 && `(${plannedWorkouts.length})`}
         </button>
         <button
           type="button"
@@ -1871,7 +1874,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           onClick={() => setTrainSubTab('history')}
           className={`segmented-item ${trainSubTab === 'history' ? 'active' : ''}`}
         >
-          History
+          {t('train.history')}
         </button>
       </div>
 
@@ -1915,11 +1918,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       )}
 
       {/* ── Your Plans ── */}
-      <section className="space-y-2.5" aria-label="Your Workout Plans">
+      <section className="space-y-2.5" aria-label={t('train.yourPlans')}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">YOUR PLANS</h2>
+            <h2 className="section-title text-[11px] mb-0">{t('train.yourPlans').toUpperCase()}</h2>
             {plannedWorkouts.length > 0 && (
               <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
                 {plannedWorkouts.length}
@@ -2788,7 +2791,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   className="w-full p-2.5 rounded-xl bg-bg-secondary/50 border border-border/60 hover:border-accent/40 text-left text-xs font-semibold text-text-primary flex items-center gap-2.5 transition-colors"
                 >
                   <Plus className="w-4 h-4 text-text-muted" />
-                  <span>Start empty workout</span>
+                  <span>{t('train.startEmptyWorkout')}</span>
                 </button>
               </div>
             </div>

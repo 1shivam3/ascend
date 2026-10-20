@@ -25,6 +25,7 @@ import {
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
+import { useTranslation } from '@/lib/i18n';
 
 import { getLevel, getLevelName, progressToNext, summarizeXpInRange } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
@@ -111,14 +112,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   } = useStore();
 
   const toast = useToast();
+  const { t, language } = useTranslation();
   // Live today: rolls over at midnight / on resume instead of freezing
   // at mount (an app left open overnight kept showing yesterday).
   const todayStr = useToday();
   const today = useMemo(() => new Date(), [todayStr]);
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
 
-  // Sentence-case personalized greeting matching Screen 8 & 9
-  const greeting = useMemo(() => getTimeGreeting(today), [today]);
+  // Sentence-case personalized greeting matching Screen 8 & 9.
+  // Hindi greetings follow the same hour buckets as getTimeGreeting.
+  const greeting = useMemo(() => {
+    if (language === 'hi') {
+      const h = today.getHours();
+      if (h >= 5 && h < 12) return t('home.greetingMorning');
+      if (h >= 12 && h < 17) return t('home.greetingAfternoon');
+      if (h >= 17 && h < 22) return t('home.greetingEvening');
+      return t('home.greetingNight');
+    }
+    return getTimeGreeting(today);
+  }, [today, language, t]);
 
   const athleteDisplayName = useMemo(() => {
     if (!profile?.name || !profile.name.trim()) return 'Alex';
@@ -504,8 +516,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             type="button"
             onClick={() => setIsNotificationsOpen(true)}
             className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
-            title="Notifications"
-            aria-label="Notifications"
+            title={t('home.notifications')}
+            aria-label={t('home.notifications')}
           >
             <Bell className="w-5 h-5" />
           </button>
@@ -529,7 +541,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
       <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs transition-all">
         <div className="flex items-center justify-between text-xs text-text-muted mb-2">
-          <span className="font-medium text-text-muted">Today&apos;s Workout</span>
+          <span className="font-medium text-text-muted">{t('home.todaysWorkout')}</span>
           <button
             type="button"
             onClick={() => setIsChangeWorkoutOpen(true)}
@@ -571,10 +583,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
         >
           {activeWorkoutDraft
-            ? 'Resume Workout'
+            ? t('home.resumeWorkout')
             : sessionInfo.status === 'completed'
-            ? 'View Completed Workout'
-            : 'Start Workout'}
+            ? t('home.viewCompletedWorkout')
+            : t('train.startWorkout')}
         </button>
         {/* Quick Log — one tap to log a session that already happened. */}
         <div className="text-center mt-3">
@@ -598,7 +610,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           tabIndex={0}
           aria-label="View Nutrition Details"
         >
-          <span className="text-xs font-medium text-text-muted">Nutrition</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.nutrition')}</span>
           <div className="mt-3">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
               {fuelStats.calories.toLocaleString()} cal
@@ -617,7 +629,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           tabIndex={0}
           aria-label="View Protein Details"
         >
-          <span className="text-xs font-medium text-text-muted">Protein</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.protein')}</span>
           <div className="mt-3">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums block leading-tight">
               {fuelStats.protein} g
@@ -655,7 +667,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           aria-label="View readiness details"
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
         >
-          <span className="text-xs font-medium text-text-muted">Readiness</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
@@ -677,7 +689,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           aria-label="View level details"
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
         >
-          <span className="text-xs font-medium text-text-muted">Level {levelInfo.level} · {levelInfo.name}</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {levelInfo.name}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {levelInfo.total.toLocaleString()} XP
@@ -707,7 +719,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Camera className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">Meal Scan</span>
+          <span className="text-3xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
         </button>
         <button
           type="button"
@@ -717,7 +729,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Barcode className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">Scan</span>
+          <span className="text-3xs font-semibold text-text-secondary">{t('home.scan')}</span>
         </button>
         <button
           type="button"
@@ -727,7 +739,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Scale className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">Weight</span>
+          <span className="text-3xs font-semibold text-text-secondary">{t('home.weight')}</span>
         </button>
       </div>
 
@@ -739,7 +751,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <Droplets className="w-4 h-4" />
             </span>
             <div>
-              <p className="text-xs font-bold text-text-primary">Hydration</p>
+              <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
               <p className="text-3xs text-text-muted tabular-nums">
                 {(todayWaterMl / 1000).toFixed(1)} / {(hydrationTargetMl / 1000).toFixed(1)} L today
               </p>
@@ -952,7 +964,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {uiPreferences.showHabitMatrix && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-text-primary">Habits This Week</span>
+          <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
           <span className="text-3xs font-mono text-text-muted">MON — SUN</span>
         </div>
         <WeeklyHabitMatrix
@@ -1059,7 +1071,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <div className="flex items-center justify-between pb-3 border-b border-border/70">
               <div className="flex items-center gap-2">
                 <Bell className="w-5 h-5 text-accent" />
-                <h3 className="text-base font-bold text-text-primary">Notifications</h3>
+                <h3 className="text-base font-bold text-text-primary">{t('home.notifications')}</h3>
               </div>
               <button
                 type="button"
@@ -1079,7 +1091,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </div>
 
               <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
-                <p className="font-semibold text-text-primary">Weekly Target</p>
+                <p className="font-semibold text-text-primary">{t('home.weeklyTarget')}</p>
                 <p className="text-text-muted mt-0.5">
                   {uiPreferences.weeklyTargetDays === 0
                     ? `${weeklyStats.completedCount} workouts completed this week.`
@@ -1098,7 +1110,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-xs font-semibold text-text-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Bell className="w-4 h-4 text-text-muted" />
-                <span>Notification Settings</span>
+                <span>{t('home.notificationSettings')}</span>
               </button>
             </div>
           </div>
@@ -1207,7 +1219,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                               className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer"
                             >
                               <Play className="w-3 h-3 fill-white" />
-                              <span>Start</span>
+                              <span>{t('home.start')}</span>
                             </button>
                           </div>
                         </div>
