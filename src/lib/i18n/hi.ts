@@ -3020,4 +3020,14 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.weeklyHold': 'स्थिर हफ़्ता — कोच का एक सुझाव: प्लान वही रखें, और नींद व प्रोटीन पर ध्यान दें।',
   'coachChat.openFullReview': 'पूरा वीकली रिव्यू खोलें',
   'coachChat.safetyNote': 'कोच आपके लॉग और चेक-इन से एडजस्ट करता है। यह कभी दर्द का निदान नहीं करता — तेज़ दर्द हमेशा सेशन रोक देता है।',
+  // ── Offline food scan (Android app) ─────────────────────────────────
+  'settings.offlineScan': 'ऑफ़लाइन फ़ूड स्कैन',
+  'settings.offlineScanHint': 'खाना सीधे आपके फ़ोन पर पहचानता है — इंटरनेट की ज़रूरत नहीं। फ़ोटो डिवाइस से बाहर नहीं जाती।',
+  'scan.offlineNote': 'ऑफ़लाइन स्कैन — बिना इंटरनेट चलता है, अभी 15 डिश पहचानता है',
+  'scan.offlineCta': 'डिश पहचानें — ऑफ़लाइन',
+  'scan.recognizingOffline': 'आपके फ़ोन पर डिश पहचानी जा रही है…',
+  'scan.didYouMean': 'क्या आपका मतलब यह था…?',
+  'scan.useAiInstead': 'इसके बजाय AI स्कैन इस्तेमाल करें',
+  'scan.offlineChoicesTitle': 'इस बार पक्का नहीं है',
+  'scan.offlineChoicesHint': 'ऑफ़लाइन स्कैन के सबसे करीबी विकल्प ये हैं। सही डिश चुनें — या AI स्कैन इस्तेमाल करें।',
 };
