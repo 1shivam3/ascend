@@ -328,6 +328,10 @@ export interface ActiveWorkoutDraft {
   savedAt: string;
 }
 
+/** Ghee/oil amount the user says is in a dish, beyond what's visible.
+ *  Levels in tsp: none=0, tsp=1, tbsp=3, tbsp2=6. */
+export type OilLevelId = 'none' | 'tsp' | 'tbsp' | 'tbsp2';
+
 export interface FoodItem {
   name: string;
   calories: number;
@@ -340,7 +344,37 @@ export interface FoodItem {
   quantity?: number;
   unit?: string;
   isUnmatched?: boolean;
+  /** User-selected ghee/oil level for Indian dishes (see OilLevelId). */
+  oilLevel?: OilLevelId;
+  /** tsp of ghee/oil the database values already assume for this dish,
+   *  per standard serving. The oil selector adjusts relative to this. */
+  oilAssumedTsp?: number;
+  /** Set when this item came from the user's own saved version. */
+  customFoodId?: string;
 }
+
+/**
+ * A user's own version of a food ("my dal, my way") — household recipe
+ * learning. Macros are stored for the exact portion in defaultQuantity/unit,
+ * the same snapshot model as FavoriteFood, so scaling stays proportional.
+ */
+export interface CustomFood {
+  id: string;
+  name: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  defaultQuantity?: number;
+  unit: string;
+  /** DB key this version was derived from, when saved from a known food. */
+  baseFoodKey?: string;
+  oilLevel?: OilLevelId;
+  createdAt: string;
+}
+
+/** Per-date meal pattern override (fasting / festival). Absent = normal day. */
+export type MealDayKind = 'no_grain_fast' | 'one_meal_fast' | 'festival_feast';
 
 export interface MealEntry {
   id: string;

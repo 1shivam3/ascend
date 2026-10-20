@@ -1,7 +1,8 @@
 import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types';
+import { INDIAN_FOOD_VALUES, getHouseholdUnitGrams } from './indian-foods';
 
 // Macros per 100g or 100ml (unless noted)
-export const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
+const FOOD_DB_BASE: Record<string, Omit<FoodItem, 'name'>> = {
   // ── Proteins ───────────────────────────────────────────────────────
   'chicken breast': { calories: 165, proteinG: 31, carbsG: 0, fatG: 3.6 },
   'chicken thigh': { calories: 209, proteinG: 26, carbsG: 0, fatG: 11 },
@@ -519,6 +520,17 @@ export const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
   'brown bread': { calories: 250, proteinG: 9, carbsG: 46, fatG: 3.5 },
 };
 
+/**
+ * The live food database: base entries plus the curated Indian thali
+ * overlay (lib/indian-foods.ts) — IFCT-aligned values for the classic
+ * confusables (dal tadka vs makhani vs sambar vs rasam vs kadhi) and
+ * thali staples. Overlay keys win where both define a dish.
+ */
+export const FOOD_DB: Record<string, Omit<FoodItem, 'name'>> = {
+  ...FOOD_DB_BASE,
+  ...INDIAN_FOOD_VALUES,
+};
+
 const EMPTY_MACROS = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
 
 // Piece/serving weights for common foods (grams per unit)
@@ -970,18 +982,27 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
   } else if (u === 'slice' || u === 'slices') {
     grams = safeQty * 35; // 1 slice ~35g
   } else if (u === 'piece' || u === 'pieces' || u === 'pcs' || u === 'pc') {
-    const pieceWeight = PIECE_WEIGHTS[cleanFoodName] || (matchedKey ? PIECE_WEIGHTS[matchedKey] : undefined) || 100;
+    // Curated Indian household units win (a phulka is 30g, a tandoori
+    // roti 40g), then the generic piece-weight table.
+    const metaPiece = matchedKey ? getHouseholdUnitGrams(matchedKey, 'piece') : undefined;
+    const pieceWeight =
+      metaPiece ??
+      (PIECE_WEIGHTS[cleanFoodName] ||
+        (matchedKey ? PIECE_WEIGHTS[matchedKey] : undefined) ||
+        100);
     grams = safeQty * pieceWeight;
   } else if (u === 'cup' || u === 'cups') {
     grams = safeQty * 240;
   } else if (u === 'bowl' || u === 'bowls') {
-    grams = safeQty * 200;
+    grams = safeQty * ((matchedKey ? getHouseholdUnitGrams(matchedKey, 'bowl') : undefined) ?? 200);
   } else if (u === 'katori') {
-    grams = safeQty * 150;
+    // A katori of sabzi (~120g) is lighter than a katori of dal (~150g) —
+    // the curated per-food equivalent wins when defined.
+    grams = safeQty * ((matchedKey ? getHouseholdUnitGrams(matchedKey, 'katori') : undefined) ?? 150);
   } else if (u === 'glass' || u === 'glas') {
-    grams = safeQty * 200;
+    grams = safeQty * ((matchedKey ? getHouseholdUnitGrams(matchedKey, 'glass') : undefined) ?? 200);
   } else if (u === 'plate' || u === 'plates' || u === 'serving') {
-    grams = safeQty * 250;
+    grams = safeQty * ((matchedKey ? getHouseholdUnitGrams(matchedKey, 'plate') : undefined) ?? 250);
   } else if (u === 'handful') {
     grams = safeQty * 30;
   }
