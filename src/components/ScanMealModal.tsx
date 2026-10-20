@@ -2,8 +2,10 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useStore } from '@/lib/store';
-import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem } from '@/lib/types';
+import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
+import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
+import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
@@ -70,6 +72,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   // Result state
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
+  // Per-item ghee/oil answers in the review step (index → level). Photo AI
+  // can't see absorbed ghee — this is the honesty correction, one tap.
+  const [oilLevels, setOilLevels] = useState<Record<number, OilLevelId>>({});
   const [mealName, setMealName] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
   const [editName, setEditName] = useState<string>('');
@@ -260,6 +265,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     stopLiveCamera();
     cleanupPreview();
     setStep('select');
+    setOilLevels({});
     setUserNotes('');
     setSelectedHiddenIngredients([]);
     setAnalysis(null);
@@ -380,6 +386,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         previewUrl || undefined
       );
       const result = applyLearnedPortionPreferences(rawResult);
+      setOilLevels({});
       setAnalysis(result);
       setMealName(result.mealName || 'Estimated Meal');
       setStep('review');
@@ -412,6 +419,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       });
 
       const result = applyLearnedPortionPreferences(rawResult);
+      setOilLevels({});
       setAnalysis(result);
       setMealName(result.mealName || 'Scanned Meal');
       setStep('review');
@@ -603,6 +611,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           userNotes: `${userNotes ? userNotes + '. ' : ''}Correction from user: ${refinementInput.trim()}`,
           hiddenIngredients: selectedHiddenIngredients,
         });
+        setOilLevels({});
         setAnalysis(refinedResult);
         toast.success('Meal re-analyzed with updated directives.', 'AI Refined');
         setRefinementInput('');
@@ -618,15 +627,30 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     if (!analysis || analysis.items.length === 0) return;
 
     const today = getLocalTodayStr();
-    const validFoods: FoodItem[] = analysis.items.map((it) => ({
-      name: it.name,
-      quantity: it.estimatedGrams,
-      unit: 'g',
-      calories: it.calories,
-      proteinG: it.proteinG,
-      carbsG: it.carbsG,
-      fatG: it.fatG,
-    }));
+    const validFoods: FoodItem[] = analysis.items.map((it, idx) => {
+      // Apply the user's ghee/oil answer on top of the AI draft — the AI
+      // cannot see absorbed fat, the user can correct it in one tap.
+      const oilDefault = defaultOilForFood(it.name);
+      const level = oilLevels[idx] ?? oilDefault?.level;
+      const adj =
+        oilDefault && level
+          ? applyOilDelta(it, oilDefault.assumedTsp, tspForOilLevel(level))
+          : it;
+      // Drafts land in household units when the grams map cleanly
+      // ("2 katori dal"), grams otherwise.
+      const draft = householdDraftFor(it.name, it.estimatedGrams);
+      return {
+        name: it.name,
+        quantity: draft ? draft.quantity : it.estimatedGrams,
+        unit: draft ? draft.unit : 'g',
+        calories: adj.calories,
+        proteinG: it.proteinG,
+        carbsG: it.carbsG,
+        fatG: adj.fatG,
+        oilLevel: oilDefault && level ? level : undefined,
+        oilAssumedTsp: oilDefault?.assumedTsp,
+      };
+    });
 
     const newMeal: MealEntry = {
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
@@ -1245,6 +1269,13 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <div className="space-y-2">
                       {analysis.items.map((item, idx) => {
                         const isEditing = editingItemIndex === idx;
+                        const oilDefault = defaultOilForFood(item.name);
+                        const oilLevel = oilLevels[idx] ?? oilDefault?.level;
+                        const adjItem =
+                          oilDefault && oilLevel
+                            ? applyOilDelta(item, oilDefault.assumedTsp, tspForOilLevel(oilLevel))
+                            : item;
+                        const householdDraft = householdDraftFor(item.name, item.estimatedGrams);
 
                         return (
                           <div
@@ -1260,6 +1291,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 </div>
                                 <span className="text-2xs text-text-secondary mt-0.5 block">
                                   {item.quantity} (~{item.estimatedGrams}g)
+                                  {householdDraft
+                                    ? ` ≈ ${householdDraft.quantity} ${householdDraft.unit}`
+                                    : ''}
                                   {item.preparation ? ` • ${item.preparation}` : ''}
                                 </span>
                               </div>
@@ -1268,10 +1302,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               <div className="flex items-center gap-2 shrink-0">
                                 <div className="text-right">
                                   <span className="font-bold text-xs text-accent block">
-                                    ~{item.calories} kcal
+                                    ~{adjItem.calories} kcal
                                   </span>
                                   <span className="text-3xs text-text-muted block">
-                                    P: {item.proteinG}g • C: {item.carbsG}g • F: {item.fatG}g
+                                    P: {item.proteinG}g • C: {item.carbsG}g • F: {adjItem.fatG}g
                                   </span>
                                 </div>
 
@@ -1295,6 +1329,34 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 </div>
                               </div>
                             </div>
+
+                            {/* Ghee/oil honesty prompt — the AI can't see
+                                absorbed fat; one tap corrects it. */}
+                            {oilDefault && oilLevel && (
+                              <div className="flex items-center justify-between gap-2 pt-1">
+                                <span className="text-3xs text-text-muted font-mono shrink-0">
+                                  GHEE/OIL IN THIS?
+                                </span>
+                                <div className="flex gap-1">
+                                  {OIL_LEVELS.map((level) => (
+                                    <button
+                                      key={level.id}
+                                      type="button"
+                                      onClick={() =>
+                                        setOilLevels((prev) => ({ ...prev, [idx]: level.id }))
+                                      }
+                                      className={`px-2 py-0.5 rounded-md text-3xs font-semibold transition-all cursor-pointer ${
+                                        oilLevel === level.id
+                                          ? 'bg-accent text-white'
+                                          : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
+                                      }`}
+                                    >
+                                      {level.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
 
                             {/* Inline food & portion editor */}
                             {isEditing && (

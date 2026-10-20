@@ -318,3 +318,28 @@ export function getHouseholdUnitGrams(
 export function isIndianDish(nameOrKey: string): boolean {
   return resolveIndianMeta(nameOrKey) !== null;
 }
+
+/**
+ * Convert a gram amount into a household-unit draft when it lands close
+ * to a clean count (whole or half units) — e.g. a scanned 300g of dal
+ * tadka becomes "2 katori". Used so photo-scan results arrive in the
+ * units people actually think in. Returns null when no unit fits.
+ */
+export function householdDraftFor(
+  name: string,
+  grams: number
+): { quantity: number; unit: string } | null {
+  const resolved = resolveIndianMeta(name);
+  if (!resolved || !(grams > 0)) return null;
+  let best: { quantity: number; unit: string; err: number } | null = null;
+  for (const unit of resolved.meta.units) {
+    const qty = grams / unit.grams;
+    const rounded = Math.round(qty * 2) / 2;
+    if (rounded < 0.5 || rounded > 8) continue;
+    const err = Math.abs(qty - rounded) / qty;
+    if (err <= 0.15 && (!best || err < best.err)) {
+      best = { quantity: rounded, unit: unit.id, err };
+    }
+  }
+  return best ? { quantity: best.quantity, unit: best.unit } : null;
+}

@@ -46,7 +46,9 @@ import {
   Leaf,
   Calendar,
 } from 'lucide-react';
-import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
+import { resolveIndianMeta } from '@/lib/indian-foods';
+import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -354,6 +356,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setActiveSuggestionIndex({});
   };
 
+  /** Ghee/oil selector: adjust this item's fat/calories relative to the
+   *  amount the database already assumed for the dish. */
+  const handleOilChange = (index: number, level: OilLevelId) => {
+    setFoods((prev) => prev.map((f, i) => (i === index ? withOilLevel(f, level) : f)));
+  };
+
   /**
    * Central handler for all food field changes.
    */
@@ -375,6 +383,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         if (name.length > 1 && next[index].quantity !== undefined && (next[index].quantity as number) > 0) {
           const est = estimateMacros(name, next[index].quantity, next[index].unit);
+          // New food identity → reset the ghee/oil state to this dish's
+          // database assumption (undefined for non-Indian dishes).
+          const oil = defaultOilForFood(name);
           next[index] = {
             ...next[index],
             calories: est.calories,
@@ -382,6 +393,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            oilAssumedTsp: oil?.assumedTsp,
+            oilLevel: oil?.level,
           };
         }
       }
@@ -466,11 +479,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const handleSelectSuggestion = (index: number, suggestion: string) => {
     let currentQty = foods[index]?.quantity;
-    const currentUnit = foods[index]?.unit || 'g';
+    let currentUnit = foods[index]?.unit || 'g';
     if (!currentQty || currentQty <= 0) {
       currentQty = ['piece', 'pieces', 'scoop', 'slice', 'bowl', 'cup', 'serving', 'handful'].includes(currentUnit) ? 1 : 100;
     }
+    // Indian dishes default to their household unit — "1 katori dal",
+    // not "100 g dal" — when the user hasn't picked a unit themselves.
+    const indianMeta = resolveIndianMeta(suggestion);
+    if (indianMeta && currentUnit === 'g') {
+      currentUnit = indianMeta.meta.units[0].id;
+      currentQty = 1;
+    }
     const est = estimateMacros(suggestion, currentQty, currentUnit);
+    const oil = defaultOilForFood(suggestion);
 
     setFoods((prev) => {
       const next = [...prev];
@@ -484,6 +505,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG:   est.carbsG,
         fatG:     est.fatG,
         isUnmatched: est.isUnmatched,
+        oilAssumedTsp: oil?.assumedTsp,
+        oilLevel: oil?.level,
       };
       return next;
     });
@@ -2330,6 +2353,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       const suggestions = foodSuggestions[i] || [];
                       const isDropdownOpen = showSuggestions[i] && suggestions.length > 0;
                       const favorited = isItemFavorited(food.name);
+                      const indianMeta = resolveIndianMeta(food.name);
+                      // Household units for this dish (katori/piece/plate)
+                      // join the generic unit list in the selector.
+                      const rowUnitOptions = [
+                        ...UNIT_OPTIONS,
+                        ...(indianMeta
+                          ? indianMeta.meta.units
+                              .filter((u) => !UNIT_OPTIONS.some((o) => o.value === u.id))
+                              .map((u) => ({ value: u.id, label: u.label }))
+                          : []),
+                      ];
 
                       return (
                         <div
@@ -2418,13 +2452,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               onChange={(e) => handleFoodChange(i, 'unit', e.target.value)}
                               className="bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-xs outline-none focus:border-accent min-w-[90px]"
                             >
-                              {UNIT_OPTIONS.map((opt) => (
+                              {rowUnitOptions.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
                                   {opt.label}
                                 </option>
                               ))}
                             </select>
                           </div>
+
+                          {/* Recipe assumption — what the DB values already
+                              count for this dish (muted, honest). */}
+                          {indianMeta && hasName && (
+                            <p className="text-3xs text-text-muted leading-relaxed">
+                              {indianMeta.meta.assumption}
+                            </p>
+                          )}
 
                           {/* Macro breakdown indicators / manual override */}
                           {hasName && (
@@ -2508,6 +2550,32 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   />
                                 </div>
                               </div>
+
+                              {/* Ghee/oil honesty prompt — one tap, adjusts
+                                  fat/calories against the DB assumption. */}
+                              {food.oilAssumedTsp !== undefined && (
+                                <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
+                                  <span className="text-2xs text-text-muted font-mono shrink-0">
+                                    GHEE/OIL IN THIS?
+                                  </span>
+                                  <div className="flex gap-1">
+                                    {OIL_LEVELS.map((level) => (
+                                      <button
+                                        key={level.id}
+                                        type="button"
+                                        onClick={() => handleOilChange(i, level.id)}
+                                        className={`px-2 py-1 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
+                                          (food.oilLevel || 'none') === level.id
+                                            ? 'bg-accent text-white'
+                                            : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
+                                        }`}
+                                      >
+                                        {level.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
