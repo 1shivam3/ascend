@@ -48,6 +48,7 @@ import {
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { purgeLocalAppData } from './storage';
+import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
@@ -125,6 +126,12 @@ export interface UiPreferences {
    * week), 0 = no target (count only), 1..7 = explicit day count.
    */
   weeklyTargetDays: number | null;
+  /**
+   * UI language ('en' | 'hi'). Persisted with the rest of uiPreferences
+   * (partialize + backup import/export); old saves without the field
+   * resolve to English in the i18n layer.
+   */
+  language: Language;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -132,6 +139,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   coachEnabled: true,
   showHabitMatrix: true,
   weeklyTargetDays: null,
+  language: 'en',
 };
 
 export interface AppState {
