@@ -492,6 +492,69 @@ export interface ReadinessResult {
 const READINESS_START = 100;
 
 /**
+ * Manual check-in weights — points per step away from neutral (3), applied
+ * PER INPUT (never averaged: averaging diluted a single bad signal 2–3× and
+ * left a 3–4 "dead zone" where selections changed nothing — the check-in
+ * must visibly move the score or users rightly conclude it is decorative).
+ *
+ *   sleep:    (v − 3) × 4  →  −8 … +8   (full 1→5 swing: 16 points)
+ *   soreness: (v − 3) × 4  →  −8 … +8   (full swing: 16 points;
+ *             v is freshness — 1 = wrecked, 5 = fresh, per ManualCheckin)
+ *   energy:   (v − 3) × 3  →  −6 … +6   (full swing: 12 points)
+ *
+ * Combined range −22 … +22: a terrible night can pull a strong score down
+ * a full band, but the check-in can neither erase nor manufacture the
+ * training-load signals (ACWR −20, RPE drift −15, streak −15), which stay
+ * the backbone of the score.
+ */
+const CHECKIN_STEP_POINTS = { sleep: 4, soreness: 4, energy: 3 } as const;
+
+/**
+ * Score delta + factor line for a manual check-in. Inputs the user never
+ * set stay neutral: energy is optional (absent = 0 contribution), and the
+ * sheet defaults unset sleep/soreness to 3 when it saves, so a partial
+ * check-in never invents a penalty or a bonus.
+ */
+function manualCheckinAdjustment(checkin: ManualCheckin): { delta: number; factor: string | null } {
+  const clamp15 = (v: number) => {
+    const n = Math.round(v);
+    return Number.isFinite(n) ? Math.max(1, Math.min(5, n)) : 3;
+  };
+  const sleep = clamp15(checkin.sleep);
+  const soreness = clamp15(checkin.soreness);
+  const energy = typeof checkin.energy === 'number' ? clamp15(checkin.energy) : undefined;
+
+  let delta = (sleep - 3) * CHECKIN_STEP_POINTS.sleep + (soreness - 3) * CHECKIN_STEP_POINTS.soreness;
+  if (energy !== undefined) delta += (energy - 3) * CHECKIN_STEP_POINTS.energy;
+
+  if (delta < 0) {
+    const complaints: string[] = [];
+    if (sleep < 3) complaints.push('sleep was rough');
+    if (soreness < 3) complaints.push("you're still sore");
+    if (energy !== undefined && energy < 3) complaints.push('energy is low');
+    return {
+      delta,
+      factor:
+        `Your check-in says ${complaints.length > 0 ? complaints.join(' and ') : 'recovery is off'}. ` +
+        `Bad recovery days are for technique work and easy volume — save the heavy stuff for when you feel human again.`,
+    };
+  }
+  if (delta > 0) {
+    const strengths: string[] = [];
+    if (sleep > 3) strengths.push('you slept well');
+    if (soreness > 3) strengths.push('your body feels fresh');
+    if (energy !== undefined && energy > 3) strengths.push('energy is high');
+    return {
+      delta,
+      factor:
+        `Your check-in helps today: ${strengths.length > 0 ? strengths.join(' and ') : 'you feel better than usual'}. ` +
+        `A good day to execute the session as planned — the score already reflects it.`,
+    };
+  }
+  return { delta: 0, factor: null };
+}
+
+/**
  * Readiness 1–100 from acute:chronic training load, RPE trend, consecutive
  * training days without rest, optional manual check-in, and rapid weight loss.
  * Conservative by design: thin data or conflicting signals push toward caution.
@@ -506,10 +569,21 @@ export function calculateReadiness(
   const sorted = [...(workouts || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
 
   if (sorted.length === 0) {
+    // No training history: a flat baseline, but the manual check-in still
+    // applies — the sheet must never be decorative. Conservative cap: with
+    // zero load data the score can rise toward 'ready', never to 'primed'.
+    let score = 70;
+    const emptyFactors = ['No recent training logged, so there is no fatigue to recover from. Start at a comfortable effort and let the first week set your baseline.'];
+    if (manualCheckin) {
+      const adj = manualCheckinAdjustment(manualCheckin);
+      score += adj.delta;
+      if (adj.factor) emptyFactors.push(adj.factor);
+    }
+    score = Math.max(1, Math.min(79, score));
     return {
-      score: 70,
-      band: 'ready',
-      factors: ['No recent training logged, so there is no fatigue to recover from. Start at a comfortable effort and let the first week set your baseline.'],
+      score,
+      band: score >= 60 ? 'ready' : score >= 40 ? 'caution' : 'rest',
+      factors: emptyFactors,
     };
   }
 
@@ -611,26 +685,14 @@ export function calculateReadiness(
     );
   }
 
-  // (d) Manual check-in.
+  // (d) Manual check-in — per-input adjustment on top of the load factors
+  // (weights documented at CHECKIN_STEP_POINTS / manualCheckinAdjustment).
+  // A saved check-in is authoritative for the inputs it covers: nothing
+  // later in this function re-derives or overwrites its contribution.
   if (manualCheckin) {
-    const clamp15 = (v: number) => Math.max(1, Math.min(5, v));
-    const parts = [clamp15(manualCheckin.sleep), clamp15(manualCheckin.soreness)];
-    if (typeof manualCheckin.energy === 'number') parts.push(clamp15(manualCheckin.energy));
-    const avgCheck = parts.reduce((a, b) => a + b, 0) / parts.length;
-    if (avgCheck < 3) {
-      const penalty = Math.round((3 - avgCheck) * 12);
-      score -= penalty;
-      const complaints: string[] = [];
-      if (manualCheckin.sleep < 3) complaints.push('sleep was rough');
-      if (manualCheckin.soreness < 3) complaints.push("you're still sore");
-      if (typeof manualCheckin.energy === 'number' && manualCheckin.energy < 3) complaints.push('energy is low');
-      factors.push(
-        `Your check-in says ${complaints.length > 0 ? complaints.join(' and ') : 'recovery is off'}. ` +
-        `Bad recovery days are for technique work and easy volume — save the heavy stuff for when you feel human again.`
-      );
-    } else if (avgCheck >= 4) {
-      score = Math.min(100, score + 3);
-    }
+    const adj = manualCheckinAdjustment(manualCheckin);
+    score += adj.delta;
+    if (adj.factor) factors.push(adj.factor);
   }
 
   // Rapid weight loss can mask under-recovery.
