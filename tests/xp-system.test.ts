@@ -15,6 +15,7 @@ import {
   progressToNext,
   getLevelName,
   getInitialXState,
+  summarizeXpInRange,
 } from '../src/lib/xp-system';
 import type { WorkoutEntry, MealEntry, WorkoutSet } from '../src/lib/types';
 
@@ -157,5 +158,47 @@ describe('awardXp', () => {
   });
   it('starts from a clean initial state', () => {
     expect(getInitialXState()).toEqual({ totalXp: 0, awardedIds: [] });
+  });
+});
+
+describe('summarizeXpInRange', () => {
+  const meal = (foods: number, date: string): MealEntry =>
+    ({
+      id: `m-${date}-${foods}`,
+      date,
+      name: 'Meal',
+      foods: Array.from({ length: foods }, () => ({})),
+    } as unknown as MealEntry);
+
+  it('sums XP per source for activity inside the range only', () => {
+    const s = summarizeXpInRange(
+      {
+        workouts: [
+          workout([set({ completed: true })], '2026-10-19'),
+          workout([set({ completed: true })], '2026-10-25'),
+          workout([set({ completed: true })], '2026-10-26'), // outside
+          workout([set({ completed: false })], '2026-10-20'), // no completed set → 0
+        ],
+        meals: [meal(2, '2026-10-19'), meal(0, '2026-10-20'), meal(1, '2026-11-02')],
+        prs: [{ date: '2026-10-21' }, { date: '2026-10-21' }, { date: '2026-09-30' }],
+        waterLogs: { '2026-10-19': 500, '2026-10-20': 0, '2026-10-22': 250, '2026-11-01': 900 },
+      },
+      '2026-10-19',
+      '2026-10-25',
+    );
+    expect(s.workoutXp).toBe(2 * XP_WORKOUT);
+    expect(s.mealXp).toBe(XP_MEAL);
+    expect(s.prXp).toBe(2 * XP_PR);
+    expect(s.waterXp).toBe(2 * XP_WATER);
+    expect(s.total).toBe(2 * XP_WORKOUT + XP_MEAL + 2 * XP_PR + 2 * XP_WATER);
+  });
+
+  it('returns zeros for an empty range', () => {
+    const s = summarizeXpInRange(
+      { workouts: [], meals: [], prs: [], waterLogs: {} },
+      '2026-10-19',
+      '2026-10-25',
+    );
+    expect(s).toEqual({ total: 0, workoutXp: 0, mealXp: 0, prXp: 0, waterXp: 0 });
   });
 });
