@@ -51,6 +51,7 @@ import {
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
+import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
 import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
@@ -922,7 +923,7 @@ export default function ActiveWorkoutScreen({
   const postWorkoutLedger = useMemo(() => {
     const improved: string[] = [];
     const steady: string[] = [];
-    const nextRules: string[] = [];
+    const nextRules: Array<{ summary: string; rationale?: string }> = [];
 
     for (const ex of exercises) {
       if (!ex.name.trim()) continue;
@@ -955,13 +956,16 @@ export default function ActiveWorkoutScreen({
       } else {
         steady.push(`${ex.name}: building reps at ${target.weight}${userUnit}`);
       }
-      nextRules.push(`${target.summaryText} — ${target.rationale}`);
+      nextRules.push({ summary: target.summaryText, rationale: target.rationale });
     }
 
     return {
       improved: improved.length > 0 ? improved.slice(0, 2) : ['First session calibration completed'],
       steady: steady.length > 0 ? steady.slice(0, 2) : ['Movement quality & baseline established'],
-      nextRules: nextRules.length > 0 ? nextRules.slice(0, 2) : ['Follow prescribed target progression'],
+      nextRules:
+        nextRules.length > 0
+          ? nextRules.slice(0, 2)
+          : [{ summary: 'Follow prescribed target progression' }],
     };
   }, [exercises, userUnit]);
 
@@ -3546,7 +3550,14 @@ export default function ActiveWorkoutScreen({
                   </div>
                   <ul className="text-2xs text-text-secondary space-y-0.5 list-disc list-inside">
                     {postWorkoutLedger.nextRules.map((item, idx) => (
-                      <li key={idx} className="leading-snug">{item}</li>
+                      <li key={idx} className="leading-snug">
+                        {item.summary}
+                        {item.rationale && (
+                          <CollapsibleDetails label="Why?">
+                            <p>{item.rationale}</p>
+                          </CollapsibleDetails>
+                        )}
+                      </li>
                     ))}
                   </ul>
                 </div>

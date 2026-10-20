@@ -6,6 +6,7 @@ import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration } from '@/lib/formatters';
+import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import {
   Trophy,
   X,
@@ -41,6 +42,8 @@ export default function PostWorkoutTakeModal({
   const store = useStore();
   const [take, setTake] = useState<AIPostWorkoutTake | null>(null);
   const [loading, setLoading] = useState(true);
+  // The engine's reason for the next-session target — shown only on demand.
+  const [targetRationale, setTargetRationale] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -48,6 +51,29 @@ export default function PostWorkoutTakeModal({
       let timeoutId: ReturnType<typeof setTimeout> | null = null;
       setLoading(true);
       setTake(null);
+      setTargetRationale(null);
+      // Canonical next-session target, computed once from the completed
+      // primary exercise — used by both the AI and fallback paths below.
+      const primaryExercise = completedWorkout.exercises[0];
+      const primarySets = (primaryExercise?.sets || [])
+        .filter((s) => isSetCompleted(s as any))
+        .map((s) => ({
+          weight: parseFloat(String(s.weight)) || 0,
+          reps: parseInt(String(s.reps), 10) || 0,
+          rpe: typeof s.rpe === 'number' ? s.rpe : undefined,
+          unit: (s.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg',
+        }));
+      const canonicalTarget =
+        primaryExercise && primarySets.length > 0
+          ? getNextSessionTarget(
+              primaryExercise.name,
+              primarySets,
+              // Same unit fallback as ai-coach's deterministic take, so the
+              // rationale shown always belongs to the target displayed.
+              (primarySets[0]?.unit as 'kg' | 'lbs') || 'kg',
+              { hadPain: exerciseHadPain(completedWorkout, primaryExercise.name) }
+            )
+          : null;
       // Timeout guard: never leave the athlete stuck on "Generating...".
       // After 20s, fall back to the deterministic local take.
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -60,34 +86,19 @@ export default function PostWorkoutTakeModal({
             // getNextSessionTarget() — the same function the Training
             // Adaptation Summary reads — so the two surfaces agree even
             // when Gemini generates the rest of the take.
-            const primary = completedWorkout.exercises[0];
-            const primarySets = (primary?.sets || [])
-              .filter((s) => isSetCompleted(s as any))
-              .map((s) => ({
-                weight: parseFloat(String(s.weight)) || 0,
-                reps: parseInt(String(s.reps), 10) || 0,
-                rpe: typeof s.rpe === 'number' ? s.rpe : undefined,
-                unit: (s.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg',
-              }));
-            const canonical = primary
-              ? getNextSessionTarget(
-                  primary.name,
-                  primarySets,
-                  (primarySets[0]?.unit as 'kg' | 'lbs') || store.profile?.unit || 'kg',
-                  { hadPain: exerciseHadPain(completedWorkout, primary.name) }
-                )
-              : null;
             setTake(
-              canonical
-                ? { ...res, nextSessionTarget: `NEXT SESSION TARGET: ${canonical.summaryText}` }
+              canonicalTarget
+                ? { ...res, nextSessionTarget: `NEXT SESSION TARGET: ${canonicalTarget.summaryText}` }
                 : res
             );
+            setTargetRationale(canonicalTarget?.rationale ?? null);
             setLoading(false);
           }
         })
         .catch((err) => {
           console.error('Failed to get post-workout take:', err);
           if (isMounted) {
+            setTargetRationale(canonicalTarget?.rationale ?? null);
             // Fallback: deterministic local take so the modal always has content.
             try {
               setTake(generateDeterministicPostWorkoutTake(completedWorkout));
@@ -307,6 +318,11 @@ export default function PostWorkoutTakeModal({
               <p className="text-xs font-semibold text-text-primary">
                 {take.nextSessionTarget}
               </p>
+              {targetRationale && (
+                <CollapsibleDetails label="Why this target?">
+                  <p>{targetRationale}</p>
+                </CollapsibleDetails>
+              )}
             </div>
           </div>
         ) : null}

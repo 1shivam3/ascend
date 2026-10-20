@@ -185,6 +185,58 @@ export function getLevelName(level: number): string {
   return 'Initiate';
 }
 
+export interface XpActivitySummary {
+  /** Total XP attributable to activity in the range. */
+  total: number;
+  workoutXp: number;
+  mealXp: number;
+  prXp: number;
+  waterXp: number;
+}
+
+/**
+ * XP attributable to logged activity between two YYYY-MM-DD dates
+ * (inclusive) — derived from the same rules the ledger awards by:
+ * workouts via xpForWorkout, meals via xpForMeal, PRs at XP_PR each, and
+ * XP_WATER once per day that has any water logged. This is a summary of
+ * logged activity, NOT an event history: the ledger stores only totals +
+ * awarded ids, so XP from entries later deleted still counts in the
+ * lifetime total but won't appear here.
+ */
+export function summarizeXpInRange(
+  data: {
+    workouts: WorkoutEntry[];
+    meals: MealEntry[];
+    prs: Array<{ date: string }>;
+    waterLogs?: Record<string, number>;
+  },
+  startStr: string,
+  endStr: string,
+): XpActivitySummary {
+  const inRange = (dateStr: string) => {
+    const d = (dateStr || '').split('T')[0];
+    return d >= startStr && d <= endStr;
+  };
+  const workoutXp = data.workouts
+    .filter((w) => inRange(w.date))
+    .reduce((sum, w) => sum + xpForWorkout(w), 0);
+  const mealXp = data.meals
+    .filter((m) => inRange(m.date))
+    .reduce((sum, m) => sum + xpForMeal(m), 0);
+  const prXp = data.prs.filter((p) => inRange(p.date)).length * XP_PR;
+  const waterXp =
+    Object.entries(data.waterLogs ?? {}).filter(
+      ([d, ml]) => inRange(d) && ml > 0,
+    ).length * XP_WATER;
+  return {
+    total: workoutXp + mealXp + prXp + waterXp,
+    workoutXp,
+    mealXp,
+    prXp,
+    waterXp,
+  };
+}
+
 /** Persisted shape for the XP slice of the store. */
 export interface XpState {
   totalXp: number;
