@@ -26,6 +26,7 @@ import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
+import { Capacitor } from '@capacitor/core';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -329,7 +330,9 @@ export default function BarcodeScannerModal({
       setHasCamera(false);
       setCameraError(
         err.name === 'NotAllowedError'
-          ? `Camera permission denied (${err.name || 'error'}). Please allow camera access in browser settings, or enter barcode below.`
+          ? Capacitor.isNativePlatform()
+            ? `Camera permission denied (${err.name || 'error'}). Enable camera access in App info → Permissions, or enter barcode below.`
+            : `Camera permission denied (${err.name || 'error'}). Please allow camera access in your browser site settings, or enter barcode below.`
           : `Camera error (${err.name || 'unknown'}). You can still type the barcode manually below.`
       );
     }
