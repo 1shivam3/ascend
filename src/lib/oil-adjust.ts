@@ -1,5 +1,5 @@
 import type { OilLevelId } from './types';
-import { resolveIndianMeta } from './indian-foods';
+import { resolveIndianMeta, getHouseholdUnitGrams } from './indian-foods';
 
 /**
  * Ghee/oil honesty adjustment.
@@ -76,18 +76,67 @@ export function applyOilDelta<T extends MacroSnapshot>(
 }
 
 /**
+ * How many standard servings an item represents, for oil math. The DB
+ * assumption (assumedOilTsp) is per standard serving — the dish's first
+ * household unit (1 katori / 1 piece / 1 plate). A 2-katori portion
+ * carries twice the assumed oil, so the selector delta must scale with
+ * it; applying a single-serving delta to a multi-serving row left half
+ * the assumed oil in place when the user picked "None" (R3 finding).
+ * Falls back to 1 whenever the portion can't be resolved.
+ */
+export function servingsForOil(
+  name: string | undefined,
+  quantity?: number,
+  unit?: string,
+  grams?: number
+): number {
+  if (!name) return 1;
+  const resolved = resolveIndianMeta(name);
+  if (!resolved) return 1;
+  const standard = resolved.meta.units[0]?.grams;
+  if (!standard || standard <= 0) return 1;
+
+  let totalGrams = grams;
+  if ((totalGrams === undefined || !(totalGrams > 0)) && quantity && quantity > 0 && unit) {
+    const perUnit =
+      getHouseholdUnitGrams(name, unit) ??
+      (unit === 'g' || unit === 'ml'
+        ? 1
+        : unit === 'kg' || unit === 'l'
+          ? 1000
+          : undefined);
+    if (perUnit) totalGrams = quantity * perUnit;
+  }
+  if (!totalGrams || totalGrams <= 0) return 1;
+  const servings = totalGrams / standard;
+  return servings > 0 ? servings : 1;
+}
+
+/**
  * Set an item's oil level, adjusting its macros relative to where they
  * currently stand. The baseline is the item's current level if one is
- * set, otherwise the DB assumption stored on the item.
+ * set, otherwise the DB assumption stored on the item. The delta is
+ * scaled by the number of servings in the row (see servingsForOil).
  */
 export function withOilLevel<
-  T extends MacroSnapshot & { oilLevel?: OilLevelId; oilAssumedTsp?: number }
+  T extends MacroSnapshot & {
+    oilLevel?: OilLevelId;
+    oilAssumedTsp?: number;
+    name?: string;
+    quantity?: number;
+    unit?: string;
+  }
 >(item: T, level: OilLevelId): T {
   const fromTsp =
     item.oilLevel !== undefined
       ? tspForOilLevel(item.oilLevel)
       : item.oilAssumedTsp ?? 0;
-  const adjusted = applyOilDelta(item, fromTsp, tspForOilLevel(level));
+  const servings = servingsForOil(item.name, item.quantity, item.unit);
+  const adjusted = applyOilDelta(
+    item,
+    fromTsp * servings,
+    tspForOilLevel(level) * servings
+  );
   return { ...adjusted, oilLevel: level };
 }
 

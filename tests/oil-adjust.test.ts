@@ -8,6 +8,7 @@ import {
   applyOilDelta,
   withOilLevel,
   defaultOilForFood,
+  servingsForOil,
 } from '../src/lib/oil-adjust';
 import { householdDraftFor } from '../src/lib/indian-foods';
 
@@ -66,6 +67,38 @@ describe('ghee/oil fat math', () => {
     expect(oilLevelForTsp(2)).toBe('tbsp');
     expect(oilLevelForTsp(3)).toBe('tbsp');
     expect(oilLevelForTsp(6)).toBe('tbsp2');
+  });
+
+  it('R3: oil delta scales with servings — 2 katori set to None removes 2 tsp, not 1', () => {
+    // 2 katori dal tadka: 384 kcal, 10.8 g fat, of which 2 tsp (8 g) is
+    // the assumed tadka across both servings.
+    const row = {
+      name: 'Dal Tadka',
+      quantity: 2,
+      unit: 'katori',
+      calories: 384,
+      proteinG: 21,
+      carbsG: 51,
+      fatG: 10.8,
+      oilAssumedTsp: 1,
+      oilLevel: 'tsp' as const,
+    };
+    const none = withOilLevel(row, 'none');
+    expect(none.fatG).toBeCloseTo(2.8, 1);
+    expect(none.calories).toBe(384 - 2 * GHEE_TSP_KCAL);
+    const tbsp = withOilLevel(row, 'tbsp');
+    expect(tbsp.fatG).toBeCloseTo(10.8 + 4 * GHEE_TSP_FAT_G, 1);
+    expect(tbsp.calories).toBe(384 + 4 * GHEE_TSP_KCAL);
+  });
+
+  it('R3: servingsForOil resolves household units, grams, and falls back to 1', () => {
+    expect(servingsForOil('dal tadka', 2, 'katori')).toBe(2);
+    expect(servingsForOil('dal tadka', 300, 'g')).toBe(2);
+    expect(servingsForOil('dal tadka', undefined, undefined, 300)).toBe(2);
+    expect(servingsForOil('dal tadka', 1, 'katori')).toBe(1);
+    expect(servingsForOil('chicken breast', 2, 'katori')).toBe(1);
+    expect(servingsForOil('dal tadka')).toBe(1);
+    expect(servingsForOil(undefined, 2, 'katori')).toBe(1);
   });
 
   it('defaultOilForFood only fires for oil-relevant Indian dishes', () => {

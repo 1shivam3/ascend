@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
 import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
-import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel } from '@/lib/oil-adjust';
+import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
@@ -632,9 +632,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       // cannot see absorbed fat, the user can correct it in one tap.
       const oilDefault = defaultOilForFood(it.name);
       const level = oilLevels[idx] ?? oilDefault?.level;
+      // The DB assumption is per standard serving — a 300 g (2 katori)
+      // portion carries twice the assumed oil, so scale the delta.
+      const servings = servingsForOil(it.name, undefined, undefined, it.estimatedGrams);
       const adj =
         oilDefault && level
-          ? applyOilDelta(it, oilDefault.assumedTsp, tspForOilLevel(level))
+          ? applyOilDelta(it, oilDefault.assumedTsp * servings, tspForOilLevel(level) * servings)
           : it;
       // Drafts land in household units when the grams map cleanly
       // ("2 katori dal"), grams otherwise.
@@ -1271,9 +1274,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         const isEditing = editingItemIndex === idx;
                         const oilDefault = defaultOilForFood(item.name);
                         const oilLevel = oilLevels[idx] ?? oilDefault?.level;
+                        const servings = servingsForOil(item.name, undefined, undefined, item.estimatedGrams);
                         const adjItem =
                           oilDefault && oilLevel
-                            ? applyOilDelta(item, oilDefault.assumedTsp, tspForOilLevel(oilLevel))
+                            ? applyOilDelta(item, oilDefault.assumedTsp * servings, tspForOilLevel(oilLevel) * servings)
                             : item;
                         const householdDraft = householdDraftFor(item.name, item.estimatedGrams);
 
