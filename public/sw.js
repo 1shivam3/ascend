@@ -64,25 +64,39 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation requests (HTML documents) - Network first with Cache fallback
+  // Navigation requests (HTML documents) - Network first with Cache fallback.
+  // The network fetch is raced against a 3s timeout: on slow 4G a hanging
+  // (not failing) connection previously left users on a blank screen
+  // forever even though a cached shell was available.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        try {
+          const response = await fetch(request, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (response && response.status === 200) {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            cache.put(request, response.clone());
           }
           return response;
-        })
-        .catch(async () => {
-          const cachedResponse = await caches.match(request);
+        } catch (err) {
+          clearTimeout(timeoutId);
+          const cachedResponse = await cache.match(request);
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Fallback to cached root page if available
-          return caches.match('/');
-        })
+          const root = await cache.match('/');
+          if (root) {
+            return root;
+          }
+          return new Response(
+            '<!doctype html><html><body style="font-family:sans-serif;padding:2rem;text-align:center"><h1>You are offline</h1><p>ASCEND could not load. Check your connection and reopen the app.</p></body></html>',
+            { status: 503, headers: { 'Content-Type': 'text/html' } }
+          );
+        }
+      })()
     );
     return;
   }

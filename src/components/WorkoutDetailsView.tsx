@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { PlannedWorkout } from '@/lib/types';
 import { useStore } from '@/lib/store';
-import { getLastExercisePerformance } from '@/lib/workout-engine';
+import { getLastExercisePerformance, estimateSessionMinutes } from '@/lib/workout-engine';
 import { getWorkoutBodyParts } from '@/lib/workout-schedule';
 
 interface WorkoutDetailsViewProps {
@@ -38,7 +38,7 @@ export default function WorkoutDetailsView({
   const userUnit = profile?.unit || 'kg';
 
   const exerciseCount = plan.exercises?.length || 0;
-  const estimatedDuration = Math.max(30, exerciseCount * 8);
+  const estimatedDuration = estimateSessionMinutes(plan);
 
   const bodyParts = React.useMemo(() => {
     const detected = getWorkoutBodyParts(plan.exercises || []);

@@ -18,6 +18,7 @@ import {
   List,
 } from 'lucide-react';
 import { WorkoutEntry } from '@/lib/types';
+import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
 import {
   toLocalDateString,
   calculateHydrationTarget,
@@ -54,6 +55,13 @@ export default function WorkoutHeatmap({
   const [selectedDate, setSelectedDate] = useState<string | null>(todayStr);
   const [activeFilter, setActiveFilter] = useState<HabitFilter>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
+  // Matrix view shows ONE week (Mon–Sun) — defaults to the current week.
+  const [matrixWeekStart, setMatrixWeekStart] = useState(() => {
+    const d = new Date(today);
+    d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+    d.setHours(0, 0, 0, 0);
+    return d;
+  });
 
   const waterTargetMl = calculateHydrationTarget({
     bodyweightKg: profile?.bodyweightKg || 75,
@@ -366,102 +374,25 @@ export default function WorkoutHeatmap({
           </div>
         </div>
       ) : (
-        /* ── View Mode: Multi-Habit Row Matrix (User item 4) ────────────────── */
-        <div className="space-y-2 py-1 overflow-x-auto no-scrollbar">
-          <div className="min-w-[320px] space-y-1.5 text-xs font-mono">
-            {/* Days header strip */}
-            <div className="flex items-center gap-1 pl-16">
-              {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => (
-                <div key={i} className="w-4 text-center text-[9px] text-text-muted">
-                  {i + 1}
-                </div>
-              ))}
-            </div>
-
-            {/* Gym Row */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-[#FF6A1A]">GYM</span>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
-                  const dayNum = i + 1;
-                  const dStr = `${yearNum}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                  const done = (workoutMap.get(dStr) || []).length > 0;
-                  return (
-                    <span
-                      key={i}
-                      onClick={() => setSelectedDate(dStr)}
-                      className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-[#FF6A1A]' : 'bg-bg-secondary border border-border/40'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Water Row */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-[#38BDF8]">WATER</span>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
-                  const dayNum = i + 1;
-                  const dStr = `${yearNum}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                  const done = (waterLogs[dStr] || 0) >= waterTargetMl * 0.85;
-                  return (
-                    <span
-                      key={i}
-                      onClick={() => setSelectedDate(dStr)}
-                      className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-[#38BDF8]' : 'bg-bg-secondary border border-border/40'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Creatine Row */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-[#F5B301]">CREAT</span>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
-                  const dayNum = i + 1;
-                  const dStr = `${yearNum}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                  const done = !!creatineLogs[dStr]?.taken;
-                  return (
-                    <span
-                      key={i}
-                      onClick={() => setSelectedDate(dStr)}
-                      className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-[#F5B301]' : 'bg-bg-secondary border border-border/40'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Protein Row */}
-            <div className="flex items-center gap-1.5">
-              <span className="w-14 text-[10px] uppercase font-bold text-[#22C55E]">PROT</span>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(14, daysInMonth) }).map((_, i) => {
-                  const dayNum = i + 1;
-                  const dStr = `${yearNum}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
-                  const done = (proteinMap.get(dStr) || 0) >= proteinTargetG * 0.85;
-                  return (
-                    <span
-                      key={i}
-                      onClick={() => setSelectedDate(dStr)}
-                      className={`w-4 h-4 rounded cursor-pointer ${
-                        done ? 'bg-[#22C55E]' : 'bg-bg-secondary border border-border/40'
-                      }`}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+        /* ── View Mode: One-Week Habit Matrix (Mon–Sun, prev/next week nav) ── */
+        <div className="py-1">
+          <WeeklyHabitMatrix
+            workouts={workouts}
+            waterLogs={waterLogs}
+            creatineLogs={creatineLogs}
+            meals={meals}
+            waterTargetMl={waterTargetMl}
+            proteinTargetG={proteinTargetG}
+            weekStart={matrixWeekStart}
+            onWeekChange={(dir) =>
+              setMatrixWeekStart((prev) => {
+                const d = new Date(prev);
+                d.setDate(d.getDate() + dir * 7);
+                return d;
+              })
+            }
+            onSelectDate={(dStr) => setSelectedDate(dStr)}
+          />
         </div>
       )}
 

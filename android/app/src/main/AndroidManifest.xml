@@ -39,4 +39,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Runtime permission required for notifications on Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Camera is used for barcode / meal scanning only; the app works fully without one -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 </manifest>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { DecodedProgram } from '@/lib/program-sharing';
+import { DecodedProgram, findDuplicateProgram } from '@/lib/program-sharing';
 import { useStore } from '@/lib/store';
 import { PlannedWorkout } from '@/lib/types';
 import { Download, Play, X, User, Dumbbell, Sparkles } from 'lucide-react';
@@ -30,11 +30,22 @@ export default function ImportProgramModal({
       id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `plan_${Date.now()}`,
       name: program.name,
       exercises: program.exercises,
+      description: program.description,
+      goalTag: program.goalTag,
       createdAt: new Date().toISOString(),
     };
   };
 
+  // Re-importing the same link must not mint a duplicate plan every tap.
+  const existingDuplicate = () =>
+    findDuplicateProgram(useStore.getState().plannedWorkouts || [], program);
+
   const handleImportOnly = () => {
+    if (existingDuplicate()) {
+      toast.info(`"${program.name}" is already in your Workout Plans.`, 'Already Imported');
+      onClose();
+      return;
+    }
     const newPlan = createPlanObject();
     addPlannedWorkout(newPlan);
     toast.success(`Imported "${program.name}" to your Workout Plans!`, 'Program Saved');
@@ -42,12 +53,15 @@ export default function ImportProgramModal({
   };
 
   const handleImportAndStart = () => {
-    const newPlan = createPlanObject();
-    addPlannedWorkout(newPlan);
+    let planToStart = existingDuplicate();
+    if (!planToStart) {
+      planToStart = createPlanObject();
+      addPlannedWorkout(planToStart);
+    }
     toast.success(`Imported "${program.name}". Starting workout!`, 'Session Started');
     onClose();
     if (onStartWorkout) {
-      onStartWorkout(newPlan);
+      onStartWorkout(planToStart);
     }
   };
 

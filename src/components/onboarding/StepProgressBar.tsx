@@ -4,7 +4,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 
 interface StepProgressBarProps {
-  currentStep: 1 | 2 | 3;
+  currentStep: 1 | 2 | 3 | 4;
   onBack: () => void;
   title?: string;
 }
@@ -33,7 +33,7 @@ export default function StepProgressBar({
           </span>
         ) : (
           <span className="text-xs font-medium text-[#858076]">
-            Step {currentStep} of 3
+            Step {currentStep} of 4
           </span>
         )}
 
@@ -41,8 +41,8 @@ export default function StepProgressBar({
         <div className="w-10 h-10" aria-hidden="true" />
       </div>
 
-      {/* 3-Segment Progress Bar */}
-      <div className="grid grid-cols-3 gap-2 w-full" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={3}>
+      {/* 4-Segment Progress Bar */}
+      <div className="grid grid-cols-4 gap-2 w-full" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={4}>
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
             currentStep >= 1 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
@@ -56,6 +56,11 @@ export default function StepProgressBar({
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
             currentStep >= 3 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
+          }`}
+        />
+        <div
+          className={`h-1.5 rounded-full transition-all duration-300 ${
+            currentStep >= 4 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
           }`}
         />
       </div>

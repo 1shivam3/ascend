@@ -60,6 +60,42 @@ import {
 } from './workout-outcome-evidence';
 import { isSetPrescribed } from './workout-adherence';
 import { isBodyweightExercise } from './strength-standards';
+import {
+  registerCustomExerciseMuscle,
+  registerCustomExerciseMuscles,
+  type MuscleGroup as LibraryMuscleGroup,
+} from './exercise-library';
+import {
+  XpState,
+  XpEvent,
+  getInitialXState as getInitialXpState,
+  awardXp,
+  xpEventId,
+  xpForWorkout,
+  xpForMeal,
+} from './xp-system';
+import {
+  StreakState,
+  getInitialStreakState,
+  getInitialXState as getInitialStreakXState,
+  refreshFreezeWeek,
+  calculateStreak,
+  applyStreakResult,
+  buildActiveDays,
+} from './streak-freeze';
+import {
+  ChallengesXState,
+  getInitialXState as getInitialChallengesXState,
+} from './challenges';
+import {
+  CoachPersistedState,
+  CalorieAdjustmentRecord,
+  ReadinessHistoryEntry,
+  getInitialCoachState,
+  detectStalls,
+  calculateReadiness,
+  type ManualCheckin,
+} from './coach-engine';
 
 export * from './types';
 
@@ -75,6 +111,27 @@ export interface ActiveWorkoutDraft {
   savedAt: string;
 }
 
+export interface UiPreferences {
+  /** XP level card, streak card, monthly challenge card on Home. */
+  gamificationEnabled: boolean;
+  /** Coach check-in cards, calorie suggestions, readiness score on Home. */
+  coachEnabled: boolean;
+  /** The one-week habit matrix card on Home. */
+  showHabitMatrix: boolean;
+  /**
+   * Weekly workout target. null = automatic (weekly schedule / days per
+   * week), 0 = no target (count only), 1..7 = explicit day count.
+   */
+  weeklyTargetDays: number | null;
+}
+
+export const DEFAULT_UI_PREFERENCES: UiPreferences = {
+  gamificationEnabled: true,
+  coachEnabled: true,
+  showHabitMatrix: true,
+  weeklyTargetDays: null,
+};
+
 export interface AppState {
   profile: UserProfile | null;
   prs: PersonalRecord[];
@@ -89,6 +146,21 @@ export interface AppState {
   plannedWorkouts: PlannedWorkout[];
   /** Built-in routine template IDs the user has hidden from the Plans tab */
   hiddenBuiltinRoutineIds: string[];
+  /** User-declared muscle groups for custom exercises (name → muscle).
+   *  Without this, customs were classified by name keywords alone and
+   *  could never be corrected. */
+  customExerciseMuscles: Record<string, LibraryMuscleGroup>;
+  setCustomExerciseMuscle: (name: string, muscle: LibraryMuscleGroup) => void;
+  /**
+   * Tombstones for user-deleted plans. Sync's pull-merge is union-based
+   * (remote rows missing locally get added), which used to resurrect
+   * deleted plans. Tombstoned ids are never merged back, and push deletes
+   * them server-side; a tombstone is pruned once the server confirms the
+   * row is gone.
+   */
+  deletedPlanIds: string[];
+  /** Remove tombstones (sync calls this once deletions are server-confirmed). */
+  clearDeletedPlanIds: (ids: string[]) => void;
   favoriteFoods: FavoriteFood[];
   hasCompletedOnboarding: boolean;
   _hasHydrated: boolean;
@@ -115,6 +187,39 @@ export interface AppState {
   // Notification Preferences
   notificationPreferences: NotificationPreferences;
   setNotificationPreferences: (prefs: NotificationPreferences) => void;
+
+  // XP System (fun, never annoying)
+  xp: XpState;
+  awardXpEvents: (events: XpEvent[]) => { leveledUp: boolean; newLevel: number; awarded: number };
+
+  // Streak System (forgiving, freeze auto-applies)
+  streak: StreakState;
+  refreshStreak: () => void;
+
+  // UI Customization — "no user trapped in anything they don't want."
+  // Defaults all-on; each surface can be hidden from Settings.
+  uiPreferences: UiPreferences;
+  setUiPreferences: (patch: Partial<UiPreferences>) => void;
+
+  // Monthly Challenges (opt-in, dismissible)
+  challenges: ChallengesXState;
+  optInChallenge: (key: string) => void;
+  optOutChallenge: (key: string) => void;
+  dismissChallenge: (key: string) => void;
+  grantChallengeReward: (key: string) => void;
+
+  // Coach Engine (adaptive coaching state)
+  coach: CoachPersistedState;
+  /** Daily feel check-ins (sleep/soreness/energy, 1–5) by date. The
+   *  readiness engine has supported these for months; until now no UI
+   *  ever collected them, so the input was permanently dead. */
+  dailyCheckins: Record<string, ManualCheckin>;
+  setDailyCheckin: (dateStr: string, checkin: ManualCheckin) => void;
+  dismissCheckIn: (id: string) => void;
+  recordCalorieAdjustment: (record: CalorieAdjustmentRecord) => void;
+  acknowledgeStall: (exercise: string) => void;
+  recordReadiness: (date: string, score: number, band: ReadinessHistoryEntry['band']) => void;
+  processCoachingAfterWorkout: () => void;
 
   // AI Training Profile & Plans
   trainingProfile: AITrainingProfile;
@@ -160,7 +265,9 @@ export interface AppState {
 
   addBodyMetric: (entry: BodyMetricEntry) => void;
   deleteBodyMetric: (id: string) => void;
-  addProgressPhoto: (photo: ProgressPhoto) => void;
+  /** Returns true when the photo was actually persisted; false means
+   *  storage quota — the photo survives only for this session. */
+  addProgressPhoto: (photo: ProgressPhoto) => boolean;
   removeProgressPhoto: (id: string) => void;
   updateBodyMetrics: (
     weightKg: number,
@@ -236,8 +343,7 @@ export interface AppState {
   importAllData: (data: any) => boolean;
 }
 
-function getLocalTodayStr(): string {
-  const d = new Date();
+function getLocalTodayStr(d: Date = new Date()): string {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
@@ -289,12 +395,56 @@ const DEFAULT_FAVORITE_FOODS: FavoriteFood[] = [
 export const PROGRESS_PHOTOS_KEY = 'ascend_progress_photos_v1';
 const MAX_PROGRESS_PHOTOS = 24;
 
-function persistProgressPhotos(photos: ProgressPhoto[]): void {
+/**
+ * The profile avatar is a device-local asset (the cloud profiles table has
+ * no avatar column). It used to live ONLY inside the big persisted store
+ * blob: one sync profile-rebuild (pre-PR#8) or a single failed/quota-busted
+ * blob write destroyed it permanently. Mirror it under its own key — the
+ * same trick as progress photos — so the picture survives blob issues and
+ * any future profile rebuild that forgets to carry it.
+ */
+export const AVATAR_MIRROR_KEY = 'ascend_avatar_v1';
+
+export function persistAvatarMirror(avatar: string | undefined): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(PROGRESS_PHOTOS_KEY, JSON.stringify(photos.slice(0, MAX_PROGRESS_PHOTOS)));
+    if (avatar) localStorage.setItem(AVATAR_MIRROR_KEY, avatar);
+    else localStorage.removeItem(AVATAR_MIRROR_KEY);
   } catch {
-    // Quota exceeded: photos stay in memory for this session.
+    // Quota etc. — the store blob still carries the avatar as primary copy.
+  }
+}
+
+export function loadAvatarMirror(): string | undefined {
+  if (typeof localStorage === 'undefined') return undefined;
+  try {
+    return localStorage.getItem(AVATAR_MIRROR_KEY) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Resolve the effective avatar: an explicit profile value wins; the
+ * mirror restores it when a profile rebuild dropped it. */
+export function resolveAvatar(
+  profileAvatar: string | undefined,
+  mirror: string | undefined = loadAvatarMirror(),
+): string | undefined {
+  return profileAvatar || mirror;
+}
+
+/**
+ * Persists progress photos to their dedicated storage key. Returns false
+ * when the write failed (quota) — callers must NOT tell the user the
+ * photo was "saved" in that case; it lives only for this session.
+ */
+function persistProgressPhotos(photos: ProgressPhoto[]): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    localStorage.setItem(PROGRESS_PHOTOS_KEY, JSON.stringify(photos.slice(0, MAX_PROGRESS_PHOTOS)));
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -315,6 +465,73 @@ function loadProgressPhotosFromDisk(): ProgressPhoto[] {
  * Progress photos are deliberately EXCLUDED (see PROGRESS_PHOTOS_KEY):
  * their base64 dataURLs would make every startup JSON.parse megabytes.
  */
+const DAY_OF_WEEK_TO_JS: Record<DayOfWeek, number> = {
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+  sunday: 0,
+};
+
+/**
+ * Workout-reminder days follow the training schedule until the user
+ * hand-picks them in the Reminder Center (daysCustomized). Before this,
+ * reminder days were a frozen install-time default ([Mon, Tue, Thu,
+ * Fri]) that silently disagreed with the user's actual schedule — a
+ * Mon/Wed/Fri trainer got pinged on rest days and never on Wed.
+ */
+export function syncWorkoutReminderDays(
+  schedule: WeeklySchedule,
+  prefs: NotificationPreferences
+): NotificationPreferences {
+  if (!prefs || !prefs.workoutReminders || prefs.workoutReminders.daysCustomized) {
+    return prefs;
+  }
+  const days = DAYS_OF_WEEK.filter((d) => {
+    const id = schedule?.[d]?.workoutPlanId;
+    return !!id && id !== 'rest';
+  })
+    .map((d) => DAY_OF_WEEK_TO_JS[d])
+    .sort((a, b) => a - b);
+  if (days.length === 0) return prefs;
+  const current = [...(prefs.workoutReminders.daysOfWeek || [])].sort((a, b) => a - b);
+  if (JSON.stringify(days) === JSON.stringify(current)) return prefs;
+  const next: NotificationPreferences = {
+    ...prefs,
+    workoutReminders: { ...prefs.workoutReminders, daysOfWeek: days },
+  };
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('ascend_notification_prefs', JSON.stringify(next));
+    }
+  } catch {}
+  // Best-effort server sync (the push dispatcher reads server prefs) —
+  // same pattern as ReminderCenterModal.persist.
+  if (typeof window !== 'undefined' && next.enabled) {
+    void (async () => {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        try {
+          const { getSupabase } = await import('./supabase/client');
+          const supabase = getSupabase();
+          const {
+            data: { session },
+          } = await supabase!.auth.getSession();
+          if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+        } catch {}
+        await fetch('/api/notifications/preferences', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(next),
+        });
+      } catch {}
+    })();
+  }
+  return next;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -328,6 +545,8 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
   hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
+  customExerciseMuscles: state.customExerciseMuscles,
+  deletedPlanIds: state.deletedPlanIds,
   favoriteFoods: state.favoriteFoods,
   hasCompletedOnboarding: state.hasCompletedOnboarding,
   waterLogs: state.waterLogs,
@@ -346,6 +565,12 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   decisionsLedgerHistory: state.decisionsLedgerHistory,
   lifterProfile: state.lifterProfile,
   notificationPreferences: state.notificationPreferences,
+  uiPreferences: state.uiPreferences,
+  xp: state.xp,
+  streak: state.streak,
+  challenges: state.challenges,
+  coach: state.coach,
+  dailyCheckins: state.dailyCheckins,
   policyDecisionRecords: state.policyDecisionRecords,
   policyDecisionsLedgerHistory: state.policyDecisionsLedgerHistory,
   policyDecisionApplications: state.policyDecisionApplications,
@@ -376,6 +601,17 @@ export const useAppStore = create<AppState>()(
       macroGoals: null,
       plannedWorkouts: [],
       hiddenBuiltinRoutineIds: [],
+      customExerciseMuscles: {},
+      setCustomExerciseMuscle: (name, muscle) => {
+        registerCustomExerciseMuscle(name, muscle);
+        set((state) => ({
+          customExerciseMuscles: {
+            ...state.customExerciseMuscles,
+            [name.trim().toLowerCase()]: muscle,
+          },
+        }));
+      },
+      deletedPlanIds: [],
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       hasCompletedOnboarding: false,
       _hasHydrated: false,
@@ -419,13 +655,20 @@ export const useAppStore = create<AppState>()(
         saturday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
         sunday: { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] },
       },
-      setWeeklySchedule: (weeklySchedule) => set({ weeklySchedule }),
-      setDaySchedule: (day, config) => set((state) => ({
-        weeklySchedule: {
+      setWeeklySchedule: (weeklySchedule) => set((state) => ({
+        weeklySchedule,
+        notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+      })),
+      setDaySchedule: (day, config) => set((state) => {
+        const weeklySchedule = {
           ...state.weeklySchedule,
           [day]: config,
-        },
-      })),
+        };
+        return {
+          weeklySchedule,
+          notificationPreferences: syncWorkoutReminderDays(weeklySchedule, state.notificationPreferences),
+        };
+      }),
 
       // Active workout persistence
       activeWorkoutDraft: null,
@@ -446,6 +689,132 @@ export const useAppStore = create<AppState>()(
       setNotificationPreferences: (prefs) => set(() => ({
         notificationPreferences: prefs,
       })),
+
+      // XP System
+      xp: getInitialXpState(),
+      awardXpEvents: (events) => {
+        const state = get();
+        // Gamification OFF means OFF: no silent XP accrual in the
+        // background while every XP surface is hidden.
+        if (state.uiPreferences && state.uiPreferences.gamificationEnabled === false) {
+          return { leveledUp: false, newLevel: 1, awarded: 0 };
+        }
+        const result = awardXp(events, state.xp.totalXp, state.xp.awardedIds);
+        set(() => ({ xp: { totalXp: result.newTotal, awardedIds: result.awardedIds } }));
+        return { leveledUp: result.leveledUp, newLevel: result.newLevel, awarded: result.awarded };
+      },
+
+      // Streak System
+      streak: getInitialStreakXState(),
+      refreshStreak: () => {
+        const state = get();
+        const refreshed = refreshFreezeWeek(state.streak);
+        const activeDays = buildActiveDays(state.workouts, state.meals);
+        const result = calculateStreak({ dailyActivity: activeDays, freezesAvailable: refreshed.freezesAvailable });
+        const next = applyStreakResult(refreshed, result);
+        set(() => ({ streak: next }));
+      },
+
+      // UI Customization
+      uiPreferences: { ...DEFAULT_UI_PREFERENCES },
+      setUiPreferences: (patch) => set((state) => ({
+        uiPreferences: { ...state.uiPreferences, ...patch },
+      })),
+
+      // Challenges
+      challenges: getInitialChallengesXState(),
+      optInChallenge: (key) => set((state) => ({
+        challenges: {
+          instances: {
+            ...state.challenges.instances,
+            [key]: { ...(state.challenges.instances[key] || { optedIn: false, dismissed: false, rewardGranted: false }), optedIn: true },
+          },
+        },
+      })),
+      optOutChallenge: (key) => set((state) => ({
+        challenges: {
+          instances: {
+            ...state.challenges.instances,
+            [key]: { ...(state.challenges.instances[key] || { optedIn: false, dismissed: false, rewardGranted: false }), optedIn: false },
+          },
+        },
+      })),
+      dismissChallenge: (key) => set((state) => ({
+        challenges: {
+          instances: {
+            ...state.challenges.instances,
+            [key]: { ...(state.challenges.instances[key] || { optedIn: false, dismissed: false, rewardGranted: false }), dismissed: true },
+          },
+        },
+      })),
+      grantChallengeReward: (key) => set((state) => ({
+        challenges: {
+          instances: {
+            ...state.challenges.instances,
+            [key]: { ...(state.challenges.instances[key] || { optedIn: false, dismissed: false, rewardGranted: false }), rewardGranted: true },
+          },
+        },
+      })),
+
+      // Coach Engine
+      coach: getInitialCoachState(),
+      dailyCheckins: {},
+      setDailyCheckin: (dateStr, checkin) => set((state) => ({
+        dailyCheckins: { ...state.dailyCheckins, [dateStr]: checkin },
+      })),
+      dismissCheckIn: (id) => set((state) => ({
+        coach: { ...state.coach, dismissedCheckIns: [...state.coach.dismissedCheckIns, id] },
+      })),
+      recordCalorieAdjustment: (record) => set((state) => ({
+        coach: { ...state.coach, lastCalorieAdjustment: record },
+      })),
+      acknowledgeStall: (exercise) => set((state) => ({
+        coach: {
+          ...state.coach,
+          stallFlags: {
+            ...state.coach.stallFlags,
+            [exercise]: { ...(state.coach.stallFlags[exercise] || {}), acknowledged: true },
+          },
+        },
+      })),
+      recordReadiness: (date, score, band) => set((state) => ({
+        coach: {
+          ...state.coach,
+          readinessHistory: [...state.coach.readinessHistory, { date, score, band }].slice(-90),
+        },
+      })),
+      processCoachingAfterWorkout: () => {
+        const state = get();
+        // Stall detection: flag exercises that haven't progressed
+        try {
+          const stalls = detectStalls(state.workouts);
+          const today = new Date().toISOString().split('T')[0];
+          const newFlags: Record<string, any> = { ...state.coach.stallFlags };
+          for (const stall of stalls) {
+            const key = stall.exercise.toLowerCase();
+            if (!newFlags[key]) {
+              newFlags[key] = {
+                suggestion: stall.suggestion,
+                flaggedDate: today,
+                acknowledged: false,
+              };
+            }
+          }
+          // Readiness: calculate and record today's score
+          const readiness = calculateReadiness(state.workouts, state.bodyMetrics);
+          set((s) => ({
+            coach: {
+              ...s.coach,
+              stallFlags: newFlags,
+              readinessHistory: [...s.coach.readinessHistory, {
+                date: today,
+                score: readiness.score,
+                band: readiness.band,
+              }].slice(-90),
+            },
+          }));
+        } catch { /* coaching is best-effort, never blocks */ }
+      },
 
       // Habit State
       waterLogs: {},
@@ -484,7 +853,7 @@ export const useAppStore = create<AppState>()(
         if (!hasBaseline && profile.bodyweightKg) {
           const entry: BodyMetricEntry = {
             id: baselineId,
-            date: profile.createdAt ? profile.createdAt.split('T')[0] : getLocalTodayStr(),
+            date: profile.createdAt ? getLocalTodayStr(new Date(profile.createdAt)) : getLocalTodayStr(),
             weightKg: profile.bodyweightKg,
             heightCm: profile.heightCm,
             notes: 'Baseline calibration',
@@ -500,6 +869,8 @@ export const useAppStore = create<AppState>()(
             localStorage.removeItem('ascend_logged_out');
           } catch {}
         }
+        // Keep the avatar mirror in step with the profile (see AVATAR_MIRROR_KEY).
+        persistAvatarMirror(profile.avatar);
         const nextGoals = (profile.goals && profile.goals.length > 0)
           ? profile.goals
           : (state.goals && state.goals.length > 0 ? state.goals : ['build_muscle' as AthleteGoal]);
@@ -580,8 +951,26 @@ export const useAppStore = create<AppState>()(
         set({ theme: systemTheme, hasCustomTheme: false });
       },
       
-      addPR: (pr) => set((state) => ({ prs: [...state.prs, pr] })),
-      addMultiplePRs: (newPrs) => set((state) => ({ prs: [...state.prs, ...newPrs] })),
+      addPR: (pr) => {
+        // Dedup: re-importing the same history (or re-saving the same PR)
+        // must not stack duplicate records — or duplicate XP. Identity is
+        // the id when present, else exercise + date + e1RM content.
+        const isDuplicate = get().prs.some(
+          (existing) =>
+            (pr?.id && existing.id === pr.id) ||
+            (existing.exercise.trim().toLowerCase() === pr.exercise.trim().toLowerCase() &&
+              existing.date === pr.date &&
+              Math.abs((existing.oneRepMax || 0) - (pr.oneRepMax || 0)) < 0.05)
+        );
+        if (isDuplicate) return;
+        set((state) => ({ prs: [...state.prs, pr] }));
+        if (pr?.id) get().awardXpEvents([{ id: xpEventId('pr', pr.id), type: 'pr' }]);
+      },
+      addMultiplePRs: (newPrs) => {
+        set((state) => ({ prs: [...state.prs, ...newPrs] }));
+        const events = (newPrs || []).filter((p) => p?.id).map((p) => ({ id: xpEventId('pr', p.id), type: 'pr' as const }));
+        if (events.length > 0) get().awardXpEvents(events);
+      },
       updatePR: (id, updatedFields) => set((state) => ({
         prs: state.prs.map(pr => pr.id === id ? { ...pr, ...updatedFields } : pr)
       })),
@@ -596,7 +985,8 @@ export const useAppStore = create<AppState>()(
         return { prTargets: next };
       }),
 
-      addWorkout: (workout) => set((state) => {
+      addWorkout: (workout) => {
+        set((state) => {
         // Idempotency guard: If workout already exists, return current state
         if (workout?.id && state.workouts.some((w) => w.id === workout.id)) {
           return state;
@@ -650,9 +1040,18 @@ export const useAppStore = create<AppState>()(
               ? topSet.weight
               : (isBW ? 0 : undefined);
 
-            const rpes = validSets.map((s) => s.rpe ?? 8);
-            const actualRpe = Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10;
+            // Only sets with a LOGGED Rpe count toward actual effort —
+            // defaulting unrated sets to 8 fabricated an average the user
+            // never reported. With no logged RPE, actual = expected
+            // (prediction error 0: no evidence either way).
+            const loggedRpes = validSets
+              .map((s) => s.rpe)
+              .filter((r): r is number => typeof r === 'number' && Number.isFinite(r));
             const expectedRpe = decision.expectedRpe || decision.nextPrescription.targetRpe || 8.0;
+            const actualRpe =
+              loggedRpes.length > 0
+                ? Math.round((loggedRpes.reduce((a, b) => a + b, 0) / loggedRpes.length) * 10) / 10
+                : expectedRpe;
             const predictionError = Math.round((actualRpe - expectedRpe) * 10) / 10;
 
             const evaluatedDecision: TrainingDecision = {
@@ -758,10 +1157,21 @@ export const useAppStore = create<AppState>()(
           }
 
           // Structured athlete safety flags: strictly check explicit boolean properties, never notes text
+          //
+          // Pain attribution: a pain-swap entry carries reportsPain for the
+          // ORIGINAL exercise (ex.painfulExerciseName) — the entry itself was
+          // renamed into the substitute. Attributing the flag to this entry
+          // used to make SAFETY-01 lock progression on the innocent
+          // substitute while the painful lift got no safety record at all.
+          // The original gets its own policy evaluation below.
+          const painSwapOriginal =
+            ex.painfulExerciseName && ex.painfulExerciseName !== ex.name
+              ? ex.painfulExerciseName
+              : null;
+          const entryReportsPain =
+            ex.reportsPain === true || ex.athleteFlags?.reportsPain === true;
           const exReportsPain =
-            workoutReportsPain ||
-            ex.reportsPain === true ||
-            ex.athleteFlags?.reportsPain === true;
+            workoutReportsPain || (!painSwapOriginal && entryReportsPain);
 
           const exRequestHold =
             workoutRequestHold ||
@@ -829,6 +1239,49 @@ export const useAppStore = create<AppState>()(
               ...updatedPolicyHistory.filter((d) => d.id !== policyDecision.id),
             ].slice(0, 50);
           }
+
+          // Pain-swap: record the SAFETY-01 pain decision against the
+          // ORIGINAL exercise that hurt — that is the lift whose
+          // progression must lock and whose record must exist.
+          if (painSwapOriginal && entryReportsPain) {
+            const painPlannedEx = matchedPlan?.exercises.find(
+              (pe) => canonicalizeExerciseName(pe.name) === canonicalizeExerciseName(painSwapOriginal)
+            );
+            const painTarget: CurrentPrescriptionTarget = {
+              name: painSwapOriginal,
+              targetWeight: painPlannedEx?.targetWeight ?? currentTarget.targetWeight,
+              targetReps: painPlannedEx?.targetReps ?? currentTarget.targetReps,
+              targetSets: painPlannedEx?.targetSets ?? currentTarget.targetSets,
+              targetUnit,
+              targetRpe: painPlannedEx?.targetRpe ?? currentTarget.targetRpe,
+              notes: painPlannedEx?.notes,
+            };
+            const painDecision = evaluateTrainingDecisionPolicyV0(
+              painSwapOriginal,
+              painTarget,
+              evidenceSummary,
+              {
+                workoutId: workout.id,
+                referenceDate: workout.date,
+                userUnit: targetUnit,
+                repRange: {
+                  min: painTarget.targetReps ?? targetRepsVal,
+                  max: painTarget.targetReps ?? targetRepsVal,
+                },
+                athleteFlags: { reportsPain: true },
+                targetExerciseId: painPlannedEx?.id,
+                planExerciseId: painPlannedEx?.id,
+              }
+            );
+            const painPersistence = canPersistDecisionToLedger(painDecision);
+            if (painPersistence.canPersist) {
+              updatedPolicyRecords[painDecision.id] = painDecision;
+              updatedPolicyHistory = [
+                painDecision,
+                ...updatedPolicyHistory.filter((d) => d.id !== painDecision.id),
+              ].slice(0, 50);
+            }
+          }
         }
 
         return {
@@ -839,7 +1292,15 @@ export const useAppStore = create<AppState>()(
           policyDecisionRecords: updatedPolicyRecords,
           policyDecisionsLedgerHistory: updatedPolicyHistory,
         };
-      }),
+        });
+        // Award XP for the workout (idempotent — no double-counting on re-save).
+        // Done outside set() so the XP ledger update is a separate, safe write.
+        if (workout?.id && xpForWorkout(workout) > 0) {
+          get().awardXpEvents([{ id: xpEventId('workout', workout.id), type: 'workout' }]);
+        }
+        // Run coach engine: stall detection + readiness update (best-effort).
+        get().processCoachingAfterWorkout();
+      },
       deleteWorkout: (id) => set((state) => {
         const nextWorkouts = state.workouts.filter(w => w.id !== id);
         const nextProfile = generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg');
@@ -849,7 +1310,12 @@ export const useAppStore = create<AppState>()(
         };
       }),
       
-      addMeal: (meal) => set((state) => ({ meals: [...state.meals, meal] })),
+      addMeal: (meal) => {
+        set((state) => ({ meals: [...state.meals, meal] }));
+        if (meal?.id && xpForMeal(meal) > 0) {
+          get().awardXpEvents([{ id: xpEventId('meal', meal.id), type: 'meal' }]);
+        }
+      },
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
       updateMeal: (id, updated) => set((state) => ({
         meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
@@ -897,11 +1363,12 @@ export const useAppStore = create<AppState>()(
       // Progress photos are downscaled (~800px JPEG) before storage; cap the
       // count so localStorage stays healthy. Persisted to their own key
       // (not the zustand blob) — see PROGRESS_PHOTOS_KEY.
-      addProgressPhoto: (photo) => set((state) => {
-        const next = [photo, ...state.progressPhotos].slice(0, MAX_PROGRESS_PHOTOS);
-        persistProgressPhotos(next);
-        return { progressPhotos: next };
-      }),
+      addProgressPhoto: (photo) => {
+        const next = [photo, ...get().progressPhotos].slice(0, MAX_PROGRESS_PHOTOS);
+        const persisted = persistProgressPhotos(next);
+        set({ progressPhotos: next });
+        return persisted;
+      },
       removeProgressPhoto: (id) => set((state) => {
         const next = state.progressPhotos.filter(p => p.id !== id);
         persistProgressPhotos(next);
@@ -974,6 +1441,8 @@ export const useAppStore = create<AppState>()(
         return {
           plannedWorkouts: nextPlans,
           weeklySchedule: baseSchedule,
+          // Explicitly re-adding a plan clears its deletion tombstone.
+          deletedPlanIds: state.deletedPlanIds.filter((d) => d !== finalPlan.id),
         };
       }),
 
@@ -1000,6 +1469,10 @@ export const useAppStore = create<AppState>()(
           weeklySchedule: nextSchedule,
         };
       }),
+
+      clearDeletedPlanIds: (ids) => set((state) => ({
+        deletedPlanIds: state.deletedPlanIds.filter((d) => !ids.includes(d)),
+      })),
 
       deletePlannedWorkout: (id) => set((state) => {
         const nextPlans = state.plannedWorkouts.filter(p => p.id !== id);
@@ -1029,6 +1502,11 @@ export const useAppStore = create<AppState>()(
         return {
           plannedWorkouts: nextPlans,
           weeklySchedule: nextSchedule,
+          // Tombstone the deletion so a stale server copy can never
+          // resurrect this plan on the next sync pull.
+          deletedPlanIds: state.deletedPlanIds.includes(id)
+            ? state.deletedPlanIds
+            : [...state.deletedPlanIds, id],
         };
       }),
 
@@ -1042,6 +1520,9 @@ export const useAppStore = create<AppState>()(
         return {
           plannedWorkouts: plans,
           weeklySchedule: nextSchedule,
+          // A full list replacement (backup restore / onboarding accept)
+          // restores the listed plans: drop their tombstones.
+          deletedPlanIds: state.deletedPlanIds.filter((d) => !validPlanIds.has(d)),
         };
       }),
 
@@ -1102,23 +1583,29 @@ export const useAppStore = create<AppState>()(
         return isAdded;
       },
 
-      logWater: (amountMl, date) => set((state) => {
+      logWater: (amountMl, date) => {
         const d = date || getLocalTodayStr();
-        const current = state.waterLogs[d] || 0;
-        const nextAmount = Math.max(0, current + amountMl);
-        const batch: WaterLogBatch = {
-          id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `water_${Date.now()}`,
-          amountMl,
-          timestamp: new Date().toISOString(),
-        };
-        return {
-          waterLogs: { ...state.waterLogs, [d]: nextAmount },
-          waterBatches: {
-            ...state.waterBatches,
-            [d]: [...(state.waterBatches[d] || []), batch],
-          },
-        };
-      }),
+        set((state) => {
+          const current = state.waterLogs[d] || 0;
+          const nextAmount = Math.max(0, current + amountMl);
+          const batch: WaterLogBatch = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `water_${Date.now()}`,
+            amountMl,
+            timestamp: new Date().toISOString(),
+          };
+          return {
+            waterLogs: { ...state.waterLogs, [d]: nextAmount },
+            waterBatches: {
+              ...state.waterBatches,
+              [d]: [...(state.waterBatches[d] || []), batch],
+            },
+          };
+        });
+        // Award XP once per day for logging water (idempotent via date key).
+        if (amountMl > 0) {
+          get().awardXpEvents([{ id: xpEventId('water', d), type: 'water' }]);
+        }
+      },
 
       resetWater: (date) => set((state) => {
         const d = date || getLocalTodayStr();
@@ -1645,6 +2132,8 @@ export const useAppStore = create<AppState>()(
           macroGoals: null,
           plannedWorkouts: [],
           hiddenBuiltinRoutineIds: [],
+          deletedPlanIds: [],
+          uiPreferences: { ...DEFAULT_UI_PREFERENCES },
           favoriteFoods: DEFAULT_FAVORITE_FOODS,
           hasCompletedOnboarding: false,
           waterLogs: {},
@@ -1661,6 +2150,10 @@ export const useAppStore = create<AppState>()(
           trainingDecisions: {},
           decisionsLedgerHistory: [],
           lifterProfile: null,
+          xp: getInitialXpState(),
+          streak: getInitialStreakXState(),
+          challenges: getInitialChallengesXState(),
+          coach: getInitialCoachState(),
           policyDecisionRecords: {},
           policyDecisionsLedgerHistory: [],
           policyDecisionApplications: [],
@@ -1836,6 +2329,9 @@ export const useAppStore = create<AppState>()(
                 ? data.hasCompletedOnboarding
                 : (data.profile ? true : state.hasCompletedOnboarding),
             plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
+            deletedPlanIds: Array.isArray(data.plannedWorkouts)
+              ? state.deletedPlanIds.filter((d) => !data.plannedWorkouts.some((p: any) => p.id === d))
+              : state.deletedPlanIds,
             favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
             waterLogs: data.waterLogs && typeof data.waterLogs === 'object' ? data.waterLogs : state.waterLogs,
             waterBatches: data.waterBatches && typeof data.waterBatches === 'object' ? data.waterBatches : state.waterBatches,
@@ -1925,6 +2421,50 @@ export const useAppStore = create<AppState>()(
             goals: Array.isArray(data.goals) ? data.goals : (data.profile?.goals || state.goals),
             userMode: data.userMode || state.userMode,
             weeklySchedule: data.weeklySchedule && typeof data.weeklySchedule === 'object' ? data.weeklySchedule : state.weeklySchedule,
+            // Backups from the unified exporter carry these; older backups
+            // silently defaulted them, losing the user's schedule prefs,
+            // customization toggles and progress photos on restore.
+            uiPreferences:
+              data.uiPreferences && typeof data.uiPreferences === 'object'
+                ? { ...state.uiPreferences, ...data.uiPreferences }
+                : state.uiPreferences,
+            customExerciseMuscles: (() => {
+              if (!data.customExerciseMuscles || typeof data.customExerciseMuscles !== 'object') {
+                return state.customExerciseMuscles;
+              }
+              const restored: Record<string, LibraryMuscleGroup> = {};
+              for (const [name, muscle] of Object.entries(data.customExerciseMuscles)) {
+                if (
+                  typeof name === 'string' &&
+                  ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms', 'Core', 'Conditioning'].includes(
+                    muscle as string
+                  )
+                ) {
+                  restored[name.toLowerCase()] = muscle as LibraryMuscleGroup;
+                }
+              }
+              registerCustomExerciseMuscles(restored);
+              return { ...state.customExerciseMuscles, ...restored };
+            })(),
+            dailyCheckins:
+              data.dailyCheckins && typeof data.dailyCheckins === 'object'
+                ? { ...state.dailyCheckins, ...data.dailyCheckins }
+                : state.dailyCheckins,
+            progressPhotos: (() => {
+              if (!Array.isArray(data.progressPhotos)) return state.progressPhotos;
+              const valid = data.progressPhotos
+                .filter(
+                  (p: any) =>
+                    p &&
+                    typeof p === 'object' &&
+                    typeof p.id === 'string' &&
+                    typeof p.dataUrl === 'string' &&
+                    p.dataUrl.startsWith('data:image/')
+                )
+                .slice(0, MAX_PROGRESS_PHOTOS);
+              persistProgressPhotos(valid);
+              return valid;
+            })(),
           }});
           return true;
         } catch {
@@ -1938,6 +2478,20 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
+
+          // Custom-exercise muscle registry: hydrate the classifier's
+          // override map from persisted choices.
+          registerCustomExerciseMuscles(state.customExerciseMuscles);
+
+          // Avatar recovery: if a profile rebuild (or a blob written by an
+          // older build) dropped the local-only avatar, restore it from
+          // the dedicated mirror key.
+          if (state.profile && !state.profile.avatar) {
+            const mirrored = loadAvatarMirror();
+            if (mirrored) {
+              state.profile = { ...state.profile, avatar: mirrored };
+            }
+          }
 
           // Progress photos: already initialized from disk at store creation
           // (see above). The persisted state excludes them via partialize,
@@ -2063,7 +2617,7 @@ export const useAppStore = create<AppState>()(
                 if (currentState.profile?.bodyweightKg && !hasBaseline) {
                   const entry: BodyMetricEntry = {
                     id: baselineId,
-                    date: currentState.profile.createdAt ? currentState.profile.createdAt.split('T')[0] : getLocalTodayStr(),
+                    date: currentState.profile.createdAt ? getLocalTodayStr(new Date(currentState.profile.createdAt)) : getLocalTodayStr(),
                     weightKg: currentState.profile.bodyweightKg,
                     heightCm: currentState.profile.heightCm,
                     notes: 'Baseline calibration',
@@ -2146,7 +2700,19 @@ useAppStore.subscribe((state) => {
   }
 });
 
-// Continuous redundancy mirror: keep an emergency snapshot and legacy keys updated
+// Emergency redundancy mirror. This used to rewrite FIVE keys (snapshot +
+// per-collection legacy mirrors) 500 ms after EVERY state change — on
+// top of the zustand persist blob, a budget phone serialized the full
+// history three times per keystroke. Now: ONE snapshot write, 2 s
+// trailing debounce. The legacy keys are still READ by the recovery path
+// (old installs) but no longer written. A failed write (quota) is no
+// longer swallowed silently — it flips a health flag the UI/diagnostics
+// can read instead of pretending the mirror exists.
+let snapshotWriteFailed = false;
+export function getSnapshotWriteFailed(): boolean {
+  return snapshotWriteFailed;
+}
+
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
   const unsubscribe = useAppStore.subscribe((state) => {
@@ -2174,20 +2740,14 @@ if (typeof window !== 'undefined') {
             savedAt: new Date().toISOString(),
           };
           localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(snapshot));
-          if (state.profile) {
-            localStorage.setItem('ascend_profile', JSON.stringify(state.profile));
+          snapshotWriteFailed = false;
+        } catch {
+          snapshotWriteFailed = true;
+          if (typeof console !== 'undefined') {
+            console.warn('[ascend] Emergency snapshot write failed (storage quota?). Main store blob is unaffected.');
           }
-          if (state.prs && state.prs.length > 0) {
-            localStorage.setItem('ascend_prs', JSON.stringify(state.prs));
-          }
-          if (state.workouts && state.workouts.length > 0) {
-            localStorage.setItem('ascend_workouts', JSON.stringify(state.workouts));
-          }
-          if (state.meals && state.meals.length > 0) {
-            localStorage.setItem('ascend_meals', JSON.stringify(state.meals));
-          }
-        } catch {}
-      }, 500);
+        }
+      }, 2000);
     }
   });
 

@@ -41,7 +41,7 @@ const HIDDEN_INGREDIENT_OPTIONS = [
   '+ Extra Ghee / Oil',
   '+ Butter / Cream',
   '+ Sugar / Sweet',
-  '✓ Normal / Light Oil',
+  'Normal / Light Oil',
 ];
 
 export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMealModalProps) {

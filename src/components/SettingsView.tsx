@@ -21,6 +21,7 @@ import {
   AlertCircle,
   FileText,
   ExternalLink,
+  Calendar,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -28,6 +29,24 @@ import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import AuthModal from '@/components/AuthModal';
+import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
+
+function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onToggle}
+      className={`w-11 h-6 rounded-full transition-colors shrink-0 cursor-pointer relative ${on ? 'bg-accent' : 'bg-border'}`}
+    >
+      <span
+        className={`block w-5 h-5 rounded-full bg-white shadow absolute top-0.5 transition-all ${on ? 'left-[22px]' : 'left-0.5'}`}
+      />
+    </button>
+  );
+}
 
 export interface SettingsViewProps {
   onBack?: () => void;
@@ -47,6 +66,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const hasCustomTheme = useStore((state) => state.hasCustomTheme);
   const logout = useStore((state) => state.logout);
   const importAllData = useStore((state) => state.importAllData);
+  const uiPreferences = useStore((state) => state.uiPreferences);
+  const setUiPreferences = useStore((state) => state.setUiPreferences);
+  const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const toast = useToast();
 
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
@@ -67,6 +89,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
 
   useEffect(() => {
@@ -98,6 +121,16 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       return true;
     }, 50);
   }, [registerBackHandler, handleBack, onBack]);
+
+  // Close the schedule modal on system back while it is open.
+  useEffect(() => {
+    if (isScheduleModalOpen) {
+      return registerBackHandler(() => {
+        setIsScheduleModalOpen(false);
+        return true;
+      }, 100);
+    }
+  }, [isScheduleModalOpen, registerBackHandler]);
 
   // Sync action
   const handleManualSync = async () => {
@@ -401,6 +434,122 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </div>
 
+      {/* ── SECTION 2b: CUSTOMIZATION ──────────────────────────────────────── */}
+      <div className="space-y-2">
+        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+          Customization
+        </span>
+        <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
+          {/* Weekly workout target */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-secondary font-sans">Weekly workout target</span>
+              <span className="text-2xs font-mono text-text-muted">
+                {uiPreferences.weeklyTargetDays === null
+                  ? 'AUTO'
+                  : uiPreferences.weeklyTargetDays === 0
+                  ? 'OFF'
+                  : `${uiPreferences.weeklyTargetDays} DAYS`}
+              </span>
+            </div>
+            <p className="text-3xs text-text-muted leading-relaxed">
+              How many workouts per week Home counts toward. Auto follows your schedule; Off just counts — no target, no pressure.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: 'Auto', value: null as number | null },
+                { label: 'Off', value: 0 as number | null },
+                { label: '2', value: 2 as number | null },
+                { label: '3', value: 3 as number | null },
+                { label: '4', value: 4 as number | null },
+                { label: '5', value: 5 as number | null },
+                { label: '6', value: 6 as number | null },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setUiPreferences({ weeklyTargetDays: opt.value })}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                    uiPreferences.weeklyTargetDays === opt.value
+                      ? 'bg-accent text-white border-accent'
+                      : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Weekly schedule editor */}
+          <div className="pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="w-full flex items-center justify-between cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary">Weekly schedule</p>
+                  <p className="text-3xs text-text-muted">Set any day to a plan or rest — or clear the week entirely</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
+          </div>
+
+          {/* Gamification toggle */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div>
+              <p className="text-xs font-bold text-text-primary">Gamification</p>
+              <p className="text-3xs text-text-muted leading-relaxed">XP, levels, streaks and monthly challenges on Home</p>
+            </div>
+            <SettingsToggle
+              label="Toggle gamification"
+              on={uiPreferences.gamificationEnabled}
+              onToggle={() => setUiPreferences({ gamificationEnabled: !uiPreferences.gamificationEnabled })}
+            />
+          </div>
+
+          {/* Coach toggle */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div>
+              <p className="text-xs font-bold text-text-primary">Coach</p>
+              <p className="text-3xs text-text-muted leading-relaxed">Check-in cards, calorie suggestions and the readiness score on Home, plus the post-workout Coach&apos;s Take</p>
+            </div>
+            <SettingsToggle
+              label="Toggle coach"
+              on={uiPreferences.coachEnabled}
+              onToggle={() => setUiPreferences({ coachEnabled: !uiPreferences.coachEnabled })}
+            />
+          </div>
+
+          {/* Habit matrix toggle */}
+          <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+            <div>
+              <p className="text-xs font-bold text-text-primary">Habit matrix on Home</p>
+              <p className="text-3xs text-text-muted leading-relaxed">The one-week Gym / Water / Creatine / Protein grid</p>
+            </div>
+            <SettingsToggle
+              label="Toggle habit matrix on Home"
+              on={uiPreferences.showHabitMatrix}
+              onToggle={() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {isScheduleModalOpen && (
+        <WeeklyScheduleModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          plannedWorkouts={plannedWorkouts}
+        />
+      )}
+
       {/* ── SECTION 3: DATA & PRIVACY ────────────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
@@ -490,6 +639,50 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
           </a>
+
+          {/* Health & Safety Disclaimer */}
+          <a
+            href="/disclaimer"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center text-amber-400">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">Health &amp; Safety Disclaimer</p>
+                <p className="text-3xs text-text-muted">Fitness guidance is not medical advice</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-text-muted" />
+          </a>
+
+          {/* Account & Data Deletion portal (web-accessible, Play requirement) */}
+          <a
+            href="/delete-account"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">Delete My Data (Web)</p>
+                <p className="text-3xs text-text-muted">Request deletion without the app installed</p>
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-text-muted" />
+          </a>
+
+          <p className="px-3 pt-1 text-3xs text-text-muted leading-relaxed">
+            ASCEND provides fitness tracking and general training guidance — it is not medical
+            advice. Consult a qualified healthcare professional before starting a new exercise
+            or nutrition program.
+          </p>
 
           {/* Anonymous Telemetry */}
           <div className="w-full p-3 flex items-center justify-between">

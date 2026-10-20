@@ -256,11 +256,38 @@ export function getAllExerciseNames(): string[] {
 }
 
 /**
+ * User-declared muscles for custom exercises. Name-only keyword guessing
+ * misfiles customs ("Nordic Curl" → Arms); when a user picks a muscle at
+ * creation, that choice wins over every heuristic. The store hydrates
+ * this registry from persisted state and updates it on each new custom.
+ */
+const customMuscleOverrides = new Map<string, MuscleGroup>();
+
+export function registerCustomExerciseMuscle(name: string, muscle: MuscleGroup): void {
+  if (name && muscle) customMuscleOverrides.set(name.trim().toLowerCase(), muscle);
+}
+
+export function registerCustomExerciseMuscles(
+  map: Record<string, MuscleGroup> | undefined | null
+): void {
+  if (!map) return;
+  for (const [name, muscle] of Object.entries(map)) {
+    registerCustomExerciseMuscle(name, muscle);
+  }
+}
+
+export function getCustomExerciseMuscle(name: string): MuscleGroup | undefined {
+  return customMuscleOverrides.get((name || '').trim().toLowerCase());
+}
+
+/**
  * Resolves any exercise name (including custom or partial names) to its target MuscleGroup.
  */
 export function getExerciseMuscle(name: string): MuscleGroup {
   if (!name || typeof name !== 'string') return 'Chest';
   const clean = name.toLowerCase().trim();
+  const override = customMuscleOverrides.get(clean);
+  if (override) return override;
   const direct = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === clean);
   if (direct) return direct.muscle;
 
@@ -269,10 +296,21 @@ export function getExerciseMuscle(name: string): MuscleGroup {
   );
   if (partial) return partial.muscle;
 
-  // Keyword heuristic matching
+  // Keyword heuristic matching. ORDER MATTERS — specific movement
+  // identities are checked before generic words they contain:
+  // Olympic lifts before 'press' ("Clean and Press" is a leg/hip power
+  // movement, not a shoulder press), Nordic curls before 'curl' (they
+  // are hamstring work, not arms), plyometrics before everything
+  // (Box Jump / Sled Push used to fall through to 'Chest').
+  if (clean.includes('clean') || clean.includes('snatch') || clean.includes('jerk') || clean.includes('thruster') || clean.includes('kettlebell')) return 'Legs';
+  if (clean.includes('jump') || clean.includes('plyo') || clean.includes('sled') || clean.includes('sprint') || clean.includes('bound') || /(^|[\s-])hop/.test(clean)) return 'Legs';
+  if (clean.includes('burpee') || clean.includes('battle rope') || clean.includes('farmer') || clean.includes('carry') || clean.includes('throw')) return 'Conditioning';
+  // Cardio names: without these, "Running" fell through to the Chest
+  // default — a runner's whole training was invisible and misfiled.
+  if (/\b(running|jogging|cycling|swimming|rowing|elliptical|skipping|jump rope|spin bike)\b/.test(clean) || clean === 'run' || clean === 'jog' || clean === 'swim') return 'Conditioning';
   if (clean.includes('bench') || clean.includes('chest') || clean.includes('fly') || clean.includes('pec') || clean.includes('push-up') || clean.includes('pushup')) return 'Chest';
   if (clean.includes('pull') || clean.includes('row') || clean.includes('lat') || clean.includes('deadlift') || clean.includes('chin') || clean.includes('shrug')) return 'Back';
-  if (clean.includes('squat') || clean.includes('leg') || clean.includes('lunge') || clean.includes('calf') || clean.includes('calves') || clean.includes('quad') || clean.includes('hamstring') || clean.includes('rdl')) return 'Legs';
+  if (clean.includes('squat') || clean.includes('leg') || clean.includes('lunge') || clean.includes('calf') || clean.includes('calves') || clean.includes('quad') || clean.includes('hamstring') || clean.includes('rdl') || clean.includes('nordic') || clean.includes('glute') || clean.includes('hip thrust') || clean.includes('bridge')) return 'Legs';
   if (clean.includes('press') || clean.includes('overhead') || clean.includes('shoulder') || clean.includes('lateral raise') || clean.includes('delt') || clean.includes('ohp')) return 'Shoulders';
   if (clean.includes('curl') || clean.includes('tricep') || clean.includes('bicep') || clean.includes('skull') || clean.includes('dip') || clean.includes('arm')) return 'Arms';
   if (clean.includes('abs') || clean.includes('crunch') || clean.includes('plank') || clean.includes('core') || clean.includes('twist')) return 'Core';
@@ -329,49 +367,49 @@ export function getExerciseFormCues(name: string): string[] {
   // Keyword-based fallback cues
   if (clean.includes('bench') || clean.includes('chest press')) {
     return [
-      'Retract scapulae and pin shoulder blades back and down into the bench.',
+      'Pull your shoulder blades back and down, and pin them into the bench.',
       'Touch lower chest with control, elbows tucked at 45–60 degrees.',
       'Drive feet into the floor and press up to lockout without shrugging shoulders.',
     ];
   }
   if (clean.includes('squat') || clean.includes('leg press')) {
     return [
-      'Brace 360-degree abdominal pressure before descending.',
-      'Break at hips and knees simultaneously, driving knees out in line with toes.',
+      'Take a deep breath into your belly and tighten your stomach — like you are about to be punched — before you go down.',
+      'Bend your hips and knees together, pushing your knees out in line with your toes.',
       'Reach full depth with flat feet, then drive floor away through midfoot.',
     ];
   }
   if (clean.includes('deadlift') || clean.includes('rdl')) {
     return [
-      'Keep bar close to body over midfoot; brace lats and lock spine neutral.',
-      'Hinge deeply at hips, loading hamstrings and glutes rather than rounding lower back.',
-      'Drive hips forward to full lockout without leaning back excessively.',
+      'Keep the bar close to your legs and your back flat — never rounded.',
+      'Push your hips back like you are closing a door with your backside, feeling the stretch in the back of your thighs.',
+      'Stand tall by squeezing your backside — do not lean back at the top.',
     ];
   }
   if (clean.includes('overhead') || clean.includes('shoulder press') || clean.includes('ohp')) {
     return [
-      'Squeeze glutes and brace core tightly to avoid arching lower back.',
+      'Squeeze your backside and tighten your stomach so your lower back does not arch.',
       'Press bar or dumbbells vertically in a clean line directly overhead.',
-      'Lock out with head moving slightly forward through the window at the top.',
+      'Finish with the weight directly above your head, arms next to your ears.',
     ];
   }
   if (clean.includes('row') || clean.includes('pulldown') || clean.includes('pull-up')) {
     return [
-      'Initiate pull by depressing and retracting shoulder blades.',
+      'Start every pull by squeezing your shoulder blades down and together.',
       'Drive elbows down and back toward hip pockets.',
-      'Pause for a split-second contraction, then resist the eccentric on the return.',
+      'Pause for a split second at the squeeze, then lower the weight back slowly.',
     ];
   }
   if (clean.includes('curl')) {
     return [
       'Pin elbows to sides of torso; avoid swinging shoulders or leaning back.',
-      'Supinate wrists and squeeze biceps hard at peak contraction.',
-      'Lower weight under control with a smooth 2-second negative.',
+      'Turn your palms upward as you curl, and squeeze your arm muscle hard at the top.',
+      'Lower the weight slowly — take about 2 seconds on the way down.',
     ];
   }
   if (clean.includes('tricep') || clean.includes('pushdown')) {
     return [
-      'Lock elbows in position at your sides; isolate forearm extension.',
+      'Keep your elbows pinned at your sides — only your forearms move.',
       'Push down fully to lock out triceps with a strong contraction.',
       'Control the return until forearms are just past 90 degrees.',
     ];
@@ -380,14 +418,14 @@ export function getExerciseFormCues(name: string): string[] {
     return [
       'Maintain steady rhythmic breathing and controlled exertion.',
       'Keep posture upright and core lightly braced throughout the duration.',
-      'Monitor cadence and target heart rate zone for continuous conditioning.',
+      'Keep a steady pace where you can still speak in short sentences.',
     ];
   }
 
   return [
-    'Control the eccentric (lowering) phase for 2 seconds with clean tension.',
-    'Maintain a neutral spine and brace your core throughout every repetition.',
-    'Focus on smooth mind-muscle connection rather than swinging momentum.',
+    'Lower the weight slowly, taking about 2 seconds, staying in control the whole way.',
+    'Keep your back flat and your stomach tight for every single rep.',
+    'Feel the muscle you are training do the work — never swing the weight.',
   ];
 }
 

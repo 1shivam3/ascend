@@ -3,10 +3,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, AITrainingProfile, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
+import { estimateSessionMinutes } from '@/lib/workout-engine';
 import { canContinueFromGoalStep } from '@/lib/onboarding';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
@@ -18,6 +19,7 @@ import LoginScreen from './onboarding/LoginScreen';
 import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
 import ExperienceLevelScreen from './onboarding/ExperienceLevelScreen';
 import PersonalDetailsScreen from './onboarding/PersonalDetailsScreen';
+import ScheduleScreen from './onboarding/ScheduleScreen';
 import StepProgressBar from './onboarding/StepProgressBar';
 
 type OnboardingScreenId =
@@ -27,6 +29,7 @@ type OnboardingScreenId =
   | 'login'
   | 'goals'
   | 'experience'
+  | 'schedule'
   | 'details'
   | 'plan_offer';
 
@@ -50,6 +53,9 @@ export default function Onboarding() {
   const [weight, setWeight] = useState<number>(70);
   const [heightCm, setHeightCm] = useState<number>(175);
   const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
+  const [equipmentChoice, setEquipmentChoice] = useState<AITrainingProfile['equipment']>('full_gym');
+  const [limitations, setLimitations] = useState<string[]>([]);
+  const [activityChoice, setActivityChoice] = useState<'sedentary' | 'light' | 'active' | 'very_active'>('light');
   const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
 
   const [isFinishing, setIsFinishing] = useState(false);
@@ -58,6 +64,11 @@ export default function Onboarding() {
   // confirmation BEFORE any plans are added. Never auto-add without asking.
   const [pendingPlans, setPendingPlans] = useState<any[] | null>(null);
   const [pendingSchedule, setPendingSchedule] = useState<any | null>(null);
+  // The profile itself is also deferred on the offer path: page.tsx unmounts
+  // Onboarding the moment a profile exists, so calling setProfile before the
+  // user answers the offer makes the offer screen unreachable. The pending
+  // profile is applied by handleAcceptPlans/handleDeclinePlans instead.
+  const [pendingProfile, setPendingProfile] = useState<any | null>(null);
   const [savedFirstName, setSavedFirstName] = useState('Athlete');
 
   // Local device snapshot detection
@@ -74,7 +85,9 @@ export default function Onboarding() {
     setPlannedWorkouts,
     setWeeklySchedule,
     setMacroGoals,
+    setCreatineConfig,
   } = useStore();
+  const currentMacroGoals = useStore((s) => s.macroGoals);
 
   // Detect Google auth session or local snapshots on-demand
   useEffect(() => {
@@ -85,7 +98,7 @@ export default function Onboarding() {
     const screenParam = searchParams.get('screen') as OnboardingScreenId;
     if (
       screenParam &&
-      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'details', 'plan_offer'].includes(
+      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'schedule', 'details', 'plan_offer'].includes(
         screenParam
       )
     ) {
@@ -261,13 +274,16 @@ export default function Onboarding() {
       userMode: experienceLevel,
     };
 
-    setProfile(profileData);
+    // NOTE: setProfile is intentionally NOT called here yet. On the plan-offer
+    // path the profile is staged in pendingProfile and applied when the user
+    // accepts/declines — calling setProfile now would unmount Onboarding via
+    // the page.tsx gate and the offer screen would never render.
     setGoals(finalGoals);
     setUserMode(experienceLevel);
 
     const [
-      { getGoalAdaptiveSplitTemplates },
-      { buildDefaultWeeklySchedule, generateSplitWeeklySchedule },
+      { getGoalAdaptiveSplitTemplates, prepareGeneratedPlans },
+      { buildDefaultWeeklySchedule, generateSplitWeeklySchedule, limitPlansToDays },
       { calculateRecommendedMacroGoals },
     ] = await Promise.all([
       import('@/lib/workout-engine'),
@@ -291,12 +307,35 @@ export default function Onboarding() {
       generatedSplit = generateSplitWeeklySchedule('full_body', details.unit).plans;
     } else {
       preferredSplit = 'upper_lower';
-      // Scale first-exposure loads to the athlete's bodyweight and experience
-      // so a light beginner is never prescribed an 85 kg lifter's weights.
       generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, details.unit, {
         bodyweightKg,
         experience: experienceLevel,
       });
+    }
+
+    // Every path gets the same treatment (previously only the 4-day path did):
+    //  1. first-exposure loads scaled to bodyweight + experience,
+    //  2. exercises the user cannot do with their equipment swapped out,
+    //  3. beginners get pull-ups regressed to a learnable variant,
+    //  4. exclusion + injury history from BEFORE this onboarding (a
+    //     re-onboarding must never silently resurrect a painful lift).
+    const priorTrainingProfile = useStore.getState().trainingProfile;
+    const priorExclusions = priorTrainingProfile?.dislikedExercises || [];
+    const priorLimitations = priorTrainingProfile?.injuriesOrLimitations || [];
+    const allLimitations = Array.from(new Set([...priorLimitations, ...limitations]));
+    if (generatedSplit) {
+      generatedSplit = prepareGeneratedPlans(generatedSplit, {
+        unit: details.unit,
+        bodyweightKg,
+        experience: experienceLevel,
+        ageYears: details.age,
+        equipment: equipmentChoice,
+        exclusions: priorExclusions,
+        limitations: allLimitations,
+      });
+      // Offer exactly the days the user will train (a 2-day user was
+      // being offered 3 full-body workouts).
+      generatedSplit = limitPlansToDays(generatedSplit, daysPerWeek);
     }
 
     setTrainingProfile({
@@ -304,10 +343,13 @@ export default function Onboarding() {
       experience: experienceLevel,
       daysPerWeek: daysPerWeek,
       preferredDurationMin: 45,
-      equipment: 'full_gym',
+      equipment: equipmentChoice,
+      activityLevel: activityChoice,
       preferredSplit: preferredSplit,
-      dislikedExercises: [],
-      injuriesOrLimitations: [],
+      // PRESERVE prior exclusions/limitations — overwriting them here
+      // silently re-prescribed exercises the user had flagged as painful.
+      dislikedExercises: priorExclusions,
+      injuriesOrLimitations: allLimitations,
       coachingStyle: 'balanced',
     });
 
@@ -330,7 +372,8 @@ export default function Onboarding() {
           primaryGoal,
           details.gender,
           details.heightCm,
-          details.age
+          details.age,
+          activityChoice
         )
       );
     }
@@ -353,8 +396,11 @@ export default function Onboarding() {
     // Note: use generatedSplit directly — setPendingPlans hasn't applied yet.
     const hasNewPlans = !existingPlans || existingPlans.length === 0;
     if (hasNewPlans && generatedSplit && generatedSplit.length > 0) {
+      // Stage the profile — applied when the user answers the offer.
+      setPendingProfile(profileData);
       setCurrentScreen('plan_offer');
     } else {
+      applyProfileWithAgeGuards(profileData);
       completeOnboarding();
     }
   };
@@ -369,7 +415,25 @@ export default function Onboarding() {
     } catch {}
   };
 
+  const applyProfileWithAgeGuards = (profileData: any) => {
+    setProfile(profileData);
+    // Minors: creatine tracking starts disabled (not recommended under
+    // 18). The Meals row, habit matrix and daily objectives also gate
+    // on age, so this is belt-and-braces at the config level.
+    if (typeof profileData?.age === 'number' && profileData.age < 18) {
+      setCreatineConfig({ enabled: false });
+    }
+  };
+
+  const applyPendingProfile = () => {
+    if (pendingProfile) {
+      applyProfileWithAgeGuards(pendingProfile);
+      setPendingProfile(null);
+    }
+  };
+
   const handleAcceptPlans = () => {
+    applyPendingProfile();
     if (pendingPlans && pendingPlans.length > 0) {
       setPlannedWorkouts(pendingPlans);
       if (pendingSchedule) {
@@ -382,6 +446,7 @@ export default function Onboarding() {
   };
 
   const handleDeclinePlans = () => {
+    applyPendingProfile();
     setPendingPlans(null);
     setPendingSchedule(null);
     completeOnboarding();
@@ -545,19 +610,41 @@ export default function Onboarding() {
     );
   }
 
-  // ── SCREEN 6: EXPERIENCE LEVEL (Step 2 of 3) ──────────────────────────────
+  // ── SCREEN 6: EXPERIENCE LEVEL (Step 2 of 4) ──────────────────────────────
   if (currentScreen === 'experience') {
     return (
       <ExperienceLevelScreen
         selectedLevel={experienceLevel}
         onSelectLevel={(level) => setExperienceLevel(level)}
-        onContinue={() => setCurrentScreen('details')}
+        onContinue={() => setCurrentScreen('schedule')}
         onBack={() => setCurrentScreen('goals')}
       />
     );
   }
 
-  // ── SCREEN 7: PERSONAL DETAILS (Step 3 of 3) ──────────────────────────────
+  // ── SCREEN 7: SCHEDULE + EQUIPMENT (Step 3 of 4) ─────────────────────────
+  // Asks the two questions that define a user's week: how many days, and what
+  // equipment. Fixes the dead daysPerWeek state and hardcoded full_gym.
+  if (currentScreen === 'schedule') {
+    return (
+      <ScheduleScreen
+        initialDays={daysPerWeek}
+        initialEquipment={equipmentChoice}
+        initialActivity={activityChoice}
+        initialLimitations={limitations}
+        onContinue={(days, equipment, activity, chosenLimitations) => {
+          setDaysPerWeek(days);
+          setEquipmentChoice(equipment);
+          setActivityChoice(activity);
+          setLimitations(chosenLimitations);
+          setCurrentScreen('details');
+        }}
+        onBack={() => setCurrentScreen('experience')}
+      />
+    );
+  }
+
+  // ── SCREEN 8: PERSONAL DETAILS (Step 4 of 4) ─────────────────────────────
   if (currentScreen === 'details') {
     return (
       <PersonalDetailsScreen
@@ -568,19 +655,19 @@ export default function Onboarding() {
         initialWeight={weight}
         initialHeightCm={heightCm}
         onContinue={handleFinishCalibration}
-        onBack={() => setCurrentScreen('experience')}
+        onBack={() => setCurrentScreen('schedule')}
         loading={isFinishing}
       />
     );
   }
 
-  // ── SCREEN 8: PLAN OFFER — ask BEFORE adding any generated plans ──────────
+  // ── SCREEN 9: PLAN OFFER — ask BEFORE adding any generated plans ──────────
   if (currentScreen === 'plan_offer') {
     const planCount = pendingPlans?.length || 0;
     const planNames = (pendingPlans || []).slice(0, 4).map((p: any) => p.name || 'Workout').join(', ');
     return (
       <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
-        <StepProgressBar currentStep={3} onBack={() => setCurrentScreen('details')} />
+        <StepProgressBar currentStep={4} onBack={() => setCurrentScreen('details')} />
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
           <div className="text-left space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
@@ -590,6 +677,43 @@ export default function Onboarding() {
               Based on your goals, I put together {planCount} workouts{planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : ''}. Add {planCount === 1 ? 'it' : 'them'} to your training, or skip and build your own.
             </p>
           </div>
+          {/* Preview what's inside — never ask for blind acceptance. */}
+          {(pendingPlans || []).length > 0 && (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {(pendingPlans || []).map((plan: any, i: number) => {
+                const exNames = (plan.exercises || []).map((e: any) => e.name);
+                const estMin = estimateSessionMinutes(plan);
+                return (
+                  <div key={plan.id || i} className="bg-white border border-[#E2DFD6] rounded-2xl px-4 py-3 shadow-2xs">
+                    <p className="text-sm font-bold">
+                      {plan.name} <span className="text-[#858076] font-medium">· ~{estMin} min · {exNames.length} exercises</span>
+                    </p>
+                    <p className="text-xs text-[#858076] mt-1 leading-relaxed">
+                      {exNames.slice(0, 6).join(' · ')}{exNames.length > 6 ? ` · +${exNames.length - 6} more` : ''}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {/* Your daily food target — explained, never set silently.
+              A fat-loss user previously got a lower number with no
+              idea why; a diabetic got no safety framing at all. */}
+          {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
+            <div className="bg-white border border-[#E2DFD6] rounded-2xl px-4 py-3 shadow-2xs space-y-1">
+              <p className="text-sm font-bold">Your daily food target: {currentMacroGoals.calories.toLocaleString()} kcal</p>
+              <p className="text-xs text-[#171916]/70 leading-relaxed">
+                Your body burns about {currentMacroGoals.maintenanceCalories.toLocaleString()} kcal a day.
+                {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
+                  ? ` To lose fat steadily and safely, your target is ${Math.abs(currentMacroGoals.calorieDelta)} kcal less — never below the safe minimum for your body.`
+                  : typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta > 0
+                    ? ` To build muscle, your target adds ${currentMacroGoals.calorieDelta} kcal on top.`
+                    : ' Your target matches what you burn, to maintain your weight.'}{' '}
+                Protein {currentMacroGoals.proteinG}g · Carbs {currentMacroGoals.carbsG}g · Fat {currentMacroGoals.fatG}g.
+                You can change this any time in Meals. If you have a medical condition like diabetes, check with your doctor before following a calorie target.
+              </p>
+            </div>
+          ) : null}
           <div className="space-y-3">
             <button
               type="button"

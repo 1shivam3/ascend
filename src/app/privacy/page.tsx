@@ -15,6 +15,7 @@ import {
   Users
 } from 'lucide-react';
 import type { Metadata } from 'next';
+import { SUPPORT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_VERSION } from '@/lib/legal';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy | ASCEND',
@@ -55,7 +56,7 @@ export default function PrivacyPage() {
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Last Updated: October 2026 • Version 2.3 • Global &amp; Google Play Store Compliant
+          Last Updated: {LEGAL_LAST_UPDATED} • Version {LEGAL_VERSION} • Global &amp; Google Play Store Compliant
         </p>
       </div>
 
@@ -84,7 +85,9 @@ export default function PrivacyPage() {
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
             <li><strong>Guest Mode (Default &amp; On-Device):</strong> All application data is stored locally in client-side Web Storage (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">localStorage</code> under the <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_store</code> key). In Guest Mode, zero workout records, PRs, or nutritional entries ever touch any remote server.</li>
             <li><strong>Optional Cloud Sync (Google OAuth &amp; Supabase):</strong> If you choose to sign in to protect your data across device changes, your profile, PRs, workouts, meals, body metrics, and custom routines are backed up to a private, encrypted Supabase PostgreSQL database. Every table is guarded by strict Row Level Security (RLS) policies enforcing that only your authenticated user ID can read or modify your records.</li>
-            <li><strong>Optional Push Notifications (Reminder Center):</strong> If you explicitly opt in to reminders (hydration, meal timing, workout notifications), your device web push subscription token (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">endpoint</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">p256dh</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">auth</code>) and reminder schedules are stored strictly to deliver your chosen alerts. You can modify preferences or unsubscribe at any time.</li>
+            <li><strong>Optional Push Notifications (Reminder Center):</strong> If you explicitly opt in to reminders (hydration, meal timing, workout notifications), your device web push subscription token (<code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">endpoint</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">p256dh</code>, <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">auth</code>) and reminder schedules are stored strictly to deliver your chosen alerts. Reminder dispatch is scheduled through Upstash QStash, which processes the delivery timing and your push endpoint — nothing else. You can modify preferences or unsubscribe at any time.</li>
+            <li><strong>Progress Photos (Device-Only):</strong> Photos you add in Progress are stored only in this device&apos;s local storage (key <code className="text-text-primary bg-bg-secondary px-1 py-0.5 rounded">ascend_progress_photos_v1</code>, up to 24 photos). They are never uploaded, never synced to the cloud, and are deleted when you delete the photo or wipe app data.</li>
+            <li><strong>Feedback Messages:</strong> If you send feedback from inside the app, your message (and the name/email you optionally type into the form) is stored in our Supabase database so we can respond. When email forwarding is configured on the server, a copy is also emailed to our support inbox via Resend (transactional email provider).</li>
           </ul>
           <p className="text-2xs text-amber-300/80 pt-1">
             <strong>Important Notice for Guest Mode:</strong> If you remain in Guest Mode without a cloud account or exported backup file, clearing your browser history, site data, or cache will permanently erase your data. Regular exports via the <em>Data Vault</em> are strongly advised.
@@ -101,7 +104,9 @@ export default function PrivacyPage() {
             ASCEND includes optional athletic utilities powered by privacy-hardened machine learning providers (such as the Autoregulated Coach, Macro Lens Photo Estimator, Natural Language Voice Logger, and Exercise Substitutions):
           </p>
           <ul className="list-disc list-inside text-2xs space-y-1.5 pl-2">
+            <li><strong>Multi-Provider Fallback Chain:</strong> AI requests are attempted in order — Groq Cloud (LPU inference), then OpenRouter, then Google Gemini — and stop at the first successful response. Meal photos are processed by Groq or Gemini only; they are never sent to OpenRouter (photos are skipped at that stage by design).</li>
             <li><strong>Meal Photo Handling &amp; Provider Data Retention:</strong> When using the optional Macro Lens photo scanner, meal images are transmitted in-memory over encrypted TLS to commercial AI developer APIs (Groq Cloud LPU and Google Gemini API). ASCEND does not permanently store meal photos on its servers. Upstream API providers retain operational logs for temporary security and abuse detection windows (typically up to 30 days pursuant to standard commercial API terms), and do not train models on API customer data on commercial developer tiers. Meal photos are strictly <em>never</em> sent to public crowd-sourced or free-tier third-party training pools.</li>
+            <li><strong>Voice Logging — Audio Never Leaves Your Device:</strong> The hands-free voice logger transcribes speech on-device using your browser&apos;s built-in speech recognition. Raw audio recordings are never stored and never transmitted. Only the resulting text transcript is sent to the AI provider to extract exercise, weight, and reps.</li>
             <li><strong>100% On-Device Offline Manual Entry:</strong> AI meal scanning is completely optional. Trainees can log foods manually using ASCEND&apos;s built-in on-device food database and offline estimation engine, which operates 100% locally with zero network transmission.</li>
             <li><strong>Opt-In and On-Demand:</strong> Network requests to AI endpoints are executed <em>only</em> when you explicitly initiate an analysis. No background scraping or automated image transmission ever occurs.</li>
             <li><strong>Zero Personal Identifiers Transmitted:</strong> We never transmit your personal contact details, email addresses, names, or device identifiers to AI providers. Only the specific anonymized training numbers or meal photo necessary to process your request is sent.</li>
@@ -145,7 +150,7 @@ export default function PrivacyPage() {
               <p>• <strong>Health &amp; Fitness:</strong> Workout logs, personal records, bodyweight, and nutrition. Stored 100% locally on-device in Guest Mode; synced with TLS 1.3 encryption to a private Supabase PostgreSQL database with Row Level Security in Cloud Mode.</p>
               <p>• <strong>Device &amp; Other Identifiers:</strong> Web Push subscription tokens (endpoint and cryptographic keys) are stored solely for delivering user-configured workout and habit reminders when push notifications are enabled.</p>
               <p>• <strong>Data Shared with Third Parties:</strong> None with advertisers, data brokers, or marketing networks. Third-party API communication is strictly user-initiated (Google Gemini for athletic coaching, Open Food Facts for barcode lookups, Web Push for reminders).</p>
-              <p>• <strong>Tracking:</strong> Zero advertising tracking, zero cross-app tracking, zero marketing cookies.</p>
+              <p>• <strong>Tracking &amp; Diagnostics:</strong> Zero advertising tracking, zero cross-app tracking, zero marketing cookies. Anonymous diagnostics (Google Analytics 4, Microsoft Clarity, Sentry error monitoring) load <em>only</em> if you explicitly opt in via the consent banner or Settings toggle, and transmit only sanitized, non-identifying app events — never workout, nutrition, or body data. In the standard build none of these services are configured, so nothing is collected.</p>
               <p>• <strong>Data Deletion:</strong> 1-tap local device wiping and instant 0-day cascade cloud account deletion via in-app settings or the external deletion portal.</p>
             </div>
           </div>
@@ -165,7 +170,7 @@ export default function PrivacyPage() {
               <li><strong>Instant In-App Deletion:</strong> Open <em>Settings &rarr; Account &amp; Privacy &rarr; Delete My Account</em>. This immediately and permanently deletes your Supabase cloud account, all synchronized workout, PR, meal, and biometric records, and wipes all device storage.</li>
               <li><strong>External Web Deletion Portal:</strong> In compliance with Google Play Data Safety requirements, you can also initiate deletion without having the app installed via our dedicated <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>.</li>
               <li><strong>Zero Retention Policy:</strong> Wiping or requesting deletion results in immediate 0-day erasure across cloud databases and authentication directories.</li>
-              <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">support@ascendfit.app</a>.</li>
+              <li><strong>Manual Support Inquiries:</strong> Contact our privacy team at <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">{SUPPORT_EMAIL}</a>.</li>
             </ul>
           </div>
         </section>
@@ -193,6 +198,22 @@ export default function PrivacyPage() {
             </p>
             <p>
               For complete details, please read our dedicated <Link href="/disclaimer" className="text-accent underline font-semibold">Medical &amp; Safety Disclaimer</Link>.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 8: Data Retention & Your Rights */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
+            <FileText className="w-4 h-4 text-accent" />
+            8. Data Retention &amp; Your Rights
+          </h2>
+          <div className="space-y-2 text-2xs">
+            <p>
+              <strong>Retention:</strong> Cloud data is kept only while your account exists — account deletion triggers immediate, zero-day erasure across all databases and authentication records. Guest Mode data lives in your device&apos;s local storage until you clear site data, reset the app, or delete it yourself. AI provider request logs are retained by the providers only for their standard short abuse-detection windows (typically up to 30 days); ASCEND keeps no copy.
+            </p>
+            <p>
+              <strong>Your rights:</strong> You can access and export all of your local data at any time via Settings &rarr; Data Vault (JSON backup), correct anything in the app itself, and delete everything via Settings &rarr; Delete Account or the <Link href="/delete-account" className="text-accent underline font-semibold">Account &amp; Data Deletion Request Page</Link>. For access, rectification, portability, or erasure requests you cannot complete yourself, email <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">{SUPPORT_EMAIL}</a> and we will act within 30 days.
             </p>
           </div>
         </section>

@@ -185,6 +185,10 @@ export function getDailyObjectives(params: {
   proteinTargetG: number;
   weightEntry?: BodyMetricEntry | null;
   profileUnit?: 'kg' | 'lbs';
+  /** When known and under 18, the creatine objective is never scored —
+   *  creatine is not recommended for minors. */
+  ageYears?: number;
+  creatineEnabled?: boolean;
 }): DailyObjectivesSummary {
   const {
     dateStr,
@@ -197,6 +201,8 @@ export function getDailyObjectives(params: {
     proteinTargetG,
     weightEntry,
     profileUnit = 'kg',
+    ageYears,
+    creatineEnabled,
   } = params;
 
   const hasWorkout = workouts.some((w) => w.date && w.date.startsWith(dateStr));
@@ -209,7 +215,7 @@ export function getDailyObjectives(params: {
     objectives.push({
       id: 'recovery',
       title: 'Active Recovery & Mobility',
-      metricLabel: 'Recovery Planned ✓',
+      metricLabel: 'Recovery Planned',
       done: true,
       isRestBonus: true,
     });
@@ -217,7 +223,7 @@ export function getDailyObjectives(params: {
     objectives.push({
       id: 'workout',
       title: 'Planned Training Session',
-      metricLabel: hasWorkout ? 'Session Complete ✓' : 'Pending',
+      metricLabel: hasWorkout ? 'Session Complete' : 'Pending',
       done: hasWorkout,
     });
   }
@@ -231,14 +237,18 @@ export function getDailyObjectives(params: {
     done: waterDone,
   });
 
-  // 3. Creatine
-  const creatineDone = !!creatineLog?.taken;
-  objectives.push({
-    id: 'creatine',
-    title: 'Creatine Daily Dose',
-    metricLabel: creatineDone ? `${creatineLog.amountG || 5}g Taken ✓` : 'Not Logged',
-    done: creatineDone,
-  });
+  // 3. Creatine — adults only, and only when tracking is enabled.
+  const creatineApplicable =
+    creatineEnabled !== false && !(typeof ageYears === 'number' && ageYears < 18);
+  if (creatineApplicable) {
+    const creatineDone = !!creatineLog?.taken;
+    objectives.push({
+      id: 'creatine',
+      title: 'Creatine Daily Dose',
+      metricLabel: creatineDone ? `${creatineLog.amountG || 5}g Taken` : 'Not Logged',
+      done: creatineDone,
+    });
+  }
 
   // 4. Protein Target
   const proteinDone = proteinTargetG > 0 ? proteinG >= proteinTargetG : proteinG >= 100;
@@ -259,7 +269,7 @@ export function getDailyObjectives(params: {
   objectives.push({
     id: 'weight',
     title: 'Log Morning Weight',
-    metricLabel: weightDone ? `${displayBw} ✓` : 'Pending',
+    metricLabel: weightDone ? `${displayBw}` : 'Pending',
     done: weightDone,
   });
 

@@ -63,12 +63,16 @@ describe('Goal single source of truth (bug: deselection did not stick)', () => {
 
   it('macro engine reports maintenance + delta so the UI can explain a deficit', () => {
     // Priya's case from the bug report: 68 kg woman, lose_fat.
-    // Must produce a real deficit (~1,514 kcal), not maintenance (~1,981 kcal).
+    // Must produce a real deficit, not maintenance (~1,981 kcal).
+    // Round 2 (persona fix): the deficit is PROPORTIONAL — 20% of
+    // maintenance, capped at 450 kcal. A flat -450 was a 27% cut for a
+    // small sedentary woman (landing her exactly on the 1200 floor in
+    // persona-calorie-maintenance) yet only 15% for a large athlete.
     const m = calculateRecommendedMacroGoals(68, 'lose_fat', 'female', 165, 27);
     expect(m.maintenanceCalories).toBeDefined();
     expect(m.calorieDelta).toBeDefined();
     expect(m.calories).toBeLessThan(m.maintenanceCalories!);
-    expect(Math.abs(m.calorieDelta! - -450)).toBeLessThanOrEqual(5);
+    expect(Math.abs(m.calorieDelta! + m.maintenanceCalories! * 0.2)).toBeLessThanOrEqual(3);
     expect(m.calories).toBeGreaterThanOrEqual(1400); // safety floor holds
     expect(m.proteinG).toBe(Math.round(68 * 2.2)); // elevated protein preserved
     expect(m.calories).toBe(m.maintenanceCalories! + m.calorieDelta!);

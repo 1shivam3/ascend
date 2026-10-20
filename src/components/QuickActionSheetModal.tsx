@@ -18,7 +18,7 @@ import BodyMetricsModal from '@/components/BodyMetricsModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import { MealEntry } from '@/lib/types';
 import { getLocalTodayStr, plural } from '@/lib/formatters';
-import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
+import { parseNaturalMealOffline, calculateMealMacros, validateMealFoods } from '@/lib/macros';
 import { useAppNavigation } from '@/lib/navigation';
 
 interface QuickActionSheetModalProps {
@@ -101,6 +101,23 @@ export default function QuickActionSheetModal({
 
       const data = await res.json();
       if (data && Array.isArray(data.foods) && data.foods.length > 0) {
+        // Same guards as the Meals page (shared validator): this sheet used
+        // to log phantom 0-kcal meals from gibberish and ~11,880 kcal from
+        // "100 rotis", both with a success toast.
+        const check = validateMealFoods(data.foods);
+        if (check.junk) {
+          toast.error(
+            `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal".`,
+            'Not Recognized'
+          );
+          setIsParsingFood(false);
+          return;
+        }
+        if (check.absurdWarning) {
+          toast.error(check.absurdWarning, 'Unlikely Quantity');
+          setIsParsingFood(false);
+          return;
+        }
         const newMeal: MealEntry = {
           id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
           date: today,
@@ -110,6 +127,12 @@ export default function QuickActionSheetModal({
 
         addMeal(newMeal);
         setQuickFoodQuery('');
+        if (check.unmatchedNames.length > 0) {
+          toast.info(
+            `Couldn't identify ${check.unmatchedNames.map((n) => `"${n}"`).join(', ')} — logged at 0 kcal, so totals may be understated. Add it manually for accurate numbers.`,
+            'Some Foods Unmatched'
+          );
+        }
         toast.success(
           `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P)!`,
           'Meal Logged'
@@ -123,6 +146,15 @@ export default function QuickActionSheetModal({
       try {
         const offlineFoods = parseNaturalMealOffline(q);
         if (offlineFoods && offlineFoods.length > 0) {
+          const offlineCheck = validateMealFoods(offlineFoods);
+          if (offlineCheck.junk) {
+            throw new Error('Offline parse produced no recognized foods');
+          }
+          if (offlineCheck.absurdWarning) {
+            toast.error(offlineCheck.absurdWarning, 'Unlikely Quantity');
+            setIsParsingFood(false);
+            return;
+          }
           const totals = calculateMealMacros(offlineFoods);
           const newMeal: MealEntry = {
             id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
@@ -132,6 +164,12 @@ export default function QuickActionSheetModal({
           };
           addMeal(newMeal);
           setQuickFoodQuery('');
+          if (offlineCheck.unmatchedNames.length > 0) {
+            toast.info(
+              `Couldn't identify ${offlineCheck.unmatchedNames.map((n) => `"${n}"`).join(', ')} — logged at 0 kcal, so totals may be understated.`,
+              'Some Foods Unmatched'
+            );
+          }
           toast.success(
             `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
             'Meal Logged (Offline)'

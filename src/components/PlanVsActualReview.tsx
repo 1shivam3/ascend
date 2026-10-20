@@ -96,28 +96,28 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
         {/* ── Key Summary Metric Pills ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-1.5 mt-2.5">
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block">Prescribed</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Prescribed</span>
             <span className="text-xs font-bold font-mono text-text-primary block mt-0.5 tabular-nums">
               {formatSetCount(adherence.totalPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block">Completed</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Completed</span>
             <span className="text-xs font-bold font-mono text-emerald-400 block mt-0.5 tabular-nums">
               {formatSetCount(adherence.completedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block">Skipped</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Skipped</span>
             <span className="text-xs font-bold font-mono text-rose-400 block mt-0.5 tabular-nums">
               {formatSetCount(adherence.skippedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block">Not Attempted</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Not Attempted</span>
             <span className="text-xs font-bold font-mono text-text-muted block mt-0.5 tabular-nums">
               {formatSetCount(adherence.notAttemptedPrescribedSets)}
             </span>
@@ -125,7 +125,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
 
           {adherence.extraCompletedSets > 0 && (
             <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center col-span-2 sm:col-span-1">
-              <span className="text-3xs uppercase font-mono text-text-muted block">Extra Sets</span>
+              <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Extra Sets</span>
               <span className="text-xs font-bold font-mono text-amber-400 block mt-0.5 tabular-nums">
                 {formatSetCount(adherence.extraCompletedSets)}
               </span>

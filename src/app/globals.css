@@ -12,7 +12,7 @@
   --bg-elevated: 255 255 255;     /* #FFFFFF elevated card */
   --text-primary: 23 25 22;       /* #171916 Graphite primary typography */
   --text-secondary: 94 97 90;     /* #5E615A refined secondary body text */
-  --text-muted: 133 128 118;      /* #858076 Sage / muted meta */
+  --text-muted: 110 106 94;       /* #6E6A5E darkened Sage — 4.7:1 on Chalk (was #858076 at 3.45:1, failing WCAG AA for meta text) */
   --border: 226 223 214;          /* #E2DFD6 hairline subtle border */
   --border-subtle: 234 231 223;   /* #EAE7DF */
   --border-hover: 160 156 148;    /* #A09C94 */
@@ -33,11 +33,11 @@
   --border-control: #A09C94;
   --text: #171916;
   --text-2: #5E615A;
-  --text-3: #858076;
+  --text-3: #6E6A5E;
   --accent-hex: #E44427;
   --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
   --accent-subtle: #FDF1EE;
-  --accent-text: #E44427;
+  --accent-text: #C7351B;          /* accent as TEXT needs the dimmer vermilion: 4.66:1 vs 3.57:1 */
   --sage: 133 128 118;
   --sage-hex: #858076;
   --sage-subtle: rgba(133, 128, 118, 0.15);
@@ -84,7 +84,7 @@
   --border-control: #474E45;
   --text: #F3F0E7;
   --text-2: #A5A9A1;
-  --text-3: #7A7E76;
+  --text-3: #8B8F87;
   --accent-hex: #E44427;
   --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
   --accent-subtle: rgba(228, 68, 39, 0.15);
@@ -256,14 +256,15 @@
     @apply fixed left-0 right-0 bottom-0 z-40;
     @apply bg-bg-primary/95 backdrop-blur-xl;
     @apply border-t border-border/60;
-    @apply flex items-center justify-around px-2 pt-1.5;
+    @apply grid grid-cols-4 px-2 pt-1.5;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
   }
 
   .native-tab-item {
-    @apply relative flex-1 flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none cursor-pointer;
+    @apply relative flex flex-col items-center justify-center py-1 rounded-xl text-xs font-medium transition-all duration-150 select-none cursor-pointer;
     @apply text-text-muted hover:text-text-primary;
     min-height: 48px;
+    min-width: 0;
   }
 
   .native-tab-item.active {

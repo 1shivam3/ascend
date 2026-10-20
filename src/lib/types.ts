@@ -278,6 +278,14 @@ export interface WorkoutExercise {
   appliedDecisionId?: string;
   /** Explicit structured athlete pain/discomfort flag (never inferred from free-text notes) */
   reportsPain?: boolean;
+  /**
+   * When this entry is a pain-swap substitute, the name of the ORIGINAL
+   * exercise that hurt. The pain flag on this entry belongs to THAT
+   * exercise — without this, renaming the entry for the swap made
+   * SAFETY-01 lock progression on the innocent substitute while the
+   * painful movement got no safety record at all.
+   */
+  painfulExerciseName?: string;
   /** Explicit structured athlete target hold request (never inferred from free-text notes) */
   requestHold?: boolean;
   /** Explicit structured athlete safety flags for this exercise */
@@ -326,6 +334,9 @@ export interface FoodItem {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** Sugar in grams, when the source provides it (barcode/OFF). Optional:
+   *  most DB entries don't carry it — absence means "unknown", not zero. */
+  sugarG?: number;
   quantity?: number;
   unit?: string;
   isUnmatched?: boolean;
@@ -343,6 +354,9 @@ export interface MacroTotals {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** Total sugar when at least one item carries sugar data; otherwise
+   *  undefined (unknown) — never fabricate a zero. */
+  sugarG?: number;
 }
 
 export type EquipmentType = 'barbell' | 'dumbbell' | 'cable' | 'bodyweight' | 'machine' | 'other';
@@ -480,6 +494,8 @@ export interface AITrainingProfile {
   daysPerWeek: number;
   preferredDurationMin: number;
   equipment: 'full_gym' | 'home_dumbbells' | 'bodyweight_only' | 'barbell_only';
+  /** Daily activity outside training — drives the maintenance-calorie multiplier. */
+  activityLevel?: 'sedentary' | 'light' | 'active' | 'very_active';
   preferredSplit: 'push_pull_legs' | 'upper_lower' | 'full_body' | 'bro_split';
   dislikedExercises: string[];
   injuriesOrLimitations: string[];
@@ -773,10 +789,21 @@ export interface NotificationPreferences {
     enabled: boolean;
     preferredTime: string;
     daysOfWeek: number[]; // 0=Sun, 1=Mon, ..., 6=Sat
+    /** True once the user hand-picks reminder days in the Reminder
+     *  Center. Until then, daysOfWeek auto-syncs from the weekly
+     *  training schedule whenever it changes. */
+    daysCustomized?: boolean;
   };
   weeklyReport: {
     enabled: boolean;
-    reportDay: 'saturday' | 'sunday' | 'monday';
+    reportDay:
+      | 'monday'
+      | 'tuesday'
+      | 'wednesday'
+      | 'thursday'
+      | 'friday'
+      | 'saturday'
+      | 'sunday';
     reportTime: string;
   };
   quietHours: {

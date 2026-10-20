@@ -43,6 +43,7 @@ import ProgressChart from '@/components/ProgressChart';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import CircularProgress from '@/components/ui/CircularProgress';
 import { useToast } from '@/components/ui/Toast';
+
 import { ExerciseRank, EquipmentType, Gender } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
@@ -323,6 +324,12 @@ function LevelProgressionModal({
               <p className="text-2xs text-text-muted font-mono">NEXT LV</p>
             </div>
           </div>
+          {/* Honest flag: this level is estimated from a proxy standard. */}
+          {levelInfo.isStandardUnavailable && levelInfo.standardNote && (
+            <p className="text-2xs text-amber-400 leading-relaxed bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+              Estimated level — {levelInfo.standardNote}
+            </p>
+          )}
 
           {/* Next level requirement */}
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 space-y-2">

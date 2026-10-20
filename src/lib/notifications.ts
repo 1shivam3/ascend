@@ -151,20 +151,36 @@ export function evaluateDueReminders(
   const userMinutes = zoned.hour * 60 + zoned.minute;
   const due: DueReminder[] = [];
 
-  // 1. Water Reminders (between 08:00 and 21:00)
+  // 1. Water Reminders — inside the user's AWAKE window. The window used
+  // to be hard-coded 08:00–21:00, so a night-shift worker whose quiet
+  // hours are 08:00–16:00 got zero reminders during his actual waking
+  // hours after midnight. When quiet hours are enabled, the awake
+  // window is their complement (quiet end → quiet start, wrapping
+  // midnight); otherwise the legacy 08:00–21:00 window applies.
   if (prefs.waterReminders && prefs.waterReminders.enabled) {
     const interval = Math.max(1, Math.min(3, prefs.waterReminders.intervalHours || 2));
-    for (let h = 8; h <= 21; h++) {
-      if ((h - 8) % interval === 0) {
-        const schedMinutes = h * 60;
-        const diff = userMinutes - schedMinutes;
-        if (diff >= 0 && diff <= windowMinutes) {
-          due.push({
-            type: 'water',
-            occurrenceId: `${zoned.dateString}_water_${h}`,
-            scheduledTime: `${zoned.dateString}T${String(h).padStart(2, '0')}:00:00`,
-          });
-        }
+    let windowStartMin = 8 * 60;
+    let windowDurationMin = 14 * 60; // 08:00 → 22:00 (last slot 21:00)
+    if (prefs.quietHours && prefs.quietHours.enabled) {
+      const [qsH, qsM] = (prefs.quietHours.start || '22:00').split(':').map(Number);
+      const [qeH, qeM] = (prefs.quietHours.end || '07:00').split(':').map(Number);
+      const quietStart = (qsH || 0) * 60 + (qsM || 0);
+      const quietEnd = (qeH || 0) * 60 + (qeM || 0);
+      windowStartMin = quietEnd;
+      windowDurationMin = (quietStart - quietEnd + 1440) % 1440;
+      if (windowDurationMin === 0) windowDurationMin = 1440;
+    }
+    for (let offset = 0; offset < windowDurationMin; offset += interval * 60) {
+      const slotMin = (windowStartMin + offset) % 1440;
+      const diff = (userMinutes - slotMin + 1440) % 1440;
+      if (diff <= windowMinutes) {
+        const h = Math.floor(slotMin / 60);
+        const m = slotMin % 60;
+        due.push({
+          type: 'water',
+          occurrenceId: `${zoned.dateString}_water_${h}_${m}`,
+          scheduledTime: `${zoned.dateString}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`,
+        });
       }
     }
   }
@@ -218,7 +234,15 @@ export function evaluateDueReminders(
 
   // 4. Weekly Report (respects configured day and time)
   if (prefs.weeklyReport && prefs.weeklyReport.enabled) {
-    const daysMap: Record<string, number> = { sunday: 0, monday: 1, saturday: 6 };
+    const daysMap: Record<string, number> = {
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
+    };
     const targetDay = daysMap[prefs.weeklyReport.reportDay] ?? 0;
     if (zoned.dayOfWeek === targetDay) {
       const timeStr = prefs.weeklyReport.reportTime || '10:00';

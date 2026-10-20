@@ -8,7 +8,9 @@ import {
   MuscleGroup,
   MUSCLE_GROUPS,
   searchExercises,
+  getExerciseMuscle,
 } from '@/lib/exercise-library';
+import { useStore } from '@/lib/store';
 
 interface ExerciseSelectorModalProps {
   isOpen: boolean;
@@ -27,6 +29,8 @@ export default function ExerciseSelectorModal({
 }: ExerciseSelectorModalProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | 'All'>(defaultMuscle);
+  const [customMuscle, setCustomMuscle] = useState<MuscleGroup | null>(null);
+  const setCustomExerciseMuscle = useStore((state) => state.setCustomExerciseMuscle);
 
   const filteredExercises = useMemo(() => {
     return searchExercises(searchQuery, selectedMuscle);
@@ -45,10 +49,19 @@ export default function ExerciseSelectorModal({
     onClose();
   };
 
+  // The muscle a custom exercise will be filed under: an explicit pick
+  // wins, then the browsed category tab, then the name heuristic.
+  const effectiveCustomMuscle = (name: string): MuscleGroup =>
+    customMuscle ??
+    (selectedMuscle !== 'All' ? selectedMuscle : getExerciseMuscle(name));
+
   const handleAddCustom = () => {
     const trimmed = searchQuery.trim();
     if (!trimmed) return;
     const isBW = /push[\s-]?up|pull[\s-]?up|chin[\s-]?up|dip|squat|plank|crunch/i.test(trimmed);
+    // Persist the muscle choice — otherwise the exercise is classified
+    // by name keywords forever, with no way to correct a wrong guess.
+    setCustomExerciseMuscle(trimmed, effectiveCustomMuscle(trimmed));
     onSelectExercise({
       name: trimmed,
       isBodyweight: isBW,
@@ -56,6 +69,7 @@ export default function ExerciseSelectorModal({
       defaultReps: 10,
     });
     setSearchQuery('');
+    setCustomMuscle(null);
     onClose();
   };
 
@@ -137,6 +151,32 @@ export default function ExerciseSelectorModal({
               </button>
             ))}
           </div>
+
+          {/* Custom-exercise muscle: shown while typing a name that will
+              be added as custom, so it is filed under the right muscle
+              instead of a keyword guess. */}
+          {searchQuery.trim() && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
+              <span className="text-text-muted shrink-0 font-semibold">Custom muscle:</span>
+              {MUSCLE_GROUPS.map((m) => {
+                const active = effectiveCustomMuscle(searchQuery.trim()) === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setCustomMuscle(m)}
+                    className={`px-2.5 py-1 rounded-full font-semibold transition-all shrink-0 cursor-pointer ${
+                      active
+                        ? 'bg-accent/85 text-white'
+                        : 'bg-bg-secondary/60 text-text-muted hover:text-text-primary border border-border/50'
+                    }`}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Exercise List */}

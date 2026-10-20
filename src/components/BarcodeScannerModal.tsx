@@ -407,6 +407,25 @@ export default function BarcodeScannerModal({
   // Explicit user confirmation to add food
   const handleConfirmAddToMeal = () => {
     if (!currentFoodItem) return;
+
+    if (isNotFoundInDB && scannedProduct) {
+      // Never persist a barcode whose nutrition is entirely zeros — it
+      // would poison every future scan of this product with a silent
+      // 0-kcal entry. Ask for at least calories before remembering it.
+      const allZero =
+        Math.round(calPer100) === 0 &&
+        Number(proPer100.toFixed(1)) === 0 &&
+        Number(carbPer100.toFixed(1)) === 0 &&
+        Number(fatPer100.toFixed(1)) === 0;
+      if (allZero) {
+        toast.error(
+          'Enter at least the calories from the product label before saving — otherwise this barcode would be remembered with no nutrition data.',
+          'Nutrition Needed'
+        );
+        return;
+      }
+    }
+
     onAddFood(currentFoodItem);
 
     if (isNotFoundInDB && scannedProduct) {

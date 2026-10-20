@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { parseWorkoutCSV } from '@/lib/workout-import';
+import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import {
   X,
   Download,
@@ -49,22 +50,16 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
 
   if (!isOpen) return null;
 
+  // ONE canonical backup builder (storage.ts) — this modal used to hand-
+  // roll an 11-field payload under the same filename, silently dropping
+  // the schedule, training profile, UI prefs, hydration/creatine logs,
+  // custom barcodes and every progress photo.
   const generateBackupPayload = () => {
-    return {
-      version: '2.0.0',
-      exportedAt: new Date().toISOString(),
-      profile,
-      prs,
-      workouts,
-      meals,
-      bodyMetrics,
-      prTargets,
-      macroGoals,
-      plannedWorkouts,
-      favoriteFoods,
-      theme,
-      hasCompletedOnboarding: true,
-    };
+    const state = useStore.getState();
+    return buildFullBackup(state as unknown as Record<string, any>, {
+      customBarcodes: getCustomBarcodes(),
+      progressPhotos: state.progressPhotos || [],
+    });
   };
 
   // 1-Tap Data Export
@@ -174,7 +169,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     reader.onload = (event) => {
       try {
         const text = event.target?.result as string;
-        const result = parseWorkoutCSV(text);
+        const result = parseWorkoutCSV(text, { fallbackUnit: profile?.unit || 'kg' });
 
         result.workouts.forEach((w) => {
           addWorkout(w);

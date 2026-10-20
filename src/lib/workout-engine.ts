@@ -19,6 +19,7 @@ import {
   UserMode,
 } from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise } from './strength-standards';
+import { getExerciseMuscle } from './exercise-library';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 import { calculateSetEffortDrift } from './lifter-twin';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
@@ -117,10 +118,49 @@ export interface NextSessionTarget {
  * - avg RPE ≤ 7 across all sets → PROGRESS the load (small overload step).
  * - otherwise (or no RPE logged) → ADD A REP at the same load (double progression).
  */
+/** Did this workout record pain for this exercise (directly, or via a
+ *  pain swap that renamed the entry — see painfulExerciseName)? */
+export function exerciseHadPain(
+  workout:
+    | Pick<WorkoutEntry, 'exercises'>
+    | {
+        exercises?: {
+          name: string;
+          reportsPain?: boolean;
+          painfulExerciseName?: string;
+          athleteFlags?: { reportsPain?: boolean };
+        }[];
+      }
+    | null
+    | undefined,
+  exerciseName: string
+): boolean {
+  if (!workout || !exerciseName) return false;
+  const key = normalizeExerciseKey(exerciseName);
+  return (workout.exercises || []).some((e) => {
+    if (e.painfulExerciseName && normalizeExerciseKey(e.painfulExerciseName) === key) {
+      return true;
+    }
+    // An entry whose pain is attributed elsewhere (pain-swap substitute)
+    // does not flag its own name.
+    const painIsOwn =
+      !e.painfulExerciseName ||
+      normalizeExerciseKey(e.painfulExerciseName) === normalizeExerciseKey(e.name);
+    return (
+      painIsOwn &&
+      normalizeExerciseKey(e.name) === key &&
+      (e.reportsPain === true || e.athleteFlags?.reportsPain === true)
+    );
+  });
+}
+
+const EXPLOSIVE_EXERCISE_PATTERN = /(clean|snatch|jerk|jump|plyo|sprint|throw|bound|hop)/i;
+
 export function getNextSessionTarget(
   exerciseName: string,
   completedSets: NextSessionTargetInput[],
-  userUnit: Unit = 'kg'
+  userUnit: Unit = 'kg',
+  opts?: { hadPain?: boolean }
 ): NextSessionTarget | null {
   const done = (completedSets || []).filter((s) => s.reps > 0);
   if (done.length === 0) return null;
@@ -137,6 +177,59 @@ export function getNextSessionTarget(
     sets: done.length,
     unit: userUnit,
   };
+
+  // Pain trumps every progression rule: a session that ended in a pain
+  // swap must never produce "+2.5 kg next time" for that movement.
+  if (opts?.hadPain) {
+    return {
+      ...base,
+      weight: maxW,
+      reps: topReps,
+      directive: 'hold',
+      summaryText: `${exerciseName}: hold ${maxW}${userUnit} × ${topReps} next session`,
+      rationale:
+        'You flagged pain on this movement last time — progression is paused. Repeat the same load only if it feels completely clean, or swap the movement.',
+    };
+  }
+
+  // Explosive work (cleans, jumps, throws) progresses by speed and
+  // technique. "+2.5 kg" or "grind out +1 rep" is the wrong directive.
+  if (EXPLOSIVE_EXERCISE_PATTERN.test(exerciseName)) {
+    return {
+      ...base,
+      weight: maxW,
+      reps: topReps,
+      directive: 'hold',
+      summaryText: `${exerciseName}: repeat ${maxW > 0 ? `${maxW}${userUnit} × ` : ''}${topReps} reps — quality over load`,
+      rationale:
+        'Explosive movements improve with crisp, fast reps at the same load — not by piling on weight or grinding extra reps.',
+    };
+  }
+
+  // Bodyweight work has no load to step: rep progression only, and never
+  // after a grinding session.
+  if (maxW <= 0) {
+    if (avgRpe !== undefined && avgRpe >= 9) {
+      return {
+        ...base,
+        weight: 0,
+        reps: topReps,
+        directive: 'hold',
+        summaryText: `${exerciseName}: hold 0${userUnit} × ${topReps} next session`,
+        rationale: `${rpeStr} — hard session. Hold and consolidate before adding reps.`,
+      };
+    }
+    return {
+      ...base,
+      weight: 0,
+      reps: topReps + 1,
+      directive: 'add_rep',
+      summaryText: `${exerciseName}: 0${userUnit} × ${topReps + 1} next session`,
+      rationale: rpeStr
+        ? `${rpeStr} — solid work. Add a rep before adding load.`
+        : 'Solid work. Add a rep — bodyweight progress is rep progress.',
+    };
+  }
 
   if (avgRpe !== undefined && avgRpe >= 9) {
     return {
@@ -852,6 +945,45 @@ export interface ProgressionTarget {
   plateauSuggestion?: string;
 }
 
+/**
+ * Estimates how long a planned session actually takes: per set, ~45s of
+ * work plus rest that depends on the movement (heavy compounds ~180s,
+ * accessories ~90s, core/conditioning ~60s). Replaces the old
+ * "exercises × 8 minutes" guess, which called a 4-exercise leg day
+ * 32 minutes and a 9-exercise accessory day 72 — wrong in both
+ * directions, and it drove the Home hero and plan-offer estimates.
+ */
+export function estimateSessionMinutes(
+  plan: { exercises?: PlannedExercise[] } | null | undefined
+): number {
+  const exercises = plan?.exercises || [];
+  if (exercises.length === 0) return 45;
+  let seconds = 0;
+  for (const ex of exercises) {
+    const sets = Math.max(1, ex.targetSets || 3);
+    const name = (ex.name || '').toLowerCase();
+    const muscle = getExerciseMuscle(ex.name);
+    let restSec: number;
+    if (
+      muscle === 'Core' ||
+      muscle === 'Conditioning' ||
+      /plank|carry|farmer|sled|battle rope/.test(name)
+    ) {
+      restSec = 60;
+    } else if (
+      /squat|deadlift|bench press|overhead press|barbell row|clean|snatch|hip thrust|leg press/.test(name)
+    ) {
+      restSec = 180;
+    } else {
+      restSec = 90;
+    }
+    seconds += sets * (45 + restSec);
+  }
+  // Between-exercise transitions.
+  seconds += Math.max(0, exercises.length - 1) * 60;
+  return Math.max(10, Math.min(180, Math.round(seconds / 60)));
+}
+
 export function getProgressionRecommendation(
   exerciseName: string,
   workouts: WorkoutEntry[],
@@ -862,6 +994,7 @@ export function getProgressionRecommendation(
 
   const targetLower = exerciseName.trim().toLowerCase();
   const sessions: { date: string; sets: WorkoutSet[]; bestE1RM: number }[] = [];
+  let firstSessionPain = false;
 
   const sortedWorkouts = [...workouts].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
@@ -891,6 +1024,7 @@ export function getProgressionRecommendation(
           };
         });
       if (validSets.length > 0) {
+        if (sessions.length === 0) firstSessionPain = exerciseHadPain(w, exerciseName);
         const bestE1RM = Math.max(...validSets.map((s) => calculateOneRepMax(typeof s.weight === 'number' ? s.weight : 0, s.reps)));
         sessions.push({ date: w.date, sets: validSets, bestE1RM });
         if (sessions.length >= 5) break;
@@ -946,6 +1080,20 @@ export function getProgressionRecommendation(
   const minTargetReps = isStrength ? 4 : isStamina ? 12 : isFatLoss ? 6 : 8;
   const step = userUnit === 'lbs' ? 5 : 2.5;
   const minBar = userUnit === 'lbs' ? 45 : 20;
+
+  // 0. Pain on the most recent session pauses progression outright —
+  // this check must beat every deload/progress rule below.
+  if (firstSessionPain) {
+    return {
+      targetWeight: lastWeight,
+      targetReps: lastReps,
+      targetSetsCount: lastSetsCount,
+      targetSummary: `${lastWeight}${userUnit} × ${lastReps} reps (held — pain reported)`,
+      rationale:
+        'You reported pain on this movement in your last session. Progression is paused: repeat the same load only if it feels completely clean. If the pain returns, swap the movement — and persistent pain deserves a professional assessment.',
+      isPlateau: false,
+    };
+  }
 
   // 1. Two consecutive misses in a row -> Suggest a 10% deload
   if (sessions.length >= 2) {
@@ -1222,6 +1370,437 @@ export function getQuickSubstitutes(exerciseName: string): ExerciseSubstitute[] 
     { name: 'Dumbbell alternative', equipment: 'dumbbell', reason: 'Independent arm freedom' },
     { name: 'Machine alternative', equipment: 'machine', reason: 'High stability and controlled path' },
   ];
+}
+
+/**
+ * Equipment-aware plan adaptation.
+ *
+ * Generated templates assume a full gym. For users who train at home we swap
+ * every exercise they cannot do for the closest movement they CAN do, using
+ * the substitution table first and a movement-pattern fallback second.
+ * Beginners additionally get pull-ups regressed to a lat/machine variant —
+ * an unscaled bodyweight-max exercise (3×8 pull-ups) in a first-week plan is
+ * a trust-destroying prescription for someone who cannot do one rep.
+ */
+export type EquipmentAccess = import('./types').AITrainingProfile['equipment'];
+
+const ALLOWED_EQUIPMENT: Record<EquipmentAccess, Set<string>> = {
+  full_gym: new Set(['barbell', 'dumbbell', 'cable', 'machine', 'bodyweight', 'smith machine', 'cardio']),
+  home_dumbbells: new Set(['dumbbell', 'bodyweight', 'cardio']),
+  bodyweight_only: new Set(['bodyweight', 'cardio']),
+  barbell_only: new Set(['barbell', 'bodyweight', 'cardio']),
+};
+
+/** Fallbacks by movement pattern when the substitution table has no fit. */
+const EQUIPMENT_FALLBACKS: { match: string[]; dumbbell: string; bodyweight: string }[] = [
+  { match: ['front squat', 'hack squat', 'leg press', 'squat'], dumbbell: 'Goblet Squat', bodyweight: 'Bodyweight Squats' },
+  { match: ['deadlift', 'romanian'], dumbbell: 'Dumbbell Romanian Deadlift', bodyweight: 'Back Hyperextension' },
+  { match: ['leg curl', 'hamstring curl'], dumbbell: 'Dumbbell Romanian Deadlift', bodyweight: 'Back Hyperextension' },
+  { match: ['leg extension'], dumbbell: 'Bulgarian Split Squat', bodyweight: 'Bodyweight Squats' },
+  { match: ['incline bench', 'incline press'], dumbbell: 'Incline Dumbbell Press', bodyweight: 'Push-ups' },
+  { match: ['bench press', 'chest press'], dumbbell: 'Dumbbell Bench Press', bodyweight: 'Push-ups' },
+  { match: ['fly', 'pec deck'], dumbbell: 'Dumbbell Chest Fly', bodyweight: 'Push-ups' },
+  { match: ['overhead press', 'shoulder press', 'ohp'], dumbbell: 'Seated Dumbbell Shoulder Press', bodyweight: 'Push-ups' },
+  { match: ['lat pulldown', 'pulldown'], dumbbell: 'Single-Arm Dumbbell Row', bodyweight: 'Inverted Bodyweight Row' },
+  // Cardio BEFORE the generic 'row' entry: "rowing" (the -ing form) is
+  // the machine, not a back exercise. There was NO cardio entry at all —
+  // machine-cardio names fell through to a Chest-default muscle swap.
+  { match: ['rowing', 'bike', 'cycling', 'cycle', 'treadmill', 'elliptical', 'stair', 'stepper', 'cardio', 'hiit', 'conditioning'], dumbbell: 'Jumping Jacks', bodyweight: 'Jumping Jacks' },
+  { match: ['row'], dumbbell: 'Single-Arm Dumbbell Row', bodyweight: 'Inverted Bodyweight Row' },
+  { match: ['face pull'], dumbbell: 'Dumbbell Rear Delt Fly', bodyweight: 'Inverted Bodyweight Row' },
+  { match: ['pushdown', 'tricep'], dumbbell: 'Overhead Dumbbell Tricep Extension', bodyweight: 'Diamond Push-ups' },
+  { match: ['skull crusher'], dumbbell: 'Overhead Dumbbell Tricep Extension', bodyweight: 'Diamond Push-ups' },
+  { match: ['preacher curl'], dumbbell: 'Concentration Curl', bodyweight: 'Chin-ups' },
+  { match: ['curl'], dumbbell: 'Dumbbell Bicep Curl', bodyweight: 'Chin-ups' },
+  { match: ['shrug'], dumbbell: 'Dumbbell Shrug', bodyweight: 'Back Hyperextension' },
+  { match: ['hip thrust'], dumbbell: 'Bulgarian Split Squat', bodyweight: 'Back Hyperextension' },
+  { match: ['lateral raise'], dumbbell: 'Dumbbell Lateral Raise', bodyweight: 'Push-ups' },
+  { match: ['upright row'], dumbbell: 'Dumbbell Lateral Raise', bodyweight: 'Push-ups' },
+];
+
+function findEquipmentFallback(name: string, access: EquipmentAccess): string | null {
+  const clean = name.toLowerCase();
+  for (const fb of EQUIPMENT_FALLBACKS) {
+    if (fb.match.some((m) => clean.includes(m))) {
+      if (access === 'barbell_only') return fb.bodyweight; // barbell fallback stays original; bodyweight is the safe substitute
+      return access === 'home_dumbbells' ? fb.dumbbell : fb.bodyweight;
+    }
+  }
+  return null;
+}
+
+/* ── Normalized exercise identity + movement families ──────────────────────
+ * Exclusions and pain records must match MOVEMENTS, not raw strings.
+ * Verified failure: a user excluded "Romanian Deadlift" and the adapter
+ * prescribed "Dumbbell Romanian Deadlift" — the same movement wearing an
+ * equipment prefix — while the UI promised "won't be prescribed again".
+ * Normalization strips equipment prefixes and expands abbreviations so
+ * variants share one key.
+ */
+const EQUIPMENT_NAME_PREFIXES = [
+  'smith machine',
+  'ez bar',
+  'trap bar',
+  'dumbbell',
+  'barbell',
+  'kettlebell',
+  'machine',
+  'cable',
+  'seated',
+  'standing',
+];
+
+export function normalizeExerciseKey(name: string): string {
+  let k = (name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-_/]/g, ' ')
+    .replace(/\s+/g, ' ');
+  k = k.replace(/\brdl\b/g, 'romanian deadlift');
+  for (const p of EQUIPMENT_NAME_PREFIXES) {
+    if (k.startsWith(p + ' ')) {
+      k = k.slice(p.length + 1);
+      break;
+    }
+  }
+  return k.trim();
+}
+
+export function exerciseMatchesExclusion(name: string, exclusions: string[] = []): boolean {
+  if (!exclusions || exclusions.length === 0) return false;
+  const key = normalizeExerciseKey(name);
+  return exclusions.some((e) => normalizeExerciseKey(e) === key);
+}
+
+export type MovementFamily =
+  | 'hinge'
+  | 'squat'
+  | 'horizontal_push'
+  | 'vertical_push'
+  | 'horizontal_pull'
+  | 'vertical_pull'
+  | 'carry'
+  | 'core'
+  | 'other';
+
+const MOVEMENT_FAMILY_PATTERNS: [MovementFamily, RegExp][] = [
+  ['hinge', /(deadlift|romanian|good morning|hip thrust|glute bridge|kettlebell swing|hyperextension|back extension)/],
+  ['squat', /(squat|lunge|leg press|hack|step[- ]?up|leg extension)/],
+  ['vertical_pull', /(pull[- ]?up|chin[- ]?up|pulldown|lat pull)/],
+  ['horizontal_pull', /(row|face pull)/],
+  ['vertical_push', /(overhead press|shoulder press|arnold|pike push|handstand|military press|\bdips?\b)/],
+  ['horizontal_push', /(bench|push[- ]?up|chest press|fly|pec deck)/],
+  ['carry', /(farmer|carry|shrug)/],
+  ['core', /(plank|crunch|knee raise|leg raise|ab wheel|russian twist|dead bug|sit[- ]?up|woodchopper)/],
+];
+
+export function getMovementFamily(name: string): MovementFamily {
+  const clean = (name || '').trim().toLowerCase();
+  for (const [family, pattern] of MOVEMENT_FAMILY_PATTERNS) {
+    if (pattern.test(clean)) return family;
+  }
+  return 'other';
+}
+
+/**
+ * Declared injuries/limitations → movement families that must never be
+ * prescribed. Deliberately conservative: a bad back bans loaded hinges,
+ * a bad knee bans squat patterns, a bad shoulder bans overhead pressing.
+ * (Wrist/elbow are recorded and surfaced to coaching, but have no safe
+ * generic ban — load choice there is individual.)
+ */
+const INJURY_FAMILY_BANS: [RegExp, MovementFamily[]][] = [
+  [/back|spine|disc|lumbar|sciatica/i, ['hinge']],
+  [/knee|meniscus|acl|patella/i, ['squat']],
+  [/shoulder|rotator|impingement/i, ['vertical_push']],
+  [/hip|groin/i, ['hinge']],
+  [/neck/i, ['vertical_push']],
+  [/ankle|achilles/i, ['squat']],
+];
+
+export function getInjuryBannedFamilies(limitations: string[] = []): Set<MovementFamily> {
+  const banned = new Set<MovementFamily>();
+  for (const lim of limitations || []) {
+    for (const [pattern, families] of INJURY_FAMILY_BANS) {
+      if (pattern.test(lim)) families.forEach((f) => banned.add(f));
+    }
+  }
+  return banned;
+}
+
+/** Last-resort swaps by muscle group when no table/pattern match exists. */
+const MUSCLE_HOME_FALLBACKS: Record<string, { dumbbell: string; bodyweight: string }> = {
+  Chest: { dumbbell: 'Dumbbell Bench Press', bodyweight: 'Push-ups' },
+  Back: { dumbbell: 'Single-Arm Dumbbell Row', bodyweight: 'Inverted Bodyweight Row' },
+  Legs: { dumbbell: 'Goblet Squat', bodyweight: 'Bodyweight Squats' },
+  Shoulders: { dumbbell: 'Seated Dumbbell Shoulder Press', bodyweight: 'Pike Push-ups' },
+  Arms: { dumbbell: 'Dumbbell Bicep Curl', bodyweight: 'Chin-ups' },
+  Core: { dumbbell: 'Dead Bug', bodyweight: 'Dead Bug' },
+};
+
+/** Machine cardio wearing a "cardio is allowed at home" costume. */
+const MACHINE_CARDIO_PATTERN =
+  /(stationary|exercise bike|cycling|treadmill|elliptical|stair|stepper|rowing machine|ergometer|air bike|assault bike)/i;
+
+/** ~30 kg per hand — the top of typical home adjustable dumbbell sets. */
+const MAX_HOME_DUMBBELL_TOTAL_KG = 60;
+const MAX_HOME_DUMBBELL_TOTAL_LBS = 130;
+
+const isPlaceholderSubstitute = (name: string) =>
+  /alternative|equivalent|variation/i.test(name);
+
+function adaptedLoadFor(
+  ex: PlannedExercise,
+  replacementName: string,
+  isLbs: boolean
+): number | undefined {
+  const increment = isLbs ? 5 : 2.5;
+  const replacementEq = String(getEquipmentType(replacementName)).toLowerCase();
+  if (replacementEq === 'bodyweight') return 0;
+  if (replacementEq === 'dumbbell' && ex.targetWeight) {
+    const converted = Math.max(increment, Math.round((ex.targetWeight * 0.35) / increment) * increment);
+    return Math.min(converted, isLbs ? MAX_HOME_DUMBBELL_TOTAL_LBS : MAX_HOME_DUMBBELL_TOTAL_KG);
+  }
+  return ex.targetWeight;
+}
+
+/**
+ * Adapt one exercise to the user's equipment + exclusions.
+ * Returns null when the exercise is excluded and NO safe replacement
+ * exists — dropping it is honest; prescribing the excluded movement
+ * (or its equipment-prefixed twin) is not.
+ */
+export function adaptExerciseForEquipment(
+  ex: PlannedExercise,
+  access: EquipmentAccess,
+  isLbs: boolean,
+  exclusions: string[] = []
+): PlannedExercise | null {
+  const isExcluded = exerciseMatchesExclusion(ex.name, exclusions);
+  if (access === 'full_gym' && !isExcluded) return ex;
+  const allowed = ALLOWED_EQUIPMENT[access];
+  const eq = String(getEquipmentType(ex.name)).toLowerCase();
+
+  // Machine cardio is not home cardio. (These names type as 'barbell' by
+  // default in getEquipmentType, so keying this on eq==='cardio' would
+  // never fire — the NAME is the reliable signal.)
+  if (access !== 'full_gym' && MACHINE_CARDIO_PATTERN.test(ex.name)) {
+    const replacement = /interval|hiit|sprint/i.test(ex.name) ? 'Burpees' : 'Jumping Jacks';
+    return {
+      ...ex,
+      name: replacement,
+      targetWeight: 0,
+      notes: `${ex.notes ? ex.notes + ' · ' : ''}Swapped from ${ex.name} — no machine available`,
+    };
+  }
+
+  if (allowed.has(eq) && !isExcluded) return ex;
+
+  const isSafe = (name: string) => !exerciseMatchesExclusion(name, exclusions);
+
+  // 1) Substitution table: first entry the user can actually do that is
+  //    not itself an excluded movement (excluded "Romanian Deadlift" must
+  //    never come back as "Dumbbell Romanian Deadlift").
+  const subs = getQuickSubstitutes(ex.name).filter(
+    (s) => allowed.has(s.equipment.toLowerCase()) && !isPlaceholderSubstitute(s.name) && isSafe(s.name)
+  );
+  let replacement = subs.length > 0 ? subs[0].name : null;
+
+  // 2) Movement-pattern fallback (exclusion-checked too).
+  if (!replacement) {
+    const fb = findEquipmentFallback(ex.name, access);
+    if (fb && isSafe(fb)) replacement = fb;
+  }
+
+  // 3) Muscle-group fallback — an unmatched name ("Close Grip Bench")
+  //    must not sail through unchanged carrying a barbell load at home.
+  if (!replacement) {
+    const mf = MUSCLE_HOME_FALLBACKS[getExerciseMuscle(ex.name)];
+    if (mf) {
+      const candidate = access === 'home_dumbbells' ? mf.dumbbell : mf.bodyweight;
+      if (isSafe(candidate)) replacement = candidate;
+    }
+  }
+
+  if (!replacement) {
+    // Excluded with nothing safe to offer → drop. Not excluded → keep
+    // (an unfamiliar exercise the user CAN do beats a guessed swap).
+    return isExcluded ? null : ex;
+  }
+
+  return {
+    ...ex,
+    name: replacement,
+    targetWeight: adaptedLoadFor(ex, replacement, isLbs),
+    notes: `${ex.notes ? ex.notes + ' · ' : ''}Swapped from ${ex.name}${access === 'full_gym' ? ' — excluded' : ` — no ${eq} available`}`,
+  };
+}
+
+/**
+ * Filtered substitute list for the in-workout swap UI. The raw table is
+ * pattern- and equipment-blind (verified: "Hurts" on Deadlift offered
+ * Romanian Deadlift and Good Mornings; home users were offered machines).
+ * Pain swaps must leave the painful movement family entirely; every swap
+ * must respect the user's equipment and their exclusion list.
+ */
+export interface SubstituteFilterOptions {
+  equipment?: EquipmentAccess;
+  exclusions?: string[];
+  /** Pain swaps: drop substitutes from this exercise's movement family. */
+  avoidSameFamilyAs?: string;
+}
+
+export function getFilteredSubstitutes(
+  exerciseName: string,
+  opts: SubstituteFilterOptions = {}
+): ExerciseSubstitute[] {
+  let list = getQuickSubstitutes(exerciseName).filter((s) => !isPlaceholderSubstitute(s.name));
+  if (opts.equipment) {
+    const allowed = ALLOWED_EQUIPMENT[opts.equipment];
+    list = list.filter((s) => allowed.has(s.equipment.toLowerCase()));
+    // Pull-ups/chin-ups are tagged "bodyweight" but need a bar, which is
+    // in neither home equipment profile.
+    if (opts.equipment === 'home_dumbbells' || opts.equipment === 'bodyweight_only') {
+      list = list.filter((s) => !/pull[- ]?up|chin[- ]?up/i.test(s.name));
+    }
+  }
+  if (opts.exclusions && opts.exclusions.length > 0) {
+    list = list.filter((s) => !exerciseMatchesExclusion(s.name, opts.exclusions));
+  }
+  if (opts.avoidSameFamilyAs) {
+    const fam = getMovementFamily(opts.avoidSameFamilyAs);
+    if (fam !== 'other') {
+      list = list.filter((s) => getMovementFamily(s.name) !== fam);
+    }
+  }
+  const selfKey = normalizeExerciseKey(exerciseName);
+  return list.filter((s) => normalizeExerciseKey(s.name) !== selfKey);
+}
+
+/** Beginner pull-up regression: 3×8 pull-ups is impossible for most day-one users. */
+export function regressPullUpsForBeginner(ex: PlannedExercise, access: EquipmentAccess): PlannedExercise {
+  if (!/^pull-?ups?$/i.test(ex.name.trim())) return ex;
+  const regression =
+    access === 'full_gym' ? 'Lat Pulldown' : access === 'home_dumbbells' ? 'Single-Arm Dumbbell Row' : 'Inverted Bodyweight Row';
+  return {
+    ...ex,
+    name: regression,
+    notes: `${ex.notes ? ex.notes + ' · ' : ''}Pull-up regression — build toward pull-ups over time`,
+  };
+}
+
+export interface AdaptSplitOptions {
+  /** Under-18s always get the pull-up regression, whatever they declared. */
+  isMinor?: boolean;
+  /** Declared injuries/limitations — banned movement families (ARJUN-1). */
+  limitations?: string[];
+}
+
+/** Find a replacement outside the banned families, or null to drop. */
+function findFamilySafeAlternative(
+  ex: PlannedExercise,
+  access: EquipmentAccess,
+  banned: Set<MovementFamily>,
+  exclusions: string[],
+  isLbs: boolean
+): PlannedExercise | null {
+  const allowed = ALLOWED_EQUIPMENT[access];
+  const subs = getQuickSubstitutes(ex.name).filter(
+    (s) =>
+      allowed.has(s.equipment.toLowerCase()) &&
+      !isPlaceholderSubstitute(s.name) &&
+      !banned.has(getMovementFamily(s.name)) &&
+      !exerciseMatchesExclusion(s.name, exclusions)
+  );
+  const pick = (name: string): PlannedExercise => ({
+    ...ex,
+    name,
+    targetWeight: adaptedLoadFor(ex, name, isLbs),
+    notes: `${ex.notes ? ex.notes + ' · ' : ''}Swapped from ${ex.name} — gentler on your declared limitation`,
+  });
+  if (subs.length > 0) return pick(subs[0].name);
+  const mf = MUSCLE_HOME_FALLBACKS[getExerciseMuscle(ex.name)];
+  if (mf) {
+    const candidate = access === 'home_dumbbells' ? mf.dumbbell : mf.bodyweight;
+    if (!banned.has(getMovementFamily(candidate)) && !exerciseMatchesExclusion(candidate, exclusions)) {
+      return pick(candidate);
+    }
+  }
+  return null;
+}
+
+export function adaptSplitForEquipment(
+  plans: PlannedWorkout[],
+  access: EquipmentAccess,
+  unit: Unit = 'kg',
+  experience?: UserMode,
+  exclusions: string[] = [],
+  options: AdaptSplitOptions = {}
+): PlannedWorkout[] {
+  const isLbs = unit === 'lbs';
+  const bannedFamilies = getInjuryBannedFamilies(options.limitations || []);
+  // Pull-ups regress for beginners, for minors, and for anyone without a
+  // bar (home/bodyweight) — the substitution table used to CREATE pull-up
+  // prescriptions for intermediate home users (round-1 bug, reintroduced
+  // via 'lat pulldown' → Pull-ups).
+  const regressPullUps = experience === 'beginner' || options.isMinor === true || access !== 'full_gym';
+
+  return plans.map((plan) => {
+    const seen = new Set<string>();
+    const out: PlannedExercise[] = [];
+    for (const ex of plan.exercises || []) {
+      let next = adaptExerciseForEquipment(ex, access, isLbs, exclusions);
+      if (!next) continue; // excluded, no safe replacement — dropped honestly
+
+      if (bannedFamilies.size > 0 && bannedFamilies.has(getMovementFamily(next.name))) {
+        const alt = findFamilySafeAlternative(next, access, bannedFamilies, exclusions, isLbs);
+        if (!alt) continue; // nothing safe for this limitation — drop
+        next = alt;
+      }
+
+      if (regressPullUps) next = regressPullUpsForBeginner(next, access);
+
+      // Adaptation converges: two template exercises can land on the same
+      // movement (verified: Dumbbell RDL twice in one session). Keep one.
+      const key = normalizeExerciseKey(next.name);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(next);
+    }
+    return { ...plan, exercises: out };
+  });
+}
+
+export interface GeneratedPlanContext {
+  unit: Unit;
+  bodyweightKg?: number;
+  experience?: UserMode;
+  ageYears?: number;
+  equipment: EquipmentAccess;
+  exclusions?: string[];
+  limitations?: string[];
+}
+
+/**
+ * THE pipeline every generated plan must pass through — first-exposure
+ * load scaling, then equipment/exclusion/injury adaptation. Round 1
+ * wired this into Onboarding and the schedule modal but the Suggested
+ * Workout modal installed raw templates (unscaled 110 kg deadlifts and
+ * 3×8 pull-ups for a 62 kg beginner). One helper, every door.
+ */
+export function prepareGeneratedPlans(
+  plans: PlannedWorkout[],
+  ctx: GeneratedPlanContext
+): PlannedWorkout[] {
+  const scaled = scaleSplitTemplatesForAthlete(plans, ctx.unit === 'lbs', {
+    bodyweightKg: ctx.bodyweightKg,
+    experience: ctx.experience,
+    ageYears: ctx.ageYears,
+  });
+  return adaptSplitForEquipment(scaled, ctx.equipment, ctx.unit, ctx.experience, ctx.exclusions || [], {
+    isMinor: typeof ctx.ageYears === 'number' && ctx.ageYears > 0 && ctx.ageYears < 18,
+    limitations: ctx.limitations || [],
+  });
 }
 
 /**
@@ -1589,6 +2168,17 @@ export function getTodaySessionState(
 export interface TemplateAthleteContext {
   bodyweightKg?: number;
   experience?: UserMode;
+  /** Under-18s are scaled as beginners whatever they self-declare. */
+  ageYears?: number;
+}
+
+/** Minors get beginner-grade first exposures — a confident checkbox must
+ *  not hand a 55 kg 16-year-old an intermediate's 70 kg deadlift. */
+function effectiveTemplateExperience(ctx: TemplateAthleteContext): UserMode | undefined {
+  if (typeof ctx.ageYears === 'number' && ctx.ageYears > 0 && ctx.ageYears < 18) {
+    return 'beginner';
+  }
+  return ctx.experience;
 }
 
 /**
@@ -1608,12 +2198,13 @@ function scaleTemplateWeightForAthlete(
   if (templateWeight === undefined || templateWeight <= 0) return templateWeight;
   const bw = ctx.bodyweightKg;
   if (!bw || bw <= 0) return templateWeight;
-  const experienceFactor = ctx.experience === 'beginner' ? BEGINNER_FIRST_EXPOSURE_FACTOR : 1;
+  const experience = effectiveTemplateExperience(ctx);
+  const experienceFactor = experience === 'beginner' ? BEGINNER_FIRST_EXPOSURE_FACTOR : 1;
   const scaled = templateWeight * (bw / TEMPLATE_REFERENCE_BW_KG) * experienceFactor;
   const increment = isLbs ? 5 : 2.5;
   const rounded = Math.max(increment, Math.round(scaled / increment) * increment);
   // Beginners never get more than the template default on first exposure.
-  if (ctx.experience === 'beginner') return Math.min(rounded, templateWeight);
+  if (experience === 'beginner') return Math.min(rounded, templateWeight);
   return rounded;
 }
 
@@ -1627,12 +2218,21 @@ export function scaleSplitTemplatesForAthlete(
   isLbs: boolean,
   ctx: TemplateAthleteContext
 ): PlannedWorkout[] {
-  if (!ctx.bodyweightKg || ctx.bodyweightKg <= 0) return plans;
+  const isBeginnerGrade = effectiveTemplateExperience(ctx) === 'beginner';
+  // Identity fast-path: nothing to scale and no set cap to apply.
+  if ((!ctx.bodyweightKg || ctx.bodyweightKg <= 0) && !isBeginnerGrade) return plans;
   return plans.map((plan) => ({
     ...plan,
     exercises: (plan.exercises || []).map((ex) => ({
       ...ex,
       targetWeight: scaleTemplateWeightForAthlete(ex.targetWeight, isLbs, ctx),
+      // Return-to-training ramp: first exposures cap at 3 sets per
+      // exercise. Full template volume (4-set compounds, ~17 sets) on
+      // day one is how deconditioned returners — postpartum, post-layoff —
+      // get buried in soreness and quit in week 1.
+      ...(isBeginnerGrade && typeof ex.targetSets === 'number'
+        ? { targetSets: Math.min(ex.targetSets, 3) }
+        : {}),
     })),
   }));
 }

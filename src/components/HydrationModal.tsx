@@ -14,6 +14,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useToday } from '@/lib/use-today';
 import { useToast } from '@/components/ui/Toast';
 import {
   toLocalDateString,
@@ -32,12 +33,12 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   useEscapeToClose(isOpen, onClose);
   const toast = useToast();
   const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
-  const todayStr = useMemo(() => toLocalDateString(new Date()), []);
+  const todayStr = useToday();
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     return toLocalDateString(d);
-  }, []);
+  }, [todayStr]);
 
   const activeDateStr = selectedDay === 'today' ? todayStr : yesterdayStr;
 
@@ -192,7 +193,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               </span>
             </div>
             <span className="text-xs font-bold text-sky-600 bg-sky-500/10 px-2 py-0.5 rounded-full">
-              {remainingMl === 0 ? 'Target Hit! ✓' : `${formatWaterLiters(remainingMl)} remaining`}
+              {remainingMl === 0 ? 'Target Hit' : `${formatWaterLiters(remainingMl)} remaining`}
             </span>
           </div>
 

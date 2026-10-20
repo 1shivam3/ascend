@@ -140,9 +140,26 @@ export function getBigThreeStats(prs: PersonalRecord[]): BigThreeStats {
 
   for (const pr of prs) {
     const name = pr.exercise.toLowerCase();
+    // The big three are BARBELL lifts. Substring matching used to count a
+    // Dumbbell Bench Press or Goblet Squat PR toward the powerlifting
+    // total — inflating a competitive metric with non-competition lifts.
+    const isVariant =
+      name.includes('dumbbell') ||
+      name.includes('goblet') ||
+      name.includes('machine') ||
+      name.includes('smith') ||
+      name.includes('cable') ||
+      name.includes('kettlebell');
+    if (isVariant) continue;
     if (name.includes('bench') && !name.includes('incline') && !name.includes('close')) {
       if (pr.oneRepMax > benchMax) benchMax = pr.oneRepMax;
-    } else if (name.includes('squat') && !name.includes('hack') && !name.includes('front')) {
+    } else if (
+      name.includes('squat') &&
+      !name.includes('hack') &&
+      !name.includes('front') &&
+      !name.includes('split') &&
+      !name.includes('box')
+    ) {
       if (pr.oneRepMax > squatMax) squatMax = pr.oneRepMax;
     } else if (name.includes('deadlift') && !name.includes('romanian') && !name.includes('stiff')) {
       if (pr.oneRepMax > deadliftMax) deadliftMax = pr.oneRepMax;

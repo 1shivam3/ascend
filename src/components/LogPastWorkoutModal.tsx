@@ -17,6 +17,7 @@ import {
   Flame,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { useToday } from '@/lib/use-today';
 import { WorkoutExercise, WorkoutSet, WorkoutEntry, PersonalRecord, PlannedWorkout } from '@/lib/types';
 import {
   isBodyweightExercise,
@@ -60,12 +61,12 @@ export default function LogPastWorkoutModal({
   const userUnit = profile?.unit || 'kg';
   const weightStep = userUnit === 'lbs' ? 5 : 2.5;
 
-  const todayStr = useMemo(() => getLocalTodayStr(), []);
+  const todayStr = useToday();
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
     return getLocalTodayStr(d);
-  }, []);
+  }, [todayStr]);
 
   const [date, setDate] = useState(todayStr);
   const [workoutName, setWorkoutName] = useState('Completed Workout');
@@ -160,7 +161,9 @@ export default function LogPastWorkoutModal({
           weight: w,
           reps: r,
           unit: userUnit,
-          rpe: 8,
+          // No fabricated RPE: the user did not rate these sets, and a
+          // made-up 8 would feed the progression engine a false signal.
+          rpe: undefined,
           completed: true,
           prescribedWeight: pEx.targetWeight,
           prescribedReps: pEx.targetReps,
@@ -169,13 +172,15 @@ export default function LogPastWorkoutModal({
       return { name: pEx.name, sets };
     });
 
+    const parsedDuration = parseInt(durationMinutes, 10);
     const entry: WorkoutEntry = {
       id: safeRandomId('wk'),
       date: new Date(`${date}T12:00:00`).toISOString(),
       name: plan.name,
       planId: plan.id,
       plannedTotalSets: completedExercises.reduce((n, ex) => n + ex.sets.length, 0),
-      durationMinutes: parseInt(durationMinutes, 10) || 45,
+      // Blank duration stays blank — never invent 45 minutes.
+      durationMinutes: Number.isFinite(parsedDuration) && parsedDuration > 0 ? parsedDuration : undefined,
       exercises: completedExercises,
     };
 
@@ -195,9 +200,9 @@ export default function LogPastWorkoutModal({
       {
         name: selected.name,
         sets: [
-          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
-          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
-          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: 8, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: undefined, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: undefined, completed: true },
+          { weight: defaultW, reps: defaultR, unit: userUnit, rpe: undefined, completed: true },
         ],
       },
     ]);

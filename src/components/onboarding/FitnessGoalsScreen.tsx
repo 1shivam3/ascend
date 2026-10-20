@@ -18,25 +18,25 @@ const GOAL_OPTIONS: GoalItem[] = [
   {
     id: 'build_muscle',
     title: ATHLETE_GOAL_CONFIGS.build_muscle.label,
-    subtitle: 'Hypertrophy volume & progressive overload',
+    subtitle: 'Bigger, stronger muscles — weights go up little by little',
     icon: Dumbbell,
   },
   {
     id: 'lose_fat',
     title: ATHLETE_GOAL_CONFIGS.lose_fat.label,
-    subtitle: 'Calorie deficit & lean mass preservation',
+    subtitle: 'Eat a little less, keep your muscle, lose the fat',
     icon: Flame,
   },
   {
     id: 'get_stronger',
     title: ATHLETE_GOAL_CONFIGS.get_stronger.label,
-    subtitle: 'Heavy compound lifts & raw power',
+    subtitle: 'Lift heavier on the big exercises',
     icon: Shield,
   },
   {
     id: 'stamina',
     title: ATHLETE_GOAL_CONFIGS.stamina.label,
-    subtitle: 'Work capacity, stamina & cardiovascular fitness',
+    subtitle: 'Better stamina and a healthier heart',
     icon: Activity,
   },
   {

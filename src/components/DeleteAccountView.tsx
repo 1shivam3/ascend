@@ -18,6 +18,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
+import { SUPPORT_EMAIL } from '@/lib/legal';
 
 export type DeletionStatus =
   | 'idle'
@@ -232,7 +233,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('partial');
         setStatusDetails(
           data?.message ||
-            'Partial deletion: Your login credentials and authentication account were purged, but some database records could not be fully cleared. Please contact support@ascendfit.app for manual verification.'
+            `Partial deletion: Your login credentials and authentication account were purged, but some database records could not be fully cleared. Please contact ${SUPPORT_EMAIL} for manual verification.`
         );
         wipeLocalData();
       } else {
@@ -246,7 +247,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       setStatus('error');
       setErrorMessage(
         err?.message ||
-          'Unable to complete deletion request. Please contact support@ascendfit.app for manual processing.'
+          `Unable to complete deletion request. Please contact ${SUPPORT_EMAIL} for manual processing.`
       );
     }
   };
@@ -465,8 +466,8 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
               </div>
               <p className="text-3xs text-text-muted">
                 Our privacy response team has been alerted. You can also contact us at{' '}
-                <a href="mailto:support@ascendfit.app" rel="noreferrer" className="underline font-mono">
-                  support@ascendfit.app
+                <a href={`mailto:${SUPPORT_EMAIL}`} rel="noreferrer" className="underline font-mono">
+                  {SUPPORT_EMAIL}
                 </a>
                 .
               </p>
@@ -645,8 +646,8 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
 
           <p className="text-3xs text-text-muted">
             For manual assistance or inquiries, email our privacy team directly at{' '}
-            <a href="mailto:support@ascendfit.app" className="text-accent underline font-mono">
-              support@ascendfit.app
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">
+              {SUPPORT_EMAIL}
             </a>
             . Manual requests are fulfilled within 24 hours.
           </p>

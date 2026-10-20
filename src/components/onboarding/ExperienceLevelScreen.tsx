@@ -16,19 +16,19 @@ const EXPERIENCE_OPTIONS: ExperienceOption[] = [
     id: 'beginner',
     title: 'Beginner',
     subtitle: 'Just getting started',
-    description: 'Learning proper exercise execution & building gym consistency',
+    description: 'Learning how to do exercises correctly & building the habit',
   },
   {
     id: 'intermediate',
     title: 'Intermediate',
     subtitle: 'Some experience',
-    description: '1–2+ years of consistent training with progressive overload',
+    description: '1–2+ years of regular training, adding weight over time',
   },
   {
     id: 'advanced',
     title: 'Advanced',
     subtitle: 'Very experienced',
-    description: 'Years of structured periodization, heavy lifts & high work capacity',
+    description: 'Years of planned training cycles, heavy lifts & lots of hard work',
   },
 ];
 

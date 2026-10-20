@@ -13,20 +13,44 @@ import {
 } from './types';
 import { toLocalDateString, getCreatineStats, calculateHydrationTarget } from './habits';
 import { getWeekDateStrings } from './formatters';
+import { isBodyweightExercise } from './strength-standards';
+import { getExerciseMuscle } from './exercise-library';
 import { buildCompactUserContext } from './ai-context';
-import { getNextSessionTarget } from './workout-engine';
+import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
+
+/**
+ * Fraction of bodyweight that acts as the load for a bodyweight
+ * movement, or null when the exercise is not a bodyweight movement.
+ * Vertical pulls/dips/squats move ~90% of body mass; horizontal/ground
+ * movements (push-ups, planks, burpees) move less.
+ */
+function bodyweightLoadFraction(name: string): number | null {
+  if (!isBodyweightExercise(name)) return null;
+  if (/push[\s-]?up|plank|burpee|mountain climber|glute bridge|crunch|sit[\s-]?up|leg raise/i.test(name)) {
+    return 0.65;
+  }
+  return 0.9;
+}
 
 /**
  * Calculates total tonnage (volume in kg) for a workout session.
- * For bodyweight exercises without added weight (or zero weight), adds estimated bodyweight percentage.
+ * Bodyweight exercises count a realistic fraction of the user's mass —
+ * previously only four named lifts (pull-up/chin-up/dip/push-up) got
+ * any bodyweight credit, so a calisthenics or running athlete's load
+ * was invisible to readiness/ACWR while their days still counted
+ * toward consecutive-day fatigue.
  */
 export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75): number {
   if (!workout?.exercises) return 0;
 
-  return workout.exercises.reduce((totalEx, ex) => {
-    const isBw = /pull[\s-]?up|chin[\s-]?up|dip|push[\s-]?up/i.test(ex.name);
-    const exTonnage = ex.sets.reduce((totalSet, set) => {
-      if (!isSetCompleted(set)) return totalSet;
+  let total = 0;
+  let allConditioning = workout.exercises.length > 0;
+
+  for (const ex of workout.exercises) {
+    if (getExerciseMuscle(ex.name) !== 'Conditioning') allConditioning = false;
+    const bwFraction = bodyweightLoadFraction(ex.name);
+    for (const set of ex.sets || []) {
+      if (!isSetCompleted(set)) continue;
       const reps = Math.max(0, Number(set.reps) || 0);
       let weightKg = Math.max(0, Number(set.weight) || 0);
 
@@ -34,15 +58,26 @@ export function calculateWorkoutTonnage(workout: WorkoutEntry, bodyweightKg = 75
         weightKg = weightKg * 0.453592;
       }
 
-      if (isBw) {
-        weightKg = (bodyweightKg * 0.9) + weightKg;
+      if (bwFraction !== null) {
+        weightKg = bodyweightKg * bwFraction + weightKg;
       }
 
-      return totalSet + (reps * weightKg);
-    }, 0);
+      total += reps * weightKg;
+    }
+  }
 
-    return totalEx + exTonnage;
-  }, 0);
+  // Pure-cardio sessions (a run, a ride) log ~zero weighted tonnage but
+  // are genuine training load. Credit a duration-based equivalent
+  // (minutes × bodyweight × 0.5) so readiness/ACWR can see them.
+  if (allConditioning && total < bodyweightKg * 10) {
+    const minutes =
+      typeof workout.durationMinutes === 'number' && workout.durationMinutes > 0
+        ? workout.durationMinutes
+        : workout.exercises.length * 10;
+    total += minutes * bodyweightKg * 0.5;
+  }
+
+  return total;
 }
 
 /**
@@ -221,11 +256,15 @@ export function generateOfflineHeuristic(
     advicePoints.push('Complete 2–3 warm-up sets before your working sets to prepare your muscles.');
   }
 
-  if (waterMl < waterTarget * 0.6) {
+  // Daily-target shortfalls are only meaningful late in the day — at
+  // 7 AM everyone is "below target". The fatigue warning below already
+  // gated its hydration claim at 16:00; these advice points didn't.
+  const lateInDay = new Date().getHours() >= 16;
+  if (lateInDay && waterMl < waterTarget * 0.6) {
     advicePoints.push("You're below today's hydration target. Consider drinking some water before training.");
   }
 
-  if (proteinG < proteinTarget * 0.7) {
+  if (lateInDay && proteinG < proteinTarget * 0.7) {
     const proteinDeficit = Math.round(proteinTarget - proteinG);
     advicePoints.push(`Prioritize protein intake (${proteinDeficit}g remaining) to support muscle recovery.`);
   }
@@ -238,9 +277,9 @@ export function generateOfflineHeuristic(
 
   let fatigueWarning: string | undefined = undefined;
   if (consecutiveDays >= 4) {
-    fatigueWarning = `⚠️ Consecutive training warning: ${consecutiveDays} continuous workout days detected without a scheduled rest day. Watch for joint soreness and technical breakdown.`;
+    fatigueWarning = `Consecutive training warning: ${consecutiveDays} continuous workout days detected without a scheduled rest day. Watch for joint soreness and technical breakdown.`;
   } else if (waterMl < 800 && new Date().getHours() >= 16) {
-    fatigueWarning = '⚠️ Hydration deficit: Less than 800 ml logged late in the day. Intracellular hydration is low, increasing cramp risk.';
+    fatigueWarning = 'Hydration deficit: Less than 800 ml logged late in the day. Intracellular hydration is low, increasing cramp risk.';
   }
 
   return {
@@ -555,7 +594,8 @@ export function generateDeterministicPostWorkoutTake(
   const canonicalTarget = getNextSessionTarget(
     primary,
     primarySets,
-    (primarySets[0]?.unit as 'kg' | 'lbs' | undefined) || 'kg'
+    (primarySets[0]?.unit as 'kg' | 'lbs' | undefined) || 'kg',
+    { hadPain: exerciseHadPain(completedWorkout, primary) }
   );
   const nextSessionTarget = canonicalTarget
     ? `NEXT SESSION TARGET: ${canonicalTarget.summaryText}`

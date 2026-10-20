@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { useToday } from '@/lib/use-today';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
@@ -47,11 +48,8 @@ import { WorkoutEntry, WorkoutExercise, WorkoutSet, PlannedWorkout, PlannedExerc
 import {
   getLastExercisePerformance,
   getProgressionRecommendation,
-  getQuickSubstitutes,
-  compressWorkout,
   parseVoiceWorkout,
   getTodaySessionState,
-  ExerciseSubstitute,
   getGoalAdaptiveSplitTemplates,
   isSetCompleted,
   finalizeWorkoutExercises,
@@ -61,14 +59,14 @@ import {
 } from '@/lib/workout-engine';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
-import ExerciseSubstitutionModal from '@/components/ExerciseSubstitutionModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
-import { AISubstitutionResult, AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
+import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
+
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
 import WorkoutDetailsView from '@/components/WorkoutDetailsView';
 import ShareProgramModal from '@/components/ShareProgramModal';
@@ -361,6 +359,30 @@ function PlanModal({
                     </div>
                   </div>
 
+                  {/* Target RPE — the plan schema carries it and sharing
+                      now preserves it, but this editor never exposed it */}
+                  <div className="mt-2">
+                    <label className="text-2xs text-text-muted font-mono block mb-1">TARGET RPE (OPTIONAL)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10}
+                      step={0.5}
+                      placeholder="e.g. 8"
+                      value={ex.targetRpe ?? ''}
+                      onChange={e =>
+                        updateExercise(
+                          i,
+                          'targetRpe',
+                          e.target.value === ''
+                            ? undefined
+                            : Math.min(10, Math.max(1, Number(e.target.value)))
+                        )
+                      }
+                      className="w-full bg-bg-elevated border border-border rounded-lg p-1.5 text-text-primary text-sm outline-none focus:border-accent"
+                    />
+                  </div>
+
                   {/* Notes */}
                   <div className="mt-2">
                     <label className="text-2xs text-text-muted font-mono block mb-1">NOTES (OPTIONAL)</label>
@@ -533,9 +555,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
   const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
   const deletePlannedWorkout = useStore((state) => state.deletePlannedWorkout);
-  const hiddenBuiltinRoutineIds = useStore((state) => state.hiddenBuiltinRoutineIds);
-  const hideBuiltinRoutine = useStore((state) => state.hideBuiltinRoutine);
-  const unhideBuiltinRoutine = useStore((state) => state.unhideBuiltinRoutine);
   const activeWorkoutDraft = useStore((state) => state.activeWorkoutDraft);
   const saveWorkoutDraft = useStore((state) => state.saveWorkoutDraft);
   const clearWorkoutDraft = useStore((state) => state.clearWorkoutDraft);
@@ -547,13 +566,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  // User's weekly-target override from Settings (null = automatic, 0 = off).
+  const weeklyTargetOverride = useStore((state) => state.uiPreferences?.weeklyTargetDays ?? null);
+  const coachEnabled = useStore((state) => state.uiPreferences?.coachEnabled ?? true);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
   const userUnit = profile?.unit || 'kg';
   const availableExercises = getExerciseList();
 
-  const todayStr = useMemo(() => getLocalTodayStr(), []);
+  const todayStr = useToday();
   const todayDayOfWeek = useMemo(() => getTodayDayOfWeek(todayStr), [todayStr]);
   const todaySessionInfo = useMemo(() => {
     const raw = getTodaySessionState(
@@ -681,15 +703,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setRestTotalSeconds(defaultRestSeconds);
   }, [defaultRestSeconds]);
 
-  // ── Quick Substitution & Voice State ───────────────────────────────────────
-  const [quickSubstituteIndex, setQuickSubstituteIndex] = useState<number | null>(null);
-  const [quickSubEquipmentFilter, setQuickSubEquipmentFilter] = useState<string>('all');
+  // ── Voice State ────────────────────────────────────────────────────────────
   const [isListening, setIsListening] = useState(false);
   const [expandedRationaleIndex, setExpandedRationaleIndex] = useState<number | null>(null);
 
   // ── Exercise Library & AI State ───────────────────────────────────────────
   const [isExerciseLibraryOpen, setIsExerciseLibraryOpen] = useState(false);
-  const [substitutionExerciseIndex, setSubstitutionExerciseIndex] = useState<number | null>(null);
   const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState(false);
   const [postWorkoutSummary, setPostWorkoutSummary] = useState<{
     name: string;
@@ -863,6 +882,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     toast.success('Resumed active workout session!', 'Workout Restored');
   };
 
+  // "Start Workout" on Home saves a fresh draft and navigates here — a draft
+  // created seconds ago with zero completed sets is a session being STARTED,
+  // not resumed. Open it immediately instead of making the user hunt for a
+  // Resume button behind an alarming "IN-PROGRESS DETECTED" banner.
+  const autoStartRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeWorkoutDraft && !isModalOpen && autoStartRef.current !== activeWorkoutDraft.savedAt) {
+      const hasWork = activeWorkoutDraft.exercises.some((e) =>
+        (e.sets || []).some((s) => isSetCompleted(s) || s.status === 'skipped')
+      );
+      const ageMs = Date.now() - new Date(activeWorkoutDraft.savedAt).getTime();
+      if (!hasWork && ageMs < 120000) {
+        autoStartRef.current = activeWorkoutDraft.savedAt;
+        handleResumeWorkout();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkoutDraft, isModalOpen]);
+
   const handleDiscardDraft = () => {
     clearWorkoutDraft();
     setStartedFromPlan(null);
@@ -894,32 +932,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setStartedFromPlan(`Repeated (${last.date})`);
     setIsModalOpen(true);
     toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
-  };
-
-  const handleCompressWorkout = (mins: 30 | 45 | 60) => {
-    const compressed = compressWorkout(exercises, mins);
-    setExercises(compressed);
-    toast.info(
-      `Workout shortened to ~${mins} min (${compressed.length} primary movements preserved).`,
-      'Time Adapted'
-    );
-  };
-
-  const handleQuickSubstitute = (index: number, sub: ExerciseSubstitute) => {
-    const targetEx = exercises[index];
-    if (!targetEx) return;
-    setExercises((prev) =>
-      prev.map((ex, i) =>
-        i === index
-          ? {
-              ...ex,
-              name: sub.name,
-            }
-          : ex
-      )
-    );
-    setQuickSubstituteIndex(null);
-    toast.success(`Swapped to ${sub.name}`, 'Exercise Replaced');
   };
 
   const toggleVoiceLogging = () => {
@@ -978,33 +990,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       recognition.start();
     } catch {
       setIsListening(false);
-    }
-  };
-
-  const handleApplyReplacement = (replacement: AISubstitutionResult) => {
-    if (substitutionExerciseIndex !== null) {
-      setExercises(prev => prev.map((ex, i) => {
-        if (i === substitutionExerciseIndex) {
-          const isBW = isBodyweightExercise(replacement.replacementExercise);
-          const repWeight = typeof replacement.targetWeightKg === 'number' && Number.isFinite(replacement.targetWeightKg)
-            ? replacement.targetWeightKg
-            : (typeof ex.sets[0]?.weight === 'number' && Number.isFinite(ex.sets[0].weight)
-                ? ex.sets[0].weight
-                : (isBW ? 0 : undefined));
-
-          return {
-            name: replacement.replacementExercise,
-            sets: Array.from({ length: replacement.targetSets || ex.sets.length || 3 }).map(() => ({
-              weight: repWeight,
-              reps: parseInt(replacement.targetReps || '8') || 8,
-              unit: userUnit,
-            })),
-          };
-        }
-        return ex;
-      }));
-      toast.success(`Replaced with ${replacement.replacementExercise}`, 'Exercise Substituted');
-      setSubstitutionExerciseIndex(null);
     }
   };
 
@@ -1396,6 +1381,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         }
 
         if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+          const isFirstExposure = existingPRs.length === 0;
           const prId = typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
             : `pr_${Date.now()}_${Math.random()}`;
@@ -1407,9 +1393,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             reps: topSet.reps,
             oneRepMax: topSet.e1RMKg,
             date,
-            notes: 'Auto-detected from workout session',
+            notes: isFirstExposure ? 'Baseline established from first session' : 'Auto-detected from workout session',
           });
-          newPRCount++;
+          // Only celebrate as a "New PR" when there's a baseline to beat.
+          // First-exposure sets establish the baseline silently.
+          if (!isFirstExposure) {
+            newPRCount++;
+          }
         }
       }
     }
@@ -1520,12 +1510,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
     }
     deletePlannedWorkout(plan.id);
-    // If the deleted plan was a built-in template (onboarding saves templates
-    // as plans with their builtin_* ids), hide the template too — otherwise
-    // it would immediately reappear under BUILT-IN ROUTINES.
-    if (/^builtin_|^ref_/.test(plan.id)) {
-      hideBuiltinRoutine(plan.id);
-    }
     toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
     setPlanToDelete(null);
     // If the deleted plan was open in the detail view, close that view too.
@@ -1675,17 +1659,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     };
   }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek, todayDayOfWeek, plannedWorkouts]);
 
+  // The active routine is always one of the USER's own plans — never a
+  // template. Templates only appear when the user explicitly browses them.
   const activeRoutinePlan = useMemo(() => {
     if (selectedRoutineId) {
-      const found = plannedWorkouts.find((p) => p.id === selectedRoutineId) || adaptiveSplitTemplates.find((p) => p.id === selectedRoutineId);
+      const found = plannedWorkouts.find((p) => p.id === selectedRoutineId);
       if (found) return found;
     }
     if (todaySessionInfo.plannedWorkoutId) {
       const found = plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId);
       if (found) return found;
     }
-    return plannedWorkouts[0] || adaptiveSplitTemplates[0];
-  }, [selectedRoutineId, todaySessionInfo.plannedWorkoutId, plannedWorkouts, adaptiveSplitTemplates]);
+    return plannedWorkouts[0] || null;
+  }, [selectedRoutineId, todaySessionInfo.plannedWorkoutId, plannedWorkouts]);
 
   const activeRoutineExercisesWithTargets = useMemo(() => {
     if (!activeRoutinePlan?.exercises) return [];
@@ -1723,149 +1709,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
   };
 
-  const availableRoutines: PlannedWorkout[] = useMemo(() => {
-    const result: PlannedWorkout[] = [];
-    const seenNames = new Set<string>();
-
-    for (const p of plannedWorkouts) {
-      const clean = p.name.trim();
-      if (!seenNames.has(clean.toLowerCase())) {
-        seenNames.add(clean.toLowerCase());
-        result.push(p);
-      }
-    }
-
-    const templateTitles = [
-      'Upper Body Strength',
-      'Lower Body Strength',
-      'Full Body',
-      'Push Pull Legs',
-      'Mobility & Recovery',
-    ];
-
-    adaptiveSplitTemplates.forEach((template, idx) => {
-      const friendlyName = templateTitles[idx] || template.name.replace(/^Builtin\s+/i, '');
-      if (!seenNames.has(friendlyName.toLowerCase())) {
-        seenNames.add(friendlyName.toLowerCase());
-        result.push({
-          ...template,
-          name: friendlyName,
-        });
-      }
-    });
-
-    if (result.length < 5) {
-      const fallbackTemplates: PlannedWorkout[] = [
-        {
-          id: 'ref_upper_body',
-          name: 'Upper Body Strength',
-          createdAt: '2026-01-01',
-          description: 'Build strength and muscle with compound movements and focused accessory work.',
-          goalTag: 'Upper Body',
-          exercises: [
-            { name: 'Bench Press', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
-            { name: 'Bent Over Row', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 155 : 70, targetUnit: userUnit },
-            { name: 'Shoulder Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 95 : 42.5, targetUnit: userUnit },
-            { name: 'Lat Pulldown', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
-            { name: 'Incline Dumbbell Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 50 : 22, targetUnit: userUnit },
-            { name: 'Dumbbell Curl', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 30 : 14, targetUnit: userUnit },
-          ],
-        },
-        {
-          id: 'ref_lower_body',
-          name: 'Lower Body Strength',
-          createdAt: '2026-01-01',
-          description: 'Maximize quad, hamstring, and glute development with heavy foundational compound lifts.',
-          goalTag: 'Lower Body',
-          exercises: [
-            { name: 'Squat', targetSets: 4, targetReps: 6, targetWeight: userUnit === 'lbs' ? 225 : 100, targetUnit: userUnit },
-            { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
-            { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: userUnit === 'lbs' ? 360 : 160, targetUnit: userUnit },
-            { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 40 : 18, targetUnit: userUnit },
-            { name: 'Hamstring Curl', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 110 : 50, targetUnit: userUnit },
-            { name: 'Calf Raise', targetSets: 4, targetReps: 15, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
-          ],
-        },
-        {
-          id: 'ref_full_body',
-          name: 'Full Body',
-          createdAt: '2026-01-01',
-          description: 'High-efficiency total body stimulus balancing anterior and posterior athletic movement patterns.',
-          goalTag: 'Full Body',
-          exercises: [
-            { name: 'Squat', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
-            { name: 'Bench Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 165 : 75, targetUnit: userUnit },
-            { name: 'Deadlift', targetSets: 3, targetReps: 5, targetWeight: userUnit === 'lbs' ? 245 : 110, targetUnit: userUnit },
-            { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 85 : 40, targetUnit: userUnit },
-            { name: 'Barbell Row', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 135 : 60, targetUnit: userUnit },
-            { name: 'Pull-ups', targetSets: 3, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
-          ],
-        },
-        {
-          id: 'ref_push_pull_legs',
-          name: 'Push Pull Legs',
-          createdAt: '2026-01-01',
-          description: 'Comprehensive hypertrophy split targeting pressing, pulling, and lower chain power.',
-          goalTag: 'Split Routine',
-          exercises: [
-            { name: 'Incline Bench', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 155 : 70, targetUnit: userUnit },
-            { name: 'Dips', targetSets: 3, targetReps: 10, targetWeight: 0, targetUnit: userUnit },
-            { name: 'Overhead Press', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 95 : 42.5, targetUnit: userUnit },
-            { name: 'Lateral Raise', targetSets: 4, targetReps: 12, targetWeight: userUnit === 'lbs' ? 25 : 12, targetUnit: userUnit },
-            { name: 'Pull-ups', targetSets: 4, targetReps: 8, targetWeight: 0, targetUnit: userUnit },
-            { name: 'Barbell Row', targetSets: 4, targetReps: 8, targetWeight: userUnit === 'lbs' ? 145 : 65, targetUnit: userUnit },
-            { name: 'Leg Press', targetSets: 4, targetReps: 10, targetWeight: userUnit === 'lbs' ? 400 : 180, targetUnit: userUnit },
-            { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: userUnit === 'lbs' ? 185 : 85, targetUnit: userUnit },
-          ],
-        },
-        {
-          id: 'ref_mobility',
-          name: 'Mobility & Recovery',
-          createdAt: '2026-01-01',
-          description: 'Active recovery, joint decompression, and core stability to accelerate athletic regeneration.',
-          goalTag: 'Recovery',
-          exercises: [
-            { name: 'Goblet Squat', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 35 : 16, targetUnit: userUnit },
-            { name: 'Front Plank (Seconds)', targetSets: 3, targetReps: 45, targetWeight: 0, targetUnit: userUnit },
-            { name: 'Hanging Knee Raise', targetSets: 3, targetReps: 12, targetWeight: 0, targetUnit: userUnit },
-            { name: 'Incline Treadmill Walk', targetSets: 1, targetReps: 15, targetWeight: 0, targetUnit: userUnit },
-            { name: 'Dumbbell Walking Lunge', targetSets: 3, targetReps: 12, targetWeight: userUnit === 'lbs' ? 20 : 10, targetUnit: userUnit },
-          ],
-        },
-      ];
-
-      for (const fb of fallbackTemplates) {
-        if (!seenNames.has(fb.name.toLowerCase())) {
-          seenNames.add(fb.name.toLowerCase());
-          result.push(fb);
-        }
-      }
-    }
-
-    return result;
-  }, [plannedWorkouts, adaptiveSplitTemplates, userUnit]);
-
-  // Built-in routine templates (not the user's own plans), minus hidden ones.
-  // A routine is "built-in" when its id isn't one of the user's plannedWorkouts.
-  const builtinRoutines = useMemo(() => {
-    const ownIds = new Set(plannedWorkouts.map((p) => p.id));
-    return availableRoutines.filter(
-      (r) => !ownIds.has(r.id) && !hiddenBuiltinRoutineIds.includes(r.id)
-    );
-  }, [availableRoutines, plannedWorkouts, hiddenBuiltinRoutineIds]);
-
-  const hiddenBuiltinCount = useMemo(() => {
-    const ownIds = new Set(plannedWorkouts.map((p) => p.id));
-    return availableRoutines.filter(
-      (r) => !ownIds.has(r.id) && hiddenBuiltinRoutineIds.includes(r.id)
-    ).length;
-  }, [availableRoutines, plannedWorkouts, hiddenBuiltinRoutineIds]);
-
-  const restoreHiddenRoutines = useCallback(() => {
-    hiddenBuiltinRoutineIds.forEach((id) => unhideBuiltinRoutine(id));
-  }, [hiddenBuiltinRoutineIds, unhideBuiltinRoutine]);
-
-  // NOTE: the plan detail view replaces the main list render, but the modals
+    // NOTE: the plan detail view replaces the main list render, but the modals
   // below MUST stay mounted — Share/Edit/Delete are all reachable from the
   // detail view's top bar. (Previously the early return skipped them, so
   // tapping Share/Edit silently armed the modal state and it popped open
@@ -2018,7 +1862,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </div>
             <div>
               <span className="text-xs font-bold text-text-primary block font-sans">
-                IN-PROGRESS WORKOUT DETECTED
+                Workout in progress
               </span>
               <span className="text-2xs text-text-secondary">
                 {activeWorkoutDraft.startedFromPlan ? `Plan: ${activeWorkoutDraft.startedFromPlan} • ` : ''}
@@ -2070,32 +1914,34 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
 
         {plannedWorkouts.length === 0 ? (
-          <div className="card p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between border-dashed border-border gap-3 text-center sm:text-left">
+          <div className="card p-4 sm:p-5 flex flex-col border-dashed border-border gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
                 <BookOpen className="w-5 h-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
                 <p className="text-2xs text-text-muted">Build your personalized routine or load a ready-made workout</p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={openCreatePlan}
-              className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5 text-white" />
-              <span>Create My Own</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsSuggestedModalOpen(true)}
-              className="py-2 px-4 text-xs font-bold flex items-center gap-1.5 shrink-0 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Browse Pre-made</span>
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={openCreatePlan}
+                className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 text-white" />
+                <span>Create My Own</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSuggestedModalOpen(true)}
+                className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Browse Pre-made</span>
+              </button>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2114,85 +1960,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </div>
         )}
       </section>
-
-      {/* ── Built-in Routines (visible, hideable) ── */}
-      {builtinRoutines.length > 0 && (
-        <section className="space-y-3" aria-label="Built-in Workout Routines">
-          <div className="flex items-center gap-2">
-            <Dumbbell className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">BUILT-IN ROUTINES</h2>
-            <span className="text-3xs font-mono text-text-muted">ready-made</span>
-          </div>
-          {builtinRoutines.map((routine) => {
-            const exCount = routine.exercises?.length || 0;
-            const duration = Math.max(30, exCount * 8);
-            const cleanName = routine.name.replace(/^Builtin\s+/i, '');
-
-            return (
-              <div
-                key={routine.id}
-                className="card p-3.5 sm:p-4 bg-bg-card border border-border/80 hover:border-accent/40 transition-all flex items-center justify-between gap-3 shadow-xs"
-              >
-                <div
-                  onClick={() => setSelectedDetailsPlan(routine)}
-                  className="flex items-center gap-3.5 min-w-0 cursor-pointer group flex-1"
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setSelectedDetailsPlan(routine);
-                    }
-                  }}
-                  aria-label={`View details for ${cleanName}`}
-                >
-                  <div className="w-12 h-12 rounded-xl bg-accent/10 border border-accent/20 text-accent flex items-center justify-center shrink-0 group-hover:bg-accent/15 transition-colors">
-                    <Dumbbell className="w-5 h-5 text-accent" />
-                  </div>
-                  <div className="min-w-0">
-                    <h3 className="text-sm sm:text-base font-bold font-sans text-text-primary tracking-tight truncate group-hover:text-accent transition-colors">
-                      {cleanName}
-                    </h3>
-                    <p className="text-xs text-text-muted font-sans mt-0.5">
-                      ~{duration} min · {exCount} exercises
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleStartPlan(routine)}
-                    className="p-2 rounded-lg text-accent hover:bg-accent/10 transition-colors"
-                    title={`Start ${cleanName}`}
-                    aria-label={`Start ${cleanName}`}
-                  >
-                    <Play className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => hideBuiltinRoutine(routine.id)}
-                    className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-                    title={`Hide ${cleanName}`}
-                    aria-label={`Hide ${cleanName}`}
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-          {hiddenBuiltinCount > 0 && (
-            <button
-              type="button"
-              onClick={restoreHiddenRoutines}
-              className="text-2xs text-text-muted hover:text-accent font-medium flex items-center gap-1 transition-colors cursor-pointer mx-auto py-1"
-            >
-              <RotateCcw className="w-3 h-3" />
-              <span>Show {hiddenBuiltinCount} hidden {hiddenBuiltinCount === 1 ? 'routine' : 'routines'}</span>
-            </button>
-          )}
-        </section>
-      )}
 
       {/* ── Contextual Rest Timer (Visible when timer is active) ── */}
       {isRestRunning && (
@@ -2257,7 +2024,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 : 'Upper / Lower Split'}
             </span>
             <span className="text-2xs text-text-muted block mt-0.5">
-              {weeklyScheduleStats.completedCount} of {weeklyScheduleStats.targetDays} completed this week
+              {weeklyTargetOverride === 0
+                ? `${weeklyScheduleStats.completedCount} completed this week`
+                : `${weeklyScheduleStats.completedCount} of ${weeklyTargetOverride ?? weeklyScheduleStats.targetDays} completed this week`}
             </span>
           </div>
           <button
@@ -2738,19 +2507,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         initialWeight={userUnit === 'kg' ? 100 : 225}
       />
 
-      {/* AI Exercise Substitution Modal */}
-      {substitutionExerciseIndex !== null && (
-        <ExerciseSubstitutionModal
-          isOpen={substitutionExerciseIndex !== null}
-          onClose={() => setSubstitutionExerciseIndex(null)}
-          exerciseName={exercises[substitutionExerciseIndex]?.name || ''}
-          onApplyReplacement={handleApplyReplacement}
-        />
-      )}
-
       {/* In-Workout Ask Coach Drawer */}
       <WorkoutCoachDrawer
-        isOpen={isCoachDrawerOpen}
+        isOpen={isCoachDrawerOpen && coachEnabled}
         onClose={() => setIsCoachDrawerOpen(false)}
         activeWorkout={{
           name: startedFromPlan || 'Current Workout',
@@ -2759,8 +2518,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onApplyModifiedWorkout={handleApplyModifiedWorkout}
       />
 
-      {/* Post-Workout Coach's Take Modal */}
-      {postWorkoutSummary && (
+      {/* Post-Workout Coach's Take Modal — a coach surface: with Coach
+          off in Settings it must not auto-appear after every workout. */}
+      {postWorkoutSummary && coachEnabled && (
         <PostWorkoutTakeModal
           isOpen={!!postWorkoutSummary}
           onClose={() => setPostWorkoutSummary(null)}

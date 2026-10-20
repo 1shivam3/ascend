@@ -6,6 +6,30 @@ export interface DecodedProgram {
   exercises: PlannedExercise[];
   coachName?: string;
   notes?: string;
+  description?: string;
+  goalTag?: string;
+}
+
+/**
+ * Content signature for duplicate detection: re-importing the same
+ * shared link must not mint another copy of the same plan every time.
+ */
+export function programContentSignature(name: string, exercises: PlannedExercise[]): string {
+  const exSig = (exercises || [])
+    .map(
+      (e) =>
+        `${(e.name || '').trim().toLowerCase()}|${e.targetSets ?? ''}|${e.targetReps ?? ''}|${e.targetWeight ?? ''}|${e.targetUnit || 'kg'}|${e.targetRpe ?? ''}`
+    )
+    .join(';;');
+  return `${(name || '').trim().toLowerCase()}::${exSig}`;
+}
+
+export function findDuplicateProgram(
+  plans: PlannedWorkout[],
+  program: DecodedProgram
+): PlannedWorkout | undefined {
+  const sig = programContentSignature(program.name, program.exercises);
+  return (plans || []).find((p) => programContentSignature(p.name, p.exercises) === sig);
 }
 
 /**
@@ -51,12 +75,16 @@ export function encodeProgramForSharing(
     n: plan.name,
     c: coachName || undefined,
     nt: notes || undefined,
+    // Plan-level context used to be silently dropped in transit.
+    d: plan.description || undefined,
+    g: plan.goalTag || undefined,
     ex: plan.exercises.map((e) => ({
       n: e.name,
       s: e.targetSets,
       r: e.targetReps,
       w: e.targetWeight,
       u: e.targetUnit || 'kg',
+      rpe: e.targetRpe || undefined,
       nt: e.notes || undefined,
     })),
   };
@@ -115,6 +143,10 @@ export function decodeProgramFromHash(hashString: string): DecodedProgram | null
         targetReps: !isNaN(reps) ? Math.min(200, Math.max(1, reps)) : 8,
         targetWeight: weight,
         targetUnit: item?.u === 'lbs' ? 'lbs' : 'kg',
+        targetRpe:
+          typeof item?.rpe === 'number' && !isNaN(item.rpe)
+            ? Math.min(10, Math.max(1, item.rpe))
+            : undefined,
         notes: item?.nt ? String(item.nt).slice(0, 200).trim() : undefined,
       };
     });
@@ -123,6 +155,8 @@ export function decodeProgramFromHash(hashString: string): DecodedProgram | null
       name: String(parsed.n).slice(0, 100).trim(),
       coachName: parsed.c ? String(parsed.c).slice(0, 100).trim() : undefined,
       notes: parsed.nt ? String(parsed.nt).slice(0, 500).trim() : undefined,
+      description: parsed.d ? String(parsed.d).slice(0, 500).trim() : undefined,
+      goalTag: parsed.g ? String(parsed.g).slice(0, 50).trim() : undefined,
       exercises,
     };
   } catch (err) {
@@ -158,14 +192,17 @@ export async function generateProgramQRCode(shareUrl: string): Promise<string> {
 export function formatWhatsAppShareText(
   plan: PlannedWorkout,
   shareUrl: string,
-  coachName?: string
+  coachName?: string,
+  notes?: string
 ): string {
   const coachHeader = coachName ? `Coach ${coachName} shared a program with you:\n\n` : '';
+  const notesLine = notes ? `📝 ${notes}\n\n` : '';
   const exList = plan.exercises
     .slice(0, 8)
     .map((e) => {
       const weightLabel = e.targetWeight ? ` @ ${e.targetWeight}${e.targetUnit || 'kg'}` : '';
-      return `• *${e.name}*: ${e.targetSets} sets × ${e.targetReps} reps${weightLabel}`;
+      const rpeLabel = e.targetRpe ? ` (RPE ${e.targetRpe})` : '';
+      return `• *${e.name}*: ${e.targetSets} sets × ${e.targetReps} reps${weightLabel}${rpeLabel}`;
     })
     .join('\n');
 
@@ -174,6 +211,7 @@ export function formatWhatsAppShareText(
   return (
     `🏋️ *ASCEND Workout Routine: ${plan.name}*\n` +
     coachHeader +
+    notesLine +
     `${exList}${moreLabel}\n\n` +
     `📲 *Open & Import 1-Tap (Free & 100% Offline):*\n` +
     `${shareUrl}\n\n` +
