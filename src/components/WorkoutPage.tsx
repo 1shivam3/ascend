@@ -727,8 +727,17 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
-  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>('plans');
+  // Restore the sub-view (Plans vs History) the user was last in, and keep
+  // it persisted so a refresh lands back on the same sub-view.
+  const setLastTrainSubTab = useStore((state) => state.setLastTrainSubTab);
+  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>(
+    () => useStore.getState().lastTrainSubTab ?? 'plans'
+  );
   const [selectedDetailsPlan, setSelectedDetailsPlan] = useState<PlannedWorkout | null>(null);
+
+  useEffect(() => {
+    setLastTrainSubTab(trainSubTab);
+  }, [trainSubTab, setLastTrainSubTab]);
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);

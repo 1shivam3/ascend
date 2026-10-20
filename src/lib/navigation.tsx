@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { useStore } from '@/lib/store';
 
 export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings';
 export type ProgressTabId = 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training';
@@ -56,17 +57,75 @@ export function buildTabUrl(tab: TabId, progressTab?: ProgressTabId): string {
   }
 }
 
-export /** True only for a genuine fresh navigation (typed URL, link, deep-link open) —
- *  NOT for reloads or back/forward restores, which should land on Home. */
-function isFreshNavigation(): boolean {
+const VALID_TABS: readonly string[] = ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'];
+const VALID_PROGRESS_TABS: readonly string[] = ['overview', 'strength', 'prs', 'bodyweight', 'training'];
+
+function asTabId(value: unknown): TabId | null {
+  return typeof value === 'string' && VALID_TABS.includes(value) ? (value as TabId) : null;
+}
+
+function asProgressTabId(value: unknown): ProgressTabId | null {
+  return typeof value === 'string' && VALID_PROGRESS_TABS.includes(value)
+    ? (value as ProgressTabId)
+    : null;
+}
+
+function toNavigationState(tab: TabId, progressTab: ProgressTabId): { tab: TabId; progressTab: ProgressTabId } {
+  // 'prs' is a deep-link alias for the Progress tab's PR section.
+  return tab === 'prs' ? { tab: 'progress', progressTab: 'prs' } : { tab, progressTab };
+}
+
+/**
+ * Where the user left off, from persisted state — used when the launch URL
+ * carries no tab (bare '/' open, WebView session restore). Reads, in order:
+ *  1. the persisted zustand blob ('ascend_store') — the same source the
+ *     store rehydrates from, so it is available before hydration finishes;
+ *  2. the legacy standalone keys older builds wrote (one-way migration —
+ *     checked before the live store because the store's in-memory default
+ *     is 'home', which must not shadow a real saved tab);
+ *  3. the live store state, in case storage was unavailable at write time.
+ */
+function resolveSavedNavigation(): { tab: TabId; progressTab: ProgressTabId } | null {
   try {
-    const nav = performance.getEntriesByType('navigation')[0] as
-      | PerformanceNavigationTiming
-      | undefined;
-    return !nav || nav.type === 'navigate';
-  } catch {
-    return true;
-  }
+    const raw = localStorage.getItem('ascend_store');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const saved = parsed?.state ?? parsed;
+      const tab = asTabId(saved?.lastActiveTab);
+      if (tab) {
+        return toNavigationState(tab, asProgressTabId(saved?.lastProgressSubTab) ?? 'overview');
+      }
+    }
+  } catch {}
+  try {
+    const legacyTab = asTabId(localStorage.getItem('ascend_active_tab'));
+    if (legacyTab) {
+      return toNavigationState(
+        legacyTab,
+        asProgressTabId(localStorage.getItem('ascend_progress_subtab')) ?? 'overview'
+      );
+    }
+  } catch {}
+  try {
+    const state = useStore.getState();
+    const tab = asTabId(state.lastActiveTab);
+    if (tab && tab !== 'home') {
+      return toNavigationState(tab, asProgressTabId(state.lastProgressSubTab) ?? 'overview');
+    }
+  } catch {}
+  return null;
+}
+
+/** Persist the active tab into the store (single source of truth). The old
+ *  standalone localStorage keys are retired and cleaned up on write. */
+function persistActiveTab(tab: TabId, progressTab?: ProgressTabId): void {
+  try {
+    useStore.getState().setLastActiveTab(tab, progressTab);
+  } catch {}
+  try {
+    localStorage.removeItem('ascend_active_tab');
+    localStorage.removeItem('ascend_progress_subtab');
+  } catch {}
 }
 
 export function getInitialNavigationState(): { tab: TabId; progressTab: ProgressTabId } {
@@ -75,33 +134,26 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
   }
 
   try {
-    // URL deep-links (?tab=...) are honored only on a fresh navigation.
-    // Reloads / restored sessions always land on Home.
-    if (isFreshNavigation()) {
-      const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get('tab');
-      const subParam = params.get('sub') as ProgressTabId | null;
-
-      // 'today' is a supported deep-link alias for the home (Today) view.
-      const resolvedTab = (tabParam === 'today' ? 'home' : tabParam) as TabId | null;
-      if (resolvedTab && ['home', 'workout', 'progress', 'meals', 'prs', 'profile', 'settings'].includes(resolvedTab)) {
-        if (resolvedTab === 'prs') {
-          return { tab: 'progress', progressTab: 'prs' };
-        }
-        return {
-          tab: resolvedTab,
-          progressTab: subParam && ['overview', 'strength', 'prs', 'bodyweight', 'training'].includes(subParam)
-            ? subParam
-            : 'overview',
-        };
-      }
+    // A URL tab (?tab=...) always wins when present. navigate() keeps the
+    // URL in sync with the active tab, so a refresh — which preserves the
+    // URL — lands back on the same tab instead of resetting to Home.
+    const params = new URLSearchParams(window.location.search);
+    const tabParam = params.get('tab');
+    // 'today' is a supported deep-link alias for the home (Today) view.
+    const urlTab = asTabId(tabParam === 'today' ? 'home' : tabParam);
+    if (urlTab) {
+      return toNavigationState(
+        urlTab,
+        urlTab === 'progress' ? (asProgressTabId(params.get('sub')) ?? 'overview') : 'overview'
+      );
     }
 
-    // Fresh app launch / reload always starts on the home tab. The
-    // last-visited tab is never restored from storage or the URL —
-    // reopening the app always lands on Home.
+    // Bare launch URL: restore the tab the user was last on.
+    const saved = resolveSavedNavigation();
+    if (saved) return saved;
   } catch {}
 
+  // First-ever launch: nothing in the URL, nothing saved.
   return { tab: 'home', progressTab: 'overview' };
 }
 
@@ -190,17 +242,12 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
 
       const targetUrl = buildTabUrl(targetTab, targetProgressTab);
 
-      // Persist to localStorage so mid-session state is written (read on launch
-      // is intentionally disabled — fresh launches always land on Home).
+      // Persist into the store so a refresh/relaunch restores this tab
+      // (see getInitialNavigationState). When no progress sub-tab is
+      // specified, the saved one is kept — returning to Progress restores
+      // the section the user was last in.
       if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('ascend_active_tab', targetTab);
-          if (targetProgressTab) {
-            localStorage.setItem('ascend_progress_subtab', targetProgressTab);
-          } else if (targetTab !== 'progress') {
-            localStorage.removeItem('ascend_progress_subtab');
-          }
-        } catch {}
+        persistActiveTab(targetTab, targetProgressTab);
       }
 
       if (options?.clearHistory) {
@@ -320,10 +367,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         '',
         initialUrl
       );
-      localStorage.setItem('ascend_active_tab', initial.tab);
-      if (initial.progressTab && initial.progressTab !== 'overview') {
-        localStorage.setItem('ascend_progress_subtab', initial.progressTab);
-      }
+      persistActiveTab(initial.tab, initial.progressTab);
     } catch {}
 
     const handlePopState = (event: PopStateEvent) => {
@@ -357,7 +401,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
           const prevUrl = buildTabUrl(prevTab);
           try {
             window.history.replaceState({ tab: prevTab, stackDepth: nextStack.length }, '', prevUrl);
-            localStorage.setItem('ascend_active_tab', prevTab);
+            persistActiveTab(prevTab);
           } catch {}
           return;
         }
@@ -369,7 +413,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
           const homeUrl = buildTabUrl('home');
           try {
             window.history.replaceState({ tab: 'home', root: true, stackDepth: 1 }, '', homeUrl);
-            localStorage.setItem('ascend_active_tab', 'home');
+            persistActiveTab('home');
           } catch {}
           return;
         }
@@ -398,27 +442,9 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     };
   }, [runBackHandlers, toast]);
 
-  // "Exited the app" behavior: when the page returns from being backgrounded
-  // for a while (app switcher / screen off), land on Home. Short hops away
-  // (checking a message mid-workout) keep the current tab.
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return;
-    let hiddenAt = 0;
-    const onVisibilityChange = () => {
-      if (document.hidden) {
-        hiddenAt = Date.now();
-      } else if (hiddenAt && Date.now() - hiddenAt > 5 * 60 * 1000) {
-        hiddenAt = 0;
-        if (activeTabRef.current !== 'home') {
-          navigate('home', { clearHistory: true });
-        }
-      }
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-    };
-  }, [navigate]);
+  // Returning from the background (app switcher / screen off) never moves
+  // the user: they resume exactly on the tab they left, however long they
+  // were away. An in-progress workout has its own draft persistence.
 
   const canGoBack = activeTab !== 'home' || historyStack.length > 1;
 

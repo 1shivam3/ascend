@@ -342,12 +342,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     }
   }, [activeTab, registerBackHandler]);
 
-  // Synchronize active sub-tab with URL and localStorage
+  // Synchronize active sub-tab with the URL and the persisted store, so a
+  // refresh restores this exact Progress section.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     try {
       const currentSub = activeTab === 'strength' && strengthSubView === 'records' ? 'prs' : activeTab;
-      localStorage.setItem('ascend_progress_subtab', currentSub);
+      // Progress-local ids map to navigation-level sub ids.
+      const navSub = currentSub === 'body' ? 'bodyweight' : currentSub === 'consistency' ? 'training' : currentSub;
+      useStore.getState().setLastActiveTab('progress', navSub);
       const url = new URL(window.location.href);
       if (url.searchParams.get('tab') === 'progress' || url.searchParams.get('tab') === 'prs') {
         if (currentSub === 'strength') {
