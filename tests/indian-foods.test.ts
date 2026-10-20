@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { FOOD_DB, estimateMacros } from '../src/lib/macros';
+import { FOOD_DB, estimateMacros, parseNaturalMealOffline } from '../src/lib/macros';
 import {
   INDIAN_FOOD_VALUES,
   INDIAN_FOOD_META,
@@ -90,6 +90,12 @@ describe('household unit conversion math', () => {
     expect(est.calories).toBe(702);
     expect(est.proteinG).toBeCloseTo(22.1, 1);
     expect(isIndianDish('veg thali')).toBe(true);
+    // …and via the quick text log the hostel crowd actually uses:
+    // "1 thali" must weigh a full plate, not a generic 100 g piece.
+    const parsed = parseNaturalMealOffline('1 thali');
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].isUnmatched).toBe(false);
+    expect(parsed[0].calories).toBe(702);
   });
 
   it('non-Indian foods keep the legacy generic katori (150g)', () => {

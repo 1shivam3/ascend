@@ -577,6 +577,10 @@ const PIECE_WEIGHTS: Record<string, number> = {
   'protein powder': 30,
   'whey protein': 30,
   'protein bar': 60,
+  // One thali = one full plate (~650 g). Without this, the text parser
+  // matched 'veg thali' but weighed it as a generic 100 g piece (R3).
+  thali: 650,
+  'veg thali': 650,
   'pre-workout': 10,
   preworkout: 10,
   bcaa: 7,
