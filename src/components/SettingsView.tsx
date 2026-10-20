@@ -24,6 +24,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
+import { buildCombinedCsvExport } from '@/lib/csv-export';
 import type { DietPreference } from '@/lib/types';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
@@ -214,6 +215,32 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       toast.success('Downloaded full JSON backup! Keep it safe.', 'Backup Saved');
     } catch {
       toast.error('Failed to export backup.', 'Export Error');
+    }
+  };
+
+  // Export CSV (workouts + meals + body metrics in one file, same
+  // download mechanism as the JSON backup so it works in the WebView).
+  const handleExportCsv = () => {
+    try {
+      const state = useStore.getState();
+      const csv = buildCombinedCsvExport({
+        workouts: state.workouts || [],
+        meals: state.meals || [],
+        bodyMetrics: state.bodyMetrics || [],
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.href = url;
+      link.download = `ascend_export_${dateStr}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success('Downloaded CSV export — workouts, meals and body metrics.', 'CSV Exported');
+    } catch {
+      toast.error('Failed to export CSV.', 'Export Error');
     }
   };
 
@@ -725,6 +752,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div>
                 <p className="text-xs font-bold text-text-primary">Export JSON Backup</p>
                 <p className="text-3xs text-text-muted">Download all workouts, PRs, and meals</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted" />
+          </button>
+
+          {/* Export CSV */}
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('settings.exportCsv')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.exportCsvHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
