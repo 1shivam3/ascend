@@ -664,15 +664,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
     store.addMeal(newMeal);
 
+    // Feedback must quote what was actually saved — the AI totals omit
+    // the user's ghee/oil corrections, so the day total used to jump by
+    // more than the toast claimed (R3 finding).
+    const savedCalories = Math.round(validFoods.reduce((s, f) => s + (f.calories || 0), 0));
+    const savedProtein = Math.round(validFoods.reduce((s, f) => s + (f.proteinG || 0), 0));
+
     // Calculate remaining protein for immediate feedback
     const todayMeals = store.meals.filter((m) => m.date === today);
     const existingProtein = todayMeals.flatMap((m) => m.foods).reduce((sum, f) => sum + (f.proteinG || 0), 0);
-    const currentProteinTotal = Math.round(existingProtein + analysis.totalProtein);
+    const currentProteinTotal = Math.round(existingProtein + savedProtein);
     const targetProtein = store.macroGoals?.proteinG || Math.round((store.profile?.bodyweightKg || 75) * 2);
     const remainingProtein = Math.max(0, targetProtein - currentProteinTotal);
 
     toast.success(
-      `Meal added: ~${analysis.totalCalories} kcal • ${analysis.totalProtein}g protein (${currentProteinTotal}/${targetProtein}g today)!`,
+      `Meal added: ~${savedCalories} kcal • ${savedProtein}g protein (${currentProteinTotal}/${targetProtein}g today)!`,
       'Meal Logged'
     );
 
