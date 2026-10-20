@@ -55,6 +55,10 @@ export const en = {
   'home.weeklyTarget': 'Weekly Target',
   'home.start': 'Start',
   'home.restDay': 'Rest Day',
+  'home.resumeWorkout': 'Resume Workout',
+  'home.viewCompletedWorkout': 'View Completed Workout',
+  'home.notificationSettings': 'Notification Settings',
+  'home.level': 'Level',
 
   // ── Train / Plans ───────────────────────────────────────────────────
   'train.plans': 'Plans',

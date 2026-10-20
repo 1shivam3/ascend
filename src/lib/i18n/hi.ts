@@ -52,6 +52,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.weeklyTarget': 'हफ़्ते का लक्ष्य',
   'home.start': 'शुरू करें',
   'home.restDay': 'आराम का दिन',
+  'home.resumeWorkout': 'वर्कआउट जारी रखें',
+  'home.viewCompletedWorkout': 'पूरा हुआ वर्कआउट देखें',
+  'home.notificationSettings': 'नोटिफ़िकेशन सेटिंग्स',
+  'home.level': 'लेवल',
 
   // ── Train / Plans ───────────────────────────────────────────────────
   'train.plans': 'प्लान',
