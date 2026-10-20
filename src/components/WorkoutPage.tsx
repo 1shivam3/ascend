@@ -58,6 +58,11 @@ import {
   getExercisePrescription,
 } from '@/lib/workout-engine';
 import { compareSetAdherence } from '@/lib/workout-adherence';
+import {
+  createSpeechRecognizer,
+  isSpeechRecognitionSupported,
+  isNativePlatform,
+} from '@/lib/voice-logger';
 import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import WorkoutCoachDrawer from '@/components/WorkoutCoachDrawer';
@@ -934,60 +939,94 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
   };
 
+  // Voice logging goes through the shared recognizer in lib/voice-logger:
+  // Web Speech in browsers, the native OS recognizer inside the app
+  // (Android WebView has no Web Speech API). Transcripts stream into
+  // pageVoiceTranscriptRef and are parsed once when the session ends.
+  const pageVoiceRecognizerRef = useRef<any>(null);
+  const pageVoiceTranscriptRef = useRef('');
+  const pageVoiceHandledRef = useRef(false);
+
+  const processPageVoiceTranscript = (transcript: string) => {
+    const parsed = parseVoiceWorkout(transcript, availableExercises);
+    if (parsed) {
+      setExercises((prev) => [
+        ...prev.filter((e) => e.name.trim()),
+        {
+          name: parsed.exerciseName,
+          sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
+        },
+      ]);
+      toast.success(
+        `Logged "${parsed.exerciseName}" (${parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')})`,
+        'Voice Input Added'
+      );
+    } else {
+      toast.error(`Could not parse: "${transcript}"`, 'Voice Error');
+    }
+  };
+
   const toggleVoiceLogging = () => {
     if (typeof window === 'undefined') return;
-    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionClass) {
-      toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
-      return;
-    }
 
     if (isListening) {
+      // Stop now — the recognizer's onEnd parses the final transcript.
+      try {
+        pageVoiceRecognizerRef.current?.stop();
+      } catch {}
       setIsListening(false);
       return;
     }
 
+    if (!isSpeechRecognitionSupported()) {
+      toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+      return;
+    }
+
     try {
-      const recognition = new SpeechRecognitionClass();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
+      pageVoiceTranscriptRef.current = '';
+      pageVoiceHandledRef.current = false;
+      try {
+        pageVoiceRecognizerRef.current?.abort();
+      } catch {}
 
-      recognition.onstart = () => {
-        setIsListening(true);
-        toast.info('Listening... Say e.g. "Bench 70 for 8 8 7"', 'Voice Logging');
-      };
+      const recognizer = createSpeechRecognizer({
+        lang: 'en-US',
+        onResult: (text: string) => {
+          pageVoiceTranscriptRef.current = text;
+        },
+        onError: (err: string) => {
+          setIsListening(false);
+          if (err === 'not-allowed' || err === 'service-not-allowed') {
+            toast.error(
+              isNativePlatform()
+                ? 'Microphone permission is off — enable it in Settings → Apps → ASCEND → Permissions.'
+                : 'Microphone access denied — allow it in your browser site settings.',
+              'Voice Logging'
+            );
+          } else if (err === 'unavailable') {
+            toast.error('Voice recognition is not available on this device.', 'Voice Logging');
+          }
+        },
+        onEnd: () => {
+          setIsListening(false);
+          const transcript = pageVoiceTranscriptRef.current.trim();
+          if (transcript && !pageVoiceHandledRef.current) {
+            pageVoiceHandledRef.current = true;
+            processPageVoiceTranscript(transcript);
+          }
+        },
+      });
 
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setIsListening(false);
-        const parsed = parseVoiceWorkout(transcript, availableExercises);
-        if (parsed) {
-          setExercises((prev) => [
-            ...prev.filter((e) => e.name.trim()),
-            {
-              name: parsed.exerciseName,
-              sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
-            },
-          ]);
-          toast.success(
-            `Logged "${parsed.exerciseName}" (${parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')})`,
-            'Voice Input Added'
-          );
-        } else {
-          toast.error(`Could not parse: "${transcript}"`, 'Voice Error');
-        }
-      };
+      if (!recognizer) {
+        toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+        return;
+      }
 
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.start();
+      pageVoiceRecognizerRef.current = recognizer;
+      recognizer.start();
+      setIsListening(true);
+      toast.info('Listening... Say e.g. "Bench 70 for 8 8 7"', 'Voice Logging');
     } catch {
       setIsListening(false);
     }

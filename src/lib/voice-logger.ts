@@ -12,7 +12,24 @@
  * - "bodyweight 10 reps" / "pullups 12 reps"
  * 
  * Includes multi-model Gemini API fallback for rare conversational gym queries.
+ *
+ * Recognition backends:
+ * - Browser: Web Speech API (unchanged).
+ * - Capacitor native app: Android WebView has no Web Speech API, so the
+ *   @capacitor-community/speech-recognition plugin drives the OS recognizer
+ *   behind the exact same { start, stop, abort } + callback contract.
+ *   Permission denial surfaces as onError('not-allowed') and a missing
+ *   speech service as onError('unavailable') so UIs can show explicit states.
  */
+
+import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
+import type { SpeechRecognitionPlugin } from '@capacitor-community/speech-recognition';
+
+/** True when running inside the Capacitor native app (not a browser). */
+export function isNativePlatform(): boolean {
+  return Capacitor.isNativePlatform();
+}
 
 export interface VoiceWorkoutResult {
   exerciseName?: string;
@@ -332,26 +349,199 @@ export function parseHinglishWorkoutVoice(
 }
 
 /**
- * Checks whether Web Speech API is supported in the current browser
+ * Checks whether speech recognition can be attempted on this platform.
+ * In the native app the OS recognizer is used, so support is assumed here —
+ * a missing speech service or denied permission is reported explicitly via
+ * the recognizer's onError ('unavailable' / 'not-allowed') when starting.
  */
 export function isSpeechRecognitionSupported(): boolean {
   if (typeof window === 'undefined') return false;
+  if (Capacitor.isNativePlatform()) return true;
   return Boolean(
     (window as any).SpeechRecognition ||
     (window as any).webkitSpeechRecognition
   );
 }
 
-/**
- * Creates and starts a continuous SpeechRecognition instance with Indian English or Hindi
- */
-export function createSpeechRecognizer(callbacks: {
+type SpeechRecognizerCallbacks = {
   onResult: (transcript: string, isFinal: boolean) => void;
   onError: (error: string) => void;
   onEnd: () => void;
   lang?: string;
-}) {
+};
+
+/**
+ * Native (Capacitor) recognizer backed by @capacitor-community/speech-recognition.
+ * Exposes the same { start, stop, abort } surface as the Web Speech object.
+ *
+ * Plugin quirks handled here (verified against the v7 Android source):
+ * - start() rejects unless RECORD_AUDIO is already granted, so permissions
+ *   are checked/requested first.
+ * - With partialResults=true the start() promise resolves immediately and the
+ *   FINAL transcript also arrives through the 'partialResults' event — after
+ *   'listeningState: stopped' fires (onEndOfSpeech precedes onResults), so
+ *   finalization waits a short grace period for that trailing event.
+ * - Recognition errors emit no events at all, so an isListening() watchdog
+ *   finalizes the session if the OS recognizer dies silently.
+ */
+function createNativeSpeechRecognizer(callbacks: SpeechRecognizerCallbacks) {
+  let plugin: SpeechRecognitionPlugin | null = null;
+  let handles: PluginListenerHandle[] = [];
+  let latest = '';
+  let ended = false;
+  let aborted = false;
+  let watchdog: ReturnType<typeof setInterval> | null = null;
+  let finalizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const cleanup = async () => {
+    if (watchdog) {
+      clearInterval(watchdog);
+      watchdog = null;
+    }
+    if (finalizeTimer) {
+      clearTimeout(finalizeTimer);
+      finalizeTimer = null;
+    }
+    const toRemove = handles;
+    handles = [];
+    for (const h of toRemove) {
+      try {
+        await h.remove();
+      } catch {}
+    }
+  };
+
+  const finalize = (graceMs = 0) => {
+    if (ended || aborted) return;
+    const run = async () => {
+      if (ended || aborted) return;
+      ended = true;
+      const text = latest.trim();
+      await cleanup();
+      if (text) {
+        callbacks.onResult(text, true);
+      }
+      callbacks.onEnd();
+    };
+    if (graceMs > 0) {
+      if (finalizeTimer) clearTimeout(finalizeTimer);
+      finalizeTimer = setTimeout(() => {
+        void run();
+      }, graceMs);
+    } else {
+      void run();
+    }
+  };
+
+  const fail = async (error: 'not-allowed' | 'unavailable') => {
+    if (ended || aborted) return;
+    ended = true;
+    await cleanup();
+    callbacks.onError(error);
+    callbacks.onEnd();
+  };
+
+  const start = async () => {
+    try {
+      const mod = await import('@capacitor-community/speech-recognition');
+      plugin = mod.SpeechRecognition;
+    } catch {
+      await fail('unavailable');
+      return;
+    }
+    if (aborted) return;
+
+    try {
+      // The plugin's start() hard-rejects without a granted permission,
+      // so run the permission flow explicitly first.
+      let perm = await plugin.checkPermissions();
+      if (perm.speechRecognition !== 'granted') {
+        perm = await plugin.requestPermissions();
+      }
+      if (perm.speechRecognition !== 'granted') {
+        await fail('not-allowed');
+        return;
+      }
+
+      const avail = await plugin.available();
+      if (!avail.available) {
+        await fail('unavailable');
+        return;
+      }
+      if (aborted) return;
+
+      handles.push(
+        await plugin.addListener('partialResults', (data) => {
+          const text = (data.matches || []).filter(Boolean).join(' ').trim();
+          if (text) {
+            latest = text;
+            if (!ended && !aborted) {
+              callbacks.onResult(text, false);
+            }
+          }
+        })
+      );
+      handles.push(
+        await plugin.addListener('listeningState', (data) => {
+          if (data.status === 'stopped') {
+            // Final transcript event trails this one — give it a grace window.
+            finalize(400);
+          }
+        })
+      );
+
+      await plugin.start({
+        language: callbacks.lang || 'en-IN',
+        maxResults: 3,
+        partialResults: true,
+        popup: false,
+      });
+
+      // Errors inside the OS recognizer emit no plugin events; poll instead.
+      watchdog = setInterval(() => {
+        if (ended || aborted || !plugin) return;
+        void plugin
+          .isListening()
+          .then(({ listening }) => {
+            if (!listening) finalize(300);
+          })
+          .catch(() => {});
+      }, 700);
+    } catch {
+      await fail('unavailable');
+    }
+  };
+
+  return {
+    start: () => {
+      void start();
+    },
+    stop: () => {
+      if (plugin) {
+        void plugin.stop().catch(() => {});
+      }
+    },
+    abort: () => {
+      aborted = true;
+      void cleanup();
+      if (plugin) {
+        void plugin.stop().catch(() => {});
+      }
+    },
+  };
+}
+
+/**
+ * Creates a continuous speech recognizer with Indian English or Hindi.
+ * Native app → OS recognizer via the Capacitor plugin; browser → Web Speech.
+ * Both expose { start, stop, abort } and the same callback contract.
+ */
+export function createSpeechRecognizer(callbacks: SpeechRecognizerCallbacks) {
   if (typeof window === 'undefined') return null;
+
+  if (Capacitor.isNativePlatform()) {
+    return createNativeSpeechRecognizer(callbacks);
+  }
 
   const SpeechRecognition =
     (window as any).SpeechRecognition ||

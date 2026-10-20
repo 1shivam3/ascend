@@ -5,6 +5,7 @@ import {
   parseHinglishWorkoutVoice,
   createSpeechRecognizer,
   isSpeechRecognitionSupported,
+  isNativePlatform,
   VoiceWorkoutResult,
 } from '@/lib/voice-logger';
 import {
@@ -45,6 +46,8 @@ export default function VoiceWorkoutLoggerModal({
   const [autoApplyCountdown, setAutoApplyCountdown] = useState<number | null>(null);
   const [speechLang, setSpeechLang] = useState<'en-IN' | 'hi-IN'>('en-IN');
   const [parseError, setParseError] = useState<string | null>(null);
+  // Explicit recognizer failure states — never fail silently.
+  const [voiceError, setVoiceError] = useState<'denied' | 'unavailable' | null>(null);
 
   const recognitionRef = useRef<any>(null);
   const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,6 +73,7 @@ export default function VoiceWorkoutLoggerModal({
     setIsAiParsing(false);
     setAutoApplyCountdown(null);
     setParseError(null);
+    setVoiceError(null);
     if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
   }, []);
@@ -170,6 +174,7 @@ export default function VoiceWorkoutLoggerModal({
           setTranscript(text);
           latestTranscriptRef.current = text;
           setParseError(null);
+          setVoiceError(null);
 
           // LIVE PREVIEW: test parsing as words stream in
           const live = parseHinglishWorkoutVoice(text, currentExerciseName, defaultUnit);
@@ -186,6 +191,14 @@ export default function VoiceWorkoutLoggerModal({
         },
         onError: (err: string) => {
           console.warn('Speech recognition status:', err);
+          // Surface blocking failures explicitly instead of dying silently.
+          if (err === 'not-allowed' || err === 'service-not-allowed') {
+            setVoiceError('denied');
+            setIsListening(false);
+          } else if (err === 'unavailable') {
+            setVoiceError('unavailable');
+            setIsListening(false);
+          }
         },
         onEnd: () => {
           setIsListening(false);
@@ -334,11 +347,37 @@ export default function VoiceWorkoutLoggerModal({
           <div className="py-4 space-y-2 text-text-muted">
             <MicOff className="w-9 h-9 mx-auto text-rose-400" />
             <p className="text-xs font-mono font-semibold text-text-primary">
-              Web Speech API not available
+              Voice recognition not available
             </p>
             <p className="text-3xs font-mono text-text-secondary">
-              Please use <strong>Google Chrome on Android</strong> for hands-free voice logging in the gym.
+              This browser doesn&apos;t support speech recognition. Please use <strong>Google Chrome</strong> for hands-free voice logging in the gym.
             </p>
+          </div>
+        ) : voiceError ? (
+          <div className="py-4 space-y-2.5 text-text-muted">
+            <MicOff className="w-9 h-9 mx-auto text-rose-400" />
+            <p className="text-xs font-mono font-semibold text-text-primary">
+              {voiceError === 'denied'
+                ? 'Microphone permission is off'
+                : 'Voice recognition not available on this device'}
+            </p>
+            <p className="text-3xs font-mono text-text-secondary leading-relaxed">
+              {voiceError === 'denied'
+                ? isNativePlatform()
+                  ? 'Voice logging needs the microphone. Enable it in Settings → Apps → ASCEND → Permissions → Microphone, then tap Retry.'
+                  : 'Voice logging needs the microphone. Allow mic access in your browser\u2019s site settings for this site, then tap Retry.'
+                : 'This device has no speech recognition service, so voice logging can\u2019t run here. You can still log sets manually.'}
+            </p>
+            {voiceError === 'denied' && (
+              <button
+                type="button"
+                onClick={startListening}
+                className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Retry</span>
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
