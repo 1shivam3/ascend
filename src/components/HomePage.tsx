@@ -50,7 +50,6 @@ const READINESS_LABEL: Record<string, string> = {
   rest: 'Rest',
 };
 
-const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
 const LogPastWorkoutModal = dynamic(() => import('@/components/LogPastWorkoutModal'), { ssr: false });
 const ScanMealModal = dynamic(() => import('@/components/ScanMealModal'), { ssr: false });
@@ -270,7 +269,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   // Modal triggers
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isScanMealModalOpen, setIsScanMealModalOpen] = useState(false);
@@ -290,12 +288,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       return registerBackHandler(() => { setIsNotificationsOpen(false); return true; }, 100);
     }
   }, [isNotificationsOpen, registerBackHandler]);
-
-  useEffect(() => {
-    if (isSettingsOpen) {
-      return registerBackHandler(() => { setIsSettingsOpen(false); return true; }, 100);
-    }
-  }, [isSettingsOpen, registerBackHandler]);
 
   useEffect(() => {
     if (isChangeWorkoutOpen) {
@@ -1221,12 +1213,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       )}
-
-      {/* ── SETTINGS MODAL ─────────────────────────────────────────────────── */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
 
       {/* ── NOTIFICATION SETTINGS (Reminder Center) ────────────────────────── */}
       <ReminderCenterModal

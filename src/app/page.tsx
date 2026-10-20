@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Home, Dumbbell, TrendingUp, UtensilsCrossed, Plus } from 'lucide-react';
+import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import OnboardingScreen from '@/components/Onboarding';
@@ -39,10 +39,6 @@ const SettingsView = dynamic(() => import('@/components/SettingsView'), {
   loading: () => <TabSkeleton />,
 });
 
-const QuickActionSheetModal = dynamic(() => import('@/components/QuickActionSheetModal'), {
-  ssr: false,
-});
-
 const ImportProgramModal = dynamic(() => import('@/components/ImportProgramModal'), {
   ssr: false,
 });
@@ -65,7 +61,6 @@ export default function AppPage() {
     registerBackHandler,
   } = useAppNavigation();
 
-  const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
@@ -168,14 +163,6 @@ export default function AppPage() {
   }, [theme, _hasHydrated, persistHydrated]);
 
   // Dismiss root modals when Back is pressed
-  useEffect(() => {
-    if (!isQuickActionOpen) return;
-    return registerBackHandler(() => {
-      setIsQuickActionOpen(false);
-      return true;
-    }, 100);
-  }, [isQuickActionOpen, registerBackHandler]);
-
   useEffect(() => {
     if (!isImportModalOpen) return;
     return registerBackHandler(() => {
@@ -392,16 +379,6 @@ export default function AppPage() {
           })}
         </nav>
       )}
-
-      {/* Quick Action Sheet Modal */}
-      <QuickActionSheetModal
-        isOpen={isQuickActionOpen}
-        onClose={() => setIsQuickActionOpen(false)}
-        onNavigate={(tab) => {
-          setIsQuickActionOpen(false);
-          navigate(tab as TabId);
-        }}
-      />
 
       {/* Shared Program Import Modal (Distribution Loop) */}
       <ImportProgramModal

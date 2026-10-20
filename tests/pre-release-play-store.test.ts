@@ -20,14 +20,24 @@ describe('Google Play Store Launch Readiness Verification', () => {
     });
 
     it('has an in-app Account & Privacy settings section with export and deletion', () => {
-      const settingsModalPath = path.join(rootDir, 'src', 'components', 'SettingsModal.tsx');
-      const content = fs.readFileSync(settingsModalPath, 'utf8');
+      // The settings surface is the Settings tab (SettingsView) plus the
+      // dedicated DeleteAccountView and ReminderCenterModal it opens. (The
+      // old SettingsModal wrapper was never reachable and has been removed;
+      // assertions now read the files users actually see.)
+      const settingsView = fs.readFileSync(
+        path.join(rootDir, 'src', 'components', 'SettingsView.tsx'), 'utf8');
+      const deleteAccountView = fs.readFileSync(
+        path.join(rootDir, 'src', 'components', 'DeleteAccountView.tsx'), 'utf8');
+      const reminderCenter = fs.readFileSync(
+        path.join(rootDir, 'src', 'components', 'ReminderCenterModal.tsx'), 'utf8');
 
-      expect(content).toContain('Account & Privacy');
-      expect(content).toContain('Export my data');
-      expect(content).toContain('Notification preferences');
-      expect(content).toContain('Delete my account');
-      expect(content).toContain('DELETE'); // Confirmation text required
+      expect(settingsView).toContain('Account &amp; Security');
+      expect(settingsView).toContain('Data, Privacy &amp; Legal');
+      expect(settingsView).toContain('exportFullBackupJSON'); // Export my data flow
+      expect(deleteAccountView).toContain('Export my data');
+      expect(deleteAccountView).toContain('Delete my account');
+      expect(deleteAccountView).toContain('DELETE'); // Confirmation text required
+      expect(reminderCenter).toContain('Notification'); // Notification preferences UI
     });
 
     it('cascades deletion across all cloud tables and auth store', () => {
@@ -55,12 +65,11 @@ describe('Google Play Store Launch Readiness Verification', () => {
   });
 
   describe('2. Android Back Button & Modal History Navigation', () => {
-    it('ensures scan meal, settings, workout, and quick action modals register back handlers', () => {
+    it('ensures scan meal, settings, and workout modals register back handlers', () => {
       const modalFiles = [
-        path.join(rootDir, 'src', 'components', 'SettingsModal.tsx'),
+        path.join(rootDir, 'src', 'components', 'SettingsView.tsx'),
         path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx'),
         path.join(rootDir, 'src', 'components', 'BarcodeScannerModal.tsx'),
-        path.join(rootDir, 'src', 'components', 'QuickActionSheetModal.tsx'),
         path.join(rootDir, 'src', 'components', 'WorkoutPage.tsx'),
       ];
 

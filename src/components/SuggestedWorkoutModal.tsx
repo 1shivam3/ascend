@@ -408,22 +408,12 @@ export default function SuggestedWorkoutModal({
   const [selectedSplitId, setSelectedSplitId] = useState<string>('ppl');
   const [selectedSplitDayIdx, setSelectedSplitDayIdx] = useState<number>(0);
 
-  // Custom Split state
-  const [isCreatingCustomSplit, setIsCreatingCustomSplit] = useState(false);
-  const [customSplitName, setCustomSplitName] = useState('My Custom Split');
-  const [customSplitDays, setCustomSplitDays] = useState<{ name: string; bodyParts: BodyPartOption[] }[]>([
-    { name: 'Day 1: Chest & Triceps', bodyParts: ['chest', 'arms'] },
-    { name: 'Day 2: Back & Biceps', bodyParts: ['back', 'arms'] },
-    { name: 'Day 3: Legs & Shoulders', bodyParts: ['legs', 'shoulders'] },
-  ]);
-
   // Plan editor state
   const [planTitle, setPlanTitle] = useState('');
   const [exercises, setExercises] = useState<PlannedExercise[]>([]);
 
   // Search & quick add exercise
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [showAddDrawer, setShowAddDrawer] = useState(false);
 
   const allAvailableExercises = useMemo(() => getExerciseList(), []);
