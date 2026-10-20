@@ -42,6 +42,7 @@ import {
   requestHealthAuthorization,
 } from '@/lib/health-connect';
 import { syncHealthConnectIfEnabled } from '@/lib/health-sync';
+import { isNativeApp } from '@/lib/app-settings';
 
 function SettingsToggle({ on, onToggle, label }: { on: boolean; onToggle: () => void; label: string }) {
   return (
@@ -720,6 +721,28 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   onRetry={handleHealthConnectToggle}
                 />
               )}
+            </div>
+          )}
+
+          {/* Offline food scan — native app only; the row simply does
+              not exist on web/PWA. Off restores the server-AI flow. */}
+          {isNativeApp() && (
+            <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
+              <div>
+                <p className="text-xs font-bold text-text-primary">
+                  {t('settings.offlineScan')}
+                </p>
+                <p className="text-3xs text-text-muted leading-relaxed">
+                  {t('settings.offlineScanHint')}
+                </p>
+              </div>
+              <SettingsToggle
+                label="Toggle offline food scan"
+                on={uiPreferences.offlineScan !== false}
+                onToggle={() =>
+                  setUiPreferences({ offlineScan: uiPreferences.offlineScan === false })
+                }
+              />
             </div>
           )}
         </div>

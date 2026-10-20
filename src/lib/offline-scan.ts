@@ -28,7 +28,7 @@
  * notes. Adding real DB entries for them is a data task, not a
  * mapping trick.
  */
-import { Capacitor, registerPlugin } from '@capacitor/core';
+import { registerPlugin } from '@capacitor/core';
 import type { MealAnalysisResult, ScannedFoodItem } from './types';
 import { FOOD_DB, estimateMacros } from './macros';
 import { recalculateMealResult } from './ai-scan-meal';
