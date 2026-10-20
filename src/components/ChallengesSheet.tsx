@@ -15,6 +15,7 @@ import { XP_CHALLENGE_COMPLETE } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { useToast } from '@/components/ui/Toast';
+import FriendChallengesSection from '@/components/FriendChallengesSection';
 
 interface ChallengesSheetProps {
   isOpen: boolean;
@@ -201,6 +202,10 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
         <p className="text-3xs text-text-muted leading-relaxed">
           Challenges never add new chores — progress comes only from workouts, meals, and PRs you log anyway. Join or leave anytime.
         </p>
+
+        <div className="border-t border-border/60 pt-4">
+          <FriendChallengesSection active={isOpen} />
+        </div>
       </div>
     </div>
   );
