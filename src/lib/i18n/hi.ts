@@ -213,4 +213,15 @@ export const hi: Partial<Record<StringKey, string>> = {
   'packed.keep': 'यही रखें',
   'packed.previewHint': 'डंबल और बॉडीवेट विकल्प पहले से चुन लें, जो कहीं भी हो सकते हैं।',
   'packed.swappedCount': '{count} एक्सरसाइज़ डंबल / बॉडीवेट में बदले गए',
+
+  // ── Offline food scan (Android app) ─────────────────────────────────
+  'settings.offlineScan': 'ऑफ़लाइन फ़ूड स्कैन',
+  'settings.offlineScanHint': 'खाना सीधे आपके फ़ोन पर पहचानता है — इंटरनेट की ज़रूरत नहीं। फ़ोटो डिवाइस से बाहर नहीं जाती।',
+  'scan.offlineNote': 'ऑफ़लाइन स्कैन — बिना इंटरनेट चलता है, अभी 15 डिश पहचानता है',
+  'scan.offlineCta': 'डिश पहचानें — ऑफ़लाइन',
+  'scan.recognizingOffline': 'आपके फ़ोन पर डिश पहचानी जा रही है…',
+  'scan.didYouMean': 'क्या आपका मतलब यह था…?',
+  'scan.useAiInstead': 'इसके बजाय AI स्कैन इस्तेमाल करें',
+  'scan.offlineChoicesTitle': 'इस बार पक्का नहीं है',
+  'scan.offlineChoicesHint': 'ऑफ़लाइन स्कैन के सबसे करीबी विकल्प ये हैं। सही डिश चुनें — या AI स्कैन इस्तेमाल करें।',
 };
