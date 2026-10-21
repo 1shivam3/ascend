@@ -34,14 +34,34 @@ async function resolveUserId(supabase: any, req: Request): Promise<string | null
   return null;
 }
 
+// The delete_token_hash column is added by
+// supabase/migrations/2026101806_add_push_subscription_delete_token.sql,
+// which may not have run yet when this code deploys (PRs merge before SQL).
+// Treat the column as opportunistic: detect its absence and fall back to
+// pre-migration behaviour instead of breaking subscribe entirely.
+function isMissingColumnError(err: any): boolean {
+  if (!err) return false;
+  if (err.code === 'PGRST204' || err.code === '42703') return true;
+  const text = [err.message, err.details, err.hint].filter(Boolean).join(' ');
+  return text.includes('delete_token_hash');
+}
+
 async function findSubscription(supabase: any, endpoint: string) {
   const { data, error } = await supabase
     .from('push_subscriptions')
     .select('endpoint, user_id, delete_token_hash')
     .eq('endpoint', endpoint)
     .maybeSingle();
-  if (error) throw error;
-  return data ?? null;
+  if (!error) return data ?? null;
+  if (!isMissingColumnError(error)) throw error;
+  // Pre-migration: retry without the column; token is treated as absent.
+  const retry = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, user_id')
+    .eq('endpoint', endpoint)
+    .maybeSingle();
+  if (retry.error) throw retry.error;
+  return retry.data ? { ...retry.data, delete_token_hash: null } : null;
 }
 
 export async function POST(req: Request) {
@@ -131,19 +151,30 @@ export async function POST(req: Request) {
     // Upsert into push_subscriptions table. user_id is only ever set from a
     // verified session or preserved from the existing row — never nulled by
     // an unauthenticated request.
-    const { error } = await supabase.from('push_subscriptions').upsert(
-      {
-        endpoint,
-        p256dh,
-        auth,
-        user_id: userId ?? existing?.user_id ?? null,
-        user_agent: userAgent || null,
-        timezone: timezone || 'UTC',
-        delete_token_hash: deleteTokenHash,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'endpoint' }
-    );
+    const record: Record<string, unknown> = {
+      endpoint,
+      p256dh,
+      auth,
+      user_id: userId ?? existing?.user_id ?? null,
+      user_agent: userAgent || null,
+      timezone: timezone || 'UTC',
+      delete_token_hash: deleteTokenHash,
+      updated_at: new Date().toISOString(),
+    };
+    let { error } = await supabase
+      .from('push_subscriptions')
+      .upsert(record, { onConflict: 'endpoint' });
+
+    if (error && isMissingColumnError(error)) {
+      // Pre-migration: store the subscription exactly as before this PR
+      // (without the token column) and don't hand out a token that
+      // cannot be verified later.
+      const { delete_token_hash: _omit, ...withoutToken } = record;
+      ({ error } = await supabase
+        .from('push_subscriptions')
+        .upsert(withoutToken, { onConflict: 'endpoint' }));
+      if (!error) deleteToken = undefined;
+    }
 
     if (error) {
       return NextResponse.json(

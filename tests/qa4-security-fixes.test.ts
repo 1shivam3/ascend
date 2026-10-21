@@ -6,9 +6,18 @@ const db = vi.hoisted(() => ({
   subs: [] as any[],
   prefs: [] as any[],
   error: null as string | null,
+  missingDeleteTokenColumn: false,
 }));
 
-vi.mock('@supabase/supabase-js', () => ({
+vi.mock('@supabase/supabase-js', () => {
+  const missingColumnError = () =>
+    Object.assign(
+      new Error(
+        "Could not find the 'delete_token_hash' column of 'push_subscriptions' in the schema cache"
+      ),
+      { code: 'PGRST204' }
+    );
+  return {
   createClient: vi.fn(() => ({
     auth: {
       getUser: async (token: string) => ({
@@ -27,15 +36,27 @@ vi.mock('@supabase/supabase-js', () => ({
     from: (table: string) => {
       if (table === 'push_subscriptions') {
         return {
-          select: () => ({
+          select: (columns?: string) => ({
             eq: (_field: string, val: string) => ({
-              maybeSingle: async () => ({
-                data: db.subs.find((s) => s.endpoint === val) ?? null,
-                error: null,
-              }),
+              maybeSingle: async () => {
+                if (
+                  db.missingDeleteTokenColumn &&
+                  typeof columns === 'string' &&
+                  columns.includes('delete_token_hash')
+                ) {
+                  return { data: null, error: missingColumnError() };
+                }
+                return {
+                  data: db.subs.find((s) => s.endpoint === val) ?? null,
+                  error: null,
+                };
+              },
             }),
           }),
           upsert: async (record: any) => {
+            if (db.missingDeleteTokenColumn && 'delete_token_hash' in record) {
+              return { error: missingColumnError() };
+            }
             if (db.error) return { error: new Error(db.error) };
             const idx = db.subs.findIndex((s) => s.endpoint === record.endpoint);
             if (idx >= 0) db.subs[idx] = { ...db.subs[idx], ...record };
@@ -74,7 +95,8 @@ vi.mock('@supabase/supabase-js', () => ({
       };
     },
   })),
-}));
+  };
+});
 
 import { POST as subscribePost, DELETE as subscribeDelete } from '../src/app/api/notifications/subscribe/route';
 import { POST as prefsPost } from '../src/app/api/notifications/preferences/route';
@@ -122,6 +144,7 @@ beforeEach(() => {
   db.subs = [];
   db.prefs = [];
   db.error = null;
+  db.missingDeleteTokenColumn = false;
   resetRateLimitStoreForTests();
   process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://fake-project.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'mock-service-role-key';
@@ -261,6 +284,74 @@ describe('QA4-009/QA4A-003 subscription ownership and DELETE proof', () => {
       lastStatus = res.status;
     }
     expect(lastStatus).toBe(429);
+  });
+});
+
+// ── Pre-migration: delete_token_hash column missing (opportunistic fallback) ─
+describe('pre-migration push subscriptions (delete_token_hash column absent)', () => {
+  beforeEach(() => {
+    db.missingDeleteTokenColumn = true;
+  });
+
+  it('subscribe POST still succeeds and stores the subscription without the column', async () => {
+    const res = await subscribePost(subscribeReq(FCM_ENDPOINT));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.success).toBe(true);
+    // No token can be issued: its hash has nowhere to be stored.
+    expect(body.deleteToken).toBeUndefined();
+    expect(db.subs).toHaveLength(1);
+    expect(db.subs[0].endpoint).toBe(FCM_ENDPOINT);
+    expect(db.subs[0].p256dh).toBe('p256-key');
+    expect(db.subs[0].auth).toBe('auth-secret');
+    expect('delete_token_hash' in db.subs[0]).toBe(false);
+  });
+
+  it('subscribe POST for a signed-in user still stores user_id pre-migration', async () => {
+    const res = await subscribePost(
+      subscribeReq(FCM_ENDPOINT, { authorization: 'Bearer token-user-a' })
+    );
+    expect(res.status).toBe(200);
+    expect(db.subs).toHaveLength(1);
+    expect(db.subs[0].user_id).toBe('user-a');
+  });
+
+  it('DELETE with owner session still succeeds (200) pre-migration', async () => {
+    await subscribePost(subscribeReq(FCM_ENDPOINT, { authorization: 'Bearer token-user-a' }));
+    expect(db.subs).toHaveLength(1);
+    const res = await subscribeDelete(
+      req('http://localhost:3000/api/notifications/subscribe', {
+        method: 'DELETE',
+        headers: { authorization: 'Bearer token-user-a' },
+        body: JSON.stringify({ endpoint: FCM_ENDPOINT }),
+      })
+    );
+    expect(res.status).toBe(200);
+    expect(db.subs).toHaveLength(0);
+  });
+
+  it('DELETE anonymous still returns 401 pre-migration and keeps the row', async () => {
+    await subscribePost(subscribeReq(FCM_ENDPOINT, { authorization: 'Bearer token-user-a' }));
+    const res = await subscribeDelete(
+      req('http://localhost:3000/api/notifications/subscribe', {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint: FCM_ENDPOINT, deleteToken: 'any-token' }),
+      })
+    );
+    expect(res.status).toBe(401);
+    expect(db.subs).toHaveLength(1);
+  });
+
+  it('DELETE anonymous on a legacy guest row still returns 401 pre-migration', async () => {
+    await subscribePost(subscribeReq(FCM_ENDPOINT));
+    const res = await subscribeDelete(
+      req('http://localhost:3000/api/notifications/subscribe', {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint: FCM_ENDPOINT }),
+      })
+    );
+    expect(res.status).toBe(401);
+    expect(db.subs).toHaveLength(1);
   });
 });
 
