@@ -3,8 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, X } from 'lucide-react';
 import { getTelemetryConsent, setTelemetryConsent, hasConfiguredTelemetry, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
+import { useTranslation } from '@/lib/i18n';
 
 export default function TelemetryConsentBanner() {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function TelemetryConsentBanner() {
   return (
     <div
       role="region"
-      aria-label="Privacy & Analytics Preferences"
+      aria-label={t('telemetry.ariaLabel')}
       className="fixed bottom-16 sm:bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-md z-50 animate-slide-up"
     >
       <div className="bg-bg-secondary/95 backdrop-blur-md border border-border/90 rounded-2xl p-4 shadow-2xl space-y-3">
@@ -49,13 +51,13 @@ export default function TelemetryConsentBanner() {
           <div className="flex items-center gap-2 text-amber-700 dark:text-accent">
             <ShieldCheck className="w-5 h-5 shrink-0" />
             <span className="font-bold text-xs tracking-wide uppercase font-mono">
-              Privacy &amp; Performance
+              {t('telemetry.title')}
             </span>
           </div>
           <button
             type="button"
             onClick={handleDecline}
-            aria-label="Close and decline analytics"
+            aria-label={t('telemetry.closeAria')}
             className="text-text-muted hover:text-text-primary p-1 -mr-1 -mt-1 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -63,7 +65,7 @@ export default function TelemetryConsentBanner() {
         </div>
 
         <p className="text-xs text-slate-700 dark:text-text-secondary leading-relaxed">
-          ASCEND uses anonymous telemetry to detect crashes and optimize loading speeds. In accordance with our offline-first architecture, your workout logs, PRs, body measurements, and meals are <strong className="text-text-primary">never</strong> tracked.
+          {t('telemetry.body')}
         </p>
 
         <div className="flex items-center gap-2 pt-1">
@@ -72,14 +74,14 @@ export default function TelemetryConsentBanner() {
             onClick={handleDecline}
             className="flex-1 py-2 px-3 rounded-xl border border-border bg-bg-elevated hover:bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold transition-all cursor-pointer text-center"
           >
-            Decline
+            {t('telemetry.decline')}
           </button>
           <button
             type="button"
             onClick={handleAccept}
             className="flex-1 py-2 px-3 rounded-xl bg-accent text-stone-950 font-black hover:bg-accent/90 text-xs transition-all shadow-xs cursor-pointer text-center"
           >
-            Accept
+            {t('telemetry.accept')}
           </button>
         </div>
       </div>

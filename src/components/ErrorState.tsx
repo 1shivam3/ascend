@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { AlertTriangle, RotateCcw, Home, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
 import { redactSecrets } from '@/lib/server-security';
+import { useTranslation } from '@/lib/i18n';
 
 export interface ErrorStateProps {
   error?: (Error & { digest?: string }) | string | null;
@@ -22,15 +23,16 @@ export default function ErrorState({
   error,
   reset,
   onHome,
-  title = 'Something went wrong',
-  message = 'An unexpected error occurred while loading this view. Your logged workouts, PRs, and personal records remain safely stored.',
+  title,
+  message,
   fullScreen = true,
 }: ErrorStateProps) {
+  const { t } = useTranslation();
   const [showDetails, setShowDetails] = useState(false);
 
   const rawErrorMessage = typeof error === 'string' ? error : error?.message;
   const digest = typeof error === 'object' && error !== null ? error.digest : undefined;
-  const sanitizedError = redactSecrets(rawErrorMessage || 'No technical diagnostics details provided.');
+  const sanitizedError = redactSecrets(rawErrorMessage || t('state.noDiagnostics'));
 
   const handleReturnHome = () => {
     if (onHome) {
@@ -62,10 +64,10 @@ export default function ErrorState({
       {/* ── Heading & Context ───────────────────────────────────────────── */}
       <div className="space-y-2">
         <h1 className="text-xl sm:text-2xl font-bold font-sans text-text-primary tracking-tight">
-          {title}
+          {title ?? t('state.errorTitle')}
         </h1>
         <p className="text-xs text-text-secondary leading-relaxed px-2 font-sans">
-          {message}
+          {message ?? t('state.errorMessage')}
         </p>
       </div>
 
@@ -79,7 +81,7 @@ export default function ErrorState({
         >
           <span className="flex items-center gap-1.5 uppercase tracking-wider font-semibold">
             <ShieldAlert className="w-3.5 h-3.5 text-accent" />
-            Technical Diagnostics
+            {t('state.diagnostics')}
           </span>
           {showDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
@@ -91,7 +93,7 @@ export default function ErrorState({
             </p>
             {digest && (
               <p className="text-3xs font-mono text-text-muted/60 pt-0.5">
-                Digest: {digest}
+                {t('state.digest')} {digest}
               </p>
             )}
           </div>
@@ -107,7 +109,7 @@ export default function ErrorState({
             className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-white flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
-            <span>Retry</span>
+            <span>{t('state.retry')}</span>
           </button>
         )}
 
@@ -117,7 +119,7 @@ export default function ErrorState({
           className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <Home className="w-4 h-4 text-text-muted" />
-          <span>Return to Dashboard</span>
+          <span>{t('state.returnHome')}</span>
         </button>
 
         <button
@@ -125,7 +127,7 @@ export default function ErrorState({
           onClick={handleEmergencyReset}
           className="text-3xs font-mono text-text-muted hover:text-accent hover:underline transition-colors pt-1 block mx-auto cursor-pointer"
         >
-          Clear temporary cache &amp; force restart
+          {t('state.emergencyReset')}
         </button>
       </div>
     </div>

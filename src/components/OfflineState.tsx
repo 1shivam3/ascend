@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { WifiOff, RefreshCw, CheckCircle2, ShieldCheck, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 
 export interface OfflineStateProps {
   onRetry?: () => void | Promise<void>;
@@ -20,6 +21,7 @@ export default function OfflineState({
   onContinueOffline,
   fullScreen = true,
 }: OfflineStateProps) {
+  const { t } = useTranslation();
   const [isChecking, setIsChecking] = useState(false);
   const toast = useToast();
 
@@ -31,14 +33,14 @@ export default function OfflineState({
       } else if (typeof window !== 'undefined') {
         const online = window.navigator.onLine;
         if (online) {
-          toast.success('Connection restored! Cloud sync resumed.', 'Back Online');
+          toast.success(t('offline.toastOnlineMsg'), t('offline.toastOnlineTitle'));
           if (onContinueOffline) onContinueOffline();
         } else {
-          toast.info('Still offline. Local gym mode remains fully operational.', 'Offline Mode');
+          toast.info(t('offline.toastOfflineMsg'), t('offline.toastOfflineTitle'));
         }
       }
     } catch {
-      toast.error('Network check failed. You can keep training offline.', 'Offline');
+      toast.error(t('offline.toastFailMsg'), t('offline.toastFailTitle'));
     } finally {
       setIsChecking(false);
     }
@@ -55,17 +57,17 @@ export default function OfflineState({
       <div className="flex justify-center -mt-2">
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
           <span className="w-2 h-2 rounded-full bg-sage animate-pulse" />
-          Offline Gym Mode Active
+          {t('offline.badge')}
         </span>
       </div>
 
       {/* ── Heading & Context ───────────────────────────────────────────── */}
       <div className="space-y-2">
         <h1 className="text-xl sm:text-2xl font-bold font-sans text-text-primary tracking-tight">
-          You&apos;re Offline
+          {t('offline.title')}
         </h1>
         <p className="text-xs text-text-secondary leading-relaxed px-2 font-sans">
-          No internet connection detected. Offline Gym Mode is active — you can continue logging workouts, PRs, and meals locally without interruption.
+          {t('offline.desc')}
         </p>
       </div>
 
@@ -74,22 +76,22 @@ export default function OfflineState({
         <div className="flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
           <p className="text-3xs text-text-secondary leading-snug">
-            <strong className="text-text-primary font-semibold block">Local Logging Active</strong>
-            All workouts, sets, and meals save safely to device storage.
+            <strong className="text-text-primary font-semibold block">{t('offline.localTitle')}</strong>
+            {t('offline.localDesc')}
           </p>
         </div>
         <div className="flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
           <p className="text-3xs text-text-secondary leading-snug">
-            <strong className="text-text-primary font-semibold block">Full Gym Engine</strong>
-            Rest timers, 1RM calculators, and routines work 100% offline.
+            <strong className="text-text-primary font-semibold block">{t('offline.engineTitle')}</strong>
+            {t('offline.engineDesc')}
           </p>
         </div>
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-sage shrink-0 mt-0.5" />
           <p className="text-3xs text-text-secondary leading-snug">
-            <strong className="text-text-primary font-semibold block">Automatic Cloud Sync</strong>
-            Queued changes automatically upload once connectivity returns.
+            <strong className="text-text-primary font-semibold block">{t('offline.syncTitle')}</strong>
+            {t('offline.syncDesc')}
           </p>
         </div>
       </div>
@@ -103,7 +105,7 @@ export default function OfflineState({
           className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-white flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
-          <span>{isChecking ? 'Checking Network...' : 'Check Connection'}</span>
+          <span>{isChecking ? t('offline.checking') : t('offline.check')}</span>
         </button>
 
         {onContinueOffline && (
@@ -112,7 +114,7 @@ export default function OfflineState({
             onClick={onContinueOffline}
             className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <span>Continue in Gym Mode</span>
+            <span>{t('offline.continue')}</span>
             <ArrowRight className="w-3.5 h-3.5 text-text-muted" />
           </button>
         )}

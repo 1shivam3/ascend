@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 export interface LoadingStateProps {
   label?: string;
@@ -14,10 +15,11 @@ export interface LoadingStateProps {
  * Palette: Graphite (#171916), Chalk (#F3F0E7), Vermilion (#E44427), Sage (#858076).
  */
 export default function LoadingState({
-  label = 'Loading...',
-  description = 'Please wait while we load your data.',
+  label,
+  description,
   fullScreen = true,
 }: LoadingStateProps) {
+  const { t } = useTranslation();
   const content = (
     <div className="w-full max-w-sm mx-auto p-6 sm:p-8 space-y-6 text-center animate-fade-in select-none">
       {/* ── Screen 26: Centered Vermilion Spinner Indicator ────────────── */}
@@ -33,10 +35,10 @@ export default function LoadingState({
       {/* ── Typography ──────────────────────────────────────────────────── */}
       <div className="space-y-1.5">
         <h2 className="text-xl font-bold font-sans text-text-primary tracking-tight">
-          {label}
+          {label ?? t('state.loadingLabel')}
         </h2>
         <p className="text-xs text-text-muted font-sans leading-relaxed">
-          {description}
+          {description ?? t('state.loadingDesc')}
         </p>
       </div>
     </div>
