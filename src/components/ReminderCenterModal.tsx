@@ -29,6 +29,7 @@ import {
 } from '@/lib/local-notifications';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import PermissionHelp from '@/components/ui/PermissionHelp';
+import { useTranslation, weekdayNames } from '@/lib/i18n';
 
 interface ReminderCenterModalProps {
   isOpen: boolean;
@@ -89,6 +90,7 @@ function Toggle({
 
 export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterModalProps) {
   useEscapeToClose(isOpen, onClose);
+  const { t, language } = useTranslation();
   const toast = useToast();
   const notificationPreferences = useStore((state) => state.notificationPreferences) || DEFAULT_NOTIFICATION_PREFERENCES;
   const setNotificationPreferences = useStore((state) => state.setNotificationPreferences);
@@ -215,7 +217,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       const granted = await requestLocalNotificationPermission();
       if (granted) {
         setPermissionState('granted');
-        toast.success('Notifications are on for this device.', 'Reminders Enabled');
+        toast.success(t('rem.enabledMsg'), t('rem.enabledTitle'));
         if (!prefs.enabled) {
           persist({ ...prefs, enabled: true });
         } else {
@@ -223,10 +225,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         }
       } else {
         setPermissionState('denied');
-        toast.error(
-          'Notifications are still off. You can allow them in Android Settings → Apps → ASCEND → Notifications.',
-          'Permission Needed'
-        );
+        toast.error(t('rem.stillOffMsg'), t('rem.permTitle'));
       }
       return;
     }
@@ -236,12 +235,12 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
     }
     if (result.success) {
       setHasSubscription(true);
-      toast.success('Notifications are on for this device.', 'Reminders Enabled');
+      toast.success(t('rem.enabledMsg'), t('rem.enabledTitle'));
       if (!prefs.enabled) {
         persist({ ...prefs, enabled: true });
       }
     } else {
-      toast.error(result.error || 'Could not enable notifications.', 'Permission Needed');
+      toast.error(result.error || t('rem.couldNotEnable'), t('rem.permTitle'));
     }
   };
 
@@ -249,16 +248,16 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
     if (isNative) {
       const state = await checkLocalNotificationPermission();
       if (state !== 'granted') {
-        toast.info('Notification permission is not granted yet — tap Enable first.', 'Permission Needed');
+        toast.info(t('rem.notGrantedMsg'), t('rem.permTitle'));
         return;
       }
       setIsSendingTest(true);
       try {
         const sent = await sendTestLocalNotification();
         if (sent) {
-          toast.success('Test notification sent — check your notification shade.', 'Test Sent');
+          toast.success(t('rem.testSentMsg'), t('rem.testSentTitle'));
         } else {
-          toast.error('Could not display a test notification on this device.', 'Test Failed');
+          toast.error(t('rem.testFailMsg'), t('rem.testFailTitle'));
         }
       } finally {
         setIsSendingTest(false);
@@ -266,11 +265,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       return;
     }
     if (typeof window === 'undefined' || !('Notification' in window)) {
-      toast.info('Notifications are not supported in this browser or app view.', 'Not Supported');
+      toast.info(t('rem.notSupportedMsg'), t('rem.notSupportedTitle'));
       return;
     }
     if (Notification.permission !== 'granted') {
-      toast.info('Notification permission is not granted yet — tap Enable first.', 'Permission Needed');
+      toast.info(t('rem.notGrantedMsg'), t('rem.permTitle'));
       return;
     }
     setIsSendingTest(true);
@@ -279,7 +278,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       if ('serviceWorker' in navigator) {
         const registration = await navigator.serviceWorker.ready;
         await registration.showNotification('ASCEND', {
-          body: 'Test notification — your reminders are working.',
+          body: t('rem.testBody'),
           icon: '/icon-192.png',
           badge: '/icon-192.png',
           tag: 'ascend-test-notification',
@@ -289,15 +288,15 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
       if (!shown) {
         // Fallback for environments without an active service worker.
         new Notification('ASCEND', {
-          body: 'Test notification — your reminders are working.',
+          body: t('rem.testBody'),
           icon: '/icon-192.png',
           tag: 'ascend-test-notification',
         });
       }
-      toast.success('Test notification sent — check your notification shade.', 'Test Sent');
+      toast.success(t('rem.testSentMsg'), t('rem.testSentTitle'));
     } catch (err) {
       console.warn('Test notification failed:', err);
-      toast.error('Could not display a test notification on this device.', 'Test Failed');
+      toast.error(t('rem.testFailMsg'), t('rem.testFailTitle'));
     } finally {
       setIsSendingTest(false);
     }
@@ -332,10 +331,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             </div>
             <div className="min-w-0">
               <h2 className="text-base sm:text-lg font-black text-text-primary tracking-tight font-display leading-tight">
-                Notifications
+                {t('rem.title')}
               </h2>
               <p className="text-2xs text-text-muted">
-                {prefs.enabled ? 'Reminders on — changes save automatically' : 'Reminders are off'}
+                {prefs.enabled ? t('rem.on') : t('rem.off')}
               </p>
             </div>
           </div>
@@ -343,13 +342,13 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <Toggle
               checked={prefs.enabled}
               onChange={handleMasterToggle}
-              label="All notifications"
+              label={t('rem.allNotifications')}
             />
             <button
               type="button"
               onClick={onClose}
               className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-              aria-label="Close Notification Settings"
+              aria-label={t('rem.closeAria')}
             >
               <X className="w-5 h-5" />
             </button>
@@ -361,8 +360,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           <div className="p-3 rounded-xl bg-bg-secondary border border-border flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-text-muted shrink-0 mt-0.5" />
             <p className="text-2xs text-text-secondary leading-relaxed">
-              Push notifications are not supported in this browser or app view. Your preferences are
-              still saved and will apply on a supported device.
+              {t('rem.unsupported')}
             </p>
           </div>
         )}
@@ -378,8 +376,8 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <div className="flex items-center gap-2 min-w-0">
               <BellRing className="w-4 h-4 text-amber-400 shrink-0" />
               <div className="text-2xs text-amber-200 leading-relaxed">
-                <span className="font-bold block">Permission needed</span>
-                <span>Allow notifications so reminders can reach this device.</span>
+                <span className="font-bold block">{t('rem.permNeeded')}</span>
+                <span>{t('rem.permNeededBody')}</span>
               </div>
             </div>
             <button
@@ -387,7 +385,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
               onClick={handleEnablePermission}
               className="btn-primary shrink-0 text-2xs px-3 py-1.5 font-bold cursor-pointer"
             >
-              Enable
+              {t('rem.enable')}
             </button>
           </div>
         )}
@@ -396,8 +394,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <p className="text-2xs text-emerald-200 leading-relaxed">
               {isNative
-                ? 'Notifications are allowed on this device and reminders are scheduled on-device.'
-                : `Notifications are allowed on this device${hasSubscription ? ' and this device is subscribed for push reminders.' : '.'}`}
+                ? t('rem.grantedNative')
+                : hasSubscription
+                  ? t('rem.grantedWebSub')
+                  : `${t('rem.grantedWeb')}.`}
             </p>
           </div>
         )}
@@ -406,7 +406,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           {/* ── TRAINING ─────────────────────────────────────────── */}
           <div className="space-y-2">
             <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-              Training
+              {t('rem.training')}
             </span>
 
             <Card variant="default" padding="sm" className="space-y-2.5">
@@ -416,11 +416,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <Dumbbell className="w-4 h-4 text-accent" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Workout Reminders</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.workout')}</span>
                     <span className="text-2xs text-text-muted block">
                       {prefs.workoutReminders.enabled
-                        ? `${formatTimeLabel(prefs.workoutReminders.preferredTime)} on training days`
-                        : 'A nudge before your planned sessions'}
+                        ? t('rem.workoutOn', { time: formatTimeLabel(prefs.workoutReminders.preferredTime) })
+                        : t('rem.workoutOff')}
                     </span>
                   </div>
                 </div>
@@ -433,14 +433,14 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       workoutReminders: { ...prefs.workoutReminders, enabled: on },
                     })
                   }
-                  label="Workout reminders"
+                  label={t('rem.toggleWorkout')}
                 />
               </div>
 
               {prefs.workoutReminders.enabled && (
                 <div className="pt-2 border-t border-border/60 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-2xs text-text-muted">Reminder time</span>
+                    <span className="text-2xs text-text-muted">{t('rem.reminderTime')}</span>
                     <input
                       type="time"
                       value={prefs.workoutReminders.preferredTime}
@@ -455,10 +455,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                   </div>
                   <div>
                     <span className="block text-3xs font-mono uppercase text-text-muted mb-1.5">
-                      Training Days
+                      {t('rem.trainingDays')}
                     </span>
                     <div className="flex gap-1">
-                      {DAYS_OF_WEEK.map((item) => {
+                      {DAYS_OF_WEEK.map((item, dayIdx) => {
                         const isSelected = prefs.workoutReminders.daysOfWeek.includes(item.day);
                         return (
                           <button
@@ -471,7 +471,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                                 : 'bg-bg-secondary text-text-muted border border-border'
                             }`}
                           >
-                            {item.label}
+                            {weekdayNames(language, 'short')[dayIdx]}
                           </button>
                         );
                       })}
@@ -488,11 +488,14 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <Calendar className="w-4 h-4 text-purple-400" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Weekly Report</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.weeklyReport')}</span>
                     <span className="text-2xs text-text-muted block">
                       {prefs.weeklyReport.enabled
-                        ? `${prefs.weeklyReport.reportDay[0].toUpperCase() + prefs.weeklyReport.reportDay.slice(1)} at ${formatTimeLabel(prefs.weeklyReport.reportTime)}`
-                        : 'Your training week, recapped'}
+                        ? t('rem.weeklyOn', {
+                            day: weekdayNames(language, 'full')[(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).indexOf(prefs.weeklyReport.reportDay)],
+                            time: formatTimeLabel(prefs.weeklyReport.reportTime),
+                          })
+                        : t('rem.weeklyOff')}
                     </span>
                   </div>
                 </div>
@@ -505,7 +508,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       weeklyReport: { ...prefs.weeklyReport, enabled: on },
                     })
                   }
-                  label="Weekly report"
+                  label={t('rem.toggleWeekly')}
                   accentClass="bg-purple-500"
                 />
               </div>
@@ -526,7 +529,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                             : 'bg-bg-secondary text-text-muted border border-border'
                         }`}
                       >
-                        {day}
+                        {weekdayNames(language, 'full')[(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).indexOf(day)]}
                       </button>
                     ))}
                   </div>
@@ -546,7 +549,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           {/* ── NUTRITION ────────────────────────────────────────── */}
           <div className="space-y-2">
             <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-              Nutrition
+              {t('rem.nutrition')}
             </span>
 
             <Card variant="default" padding="sm" className="space-y-2.5">
@@ -556,11 +559,15 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <Utensils className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Meal Reminders</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.meals')}</span>
                     <span className="text-2xs text-text-muted block">
                       {prefs.mealReminders.enabled
-                        ? `Breakfast ${formatTimeLabel(prefs.mealReminders.breakfastTime)} · Lunch ${formatTimeLabel(prefs.mealReminders.lunchTime)} · Dinner ${formatTimeLabel(prefs.mealReminders.dinnerTime)}`
-                        : 'Gentle prompts at your meal times'}
+                        ? t('rem.mealsOn', {
+                            breakfast: formatTimeLabel(prefs.mealReminders.breakfastTime),
+                            lunch: formatTimeLabel(prefs.mealReminders.lunchTime),
+                            dinner: formatTimeLabel(prefs.mealReminders.dinnerTime),
+                          })
+                        : t('rem.mealsOff')}
                     </span>
                   </div>
                 </div>
@@ -573,7 +580,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       mealReminders: { ...prefs.mealReminders, enabled: on },
                     })
                   }
-                  label="Meal reminders"
+                  label={t('rem.toggleMeals')}
                   accentClass="bg-emerald-500"
                 />
               </div>
@@ -582,9 +589,9 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                 <div className="pt-2 border-t border-border/60 grid grid-cols-3 gap-2">
                   {(
                     [
-                      { key: 'breakfastTime', label: 'Breakfast' },
-                      { key: 'lunchTime', label: 'Lunch' },
-                      { key: 'dinnerTime', label: 'Dinner' },
+                      { key: 'breakfastTime', label: t('meals.breakfast') },
+                      { key: 'lunchTime', label: t('meals.lunch') },
+                      { key: 'dinnerTime', label: t('meals.dinner') },
                     ] as const
                   ).map(({ key, label }) => (
                     <div key={key}>
@@ -612,7 +619,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           {/* ── HABITS ───────────────────────────────────────────── */}
           <div className="space-y-2">
             <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-              Habits
+              {t('rem.habits')}
             </span>
 
             <Card variant="default" padding="sm" className="space-y-2.5">
@@ -622,11 +629,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <Droplets className="w-4 h-4 text-blue-400" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Water Reminders</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.water')}</span>
                     <span className="text-2xs text-text-muted block">
                       {prefs.waterReminders.enabled
-                        ? `Every ${prefs.waterReminders.intervalHours} ${prefs.waterReminders.intervalHours === 1 ? 'hour' : 'hours'}`
-                        : 'Stay on top of hydration'}
+                        ? t(prefs.waterReminders.intervalHours === 1 ? 'rem.waterOnOne' : 'rem.waterOn', { hours: prefs.waterReminders.intervalHours })
+                        : t('rem.waterOff')}
                     </span>
                   </div>
                 </div>
@@ -639,14 +646,14 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                       waterReminders: { ...prefs.waterReminders, enabled: on },
                     })
                   }
-                  label="Water reminders"
+                  label={t('rem.toggleWater')}
                   accentClass="bg-blue-500"
                 />
               </div>
 
               {prefs.waterReminders.enabled && (
                 <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-                  <span className="text-2xs text-text-muted">Reminder interval</span>
+                  <span className="text-2xs text-text-muted">{t('rem.interval')}</span>
                   <div className="flex gap-1.5">
                     {[1, 2, 3].map((hours) => (
                       <button
@@ -664,7 +671,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                             : 'bg-bg-secondary text-text-muted border border-border'
                         }`}
                       >
-                        Every {hours} {hours === 1 ? 'hour' : 'hours'}
+                        {t(hours === 1 ? 'rem.everyHour' : 'rem.everyHours', { hours })}
                       </button>
                     ))}
                   </div>
@@ -676,7 +683,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           {/* ── QUIET HOURS & PRIVACY ────────────────────────────── */}
           <div className="space-y-2">
             <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-              Do Not Disturb &amp; Privacy
+              {t('rem.dndPrivacy')}
             </span>
 
             <Card variant="default" padding="sm" className="space-y-2.5">
@@ -691,11 +698,11 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <Moon className="w-4 h-4 text-indigo-400" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Quiet Hours</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.quiet')}</span>
                     <span className="text-2xs text-text-muted block">
                       {prefs.quietHours.enabled
-                        ? `${formatTimeLabel(prefs.quietHours.start)} – ${formatTimeLabel(prefs.quietHours.end)} · tap to edit`
-                        : 'Off — reminders can arrive any time'}
+                        ? t('rem.quietOn', { start: formatTimeLabel(prefs.quietHours.start), end: formatTimeLabel(prefs.quietHours.end) })
+                        : t('rem.quietOff')}
                     </span>
                   </div>
                 </button>
@@ -704,7 +711,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                   onChange={(on) =>
                     persist({ ...prefs, quietHours: { ...prefs.quietHours, enabled: on } })
                   }
-                  label="Quiet hours"
+                  label={t('rem.toggleQuiet')}
                   accentClass="bg-indigo-500"
                 />
               </div>
@@ -712,10 +719,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
               {quietHoursExpanded && prefs.quietHours.enabled && (
                 <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
                   <label className="flex items-center gap-2 text-2xs text-text-muted">
-                    From
+                    {t('rem.from')}
                     <input
                       type="time"
-                      aria-label="Quiet hours start"
+                      aria-label={t('rem.quietStartAria')}
                       value={prefs.quietHours.start}
                       onChange={(e) =>
                         persist({ ...prefs, quietHours: { ...prefs.quietHours, start: e.target.value } })
@@ -724,10 +731,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     />
                   </label>
                   <label className="flex items-center gap-2 text-2xs text-text-muted">
-                    Until
+                    {t('rem.until')}
                     <input
                       type="time"
-                      aria-label="Quiet hours end"
+                      aria-label={t('rem.quietEndAria')}
                       value={prefs.quietHours.end}
                       onChange={(e) =>
                         persist({ ...prefs, quietHours: { ...prefs.quietHours, end: e.target.value } })
@@ -744,16 +751,16 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     <ShieldCheck className="w-4 h-4 text-emerald-400" />
                   </div>
                   <div className="min-w-0">
-                    <span className="text-xs font-bold text-text-primary block">Lock Screen Privacy</span>
+                    <span className="text-xs font-bold text-text-primary block">{t('rem.lockPrivacy')}</span>
                     <span className="text-2xs text-text-muted block">
-                      Hide bodyweight and sensitive metrics in notifications
+                      {t('rem.lockPrivacyBody')}
                     </span>
                   </div>
                 </div>
                 <Toggle
                   checked={prefs.lockScreenPrivacy}
                   onChange={(on) => persist({ ...prefs, lockScreenPrivacy: on })}
-                  label="Lock screen privacy"
+                  label={t('rem.toggleLock')}
                   accentClass="bg-emerald-500"
                 />
               </div>
@@ -769,10 +776,10 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           className="w-full py-3 rounded-xl border border-border bg-bg-card text-text-primary text-xs font-bold flex items-center justify-center gap-2 hover:border-accent/50 transition-colors cursor-pointer disabled:opacity-50"
         >
           <Send className="w-4 h-4 text-accent" />
-          <span>{isSendingTest ? 'Sending…' : 'Send Test Notification'}</span>
+          <span>{isSendingTest ? t('rem.sending') : t('rem.sendTest')}</span>
         </button>
         <p className="text-3xs text-text-muted text-center font-mono">
-          Changes save automatically on this device and sync to your account.
+          {t('rem.footer')}
         </p>
       </div>
     </div>
