@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { calculatePlates, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { X, Dumbbell, Minus, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
 
@@ -23,6 +24,8 @@ export default function PlateCalculatorModal({
   bestSetWeight,
   milestoneWeight,
 }: PlateCalculatorModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [unit, setUnit] = useState<'kg' | 'lbs'>(initialUnit);
   const [barWeight, setBarWeight] = useState<number>(initialUnit === 'kg' ? 20 : 45);
   const [targetWeight, setTargetWeight] = useState<number>(initialWeight || 100);
@@ -74,7 +77,7 @@ export default function PlateCalculatorModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content p-5 space-y-4 max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
@@ -96,7 +99,7 @@ export default function PlateCalculatorModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

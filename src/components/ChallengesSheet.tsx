@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Trophy } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
@@ -13,7 +14,6 @@ import {
 } from '@/lib/challenges';
 import { XP_CHALLENGE_COMPLETE } from '@/lib/xp-system';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { useToast } from '@/components/ui/Toast';
 import FriendChallengesSection from '@/components/FriendChallengesSection';
 
@@ -50,7 +50,8 @@ function formatDate(dateStr: string): string {
  * the user already logs. No badges, no reminders, no pressure copy.
  */
 export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const {
     workouts,
@@ -112,7 +113,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
+      <div ref={modalRef} {...dialogProps}
         className="modal-content max-w-md w-full p-5 space-y-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

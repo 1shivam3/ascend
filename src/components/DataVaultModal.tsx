@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { parseWorkoutCSV } from '@/lib/workout-import';
@@ -25,6 +26,8 @@ interface DataVaultModalProps {
 }
 
 export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -224,7 +227,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content p-5 space-y-4 max-w-md w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}

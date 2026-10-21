@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
 import {
@@ -201,7 +202,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const [isMeetModalOpen, setIsMeetModalOpen] = useState(false);
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
   const [isDotsInfoOpen, setIsDotsInfoOpen] = useState(false);
+  const dotsInfoRef = useRef<HTMLDivElement>(null); const { dialogProps: dotsInfoDialogProps } = useModalA11y(dotsInfoRef, isDotsInfoOpen, () => setIsDotsInfoOpen(false));
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null); const { dialogProps: toolsMenuDialogProps } = useModalA11y(toolsMenuRef, isToolsMenuOpen, () => setIsToolsMenuOpen(false));
 
   useEffect(() => {
     if (initialTab === 'bodyweight' || initialTab === 'body') {
@@ -1573,7 +1576,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
       {/* Tools Drawer */}
       {isToolsMenuOpen && (
-        <div
+        <div ref={toolsMenuRef} {...toolsMenuDialogProps}
           className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
           onClick={() => setIsToolsMenuOpen(false)}
         >
@@ -1724,7 +1727,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
       {/* DOTS Modal */}
       {isDotsInfoOpen && (
-        <div className="modal-overlay" onClick={() => setIsDotsInfoOpen(false)}>
+        <div ref={dotsInfoRef} {...dotsInfoDialogProps} className="modal-overlay" onClick={() => setIsDotsInfoOpen(false)}>
           <div
             className="modal-content max-w-md w-full p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}

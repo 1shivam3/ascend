@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { TrainingDecisionRecord, Unit, validatePolicyDecisionApplication } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import {
@@ -55,6 +56,7 @@ export default function PolicyDecisionCard({
 
   const [isOverriding, setIsOverriding] = useState(false);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
+  const applyModalRef = useRef<HTMLDivElement>(null); const { dialogProps: applyDialogProps } = useModalA11y(applyModalRef, isApplyModalOpen, () => setIsApplyModalOpen(false));
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [selectedExerciseIndex, setSelectedExerciseIndex] = useState<number>(0);
   const [customWeight, setCustomWeight] = useState<number>(
@@ -709,7 +711,7 @@ export default function PolicyDecisionCard({
 
       {/* ── Modal: Apply Recommendation to Future Workout ── */}
       {isApplyModalOpen && (
-        <div
+        <div ref={applyModalRef} {...applyDialogProps}
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in"
           role="dialog"
           aria-modal="true"

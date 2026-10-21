@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   parseHinglishWorkoutVoice,
   createSpeechRecognizer,
@@ -40,6 +41,8 @@ export default function VoiceWorkoutLoggerModal({
   defaultUnit = 'kg',
   onApplySet,
 }: VoiceWorkoutLoggerModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
 
   const [isListening, setIsListening] = useState(false);
@@ -301,7 +304,7 @@ export default function VoiceWorkoutLoggerModal({
   const weightStep = defaultUnit === 'lbs' ? 5 : 2.5;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-sm w-full p-4 sm:p-5 space-y-3.5 text-center select-none"
         onClick={(e) => e.stopPropagation()}
@@ -341,7 +344,7 @@ export default function VoiceWorkoutLoggerModal({
               type="button"
               onClick={onClose}
               className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-            >
+             aria-label="Close">
               <X className="w-4 h-4" />
             </button>
           </div>

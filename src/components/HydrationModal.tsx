@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Droplet,
@@ -22,7 +23,6 @@ import {
   formatWaterLiters,
   getDayType,
 } from '@/lib/habits';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface HydrationModalProps {
   isOpen: boolean;
@@ -30,7 +30,8 @@ interface HydrationModalProps {
 }
 
 export default function HydrationModal({ isOpen, onClose }: HydrationModalProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
   const todayStr = useToday();
@@ -117,7 +118,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -139,7 +140,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

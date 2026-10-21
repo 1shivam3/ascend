@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -27,7 +28,6 @@ import {
   sendTestLocalNotification,
   syncLocalNotifications,
 } from '@/lib/local-notifications';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 
 interface ReminderCenterModalProps {
@@ -88,7 +88,8 @@ function Toggle({
 }
 
 export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterModalProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const notificationPreferences = useStore((state) => state.notificationPreferences) || DEFAULT_NOTIFICATION_PREFERENCES;
   const setNotificationPreferences = useStore((state) => state.setNotificationPreferences);
@@ -319,7 +320,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
   const sectionDim = prefs.enabled ? '' : 'opacity-50 pointer-events-none';
 
   return (
-    <div className="modal-overlay z-55" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay z-55" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full max-h-[90vh] overflow-y-auto p-4 sm:p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}

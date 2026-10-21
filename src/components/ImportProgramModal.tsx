@@ -1,6 +1,7 @@
 "use client";
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { DecodedProgram, findDuplicateProgram } from '@/lib/program-sharing';
 import { useStore } from '@/lib/store';
 import { PlannedWorkout } from '@/lib/types';
@@ -20,6 +21,8 @@ export default function ImportProgramModal({
   onClose,
   onStartWorkout,
 }: ImportProgramModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
   const toast = useToast();
 
@@ -67,7 +70,7 @@ export default function ImportProgramModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -89,7 +92,7 @@ export default function ImportProgramModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

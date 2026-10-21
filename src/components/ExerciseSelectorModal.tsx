@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Search, Dumbbell, Plus, Check } from 'lucide-react';
 import {
   EXERCISE_LIBRARY,
@@ -27,6 +28,8 @@ export default function ExerciseSelectorModal({
   defaultMuscle = 'All',
   title = 'Add Exercise',
 }: ExerciseSelectorModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | 'All'>(defaultMuscle);
   const [customMuscle, setCustomMuscle] = useState<MuscleGroup | null>(null);
@@ -74,7 +77,7 @@ export default function ExerciseSelectorModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full max-h-[85vh] flex flex-col p-0 overflow-hidden animate-scale-in"
         onClick={(e) => e.stopPropagation()}
@@ -94,7 +97,7 @@ export default function ExerciseSelectorModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>

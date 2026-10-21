@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   Search,
   X,
@@ -89,6 +90,8 @@ export default function ExerciseLibraryModal({
   prs,
   userUnit = 'kg',
 }: ExerciseLibraryModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
   const [selectedMuscle, setSelectedMuscle] = useState<string>('all');
@@ -144,7 +147,7 @@ export default function ExerciseLibraryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-lg w-full max-h-[85vh] flex flex-col p-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -164,7 +167,7 @@ export default function ExerciseLibraryModal({
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

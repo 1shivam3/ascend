@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Calendar,
@@ -43,6 +44,8 @@ export default function WeeklyScheduleModal({
   plannedWorkouts,
   initialDay,
 }: WeeklyScheduleModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const currentWeeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
@@ -171,7 +174,7 @@ export default function WeeklyScheduleModal({
   ).length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+    <div ref={modalRef} {...dialogProps} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
       <div
         className="w-full max-w-xl max-h-[90vh] bg-bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
@@ -195,7 +198,7 @@ export default function WeeklyScheduleModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </header>
