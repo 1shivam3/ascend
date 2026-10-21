@@ -301,3 +301,85 @@ describe('QA4-025 body metrics validation surfaces errors (no silent drops)', ()
     expect(r.errors.waist).toBeTruthy();
   });
 });
+
+/* ── QA4-027: barcode check digits + per-100g macro validation ────────── */
+import {
+  hasValidGtinCheckDigit,
+  isValidManualBarcode,
+  validatePer100gMacros,
+} from '../src/lib/barcode-scanner';
+
+describe('QA4-027 GTIN check-digit validation', () => {
+  it('accepts known-valid EAN-13 / UPC-A / EAN-8 codes', () => {
+    expect(hasValidGtinCheckDigit('8901491101905')).toBe(true);
+    expect(hasValidGtinCheckDigit('3017620422003')).toBe(true);
+    expect(hasValidGtinCheckDigit('036000291452')).toBe(true); // UPC-A
+    expect(hasValidGtinCheckDigit('96385074')).toBe(true); // EAN-8
+  });
+
+  it('rejects a corrupted check digit', () => {
+    expect(hasValidGtinCheckDigit('8901491101907')).toBe(false);
+    expect(hasValidGtinCheckDigit('036000291453')).toBe(false);
+    expect(hasValidGtinCheckDigit('96385075')).toBe(false);
+  });
+
+  it('rejects non-standard lengths and non-digits', () => {
+    expect(hasValidGtinCheckDigit('12345')).toBe(false);
+    expect(hasValidGtinCheckDigit('abcdefghijklm')).toBe(false);
+    expect(hasValidGtinCheckDigit('')).toBe(false);
+  });
+
+  it('manual entry validation: valid passes, typo fails with no lookup', () => {
+    expect(isValidManualBarcode('8901491101905')).toBe(true);
+    expect(isValidManualBarcode('8901491101907')).toBe(false);
+    expect(isValidManualBarcode('123')).toBe(false);
+    expect(isValidManualBarcode('8901abc901905')).toBe(false);
+  });
+
+  it('the modal routes manual entry through the validator', () => {
+    const modal = readSrc('src/components/BarcodeScannerModal.tsx');
+    expect(modal).toContain('handleManualBarcodeSubmit');
+    expect(modal).toContain('isValidManualBarcode(manualBarcode)');
+    expect(modal).toContain('validatePer100gMacros');
+  });
+});
+
+describe('QA4-027 per-100g macro range validation', () => {
+  const ok = { calories: 500, proteinG: 25, carbsG: 50, fatG: 20 };
+
+  it('accepts sane per-100g values', () => {
+    expect(validatePer100gMacros(ok)).toBeNull();
+    expect(validatePer100gMacros({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })).toBeNull();
+  });
+
+  it('rejects 500 g protein per 100 g', () => {
+    expect(validatePer100gMacros({ ...ok, proteinG: 500 })).toMatch(/Protein/);
+  });
+
+  it('rejects negative, NaN and over-cap calories', () => {
+    expect(validatePer100gMacros({ ...ok, fatG: -1 })).toMatch(/Fat/);
+    expect(validatePer100gMacros({ ...ok, carbsG: NaN })).toMatch(/Carbs/);
+    expect(validatePer100gMacros({ ...ok, calories: 5000 })).toMatch(/Calories/);
+  });
+
+  it('rejects macros summing past 100 g per 100 g', () => {
+    expect(
+      validatePer100gMacros({ calories: 700, proteinG: 60, carbsG: 50, fatG: 10 })
+    ).toMatch(/more than 100 g/);
+  });
+});
+
+/* ── LOOP-3: Escape takes the cleanup path, not the raw onClose ───────── */
+describe('LOOP-3 Escape invokes cleanup wrappers', () => {
+  it('BarcodeScannerModal: Escape stops the camera via handleClose', () => {
+    const modal = readSrc('src/components/BarcodeScannerModal.tsx');
+    expect(modal).toContain('useEscapeToClose(isOpen, handleClose)');
+    expect(modal).not.toContain('useEscapeToClose(isOpen, onClose)');
+  });
+
+  it('FeedbackModal: Escape resets the form via handleResetAndClose', () => {
+    const modal = readSrc('src/components/FeedbackModal.tsx');
+    expect(modal).toContain('useEscapeToClose(isOpen, handleResetAndClose)');
+    expect(modal).not.toContain('useEscapeToClose(isOpen, onClose)');
+  });
+});

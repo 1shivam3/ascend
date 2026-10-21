@@ -20,12 +20,13 @@ import {
 import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
-import { selectScannerEngine, NATIVE_BARCODE_FORMATS } from '@/lib/barcode-scanner';
+import { selectScannerEngine, NATIVE_BARCODE_FORMATS, isValidManualBarcode, validatePer100gMacros } from '@/lib/barcode-scanner';
 import { saveCustomBarcode } from '@/lib/storage';
 import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { Capacitor } from '@capacitor/core';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 
@@ -146,6 +147,7 @@ export default function BarcodeScannerModal({
     setCameraError(null);
     setShowSuggestions(false);
 
+
     try {
       const product = await fetchProductByBarcode(clean);
       setIsLoadingProduct(false);
@@ -202,6 +204,19 @@ export default function BarcodeScannerModal({
     }
   }, [playScanFeedback, stopCamera]);
 
+  // QA4-027: manual entry goes through check-digit validation first —
+  // a typo'd code gets a clear "invalid barcode" message here instead
+  // of a wasted database lookup that ends in a bare "not found".
+  const handleManualBarcodeSubmit = () => {
+    if (!isValidManualBarcode(manualBarcode)) {
+      toast.error(
+        'That barcode looks invalid — check the digits under the bars and try again.',
+        'Invalid Barcode'
+      );
+      return;
+    }
+    handleBarcodeFound(manualBarcode);
+  };
 
   // Toggle the camera flashlight (only when the track reports torch support)
   const toggleTorch = useCallback(async () => {
@@ -430,6 +445,19 @@ export default function BarcodeScannerModal({
         );
         return;
       }
+      // QA4-027: per-100g values were parseFloat(...) || 0 with no range
+      // check — 500 g protein per 100 g persisted happily. Validate
+      // BEFORE the food is added or the barcode is remembered.
+      const macroError = validatePer100gMacros({
+        calories: calPer100,
+        proteinG: proPer100,
+        carbsG: carbPer100,
+        fatG: fatPer100,
+      });
+      if (macroError) {
+        toast.error(macroError, 'Check Nutrition Values');
+        return;
+      }
     }
 
     onAddFood(currentFoodItem);
@@ -513,6 +541,11 @@ export default function BarcodeScannerModal({
     stopCamera();
     onClose();
   }, [stopCamera, onClose]);
+
+  // LOOP-3: Escape must take the same cleanup path as the X button —
+  // handleClose stops the camera; the plain onClose prop does not (the
+  // camera previously stopped only via the isOpen effect afterwards).
+  useEscapeToClose(isOpen, handleClose);
 
   const handleScanAgain = useCallback(() => {
     stopCamera();
@@ -674,13 +707,13 @@ export default function BarcodeScannerModal({
                       value={manualBarcode}
                       onChange={(e) => setManualBarcode(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleBarcodeFound(manualBarcode);
+                        if (e.key === 'Enter') handleManualBarcodeSubmit();
                       }}
                       className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-text-primary text-xs font-mono outline-none focus:border-accent"
                     />
                     <button
                       type="button"
-                      onClick={() => handleBarcodeFound(manualBarcode)}
+                      onClick={handleManualBarcodeSubmit}
                       disabled={!manualBarcode.trim()}
                       className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
                     >
