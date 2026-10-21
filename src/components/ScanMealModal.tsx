@@ -10,6 +10,7 @@ import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import ReportAIModal from '@/components/ReportAIModal';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useAppNavigation } from '@/lib/navigation';
 import {
@@ -32,6 +33,7 @@ import {
   Send,
   Zap,
   Check,
+  Flag,
 } from 'lucide-react';
 
 interface ScanMealModalProps {
@@ -74,6 +76,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   // Result state
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null);
+  const [showReportAI, setShowReportAI] = useState(false);
   // Per-item ghee/oil answers in the review step (index → level). Photo AI
   // can't see absorbed ghee — this is the honesty correction, one tap.
   const [oilLevels, setOilLevels] = useState<Record<number, OilLevelId>>({});
@@ -1069,6 +1072,17 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         <li>You can also type a note in &quot;Describe or Note&quot; before scanning to guide the AI.</li>
                       </ul>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowReportAI(true)}
+                      aria-label="Report AI content"
+                      title="Report AI content"
+                      data-testid="report-ai-scan-meal-empty"
+                      className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-danger transition-colors"
+                    >
+                      <Flag className="w-3 h-3" />
+                      <span>Report this AI result</span>
+                    </button>
                   </div>
 
                   {/* Manual entry fallback */}
@@ -1158,9 +1172,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <div className="card p-4 bg-bg-card border border-border space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="section-title text-[11px] mb-0">MEAL ESTIMATE</span>
-                      <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
-                        Estimated
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
+                          Estimated
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowReportAI(true)}
+                          aria-label="Report AI content"
+                          title="Report AI content"
+                          data-testid="report-ai-scan-meal"
+                          className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                        >
+                          <Flag className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="flex items-baseline gap-2 pt-0.5">
@@ -1556,6 +1582,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           );
         })()}
       </div>
+      {analysis && (
+        <ReportAIModal
+          isOpen={showReportAI}
+          onClose={() => setShowReportAI(false)}
+          sourceFeature="Meal Scan (Macro Lens)"
+          aiContentSnippet={[
+            analysis.mealName,
+            analysis.items.map((i) => i.name).join(', '),
+            analysis.coachingNote || '',
+            `~${analysis.totalCalories} kcal, ${analysis.totalProtein}g protein`,
+          ]
+            .filter(Boolean)
+            .join(' — ')}
+        />
+      )}
     </div>
   );
 }

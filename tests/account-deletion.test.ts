@@ -137,22 +137,32 @@ function resetMocks() {
   mockSupabase.from.mockImplementation((tableName: string) => {
     if (tableName === 'consumed_deletion_nonces') {
       return {
-        select: vi.fn((_cols: string) => ({
-          eq: vi.fn((col: string, val: string) => ({
+        // Chained-eq builder mirroring real PostgREST: the route's
+        // recovery lookup chains .eq('email', …).eq('status', 'partial'),
+        // so eq() must return a builder that supports further eq() calls
+        // as well as maybeSingle().
+        select: vi.fn((_cols: string) => {
+          const filters: Record<string, string> = {};
+          const builder: any = {
+            eq: vi.fn((col: string, val: string) => {
+              filters[col] = val;
+              return builder;
+            }),
             maybeSingle: vi.fn().mockImplementation(async () => {
-              if (col === 'jti') {
-                const record = mockDurableNonces.get(val);
+              if (filters.jti) {
+                const record = mockDurableNonces.get(filters.jti);
                 return { data: record || null, error: null };
               }
-              if (col === 'email') {
-                for (const row of mockDurableNonces.values()) {
-                  if (row.email === val) return { data: row, error: null };
-                }
+              for (const row of mockDurableNonces.values()) {
+                if (filters.email && row.email !== filters.email) continue;
+                if (filters.status && row.status !== filters.status) continue;
+                if (filters.email || filters.status) return { data: row, error: null };
               }
               return { data: null, error: null };
             }),
-          })),
-        })),
+          };
+          return builder;
+        }),
         upsert: vi.fn().mockImplementation(async (record: any) => {
           mockDurableNonces.set(record.jti, record);
           return { error: null };

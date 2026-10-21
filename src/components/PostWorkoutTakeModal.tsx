@@ -7,6 +7,7 @@ import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/li
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration } from '@/lib/formatters';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import ReportAIModal from '@/components/ReportAIModal';
 import {
   Trophy,
   X,
@@ -17,7 +18,8 @@ import {
   Dumbbell,
   CheckCircle2,
   Zap,
-  Target
+  Target,
+  Flag
 } from 'lucide-react';
 
 interface PostWorkoutTakeModalProps {
@@ -41,6 +43,7 @@ export default function PostWorkoutTakeModal({
 }: PostWorkoutTakeModalProps) {
   const store = useStore();
   const [take, setTake] = useState<AIPostWorkoutTake | null>(null);
+  const [showReportAI, setShowReportAI] = useState(false);
   const [loading, setLoading] = useState(true);
   // The engine's reason for the next-session target — shown only on demand.
   const [targetRationale, setTargetRationale] = useState<string | null>(null);
@@ -290,15 +293,27 @@ export default function PostWorkoutTakeModal({
               <span className="font-bold uppercase tracking-wider text-accent flex items-center gap-1">
                 <Sparkles className="w-3.5 h-3.5" /> Coach&apos;s Take
               </span>
-              {take.source === 'gemini' ? (
-                <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                  Autoregulated Coach
-                </span>
-              ) : (
-                <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
-                  Local Coach
-                </span>
-              )}
+              <div className="flex items-center gap-1.5">
+                {take.source === 'gemini' ? (
+                  <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                    Autoregulated Coach
+                  </span>
+                ) : (
+                  <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
+                    Local Coach
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowReportAI(true)}
+                  aria-label="Report AI content"
+                  title="Report AI content"
+                  data-testid="report-ai-coach-take"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                >
+                  <Flag className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <p className="text-sm font-black text-text-primary leading-snug">
@@ -327,6 +342,17 @@ export default function PostWorkoutTakeModal({
           </div>
         ) : null}
         </div>
+
+        {take && (
+          <ReportAIModal
+            isOpen={showReportAI}
+            onClose={() => setShowReportAI(false)}
+            sourceFeature="AI Coach — Post-Workout Take"
+            aiContentSnippet={[take.headline, take.volumeVsLastWeek, take.nextSessionTarget]
+              .filter(Boolean)
+              .join(' — ')}
+          />
+        )}
 
         {/* Sticky Pinned Footer with Done CTA */}
         <div className="p-4 pt-3 border-t border-border shrink-0 bg-bg-card z-10">
