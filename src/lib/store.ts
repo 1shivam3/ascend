@@ -48,6 +48,7 @@ import {
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { purgeLocalAppData } from './storage';
+import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
@@ -2870,7 +2871,20 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'ascend_store',
-      storage: createJSONStorage(() => localStorage),
+      // QA4-010: persist writes pass through the cross-tab guard — a
+      // follower tab (ASCEND open elsewhere) must not overwrite the
+      // leader's blob. Reads/removals are unaffected; in a single tab
+      // (or outside the browser) the guard is leader/null and this is
+      // exactly the old behavior.
+      storage: createJSONStorage(() => ({
+        getItem: (name: string) => localStorage.getItem(name),
+        setItem: (name: string, value: string) => {
+          const guard = getTabLeaderGuard();
+          if (guard?.shouldSuppressWrites()) return;
+          localStorage.setItem(name, value);
+        },
+        removeItem: (name: string) => localStorage.removeItem(name),
+      })),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
@@ -3092,7 +3106,7 @@ export const useAppStore = create<AppState>()(
       // are never lost on rehydration. See migratePersistedState.
       version: PERSIST_VERSION,
       migrate: (persistedState: unknown, version: number) =>
-        migratePersistedState(persistedState, version) as AppState,
+        migratePersistedState(persistedState, version) as unknown as AppState,
     }
   )
 );
@@ -3153,6 +3167,8 @@ export function getSnapshotWriteFailed(): boolean {
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
   const unsubscribe = useAppStore.subscribe((state) => {
+    // QA4-010: a follower tab must not overwrite the leader's snapshot.
+    if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
       clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {

@@ -3584,15 +3584,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => {
-                  // QA4-014: snapshot + index before deleting so the
-                  // toast's Undo restores the meal exactly in place.
-                  const snapshot: MealEntry = { ...mealToDelete, foods: [...mealToDelete.foods] };
+                  // QA4-014: snapshot the full meal + its index before
+                  // deleting so the toast's Undo restores it exactly in
+                  // place (mealToDelete itself only carries id + name).
                   const mealIndex = meals.findIndex((m) => m.id === mealToDelete.id);
+                  const full = mealIndex >= 0 ? meals[mealIndex] : undefined;
+                  const snapshot: MealEntry | undefined = full
+                    ? { ...full, foods: [...full.foods] }
+                    : undefined;
                   deleteMeal(mealToDelete.id);
-                  toast.showToast('info', `Deleted ${mealToDelete.name}`, undefined, undefined, {
-                    label: 'Undo',
-                    onAction: () => insertMealAt(snapshot, mealIndex),
-                  });
+                  toast.showToast('info', `Deleted ${mealToDelete.name}`, undefined, undefined,
+                    snapshot
+                      ? { label: 'Undo', onAction: () => insertMealAt(snapshot, mealIndex) }
+                      : undefined,
+                  );
                   setMealToDelete(null);
                 }}
                 className="btn-danger flex-1 py-2.5 text-xs font-bold"

@@ -13,6 +13,7 @@ import OfflineState from '@/components/OfflineState';
 
 import HomePage from '@/components/HomePage';
 import TabSkeleton from '@/components/TabSkeleton';
+import TabGuardBanner from '@/components/ui/TabGuardBanner';
 
 // Non-home tabs are code-split: on a 2 GB phone the old single chunk
 // (~1.1 MB) paid the full parse cost for screens the user may never
@@ -289,6 +290,7 @@ export default function AppPage() {
   if (!profile) {
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
+        <TabGuardBanner />
         <OnboardingScreen />
       </main>
     );
@@ -296,6 +298,7 @@ export default function AppPage() {
 
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
+      <TabGuardBanner />
       {isOffline && (
         <aside
           role="status"

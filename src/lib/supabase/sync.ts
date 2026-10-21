@@ -1,5 +1,6 @@
 import { getSupabase } from './client';
 import { useStore, resolveAvatar } from '../store';
+import { getTabLeaderGuard } from '../tab-leader';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
 import { mergeRemotePlans, prunableTombstones } from './reconcile';
 
@@ -270,6 +271,10 @@ class SupabaseSyncEngine {
     useStore.subscribe((state, prevState) => {
       if (!this.initialized || this.isSyncing) return;
       if (!navigator.onLine) return;
+      // QA4-010: a follower tab never pushes — its in-memory state is
+      // not the source of truth and pushing it would clobber the
+      // leader's data server-side too.
+      if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
 
       if (hasSyncedContentChanged(prevState, state)) {
         this.scheduleDebouncedPush();
