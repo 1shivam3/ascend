@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { calculatePlates, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { X, Dumbbell, Minus, Plus, RotateCcw, AlertTriangle } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 interface PlateCalculatorModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export default function PlateCalculatorModal({
   const [unit, setUnit] = useState<'kg' | 'lbs'>(initialUnit);
   const [barWeight, setBarWeight] = useState<number>(initialUnit === 'kg' ? 20 : 45);
   const [targetWeight, setTargetWeight] = useState<number>(initialWeight || 100);
+  const { t } = useTranslation();
   const [showWarmupRamp, setShowWarmupRamp] = useState<boolean>(true);
 
   useEffect(() => {
@@ -55,13 +57,13 @@ export default function PlateCalculatorModal({
     const step = unit === 'kg' ? 2.5 : 5;
     const roundToStep = (wt: number) => Math.max(barWeight, Math.round(wt / step) * step);
     return [
-      { label: 'Set 1 (Empty Bar)', weight: barWeight, reps: '10 reps', pct: 'Warmup' },
-      { label: 'Set 2 (50%)', weight: roundToStep(targetWeight * 0.5), reps: '5 reps', pct: '50%' },
-      { label: 'Set 3 (70%)', weight: roundToStep(targetWeight * 0.7), reps: '3 reps', pct: '70%' },
-      { label: 'Set 4 (85%)', weight: roundToStep(targetWeight * 0.85), reps: '1-2 reps', pct: '85%' },
-      { label: 'Work Set (100%)', weight: targetWeight, reps: 'Work reps', pct: '100%' },
+      { label: t('plates.setEmpty'), weight: barWeight, reps: t('plates.reps10'), pct: t('plates.warmupPct') },
+      { label: t('plates.setPct', { n: 2, pct: 50 }), weight: roundToStep(targetWeight * 0.5), reps: t('plates.reps5'), pct: '50%' },
+      { label: t('plates.setPct', { n: 3, pct: 70 }), weight: roundToStep(targetWeight * 0.7), reps: t('plates.reps3'), pct: '70%' },
+      { label: t('plates.setPct', { n: 4, pct: 85 }), weight: roundToStep(targetWeight * 0.85), reps: t('plates.reps12'), pct: '85%' },
+      { label: t('plates.workSet'), weight: targetWeight, reps: t('plates.repsWork'), pct: '100%' },
     ];
-  }, [targetWeight, barWeight, unit]);
+  }, [targetWeight, barWeight, unit, t]);
 
   const calculation = useMemo(() => {
     return calculatePlates(targetWeight, barWeight, unit);
@@ -87,9 +89,9 @@ export default function PlateCalculatorModal({
             </div>
             <div>
               <h2 className="font-bold text-base text-text-primary leading-tight">
-                Plate Loading Calculator
+                {t('plates.title')}
               </h2>
-              <p className="text-2xs text-text-muted font-mono">IPF Olympic Barbell Spec</p>
+              <p className="text-2xs text-text-muted font-mono">{t('plates.subtitle')}</p>
             </div>
           </div>
           <button
@@ -120,7 +122,7 @@ export default function PlateCalculatorModal({
                       : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  <span className="text-[10px] text-text-muted">Best Working Set</span>
+                  <span className="text-[10px] text-text-muted">{t('plates.bestSet')}</span>
                   <span className="font-bold">{bestSetWeight} {unit}</span>
                 </button>
               )}
@@ -134,7 +136,7 @@ export default function PlateCalculatorModal({
                       : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  <span className="text-[10px] text-text-muted">Target / 1RM</span>
+                  <span className="text-[10px] text-text-muted">{t('plates.target1rm')}</span>
                   <span className="font-bold">{milestoneWeight} {unit}</span>
                 </button>
               )}
@@ -147,7 +149,7 @@ export default function PlateCalculatorModal({
           {/* Target Weight Input with Steppers */}
           <div className="space-y-1.5">
             <label className="text-2xs font-mono text-text-muted uppercase font-bold">
-              TARGET WEIGHT ({unit.toUpperCase()})
+              {t('plates.targetWeight')} ({unit.toUpperCase()})
             </label>
             <div className="flex items-center gap-2">
               <button
@@ -211,8 +213,8 @@ export default function PlateCalculatorModal({
           {/* Barbell Weight Selection */}
           <div className="p-2.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-text-muted font-bold text-2xs uppercase">Barbell Type:</span>
-              <span className="text-accent text-2xs font-bold">{barWeight} {unit} bar</span>
+              <span className="text-text-muted font-bold text-2xs uppercase">{t('plates.barbellType')}</span>
+              <span className="text-accent text-2xs font-bold">{t('plates.barUnit', { weight: barWeight, unit })}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {BARBELL_PRESETS.map((preset) => {
@@ -241,15 +243,15 @@ export default function PlateCalculatorModal({
         {/* Visual Barbell Graphic (Single Side Sleeve Stack) */}
         <div className="p-4 rounded-xl bg-bg-elevated border border-border/80 space-y-2">
           <div className="flex justify-between items-center text-2xs font-mono text-text-muted">
-            <span>PER SIDE: {calculation.weightPerSide} {unit}</span>
-            <span>TOTAL: {calculation.totalLoadedWeight} {unit}</span>
+            <span>{t('plates.perSide')} {calculation.weightPerSide} {unit}</span>
+            <span>{t('plates.total')} {calculation.totalLoadedWeight} {unit}</span>
           </div>
 
           <div className="h-28 flex items-center justify-start bg-bg-secondary/70 rounded-lg px-4 border border-border/40 relative overflow-x-auto">
             {/* Barbell Inner Shaft */}
             <div className="w-12 h-4 bg-zinc-600 rounded-l flex-shrink-0 relative">
               <span className="absolute -top-4 left-1 text-[9px] font-mono text-text-muted">
-                Bar
+                {t('plates.bar')}
               </span>
             </div>
 
@@ -283,7 +285,7 @@ export default function PlateCalculatorModal({
                 )
               ) : (
                 <span className="text-2xs font-mono text-text-muted pl-4 italic z-10">
-                  Empty Bar ({barWeight} {unit})
+                  {t('plates.emptyBar', { weight: barWeight, unit })}
                 </span>
               )}
             </div>
@@ -292,7 +294,7 @@ export default function PlateCalculatorModal({
           {calculation.remainder > 0 && (
             <p className="text-2xs font-mono text-amber-500 text-center flex items-center justify-center gap-1">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-              <span>{calculation.remainder} {unit} cannot be loaded with available standard plates.</span>
+              <span>{t('plates.remainder', { amount: calculation.remainder, unit })}</span>
             </p>
           )}
         </div>
@@ -300,7 +302,7 @@ export default function PlateCalculatorModal({
         {/* Detailed Plates List Table */}
         <div className="space-y-1.5">
           <span className="text-2xs font-mono uppercase text-text-muted font-bold block">
-            PLATES BREAKDOWN (EACH SIDE)
+            {t('plates.breakdown')}
           </span>
 
           {calculation.plates.length > 0 ? (
@@ -325,7 +327,7 @@ export default function PlateCalculatorModal({
             </div>
           ) : (
             <p className="text-xs text-text-muted text-center py-2 font-mono">
-              Load barbell above {barWeight} {unit} to see plate combinations.
+              {t('plates.loadAbove', { weight: barWeight, unit })}
             </p>
           )}
         </div>
@@ -335,14 +337,14 @@ export default function PlateCalculatorModal({
           <div className="space-y-1.5 border-t border-border/60 pt-3">
             <div className="flex items-center justify-between">
               <span className="text-2xs font-mono uppercase text-text-muted font-bold block">
-                WARM-UP RAMP GENERATOR
+                {t('plates.warmupTitle')}
               </span>
               <button
                 type="button"
                 onClick={() => setShowWarmupRamp(!showWarmupRamp)}
                 className="text-2xs font-mono text-accent hover:underline"
               >
-                {showWarmupRamp ? 'Hide' : 'Show Ramp'}
+                {showWarmupRamp ? t('plates.hide') : t('plates.showRamp')}
               </button>
             </div>
 
@@ -371,11 +373,11 @@ export default function PlateCalculatorModal({
                         onClick={() => setTargetWeight(ws.weight)}
                         className="px-2 py-0.5 rounded bg-bg-elevated border border-border text-2xs text-text-primary hover:border-accent hover:text-accent transition-colors"
                       >
-                        Load Plates
+                        {t('plates.loadPlates')}
                       </button>
                     ) : (
                       <span className="text-2xs text-accent font-semibold px-2 py-0.5">
-                        Current
+                        {t('plates.current')}
                       </span>
                     )}
                   </div>
@@ -390,7 +392,7 @@ export default function PlateCalculatorModal({
           onClick={onClose}
           className="btn-primary w-full text-center font-semibold text-sm"
         >
-          Done
+          {t('common.done')}
         </button>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { parseWorkoutCSV } from '@/lib/workout-import';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
+import { useTranslation } from '@/lib/i18n';
 import {
   X,
   Download,
@@ -40,6 +41,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const addWorkout = useStore((state) => state.addWorkout);
   const addPR = useStore((state) => state.addPR);
 
+  const { t } = useTranslation();
   const toast = useToast();
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -85,18 +87,18 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
       }
 
       toast.success(
-        `Exported ${prs.length} PRs, ${workouts.length} workouts & body logs.`,
-        'Backup Downloaded'
+        t('vault.exportedToast', { prs: prs.length, workouts: workouts.length }),
+        t('vault.backupDownloaded')
       );
       setMessage({
-        text: `Exported ${prs.length} PRs, ${workouts.length} workouts & metrics successfully!`,
+        text: t('vault.exportedMsg', { prs: prs.length, workouts: workouts.length }),
         type: 'success',
       });
       setTimeout(() => setMessage(null), 4000);
       return true;
     } catch {
-      toast.error('Failed to generate or download backup file.', 'Export Error');
-      setMessage({ text: 'Failed to export backup.', type: 'error' });
+      toast.error(t('vault.exportFailToast'), t('vault.exportError'));
+      setMessage({ text: t('vault.exportFailMsg'), type: 'error' });
       return false;
     }
   };
@@ -118,7 +120,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
 
     // Check file size (< 20MB)
     if (file.size > 20 * 1024 * 1024) {
-      toast.error('File size exceeds the 20MB limit for local backups.', 'File Too Large');
+      toast.error(t('vault.tooLargeMsg'), t('vault.tooLargeTitle'));
       if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
@@ -131,31 +133,22 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
 
         const success = importAllData(parsed);
         if (success) {
-          toast.success(
-            'All personal records, workouts & body metrics restored successfully!',
-            'Data Restored'
-          );
-          setMessage({
-            text: 'Data restored successfully! All lifts, workouts & metrics updated.',
-            type: 'success',
-          });
+          toast.success(t('vault.restoredToast'), t('vault.dataRestored'));
+          setMessage({ text: t('vault.restoredMsg'), type: 'success' });
         } else {
-          toast.error(
-            'The selected JSON file does not match the ASCEND backup structure.',
-            'Invalid Structure'
-          );
-          setMessage({ text: 'Invalid backup file structure.', type: 'error' });
+          toast.error(t('vault.invalidToast'), t('vault.invalidTitle'));
+          setMessage({ text: t('vault.invalidMsg'), type: 'error' });
         }
       } catch {
-        toast.error('Could not read or parse the JSON backup file.', 'Parse Failure');
-        setMessage({ text: 'Could not parse backup JSON file.', type: 'error' });
+        toast.error(t('vault.parseToast'), t('vault.parseTitle'));
+        setMessage({ text: t('vault.parseMsg'), type: 'error' });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
         setTimeout(() => setMessage(null), 5000);
       }
     };
     reader.onerror = () => {
-      toast.error('Device file access was denied or interrupted.', 'Access Denied');
+      toast.error(t('vault.accessToast'), t('vault.accessTitle'));
     };
     reader.readAsText(file);
   };
@@ -180,23 +173,23 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
         });
 
         toast.success(
-          `Imported ${result.workoutsImported} workouts & calibrated ${result.newPRsCount} PRs!`,
-          'History Imported'
+          t('vault.csvToast', { workouts: result.workoutsImported, prs: result.newPRsCount }),
+          t('vault.historyImported')
         );
         setMessage({
-          text: `Successfully imported ${result.workoutsImported} workouts (${result.totalSets} total sets) and calibrated ${result.newPRsCount} PR milestones from CSV!`,
+          text: t('vault.csvMsg', { workouts: result.workoutsImported, sets: result.totalSets, prs: result.newPRsCount }),
           type: 'success',
         });
       } catch (err: any) {
-        toast.error(err?.message || 'Could not parse CSV file.', 'CSV Import Failed');
-        setMessage({ text: err?.message || 'Invalid workout CSV.', type: 'error' });
+        toast.error(err?.message || t('vault.csvParseFail'), t('vault.csvFailTitle'));
+        setMessage({ text: err?.message || t('vault.csvInvalid'), type: 'error' });
       } finally {
         if (csvFileInputRef.current) csvFileInputRef.current.value = '';
         setTimeout(() => setMessage(null), 5000);
       }
     };
     reader.onerror = () => {
-      toast.error('File reading was interrupted.', 'Import Error');
+      toast.error(t('vault.readInterrupted'), t('vault.importError'));
     };
     reader.readAsText(file);
   };
@@ -207,7 +200,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     setTimeout(() => {
       clearAllData();
       setShowDeleteConfirm(false);
-      toast.info('App reset complete. Your backup JSON was saved to your device.', 'Data Cleared');
+      toast.info(t('vault.resetToast'), t('vault.dataCleared'));
       onClose();
     }, 500);
   };
@@ -219,7 +212,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
     }
     clearAllData();
     setShowDeleteConfirm(false);
-    toast.error('All local records were purged from this device.', 'App Reset');
+    toast.error(t('vault.purgedToast'), t('vault.appReset'));
     onClose();
   };
 
@@ -236,15 +229,15 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <HardDrive className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-text-primary leading-tight">Data Vault &amp; Backup</h2>
-              <p className="text-2xs text-text-muted font-mono">100% Offline Local Storage</p>
+              <h2 className="font-bold text-base text-text-primary leading-tight">{t('vault.title')}</h2>
+              <p className="text-2xs text-text-muted font-mono">{t('vault.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-            aria-label="Close Data Vault"
+            aria-label={t('vault.closeAria')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -274,15 +267,15 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             <div className="flex items-center gap-2 text-accent">
               <FolderOpen className="w-5 h-5 flex-shrink-0" />
               <h4 className="font-bold text-xs uppercase tracking-wider">
-                Allow Device File Access
+                {t('vault.allowAccess')}
               </h4>
             </div>
             <p className="text-2xs text-text-secondary leading-relaxed">
-              ASCEND requests access to select and read your <strong className="text-text-primary">.json backup file</strong> from your device storage.
+              {t('vault.accessBody')}
             </p>
             <p className="text-[11px] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60 flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
-              <span><strong>Privacy Notice:</strong> Your backup file is parsed entirely client-side inside your browser and is NEVER transmitted over the internet.</span>
+              <span><strong>{t('vault.privacyNotice')}</strong> {t('vault.privacyBody')}</span>
             </p>
 
             <div className="flex gap-2 pt-1">
@@ -291,14 +284,14 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 onClick={handleConfirmFileAccess}
                 className="btn-primary flex-1 py-2 text-xs font-bold"
               >
-                Allow &amp; Choose File
+                {t('vault.allowChoose')}
               </button>
               <button
                 type="button"
                 onClick={() => setShowFileAccessPrompt(false)}
                 className="btn-secondary py-2 px-3 text-xs"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -307,10 +300,10 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
           <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 space-y-3 animate-fade-in">
             <div className="flex items-center gap-2 text-rose-400">
               <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-              <h4 className="font-bold text-sm">Safeguard Your Progress Before Deleting</h4>
+              <h4 className="font-bold text-sm">{t('vault.safeguardTitle')}</h4>
             </div>
             <p className="text-2xs text-text-secondary leading-relaxed font-mono">
-              Deleting app data will clear your profile, PRs, workouts, and body metrics. Download your local backup file now so you can restore your data whenever you reinstall!
+              {t('vault.safeguardBody')}
             </p>
 
             <div className="space-y-2 pt-1">
@@ -320,7 +313,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 className="w-full py-2.5 px-3 rounded-lg bg-accent text-bg-primary font-bold text-xs flex items-center justify-center gap-2 hover:brightness-110 active:scale-98 transition-all shadow-sm font-mono"
               >
                 <Download className="w-4 h-4" />
-                <span>Download Backup &amp; Delete Data</span>
+                <span>{t('vault.downloadDelete')}</span>
               </button>
 
               <button
@@ -329,7 +322,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 className="w-full py-2 px-3 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 hover:bg-rose-500/30 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all font-mono"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete Without Backup</span>
+                <span>{t('vault.deleteNoBackup')}</span>
               </button>
 
               <button
@@ -337,7 +330,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 onClick={() => setShowDeleteConfirm(false)}
                 className="w-full py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors text-center font-mono"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           </div>
@@ -346,7 +339,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             {/* Backup & Restore Controls */}
             <div className="space-y-2">
               <span className="text-2xs font-mono uppercase text-text-muted font-bold block">
-                LOCAL DATA BACKUP &amp; RESTORE
+                {t('vault.sectionBackup')}
               </span>
 
               <div className="grid grid-cols-2 gap-2.5">
@@ -356,8 +349,8 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-center transition-all active:scale-[0.98]"
                 >
                   <Download className="w-5 h-5 text-accent" />
-                  <span className="text-xs font-semibold text-text-primary">Download Backup</span>
-                  <span className="text-[10px] text-text-muted font-mono">Save .JSON File</span>
+                  <span className="text-xs font-semibold text-text-primary">{t('vault.downloadBackup')}</span>
+                  <span className="text-[10px] text-text-muted font-mono">{t('vault.saveJson')}</span>
                 </button>
 
                 <button
@@ -366,8 +359,8 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                   className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-center transition-all active:scale-[0.98]"
                 >
                   <Upload className="w-5 h-5 text-emerald-400" />
-                  <span className="text-xs font-semibold text-text-primary">Restore Backup</span>
-                  <span className="text-[10px] text-text-muted font-mono">Upload .JSON File</span>
+                  <span className="text-xs font-semibold text-text-primary">{t('vault.restoreBackup')}</span>
+                  <span className="text-[10px] text-text-muted font-mono">{t('vault.uploadJson')}</span>
                 </button>
               </div>
 
@@ -380,7 +373,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               />
 
               <p className="text-2xs text-text-muted text-center pt-1 font-mono">
-                {prs.length} PRs • {workouts.length} Workouts • {bodyMetrics.length} Body Weight logs
+                {t('vault.counts', { prs: prs.length, workouts: workouts.length, metrics: bodyMetrics.length })}
               </p>
             </div>
 
@@ -390,7 +383,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
                   <span className="text-2xs font-mono uppercase font-bold text-text-primary">
-                    Import Workout History (CSV)
+                    {t('vault.csvTitle')}
                   </span>
                 </div>
                 <span className="text-3xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
@@ -398,7 +391,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 </span>
               </div>
               <p className="text-2xs text-text-secondary leading-relaxed">
-                Seamlessly transfer your training history. Upload your export CSV file to import all past workouts and auto-calibrate your PRs.
+                {t('vault.csvDesc')}
               </p>
               <button
                 type="button"
@@ -406,7 +399,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 className="btn-secondary w-full py-2 px-3 text-xs font-semibold flex items-center justify-center gap-2 hover:border-emerald-500/40 hover:text-emerald-400"
               >
                 <Upload className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Upload Workout CSV</span>
+                <span>{t('vault.uploadCsv')}</span>
               </button>
               <input
                 ref={csvFileInputRef}
@@ -420,7 +413,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
             {/* Privacy Guarantee */}
             <div className="flex items-center gap-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/40 text-2xs text-text-muted font-mono">
               <Shield className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-              <span>Your data stays 100% on your device. Backups download as a file you keep.</span>
+              <span>{t('vault.privacyGuarantee')}</span>
             </div>
 
             {/* Reset / Delete Danger Area */}
@@ -431,7 +424,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                 className="w-full py-2 px-3 rounded-lg border border-rose-500/30 text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-all"
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>Delete WebApp Data &amp; Reset</span>
+                <span>{t('vault.deleteReset')}</span>
               </button>
             </div>
           </>
@@ -442,7 +435,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
           onClick={onClose}
           className="btn-primary w-full text-center font-semibold text-sm"
         >
-          Done
+          {t('common.done')}
         </button>
       </div>
     </div>

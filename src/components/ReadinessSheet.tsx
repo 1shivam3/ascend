@@ -159,7 +159,7 @@ export default function ReadinessSheet({
           <p className="text-3xs text-text-muted pt-0.5">
             {todayCheckin
               ? t('ready.checkedIn')
-              : t('ready.howFeel')}}
+              : t('ready.howFeel')}
           </p>
         </div>
       </div>
