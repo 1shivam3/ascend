@@ -47,7 +47,7 @@ import {
   ApplyPolicyDecisionResult,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
-import { purgeLocalAppData } from './storage';
+import { purgeLocalAppData, isRecognizedBackupData } from './storage';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
@@ -205,6 +205,22 @@ export interface AppState {
   deletedPlanIds: string[];
   /** Remove tombstones (sync calls this once deletions are server-confirmed). */
   clearDeletedPlanIds: (ids: string[]) => void;
+  /**
+   * Tombstones for user-deleted PRs / workouts / meals / body metrics —
+   * the deletedPlanIds mechanism generalized (QA4-001). Same contract:
+   * tombstoned ids are never pull-merged back, push deletes them
+   * server-side, and a tombstone is pruned once the server confirms the
+   * row is gone. A full reset (clearAllData) clears them WITHOUT pushing,
+   * so a reset never wipes the cloud copy.
+   */
+  deletedPrIds: string[];
+  deletedWorkoutIds: string[];
+  deletedMealIds: string[];
+  deletedBodyMetricIds: string[];
+  clearDeletedPrIds: (ids: string[]) => void;
+  clearDeletedWorkoutIds: (ids: string[]) => void;
+  clearDeletedMealIds: (ids: string[]) => void;
+  clearDeletedBodyMetricIds: (ids: string[]) => void;
   favoriteFoods: FavoriteFood[];
   /** Household recipe learning — the user's own versions of foods.
    *  Local-persisted (partialize + backup import/export); no server
@@ -632,6 +648,11 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
   customExerciseMuscles: state.customExerciseMuscles,
   deletedPlanIds: state.deletedPlanIds,
+  deletedPrIds: state.deletedPrIds,
+  deletedWorkoutIds: state.deletedWorkoutIds,
+  deletedMealIds: state.deletedMealIds,
+  deletedBodyMetricIds: state.deletedBodyMetricIds,
+  userPortionPreferences: state.userPortionPreferences,
   favoriteFoods: state.favoriteFoods,
   customFoods: state.customFoods,
   mealDayKinds: state.mealDayKinds,
@@ -706,6 +727,22 @@ export const useAppStore = create<AppState>()(
         }));
       },
       deletedPlanIds: [],
+      deletedPrIds: [],
+      deletedWorkoutIds: [],
+      deletedMealIds: [],
+      deletedBodyMetricIds: [],
+      clearDeletedPrIds: (ids) => set((state) => ({
+        deletedPrIds: (state.deletedPrIds || []).filter((d) => !ids.includes(d)),
+      })),
+      clearDeletedWorkoutIds: (ids) => set((state) => ({
+        deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => !ids.includes(d)),
+      })),
+      clearDeletedMealIds: (ids) => set((state) => ({
+        deletedMealIds: (state.deletedMealIds || []).filter((d) => !ids.includes(d)),
+      })),
+      clearDeletedBodyMetricIds: (ids) => set((state) => ({
+        deletedBodyMetricIds: (state.deletedBodyMetricIds || []).filter((d) => !ids.includes(d)),
+      })),
       favoriteFoods: DEFAULT_FAVORITE_FOODS,
       customFoods: [],
       mealDayKinds: {},
@@ -718,7 +755,9 @@ export const useAppStore = create<AppState>()(
         const nextGoals = goals && goals.length > 0 ? [...goals] : [...DEFAULT_GOALS];
         return {
           goals: nextGoals,
-          profile: state.profile ? { ...state.profile, goals: nextGoals } : null,
+          profile: state.profile
+            ? { ...state.profile, goals: nextGoals, updatedAt: new Date().toISOString() }
+            : null,
         };
       }),
       toggleGoal: (goal) => set((state) => {
@@ -732,7 +771,9 @@ export const useAppStore = create<AppState>()(
         }
         return {
           goals: next,
-          profile: state.profile ? { ...state.profile, goals: next } : null,
+          profile: state.profile
+            ? { ...state.profile, goals: next, updatedAt: new Date().toISOString() }
+            : null,
         };
       }),
 
@@ -1029,7 +1070,12 @@ export const useAppStore = create<AppState>()(
           ? profile.goals
           : (state.goals && state.goals.length > 0 ? state.goals : ['build_muscle' as AthleteGoal]);
         return {
-          profile: { ...profile, goals: nextGoals },
+          // Stamp every profile write with the edit time so sync's
+          // last-write-wins can tell a fresh local edit from a stale
+          // server row (QA4A-001). Callers spread the old profile (old
+          // stamp included) when editing, so the stamp is always
+          // refreshed here — sync itself writes via setState, not here.
+          profile: { ...profile, goals: nextGoals, updatedAt: new Date().toISOString() },
           goals: nextGoals,
           hasCompletedOnboarding: true,
           bodyMetrics: nextMetrics,
@@ -1117,18 +1163,35 @@ export const useAppStore = create<AppState>()(
               Math.abs((existing.oneRepMax || 0) - (pr.oneRepMax || 0)) < 0.05)
         );
         if (isDuplicate) return;
-        set((state) => ({ prs: [...state.prs, pr] }));
+        set((state) => ({
+          prs: [...state.prs, pr],
+          // Explicitly re-adding a PR clears its deletion tombstone.
+          deletedPrIds: pr?.id
+            ? (state.deletedPrIds || []).filter((d) => d !== pr.id)
+            : state.deletedPrIds,
+        }));
         if (pr?.id) get().awardXpEvents([{ id: xpEventId('pr', pr.id), type: 'pr' }]);
       },
       addMultiplePRs: (newPrs) => {
-        set((state) => ({ prs: [...state.prs, ...newPrs] }));
+        set((state) => ({
+          prs: [...state.prs, ...newPrs],
+          deletedPrIds: (state.deletedPrIds || []).filter(
+            (d) => !newPrs.some((p) => p?.id === d)
+          ),
+        }));
         const events = (newPrs || []).filter((p) => p?.id).map((p) => ({ id: xpEventId('pr', p.id), type: 'pr' as const }));
         if (events.length > 0) get().awardXpEvents(events);
       },
       updatePR: (id, updatedFields) => set((state) => ({
         prs: state.prs.map(pr => pr.id === id ? { ...pr, ...updatedFields } : pr)
       })),
-      deletePR: (id) => set((state) => ({ prs: state.prs.filter(pr => pr.id !== id) })),
+      deletePR: (id) => set((state) => ({
+        prs: state.prs.filter(pr => pr.id !== id),
+        // Tombstone so a stale server copy can't resurrect this PR (QA4-001).
+        deletedPrIds: (state.deletedPrIds || []).includes(id)
+          ? state.deletedPrIds
+          : [...(state.deletedPrIds || []), id],
+      })),
       
       setPRTarget: (exercise, targetKg) => set((state) => ({
         prTargets: { ...state.prTargets, [exercise]: targetKg }
@@ -1440,6 +1503,10 @@ export const useAppStore = create<AppState>()(
 
         return {
           workouts: nextWorkouts,
+          // Explicitly re-adding a workout clears its deletion tombstone.
+          deletedWorkoutIds: workout?.id
+            ? (state.deletedWorkoutIds || []).filter((d) => d !== workout.id)
+            : state.deletedWorkoutIds,
           lifterProfile: nextProfile,
           trainingDecisions: updatedDecisions,
           decisionsLedgerHistory: updatedLedger,
@@ -1461,16 +1528,32 @@ export const useAppStore = create<AppState>()(
         return {
           workouts: nextWorkouts,
           lifterProfile: nextProfile,
+          // Tombstone so a stale server copy can't resurrect it (QA4-001).
+          deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
+            ? state.deletedWorkoutIds
+            : [...(state.deletedWorkoutIds || []), id],
         };
       }),
       
       addMeal: (meal) => {
-        set((state) => ({ meals: [...state.meals, meal] }));
+        set((state) => ({
+          meals: [...state.meals, meal],
+          // Explicitly re-adding a meal clears its deletion tombstone.
+          deletedMealIds: meal?.id
+            ? (state.deletedMealIds || []).filter((d) => d !== meal.id)
+            : state.deletedMealIds,
+        }));
         if (meal?.id && xpForMeal(meal) > 0) {
           get().awardXpEvents([{ id: xpEventId('meal', meal.id), type: 'meal' }]);
         }
       },
-      deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
+      deleteMeal: (id) => set((state) => ({
+        meals: state.meals.filter(meal => meal.id !== id),
+        // Tombstone so a stale server copy can't resurrect it (QA4-001).
+        deletedMealIds: (state.deletedMealIds || []).includes(id)
+          ? state.deletedMealIds
+          : [...(state.deletedMealIds || []), id],
+      })),
       updateMeal: (id, updated) => set((state) => ({
         meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
       })),
@@ -1485,7 +1568,18 @@ export const useAppStore = create<AppState>()(
             };
           })
           .filter((meal) => meal.foods.length > 0);
-        return { meals: nextMeals };
+        // Removing a meal's last food deletes the meal itself — tombstone
+        // it too, or the next sync pull resurrects the emptied meal.
+        const removedIds = state.meals
+          .filter((meal) => !nextMeals.some((m) => m.id === meal.id))
+          .map((meal) => meal.id);
+        return {
+          meals: nextMeals,
+          deletedMealIds:
+            removedIds.length > 0
+              ? [...new Set([...(state.deletedMealIds || []), ...removedIds])]
+              : state.deletedMealIds,
+        };
       }),
 
       copyMealsFromDate: (sourceDate, targetDate) => {
@@ -1510,10 +1604,29 @@ export const useAppStore = create<AppState>()(
 
       setMacroGoals: (goals) => set({ macroGoals: goals }),
 
-      addBodyMetric: (entry) => set((state) => ({
-        bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)]
+      addBodyMetric: (entry) => set((state) => {
+        // One entry per date: a same-date entry is replaced, and the
+        // replaced row must be tombstoned or sync resurrects it (QA4-001).
+        const replacedIds = state.bodyMetrics
+          .filter(m => m.date === entry.date && m.id !== entry.id)
+          .map(m => m.id);
+        return {
+          bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)],
+          deletedBodyMetricIds: [
+            ...new Set([
+              ...(state.deletedBodyMetricIds || []).filter((d) => d !== entry.id),
+              ...replacedIds,
+            ]),
+          ],
+        };
+      }),
+      deleteBodyMetric: (id) => set((state) => ({
+        bodyMetrics: state.bodyMetrics.filter(m => m.id !== id),
+        // Tombstone so a stale server copy can't resurrect it (QA4-001).
+        deletedBodyMetricIds: (state.deletedBodyMetricIds || []).includes(id)
+          ? state.deletedBodyMetricIds
+          : [...(state.deletedBodyMetricIds || []), id],
       })),
-      deleteBodyMetric: (id) => set((state) => ({ bodyMetrics: state.bodyMetrics.filter(m => m.id !== id) })),
       // Progress photos are downscaled (~800px JPEG) before storage; cap the
       // count so localStorage stays healthy. Persisted to their own key
       // (not the zustand blob) — see PROGRESS_PHOTOS_KEY.
@@ -1545,10 +1658,21 @@ export const useAppStore = create<AppState>()(
           bodyweightKg: Math.round(weightKg * 10) / 10,
           bodyweightLbs: Math.round(weightKg * 2.20462 * 10) / 10,
           ...(heightCm ? { heightCm: Math.round(heightCm) } : {}),
+          // Profile changed — stamp it so sync's last-write-wins keeps
+          // this edit over an older server row (QA4A-001).
+          updatedAt: new Date().toISOString(),
         } : null;
+        // The new entry replaces any same-date entry; tombstone the
+        // replaced row or the next sync pull resurrects it (QA4-001).
+        const replacedIds = state.bodyMetrics
+          .filter(m => m.date === todayDate)
+          .map(m => m.id);
         return {
           profile: updatedProfile,
           bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== todayDate)],
+          deletedBodyMetricIds: [
+            ...new Set([...(state.deletedBodyMetricIds || []), ...replacedIds]),
+          ],
         };
       }),
 
@@ -2321,6 +2445,10 @@ export const useAppStore = create<AppState>()(
           plannedWorkouts: [],
           hiddenBuiltinRoutineIds: [],
           deletedPlanIds: [],
+          deletedPrIds: [],
+          deletedWorkoutIds: [],
+          deletedMealIds: [],
+          deletedBodyMetricIds: [],
           uiPreferences: { ...DEFAULT_UI_PREFERENCES },
           lastActiveTab: 'home',
           lastProgressSubTab: 'overview',
@@ -2421,6 +2549,12 @@ export const useAppStore = create<AppState>()(
       importAllData: (data) => {
         try {
           if (!data || typeof data !== 'object') return false;
+          // Shape gate (QA4-013): a payload with none of the backup's
+          // recognized fields is not a backup — reject it instead of
+          // reporting success while applying nothing ({"hello":1} used
+          // to "restore" successfully). Partial imports carrying at
+          // least one recognized field still apply.
+          if (!isRecognizedBackupData(data)) return false;
           if (typeof window !== 'undefined') {
             try {
               localStorage.removeItem('ascend_logged_out');
@@ -2431,6 +2565,24 @@ export const useAppStore = create<AppState>()(
           // well-formed fields with correct types to prevent injection of
           // arbitrary or malformed data from backup imports.
           set((state) => {
+            // Tombstone restore (QA4-001): backups carry the deletion
+            // lists. Restoring an entity list revives those entities, so
+            // their tombstones are dropped; tombstones for entities not
+            // in the backup are kept so their deletions still propagate.
+            const restoredTombstones = (
+              current: string[] | undefined,
+              fromBackup: unknown,
+              restoredList: unknown,
+            ): string[] => {
+              const base = Array.isArray(fromBackup)
+                ? fromBackup.filter((d): d is string => typeof d === 'string')
+                : (current || []);
+              if (!Array.isArray(restoredList)) return base;
+              const revived = new Set(
+                restoredList.map((e: any) => e?.id).filter((id: any) => typeof id === 'string'),
+              );
+              return base.filter((d) => !revived.has(d));
+            };
             const validatedProfile =
               data.profile && typeof data.profile === 'object'
                 ? {
@@ -2487,6 +2639,9 @@ export const useAppStore = create<AppState>()(
                       typeof data.profile.createdAt === 'string' && !isNaN(Date.parse(data.profile.createdAt))
                         ? data.profile.createdAt
                         : new Date().toISOString(),
+                    // A restore is the user's newest intent — stamp it so
+                    // sync's last-write-wins doesn't undo it (QA4A-001).
+                    updatedAt: new Date().toISOString(),
                   }
                 : state.profile;
             return {
@@ -2528,9 +2683,11 @@ export const useAppStore = create<AppState>()(
                 ? data.hasCompletedOnboarding
                 : (data.profile ? true : state.hasCompletedOnboarding),
             plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
-            deletedPlanIds: Array.isArray(data.plannedWorkouts)
-              ? state.deletedPlanIds.filter((d) => !data.plannedWorkouts.some((p: any) => p.id === d))
-              : state.deletedPlanIds,
+            deletedPlanIds: restoredTombstones(state.deletedPlanIds, data.deletedPlanIds, data.plannedWorkouts),
+            deletedPrIds: restoredTombstones(state.deletedPrIds, data.deletedPrIds, data.prs),
+            deletedWorkoutIds: restoredTombstones(state.deletedWorkoutIds, data.deletedWorkoutIds, data.workouts),
+            deletedMealIds: restoredTombstones(state.deletedMealIds, data.deletedMealIds, data.meals),
+            deletedBodyMetricIds: restoredTombstones(state.deletedBodyMetricIds, data.deletedBodyMetricIds, data.bodyMetrics),
             favoriteFoods: Array.isArray(data.favoriteFoods) ? data.favoriteFoods : state.favoriteFoods,
             customFoods: (() => {
               if (!Array.isArray(data.customFoods)) return state.customFoods;
@@ -2705,6 +2862,68 @@ export const useAppStore = create<AppState>()(
               data.runProgram !== undefined
                 ? sanitizeRunProgramState(data.runProgram)
                 : state.runProgram,
+            // Gamification + notification slices (QA4-005): backups have
+            // always EXPORTED these, but restore silently dropped them —
+            // XP, streak freezes, challenge progress and notification
+            // prefs reverted to defaults under a success toast.
+            xp: (() => {
+              if (!data.xp || typeof data.xp !== 'object') return state.xp;
+              const totalXp =
+                typeof data.xp.totalXp === 'number' && Number.isFinite(data.xp.totalXp) && data.xp.totalXp >= 0
+                  ? data.xp.totalXp
+                  : state.xp.totalXp;
+              const awardedIds = Array.isArray(data.xp.awardedIds)
+                ? data.xp.awardedIds.filter((id: any) => typeof id === 'string').slice(0, 10000)
+                : state.xp.awardedIds;
+              return { totalXp, awardedIds };
+            })(),
+            streak: (() => {
+              if (!data.streak || typeof data.streak !== 'object') return state.streak;
+              const num = (v: any, fallback: number) =>
+                typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : fallback;
+              return {
+                freezesAvailable: num(data.streak.freezesAvailable, state.streak.freezesAvailable),
+                freezesUsedThisWeek: num(data.streak.freezesUsedThisWeek, state.streak.freezesUsedThisWeek),
+                weekStart:
+                  typeof data.streak.weekStart === 'string' && data.streak.weekStart
+                    ? data.streak.weekStart
+                    : state.streak.weekStart,
+                longestStreak: num(data.streak.longestStreak, state.streak.longestStreak),
+              };
+            })(),
+            challenges: (() => {
+              if (!data.challenges || typeof data.challenges !== 'object' || !data.challenges.instances || typeof data.challenges.instances !== 'object') {
+                return state.challenges;
+              }
+              const instances: ChallengesXState['instances'] = {};
+              for (const [key, inst] of Object.entries(data.challenges.instances)) {
+                if (inst && typeof inst === 'object') {
+                  const i = inst as Record<string, unknown>;
+                  instances[key] = {
+                    optedIn: i.optedIn === true,
+                    dismissed: i.dismissed === true,
+                    rewardGranted: i.rewardGranted === true,
+                  };
+                }
+              }
+              return { instances };
+            })(),
+            notificationPreferences:
+              data.notificationPreferences && typeof data.notificationPreferences === 'object'
+                ? { ...state.notificationPreferences, ...data.notificationPreferences }
+                : state.notificationPreferences,
+            userPortionPreferences: (() => {
+              if (!data.userPortionPreferences || typeof data.userPortionPreferences !== 'object') {
+                return state.userPortionPreferences;
+              }
+              const restored: Record<string, number> = {};
+              for (const [name, grams] of Object.entries(data.userPortionPreferences)) {
+                if (typeof grams === 'number' && Number.isFinite(grams) && grams > 0) {
+                  restored[name] = grams;
+                }
+              }
+              return restored;
+            })(),
             progressPhotos: (() => {
               if (!Array.isArray(data.progressPhotos)) return state.progressPhotos;
               const valid = data.progressPhotos

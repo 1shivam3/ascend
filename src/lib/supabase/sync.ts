@@ -1,7 +1,29 @@
 import { getSupabase } from './client';
 import { useStore, resolveAvatar } from '../store';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
-import { mergeRemotePlans, prunableTombstones } from './reconcile';
+import {
+  mergeRemotePlans,
+  mergeRemoteRecords,
+  prunableTombstones,
+  tombstonedIdsToDelete,
+  isLocalProfileNewer,
+  buildPlanExtras,
+  planFieldsFromExtras,
+} from './reconcile';
+
+/** Map a `planned_workouts` row to a local plan, restoring the
+ *  column-less fields (description / goalTag / intensityMode) from the
+ *  row's `extras` jsonb when present (QA4-006). Rows from a database
+ *  without the extras column simply have no `extras` key. */
+function planFromRemoteRow(r: any): PlannedWorkout {
+  return {
+    id: r.id,
+    name: r.name,
+    exercises: r.exercises || [],
+    createdAt: r.created_at || new Date().toISOString(),
+    ...planFieldsFromExtras(r.extras),
+  };
+}
 
 export type SyncStatus = 'unconfigured' | 'offline' | 'idle' | 'syncing' | 'synced' | 'error';
 
@@ -641,7 +663,15 @@ class SupabaseSyncEngine {
       const updates: any = {};
 
       if (remoteProfile.data) {
-        // Authoritative cloud profile for the authenticated account.
+        // Authoritative cloud profile for the authenticated account —
+        // UNLESS the local profile was edited more recently than the
+        // server row (QA4A-001, last-write-wins): the pull used to rebuild
+        // the profile from the server unconditionally, erasing an unsynced
+        // local edit (e.g. a weigh-in via updateBodyMetrics) and then
+        // pushing the stale copy back up. When local is newer we skip the
+        // rebuild and the push below carries the local edit to the server.
+        // Cross-account rebuilds always take the server row — it is a
+        // different account's data, not an older copy of this one.
         // NOTE: the avatar lives only on this device (no avatar column in
         // cloud profiles) — always preserve the local one, otherwise every
         // sync wipes the user's profile picture. Same-account rebuilds also
@@ -649,24 +679,31 @@ class SupabaseSyncEngine {
         // survive; cross-account rebuilds start clean (no field leakage
         // from the previous account on this device).
         const rp = remoteProfile.data;
-        updates.profile = {
-          ...(isCrossAccountSwitch ? {} : localState.profile || {}),
-          id: rp.id,
-          name: rp.name,
-          gender: rp.gender,
-          bodyweightKg: Number(rp.bodyweight_kg) || 75,
-          bodyweightLbs: Number(rp.bodyweight_lbs) || 165,
-          heightCm: rp.height_cm ? Number(rp.height_cm) : undefined,
-          unit: rp.unit || 'kg',
-          goals: rp.goals || ['build_muscle'],
-          dietPreference: rp.diet_preference || 'non_vegetarian',
-          createdAt: rp.created_at,
-          avatar: isCrossAccountSwitch
-            ? undefined
-            : resolveAvatar(localState.profile?.avatar),
-        };
-        updates.hasCompletedOnboarding = true;
-        needsLocalUpdate = true;
+        const localProfileIsNewer =
+          !isCrossAccountSwitch &&
+          localState.profile?.id === rp.id &&
+          isLocalProfileNewer(localState.profile?.updatedAt, rp.updated_at);
+        if (!localProfileIsNewer) {
+          updates.profile = {
+            ...(isCrossAccountSwitch ? {} : localState.profile || {}),
+            id: rp.id,
+            name: rp.name,
+            gender: rp.gender,
+            bodyweightKg: Number(rp.bodyweight_kg) || 75,
+            bodyweightLbs: Number(rp.bodyweight_lbs) || 165,
+            heightCm: rp.height_cm ? Number(rp.height_cm) : undefined,
+            unit: rp.unit || 'kg',
+            goals: rp.goals || ['build_muscle'],
+            dietPreference: rp.diet_preference || 'non_vegetarian',
+            createdAt: rp.created_at,
+            ...(rp.updated_at ? { updatedAt: rp.updated_at } : {}),
+            avatar: isCrossAccountSwitch
+              ? undefined
+              : resolveAvatar(localState.profile?.avatar),
+          };
+          updates.hasCompletedOnboarding = true;
+          needsLocalUpdate = true;
+        }
       } else if (localState.profile && !isCrossAccountSwitch) {
         // Guest profile linking to newly authenticated cloud account for the first time
         if (localState.profile.id !== user.id) {
@@ -735,103 +772,89 @@ class SupabaseSyncEngine {
           heightCm: r.height_cm ? Number(r.height_cm) : undefined,
           notes: r.notes || undefined,
         }));
-        updates.plannedWorkouts = (remotePlans.data || []).map((r: any) => ({
-          id: r.id,
-          name: r.name,
-          exercises: r.exercises || [],
-          createdAt: r.created_at || new Date().toISOString(),
-        }));
+        updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
         needsLocalUpdate = true;
       } else {
         // Same account / guest migration: Merge remote cloud records into local store
 
-        // Merge PRs
+        // Merge PRs / Workouts / Meals / Body Metrics — tombstone-aware
+        // (QA4-001): the union merge must never resurrect a record the
+        // user deleted locally, exactly like plans below.
         if (remotePRs.data && remotePRs.data.length > 0) {
-          const localPRMap = new Map(localState.prs.map((p) => [p.id, p]));
-          let prMerged = false;
-          for (const r of remotePRs.data) {
-            if (!localPRMap.has(r.id)) {
-              localPRMap.set(r.id, {
-                id: r.id,
-                exercise: r.exercise,
-                weightKg: Number(r.weight_kg),
-                weightLbs: Number(r.weight_lbs),
-                reps: Number(r.reps),
-                oneRepMax: Number(r.one_rep_max),
-                date: r.date,
-                notes: r.notes || undefined,
-              });
-              prMerged = true;
-            }
-          }
-          if (prMerged) {
-            updates.prs = Array.from(localPRMap.values());
+          const remoteMapped = remotePRs.data.map((r: any) => ({
+            id: r.id,
+            exercise: r.exercise,
+            weightKg: Number(r.weight_kg),
+            weightLbs: Number(r.weight_lbs),
+            reps: Number(r.reps),
+            oneRepMax: Number(r.one_rep_max),
+            date: r.date,
+            notes: r.notes || undefined,
+          }));
+          const { merged, changed } = mergeRemoteRecords(
+            localState.prs || [],
+            remoteMapped,
+            localState.deletedPrIds || []
+          );
+          if (changed) {
+            updates.prs = merged;
             needsLocalUpdate = true;
           }
         }
 
-        // Merge Workouts
         if (remoteWorkouts.data && remoteWorkouts.data.length > 0) {
-          const localWMap = new Map(localState.workouts.map((w) => [w.id, w]));
-          let wMerged = false;
-          for (const r of remoteWorkouts.data) {
-            if (!localWMap.has(r.id)) {
-              localWMap.set(r.id, {
-                id: r.id,
-                name: r.name || undefined,
-                date: r.date,
-                durationMinutes: r.duration_minutes || undefined,
-                notes: r.notes || undefined,
-                exercises: r.exercises || [],
-              });
-              wMerged = true;
-            }
-          }
-          if (wMerged) {
-            updates.workouts = Array.from(localWMap.values());
+          const remoteMapped = remoteWorkouts.data.map((r: any) => ({
+            id: r.id,
+            name: r.name || undefined,
+            date: r.date,
+            durationMinutes: r.duration_minutes || undefined,
+            notes: r.notes || undefined,
+            exercises: r.exercises || [],
+          }));
+          const { merged, changed } = mergeRemoteRecords(
+            localState.workouts || [],
+            remoteMapped,
+            localState.deletedWorkoutIds || []
+          );
+          if (changed) {
+            updates.workouts = merged;
             needsLocalUpdate = true;
           }
         }
 
-        // Merge Meals
         if (remoteMeals.data && remoteMeals.data.length > 0) {
-          const localMMap = new Map(localState.meals.map((m) => [m.id, m]));
-          let mMerged = false;
-          for (const r of remoteMeals.data) {
-            if (!localMMap.has(r.id)) {
-              localMMap.set(r.id, {
-                id: r.id,
-                name: r.name,
-                date: r.date,
-                foods: r.foods || [],
-              });
-              mMerged = true;
-            }
-          }
-          if (mMerged) {
-            updates.meals = Array.from(localMMap.values());
+          const remoteMapped = remoteMeals.data.map((r: any) => ({
+            id: r.id,
+            name: r.name,
+            date: r.date,
+            foods: r.foods || [],
+          }));
+          const { merged, changed } = mergeRemoteRecords(
+            localState.meals || [],
+            remoteMapped,
+            localState.deletedMealIds || []
+          );
+          if (changed) {
+            updates.meals = merged;
             needsLocalUpdate = true;
           }
         }
 
-        // Merge Body Metrics (Weigh-ins)
         if (remoteMetrics.data && remoteMetrics.data.length > 0) {
-          const localBMap = new Map((localState.bodyMetrics || []).map((b) => [b.id, b]));
-          let bMerged = false;
-          for (const r of remoteMetrics.data) {
-            if (!localBMap.has(r.id)) {
-              localBMap.set(r.id, {
-                id: r.id,
-                date: r.date,
-                weightKg: Number(r.weight_kg),
-                heightCm: r.height_cm ? Number(r.height_cm) : undefined,
-                notes: r.notes || undefined,
-              });
-              bMerged = true;
-            }
-          }
-          if (bMerged) {
-            updates.bodyMetrics = Array.from(localBMap.values());
+          const remoteMapped = remoteMetrics.data.map((r: any) => ({
+            id: r.id,
+            date: r.date,
+            weightKg: Number(r.weight_kg),
+            heightCm: r.height_cm ? Number(r.height_cm) : undefined,
+            notes: r.notes || undefined,
+          }));
+          const { merged, changed } = mergeRemoteRecords(
+            localState.bodyMetrics || [],
+            remoteMapped,
+            localState.deletedBodyMetricIds || []
+          );
+          if (changed) {
+            updates.bodyMetrics = merged;
             needsLocalUpdate = true;
           }
         }
@@ -840,12 +863,7 @@ class SupabaseSyncEngine {
         // a plan the user deleted locally is never resurrected by a stale
         // server copy.
         if (remotePlans.data && remotePlans.data.length > 0) {
-          const remoteMapped = remotePlans.data.map((r: any) => ({
-            id: r.id,
-            name: r.name,
-            exercises: r.exercises || [],
-            createdAt: r.created_at || new Date().toISOString(),
-          }));
+          const remoteMapped = remotePlans.data.map(planFromRemoteRow);
           const { merged, changed } = mergeRemotePlans(
             localState.plannedWorkouts || [],
             remoteMapped,
@@ -908,7 +926,10 @@ class SupabaseSyncEngine {
         unit: state.profile.unit,
         goals: state.profile.goals || ['build_muscle'],
         diet_preference: state.profile.dietPreference || 'non_vegetarian',
-        updated_at: new Date().toISOString(),
+        // Carry the local last-edit stamp up (QA4A-001): writing "now"
+        // here would make the server row look newer than any offline
+        // edit made since, and the next pull would clobber it.
+        updated_at: state.profile.updatedAt || new Date().toISOString(),
       });
     }
 
@@ -971,7 +992,12 @@ class SupabaseSyncEngine {
       await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
     }
 
-    // 6. Planned Workouts
+    // 6. Planned Workouts — description / goalTag / intensityMode have no
+    // columns on the table, so they travel in the `extras` jsonb payload
+    // (QA4-006). The column exists only after the user runs the migration
+    // in supabase/schema.sql; until then PostgREST rejects rows carrying
+    // `extras`, so on a missing-column error we retry without it — plans
+    // keep syncing and those three fields stay local-only in the meantime.
     if (state.plannedWorkouts && state.plannedWorkouts.length > 0) {
       const planRows = state.plannedWorkouts.map((p) => ({
         id: p.id,
@@ -979,38 +1005,67 @@ class SupabaseSyncEngine {
         name: p.name,
         exercises: p.exercises || [],
         updated_at: new Date().toISOString(),
+        extras: buildPlanExtras(p) ?? null,
       }));
-      await supabase.from('planned_workouts').upsert(planRows, { onConflict: 'id' });
+      const { error: planUpsertError } = await supabase
+        .from('planned_workouts')
+        .upsert(planRows, { onConflict: 'id' });
+      if (planUpsertError) {
+        // LOOP-2: the bare retry exists ONLY for the pre-migration case
+        // where the `extras` column itself is missing. Any other error
+        // must not be masked by a silent retry without extras.
+        const errMsg = planUpsertError.message || '';
+        const missingExtrasColumn =
+          planUpsertError.code === 'PGRST204' ||
+          planUpsertError.code === '42703' ||
+          /column .* does not exist/i.test(errMsg) ||
+          /could not find the .* column/i.test(errMsg);
+        if (missingExtrasColumn) {
+          const bareRows = planRows.map(({ extras: _extras, ...rest }) => rest);
+          await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
+        } else {
+          console.error('Supabase planned_workouts upsert error:', planUpsertError);
+        }
+      }
     }
 
-    // 7. Plan-deletion propagation: the push path historically only upserted,
-    // so a locally deleted plan stayed on the server forever and the
+    // 7. Deletion propagation: the push path historically only upserted,
+    // so a locally deleted record stayed on the server forever and the
     // union pull-merge resurrected it on the next sync. Delete exactly the
-    // tombstoned plans (explicit user deletions) — a full local reset does
-    // NOT reach this path, so a "reset" never wipes the cloud copy.
-    await this.propagatePlanDeletions(userId);
+    // tombstoned records (explicit user deletions) — a full local reset
+    // clears tombstones without reaching this path, so a "reset" never
+    // wipes the cloud copy.
+    await this.propagateAllDeletions(userId);
   }
 
   /**
-   * Delete server-side plans the user explicitly deleted locally
-   * (tracked as tombstones). Fail-safe: on any uncertainty, delete nothing.
+   * Delete the tombstoned rows of ONE table server-side. Fail-safe: on
+   * any uncertainty, delete nothing. Only ids that are (a) gone locally,
+   * (b) still on the server and (c) explicitly tombstoned are deleted —
+   * a plain local/server diff alone never deletes (a reset must not wipe
+   * the cloud copy).
    */
-  private async propagatePlanDeletions(userId: string): Promise<void> {
+  private async propagateDeletions(
+    userId: string,
+    table: string,
+    tombstones: string[],
+    localIds: Set<string>,
+    clearTombstones: (ids: string[]) => void,
+  ): Promise<void> {
     try {
-      const tombstones = useStore.getState().deletedPlanIds || [];
       if (tombstones.length === 0) return;
       const supabase = getSupabase();
       if (!supabase) return;
       const { data, error } = await supabase
-        .from('planned_workouts')
+        .from(table)
         .select('id')
         .eq('user_id', userId);
       if (error) return;
-      const remoteIds = new Set((data || []).map((r: any) => r.id));
-      const toDelete = tombstones.filter((id) => remoteIds.has(id));
+      const remoteIds = (data || []).map((r: any) => r.id as string);
+      const toDelete = tombstonedIdsToDelete(localIds, remoteIds, tombstones);
       if (toDelete.length > 0) {
         const { error: delError } = await supabase
-          .from('planned_workouts')
+          .from(table)
           .delete()
           .eq('user_id', userId)
           .in('id', toDelete);
@@ -1018,16 +1073,52 @@ class SupabaseSyncEngine {
       }
       // Server confirms the deletions — prune those tombstones (a tombstone
       // for an id no longer on the server and not local is dead weight).
-      const localIds = new Set((useStore.getState().plannedWorkouts || []).map((p) => p.id));
-      const pruned = prunableTombstones(
-        tombstones,
-        localIds,
-        (data || []).map((r: any) => r.id).filter((id) => !toDelete.includes(id))
-      );
-      if (pruned.length > 0) useStore.getState().clearDeletedPlanIds(pruned);
+      const remainingRemoteIds = remoteIds.filter((id) => !toDelete.includes(id));
+      const pruned = prunableTombstones(tombstones, localIds, remainingRemoteIds);
+      if (pruned.length > 0) clearTombstones(pruned);
     } catch {
       // Offline or unexpected — never block the push on this.
     }
+  }
+
+  /** Propagate explicit deletions for every synced entity (QA4-001). */
+  private async propagateAllDeletions(userId: string): Promise<void> {
+    const s = useStore.getState();
+    await this.propagateDeletions(
+      userId,
+      'planned_workouts',
+      s.deletedPlanIds || [],
+      new Set((s.plannedWorkouts || []).map((p) => p.id)),
+      (ids) => useStore.getState().clearDeletedPlanIds(ids),
+    );
+    await this.propagateDeletions(
+      userId,
+      'personal_records',
+      s.deletedPrIds || [],
+      new Set((s.prs || []).map((p) => p.id)),
+      (ids) => useStore.getState().clearDeletedPrIds(ids),
+    );
+    await this.propagateDeletions(
+      userId,
+      'workouts',
+      s.deletedWorkoutIds || [],
+      new Set((s.workouts || []).map((w) => w.id)),
+      (ids) => useStore.getState().clearDeletedWorkoutIds(ids),
+    );
+    await this.propagateDeletions(
+      userId,
+      'meals',
+      s.deletedMealIds || [],
+      new Set((s.meals || []).map((m) => m.id)),
+      (ids) => useStore.getState().clearDeletedMealIds(ids),
+    );
+    await this.propagateDeletions(
+      userId,
+      'body_metrics',
+      s.deletedBodyMetricIds || [],
+      new Set((s.bodyMetrics || []).map((b) => b.id)),
+      (ids) => useStore.getState().clearDeletedBodyMetricIds(ids),
+    );
   }
 
   private async syncPush() {
