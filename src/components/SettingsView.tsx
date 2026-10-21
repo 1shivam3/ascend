@@ -34,7 +34,7 @@ import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, type StringKey } from '@/lib/i18n';
 import {
   isHealthConnectAvailable,
   isHealthConnectSupported,
@@ -83,6 +83,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const toast = useToast();
   const { t } = useTranslation();
+  const modeLabel = (m: string) =>
+    t(
+      m === 'intermediate'
+        ? 'settings.modeIntermediate'
+        : m === 'advanced'
+        ? 'settings.modeAdvanced'
+        : 'settings.modeBeginner'
+    );
 
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -114,7 +122,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     if (uiPreferences.healthConnectEnabled === true) {
       setUiPreferences({ healthConnectEnabled: false });
       setHealthStatus('idle');
-      toast.info('Health Connect sync is off. Data already imported stays in your metrics.', 'Health Connect');
+      toast.info(t('settings.healthOffMsg'), t('health.title'));
       return;
     }
     setHealthStatus('connecting');
@@ -130,9 +138,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       const outcome = await syncHealthConnectIfEnabled();
       toast.success(
         outcome === 'synced'
-          ? 'Health Connect is syncing steps, sleep and weight.'
-          : 'Health Connect connected. Your latest data will appear shortly.',
-        'Health Connect'
+          ? t('settings.healthSyncedMsg')
+          : t('settings.healthConnectedMsg'),
+        t('health.title')
       );
     } else if (auth === 'denied') {
       // Same denied-permission pattern as everywhere else (Item 0):
@@ -140,7 +148,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       setHealthStatus('denied');
     } else {
       setHealthStatus('idle');
-      toast.error('Could not connect to Health Connect on this device.', 'Health Connect');
+      toast.error(t('settings.healthFailedMsg'), t('health.title'));
     }
   };
   const [telemetryConsent, setTelemetryConsentState] = useState<TelemetryConsent>(null);
@@ -190,9 +198,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     setIsSyncing(true);
     try {
       await syncNow();
-      toast.success('Sync completed successfully!', 'Cloud Synchronized');
+      toast.success(t('settings.syncDoneMsg'), t('settings.syncDoneTitle'));
     } catch {
-      toast.error('Could not sync with cloud.', 'Sync Error');
+      toast.error(t('settings.syncErrorMsg'), t('settings.syncErrorTitle'));
     } finally {
       setIsSyncing(false);
     }
@@ -212,9 +220,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success('Downloaded full JSON backup! Keep it safe.', 'Backup Saved');
+      toast.success(t('settings.backupSavedMsg'), t('settings.backupSavedTitle'));
     } catch {
-      toast.error('Failed to export backup.', 'Export Error');
+      toast.error(t('settings.exportErrorMsg'), t('settings.exportErrorTitle'));
     }
   };
 
@@ -238,9 +246,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success('Downloaded CSV export — workouts, meals and body metrics.', 'CSV Exported');
+      toast.success(t('settings.csvExportedMsg'), t('settings.csvExportedTitle'));
     } catch {
-      toast.error('Failed to export CSV.', 'Export Error');
+      toast.error(t('settings.csvErrorMsg'), t('settings.exportErrorTitle'));
     }
   };
 
@@ -256,12 +264,12 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         const success = importAllData(parsed);
         importFullBackupJSON(content);
         if (success) {
-          toast.success('Restored all PRs, workouts, meals & settings successfully!', 'Data Restored');
+          toast.success(t('settings.restoredMsg'), t('settings.restoredTitle'));
         } else {
-          toast.error('Invalid backup file structure.', 'Restore Failed');
+          toast.error(t('settings.invalidBackupMsg'), t('settings.restoreFailedTitle'));
         }
       } catch {
-        toast.error('Could not parse backup file.', 'Parse Failure');
+        toast.error(t('settings.parseFailedMsg'), t('settings.parseFailedTitle'));
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
@@ -278,7 +286,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       console.warn('Sign out warning:', err);
     }
     logout({ clearLocalData: false });
-    toast.info('Signed out. Data preserved on this device.', 'Signed Out');
+    toast.info(t('settings.signedOutMsg'), t('settings.signedOutTitle'));
     if (onNavigate) onNavigate('home');
   };
 
@@ -289,14 +297,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       const result = await deleteAccount();
       if (result.success) {
         setShowDeleteConfirm(false);
-        toast.success('Account and data permanently deleted.', 'Account Eradicated');
+        toast.success(t('settings.accountDeletedMsg'), t('settings.accountDeletedTitle'));
         if (onNavigate) onNavigate('home');
       } else {
-        toast.info(result.error || 'Local data purged.', 'Data Purged');
+        toast.info(result.error || t('settings.localPurgedMsg'), t('settings.dataPurgedTitle'));
         setShowDeleteConfirm(false);
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to delete account.');
+      toast.error(err?.message || t('settings.deleteFailedMsg'));
     } finally {
       setIsDeleting(false);
     }
@@ -311,7 +319,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             type="button"
             onClick={handleBack}
             className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-            aria-label="Back"
+            aria-label={t('common.back')}
           >
             <ChevronLeft className="w-5 h-5 text-accent" />
           </button>
@@ -324,13 +332,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       {/* ── SECTION 1: ACCOUNT & CLOUD SYNC ─────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          Account &amp; Security
+          {t('settings.accountSecurity')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <span className="text-sm font-bold text-text-primary font-sans block">
-                {user?.email || profile?.name || 'Local Guest Athlete'}
+                {user?.email || profile?.name || t('common.guestAthlete')}
               </span>
               <div className="flex items-center gap-1.5">
                 <span
@@ -345,11 +353,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <span className="text-2xs font-mono text-text-muted">
                   {user
                     ? syncStatus === 'synced'
-                      ? 'Cloud Synced'
+                      ? t('settings.cloudSynced')
                       : syncStatus === 'syncing'
-                      ? 'Syncing...'
-                      : 'Sync Idle'
-                    : 'Local Device Only'}
+                      ? t('settings.syncing')
+                      : t('settings.syncIdle')
+                    : t('settings.localOnly')}
                 </span>
               </div>
             </div>
@@ -360,10 +368,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 onClick={handleManualSync}
                 disabled={isSyncing}
                 className="p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-text-secondary hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
-                title="Sync Now"
+                title={t('settings.syncNow')}
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-accent' : ''}`} />
-                <span>Sync</span>
+                <span>{t('settings.sync')}</span>
               </button>
             ) : (
               <button
@@ -371,21 +379,21 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 onClick={() => setIsAuthModalOpen(true)}
                 className="py-1.5 px-3 rounded-xl bg-accent hover:bg-accent-dim text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                Sign In
+                {t('settings.signIn')}
               </button>
             )}
           </div>
 
           {user && (
             <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-              <span className="text-xs text-text-muted">Cloud Account</span>
+              <span className="text-xs text-text-muted">{t('settings.cloudAccount')}</span>
               <button
                 type="button"
                 onClick={() => setShowLogoutConfirm(true)}
                 className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Sign Out</span>
+                <span>{t('settings.signOut')}</span>
               </button>
             </div>
           )}
@@ -395,15 +403,15 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       {/* ── SECTION 2: APP PREFERENCES ───────────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          App Preferences
+          {t('settings.appPreferences')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           {/* Appearance / Theme */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">Appearance</span>
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.appearance')}</span>
               <span className="text-2xs font-mono text-text-muted capitalize">
-                {hasCustomTheme ? (theme === 'dark' ? 'Graphite Dark' : 'Chalk Light') : 'System Default'}
+                {hasCustomTheme ? (theme === 'dark' ? t('settings.themeDark') : t('settings.themeLight')) : t('settings.systemDefault')}
               </span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
@@ -417,7 +425,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 }`}
               >
                 <Sun className="w-3.5 h-3.5" />
-                <span>Chalk</span>
+                <span>{t('settings.themeChalk')}</span>
               </button>
               <button
                 type="button"
@@ -429,7 +437,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 }`}
               >
                 <Moon className="w-3.5 h-3.5" />
-                <span>Graphite</span>
+                <span>{t('settings.themeGraphite')}</span>
               </button>
               <button
                 type="button"
@@ -441,7 +449,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 }`}
               >
                 <Laptop className="w-3.5 h-3.5" />
-                <span>System</span>
+                <span>{t('settings.themeSystem')}</span>
               </button>
             </div>
           </div>
@@ -449,7 +457,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Unit Preference */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">Units of Measure</span>
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.units')}</span>
               <span className="text-2xs font-mono text-text-muted uppercase">{profile?.unit || 'lbs'}</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
@@ -457,7 +465,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 type="button"
                 onClick={() => {
                   if (profile) setProfile({ ...profile, unit: 'lbs' });
-                  toast.info('Units switched to Pounds & Inches', 'Units Updated');
+                  toast.info(t('settings.unitsImperialMsg'), t('settings.unitsUpdatedTitle'));
                 }}
                 className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'lbs'
@@ -465,13 +473,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
-                LBS / INCHES
+                {t('settings.unitsImperial')}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   if (profile) setProfile({ ...profile, unit: 'kg' });
-                  toast.info('Units switched to Kilograms & Centimeters', 'Units Updated');
+                  toast.info(t('settings.unitsMetricMsg'), t('settings.unitsUpdatedTitle'));
                 }}
                 className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   profile?.unit === 'kg'
@@ -479,7 +487,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
-                KG / CENTIMETERS
+                {t('settings.unitsMetric')}
               </button>
             </div>
           </div>
@@ -500,17 +508,17 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <div>
               <span className="text-xs font-bold text-text-primary block">{t('settings.dietPreference')}</span>
               <span className="text-3xs text-text-muted block mt-0.5">
-                Used by the protein coach for suggestions that fit how you eat.
+                {t('settings.dietHint')}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               {(
                 [
-                  { id: 'vegetarian', label: 'Vegetarian' },
-                  { id: 'eggitarian', label: 'Eggetarian' },
-                  { id: 'non_vegetarian', label: 'Non-Vegetarian' },
-                  { id: 'vegan', label: 'Vegan' },
-                ] as { id: DietPreference; label: string }[]
+                  { id: 'vegetarian', labelKey: 'settings.dietVegetarian' },
+                  { id: 'eggitarian', labelKey: 'settings.dietEggetarian' },
+                  { id: 'non_vegetarian', labelKey: 'settings.dietNonVegetarian' },
+                  { id: 'vegan', labelKey: 'settings.dietVegan' },
+                ] as { id: DietPreference; labelKey: StringKey }[]
               ).map((opt) => {
                 const active = (profile?.dietPreference || 'non_vegetarian') === opt.id;
                 return (
@@ -520,7 +528,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     onClick={() => {
                       if (!profile) return;
                       setProfile({ ...profile, dietPreference: opt.id });
-                      toast.success(`Diet preference set to ${opt.label}.`, 'Preferences');
+                      toast.success(t('settings.dietSetMsg', { label: t(opt.labelKey) }), t('settings.preferencesTitle'));
                     }}
                     className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
                       active
@@ -528,7 +536,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                         : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
                     }`}
                   >
-                    {opt.label}
+                    {t(opt.labelKey)}
                   </button>
                 );
               })}
@@ -538,8 +546,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Experience Mode */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">Athlete Experience</span>
-              <span className="text-2xs font-mono text-text-muted capitalize">{userMode}</span>
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.experience')}</span>
+              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(userMode)}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
               {(['beginner', 'intermediate', 'advanced'] as const).map((m) => (
@@ -548,7 +556,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   type="button"
                   onClick={() => {
                     setUserMode(m);
-                    toast.info(`Experience mode calibrated to ${m}`, 'Mode Updated');
+                    toast.info(t('settings.modeSetMsg', { mode: modeLabel(m) }), t('settings.modeUpdatedTitle'));
                   }}
                   className={`py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
                     userMode === m
@@ -556,7 +564,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {m}
+                  {modeLabel(m)}
                 </button>
               ))}
             </div>
@@ -576,19 +584,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.weeklyWorkoutTarget')}</span>
               <span className="text-2xs font-mono text-text-muted">
                 {uiPreferences.weeklyTargetDays === null
-                  ? 'AUTO'
+                  ? t('settings.targetAuto')
                   : uiPreferences.weeklyTargetDays === 0
-                  ? 'OFF'
-                  : `${uiPreferences.weeklyTargetDays} DAYS`}
+                  ? t('settings.targetOff')
+                  : t('settings.targetDays', { days: uiPreferences.weeklyTargetDays })}
               </span>
             </div>
             <p className="text-3xs text-text-muted leading-relaxed">
-              How many workouts per week Home counts toward. Auto follows your schedule; Off just counts — no target, no pressure.
+              {t('settings.weeklyTargetHint')}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {[
-                { label: 'Auto', value: null as number | null },
-                { label: 'Off', value: 0 as number | null },
+                { label: t('settings.auto'), value: null as number | null },
+                { label: t('settings.off'), value: 0 as number | null },
                 { label: '2', value: 2 as number | null },
                 { label: '3', value: 3 as number | null },
                 { label: '4', value: 4 as number | null },
@@ -623,8 +631,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-text-primary">Weekly schedule</p>
-                  <p className="text-3xs text-text-muted">Set any day to a plan or rest — or clear the week entirely</p>
+                  <p className="text-xs font-bold text-text-primary">{t('settings.weeklySchedule')}</p>
+                  <p className="text-3xs text-text-muted">{t('settings.weeklyScheduleHint')}</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -635,10 +643,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('settings.gamification')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">XP, levels, streaks and monthly challenges on Home</p>
+              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.gamificationHint')}</p>
             </div>
             <SettingsToggle
-              label="Toggle gamification"
+              label={t('settings.toggleGamification')}
               on={uiPreferences.gamificationEnabled}
               onToggle={() => setUiPreferences({ gamificationEnabled: !uiPreferences.gamificationEnabled })}
             />
@@ -648,10 +656,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('settings.coach')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">Check-in cards, calorie suggestions and the readiness score on Home, plus the post-workout Coach&apos;s Take</p>
+              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.coachHint')}</p>
             </div>
             <SettingsToggle
-              label="Toggle coach"
+              label={t('settings.toggleCoach')}
               on={uiPreferences.coachEnabled}
               onToggle={() => setUiPreferences({ coachEnabled: !uiPreferences.coachEnabled })}
             />
@@ -660,11 +668,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Habit matrix toggle */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
-              <p className="text-xs font-bold text-text-primary">Habit matrix on Home</p>
-              <p className="text-3xs text-text-muted leading-relaxed">The one-week Gym / Water / Creatine / Protein grid</p>
+              <p className="text-xs font-bold text-text-primary">{t('settings.habitMatrix')}</p>
+              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.habitMatrixHint')}</p>
             </div>
             <SettingsToggle
-              label="Toggle habit matrix on Home"
+              label={t('settings.toggleHabitMatrix')}
               on={uiPreferences.showHabitMatrix}
               onToggle={() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix })}
             />
@@ -674,10 +682,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('progress.muscleVolume')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">Per-muscle weekly sets and the recovery map on Progress</p>
+              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.muscleVolumeHint')}</p>
             </div>
             <SettingsToggle
-              label="Toggle muscle volume on Progress"
+              label={t('settings.toggleMuscleVolume')}
               on={uiPreferences.showMuscleVolume !== false}
               onToggle={() => setUiPreferences({ showMuscleVolume: uiPreferences.showMuscleVolume === false })}
             />
@@ -692,7 +700,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   <p className="text-3xs text-text-muted leading-relaxed">{t('health.hint')}</p>
                 </div>
                 <SettingsToggle
-                  label="Toggle Health Connect sync"
+                  label={t('settings.toggleHealth')}
                   on={uiPreferences.healthConnectEnabled === true}
                   onToggle={handleHealthConnectToggle}
                 />
@@ -707,7 +715,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </p>
               )}
               {healthStatus === 'connecting' && (
-                <p className="text-3xs text-text-muted">Opening Health Connect…</p>
+                <p className="text-3xs text-text-muted">{t('settings.healthOpening')}</p>
               )}
               {healthStatus === 'unavailable' && (
                 <p className="text-3xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
@@ -736,7 +744,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       {/* ── SECTION 3: DATA & PRIVACY ────────────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          Data, Privacy &amp; Legal
+          {t('settings.dataPrivacyLegal')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
           {/* Export JSON */}
@@ -750,8 +758,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Download className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Export JSON Backup</p>
-                <p className="text-3xs text-text-muted">Download all workouts, PRs, and meals</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.exportJson')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.exportJsonHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -780,15 +788,15 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
-            aria-label="Import backup file"
+            aria-label={t('settings.importAria')}
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
                 <Upload className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Import Backup File</p>
-                <p className="text-3xs text-text-muted">Restore data from an exported backup</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.importBackup')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.importBackupHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -815,8 +823,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Shield className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Privacy Policy</p>
-                <p className="text-3xs text-text-muted">How your biometric data is protected</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.privacyPolicy')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.privacyPolicyHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -834,8 +842,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <FileText className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Terms of Service</p>
-                <p className="text-3xs text-text-muted">ASCEND athletic platform usage terms</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.terms')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.termsHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -853,8 +861,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <AlertCircle className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Health &amp; Safety Disclaimer</p>
-                <p className="text-3xs text-text-muted">Fitness guidance is not medical advice</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.disclaimer')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.disclaimerHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -872,24 +880,22 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Trash2 className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Delete My Data (Web)</p>
-                <p className="text-3xs text-text-muted">Request deletion without the app installed</p>
+                <p className="text-xs font-bold text-text-primary">{t('settings.deleteDataWeb')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.deleteDataWebHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
           </a>
 
           <p className="px-3 pt-1 text-3xs text-text-muted leading-relaxed">
-            ASCEND provides fitness tracking and general training guidance — it is not medical
-            advice. Consult a qualified healthcare professional before starting a new exercise
-            or nutrition program.
+            {t('settings.medicalNote')}
           </p>
 
           {/* Anonymous Telemetry */}
           <div className="w-full p-3 flex items-center justify-between">
             <div className="space-y-0.5 pr-2">
-              <p className="text-xs font-bold text-text-primary">Anonymous Diagnostics</p>
-              <p className="text-3xs text-text-muted">Share non-identifying crash and error reports</p>
+              <p className="text-xs font-bold text-text-primary">{t('settings.diagnostics')}</p>
+              <p className="text-3xs text-text-muted">{t('settings.diagnosticsHint')}</p>
             </div>
             <button
               type="button"
@@ -898,14 +904,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 setTelemetryConsent(next);
                 setTelemetryConsentState(next);
                 toast.info(
-                  next === 'accepted' ? 'Diagnostics reporting enabled' : 'Diagnostics reporting disabled',
-                  'Privacy Updated'
+                  next === 'accepted' ? t('settings.diagnosticsOn') : t('settings.diagnosticsOff'),
+                  t('settings.privacyUpdatedTitle')
                 );
               }}
               className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
                 telemetryConsent === 'accepted' ? 'bg-accent' : 'bg-bg-secondary border border-border'
               }`}
-              aria-label="Toggle Diagnostics"
+              aria-label={t('settings.toggleDiagnostics')}
             >
               <div
                 className={`w-5 h-5 rounded-full bg-white transition-transform absolute top-0.5 ${
@@ -926,8 +932,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Trash2 className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-accent">Delete Account</p>
-                <p className="text-3xs text-text-muted">Permanently erase account and all local data</p>
+                <p className="text-xs font-bold text-accent">{t('settings.deleteAccount')}</p>
+                <p className="text-3xs text-text-muted">{t('settings.deleteAccountHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-accent" />
@@ -941,14 +947,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleExecuteSignOut}
-        title="Sign Out of ASCEND?"
-        message={
-          user
-            ? "Your account stays intact — your workout data, personal records, and meals remain safely preserved and synced."
-            : "Signing out clears your profile from this device. Your sessions, PRs, meals, plans and targets stay saved on this device and return when you set up your profile again."
-        }
-        confirmText="Sign Out"
-        cancelText="Cancel"
+        title={t('settings.signOutTitle')}
+        message={user ? t('settings.signOutMsgUser') : t('settings.signOutMsgGuest')}
+        confirmText={t('settings.signOut')}
+        cancelText={t('common.cancel')}
         variant="default"
         icon="logout"
       />
@@ -958,10 +960,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         isOpen={showDeleteConfirm}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleExecuteDeleteAccount}
-        title="Delete Account Permanently?"
-        message="This action cannot be undone. All your workout history, personal records, custom routines, and nutrition logs will be permanently eradicated from this device and our servers."
-        confirmText="Delete Account"
-        cancelText="Cancel"
+        title={t('settings.deleteTitle')}
+        message={t('settings.deleteMsg')}
+        confirmText={t('settings.deleteAccount')}
+        cancelText={t('common.cancel')}
         variant="danger"
         icon="trash"
         requireTypedConfirmation="DELETE"

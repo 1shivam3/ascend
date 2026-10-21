@@ -24,6 +24,7 @@ import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
 import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
 import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
 import EditProfileModal from '@/components/EditProfileModal';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
@@ -46,6 +47,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const goals = useStore((state) => state.goals || []);
   const logout = useStore((state) => state.logout);
   const toast = useToast();
+  const { t } = useTranslation();
 
   const { goBack, canGoBack } = useAppNavigation();
   const { user, signOut } = useSupabaseSync();
@@ -65,7 +67,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // there is exactly one.
   const handleShareSplit = () => {
     if (plannedWorkouts.length === 0) {
-      toast.info('Create a workout plan first — there is nothing to share yet.', 'No Plans');
+      toast.info(t('profile.noPlansMsg'), t('profile.noPlansTitle'));
       return;
     }
     if (plannedWorkouts.length === 1) {
@@ -98,7 +100,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
       console.warn('Sign out warning:', err);
     }
     logout({ clearLocalData: false });
-    toast.info('Logged out. Switched to welcome screen.', 'Logged Out');
+    toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
     if (onNavigate) onNavigate('home');
   };
 
@@ -124,7 +126,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     const estimatedCount = levels.filter((l) => l.isStandardUnavailable).length;
     return { ...getOverallLevel(levels), estimatedCount, totalLifts: levels.length };
   }, [prs, profile?.bodyweightKg, profile?.gender]);
-  const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : 'Local Guest Athlete';
+  const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : t('common.guestAthlete');
   const userUnit = profile?.unit || 'lbs';
 
   // Format height display
@@ -160,12 +162,12 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
             type="button"
             onClick={handleBack}
             className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-            aria-label="Back to previous screen"
+            aria-label={t('profile.back')}
           >
             <ChevronLeft className="w-5 h-5 text-accent" />
           </button>
           <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
-            Profile
+            {t('profile.title')}
           </h1>
         </div>
 
@@ -173,8 +175,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           type="button"
           onClick={() => onNavigate?.('settings')}
           className="p-2 min-h-[44px] min-w-[44px] rounded-xl bg-bg-card border border-border text-text-secondary hover:text-accent transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-          title="App Settings"
-          aria-label="Open Settings"
+          title={t('profile.appSettings')}
+          aria-label={t('profile.openSettings')}
         >
           <Settings className="w-5 h-5 text-accent" />
         </button>
@@ -189,7 +191,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={profile.avatar}
-                alt="Profile"
+                alt={t('profile.title')}
                 className="w-16 h-16 rounded-full object-cover border-2 border-accent/40 shadow-xs select-none"
               />
             ) : (
@@ -209,12 +211,14 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               <div className="pt-1">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
-                  {athleteTier.title} · Lv {athleteTier.level}
+                  {athleteTier.title} · {t('profile.level', { level: athleteTier.level })}
                 </span>
                 {athleteTier.estimatedCount > 0 && (
                   <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
-                    {athleteTier.estimatedCount} of {athleteTier.totalLifts} lifts have no published
-                    standard — estimated and excluded from this level.
+                    {t('profile.estimatedLifts', {
+                      estimated: athleteTier.estimatedCount,
+                      total: athleteTier.totalLifts,
+                    })}
                   </p>
                 )}
               </div>
@@ -225,8 +229,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
             type="button"
             onClick={() => setIsEditProfileOpen(true)}
             className="p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-text-secondary hover:text-accent transition-colors cursor-pointer"
-            title="Edit Profile Details"
-            aria-label="Edit Profile"
+            title={t('profile.editProfileDetails')}
+            aria-label={t('profile.editProfile')}
           >
             <Edit2 className="w-4 h-4 text-accent" />
           </button>
@@ -236,7 +240,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-border/60">
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
             <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
-              Height
+              {t('profile.height')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
               {displayHeight()}
@@ -245,7 +249,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
             <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
-              Weight
+              {t('home.weight')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
               {displayWeight()}
@@ -254,7 +258,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
             <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
-              Age
+              {t('profile.age')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
               {displayAge()}
@@ -266,7 +270,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
       {/* ── SECTION 1: ACCOUNT & TRAINING MENU ──────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          Account &amp; Training
+          {t('profile.sectionAccount')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
           {/* Edit Profile */}
@@ -280,8 +284,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <User className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Personal Details</p>
-                <p className="text-3xs text-text-muted">Name, Gender, Height, Weight &amp; Age</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.personalDetails')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.personalDetailsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -298,11 +302,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Target className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Fitness Goals</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.fitnessGoals')}</p>
                 <p className="text-3xs text-text-muted">
                   {goals.length > 0
                     ? goals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(', ')
-                    : 'Strength & Hypertrophy'}
+                    : t('profile.defaultGoal')}
                 </p>
               </div>
             </div>
@@ -320,8 +324,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Bell className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Reminders &amp; Alerts</p>
-                <p className="text-3xs text-text-muted">Hydration, workout and meal schedule prompts</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.reminders')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.remindersHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -338,8 +342,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Database className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Data &amp; Storage</p>
-                <p className="text-3xs text-text-muted">Local device storage, export &amp; backup</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.dataStorage')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.dataStorageHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -356,8 +360,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Settings className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">App Settings</p>
-                <p className="text-3xs text-text-muted">Theme, units, cloud account &amp; privacy controls</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.appSettings')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.appSettingsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -368,7 +372,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
       {/* ── SECTION 2: SHARING & COMMUNITY ──────────────────────────────────── */}
       <div className="space-y-2">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          Sharing &amp; Support
+          {t('profile.sectionSharing')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
           {/* Share Workout Routine */}
@@ -382,8 +386,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Share2 className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Share Workout Split</p>
-                <p className="text-3xs text-text-muted">Export custom workout routine via link or QR code</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.shareSplit')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.shareSplitHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -400,8 +404,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <Trophy className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Weekly Training Card</p>
-                <p className="text-3xs text-text-muted">Export shareable athletic performance summary</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.weeklyCard')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.weeklyCardHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -418,8 +422,8 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 <MessageSquare className="w-4 h-4 text-accent" />
               </div>
               <div>
-                <p className="text-xs font-bold text-text-primary">Feedback &amp; Support</p>
-                <p className="text-3xs text-text-muted">Report bugs or request new athletic features</p>
+                <p className="text-xs font-bold text-text-primary">{t('profile.feedback')}</p>
+                <p className="text-3xs text-text-muted">{t('profile.feedbackHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -435,7 +439,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border text-xs font-bold text-text-secondary hover:text-accent transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
           <LogOut className="w-4 h-4 text-accent" />
-          <span>Log Out</span>
+          <span>{t('profile.logOut')}</span>
         </button>
       </div>
 
@@ -477,13 +481,13 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           onClick={() => setIsSharePickerOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="Choose a plan to share"
+          aria-label={t('profile.choosePlanToShare')}
         >
           <div
             className="modal-content max-w-md w-full p-5 space-y-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-bold text-text-primary text-sm">Share which plan?</h3>
+            <h3 className="font-bold text-text-primary text-sm">{t('profile.shareWhichPlan')}</h3>
             <div className="space-y-2 max-h-[50vh] overflow-y-auto">
               {plannedWorkouts.map((p) => (
                 <button
@@ -497,7 +501,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 >
                   <span className="block text-sm font-bold text-text-primary">{p.name}</span>
                   <span className="block text-2xs text-text-muted mt-0.5">
-                    {p.exercises.length} exercises
+                    {t('profile.exercisesCount', { count: p.exercises.length })}
                   </span>
                 </button>
               ))}
@@ -507,7 +511,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               onClick={() => setIsSharePickerOpen(false)}
               className="w-full py-2.5 rounded-xl bg-bg-secondary text-text-secondary text-sm font-semibold cursor-pointer"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -524,14 +528,10 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         isOpen={showLogoutConfirm}
         onClose={() => setShowLogoutConfirm(false)}
         onConfirm={handleConfirmLogout}
-        title="Log Out of ASCEND?"
-        message={
-          user
-            ? "Your account stays intact — your sessions, PRs and meal history remain saved and synced."
-            : "Logging out clears your profile from this device. Your sessions, PRs, meals, plans and targets stay saved on this device and return when you set up your profile again."
-        }
-        confirmText="Log Out"
-        cancelText="Cancel"
+        title={t('profile.logoutTitle')}
+        message={user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}
+        confirmText={t('profile.logOut')}
+        cancelText={t('common.cancel')}
         variant="default"
         icon="logout"
       />

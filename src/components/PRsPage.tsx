@@ -46,6 +46,7 @@ import { useToast } from '@/components/ui/Toast';
 
 import { ExerciseRank, EquipmentType, Gender } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
 import { safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -95,6 +96,7 @@ interface ExerciseDropdownProps {
 }
 
 function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -137,7 +139,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
     return value === 'Custom' ? null : null;
   }, [value, grouped]);
 
-  const displayLabel = value === 'Custom' ? 'Custom Exercise...' : value || 'Select an exercise...';
+  const displayLabel = value === 'Custom' ? t('prs.customExercise') : value || t('prs.selectExercise');
   const pill = selectedCategory ? CATEGORY_PILL[selectedCategory] : null;
 
   return (
@@ -173,7 +175,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search exercises..."
+                placeholder={t('prs.searchExercises')}
                 className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none border-none p-0"
               />
               {search && (
@@ -235,12 +237,12 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" />
-                Custom Exercise...
+                {t('prs.customExercise')}
               </button>
             </div>
 
             {filtered.length === 0 && !search.trim() && (
-              <p className="text-xs text-text-muted text-center py-4">No exercises found.</p>
+              <p className="text-xs text-text-muted text-center py-4">{t('prs.noExercises')}</p>
             )}
           </div>
         </div>
@@ -268,6 +270,7 @@ function LevelProgressionModal({
   userUnit,
   onClose,
 }: LevelModalProps) {
+  const { t } = useTranslation();
   const nextInfo = useMemo(
     () => getNextLevelInfo(exercise, levelInfo.level, bodyweightKg, gender),
     [exercise, levelInfo.level, bodyweightKg, gender]
@@ -301,7 +304,7 @@ function LevelProgressionModal({
         <div className="p-4 border-b border-border flex justify-between items-center bg-gradient-to-r from-bg-card to-bg-secondary">
           <div>
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
-            <p className="text-2xs text-text-muted font-mono mt-0.5">Level Progression</p>
+            <p className="text-2xs text-text-muted font-mono mt-0.5">{t('prs.levelProgression')}</p>
           </div>
           <button type="button" onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded">
             <X size={18} />
@@ -313,21 +316,21 @@ function LevelProgressionModal({
           <div className="flex items-center justify-between gap-4">
             <div className="text-center">
               <span className="text-3xl font-extrabold text-accent font-mono">{currentLevel}</span>
-              <p className="text-2xs text-text-muted font-mono">CURRENT LV</p>
+              <p className="text-2xs text-text-muted font-mono">{t('prs.currentLv')}</p>
             </div>
             <div className="flex-1 flex flex-col items-center gap-1">
               <RankBadge rank={currentRank} size="md" />
-              <p className="text-2xs text-text-muted font-mono">{levelInfo.ratio}x BW ratio</p>
+              <p className="text-2xs text-text-muted font-mono">{t('prs.bwRatio', { ratio: levelInfo.ratio })}</p>
             </div>
             <div className="text-center">
               <span className="text-3xl font-extrabold text-text-secondary font-mono">{nextInfo.nextLevel}</span>
-              <p className="text-2xs text-text-muted font-mono">NEXT LV</p>
+              <p className="text-2xs text-text-muted font-mono">{t('prs.nextLv')}</p>
             </div>
           </div>
           {/* Honest flag: this level is estimated from a proxy standard. */}
           {levelInfo.isStandardUnavailable && levelInfo.standardNote && (
             <p className="text-2xs text-amber-400 leading-relaxed bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
-              Estimated level — {levelInfo.standardNote}
+              {t('prs.estimatedLevel', { note: levelInfo.standardNote })}
             </p>
           )}
 
@@ -335,18 +338,18 @@ function LevelProgressionModal({
           <div className="rounded-xl border border-accent/30 bg-accent/5 p-3 space-y-2">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-accent" />
-              <span className="text-xs font-semibold text-text-primary">To reach Level {nextInfo.nextLevel}</span>
+              <span className="text-xs font-semibold text-text-primary">{t('prs.toReachLevel', { level: nextInfo.nextLevel })}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-2xs text-text-muted font-mono">Required 1RM</span>
+              <span className="text-2xs text-text-muted font-mono">{t('prs.required1rm')}</span>
               <span className="text-base font-bold text-accent font-mono">
                 {requiredDisplay} {userUnit}
-                {isDB && <span className="text-2xs ml-1 text-text-muted">/hand</span>}
+                {isDB && <span className="text-2xs ml-1 text-text-muted">{t('prs.perHand')}</span>}
               </span>
             </div>
             {nextInfo.levelsToNextRank > 0 && (
               <div className="flex items-center justify-between">
-                <span className="text-2xs text-text-muted font-mono">Levels to next rank tier</span>
+                <span className="text-2xs text-text-muted font-mono">{t('prs.levelsToNextRank')}</span>
                 <span className="text-sm font-bold text-warning font-mono">{nextInfo.levelsToNextRank}</span>
               </div>
             )}
@@ -355,7 +358,7 @@ function LevelProgressionModal({
           {/* Progress bar within current tier */}
           <div className="space-y-1.5">
             <div className="flex justify-between text-2xs text-text-muted font-mono">
-              <span>{currentRank} Tier Progress</span>
+              <span>{t('prs.tierProgress', { rank: currentRank })}</span>
               <span>{Math.round(tierProgressPct)}%</span>
             </div>
             <div className="level-bar">
@@ -372,7 +375,7 @@ function LevelProgressionModal({
 
           {/* All 7 rank tiers */}
           <div className="space-y-1.5">
-            <p className="section-title">ALL RANK TIERS</p>
+            <p className="section-title">{t('prs.allRankTiers')}</p>
             <div className="space-y-1">
               {RANK_TIERS.map((t) => {
                 const isCurrent = t.rank === currentRank;
@@ -455,6 +458,7 @@ function LiftCard({
   onOpenTargetModal,
   onDeletePR,
 }: LiftCardProps) {
+  const { t } = useTranslation();
   const display1RM =
     userUnit === 'lbs'
       ? Math.round(item.best1RMKg * 2.20462 * 10) / 10
@@ -479,7 +483,7 @@ function LiftCard({
           </h3>
           <p className="text-xs text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
             <span>
-              Best:{' '}
+              {t('prs.best')}{' '}
               <strong className="text-text-primary font-medium">
                 {item.bestSet.isBodyweight
                   ? `BW × ${item.bestSet.reps}`
@@ -488,7 +492,7 @@ function LiftCard({
             </span>
             {isBaselineLift && (
               <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-sans">
-                Baseline
+                {t('prs.baseline')}
               </span>
             )}
           </p>
@@ -500,7 +504,7 @@ function LiftCard({
             <span className="text-xs font-normal text-text-muted">{userUnit}</span>
           </span>
           <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
-            Estimated 1RM
+            {t('prs.estimated1rm')}
           </span>
         </div>
       </div>
@@ -511,7 +515,7 @@ function LiftCard({
           <span className="text-text-muted flex items-center gap-1 font-medium">
             <Target className="w-3.5 h-3.5 text-accent" />
             <span>
-              Next milestone: <strong className="text-text-primary">{item.nextMilestone} {userUnit}</strong>
+              {t('prs.nextMilestone')} <strong className="text-text-primary">{item.nextMilestone} {userUnit}</strong>
             </span>
           </span>
           <div className="flex items-center gap-1.5">
@@ -519,12 +523,12 @@ function LiftCard({
               type="button"
               onClick={onOpenTargetModal}
               className="text-2xs text-text-muted hover:text-accent underline"
-              title="Set target"
+              title={t('prs.setTarget')}
             >
-              Edit Target
+              {t('prs.editTarget')}
             </button>
             <span className="font-bold text-accent text-xs font-mono tabular-nums">
-              {toGo > 0 ? `${toGo} ${userUnit} to go` : 'Target reached!'}
+              {toGo > 0 ? t('prs.toGo', { amount: toGo, unit: userUnit }) : t('prs.targetReached')}
             </span>
           </div>
         </div>
@@ -544,9 +548,11 @@ function LiftCard({
           onClick={onToggleExpand}
           className="text-text-muted hover:text-text-primary font-medium flex items-center gap-1.5 transition-colors py-0.5"
         >
-          <span>{isExpanded ? 'Hide History' : 'View History'}</span>
+          <span>{isExpanded ? t('prs.hideHistory') : t('prs.viewHistory')}</span>
           <span className="text-2xs font-mono text-text-muted">
-            ({item.prs.length} {item.prs.length === 1 ? 'PR' : 'PRs'})
+            {t(item.prs.length === 1 ? 'prs.historyCountOne' : 'prs.historyCount', {
+              count: item.prs.length,
+            })}
           </span>
           {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
@@ -555,10 +561,10 @@ function LiftCard({
           type="button"
           onClick={onOpenPlateModal}
           className="text-2xs text-text-muted hover:text-accent font-medium flex items-center gap-1 py-0.5"
-          title="Tap to calculate barbell plates"
+          title={t('prs.plateCalcTitle')}
         >
           <Dumbbell className="w-3 h-3 text-accent" />
-          <span>Plate Calc</span>
+          <span>{t('prs.plateCalc')}</span>
         </button>
       </div>
 
@@ -572,9 +578,9 @@ function LiftCard({
                 type="button"
                 onClick={onOpenLevelModal}
                 className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
-                title="View tier progression"
+                title={t('prs.viewTier')}
               >
-                <span>Level {item.levelInfo.level}</span>
+                <span>{t('prs.level', { level: item.levelInfo.level })}</span>
                 <span>•</span>
                 <span>{item.levelInfo.rank}</span>
               </button>
@@ -583,7 +589,7 @@ function LiftCard({
             </div>
             {isMain && (
               <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
-                Core Lift
+                {t('prs.coreLift')}
               </span>
             )}
           </div>
@@ -609,29 +615,29 @@ function LiftCard({
                   <div>
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="font-bold text-text-primary">
-                        {isBWRecord ? 'Bodyweight' : `${w} ${userUnit}`} × {p.reps} reps
+                        {isBWRecord ? t('prs.equipmentBodyweight') : `${w} ${userUnit}`} × {t('prs.repsWord', { reps: p.reps })}
                       </span>
                       {isAllTimePeak && (
                         <span className="text-[9px] font-sans font-black text-accent bg-accent/20 px-1.5 py-0.5 rounded border border-accent/40 flex items-center gap-1 shadow-2xs">
                           <Trophy className="w-2.5 h-2.5 text-accent" />
-                          <span>All-Time Record</span>
+                          <span>{t('prs.allTimeRecord')}</span>
                         </span>
                       )}
                       {p.prType === 'reps' && (
                         <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
                           <Zap className="w-2.5 h-2.5 text-accent fill-accent" />
-                          <span>Rep PR</span>
+                          <span>{t('prs.repPr')}</span>
                         </span>
                       )}
                       {(p.prType === '1rm' || (!p.prType && p.reps === 1)) && (
                         <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
                           <Award className="w-2.5 h-2.5 text-accent" />
-                          <span>1RM PR</span>
+                          <span>{t('prs.oneRmPr')}</span>
                         </span>
                       )}
                       {(p.isBaseline || p.notes?.includes('Baseline')) && (
                         <span className="text-[9px] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
-                          Baseline
+                          {t('prs.baseline')}
                         </span>
                       )}
                     </div>
@@ -652,7 +658,7 @@ function LiftCard({
                     type="button"
                     onClick={() => onDeletePR(p.id, p.date, p.exercise)}
                     className="text-text-muted hover:text-danger p-1 rounded hover:bg-danger/10 transition-colors"
-                    title="Delete record"
+                    title={t('prs.deleteRecord')}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -674,6 +680,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const bodyweightKg = profile?.bodyweightKg || 75;
   const gender = profile?.gender || 'male';
   const toast = useToast();
+  const { t } = useTranslation();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
@@ -755,13 +762,13 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const handleSavePR = () => {
     const finalExercise = exercise === 'Custom' ? customExercise.trim() : exercise;
     if (!finalExercise) {
-      toast.error('Please select or specify an exercise name.', 'Missing Exercise');
+      toast.error(t('prs.toastMissingExercise'), t('prs.toastMissingExerciseTitle'));
       return;
     }
 
     const repsNum = parseInt(reps, 10);
     if (isNaN(repsNum) || repsNum <= 0) {
-      toast.error('Reps count must be at least 1.', 'Invalid Reps');
+      toast.error(t('prs.toastInvalidReps'), t('prs.toastInvalidRepsTitle'));
       return;
     }
 
@@ -772,11 +779,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     if (isBW) {
       const addedWeightNum = weightStr === '' || weightStr === '0' ? 0 : parseFloat(weightStr);
       if (weightStr !== '' && weightStr !== '0' && isNaN(addedWeightNum)) {
-        toast.error('Added weight must be a valid number.', 'Invalid Weight');
+        toast.error(t('prs.toastAddedWeightNumber'), t('prs.toastInvalidWeightTitle'));
         return;
       }
       if (addedWeightNum < 0) {
-        toast.error('Added weight cannot be negative.', 'Invalid Weight');
+        toast.error(t('prs.toastAddedWeightNegative'), t('prs.toastInvalidWeightTitle'));
         return;
       }
 
@@ -793,8 +800,8 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       }
       if (addedKg > MAX_PR_WEIGHT_KG) {
         toast.error(
-          `Added weight is above the ${MAX_PR_WEIGHT_KG} kg sanity cap. Please check the value.`,
-          'Unlikely Weight'
+          t('prs.toastAddedAboveCap', { max: MAX_PR_WEIGHT_KG }),
+          t('prs.toastUnlikelyTitle')
         );
         return;
       }
@@ -817,20 +824,24 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       const displayStr =
         addedWeightNum > 0
           ? `+${addedWeightNum} ${unit} × ${repsNum}`
-          : `Bodyweight × ${repsNum}`;
+          : t('prs.toastBodyweightDisplay', { reps: repsNum });
       toast.success(
-        `${finalExercise}: ${displayStr} (${Math.round(oneRepMaxKg)} kg 1RM)`,
-        'PR Logged'
+        t('prs.toastPrDetail', {
+          exercise: finalExercise,
+          detail: displayStr,
+          onerm: Math.round(oneRepMaxKg),
+        }),
+        t('prs.toastPrLoggedTitle')
       );
     } else {
       // Standard exercise: weight required
       if (!weightStr) {
-        toast.error('Please enter the weight lifted.', 'Missing Weight');
+        toast.error(t('prs.toastMissingWeight'), t('prs.toastMissingWeightTitle'));
         return;
       }
       const weightNum = parseFloat(weightStr);
       if (isNaN(weightNum) || weightNum <= 0) {
-        toast.error('Weight lifted must be greater than zero.', 'Invalid Weight');
+        toast.error(t('prs.toastWeightGtZero'), t('prs.toastInvalidWeightTitle'));
         return;
       }
 
@@ -846,8 +857,13 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       if (weightKg > MAX_PR_WEIGHT_KG) {
         toast.error(
-          `${weightNum} ${unit} (≈${Math.round(weightKg)} kg) is above the ${MAX_PR_WEIGHT_KG} kg sanity cap — no raw lift in history exceeds it. Please check the value.`,
-          'Unlikely Weight'
+          t('prs.toastAboveCapDetail', {
+            weight: weightNum,
+            unit,
+            kg: Math.round(weightKg),
+            max: MAX_PR_WEIGHT_KG,
+          }),
+          t('prs.toastUnlikelyTitle')
         );
         return;
       }
@@ -866,8 +882,12 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
       });
 
       toast.success(
-        `${finalExercise}: ${weightNum} ${unit} × ${repsNum} (${Math.round(oneRepMaxKg)} kg 1RM)`,
-        'PR Logged'
+        t('prs.toastPrDetail', {
+          exercise: finalExercise,
+          detail: `${weightNum} ${unit} × ${repsNum}`,
+          onerm: Math.round(oneRepMaxKg),
+        }),
+        t('prs.toastPrLoggedTitle')
       );
     }
 
@@ -886,15 +906,19 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
     if (!targetModalExercise || !targetWeightInput) return;
     const targetVal = parseFloat(targetWeightInput);
     if (isNaN(targetVal) || targetVal <= 0) {
-      toast.error('Please enter a target weight greater than zero.', 'Invalid Target');
+      toast.error(t('prs.toastInvalidTarget'), t('prs.toastInvalidTargetTitle'));
       return;
     }
 
     const targetKg = userUnit === 'lbs' ? targetVal * 0.453592 : targetVal;
     setPRTarget(targetModalExercise, Math.round(targetKg * 10) / 10);
     toast.success(
-      `Next milestone target for ${targetModalExercise} set to ${targetVal} ${userUnit}.`,
-      'Target Updated'
+      t('prs.toastTargetUpdated', {
+        exercise: targetModalExercise,
+        weight: targetVal,
+        unit: userUnit,
+      }),
+      t('prs.toastTargetUpdatedTitle')
     );
 
     setTargetModalExercise(null);
@@ -1061,16 +1085,16 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               type="button"
               onClick={goBack}
               className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Go back to previous page"
-              title="Go back"
+              aria-label={t('prs.goBack')}
+              title={t('prs.goBack')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#E44427] uppercase">PERSONAL BESTS</div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#E44427] uppercase">{t('prs.personalBests')}</div>
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">
-              PERSONAL RECORDS.
+              {t('prs.title')}
             </h1>
           </div>
         </div>
@@ -1082,7 +1106,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               setPlateModalMeta(null);
             }}
             className="p-2 rounded-lg bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors"
-            title="Barbell Plate Calculator"
+            title={t('prs.plateCalculator')}
           >
             <Dumbbell className="w-4 h-4 text-accent" />
           </button>
@@ -1092,7 +1116,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             onClick={() => setShowAddModal(true)}
           >
             <Plus size={16} />
-            <span>Add PR</span>
+            <span>{t('prs.addPr')}</span>
           </button>
         </div>
       </div>
@@ -1103,14 +1127,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="flex justify-between items-baseline">
             <div>
               <span className="section-title text-[11px] mb-0 font-sans">
-                {profile?.goals?.includes('get_stronger') ? 'POWERLIFTING SCOREBOARD' : 'KEY COMPOUND LIFTS TOTAL'}
+                {profile?.goals?.includes('get_stronger') ? t('prs.scoreboardPowerlifting') : t('prs.scoreboardCompounds')}
               </span>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl font-black text-accent font-sans tabular-nums">
                   {displayWeight(bigThreeStats.totalKg)}
                 </span>
                 <span className="text-sm font-semibold text-text-primary">
-                  {profile?.goals?.includes('get_stronger') ? 'Big 3 Total' : 'Combined Compound Total'}
+                  {profile?.goals?.includes('get_stronger') ? t('prs.big3Total') : t('prs.combinedTotal')}
                 </span>
               </div>
             </div>
@@ -1120,14 +1144,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
                     {Math.round(dotsScore)} DOTS
                   </span>
-                  <span className="text-3xs text-text-muted block">Normalized Score</span>
+                  <span className="text-3xs text-text-muted block">{t('prs.normalizedScore')}</span>
                 </>
               ) : (
                 <>
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
-                    {exerciseStats.length} Lifts
+                    {t('prs.liftsCount', { count: exerciseStats.length })}
                   </span>
-                  <span className="text-3xs text-text-muted block">Calibrated PRs</span>
+                  <span className="text-3xs text-text-muted block">{t('prs.calibratedPrs')}</span>
                 </>
               )}
             </div>
@@ -1135,7 +1159,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
           <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center">
             <div>
-              <span className="text-xs font-bold text-text-secondary block">Squat</span>
+              <span className="text-xs font-bold text-text-secondary block">{t('prs.squat')}</span>
               <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
               </span>
@@ -1146,7 +1170,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               )}
             </div>
             <div className="border-l border-border">
-              <span className="text-xs font-bold text-text-secondary block">Bench</span>
+              <span className="text-xs font-bold text-text-secondary block">{t('prs.bench')}</span>
               <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
               </span>
@@ -1157,7 +1181,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               )}
             </div>
             <div className="border-l border-border">
-              <span className="text-xs font-bold text-text-secondary block">Deadlift</span>
+              <span className="text-xs font-bold text-text-secondary block">{t('prs.deadlift')}</span>
               <span className="text-sm font-black text-text-primary mt-0.5 block tabular-nums">
                 {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
               </span>
@@ -1180,9 +1204,9 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         {prs.length > 0 && (
           <div className="flex items-center bg-bg-card border border-border/80 rounded-xl p-1 gap-1 shadow-xs">
             {[
-              { id: 'all', label: 'All PRs', count: prs.length },
-              { id: '1rm', label: '1RM Maxes', count: prs.filter((p) => p.prType === '1rm' || (!p.prType && p.reps === 1)).length },
-              { id: 'reps', label: 'Rep Milestones', count: prs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps > 1)).length },
+              { id: 'all', label: t('prs.filterAll'), count: prs.length },
+              { id: '1rm', label: t('prs.filter1rm'), count: prs.filter((p) => p.prType === '1rm' || (!p.prType && p.reps === 1)).length },
+              { id: 'reps', label: t('prs.filterReps'), count: prs.filter((p) => p.prType === 'reps' || (!p.prType && p.reps > 1)).length },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1205,21 +1229,21 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div>
-            <h2 className="section-title mb-0 font-sans">YOUR LIFTS &amp; MILESTONES</h2>
+            <h2 className="section-title mb-0 font-sans">{t('prs.yourLifts')}</h2>
             <p className="text-2xs text-text-muted mt-0.5 font-sans">
-              {mainCompoundLifts.length} Core Compound Lifts • {otherLifts.length} Accessory Exercises
+              {t('prs.liftsSummary', { core: mainCompoundLifts.length, other: otherLifts.length })}
             </p>
           </div>
 
           {/* Equipment Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             {[
-              { id: 'all', label: 'All Lifts', count: exerciseStats.length, icon: null },
-              { id: 'barbell', label: 'Barbell', count: equipmentCounts.barbell, icon: Dumbbell },
-              { id: 'dumbbell', label: 'Dumbbell', count: equipmentCounts.dumbbell, icon: Activity },
-              { id: 'cable', label: 'Cable', count: equipmentCounts.cable, icon: Layers },
-              { id: 'bodyweight', label: 'Bodyweight', count: equipmentCounts.bodyweight, icon: Target },
-              { id: 'machine', label: 'Machine', count: equipmentCounts.machine, icon: Sliders },
+              { id: 'all', label: t('prs.equipmentAll'), count: exerciseStats.length, icon: null },
+              { id: 'barbell', label: t('prs.equipmentBarbell'), count: equipmentCounts.barbell, icon: Dumbbell },
+              { id: 'dumbbell', label: t('prs.equipmentDumbbell'), count: equipmentCounts.dumbbell, icon: Activity },
+              { id: 'cable', label: t('prs.equipmentCable'), count: equipmentCounts.cable, icon: Layers },
+              { id: 'bodyweight', label: t('prs.equipmentBodyweight'), count: equipmentCounts.bodyweight, icon: Target },
+              { id: 'machine', label: t('prs.equipmentMachine'), count: equipmentCounts.machine, icon: Sliders },
             ]
               .filter((chip) => chip.id === 'all' || chip.count > 0)
               .map((chip) => {
@@ -1247,15 +1271,15 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         {exerciseStats.length === 0 ? (
           <div className="card text-center py-12">
             <Target className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
-            <p className="text-text-secondary text-sm">No personal records logged yet.</p>
+            <p className="text-text-secondary text-sm">{t('prs.emptyTitle')}</p>
             <p className="text-xs text-text-muted mt-1">
-              Tap &quot;Add PR&quot; above to calibrate your first lift and discover your rank.
+              {t('prs.emptyHint')}
             </p>
           </div>
         ) : filteredStats.length === 0 ? (
           <div className="card text-center py-12 space-y-2">
             <Filter className="w-8 h-8 text-text-muted mx-auto mb-2 opacity-50" />
-            <p className="text-text-secondary text-sm">No records found for this filter combination.</p>
+            <p className="text-text-secondary text-sm">{t('prs.noFilterResults')}</p>
             <button
               type="button"
               onClick={() => {
@@ -1264,7 +1288,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
               }}
               className="btn-secondary text-xs py-1.5 px-3 mx-auto"
             >
-              Clear Filters
+              {t('prs.clearFilters')}
             </button>
           </div>
         ) : selectedEquipmentFilter !== 'all' ? (
@@ -1304,7 +1328,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 }}
                 onDeletePR={(id, date, ex) => {
                   deletePR(id);
-                  toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                  toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
                 }}
               />
             ))}
@@ -1318,10 +1342,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 <div className="flex items-center justify-between px-0.5">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="w-4 h-4 text-accent" />
-                    <h3 className="section-title text-[11px] mb-0">MAIN COMPOUND LIFTS</h3>
+                    <h3 className="section-title text-[11px] mb-0">{t('prs.mainCompounds')}</h3>
                   </div>
                   <span className="text-2xs font-bold px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-mono">
-                    {mainCompoundLifts.length} Core Lifts
+                    {t('prs.coreLiftsCount', { count: mainCompoundLifts.length })}
                   </span>
                 </div>
 
@@ -1360,7 +1384,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                       }}
                       onDeletePR={(id, date, ex) => {
                         deletePR(id);
-                        toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                        toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
                       }}
                     />
                   ))}
@@ -1385,15 +1409,15 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         </div>
                         <div>
                           <span className="text-xs font-bold text-text-primary group-hover:text-accent block">
-                            Other Exercises &amp; Accessories ({otherLifts.length})
+                            {t('prs.otherExercises', { count: otherLifts.length })}
                           </span>
                           <span className="text-2xs text-text-muted">
-                            Dumbbell, cable, machine &amp; accessory PRs
+                            {t('prs.otherExercisesHint')}
                           </span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
-                        <span>{showAllOtherLifts ? 'Show Less' : `Show More (${otherLifts.length})`}</span>
+                        <span>{showAllOtherLifts ? t('prs.showLess') : t('prs.showMore', { count: otherLifts.length })}</span>
                         <ChevronDown
                           className={`w-3.5 h-3.5 transition-transform duration-200 ${
                             showAllOtherLifts ? 'rotate-180' : ''
@@ -1440,7 +1464,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                             }}
                             onDeletePR={(id, date, ex) => {
                               deletePR(id);
-                              toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                              toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
                             }}
                           />
                         ))}
@@ -1451,8 +1475,8 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   // If no main compound lifts have been logged yet, show other lifts directly
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-0.5">
-                      <h3 className="section-title text-[11px] mb-0">LOGGED EXERCISES</h3>
-                      <span className="text-2xs text-text-muted">{otherLifts.length} Logged</span>
+                      <h3 className="section-title text-[11px] mb-0">{t('prs.loggedExercises')}</h3>
+                      <span className="text-2xs text-text-muted">{t('prs.loggedCount', { count: otherLifts.length })}</span>
                     </div>
                     {otherLifts.map((item) => (
                       <LiftCard
@@ -1487,7 +1511,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         }}
                         onDeletePR={(id, date, ex) => {
                           deletePR(id);
-                          toast.info(`Deleted ${ex} record from ${date}.`, 'PR Removed');
+                          toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
                         }}
                       />
                     ))}
@@ -1516,15 +1540,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="modal-overlay" onClick={() => setTargetModalExercise(null)}>
           <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-border pb-3">
-              <h3 className="font-bold text-text-primary text-base">Set Target Milestone</h3>
+              <h3 className="font-bold text-text-primary text-base">{t('prs.setTargetTitle')}</h3>
               <button type="button" onClick={() => setTargetModalExercise(null)} className="text-text-muted p-1">
                 <X size={18} />
               </button>
             </div>
 
             <p className="text-xs text-text-secondary">
-              Set your next target 1RM for{' '}
-              <span className="text-accent font-semibold">{targetModalExercise}</span>.
+              {t('prs.setTargetDesc', { exercise: targetModalExercise })}
             </p>
 
             <div className="flex gap-2">
@@ -1533,7 +1556,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 step="0.5"
                 value={targetWeightInput}
                 onChange={(e) => setTargetWeightInput(e.target.value)}
-                placeholder="Target Weight"
+                placeholder={t('prs.targetWeightPlaceholder')}
                 className="w-full text-base font-mono font-bold tabular-nums"
                 autoFocus
               />
@@ -1548,10 +1571,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 onClick={() => setTargetModalExercise(null)}
                 className="btn-ghost flex-1 text-xs"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="button" onClick={handleSaveTarget} className="btn-primary flex-1 text-xs">
-                Save Target
+                {t('prs.saveTarget')}
               </button>
             </div>
           </div>
@@ -1563,7 +1586,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex justify-between items-center">
-              <h2 className="text-base font-bold text-text-primary">Record Personal Best</h2>
+              <h2 className="text-base font-bold text-text-primary">{t('prs.recordTitle')}</h2>
               <button type="button" onClick={() => setShowAddModal(false)} className="text-text-muted p-1">
                 <X size={18} />
               </button>
@@ -1572,7 +1595,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             <div className="p-4 space-y-4">
               {/* Exercise selector — custom dropdown */}
               <div>
-                <label className="section-title mb-1.5 block">EXERCISE</label>
+                <label className="section-title mb-1.5 block">{t('prs.exerciseLabel')}</label>
                 <ExerciseDropdown
                   value={exercise}
                   onChange={(val) => {
@@ -1585,12 +1608,12 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
               {exercise === 'Custom' && (
                 <div>
-                  <label className="section-title mb-1.5 block">CUSTOM EXERCISE NAME</label>
+                  <label className="section-title mb-1.5 block">{t('prs.customExerciseLabel')}</label>
                   <input
                     type="text"
                     value={customExercise}
                     onChange={(e) => setCustomExercise(e.target.value)}
-                    placeholder="e.g. Front Squat"
+                    placeholder={t('prs.customExercisePlaceholder')}
                     className="w-full"
                   />
                 </div>
@@ -1601,10 +1624,10 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 <div>
                   <label className="section-title mb-1.5 block">
                     {selectedIsBodyweight
-                      ? 'ADDED WEIGHT (OPTIONAL)'
+                      ? t('prs.addedWeightLabel')
                       : selectedIsDumbbell
-                      ? 'WEIGHT (PER HAND)'
-                      : 'WEIGHT'}
+                      ? t('prs.weightPerHandLabel')
+                      : t('prs.weightLabel')}
                   </label>
                   <div className="flex">
                     <input
@@ -1613,7 +1636,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                       min="0"
                       value={weight}
                       onChange={(e) => setWeight(e.target.value)}
-                      placeholder={selectedIsBodyweight ? '0 (bodyweight)' : '0'}
+                      placeholder={selectedIsBodyweight ? t('prs.bodyweightPlaceholder') : '0'}
                       required={!selectedIsBodyweight}
                       className="w-full rounded-r-none font-mono font-bold text-base tabular-nums"
                     />
@@ -1628,19 +1651,19 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   </div>
                   {selectedIsBodyweight && (
                     <p className="text-2xs text-text-muted mt-1 font-mono">
-                      Leave 0 or blank for pure bodyweight ({Math.round(bodyweightKg)} kg)
+                      {t('prs.bodyweightHint', { kg: Math.round(bodyweightKg) })}
                     </p>
                   )}
                   {selectedIsDumbbell && (
-                    <p className="text-2xs text-text-muted mt-1 font-mono">Per-hand weight</p>
+                    <p className="text-2xs text-text-muted mt-1 font-mono">{t('prs.perHandHint')}</p>
                   )}
                   {weight.trim() !== '' && (() => {
                     const wNum = parseFloat(weight);
                     const wKg = unit === 'lbs' ? wNum * 0.453592 : wNum;
                     const reason =
-                      isNaN(wNum) ? 'Enter a valid number.'
-                      : wNum <= 0 ? 'Weight must be greater than zero.'
-                      : wKg > MAX_PR_WEIGHT_KG ? `Above the ${MAX_PR_WEIGHT_KG} kg sanity cap — please check.` : null;
+                      isNaN(wNum) ? t('prs.validNumber')
+                      : wNum <= 0 ? t('prs.weightGtZero')
+                      : wKg > MAX_PR_WEIGHT_KG ? t('prs.aboveCap', { max: MAX_PR_WEIGHT_KG }) : null;
                     return reason ? (
                       <p className="text-2xs text-danger mt-1 font-mono">{reason}</p>
                     ) : null;
@@ -1648,7 +1671,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 </div>
 
                 <div>
-                  <label className="section-title mb-1.5 block">REPS</label>
+                  <label className="section-title mb-1.5 block">{t('prs.repsLabel')}</label>
                   <input
                     type="number"
                     min="1"
@@ -1662,7 +1685,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
               {/* Date */}
               <div>
-                <label className="section-title mb-1.5 block">DATE</label>
+                <label className="section-title mb-1.5 block">{t('prs.dateLabel')}</label>
                 <input
                   type="date"
                   value={date}
@@ -1673,11 +1696,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
               {/* Notes */}
               <div>
-                <label className="section-title mb-1.5 block">NOTES (OPTIONAL)</label>
+                <label className="section-title mb-1.5 block">{t('prs.notesLabel')}</label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="RPE, bar speed, cue, beltless..."
+                  placeholder={t('prs.notesPlaceholder')}
                   className="w-full h-18 resize-none text-sm"
                 />
               </div>
@@ -1689,7 +1712,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   onClick={() => setShowAddModal(false)}
                   className="btn-ghost flex-1 text-xs"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -1702,7 +1725,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   }
                   className="btn-primary flex-1 disabled:opacity-40 text-xs"
                 >
-                  Save Record
+                  {t('prs.saveRecord')}
                 </button>
               </div>
             </div>

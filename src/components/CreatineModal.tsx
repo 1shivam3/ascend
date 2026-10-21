@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { toLocalDateString, getCreatineStats } from '@/lib/habits';
 
 interface CreatineModalProps {
@@ -22,6 +23,7 @@ interface CreatineModalProps {
 }
 
 export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const todayStr = toLocalDateString(new Date());
 
@@ -64,15 +66,15 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
   const handleToggle = () => {
     toggleCreatine(todayStr, targetDoseG);
     if (!stats.takenToday) {
-      toast.success(`${targetDoseG}g creatine logged! Supply updated.`, 'Creatine Taken');
+      toast.success(t('creatine.loggedToast', { grams: targetDoseG }), t('creatine.takenTitle'));
     } else {
-      toast.info('Creatine marked as not taken for today.', 'Creatine Updated');
+      toast.info(t('creatine.notTakenToast'), t('creatine.updatedTitle'));
     }
   };
 
   const handleRefill = () => {
     refillCreatineSupply(containerSizeG);
-    toast.success(`Container refilled to ${containerSizeG}g!`, 'Supply Restocked');
+    toast.success(t('creatine.refilledToast', { grams: containerSizeG }), t('creatine.restockedTitle'));
   };
 
   const handleSaveSettings = () => {
@@ -95,7 +97,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
     }
 
     setShowConfig(false);
-    toast.success('Creatine settings and supply updated!', 'Preferences Saved');
+    toast.success(t('creatine.settingsSavedToast'), t('creatine.prefsSavedTitle'));
   };
 
   return (
@@ -112,9 +114,9 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             </div>
             <div>
               <h2 className="text-lg font-bold text-text-primary leading-tight">
-                Creatine Tracker
+                {t('creatine.title')}
               </h2>
-              <p className="text-xs text-text-muted">Cellular phosphocreatine &amp; power output</p>
+              <p className="text-xs text-text-muted">{t('creatine.subtitle')}</p>
             </div>
           </div>
           <button
@@ -130,10 +132,10 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
         <div className="card p-4 bg-gradient-to-br from-bg-card to-amber-500/5 border border-amber-500/25 space-y-3">
           <div className="flex items-center justify-between">
             <span className="section-title text-[10px] text-amber-600 block mb-0">
-              TODAY&apos;S INTAKE
+              {t('creatine.todaysIntake')}
             </span>
             <span className="text-xs font-semibold text-text-muted">
-              Target: {targetDoseG}g
+              {t('creatine.targetLabel', { grams: targetDoseG })}
             </span>
           </div>
 
@@ -149,12 +151,12 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             {stats.takenToday ? (
               <>
                 <Check className="w-4 h-4 stroke-[3]" />
-                <span>{targetDoseG}G TAKEN TODAY</span>
+                <span>{t('creatine.takenTodayBtn', { grams: targetDoseG })}</span>
               </>
             ) : (
               <>
                 <Sparkles className="w-4 h-4 fill-white stroke-white" />
-                <span>MARK {targetDoseG}G TAKEN TODAY</span>
+                <span>{t('creatine.markTakenBtn', { grams: targetDoseG })}</span>
               </>
             )}
           </button>
@@ -164,11 +166,11 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
         <div className="card p-4 bg-bg-card border border-border space-y-3">
           <div className="flex items-center justify-between">
             <span className="section-title text-[10px] block mb-0">
-              CONSISTENCY (LAST 30 DAYS)
+              {t('creatine.consistency')}
             </span>
             <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
               <Flame className="w-3.5 h-3.5 fill-amber-500 stroke-amber-500" />
-              {stats.currentStreak} Day Streak
+              {t('creatine.dayStreak', { count: stats.currentStreak })}
             </span>
           </div>
 
@@ -177,10 +179,10 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
               <span className="text-2xl font-black text-text-primary font-sans">
                 {stats.takenCount30}
               </span>
-              <span className="text-sm font-semibold text-text-muted">/ 30 days</span>
+              <span className="text-sm font-semibold text-text-muted">{t('creatine.of30Days')}</span>
             </div>
             <span className="text-xs font-bold text-text-primary">
-              {stats.saturationLevel} Saturation
+              {stats.saturationLevel} {t('creatine.saturationWord')}
             </span>
           </div>
 
@@ -204,7 +206,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             <div className="flex items-center gap-1.5">
               <Package className="w-4 h-4 text-accent" />
               <span className="section-title text-[10px] block mb-0">
-                CREATINE SUPPLY TRACKER
+                {t('creatine.supplyTracker')}
               </span>
             </div>
             <button
@@ -213,7 +215,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
               className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
             >
               <RotateCw className="w-3 h-3" />
-              <span>Refill</span>
+              <span>{t('creatine.refill')}</span>
             </button>
           </div>
 
@@ -222,22 +224,22 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center gap-2 text-amber-800 dark:text-amber-300 text-xs font-medium">
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
               <span>
-                <strong>LOW SUPPLY:</strong> Approximately {daysRemaining} days remaining. Time to reorder!
+                <strong>{t('creatine.lowSupply')}</strong> {t('creatine.lowSupplyMsg', { days: daysRemaining })}
               </span>
             </div>
           )}
 
           <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
             <div>
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Container</span>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.container')}</span>
               <span className="font-bold text-text-primary text-sm">{containerSizeG}g</span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Remaining</span>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.remaining')}</span>
               <span className="font-bold text-text-primary text-sm">{currentAmountG}g</span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">Est. Days</span>
+              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.estDays')}</span>
               <span
                 className={`font-bold text-sm ${
                   isLowSupply ? 'text-amber-500' : 'text-emerald-600'
@@ -258,10 +260,10 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
           >
             <div className="flex items-center gap-1.5">
               <Sliders className="w-3.5 h-3.5 text-accent" />
-              <span>Configure Target &amp; Supply</span>
+              <span>{t('creatine.configure')}</span>
             </div>
             <span className="text-[11px] text-accent font-medium">
-              {showConfig ? 'Hide' : 'Edit Settings'}
+              {showConfig ? t('creatine.hide') : t('creatine.editSettings')}
             </span>
           </button>
 
@@ -270,7 +272,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                    Daily Dose (g)
+                    {t('creatine.dailyDose')}
                   </label>
                   <input
                     type="number"
@@ -284,11 +286,10 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                    Dose Reminder
+                    {t('creatine.doseReminder')}
                   </label>
                   <p className="text-[11px] text-text-muted leading-relaxed pt-1.5">
-                    Creatine reminders aren&apos;t sent yet — use the water &amp; meal
-                    reminders in the Notification Center for daily nudges.
+                    {t('creatine.reminderNote')}
                   </p>
                 </div>
               </div>
@@ -296,7 +297,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                    Container Tub Size (g)
+                    {t('creatine.containerSize')}
                   </label>
                   <input
                     type="number"
@@ -310,7 +311,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                 </div>
                 <div>
                   <label className="text-[11px] font-semibold text-text-secondary block mb-1">
-                    Current Remaining (g)
+                    {t('creatine.currentRemaining')}
                   </label>
                   <input
                     type="number"
@@ -329,7 +330,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                 onClick={handleSaveSettings}
                 className="btn-primary w-full py-2 text-xs font-bold mt-1"
               >
-                Save Preferences
+                {t('creatine.savePrefs')}
               </button>
             </div>
           )}

@@ -156,3 +156,55 @@ describe('rendering key strings', () => {
     expect(html).not.toContain('home.todaysWorkout');
   });
 });
+
+// QA4-004: the surfaces wired after the first i18n pass (Profile, PRs,
+// Scan Meal, Active Workout, Settings sections, Meals headings, Progress,
+// Hydration/Creatine/EditProfile/BodyMetrics modals) must resolve real
+// Hindi copy — not the raw key and not the English string.
+describe('QA4-004 newly wired surfaces resolve in Hindi', () => {
+  const wiredKeys = [
+    'profile.title',
+    'profile.editProfile',
+    'prs.addPr',
+    'prs.title',
+    'scan.title',
+    'scan.analyzingTitle',
+    'workout.completeSet',
+    'workout.restTimer',
+    'settings.accountSecurity',
+    'settings.customization',
+    'meals.title',
+    'meals.dailyIntake',
+    'progress.strengthProgress',
+    'progress.personalRecords',
+    'hydration.title',
+    'creatine.title',
+    'editProfile.title',
+    'bodyMetrics.save',
+  ] as const;
+
+  it('every wired-surface key exists in both dictionaries', () => {
+    for (const key of wiredKeys) {
+      expect(en[key], `en missing ${key}`).toBeTruthy();
+      expect(hi[key], `hi missing ${key}`).toBeTruthy();
+    }
+  });
+
+  it('Hindi copy is Devanagari and differs from English', () => {
+    const devanagari = /[\u0900-\u097F]/;
+    for (const key of wiredKeys) {
+      const hiValue = translate('hi', key);
+      expect(hiValue, `hi ${key} fell back to the raw key`).not.toBe(key);
+      expect(hiValue, `hi ${key} has no Devanagari`).toMatch(devanagari);
+      expect(hiValue, `hi ${key} identical to en`).not.toBe(translate('en', key));
+    }
+  });
+
+  it('parameterized wired keys interpolate in Hindi', () => {
+    expect(translate('hi', 'prs.liftsCount', { count: 12 })).toContain('12');
+    expect(translate('hi', 'prs.liftsCount', { count: 12 })).not.toContain('{count}');
+    expect(translate('hi', 'meals.waterLogged', { ml: 250 })).toContain('250');
+    expect(translate('hi', 'creatine.dayStreak', { count: 7 })).toContain('7');
+    expect(translate('hi', 'workout.exerciseOf', { current: 2, total: 5 })).not.toContain('{current}');
+  });
+});

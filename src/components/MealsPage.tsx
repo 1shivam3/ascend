@@ -1491,15 +1491,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               type="button"
               onClick={goBack}
               className="p-1.5 -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Go back to previous page"
-              title="Go back"
+              aria-label={t('prs.goBack')}
+              title={t('prs.goBack')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">NUTRITION &amp; FUEL</div>
-            <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">FUEL THE WORK.</h1>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">{t('meals.eyebrow')}</div>
+            <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">{t('meals.title')}</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1507,17 +1507,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             type="button"
             onClick={() => setIsToolsMenuOpen(true)}
             className="py-1.5 px-2.5 rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-            title="Nutrition Options & Tools"
-            aria-label="Nutrition Options"
+            title={t('meals.optionsTitle')}
+            aria-label={t('meals.optionsAria')}
           >
             <Sliders className="w-4 h-4 text-accent" />
-            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">Options</span>
+            <span className="text-2xs font-bold text-text-primary font-mono hidden sm:inline">{t('meals.options')}</span>
           </button>
         </div>
       </header>
 
       {/* ── Segmented Control (Reference: Screen 18 in Image 1 & Image 3) ── */}
-      <div role="tablist" aria-label="Fuel navigation" className="segmented-control">
+      <div role="tablist" aria-label={t('meals.navAria')} className="segmented-control">
         <button
           type="button"
           role="tab"
@@ -1525,7 +1525,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           onClick={() => setFuelSubTab('today')}
           className={`segmented-item ${fuelSubTab === 'today' ? 'active' : ''}`}
         >
-          Today
+          {t('common.today')}
         </button>
         <button
           type="button"
@@ -1534,7 +1534,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           onClick={() => setFuelSubTab('meals')}
           className={`segmented-item ${fuelSubTab === 'meals' ? 'active' : ''}`}
         >
-          Meals {todayMeals.length > 0 && `(${todayMeals.length})`}
+          {t('meals.tabMeals')} {todayMeals.length > 0 && `(${todayMeals.length})`}
         </button>
         <button
           type="button"
@@ -1543,7 +1543,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           onClick={() => setFuelSubTab('macros')}
           className={`segmented-item ${fuelSubTab === 'macros' ? 'active' : ''}`}
         >
-          Macros
+          {t('meals.tabMacros')}
         </button>
       </div>
 
@@ -1554,7 +1554,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <section className="card p-5 sm:p-6 bg-bg-card border border-border/80 flex flex-col items-center justify-center space-y-4">
             <div className="w-full flex items-center justify-between">
               <span className="text-2xs font-bold uppercase tracking-wider text-text-muted">
-                Daily Intake
+                {t('meals.dailyIntake')}
               </span>
               <button
                 type="button"
@@ -1562,7 +1562,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
               >
                 <Target className="w-3.5 h-3.5" />
-                <span>{macroGoals ? 'Edit Target' : 'Set Target'}</span>
+                <span>{macroGoals ? t('prs.editTarget') : t('meals.setTarget')}</span>
               </button>
             </div>
 
@@ -1600,7 +1600,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             </div>
             <span className="text-2xs font-semibold text-text-muted tabular-nums">
-              of {displayGoals?.calories || 2400} daily target
+              {t('meals.ofDailyTarget', { target: displayGoals?.calories || 2400 })}
             </span>
 
             {/* Fast / festival day pattern — per-date, targets are guidance */}
@@ -1608,16 +1608,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="flex flex-wrap justify-center gap-1">
                 {(
                   [
-                    { kind: undefined, label: 'Normal day' },
-                    { kind: 'no_grain_fast', label: 'Fasting · no grain' },
-                    { kind: 'one_meal_fast', label: 'One-meal fast' },
-                    { kind: 'festival_feast', label: 'Festival day' },
-                  ] as { kind: MealDayKind | undefined; label: string }[]
+                    { kind: undefined, labelKey: 'meals.dayNormal' },
+                    { kind: 'no_grain_fast', labelKey: 'meals.dayNoGrainFast' },
+                    { kind: 'one_meal_fast', labelKey: 'meals.dayOneMealFast' },
+                    { kind: 'festival_feast', labelKey: 'meals.dayFestival' },
+                  ] as { kind: MealDayKind | undefined; labelKey: StringKey }[]
                 ).map((opt) => {
                   const active = dayKind === opt.kind;
                   return (
                     <button
-                      key={opt.label}
+                      key={opt.labelKey}
                       type="button"
                       onClick={() => setMealDayKind(todayDate, opt.kind ?? null)}
                       className={`px-2 py-1 rounded-full text-3xs font-semibold transition-all cursor-pointer ${
@@ -1626,7 +1626,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                       }`}
                     >
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </button>
                   );
                 })}
@@ -1639,16 +1639,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </div>
             {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
               <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2">
-                {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} maintenance{' '}
+                {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
                 {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
-                {macroGoals.calorieDelta < 0 ? 'deficit' : 'surplus'}
+                {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
                 {macroGoals.calorieDelta < 0 && (
-                  <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} kg/week</>
+                  <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
                 )}
                 <span className="block text-4xs opacity-80">
                   {macroGoals.calorieDelta < 0
-                    ? `Targets stay above a ${getSafeMinCalories(profile?.gender || 'male').toLocaleString()} kcal safety floor. Weigh yourself weekly — the trend matters more than any single day. General guidance, not medical advice.`
-                    : 'Fuel the surplus with protein first; extra calories build muscle only alongside training.'}
+                    ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
+                    : t('meals.surplusNote')}
                 </span>
               </span>
             )}
@@ -1694,9 +1694,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 0: unknown is not zero, especially for diabetics. */}
             {typeof todayMacros.sugarG === 'number' && (
               <p className="w-full text-center text-3xs text-text-muted pt-1">
-                Sugar from packaged foods logged today:{' '}
+                {t('meals.sugarNote')}{' '}
                 <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
-                (foods without label data aren&apos;t counted)
+                {t('meals.sugarNoteSuffix')}
               </p>
             )}
           </section>
@@ -1710,7 +1710,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
-                    Protein coach
+                    {t('meals.proteinCoach')}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
                     {proteinSuggestion.message}
@@ -1719,7 +1719,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <button
                   type="button"
                   onClick={dismissProteinHint}
-                  aria-label="Dismiss protein suggestion"
+                  aria-label={t('meals.dismissProtein')}
                   className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
@@ -1736,19 +1736,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
-                    Lighter dinner today
+                    {t('meals.lighterDinner')}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
-                    A dinner near {dayAdaptation.suggestedDinnerKcal.toLocaleString()} kcal keeps today on target.
+                    {t('meals.dinnerHint', { kcal: dayAdaptation.suggestedDinnerKcal.toLocaleString() })}
                   </p>
-                  <CollapsibleDetails label="Why?" className="mt-0.5">
+                  <CollapsibleDetails label={t('meals.why')} className="mt-0.5">
                     {dayAdaptation.reason}
                   </CollapsibleDetails>
                 </div>
                 <button
                   type="button"
                   onClick={dismissAdaptationHint}
-                  aria-label="Dismiss dinner suggestion"
+                  aria-label={t('meals.dismissDinner')}
                   className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
@@ -1768,8 +1768,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <Camera className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold text-text-primary block">Scan Food</span>
-                <span className="text-3xs text-text-muted">Take a photo</span>
+                <span className="text-xs font-bold text-text-primary block">{t('meals.scanFood')}</span>
+                <span className="text-3xs text-text-muted">{t('meals.takePhoto')}</span>
               </div>
             </button>
 
@@ -1782,8 +1782,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <BarcodeIcon className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-xs font-bold text-text-primary block">Scan Barcode</span>
-                <span className="text-3xs text-text-muted">Packaged products</span>
+                <span className="text-xs font-bold text-text-primary block">{t('meals.scanBarcode')}</span>
+                <span className="text-3xs text-text-muted">{t('meals.packagedProducts')}</span>
               </div>
             </button>
           </div>
@@ -1799,7 +1799,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               className="btn-primary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-sm hover:brightness-105 active:scale-95 transition-all cursor-pointer"
             >
               <Camera className="w-4 h-4 stroke-[2.5]" />
-              <span>Scan Meal</span>
+              <span>{t('meals.scanMeal')}</span>
             </button>
 
             <button
@@ -1811,7 +1811,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               className="btn-secondary py-3 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 border border-border hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[2.5] text-accent" />
-              <span>Add Manually</span>
+              <span>{t('meals.addManually')}</span>
             </button>
           </div>
 
@@ -1820,7 +1820,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <input
               type="text"
               placeholder={t('meals.quickLogPlaceholder')}
-              aria-label="Describe foods and quantities to log meal"
+              aria-label={t('meals.quickLogAria')}
               value={naturalQuery}
               onChange={(e) => setNaturalQuery(e.target.value)}
               disabled={isNaturalParsing}
@@ -1830,7 +1830,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
-                aria-label="Log meal"
+                aria-label={t('meals.logMealAria')}
                 className="px-3 py-1.5 min-h-[36px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
@@ -1838,7 +1838,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>Log</span>
+                    <span>{t('meals.log')}</span>
                   </>
                 )}
               </button>
@@ -1853,9 +1853,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="button"
                 onClick={() => setIsMoreToolsOpen(!isMoreToolsOpen)}
                 className="py-1 px-1.5 min-h-[44px] text-text-muted hover:text-accent font-semibold transition-colors flex items-center gap-1 cursor-pointer"
-                aria-label="More options"
+                aria-label={t('meals.moreOptions')}
               >
-                <span>More options</span>
+                <span>{t('meals.moreOptions')}</span>
                 <ChevronDown className={`w-3 h-3 transition-transform ${isMoreToolsOpen ? 'rotate-180' : ''}`} />
               </button>
               {isMoreToolsOpen && (
@@ -1869,7 +1869,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
                   >
                     <BarcodeIcon className="w-4 h-4 text-accent" />
-                    <span>Scan Barcode</span>
+                    <span>{t('meals.scanBarcode')}</span>
                   </button>
                   <button
                     type="button"
@@ -1881,7 +1881,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left disabled:opacity-40 cursor-pointer"
                   >
                     <Copy className="w-4 h-4 text-accent" />
-                    <span>Copy Yesterday</span>
+                    <span>{t('meals.copyYesterday')}</span>
                   </button>
                   <button
                     type="button"
@@ -1892,7 +1892,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
                   >
                     <Star className="w-4 h-4 text-accent" />
-                    <span>Pinned Staples</span>
+                    <span>{t('meals.pinnedStaples')}</span>
                   </button>
                   <button
                     type="button"
@@ -1903,7 +1903,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     className="w-full flex items-center gap-2 p-2 rounded-lg text-xs font-semibold text-text-primary hover:bg-bg-secondary text-left cursor-pointer"
                   >
                     <Target className="w-4 h-4 text-accent" />
-                    <span>Macro Goals</span>
+                    <span>{t('meals.macroGoalsOption')}</span>
                   </button>
                 </div>
               )}
@@ -1921,13 +1921,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               type="button"
               className="flex items-center gap-2.5 min-w-0 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-sky-400 rounded-lg p-1 transition-opacity hover:opacity-90"
               onClick={() => setIsHydrationModalOpen(true)}
-              aria-label="View hydration details"
+              aria-label={t('meals.viewHydration')}
             >
               <div className="w-8 h-8 rounded-lg bg-sky-500/15 text-sky-400 flex items-center justify-center shrink-0">
                 <Droplet className="w-4 h-4" />
               </div>
               <div className="truncate">
-                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">WATER</span>
+                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">{t('meals.water')}</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
                   {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-3xs">/ {formatWaterMl(waterTargetMl)}</span>
                 </span>
@@ -1938,10 +1938,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="button"
                 onClick={() => {
                   logWater(250, todayDate);
-                  toast.success('+250 ml logged!', 'Hydration');
+                  toast.success(t('meals.waterLogged', { ml: 250 }), t('meals.hydration'));
                 }}
                 className="min-h-[44px] min-w-[54px] px-3 py-2 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                aria-label="Log 250ml water"
+                aria-label={t('meals.logWater250')}
               >
                 +250ml
               </button>
@@ -1949,10 +1949,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="button"
                 onClick={() => {
                   logWater(500, todayDate);
-                  toast.success('+500 ml logged!', 'Hydration');
+                  toast.success(t('meals.waterLogged', { ml: 500 }), t('meals.hydration'));
                 }}
                 className="min-h-[44px] min-w-[54px] px-3 py-2 rounded-lg bg-bg-card border border-border text-xs font-mono font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer flex items-center justify-center"
-                aria-label="Log 500ml water"
+                aria-label={t('meals.logWater500')}
               >
                 +500ml
               </button>
@@ -1966,15 +1966,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               type="button"
               className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer text-left focus:outline-none focus:ring-1 focus:ring-purple-400 rounded-lg p-1 transition-opacity hover:opacity-90"
               onClick={() => setIsCreatineModalOpen(true)}
-              aria-label="View creatine details"
+              aria-label={t('meals.viewCreatine')}
             >
               <div className="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
                 <Sparkles className="w-4 h-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono truncate">CREATINE</span>
+                <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono truncate">{t('meals.creatine')}</span>
                 <span className={`text-xs font-bold font-mono block truncate ${creatineTaken ? 'text-emerald-400' : 'text-text-primary'}`}>
-                  {creatineTaken ? `${creatineAmountG}g Taken Today` : `${dailyCreatineTarget}g Daily Target`}
+                  {creatineTaken ? t('meals.creatineTakenToday', { grams: creatineAmountG }) : t('meals.creatineDailyTarget', { grams: dailyCreatineTarget })}
                 </span>
               </div>
             </button>
@@ -1983,9 +1983,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               onClick={() => {
                 toggleCreatine(todayDate, dailyCreatineTarget);
                 if (!creatineTaken) {
-                  toast.success(`${dailyCreatineTarget}g creatine logged!`, 'Creatine');
+                  toast.success(t('meals.creatineLogged', { grams: dailyCreatineTarget }), t('meals.creatine'));
                 } else {
-                  toast.info('Creatine marked as not taken', 'Creatine');
+                  toast.info(t('meals.creatineNotTaken'), t('meals.creatine'));
                 }
               }}
               className={`min-h-[44px] px-3.5 py-2 rounded-lg border text-xs font-mono font-bold transition-all active:scale-95 cursor-pointer shrink-0 flex items-center justify-center ${
@@ -1993,9 +1993,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
                   : 'bg-bg-card border-border text-text-primary hover:border-accent/40'
               }`}
-              aria-label={creatineTaken ? "Mark creatine not taken" : `Log ${dailyCreatineTarget}g creatine`}
+              aria-label={creatineTaken ? t('meals.markCreatineNotTaken') : t('meals.logCreatine', { grams: dailyCreatineTarget })}
             >
-              {creatineTaken ? 'Taken' : `+ Log ${dailyCreatineTarget}g`}
+              {creatineTaken ? t('meals.taken') : t('meals.logCreatineShort', { grams: dailyCreatineTarget })}
             </button>
           </div>
           )}
@@ -2008,7 +2008,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <div className="flex items-center gap-2">
             <Utensils className="w-4 h-4 text-accent" />
             <h2 className="section-title text-xs mb-0 font-sans tracking-wider">
-              WHAT YOU ATE TODAY ({todayMeals.length})
+              {t('meals.whatYouAte', { count: todayMeals.length })}
             </h2>
           </div>
           <div className="text-2xs font-mono font-bold">
@@ -2020,9 +2020,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         {todayMeals.length === 0 ? (
           <div className="p-6 text-center rounded-xl bg-bg-secondary/40 border border-dashed border-border/80 space-y-1.5">
-            <p className="text-xs font-bold text-text-primary">No meals logged yet today</p>
+            <p className="text-xs font-bold text-text-primary">{t('meals.noMealsToday')}</p>
             <p className="text-2xs text-text-muted max-w-xs mx-auto">
-              Tap &quot;Scan Meal&quot; above, type what you ate in natural language, or tap &quot;Add Manually&quot;.
+              {t('meals.noMealsTodayHint')}
             </p>
           </div>
         ) : (
@@ -2060,8 +2060,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           setMealToDelete({ id: meal.id, name: meal.name });
                         }}
                         className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                        title="Delete this meal"
-                        aria-label={`Delete meal ${meal.name}`}
+                        title={t('meals.deleteMeal')}
+                        aria-label={t('meals.deleteMealNamed', { name: meal.name })}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -2093,10 +2093,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 deleteFoodFromMeal(meal.id, idx);
-                                toast.info(`Deleted ${food.name}`);
+                                toast.info(t('meals.deletedFood', { name: food.name }));
                               }}
                               className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                              title="Delete this food item"
+                              title={t('meals.deleteFoodItem')}
                             >
                               <Trash2 className="w-3 h-3" />
                             </button>
@@ -2118,7 +2118,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               onClick={() => setFuelSubTab('meals')}
               className="text-xs font-semibold text-accent hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              <span>View full meal history ({groupedMeals.length} {groupedMeals.length === 1 ? 'day' : 'days'} recorded)</span>
+              <span>{t('meals.viewHistory', { count: groupedMeals.length, word: t(groupedMeals.length === 1 ? 'meals.dayOne' : 'meals.dayMany') })}</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -2132,8 +2132,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-extrabold text-text-primary">Meal History</h2>
-          <p className="text-2xs text-text-muted">All logged nutrition and meals by day</p>
+          <h2 className="text-base font-extrabold text-text-primary">{t('meals.historyTitle')}</h2>
+          <p className="text-2xs text-text-muted">{t('meals.historySubtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -2142,7 +2142,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             className="py-1.5 px-3 rounded-xl bg-accent text-white text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Camera className="w-3.5 h-3.5" />
-            <span>Scan Meal</span>
+            <span>{t('meals.scanMeal')}</span>
           </button>
           <button
             type="button"
@@ -2153,7 +2153,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             className="py-1.5 px-3 rounded-xl bg-bg-card border border-border text-xs font-bold text-text-primary hover:border-accent/40 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5 text-accent" />
-            <span>Add</span>
+            <span>{t('common.add')}</span>
           </button>
         </div>
       </div>
@@ -2164,9 +2164,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <Utensils className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-text-primary">No Meals Logged Yet</h3>
+            <h3 className="text-sm font-bold text-text-primary">{t('meals.noMealsTitle')}</h3>
             <p className="text-2xs text-text-muted mt-1 max-w-xs mx-auto">
-              Scan a plate with AI or add individual foods to start tracking your daily calories and macros.
+              {t('meals.noMealsHint')}
             </p>
           </div>
           <button
@@ -2175,7 +2175,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             className="btn-primary py-2.5 px-5 rounded-xl text-xs font-bold inline-flex items-center gap-2"
           >
             <Camera className="w-4 h-4" />
-            <span>Scan First Meal</span>
+            <span>{t('meals.scanFirstMeal')}</span>
           </button>
         </div>
       ) : (
@@ -2195,10 +2195,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-xs font-bold text-text-primary">
-                        {isToday ? 'Today' : isYesterday ? 'Yesterday' : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {isToday ? t('common.today') : isYesterday ? t('meals.yesterday') : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </h3>
                       <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
-                        {dayMeals.length} {dayMeals.length === 1 ? 'meal' : 'meals'}
+                        {t(dayMeals.length === 1 ? 'meals.mealCountOne' : 'meals.mealCountMany', { count: dayMeals.length })}
                       </span>
                     </div>
                   </div>
@@ -2247,8 +2247,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 setMealToDelete({ id: meal.id, name: meal.name });
                               }}
                               className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                              title="Delete meal"
-                              aria-label={`Delete meal ${meal.name}`}
+                              title={t('meals.deleteMealShort')}
+                              aria-label={t('meals.deleteMealNamed', { name: meal.name })}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -2279,10 +2279,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       deleteFoodFromMeal(meal.id, idx);
-                                      toast.info(`Deleted ${food.name}`);
+                                      toast.info(t('meals.deletedFood', { name: food.name }));
                                     }}
                                     className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
-                                    title="Delete this food item"
+                                    title={t('meals.deleteFoodItem')}
                                   >
                                     <Trash2 className="w-3 h-3" />
                                   </button>
@@ -2310,8 +2310,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       <section className="card p-5 bg-bg-card border border-border space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-border/60">
           <div>
-            <h2 className="text-sm font-extrabold text-text-primary">Daily Macro Goals</h2>
-            <p className="text-2xs text-text-muted">Target calories and macronutrient distribution</p>
+            <h2 className="text-sm font-extrabold text-text-primary">{t('meals.macroGoalsTitle')}</h2>
+            <p className="text-2xs text-text-muted">{t('meals.goalsSubtitle')}</p>
           </div>
           <button
             type="button"
@@ -2319,14 +2319,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
           >
             <Target className="w-3.5 h-3.5" />
-            <span>Edit Targets</span>
+            <span>{t('meals.editTargets')}</span>
           </button>
         </div>
 
         {/* Big numbers row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-muted block">Target</span>
+            <span className="text-3xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.calories || 2400}
             </span>
@@ -2364,24 +2364,24 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         {/* Visual Macro Ratio Bar */}
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between text-3xs text-text-muted font-mono">
-            <span>Macro Split</span>
+            <span>{t('meals.macroSplit')}</span>
             <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}% • C {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}% • F {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%</span>
           </div>
           <div className="h-2 rounded-full overflow-hidden flex bg-bg-secondary">
             <div
               style={{ width: `${Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
               className="bg-accent h-full"
-              title="Protein"
+              title={t('meals.protein')}
             />
             <div
               style={{ width: `${Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
               className="bg-sky-400 h-full"
-              title="Carbs"
+              title={t('meals.carbs')}
             />
             <div
               style={{ width: `${Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%` }}
               className="bg-amber-400 h-full"
-              title="Fat"
+              title={t('meals.fat')}
             />
           </div>
         </div>
@@ -2390,7 +2390,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       {/* Today's Adherence Card */}
       <section className="card p-5 bg-bg-card border border-border space-y-3">
         <h3 className="text-xs font-bold text-text-primary uppercase tracking-wider text-text-muted">
-          Today&apos;s Target Adherence
+          {t('meals.adherenceTitle')}
         </h3>
 
         <div className="space-y-3">
@@ -2413,7 +2413,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Protein Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-accent">Protein</span>
+              <span className="font-semibold text-accent">{t('meals.protein')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.proteinG)}g / {macroGoals?.proteinG || proteinTargetG}g ({Math.round((todayMacros.proteinG / (macroGoals?.proteinG || proteinTargetG)) * 100)}%)
               </span>
@@ -2429,7 +2429,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Carbs Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-text-primary">Carbohydrates</span>
+              <span className="font-semibold text-text-primary">{t('meals.carbohydrates')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.carbsG)}g / {macroGoals?.carbsG || 220}g ({Math.round((todayMacros.carbsG / (macroGoals?.carbsG || 220)) * 100)}%)
               </span>
@@ -2445,7 +2445,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           {/* Fat Bar */}
           <div className="space-y-1">
             <div className="flex justify-between text-2xs font-mono">
-              <span className="font-semibold text-text-primary">Dietary Fat</span>
+              <span className="font-semibold text-text-primary">{t('meals.dietaryFat')}</span>
               <span className="text-text-muted">
                 {Math.round(todayMacros.fatG)}g / {macroGoals?.fatG || 70}g ({Math.round((todayMacros.fatG / (macroGoals?.fatG || 70)) * 100)}%)
               </span>
@@ -2469,16 +2469,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
             {/* Header */}
             <div className="p-4 border-b border-border flex justify-between items-center">
-              <h2 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">LOG MEAL.</h2>
+              <h2 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{t('meals.logMealTitle')}</h2>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setIsBarcodeModalOpen(true)}
                   className="px-2 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent flex items-center gap-1"
-                  title="Scan Food Barcode"
+                  title={t('meals.scanBarcodeTitle')}
                 >
                   <BarcodeIcon className="w-3.5 h-3.5" />
-                  <span>Scan</span>
+                  <span>{t('home.scan')}</span>
                 </button>
                 <button type="button" onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
                   <X className="w-5 h-5" />
@@ -2490,7 +2490,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {/* ── Meal Name + Quick Templates ── */}
               <div>
-                <label className="section-title mb-1.5 block">Meal Name</label>
+                <label className="section-title mb-1.5 block">{t('meals.mealName')}</label>
 
                 {/* Quick-log template buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
@@ -2523,7 +2523,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {favoriteFoods.length > 0 && (
                 <div>
                   <label className="text-2xs font-mono text-text-muted uppercase block mb-1">
-                    Quick-Add Favorites (1-Tap)
+                    {t('meals.quickAddFavorites')}
                   </label>
                   <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono">
                     {favoriteFoods.map((fav) => (
@@ -2544,7 +2544,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {/* ── Foods Section ── */}
               <div>
                 <div className="flex justify-between items-center mb-2.5">
-                  <label className="section-title">Foods</label>
+                  <label className="section-title">{t('meals.foods')}</label>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -2566,9 +2566,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 {foods.length === 0 ? (
                   <div className="border border-dashed border-border/80 rounded-xl p-5 text-center bg-bg-elevated/20">
                     <Utensils className="w-6 h-6 text-text-muted mx-auto mb-1.5 opacity-40" />
-                    <p className="text-xs text-text-secondary font-medium">No foods added to this meal yet.</p>
+                    <p className="text-xs text-text-secondary font-medium">{t('meals.noFoodsInMeal')}</p>
                     <p className="text-[11px] text-text-muted font-mono mt-0.5">
-                      Tap &quot;Add Food&quot;, select from Favorites above, or scan a barcode.
+                      {t('meals.addFoodHint')}
                     </p>
                     <button
                       type="button"
@@ -2614,7 +2614,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   type="button"
                                   onClick={() => handleToggleFavorite(food)}
                                   className="text-text-muted hover:text-accent p-0.5"
-                                  title={favorited ? 'Unpin favorite' : 'Pin to favorites'}
+                                  title={favorited ? t('meals.unpinFavorite') : t('meals.pinFavorite')}
                                 >
                                   <Star
                                     className={`w-3.5 h-3.5 ${
@@ -2666,7 +2666,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         {sugg.name}
                                         {sugg.kind === 'custom' && (
                                           <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
-                                            My version
+                                            {t('meals.myVersionBadge')}
                                           </span>
                                         )}
                                       </span>
@@ -2675,7 +2675,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     {sugg.kind === 'custom' && (
                                       <button
                                         type="button"
-                                        aria-label={`Delete my version of ${sugg.name}`}
+                                        aria-label={t('meals.deleteMyVersion', { name: sugg.name })}
                                         onMouseDown={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
@@ -2696,7 +2696,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           <div className="flex gap-2">
                             <input
                               type="number"
-                              placeholder="Qty (enter amount)"
+                              placeholder={t('meals.qtyPlaceholder')}
                               value={food.quantity ?? ''}
                               onChange={(e) => {
                                 const v = e.target.value;
@@ -2732,14 +2732,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               {/* Quantity guidance banner if quantity is missing */}
                               {!isQtySet ? (
                                 <p className="text-[11px] text-text-muted font-mono italic">
-                                  Enter quantity above to calculate macros automatically.
+                                  {t('meals.qtyHint')}
                                 </p>
                               ) : (
                                 <div className="space-y-1.5">
                                   {food.isUnmatched && (
                                     <div className="flex items-center gap-1.5 text-2xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
                                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
-                                      <span>Not found in offline database — enter custom macros below</span>
+                                      <span>{t('meals.notInDb')}</span>
                                     </div>
                                   )}
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
@@ -2828,7 +2828,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               {food.oilAssumedTsp !== undefined && (
                                 <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-border/40">
                                   <span className="text-2xs text-text-muted font-mono shrink-0">
-                                    GHEE/OIL IN THIS?
+                                    {t('meals.gheeOilHeading')}
                                   </span>
                                   <div className="flex gap-1">
                                     {OIL_LEVELS.map((level) => (
@@ -2861,7 +2861,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {/* Footer with Meal Totals + Actions */}
             <div className="p-4 border-t border-border bg-bg-card">
               <div className="flex justify-between text-xs mb-1.5 font-mono">
-                <span className="text-text-muted">MEAL TOTAL</span>
+                <span className="text-text-muted">{t('meals.mealTotal')}</span>
                 <span className="font-bold text-accent">~{Math.round(currentMealMacros.calories)} kcal</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
@@ -2877,7 +2877,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}
                   className="btn-ghost flex-1 text-xs"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -2885,7 +2885,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   disabled={foods.length === 0 || !foods.some((f) => f.name.trim())}
                   className="btn-primary flex-1 disabled:opacity-40 text-xs"
                 >
-                  Save Meal
+                  {t('meals.saveMeal')}
                 </button>
               </div>
             </div>
@@ -2907,9 +2907,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <h3 className="font-bold text-base text-text-primary leading-tight">
-                    Daily Macro Targets
+                    {t('meals.dailyMacroTargets')}
                   </h3>
-                  <p className="text-2xs text-text-muted font-mono">Caloric &amp; protein pacing</p>
+                  <p className="text-2xs text-text-muted font-mono">{t('meals.pacingSubtitle')}</p>
                 </div>
               </div>
               <button
@@ -2927,10 +2927,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <div>
                   <p className="text-xs font-semibold text-text-primary flex items-center gap-1">
                     <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    Goal-Adaptive Macro Engine
+                    {t('meals.macroEngine')}
                   </p>
                   <p className="text-[11px] text-text-muted font-mono">
-                    Based on {profile?.bodyweightKg || 75}kg bodyweight
+                    {t('meals.basedOnBw', { kg: profile?.bodyweightKg || 75 })}
                   </p>
                 </div>
                 <button
@@ -2938,7 +2938,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   onClick={handleAutoCalculateGoals}
                   className="px-2.5 py-1 rounded bg-bg-elevated border border-border text-xs font-mono text-accent hover:border-accent/60 transition-colors font-bold cursor-pointer"
                 >
-                  Apply
+                  {t('meals.apply')}
                 </button>
               </div>
             </div>
@@ -2947,7 +2947,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="space-y-3 font-mono">
               <div>
                 <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                  Daily Calorie Target (kcal)
+                  {t('meals.calorieTargetLabel')}
                 </label>
                 <input
                   type="number"
@@ -2960,7 +2960,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               <div>
                 <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                  Protein Target (grams)
+                  {t('meals.proteinTargetLabel')}
                 </label>
                 <input
                   type="number"
@@ -2974,7 +2974,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Carbs (g, optional)
+                    {t('meals.carbsOptionalLabel')}
                   </label>
                   <input
                     type="number"
@@ -2986,7 +2986,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Fat (g, optional)
+                    {t('meals.fatOptionalLabel')}
                   </label>
                   <input
                     type="number"
@@ -3013,14 +3013,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 return (
                   <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 flex items-center justify-between text-xs font-mono">
                     <div>
-                      <span className="text-text-muted">Macro sum: </span>
+                      <span className="text-text-muted">{t('meals.macroSum')} </span>
                       <span className="font-bold text-text-primary">{macroSum} kcal</span>
                       {Math.abs(delta) > 5 ? (
                         <span className={`ml-1.5 text-2xs font-semibold ${delta > 0 ? 'text-amber-400' : 'text-sky-400'}`}>
                           ({delta > 0 ? `+${delta}` : `${delta}`} kcal)
                         </span>
                       ) : (
-                        <span className="ml-1.5 text-2xs font-semibold text-emerald-400">Balanced</span>
+                        <span className="ml-1.5 text-2xs font-semibold text-emerald-400">{t('meals.balanced')}</span>
                       )}
                     </div>
                     {Math.abs(delta) > 5 && calVal > 0 && (
@@ -3029,7 +3029,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         onClick={handleReconcileCarbs}
                         className="px-2 py-0.5 rounded bg-accent/15 text-accent text-3xs font-bold hover:bg-accent/25 transition-colors"
                       >
-                        Auto-balance Carbs
+                        {t('meals.autoBalanceCarbs')}
                       </button>
                     )}
                   </div>
@@ -3044,9 +3044,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   type="button"
                   onClick={handleClearGoals}
                   className="btn-danger py-2 px-3 text-xs font-mono"
-                  title="Remove daily targets"
+                  title={t('meals.removeTargets')}
                 >
-                  Clear
+                  {t('meals.clear')}
                 </button>
               )}
               <button
@@ -3054,7 +3054,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 onClick={handleSaveGoals}
                 className="btn-primary flex-1 py-2 text-xs font-bold font-mono uppercase"
               >
-                Save Targets
+                {t('meals.saveTargets')}
               </button>
             </div>
           </div>
@@ -3099,7 +3099,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex justify-between items-center pb-2 border-b border-border">
               <div className="flex items-center gap-2">
                 <Star className="w-4 h-4 text-accent fill-accent" />
-                <h2 className="text-base font-bold text-text-primary">Manage Pinned Foods</h2>
+                <h2 className="text-base font-bold text-text-primary">{t('meals.managePinned')}</h2>
               </div>
               <button
                 type="button"
@@ -3111,7 +3111,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </div>
 
             <p className="text-2xs text-text-muted">
-              Edit portion sizes, adjust calories/macros, or remove pinned items. Pinned foods appear on your nutrition dashboard for 1-tap logging.
+              {t('meals.managePinnedHint')}
             </p>
 
             {/* List of Pinned Foods */}
@@ -3136,7 +3136,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       type="button"
                       onClick={() => openEditPinned(fav)}
                       className="p-1.5 rounded-lg bg-bg-secondary text-text-secondary hover:text-accent hover:border-accent/40 border border-border transition-colors"
-                      title="Edit food details"
+                      title={t('meals.editFoodDetails')}
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
@@ -3144,7 +3144,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       type="button"
                       onClick={() => handleDeletePinned(fav.id, fav.name)}
                       className="p-1.5 rounded-lg bg-bg-secondary text-text-muted hover:text-danger hover:border-danger/40 border border-border transition-colors"
-                      title="Remove food"
+                      title={t('meals.removeFood')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -3154,7 +3154,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
               {favoriteFoods.length === 0 && (
                 <div className="p-4 rounded-xl bg-bg-secondary/40 border border-dashed border-border text-center text-xs text-text-muted">
-                  No pinned foods. Tap &quot;Add Custom Food&quot; below to create your first pinned food!
+                  {t('meals.noPinnedFoods')}
                 </div>
               )}
             </div>
@@ -3164,10 +3164,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="p-3 rounded-xl bg-danger/10 border border-danger/30 space-y-2">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-danger">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>Remove all {favoriteFoods.length} pinned foods?</span>
+                  <span>{t('meals.removeAllPinned', { count: favoriteFoods.length })}</span>
                 </div>
                 <p className="text-2xs text-text-muted">
-                  This will remove all items from your pinned foods list. This action cannot be undone.
+                  {t('meals.clearPinnedWarn')}
                 </p>
                 <div className="flex gap-2 pt-1">
                   <button
@@ -3175,14 +3175,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     onClick={() => setConfirmClearAll(false)}
                     className="btn-secondary flex-1 py-1.5 text-xs font-semibold"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button
                     type="button"
                     onClick={handleClearAllPinned}
                     className="btn-danger flex-1 py-1.5 text-xs font-bold"
                   >
-                    Yes, Clear All
+                    {t('meals.yesClearAll')}
                   </button>
                 </div>
               </div>
@@ -3197,7 +3197,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   className="text-xs font-semibold text-danger hover:underline flex items-center gap-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove All</span>
+                  <span>{t('meals.removeAll')}</span>
                 </button>
               )}
               <button
@@ -3206,7 +3206,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 className="btn-primary ml-auto py-2 px-3 text-xs font-bold flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Custom Food</span>
+                <span>{t('meals.addCustomFood')}</span>
               </button>
             </div>
           </div>
@@ -3224,10 +3224,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex justify-between items-center pb-2 border-b border-border">
               <div>
                 <h2 className="text-base font-bold text-text-primary">
-                  {isNewPinned ? 'Add Pinned Food' : `Edit "${editingPinnedFood?.name}"`}
+                  {isNewPinned ? t('meals.addPinnedFood') : t('meals.editPinnedFood', { name: editingPinnedFood?.name ?? '' })}
                 </h2>
                 <p className="text-2xs text-text-muted mt-0.5">
-                  Set default portion &amp; nutritional values
+                  {t('meals.pinnedFormHint')}
                 </p>
               </div>
               <button
@@ -3244,11 +3244,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {/* Name */}
               <div>
                 <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                  Food Name
+                  {t('meals.foodNameLabel')}
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Chicken Breast, Whole Eggs, Oats"
+                  placeholder={t('meals.foodNameExamplePlaceholder')}
                   value={pinnedName}
                   onChange={(e) => setPinnedName(e.target.value)}
                   className="w-full bg-bg-elevated border border-border rounded-lg p-2.5 text-text-primary text-sm focus:border-accent outline-none font-medium"
@@ -3259,7 +3259,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Default Quantity
+                    {t('meals.defaultQuantity')}
                   </label>
                   <input
                     type="number"
@@ -3272,7 +3272,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Unit
+                    {t('meals.unit')}
                   </label>
                   <select
                     value={pinnedUnit}
@@ -3295,14 +3295,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 className="w-full py-1.5 px-3 rounded-lg bg-bg-secondary border border-border hover:border-accent/40 text-xs font-semibold text-accent flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Auto-Calculate Macros from Name</span>
+                <span>{t('meals.autoCalc')}</span>
               </button>
 
               {/* Macros Breakdown */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Calories (kcal)
+                    {t('meals.caloriesKcal')}
                   </label>
                   <input
                     type="number"
@@ -3315,7 +3315,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <label className="text-2xs font-bold text-emerald-600 uppercase block mb-1">
-                    Protein (g)
+                    {t('scan.proteinLabel')}
                   </label>
                   <input
                     type="number"
@@ -3328,7 +3328,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Carbs (g)
+                    {t('scan.carbsLabel')}
                   </label>
                   <input
                     type="number"
@@ -3341,7 +3341,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </div>
                 <div>
                   <label className="text-2xs font-bold text-text-muted uppercase block mb-1">
-                    Fat (g)
+                    {t('scan.fatLabel')}
                   </label>
                   <input
                     type="number"
@@ -3362,14 +3362,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 onClick={() => setIsEditPinnedOpen(false)}
                 className="btn-secondary py-2 px-4 text-xs font-semibold"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={handleSavePinnedFood}
                 className="btn-primary flex-1 py-2 text-xs font-bold uppercase tracking-wider"
               >
-                {isNewPinned ? 'Pin Food' : 'Save Changes'}
+                {isNewPinned ? t('meals.pinFood') : t('scan.saveChanges')}
               </button>
             </div>
           </div>
@@ -3389,7 +3389,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex items-center justify-between border-b border-border/80 pb-3">
               <div className="flex items-center gap-2">
                 <Sliders className="w-4 h-4 text-accent" />
-                <h3 className="font-bold text-text-primary text-base">Nutrition Options</h3>
+                <h3 className="font-bold text-text-primary text-base">{t('meals.optionsHeading')}</h3>
               </div>
               <button
                 type="button"
@@ -3414,9 +3414,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <Target className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Macro &amp; Calorie Targets</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsMacroTargets')}</h4>
                     <p className="text-2xs text-text-muted">
-                      {macroGoals ? `${macroGoals.calories} kcal • ${macroGoals.proteinG}g P` : 'Auto-calculate for your weight'}
+                      {macroGoals ? `${macroGoals.calories} kcal • ${macroGoals.proteinG}g P` : t('meals.toolsAutoCalc')}
                     </p>
                   </div>
                 </div>
@@ -3436,9 +3436,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <Droplet className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Hydration Tracker</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsHydration')}</h4>
                     <p className="text-2xs text-text-muted">
-                      Water target ({formatWaterMl(waterTargetMl)}) &amp; daily water logs
+                      {t('meals.toolsHydrationHint', { target: formatWaterMl(waterTargetMl) })}
                     </p>
                   </div>
                 </div>
@@ -3458,9 +3458,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Supplements &amp; Creatine</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsSupplements')}</h4>
                     <p className="text-2xs text-text-muted">
-                      Daily target ({dailyCreatineTarget}g), reminder &amp; supply tub
+                      {t('meals.toolsSupplementsHint', { grams: dailyCreatineTarget })}
                     </p>
                   </div>
                 </div>
@@ -3480,9 +3480,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <Star className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Manage Pinned Staples</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsManagePinned')}</h4>
                     <p className="text-2xs text-text-muted">
-                      {favoriteFoods.length} saved daily food items
+                      {t('meals.toolsSavedItems', { count: favoriteFoods.length })}
                     </p>
                   </div>
                 </div>
@@ -3502,8 +3502,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <CalendarCheck className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Past Meal History</h4>
-                    <p className="text-2xs text-text-muted">Browse past dates and copy prior days</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsPastHistory')}</h4>
+                    <p className="text-2xs text-text-muted">{t('meals.toolsPastHistoryHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3523,14 +3523,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <Copy className="w-4 h-4" />
                     </div>
                     <div>
-                      <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Copy Yesterday&apos;s Meals</h4>
+                      <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('meals.toolsCopyYesterday')}</h4>
                       <p className="text-2xs text-text-muted">
-                        {yesterdayMeals.length} meals • ~{Math.round(yesterdayMacros.calories)} kcal
+                        {t('meals.toolsCopyYesterdayHint', { count: yesterdayMeals.length, kcal: Math.round(yesterdayMacros.calories) })}
                       </p>
                     </div>
                   </div>
                   <span className="text-3xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
-                    1-Tap
+                    {t('meals.oneTap')}
                   </span>
                 </button>
               )}
@@ -3555,10 +3555,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div>
                 <h3 id="delete-meal-title" className="text-sm font-bold text-text-primary">
-                  Delete Meal?
+                  {t('meals.deleteMealTitle')}
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Are you sure you want to delete &ldquo;{mealToDelete.name}&rdquo;? This action cannot be undone.
+                  {t('meals.deleteMealMsg', { name: mealToDelete.name })}
                 </p>
               </div>
             </div>
@@ -3569,18 +3569,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 onClick={() => setMealToDelete(null)}
                 className="btn-secondary flex-1 py-2.5 text-xs font-bold"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="button"
                 onClick={() => {
                   deleteMeal(mealToDelete.id);
-                  toast.info(`Deleted ${mealToDelete.name}`);
+                  toast.info(t('meals.deletedFood', { name: mealToDelete.name }));
                   setMealToDelete(null);
                 }}
                 className="btn-danger flex-1 py-2.5 text-xs font-bold"
               >
-                Delete Meal
+                {t('meals.deleteMealButton')}
               </button>
             </div>
           </div>

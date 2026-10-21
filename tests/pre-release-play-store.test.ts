@@ -31,8 +31,15 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const reminderCenter = fs.readFileSync(
         path.join(rootDir, 'src', 'components', 'ReminderCenterModal.tsx'), 'utf8');
 
-      expect(settingsView).toContain('Account &amp; Security');
-      expect(settingsView).toContain('Data, Privacy &amp; Legal');
+      // QA4-004: the section-header copy moved into the i18n dictionary
+      // (en.ts is the source of truth) and SettingsView renders it via t().
+      // Assert the exact copy in the dictionary and the wiring in the view.
+      const enDict = fs.readFileSync(
+        path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
+      expect(enDict).toContain("'settings.accountSecurity': 'Account & Security'");
+      expect(enDict).toContain("'settings.dataPrivacyLegal': 'Data, Privacy & Legal'");
+      expect(settingsView).toContain("t('settings.accountSecurity')");
+      expect(settingsView).toContain("t('settings.dataPrivacyLegal')");
       expect(settingsView).toContain('exportFullBackupJSON'); // Export my data flow
       expect(deleteAccountView).toContain('Export my data');
       expect(deleteAccountView).toContain('Delete my account');
@@ -96,7 +103,12 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const scanMealModalPath = path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx');
       const scanContent = fs.readFileSync(scanMealModalPath, 'utf8');
       expect(scanContent).not.toContain('AI Vision');
-      expect(scanContent).toContain('Macro Lens');
+      // QA4-004: the 'Macro Lens' brand title moved into the i18n dictionary
+      // and the modal renders it via t('scan.title').
+      const enDict = fs.readFileSync(
+        path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
+      expect(enDict).toContain("'scan.title': 'Macro Lens'");
+      expect(scanContent).toContain("t('scan.title')");
     });
   });
 
