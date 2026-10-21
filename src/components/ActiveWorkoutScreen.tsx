@@ -970,21 +970,21 @@ export default function ActiveWorkoutScreen({
     if (typeof firstSet?.prescribedWeight === 'number' && Number.isFinite(firstSet.prescribedWeight)) {
       if (isBW) {
         if (firstSet.prescribedWeight === 0) {
-          return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+          return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe };
         } else {
-          return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+          return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe };
         }
       }
       return {
         text: `${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`,
         isUnconfigured: false,
-        targetRpe: targetRpe ?? 8,
+        targetRpe,
       };
     }
 
     // 2. Bodyweight exercise without explicit extra load:
     if (isBW) {
-      return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+      return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe };
     }
 
     // 3. Unconfigured non-bodyweight exercise:
