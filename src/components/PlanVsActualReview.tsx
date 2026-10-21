@@ -73,7 +73,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
               className="text-2xs font-mono px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold"
               title={t('pva.completionTitle')}
             >
-              {t('pva.setCompletion', { rate: completionSummary.completionRateFormatted })}
+              {t('pva.setCompletion', { rate: completionSummary.completionRateFormatted ?? '' })}
             </span>
 
             <button
