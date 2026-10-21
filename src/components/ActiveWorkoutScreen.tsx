@@ -310,6 +310,12 @@ export default function ActiveWorkoutScreen({
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
   const [plateTargetWeight, setPlateTargetWeight] = useState<number>(60);
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+  // QA4-028: double-submit guard for workout finish — the workout id is
+  // minted inside handleConfirmFinish, so a fast double-tap would save
+  // two distinct workouts. Ref blocks re-entry synchronously; state
+  // disables the button.
+  const [isFinishing, setIsFinishing] = useState(false);
+  const isFinishingRef = useRef(false);
   const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
@@ -1693,6 +1699,9 @@ export default function ActiveWorkoutScreen({
 
   // Finish Workout & detect PRs
   const handleConfirmFinish = () => {
+    // QA4-028: in-flight guard — a second tap while finishing must not
+    // mint and save a duplicate workout (the id is created below).
+    if (isFinishingRef.current) return;
     const today = getLocalTodayStr();
     const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
@@ -1700,6 +1709,9 @@ export default function ActiveWorkoutScreen({
       toast.error('No exercises or planned sets recorded to finish.', 'Cannot Finish');
       return;
     }
+
+    isFinishingRef.current = true;
+    setIsFinishing(true);
 
     // PR detection (only evaluates completed sets)
     let newPRsCount = 0;
@@ -3757,9 +3769,10 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleConfirmFinish}
-                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md shadow-accent/25"
+                  disabled={isFinishing}
+                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md shadow-accent/25 disabled:opacity-50"
                 >
-                  Save &amp; Finish
+                  {isFinishing ? 'Saving…' : 'Save & Finish'}
                 </button>
               </div>
             </div>

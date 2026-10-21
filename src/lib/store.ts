@@ -1463,6 +1463,12 @@ export const useAppStore = create<AppState>()(
       }),
       
       addMeal: (meal) => {
+        // QA4-028: idempotency guard, mirroring addWorkout — a fast
+        // double-tap re-submits the SAME meal id; storing it twice would
+        // duplicate the meal and double-pay its XP.
+        if (meal?.id && get().meals.some((m) => m.id === meal.id)) {
+          return;
+        }
         set((state) => ({ meals: [...state.meals, meal] }));
         if (meal?.id && xpForMeal(meal) > 0) {
           get().awardXpEvents([{ id: xpEventId('meal', meal.id), type: 'meal' }]);
