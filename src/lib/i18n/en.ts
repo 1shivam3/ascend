@@ -1176,6 +1176,14 @@ export const en = {
   'pdc.toastOverriddenT': 'Target Overridden',
   'pdc.toastDismissed': 'Dismissed decision for {name}.',
   'pdc.toastDismissedT': 'Decision Dismissed',
+  'nf.logoTitle': 'Return to ASCEND Dashboard',
+  'nf.headline': 'REP FAILED • PAGE NOT FOUND',
+  'nf.body': 'Even world-class lifters miss a rep. The page you are looking for has been moved or does not exist in the iron vault.',
+  'nf.return': 'Return to Dashboard',
+  'nf.footer': 'ASCEND v2.0 • Offline Powerlifting Sanctuary',
+  'nf.home': 'Home',
+  'nf.prs': 'PRs',
+  'nf.nutrition': 'Nutrition',
 } as const;
 
 export type StringKey = keyof typeof en;

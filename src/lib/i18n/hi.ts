@@ -1173,4 +1173,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'pdc.toastOverriddenT': 'लक्ष्य बदला गया',
   'pdc.toastDismissed': '{name} के लिए निर्णय खारिज हुआ।',
   'pdc.toastDismissedT': 'निर्णय खारिज',
+  'nf.logoTitle': 'ASCEND डैशबोर्ड पर लौटें',
+  'nf.headline': 'रेप विफल • पेज नहीं मिला',
+  'nf.body': 'विश्व-स्तरीय लिफ़्टर भी रेप चूकते हैं। आप जो पेज खोज रहे हैं वह स्थानांतरित हो गया है या आयरन वॉल्ट में मौजूद नहीं है।',
+  'nf.return': 'डैशबोर्ड पर लौटें',
+  'nf.footer': 'ASCEND v2.0 • ऑफ़लाइन पावरलिफ़्टिंग अभयारण्य',
+  'nf.home': 'होम',
+  'nf.prs': 'PR',
+  'nf.nutrition': 'पोषण',
 };
