@@ -102,6 +102,64 @@ describe('i18n translate()', () => {
   });
 });
 
+describe('i18n wiring coverage (pinned)', () => {
+  // Every .tsx surface under src/components and src/app must resolve its
+  // user-visible copy through the i18n dictionaries, EXCEPT the pinned
+  // list below. If you wire a file, remove it from the list; if a new
+  // unwired file appears, this test fails until it is wired or the
+  // exception is justified here.
+  const EXPECTED_UNWIRED = [
+    // Wired by Wave 1 PR #28 (feat/qa4-hindi-complete) — lands with that PR:
+    'src/components/BodyMetricsModal.tsx',
+    'src/components/CreatineModal.tsx',
+    'src/components/EditProfileModal.tsx',
+    'src/components/HydrationModal.tsx',
+    'src/components/PRsPage.tsx',
+    'src/components/ProfileView.tsx',
+    'src/components/ProgressPage.tsx',
+    'src/components/ScanMealModal.tsx',
+    // No user-visible strings (verified): pure layout/logic/providers.
+    'src/components/ServiceWorkerRegister.tsx',
+    'src/components/TabSkeleton.tsx',
+    'src/components/TelemetryProvider.tsx',
+    'src/components/ui/Badge.tsx',
+    'src/components/ui/Button.tsx',
+    'src/components/ui/Card.tsx',
+    'src/components/ui/CircularProgress.tsx',
+    // App shells: error/loading delegate to the wired state components;
+    // layout + legal pages carry metadata / formal legal text only.
+    'src/app/delete-account/page.tsx',
+    'src/app/disclaimer/page.tsx',
+    'src/app/error.tsx',
+    'src/app/layout.tsx',
+    'src/app/loading.tsx',
+    'src/app/privacy/page.tsx',
+    'src/app/terms/page.tsx',
+  ].sort();
+
+  it('pins the exact set of files not yet calling the i18n API', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const roots = ['src/components', 'src/app'];
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.tsx')) files.push(full);
+      }
+    };
+    roots.forEach(walk);
+    const unwired = files
+      .filter((f) => {
+        const src = readFileSync(f, 'utf8');
+        return !src.includes('useTranslation') && !src.includes('translate(');
+      })
+      .sort();
+    expect(unwired).toEqual(EXPECTED_UNWIRED);
+  });
+});
+
 describe('language preference in the store', () => {
   it('defaults to English', () => {
     expect(DEFAULT_UI_PREFERENCES.language).toBe('en');
