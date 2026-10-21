@@ -6,6 +6,9 @@ import {
   XP_WATER,
   XP_STREAK_DAY,
   XP_CHALLENGE_COMPLETE,
+  MAX_AWARDED_IDS,
+  MAX_COMPACTED_AWARD_HASHES,
+  hashAwardId,
   xpEventId,
   xpForWorkout,
   xpForMeal,
@@ -157,7 +160,11 @@ describe('awardXp', () => {
     expect(r.newTotal).toBe(500);
   });
   it('starts from a clean initial state', () => {
-    expect(getInitialXState()).toEqual({ totalXp: 0, awardedIds: [] });
+    expect(getInitialXState()).toEqual({
+      totalXp: 0,
+      awardedIds: [],
+      compactedAwardedHashes: [],
+    });
   });
 });
 
@@ -200,5 +207,75 @@ describe('summarizeXpInRange', () => {
       '2026-10-25',
     );
     expect(s).toEqual({ total: 0, workoutXp: 0, mealXp: 0, prXp: 0, waterXp: 0 });
+  });
+});
+
+describe('QA4-042 awardXp ledger compaction (cap boundary)', () => {
+  const batch = (from: number, count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: `workout:w${from + i}`,
+      type: 'workout' as const,
+      amount: 1,
+    }));
+
+  it('hashAwardId is deterministic, 16 hex chars, and discriminating', () => {
+    expect(hashAwardId('workout:abc')).toBe(hashAwardId('workout:abc'));
+    expect(hashAwardId('workout:abc')).toMatch(/^[0-9a-f]{16}$/);
+    expect(hashAwardId('workout:abc')).not.toBe(hashAwardId('workout:abd'));
+    expect(hashAwardId('workout:abc')).not.toBe(hashAwardId('meal:abc'));
+  });
+
+  it('an id evicted past MAX_AWARDED_IDS still cannot pay twice', () => {
+    // Fill the ledger exactly to the cap, then push 5 more so the
+    // oldest 5 ids are evicted from the full list into compaction.
+    const first = awardXp(batch(0, MAX_AWARDED_IDS), 0);
+    expect(first.awardedIds).toHaveLength(MAX_AWARDED_IDS);
+    expect(first.compactedAwardedHashes).toHaveLength(0);
+
+    const second = awardXp(batch(MAX_AWARDED_IDS, 5), first.newTotal, first.awardedIds, first.compactedAwardedHashes);
+    expect(second.awardedIds).toHaveLength(MAX_AWARDED_IDS);
+    expect(second.awardedIds).not.toContain('workout:w0');
+    expect(second.compactedAwardedHashes).toHaveLength(5);
+    expect(second.compactedAwardedHashes).toContain(hashAwardId('workout:w0'));
+
+    // Replay the evicted oldest id, a mid-list id, and the newest id:
+    // none of them may pay again.
+    const replay = awardXp(
+      [
+        { id: 'workout:w0', type: 'workout' },
+        { id: 'workout:w5000', type: 'workout' },
+        { id: `workout:w${MAX_AWARDED_IDS + 4}`, type: 'workout' },
+      ],
+      second.newTotal,
+      second.awardedIds,
+      second.compactedAwardedHashes,
+    );
+    expect(replay.awarded).toBe(0);
+    expect(replay.skippedDuplicates).toBe(3);
+    expect(replay.newTotal).toBe(second.newTotal);
+  });
+
+  it('new events still award normally after compaction', () => {
+    const first = awardXp(batch(0, MAX_AWARDED_IDS + 10), 0);
+    const next = awardXp(
+      [{ id: 'workout:brand-new', type: 'workout' }],
+      first.newTotal,
+      first.awardedIds,
+      first.compactedAwardedHashes,
+    );
+    expect(next.awarded).toBe(XP_WORKOUT);
+    expect(next.awardedIds).toContain('workout:brand-new');
+    expect(next.compactedAwardedHashes.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('legacy callers without a compacted index behave as before', () => {
+    const r = awardXp([{ id: 'workout:w1', type: 'workout' }], 0, ['workout:w1']);
+    expect(r.awarded).toBe(0);
+    expect(r.skippedDuplicates).toBe(1);
+    expect(r.compactedAwardedHashes).toEqual([]);
+  });
+
+  it('exports a justified compaction bound far above the full-id cap', () => {
+    expect(MAX_COMPACTED_AWARD_HASHES).toBeGreaterThanOrEqual(MAX_AWARDED_IDS * 10);
   });
 });
