@@ -26,6 +26,8 @@ import {
 } from '@/lib/strength-standards';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 import { safeRandomId, getLocalTodayStr } from '@/lib/formatters';
 
 interface LogPastWorkoutModalProps {
@@ -34,16 +36,16 @@ interface LogPastWorkoutModalProps {
   onSaved?: (workout: WorkoutEntry) => void;
 }
 
-const RPE_PRESETS = [
-  { value: 0, label: 'No RPE', desc: 'Not tracked' },
-  { value: 6, label: '@6', desc: 'Warmup / very easy (4+ reps in reserve)' },
-  { value: 7, label: '@7', desc: 'Easy effort (3 reps in reserve)' },
-  { value: 7.5, label: '@7.5', desc: 'Solid effort (2–3 reps in reserve)' },
-  { value: 8, label: '@8', desc: 'Standard work set (2 reps in reserve)' },
-  { value: 8.5, label: '@8.5', desc: 'Hard work set (1–2 reps in reserve)' },
-  { value: 9, label: '@9', desc: 'Heavy effort (1 rep in reserve)' },
-  { value: 9.5, label: '@9.5', desc: 'Near max (maybe 1 rep left)' },
-  { value: 10, label: '@10', desc: 'Maximum effort (0 reps left)' },
+const RPE_PRESETS: { value: number; label: string; descKey: StringKey }[] = [
+  { value: 0, label: 'No RPE', descKey: 'lp.rpeNone' },
+  { value: 6, label: '@6', descKey: 'lp.rpe6' },
+  { value: 7, label: '@7', descKey: 'lp.rpe7' },
+  { value: 7.5, label: '@7.5', descKey: 'lp.rpe75' },
+  { value: 8, label: '@8', descKey: 'lp.rpe8' },
+  { value: 8.5, label: '@8.5', descKey: 'lp.rpe85' },
+  { value: 9, label: '@9', descKey: 'lp.rpe9' },
+  { value: 9.5, label: '@9.5', descKey: 'lp.rpe95' },
+  { value: 10, label: '@10', descKey: 'lp.rpe10' },
 ];
 
 export default function LogPastWorkoutModal({
@@ -51,6 +53,7 @@ export default function LogPastWorkoutModal({
   onClose,
   onSaved,
 }: LogPastWorkoutModalProps) {
+  const { t } = useTranslation();
   const profile = useStore((state) => state.profile);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const prs = useStore((state) => state.prs || []);
@@ -69,7 +72,7 @@ export default function LogPastWorkoutModal({
   }, [todayStr]);
 
   const [date, setDate] = useState(todayStr);
-  const [workoutName, setWorkoutName] = useState('Completed Workout');
+  const [workoutName, setWorkoutName] = useState(() => t('lp.defaultName'));
   const [durationMinutes, setDurationMinutes] = useState('45');
   const [notes, setNotes] = useState('');
   const [isExerciseSelectorOpen, setIsExerciseSelectorOpen] = useState(false);
@@ -136,7 +139,7 @@ export default function LogPastWorkoutModal({
     });
 
     setExercises(loaded);
-    toast.info(`Loaded ${plan.name} (${loaded.length} exercises)`, 'Template Applied');
+    toast.info(t('lp.toastLoaded', { name: plan.name, count: loaded.length }), t('lp.toastTemplate'));
   };
 
   /**
@@ -147,7 +150,7 @@ export default function LogPastWorkoutModal({
   const handleQuickLogPlan = () => {
     const plan = plannedWorkouts.find((p) => p.id === quickPlanId);
     if (!plan) {
-      toast.error('Pick a workout plan first.', 'No Plan Selected');
+      toast.error(t('lp.toastPickPlan'), t('lp.toastNoPlan'));
       return;
     }
     const completedExercises: WorkoutExercise[] = plan.exercises.map((pEx) => {
@@ -186,7 +189,7 @@ export default function LogPastWorkoutModal({
 
     addWorkout(entry);
     if (onSaved) onSaved(entry);
-    toast.success(`Logged "${plan.name}" as complete (${completedExercises.length} exercises).`, 'Workout Logged');
+    toast.success(t('lp.toastLoggedComplete', { name: plan.name, count: completedExercises.length }), t('lp.toastLogged'));
     onClose();
   };
 
@@ -211,7 +214,7 @@ export default function LogPastWorkoutModal({
 
   const handleRemoveExercise = (idx: number) => {
     if (exercises.length <= 1) {
-      toast.error('Workout must have at least one exercise', 'Cannot Remove');
+      toast.error(t('lp.toastMinOne'), t('lp.toastCannotRemove'));
       return;
     }
     setExercises((prev) => prev.filter((_, i) => i !== idx));
@@ -394,7 +397,7 @@ export default function LogPastWorkoutModal({
       .filter((ex) => ex.name.trim() && ex.sets.length > 0);
 
     if (validExercises.length === 0) {
-      toast.error('Please enter at least one exercise with sets.', 'Empty Workout');
+      toast.error(t('lp.toastEmpty'), t('lp.toastEmptyT'));
       return;
     }
 
@@ -448,9 +451,9 @@ export default function LogPastWorkoutModal({
     if (onSaved) onSaved(entry);
 
     if (newPRsCount > 0) {
-      toast.success(`Workout logged! ${newPRsCount} new PR${newPRsCount > 1 ? 's' : ''} saved!`, 'Workout Saved');
+      toast.success(t(newPRsCount > 1 ? 'lp.toastSavedPr' : 'lp.toastSavedPrOne', { count: newPRsCount }), t('lp.toastSavedT'));
     } else {
-      toast.success(`Logged ${validExercises.length} exercises from ${date}`, 'Workout Saved');
+      toast.success(t('lp.toastSaved', { count: validExercises.length, date }), t('lp.toastSavedT'));
     }
 
     onClose();
@@ -471,10 +474,10 @@ export default function LogPastWorkoutModal({
               </div>
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-text-primary tracking-tight">
-                  Log Past Workout
+                  {t('lp.title')}
                 </h2>
                 <p className="text-xs text-text-muted">
-                  Record your completed gym session with weights, reps &amp; RPE
+                  {t('lp.subtitle')}
                 </p>
               </div>
             </div>
@@ -490,14 +493,14 @@ export default function LogPastWorkoutModal({
           {/* Quick Summary Strip */}
           <div className="px-4 sm:px-5 py-2.5 bg-bg-secondary/60 border-b border-border/50 flex items-center justify-between text-2xs text-text-secondary">
             <div className="flex items-center gap-3 font-mono">
-              <span>{exercises.length} Exercises</span>
+              <span>{t('lp.exercisesCount', { count: exercises.length })}</span>
               <span>•</span>
-              <span>{sessionStats.totalSets} Sets</span>
+              <span>{t('lp.setsCount', { count: sessionStats.totalSets })}</span>
               <span>•</span>
-              <span className="text-accent font-semibold">{sessionStats.totalVolume} {userUnit} Volume</span>
+              <span className="text-accent font-semibold">{t('lp.volume', { volume: sessionStats.totalVolume, unit: userUnit })}</span>
             </div>
             <span className="text-3xs text-text-muted font-mono uppercase tracking-wider">
-              AUTO PR TRACKING ON
+              {t('lp.autoPr')}
             </span>
           </div>
 
@@ -510,19 +513,19 @@ export default function LogPastWorkoutModal({
                 {plannedWorkouts.length > 0 && (
                   <div className="sm:col-span-3 p-3 rounded-xl bg-accent/5 border border-accent/25 space-y-2">
                     <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent block">
-                      Quick Log — Mark Plan Complete
+                      {t('lp.quickLog')}
                     </span>
                     <div className="flex gap-2">
                       <select
                         value={quickPlanId}
                         onChange={(e) => setQuickPlanId(e.target.value)}
                         className="flex-1 bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-semibold text-text-primary outline-none focus:border-accent"
-                        aria-label="Choose a planned workout to log as complete"
+                        aria-label={t('lp.chooseAria')}
                       >
-                        <option value="">Choose a workout…</option>
+                        <option value="">{t('lp.choose')}</option>
                         {plannedWorkouts.map((p) => (
                           <option key={p.id} value={p.id}>
-                            {p.name} ({p.exercises.length} exercises)
+                            {t('lp.planOption', { name: p.name, count: p.exercises.length })}
                           </option>
                         ))}
                       </select>
@@ -532,11 +535,11 @@ export default function LogPastWorkoutModal({
                         disabled={!quickPlanId}
                         className="btn-primary px-4 py-2 text-xs font-bold disabled:opacity-40 shrink-0"
                       >
-                        Log as Complete
+                        {t('lp.logComplete')}
                       </button>
                     </div>
                     <p className="text-3xs text-text-muted">
-                      Logs every prescribed set as completed on the date above — no manual entry needed.
+                      {t('lp.quickHint')}
                     </p>
                   </div>
                 )}
@@ -544,7 +547,7 @@ export default function LogPastWorkoutModal({
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-2xs font-mono font-semibold uppercase text-text-muted">
-                      DATE
+                      {t('lp.date')}
                     </label>
                     <div className="flex items-center gap-1">
                       <button
@@ -554,7 +557,7 @@ export default function LogPastWorkoutModal({
                           date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
                         }`}
                       >
-                        Today
+                        {t('lp.today')}
                       </button>
                       <button
                         type="button"
@@ -563,7 +566,7 @@ export default function LogPastWorkoutModal({
                           date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
                         }`}
                       >
-                        Yesterday
+                        {t('lp.yesterday')}
                       </button>
                     </div>
                   </div>
@@ -579,7 +582,7 @@ export default function LogPastWorkoutModal({
                 {/* Duration */}
                 <div>
                   <label className="text-2xs font-mono font-semibold uppercase text-text-muted block mb-1">
-                    DURATION (MIN)
+                    {t('lp.duration')}
                   </label>
                   <div className="relative">
                     <input
@@ -592,7 +595,7 @@ export default function LogPastWorkoutModal({
                       className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
                     />
                     <span className="text-3xs font-mono text-text-muted absolute right-3 top-1/2 -translate-y-1/2">
-                      min
+                      {t('lp.min')}
                     </span>
                   </div>
                 </div>
@@ -600,13 +603,13 @@ export default function LogPastWorkoutModal({
                 {/* Session Name */}
                 <div>
                   <label className="text-2xs font-mono font-semibold uppercase text-text-muted block mb-1">
-                    SESSION TITLE
+                    {t('lp.sessionTitle')}
                   </label>
                   <input
                     type="text"
                     value={workoutName}
                     onChange={(e) => setWorkoutName(e.target.value)}
-                    placeholder="e.g. Upper Body Focus"
+                    placeholder={t('lp.titlePlaceholder')}
                     className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-semibold text-text-primary outline-none focus:border-accent"
                   />
                 </div>
@@ -616,7 +619,7 @@ export default function LogPastWorkoutModal({
               {plannedWorkouts.length > 0 && (
                 <div className="pt-1 border-t border-border/40">
                   <span className="text-3xs font-mono font-semibold uppercase text-text-muted block mb-1.5">
-                    OR PRE-FILL FROM SAVED WORKOUT:
+                    {t('lp.prefill')}
                   </span>
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
                     {plannedWorkouts.map((plan) => (
@@ -638,7 +641,7 @@ export default function LogPastWorkoutModal({
             <div className="space-y-3.5">
               <div className="flex items-center justify-between px-1">
                 <span className="text-xs font-bold text-text-primary uppercase tracking-wider flex items-center gap-1.5">
-                  <span>Exercises</span>
+                  <span>{t('lp.exercises')}</span>
                   <span className="text-2xs font-mono text-text-muted">({exercises.length})</span>
                 </span>
                 <button
@@ -647,7 +650,7 @@ export default function LogPastWorkoutModal({
                   className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 rounded-xl border border-accent/30 text-accent hover:border-accent cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add Exercise</span>
+                  <span>{t('lp.addExercise')}</span>
                 </button>
               </div>
 
@@ -667,7 +670,7 @@ export default function LogPastWorkoutModal({
                         <div>
                           <h4 className="text-sm font-bold text-text-primary leading-tight">{ex.name}</h4>
                           <span className="text-3xs text-text-muted font-mono">
-                            {isBW ? 'Bodyweight Movement' : `Loaded Exercise (${userUnit})`}
+                            {isBW ? t('lp.bodyweight') : t('lp.loaded', { unit: userUnit })}
                           </span>
                         </div>
                       </div>
@@ -679,14 +682,14 @@ export default function LogPastWorkoutModal({
                           className="text-xs font-semibold text-accent hover:bg-accent/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
-                          <span>Set</span>
+                          <span>{t('lp.set')}</span>
                         </button>
                         {exercises.length > 1 && (
                           <button
                             type="button"
                             onClick={() => handleRemoveExercise(exIdx)}
                             className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                            title="Remove exercise"
+                            title={t('lp.removeExercise')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -699,8 +702,8 @@ export default function LogPastWorkoutModal({
                       {/* Table Column Labels */}
                       <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-semibold uppercase text-text-muted px-1">
                         <span className="col-span-1 text-center">#</span>
-                        <span className="col-span-5 text-center">{isBW ? `ADDED (${userUnit})` : `LOAD (${userUnit})`}</span>
-                        <span className="col-span-3 text-center">REPS</span>
+                        <span className="col-span-5 text-center">{isBW ? t('lp.added', { unit: userUnit }) : t('lp.load', { unit: userUnit })}</span>
+                        <span className="col-span-3 text-center">{t('lp.reps')}</span>
                         <span className="col-span-2 text-center">RPE</span>
                         <span className="col-span-1 text-right"></span>
                       </div>
@@ -753,7 +756,7 @@ export default function LogPastWorkoutModal({
                               onBlur={() => handleSetBlur(exIdx, sIdx, 'reps')}
                               className="w-full text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-transparent outline-none p-0 tabular-nums"
                             />
-                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">reps</span>
+                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">{t('lp.repsUnit')}</span>
                           </div>
 
                           {/* RPE Selector */}
@@ -762,7 +765,7 @@ export default function LogPastWorkoutModal({
                               value={set.rpe || 0}
                               onChange={(e) => handleSetChange(exIdx, sIdx, 'rpe', e.target.value)}
                               className="w-full bg-bg-secondary border border-border/60 rounded-xl px-1.5 py-1.5 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent cursor-pointer text-center truncate"
-                              title="Rate of Perceived Exertion (RPE)"
+                              title={t('lp.rpeTitle')}
                             >
                               {RPE_PRESETS.map((p) => (
                                 <option key={p.value} value={p.value}>
@@ -779,7 +782,7 @@ export default function LogPastWorkoutModal({
                                 type="button"
                                 onClick={() => handleRemoveSet(exIdx, sIdx)}
                                 className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                                title="Remove set"
+                                title={t('lp.removeSet')}
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -788,7 +791,7 @@ export default function LogPastWorkoutModal({
                                 type="button"
                                 onClick={() => handleDuplicateSet(exIdx, sIdx)}
                                 className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                                title="Duplicate set"
+                                title={t('lp.duplicateSet')}
                               >
                                 <Copy className="w-3 h-3" />
                               </button>
@@ -800,7 +803,7 @@ export default function LogPastWorkoutModal({
                       {/* Quick Weight Adjust Chips for Active Set */}
                       <div className="flex items-center justify-between pt-1 px-1">
                         <span className="text-3xs font-mono text-text-muted">
-                          Quick step ({userUnit}):
+                          {t('lp.quickStep', { unit: userUnit })}
                         </span>
                         <div className="flex items-center gap-1">
                           {[-weightStep * 2, -weightStep, weightStep, weightStep * 2].map((delta) => (
@@ -829,7 +832,7 @@ export default function LogPastWorkoutModal({
               className="w-full py-3.5 rounded-2xl border-2 border-dashed border-border/80 hover:border-accent/60 bg-bg-secondary/30 hover:bg-accent/5 text-text-secondary hover:text-accent font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Another Exercise to Workout</span>
+              <span>{t('lp.addAnother')}</span>
             </button>
           </div>
 
@@ -840,7 +843,7 @@ export default function LogPastWorkoutModal({
               onClick={onClose}
               className="btn-secondary py-2.5 px-4 text-xs font-semibold rounded-xl cursor-pointer"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -848,7 +851,7 @@ export default function LogPastWorkoutModal({
               className="btn-primary py-2.5 px-6 text-xs font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-accent/20 flex-1 sm:flex-initial cursor-pointer"
             >
               <Check className="w-4 h-4 stroke-[3]" />
-              <span>Save {exercises.length} Exercises to History</span>
+              <span>{t('lp.save', { count: exercises.length })}</span>
             </button>
           </div>
         </div>
