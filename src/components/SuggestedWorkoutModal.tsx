@@ -31,6 +31,8 @@ import { generateSplitWeeklySchedule } from '@/lib/workout-schedule';
 import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { EquipmentType } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 export type BodyPartOption =
   | 'chest'
@@ -54,16 +56,16 @@ interface SuggestedWorkoutModalProps {
   onSavePlan: (plan: Omit<PlannedWorkout, 'id' | 'createdAt'>) => void;
 }
 
-const BODY_PARTS: { id: BodyPartOption; label: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
-  { id: 'chest',      label: 'Chest',       icon: Target,   description: 'Pectorals & Incline' },
-  { id: 'back',       label: 'Back',        icon: Layers,   description: 'Lats, Traps & Rhomboids' },
-  { id: 'shoulders',  label: 'Shoulders',   icon: Shield,   description: 'Delts & Overhead' },
-  { id: 'arms',       label: 'Arms',        icon: Dumbbell, description: 'Biceps & Triceps' },
-  { id: 'legs',       label: 'Legs',        icon: Activity, description: 'Quads, Hamstrings & Calves' },
-  { id: 'core',       label: 'Core / Abs',  icon: Box,      description: 'Abs & Stability' },
-  { id: 'push',       label: 'Push Day',    icon: Flame,    description: 'Chest, Shoulders & Triceps' },
-  { id: 'pull',       label: 'Pull Day',    icon: Zap,      description: 'Back, Biceps & Rear Delts' },
-  { id: 'full_body',  label: 'Full Body',   icon: Crown,    description: 'Compound Total Body' },
+const BODY_PARTS: { id: BodyPartOption; labelKey: StringKey; icon: React.ComponentType<{ className?: string }>; descKey: StringKey }[] = [
+  { id: 'chest',      labelKey: 'sg.bp.chest',      icon: Target,   descKey: 'sg.bp.chestDesc' },
+  { id: 'back',       labelKey: 'sg.bp.back',       icon: Layers,   descKey: 'sg.bp.backDesc' },
+  { id: 'shoulders',  labelKey: 'sg.bp.shoulders',  icon: Shield,   descKey: 'sg.bp.shouldersDesc' },
+  { id: 'arms',       labelKey: 'sg.bp.arms',       icon: Dumbbell, descKey: 'sg.bp.armsDesc' },
+  { id: 'legs',       labelKey: 'sg.bp.legs',       icon: Activity, descKey: 'sg.bp.legsDesc' },
+  { id: 'core',       labelKey: 'sg.bp.core',       icon: Box,      descKey: 'sg.bp.coreDesc' },
+  { id: 'push',       labelKey: 'sg.bp.push',       icon: Flame,    descKey: 'sg.bp.pushDesc' },
+  { id: 'pull',       labelKey: 'sg.bp.pull',       icon: Zap,      descKey: 'sg.bp.pullDesc' },
+  { id: 'full_body',  labelKey: 'sg.bp.full',       icon: Crown,    descKey: 'sg.bp.fullDesc' },
 ];
 
 interface SplitPreset {
@@ -128,25 +130,25 @@ const SPLIT_PRESETS: SplitPreset[] = [
   },
 ];
 
-const INTENSITIES: { id: IntensityOption; label: string; tag: string; description: string; badgeColor: string }[] = [
+const INTENSITIES: { id: IntensityOption; labelKey: StringKey; tagKey: StringKey; description: string; badgeColor: string }[] = [
   {
     id: 'low',
-    label: 'Low',
-    tag: 'Deload / Recovery / Form',
+    labelKey: 'sg.int.low',
+    tagKey: 'sg.int.lowTag',
     description: '4 exercises • 2–3 sets • 12–15 reps • Focus on technique',
     badgeColor: 'text-sky-400 bg-sky-500/10 border-sky-500/30',
   },
   {
     id: 'medium',
-    label: 'Medium',
-    tag: 'Hypertrophy & Muscle Growth',
+    labelKey: 'sg.int.medium',
+    tagKey: 'sg.int.mediumTag',
     description: '5 exercises • 3–4 sets • 8–10 reps • Weights rise gradually as you get stronger',
     badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30',
   },
   {
     id: 'high',
-    label: 'High',
-    tag: 'Maximum Strength',
+    labelKey: 'sg.int.high',
+    tagKey: 'sg.int.highTag',
     description: '5 exercises • 4–5 sets • 4–6 reps (compounds) • Peak neural drive',
     badgeColor: 'text-accent bg-accent/10 border-accent/30',
   },
@@ -339,6 +341,7 @@ export default function SuggestedWorkoutModal({
   onStartWorkout,
   onSavePlan,
 }: SuggestedWorkoutModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const setPlannedWorkouts = useStore((state) => state.setPlannedWorkouts);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
@@ -359,11 +362,11 @@ export default function SuggestedWorkoutModal({
 
   const todayRoutineName = useMemo(() => {
     if (!todaySchedule) return '';
-    if (todaySchedule.workoutPlanId === 'rest') return 'Rest & Recovery';
+    if (todaySchedule.workoutPlanId === 'rest') return t('sg.restRecovery');
     if (todaySchedule.customTitle) return todaySchedule.customTitle;
     const plan = plannedWorkouts.find((p) => p.id === todaySchedule.workoutPlanId);
-    return plan?.name || todaySchedule.workoutPlanId || 'Scheduled Routine';
-  }, [todaySchedule, plannedWorkouts]);
+    return plan?.name || todaySchedule.workoutPlanId || t('sg.scheduledRoutine');
+  }, [todaySchedule, plannedWorkouts, t]);
 
   // Mode: 'bodyparts' | 'split'
   const [activeTab, setActiveTab] = useState<'bodyparts' | 'split'>('bodyparts');
@@ -450,8 +453,8 @@ export default function SuggestedWorkoutModal({
     if (!isOpen) return;
 
     if (activeTab === 'bodyparts') {
-      const names = selectedBodyParts.map((bp) => BODY_PARTS.find((b) => b.id === bp)?.label || bp).join(' + ');
-      setPlanTitle(`${names} (${INTENSITIES.find((i) => i.id === selectedIntensity)?.label})`);
+      const names = selectedBodyParts.map((bp) => { const f = BODY_PARTS.find((b) => b.id === bp); return f ? t(f.labelKey) : bp; }).join(' + ');
+      setPlanTitle(`${names} (${t(INTENSITIES.find((i) => i.id === selectedIntensity)?.labelKey ?? 'sg.int.medium')})`);
       setExercises(generateExercisesFromSelection(selectedBodyParts, selectedIntensity, userUnit));
     } else {
       // Split mode
@@ -462,7 +465,7 @@ export default function SuggestedWorkoutModal({
         setExercises(generateExercisesFromSelection(day.bodyParts, selectedIntensity, userUnit));
       }
     }
-  }, [isOpen, activeTab, selectedBodyParts, selectedIntensity, selectedSplitId, selectedSplitDayIdx, userUnit]);
+  }, [isOpen, activeTab, selectedBodyParts, selectedIntensity, selectedSplitId, selectedSplitDayIdx, userUnit, t]);
 
   if (!isOpen) return null;
 
@@ -474,7 +477,7 @@ export default function SuggestedWorkoutModal({
 
   const handleRemoveExercise = (index: number) => {
     if (exercises.length <= 1) {
-      toast.error('Workout must have at least one exercise.');
+      toast.error(t('sg.toastMinOne'));
       return;
     }
     setExercises((prev) => prev.filter((_, i) => i !== index));
@@ -482,7 +485,7 @@ export default function SuggestedWorkoutModal({
 
   const handleQuickAddExercise = (exerciseName: string) => {
     if (exercises.some((e) => e.name.toLowerCase() === exerciseName.toLowerCase())) {
-      toast.info(`${exerciseName} is already in the routine.`);
+      toast.info(t('sg.toastAlreadyIn', { name: exerciseName }));
       return;
     }
     setExercises((prev) => [
@@ -496,27 +499,27 @@ export default function SuggestedWorkoutModal({
       },
     ]);
     setShowAddDrawer(false);
-    toast.success(`Added ${exerciseName} to routine!`);
+    toast.success(t('sg.toastAdded', { name: exerciseName }));
   };
 
   const handleStartNow = () => {
     const valid = exercises.filter((e) => e.name.trim());
     if (valid.length === 0) {
-      toast.error('Please include at least one named exercise.');
+      toast.error(t('sg.toastNamed'));
       return;
     }
-    onStartWorkout(planTitle || 'Suggested Workout', valid);
+    onStartWorkout(planTitle || t('sg.fallbackWorkout'), valid);
     onClose();
   };
 
   const handleSaveToPlans = () => {
     const valid = exercises.filter((e) => e.name.trim());
     if (valid.length === 0) {
-      toast.error('Please include at least one named exercise.');
+      toast.error(t('sg.toastNamed'));
       return;
     }
     onSavePlan({
-      name: planTitle || 'Suggested Routine',
+      name: planTitle || t('sg.fallbackRoutine'),
       exercises: valid,
     });
     onClose();
@@ -548,7 +551,7 @@ export default function SuggestedWorkoutModal({
         daysPerWeek: result.daysPerWeek,
       });
     }
-    toast.success(`Generated ${result.daysPerWeek}-day ${result.splitName} weekly workout plan!`, 'Schedule Generated');
+    toast.success(t('sg.toastGenerated', { days: result.daysPerWeek, split: result.splitName }), t('sg.toastGeneratedT'));
     onClose();
   };
 
@@ -568,10 +571,10 @@ export default function SuggestedWorkoutModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-text-primary leading-tight font-sans">
-                Workout Plan Generator
+                {t('sg.title')}
               </h2>
               <p className="text-2xs text-text-secondary">
-                Select multiple body parts or choose your training split
+                {t('sg.subtitle')}
               </p>
             </div>
           </div>
@@ -596,7 +599,7 @@ export default function SuggestedWorkoutModal({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>Multi-Body Parts</span>
+            <span>{t('sg.tabParts')}</span>
           </button>
           <button
             type="button"
@@ -608,7 +611,7 @@ export default function SuggestedWorkoutModal({
             }`}
           >
             <Repeat className="w-3.5 h-3.5" />
-            <span>Choose Split Routine</span>
+            <span>{t('sg.tabSplit')}</span>
           </button>
         </div>
 
@@ -623,7 +626,7 @@ export default function SuggestedWorkoutModal({
                 </div>
                 <div>
                   <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider block">
-                    TODAY&apos;S SCHEDULED ROUTINE
+                    {t('sg.todayRoutine')}
                   </span>
                   <h3 className="text-xs sm:text-sm font-bold text-text-primary">
                     {todayRoutineName}
@@ -645,13 +648,13 @@ export default function SuggestedWorkoutModal({
                 className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 cursor-pointer shrink-0 shadow-sm"
               >
                 <Play className="w-3.5 h-3.5 fill-stone-950 stroke-stone-950" />
-                <span>Start Routine</span>
+                <span>{t('sg.startRoutine')}</span>
               </button>
             </div>
           ) : todaySchedule && todaySchedule.workoutPlanId === 'rest' ? (
             <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 flex items-center gap-2.5 text-xs text-text-muted">
               <span className="w-2 h-2 rounded-full bg-sky-400 shrink-0" />
-              <span>Today is a scheduled Rest Day. Pick what you want to train below to generate a bonus session:</span>
+              <span>{t('sg.restBanner')}</span>
             </div>
           ) : null}
 
@@ -660,29 +663,29 @@ export default function SuggestedWorkoutModal({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-label font-bold text-text-muted">
-                  What do you want to train today?
+                  {t('sg.trainToday')}
                 </span>
                 <span className="text-2xs text-accent font-bold font-mono">
-                  {selectedBodyParts.length} selected
+                  {t('sg.selected', { count: selectedBodyParts.length })}
                 </span>
               </div>
 
               {/* 1-Tap Quick Presets */}
               <div className="flex flex-wrap gap-1.5 pb-1">
-                {[
-                  { label: 'Push Day', parts: ['push'] as BodyPartOption[] },
-                  { label: 'Pull Day', parts: ['pull'] as BodyPartOption[] },
-                  { label: 'Legs', parts: ['legs'] as BodyPartOption[] },
-                  { label: 'Upper Body', parts: ['chest', 'back', 'shoulders'] as BodyPartOption[] },
-                  { label: 'Full Body', parts: ['full_body'] as BodyPartOption[] },
-                ].map((preset) => (
+                {([
+                  { labelKey: 'sg.bp.push', parts: ['push'] as BodyPartOption[] },
+                  { labelKey: 'sg.bp.pull', parts: ['pull'] as BodyPartOption[] },
+                  { labelKey: 'sg.bp.legs', parts: ['legs'] as BodyPartOption[] },
+                  { labelKey: 'sg.presetUpper', parts: ['chest', 'back', 'shoulders'] as BodyPartOption[] },
+                  { labelKey: 'sg.bp.full', parts: ['full_body'] as BodyPartOption[] },
+                ] as { labelKey: StringKey; parts: BodyPartOption[] }[]).map((preset) => (
                   <button
-                    key={preset.label}
+                    key={preset.labelKey}
                     type="button"
                     onClick={() => setSelectedBodyParts(preset.parts)}
                     className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent border border-border/80 text-text-secondary text-2xs font-semibold active:scale-95 transition-all cursor-pointer"
                   >
-                    {preset.label}
+                    {t(preset.labelKey)}
                   </button>
                 ))}
               </div>
@@ -709,10 +712,10 @@ export default function SuggestedWorkoutModal({
                       </div>
                       <div className="min-w-0 flex-1">
                         <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
-                          {bp.label}
+                          {t(bp.labelKey)}
                         </span>
                         <span className="text-[10px] text-text-muted truncate block">
-                          {bp.description}
+                          {t(bp.descKey)}
                         </span>
                       </div>
                       {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
@@ -727,7 +730,7 @@ export default function SuggestedWorkoutModal({
           {activeTab === 'split' && (
             <div className="space-y-3">
               <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
-                Choose Split Template
+                {t('sg.chooseSplit')}
               </span>
 
               {/* Split Cards */}
@@ -762,7 +765,7 @@ export default function SuggestedWorkoutModal({
               {/* Day selection within chosen split */}
               <div className="pt-1 space-y-1.5">
                 <span className="text-2xs font-mono font-bold text-text-secondary uppercase block">
-                  Select Day to Train:
+                  {t('sg.selectDay')}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {currentSplit.days.map((day, idx) => {
@@ -790,10 +793,10 @@ export default function SuggestedWorkoutModal({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
                     <span className="text-xs font-bold text-text-primary block">
-                      Generate Full Weekly Workout Plan
+                      {t('sg.genWeekly')}
                     </span>
                     <span className="text-3xs text-text-secondary block mt-0.5">
-                      Sets up all {currentSplit.name} routines and populates your 7-day schedule
+                      {t('sg.genWeeklySub', { name: currentSplit.name })}
                     </span>
                   </div>
                   <button
@@ -802,7 +805,7 @@ export default function SuggestedWorkoutModal({
                     className="btn-primary py-1.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer shrink-0"
                   >
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>Apply to Weekly Schedule</span>
+                    <span>{t('sg.applyWeekly')}</span>
                   </button>
                 </div>
               </div>
@@ -812,7 +815,7 @@ export default function SuggestedWorkoutModal({
           {/* Intensity Selector */}
           <div className="space-y-1.5 pt-1">
             <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
-              Intensity & Target Volume
+              {t('sg.intensity')}
             </span>
             <div className="grid grid-cols-3 gap-2">
               {INTENSITIES.map((int) => {
@@ -828,9 +831,9 @@ export default function SuggestedWorkoutModal({
                         : 'bg-bg-secondary border-border text-text-secondary hover:border-accent/40'
                     }`}
                   >
-                    <span className="text-xs font-bold block">{int.label}</span>
+                    <span className="text-xs font-bold block">{t(int.labelKey)}</span>
                     <span className="text-[9px] text-text-muted font-mono block mt-0.5 truncate">
-                      {int.tag}
+                      {t(int.tagKey)}
                     </span>
                   </button>
                 );
@@ -846,11 +849,11 @@ export default function SuggestedWorkoutModal({
                   type="text"
                   value={planTitle}
                   onChange={(e) => setPlanTitle(e.target.value)}
-                  placeholder="Workout Plan Name"
+                  placeholder={t('sg.planNamePlaceholder')}
                   className="font-bold text-sm text-text-primary bg-transparent border-b border-border/80 focus:border-accent outline-none pb-0.5"
                 />
                 <span className="text-2xs text-text-muted block mt-0.5 font-mono">
-                  {exercises.length} exercises configured
+                  {t('sg.configured', { count: exercises.length })}
                 </span>
               </div>
 
@@ -860,7 +863,7 @@ export default function SuggestedWorkoutModal({
                 className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent hover:bg-accent/10"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add Exercise</span>
+                <span>{t('sg.addExercise')}</span>
               </button>
             </div>
 
@@ -871,7 +874,7 @@ export default function SuggestedWorkoutModal({
                   <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-text-muted" />
                   <input
                     type="text"
-                    placeholder="Search exercise (e.g. Bench, Curl, Squat)..."
+                    placeholder={t('sg.searchPlaceholder')}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-8 pr-3 py-1.5 text-xs bg-bg-card border border-border rounded-lg text-text-primary outline-none focus:border-accent font-sans"
@@ -893,7 +896,7 @@ export default function SuggestedWorkoutModal({
                   ))}
                   {filteredAvailableExercises.length === 0 && (
                     <p className="text-2xs text-text-muted py-2 w-full text-center">
-                      No matching exercises found.
+                      {t('sg.noMatching')}
                     </p>
                   )}
                 </div>
@@ -919,12 +922,12 @@ export default function SuggestedWorkoutModal({
                   {/* Steppers for Sets & Reps */}
                   <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
                     <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px] pl-1">Sets:</span>
+                      <span className="text-text-muted text-[10px] pl-1">{t('sg.sets')}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', Math.max(1, ex.targetSets - 1))}
                         className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
-                        aria-label="Decrease sets"
+                        aria-label={t('sg.decSets')}
                       >
                         −
                       </button>
@@ -933,19 +936,19 @@ export default function SuggestedWorkoutModal({
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', ex.targetSets + 1)}
                         className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
-                        aria-label="Increase sets"
+                        aria-label={t('sg.incSets')}
                       >
                         +
                       </button>
                     </div>
 
                     <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px] pl-1">Reps:</span>
+                      <span className="text-text-muted text-[10px] pl-1">{t('sg.reps')}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', Math.max(1, ex.targetReps - 1))}
                         className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
-                        aria-label="Decrease reps"
+                        aria-label={t('sg.decReps')}
                       >
                         −
                       </button>
@@ -954,7 +957,7 @@ export default function SuggestedWorkoutModal({
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', ex.targetReps + 1)}
                         className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
-                        aria-label="Increase reps"
+                        aria-label={t('sg.incReps')}
                       >
                         +
                       </button>
@@ -964,7 +967,7 @@ export default function SuggestedWorkoutModal({
                       type="button"
                       onClick={() => handleRemoveExercise(idx)}
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
-                      title="Remove exercise"
+                      title={t('sg.removeExercise')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -984,7 +987,7 @@ export default function SuggestedWorkoutModal({
               className="btn-primary py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
             >
               <Calendar className="w-4 h-4" />
-              <span>Apply Full Weekly Schedule</span>
+              <span>{t('sg.applyFull')}</span>
             </button>
           )}
           <div className="flex gap-2 flex-1">
@@ -994,7 +997,7 @@ export default function SuggestedWorkoutModal({
               className="btn-secondary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <BookmarkPlus className="w-4 h-4 text-accent" />
-              <span>Save Day to Plans</span>
+              <span>{t('sg.saveDay')}</span>
             </button>
             <button
               type="button"
@@ -1002,7 +1005,7 @@ export default function SuggestedWorkoutModal({
               className="btn-primary flex-1 py-2.5 px-3 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
             >
               <Play className="w-4 h-4 fill-white stroke-white" />
-              <span>Start Workout</span>
+              <span>{t('sg.startWorkout')}</span>
             </button>
           </div>
         </div>
