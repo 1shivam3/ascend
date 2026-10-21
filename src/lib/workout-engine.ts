@@ -2257,6 +2257,15 @@ export function scaleSplitTemplatesForAthlete(
  * Goal-adaptive built-in split templates, optionally scaled to the athlete.
  * Pass bodyweightKg + experience at onboarding/first-exposure so a 62 kg
  * beginner is never prescribed an 85 kg lifter's loads.
+ *
+ * QA4-021: scaling alone is not enough — the raw templates contain
+ * Pull-ups 3×8, which load-scaling leaves untouched (bodyweight load 0).
+ * The generation pipeline (prepareGeneratedPlans → adaptSplitForEquipment)
+ * regresses pull-ups for beginners/minors; this door must apply the same
+ * regression or a beginner can start raw 3×8 pull-ups from a template.
+ * Equipment-specific adaptation still happens in prepareGeneratedPlans —
+ * a Lat Pulldown regression is itself equipment-swapped there for home
+ * users, exactly as a raw Pull-ups entry would have been.
  */
 export function getGoalAdaptiveSplitTemplates(
   goal: AthleteGoal = 'build_muscle',
@@ -2265,7 +2274,12 @@ export function getGoalAdaptiveSplitTemplates(
 ): PlannedWorkout[] {
   const plans = buildGoalAdaptiveSplitTemplates(goal, unit);
   if (!athlete) return plans;
-  return scaleSplitTemplatesForAthlete(plans, unit === 'lbs', athlete);
+  const scaled = scaleSplitTemplatesForAthlete(plans, unit === 'lbs', athlete);
+  if (effectiveTemplateExperience(athlete) !== 'beginner') return scaled;
+  return scaled.map((plan) => ({
+    ...plan,
+    exercises: (plan.exercises || []).map((ex) => regressPullUpsForBeginner(ex, 'full_gym')),
+  }));
 }
 
 function buildGoalAdaptiveSplitTemplates(
