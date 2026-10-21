@@ -629,6 +629,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           role="button"
           tabIndex={0}
           aria-label="View Nutrition Details"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('meals');
+            }
+          }}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.nutrition')}</span>
           <div className="mt-3">
@@ -648,6 +654,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           role="button"
           tabIndex={0}
           aria-label="View Protein Details"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('meals');
+            }
+          }}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.protein')}</span>
           <div className="mt-3">
