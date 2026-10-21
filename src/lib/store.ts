@@ -933,7 +933,9 @@ export const useAppStore = create<AppState>()(
         // Stall detection: flag exercises that haven't progressed
         try {
           const stalls = detectStalls(state.workouts);
-          const today = new Date().toISOString().split('T')[0];
+          // QA4-024: local calendar day — a UTC key dates readiness
+          // history to the wrong day around local midnight.
+          const today = getLocalTodayStr();
           const newFlags: Record<string, any> = { ...state.coach.stallFlags };
           for (const stall of stalls) {
             const key = stall.exercise.toLowerCase();
@@ -1485,7 +1487,7 @@ export const useAppStore = create<AppState>()(
       }),
 
       copyMealsFromDate: (sourceDate, targetDate) => {
-        const tgt = targetDate || new Date().toISOString().split('T')[0];
+        const tgt = targetDate || getLocalTodayStr();
         let copiedCount = 0;
         set((state) => {
           const sourceMeals = state.meals.filter(m => m.date === sourceDate);

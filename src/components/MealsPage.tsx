@@ -2186,7 +2186,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             const isYesterday = (() => {
               const y = new Date();
               y.setDate(y.getDate() - 1);
-              return date === y.toISOString().slice(0, 10);
+              return date === getLocalTodayStr(y);
             })();
 
             return (

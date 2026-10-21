@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
-import { formatDuration } from '@/lib/formatters';
+import { formatDuration, getLocalTodayStr } from '@/lib/formatters';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import {
   Trophy,
@@ -153,7 +153,9 @@ export default function PostWorkoutTakeModal({
     return `${displayVal.toLocaleString()} ${userUnit}`;
   }, [completedWorkout.exercises, userUnit]);
 
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+  // QA4-024: PR dates are local-day keys — a UTC key hides PRs set
+  // earlier the same local day (and can show yesterday's as today's).
+  const todayStr = useMemo(() => getLocalTodayStr(), []);
   const todayPRs = useMemo(() => {
     return (store.prs || []).filter((p) => p.date && p.date.startsWith(todayStr));
   }, [store.prs, todayStr]);
