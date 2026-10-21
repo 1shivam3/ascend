@@ -17,6 +17,7 @@ import {
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ export default function FeedbackModal({
   initialCategory = 'review',
 }: FeedbackModalProps) {
   const profile = useStore((state) => state.profile);
+  const { t } = useTranslation();
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
 
@@ -91,7 +93,7 @@ export default function FeedbackModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) {
-      toast.error('Please describe your feedback, bug, or review.', 'Missing Details');
+      toast.error(t('fb.missingMsg'), t('fb.missingTitle'));
       return;
     }
 
@@ -105,7 +107,7 @@ export default function FeedbackModal({
         title: title.trim() || undefined,
         message: message.trim(),
         userEmail: contactEmail.trim() || undefined,
-        userName: profile?.name || 'Athlete',
+        userName: profile?.name || t('fb.athlete'),
         diagnostics,
       };
 
@@ -120,17 +122,17 @@ export default function FeedbackModal({
         setSubmittedRefId(data.referenceId || `fb_${Date.now()}`);
         toast.success(
           category === 'bug'
-            ? 'Bug report sent to engineering team!'
+            ? t('fb.bugSent')
             : category === 'feature'
-            ? 'Feature suggestion logged for roadmap!'
-            : 'Thank you for your rating & review!',
-          'Feedback Received'
+            ? t('fb.featureSent')
+            : t('fb.reviewSent'),
+          t('fb.receivedTitle')
         );
       } else {
-        toast.error(data.message || 'Could not submit feedback.', 'Submission Failed');
+        toast.error(data.message || t('fb.submitFailMsg'), t('fb.submitFailTitle'));
       }
     } catch {
-      toast.error('Network error. Please check your connection.', 'Submission Error');
+      toast.error(t('fb.networkMsg'), t('fb.networkTitle'));
     } finally {
       setIsSubmitting(false);
     }
@@ -145,9 +147,9 @@ export default function FeedbackModal({
   };
 
   const categoryPlaceholders = {
-    bug: 'Describe what happened, what you expected, and steps to reproduce (e.g. "Barcode scanner didn\'t open camera").',
-    feature: 'Describe the feature or improvement you\'d love to see (e.g. "Add plate visualizer for barbell warmup").',
-    review: 'Tell us how ASCEND is working for your training, strength progression, or macro tracking!',
+    bug: t('fb.phBug'),
+    feature: t('fb.phFeature'),
+    review: t('fb.phReview'),
   };
 
   return (
@@ -164,10 +166,10 @@ export default function FeedbackModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-text-primary tracking-tight">
-                Feedback &amp; Reviews
+                {t('fb.title')}
               </h2>
               <p className="text-2xs text-text-muted">
-                Direct channel to the engineering team
+                {t('fb.subtitle')}
               </p>
             </div>
           </div>
@@ -175,7 +177,7 @@ export default function FeedbackModal({
             type="button"
             onClick={handleResetAndClose}
             className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors cursor-pointer"
-            aria-label="Close Feedback"
+            aria-label={t('fb.closeAria')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -189,21 +191,21 @@ export default function FeedbackModal({
             </div>
             <div className="space-y-1">
               <h3 className="text-base font-bold text-text-primary">
-                Thank You, {profile?.name || 'Athlete'}!
+                {t('fb.thankYou', { name: profile?.name || t('fb.athlete') })}
               </h3>
               <p className="text-xs text-text-secondary max-w-xs mx-auto leading-relaxed">
-                Your submission has been delivered directly to the developers. Every report shapes the next ASCEND build.
+                {t('fb.delivered')}
               </p>
             </div>
             <div className="p-2.5 rounded-xl bg-bg-elevated border border-border text-2xs font-mono text-text-muted">
-              Reference: <span className="text-accent">{submittedRefId}</span>
+              {t('fb.reference')} <span className="text-accent">{submittedRefId}</span>
             </div>
             <button
               type="button"
               onClick={handleResetAndClose}
               className="btn-primary w-full py-2.5 text-xs font-bold"
             >
-              Done
+              {t('common.done')}
             </button>
           </div>
         ) : (
@@ -211,7 +213,7 @@ export default function FeedbackModal({
             {/* Category Selector */}
             <div className="space-y-1.5">
               <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-                What are you sharing?
+                {t('fb.sharing')}
               </label>
               <div className="grid grid-cols-3 gap-2">
                 <button
@@ -224,7 +226,7 @@ export default function FeedbackModal({
                   }`}
                 >
                   <Star className="w-4 h-4 mx-auto mb-1 stroke-[2]" />
-                  <span className="text-xs block">Review</span>
+                  <span className="text-xs block">{t('fb.review')}</span>
                 </button>
                 <button
                   type="button"
@@ -236,7 +238,7 @@ export default function FeedbackModal({
                   }`}
                 >
                   <Bug className="w-4 h-4 mx-auto mb-1 stroke-[2]" />
-                  <span className="text-xs block">Bug Report</span>
+                  <span className="text-xs block">{t('fb.bug')}</span>
                 </button>
                 <button
                   type="button"
@@ -248,7 +250,7 @@ export default function FeedbackModal({
                   }`}
                 >
                   <Lightbulb className="w-4 h-4 mx-auto mb-1 stroke-[2]" />
-                  <span className="text-xs block">Feature</span>
+                  <span className="text-xs block">{t('fb.feature')}</span>
                 </button>
               </div>
             </div>
@@ -257,18 +259,18 @@ export default function FeedbackModal({
             <div className="p-3 rounded-xl bg-bg-elevated/40 border border-border flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-text-primary block">
-                  {category === 'review' ? 'Your Rating' : 'Experience Rating'}
+                  {category === 'review' ? t('fb.yourRating') : t('fb.expRating')}
                 </span>
                 <span className="text-2xs text-text-muted">
                   {rating === 5
-                    ? '5 Stars — Excellent'
+                    ? t('fb.stars5')
                     : rating === 4
-                    ? '4 Stars — Good'
+                    ? t('fb.stars4')
                     : rating === 3
-                    ? '3 Stars — Okay'
+                    ? t('fb.stars3')
                     : rating === 2
-                    ? '2 Stars — Needs work'
-                    : '1 Star — Broken / Poor'}
+                    ? t('fb.stars2')
+                    : t('fb.stars1')}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -296,16 +298,16 @@ export default function FeedbackModal({
             {/* Title / Summary */}
             <div className="space-y-1">
               <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-                Title / Summary (Optional)
+                {t('fb.titleLabel')}
               </label>
               <input
                 type="text"
                 placeholder={
                   category === 'bug'
-                    ? 'e.g. Scan meal failed with timeout'
+                    ? t('fb.titleBug')
                     : category === 'feature'
-                    ? 'e.g. Add 1RM progression charts'
-                    : 'e.g. Best offline gym logger so far'
+                    ? t('fb.titleFeature')
+                    : t('fb.titleReview')
                 }
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -318,7 +320,7 @@ export default function FeedbackModal({
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-                  Description <span className="text-accent">*</span>
+                  {t('fb.description')} <span className="text-accent">*</span>
                 </label>
                 <span className="text-2xs font-mono text-text-muted">
                   {message.length}/2000
@@ -338,7 +340,7 @@ export default function FeedbackModal({
             {/* Contact Email (Optional) */}
             <div className="space-y-1">
               <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
-                Your Email (Optional, for developer replies)
+                {t('fb.emailLabel')}
               </label>
               <input
                 type="email"
@@ -361,9 +363,9 @@ export default function FeedbackModal({
               />
               <label htmlFor="includeDiagnostics" className="cursor-pointer leading-tight select-none">
                 <span className="text-text-secondary font-medium block">
-                  Include anonymous device diagnostics
+                  {t('fb.diagTitle')}
                 </span>
-                Helps fix bugs faster by sending browser, OS, and screen resolution. No personal data.
+                {t('fb.diagBody')}
               </label>
             </div>
 
@@ -374,7 +376,7 @@ export default function FeedbackModal({
                 onClick={handleResetAndClose}
                 className="btn-ghost flex-1 py-2.5 text-xs font-semibold"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -384,12 +386,12 @@ export default function FeedbackModal({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Sending...</span>
+                    <span>{t('fb.sending')}</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-3.5 h-3.5" />
-                    <span>Submit Feedback</span>
+                    <span>{t('fb.submit')}</span>
                   </>
                 )}
               </button>
