@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
-import { useStore } from '@/lib/store';
+import { useStore, getStorageWriteFailed } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { parseWorkoutCSV } from '@/lib/workout-import';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
@@ -82,9 +82,16 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      // Save an emergency snapshot in localStorage in case user re-installs or clears main store
+      // Save an emergency snapshot in localStorage in case user re-installs or clears main store.
+      // Isolated try/catch: a quota failure here must not turn a successful
+      // download into an "Export Error" — the file the user just saved IS
+      // the backup; the snapshot is only a convenience mirror.
       if (typeof window !== 'undefined') {
-        localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(backupData));
+        try {
+          localStorage.setItem('ascend_emergency_snapshot', JSON.stringify(backupData));
+        } catch {
+          /* storage full — the downloaded backup file still succeeded */
+        }
       }
 
       toast.success(
@@ -268,6 +275,21 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
             )}
             <span>{message.text}</span>
+          </div>
+        )}
+
+        {/* Storage-health warning (QA4A-004): a persist write to device
+            storage has failed (quota) and not yet recovered — say so
+            honestly, here where the remedy (Download Backup) lives,
+            instead of letting changes silently stop surviving restarts. */}
+        {getStorageWriteFailed() && (
+          <div className="p-3 rounded-xl flex items-center gap-2 text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>
+              Device storage is full — your latest changes could not be saved on this device and may not
+              survive an app restart. Download a backup now to keep them safe, and free up space (for
+              example by deleting older progress photos).
+            </span>
           </div>
         )}
 

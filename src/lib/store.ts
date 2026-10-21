@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import {
   UserProfile,
   PersonalRecord,
@@ -695,6 +695,66 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   lastTrainSubTab: state.lastTrainSubTab,
   };
 }
+
+/**
+ * QA4A-004: the main persist blob's writes used to fail SILENTLY. The
+ * blob grows ~1.2–1.5 MB/yr for a heavy user against a shared ~5–10 MB
+ * origin quota; once setItem starts throwing QuotaExceededError, every
+ * change keeps working in memory but nothing survives a reload — and
+ * the user was never told. This adapter mirrors the emergency-snapshot
+ * pattern (see getSnapshotWriteFailed below): a failed write flips a
+ * health flag instead of escaping or vanishing, a later successful
+ * write clears it, and the Data Vault surfaces the flag with the remedy
+ * (export a backup / free up space). No data is ever pruned here —
+ * in-memory state stays fully usable for the session.
+ */
+let mainStoreWriteFailed = false;
+export function getMainStoreWriteFailed(): boolean {
+  return mainStoreWriteFailed;
+}
+
+export const mainStoreStorage: StateStorage = {
+  getItem: (name) => {
+    // SSR/prerender: no storage exists — that is not a failure.
+    if (typeof localStorage === 'undefined') return null;
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      // Storage blocked/unavailable — behave as "nothing stored" so
+      // rehydration falls back to defaults instead of crashing boot.
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    // SSR/prerender: nothing to write to, and NOT a quota failure —
+    // the health flag must only flip on a real failed write.
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.setItem(name, value);
+      mainStoreWriteFailed = false;
+    } catch (err) {
+      mainStoreWriteFailed = true;
+      if (typeof console !== 'undefined') {
+        console.warn(
+          '[ascend] Main store persist write failed (storage quota?). Changes will not survive a restart until space frees up.',
+          err
+        );
+      }
+      // Deliberately swallowed: the write failure must never break the
+      // state update that triggered it. It is surfaced via
+      // getMainStoreWriteFailed()/getStorageWriteFailed().
+    }
+  },
+  removeItem: (name) => {
+    if (typeof localStorage === 'undefined') return;
+    try {
+      localStorage.removeItem(name);
+    } catch {
+      // Nothing to surface: a failed remove leaves stale data behind,
+      // it does not lose new data.
+    }
+  },
+};
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -2948,7 +3008,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'ascend_store',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => mainStoreStorage),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
@@ -3185,6 +3245,17 @@ useAppStore.subscribe((state) => {
 let snapshotWriteFailed = false;
 export function getSnapshotWriteFailed(): boolean {
   return snapshotWriteFailed;
+}
+
+/**
+ * Combined device-storage health: true when ANY local persistence
+ * writer (main persist blob or emergency snapshot mirror) has failed
+ * and not yet recovered. This is the flag the Data Vault warning reads
+ * — before QA4A-004 the snapshot flag existed but had no UI consumer,
+ * and the main blob had no flag at all.
+ */
+export function getStorageWriteFailed(): boolean {
+  return mainStoreWriteFailed || snapshotWriteFailed;
 }
 
 if (typeof window !== 'undefined') {
