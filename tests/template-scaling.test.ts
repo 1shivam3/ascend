@@ -50,14 +50,17 @@ describe('First-exposure load scaling (bug: 62kg beginner prescribed 70kg bench)
   });
 
   it('leaves bodyweight exercises at 0', () => {
+    // QA4-021: for a beginner the Pull-ups entry itself is regressed to
+    // Lat Pulldown (see qa4-tail-sweep.test.ts) — the regressed entry keeps
+    // the bodyweight exercise's 0 load rather than inventing one.
     const plans = getGoalAdaptiveSplitTemplates('get_stronger', 'kg', {
       bodyweightKg: 62,
       experience: 'beginner',
     });
-    const pullups = plans
+    const regressed = plans
       .flatMap((p) => p.exercises)
-      .find((e) => e.name === 'Pull-ups');
-    expect(pullups?.targetWeight).toBe(0);
+      .find((e) => e.name === 'Lat Pulldown' && e.notes?.includes('Pull-up regression'));
+    expect(regressed?.targetWeight).toBe(0);
   });
 
   it('rounds to 5lb increments in lbs mode', () => {

@@ -667,6 +667,7 @@ export const en = {
   'workout.whatChanges': 'What changes next time',
   'workout.why': 'Why?',
   'workout.saveFinish': 'Save & Finish',
+  'workout.saving': 'Saving…',
   'workout.howHardSet': 'How hard was that set?',
   'workout.rpeExplainer': 'Set {n} • Effort score (RPE): 10 = you could not do one more rep, 8 = two good reps left in the tank, 6 = easy.',
   'workout.closeEffort': 'Close effort picker',

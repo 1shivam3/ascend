@@ -51,7 +51,10 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
       w = parsed;
     }
   }
-  const r = parseInt(String(set.reps), 10) || 0;
+  // QA4-026 finalize guard: a typed negative must never persist — it
+  // would subtract from session volume. Clamp to 0 (the stepper floor).
+  if (w !== undefined && w < 0) w = 0;
+  const r = Math.max(0, parseInt(String(set.reps), 10) || 0);
   const isCompleted = isActiveSetCompleted(set) && r > 0;
 
   let finalStatus: SetExecutionStatus;
@@ -458,7 +461,10 @@ export function createWorkoutExercisesFromPlan(
           weight: suggested !== undefined ? suggested : assignedWeight,
           reps: pe.targetReps ?? 8,
           unit: targetUnit,
-          rpe: hasConfiguredRpe ? (pe.targetRpe as number) : 8,
+          // QA4-022: no configured targetRpe means UNRATED — never invent
+          // an RPE 8 the athlete never reported (prescribedRpe below
+          // already follows this rule).
+          rpe: hasConfiguredRpe ? (pe.targetRpe as number) : undefined,
           completed: false,
           status: 'pending' as const,
           prescribedWeight: suggested !== undefined ? suggested : prescribedWeight,
@@ -2257,6 +2263,15 @@ export function scaleSplitTemplatesForAthlete(
  * Goal-adaptive built-in split templates, optionally scaled to the athlete.
  * Pass bodyweightKg + experience at onboarding/first-exposure so a 62 kg
  * beginner is never prescribed an 85 kg lifter's loads.
+ *
+ * QA4-021: scaling alone is not enough — the raw templates contain
+ * Pull-ups 3×8, which load-scaling leaves untouched (bodyweight load 0).
+ * The generation pipeline (prepareGeneratedPlans → adaptSplitForEquipment)
+ * regresses pull-ups for beginners/minors; this door must apply the same
+ * regression or a beginner can start raw 3×8 pull-ups from a template.
+ * Equipment-specific adaptation still happens in prepareGeneratedPlans —
+ * a Lat Pulldown regression is itself equipment-swapped there for home
+ * users, exactly as a raw Pull-ups entry would have been.
  */
 export function getGoalAdaptiveSplitTemplates(
   goal: AthleteGoal = 'build_muscle',
@@ -2265,7 +2280,12 @@ export function getGoalAdaptiveSplitTemplates(
 ): PlannedWorkout[] {
   const plans = buildGoalAdaptiveSplitTemplates(goal, unit);
   if (!athlete) return plans;
-  return scaleSplitTemplatesForAthlete(plans, unit === 'lbs', athlete);
+  const scaled = scaleSplitTemplatesForAthlete(plans, unit === 'lbs', athlete);
+  if (effectiveTemplateExperience(athlete) !== 'beginner') return scaled;
+  return scaled.map((plan) => ({
+    ...plan,
+    exercises: (plan.exercises || []).map((ex) => regressPullUpsForBeginner(ex, 'full_gym')),
+  }));
 }
 
 function buildGoalAdaptiveSplitTemplates(

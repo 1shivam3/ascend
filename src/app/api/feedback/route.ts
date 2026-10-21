@@ -33,7 +33,31 @@ function getSupabaseServerClient() {
   });
 }
 
+/**
+ * QA4-033 (remainder): hard cap on the feedback request body. Fields
+ * are individually truncated after parsing, but the parse itself was
+ * unbounded — an oversized body would be fully buffered and
+ * JSON-parsed first. 32 KB is far above any legitimate payload
+ * (title ≤200 chars, message ≤3000 chars, plus small diagnostics).
+ */
+const MAX_FEEDBACK_BODY_BYTES = 32 * 1024;
+
 export async function POST(req: Request) {
+  // 0. Body-size cap (before rate limiting and parsing)
+  const tooLarge = () =>
+    NextResponse.json(
+      { success: false, error: 'PAYLOAD_TOO_LARGE', message: 'Feedback payload is too large.' },
+      { status: 413 }
+    );
+  const declaredLength = Number(req.headers.get('content-length') || 0);
+  if (declaredLength > MAX_FEEDBACK_BODY_BYTES) {
+    return tooLarge();
+  }
+  const rawBody = await req.text().catch(() => '');
+  if (new TextEncoder().encode(rawBody).length > MAX_FEEDBACK_BODY_BYTES) {
+    return tooLarge();
+  }
+
   // 1. Rate limiting: 10 feedback requests per 10 minutes per IP
   const rateLimit = await checkRateLimit(req, {
     windowMs: 10 * 60 * 1000,
@@ -46,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body: FeedbackRequestBody = await req.json();
+    const body: FeedbackRequestBody = JSON.parse(rawBody);
 
     const category = body.category && ['bug', 'feature', 'review', 'general'].includes(body.category)
       ? body.category

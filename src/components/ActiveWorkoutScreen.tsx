@@ -313,6 +313,12 @@ export default function ActiveWorkoutScreen({
   const [plateTargetWeight, setPlateTargetWeight] = useState<number>(60);
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
   const finishModalRef = useRef<HTMLDivElement>(null); const { dialogProps: finishDialogProps } = useModalA11y(finishModalRef, isFinishModalOpen, () => setIsFinishModalOpen(false));
+  // QA4-028: double-submit guard for workout finish — the workout id is
+  // minted inside handleConfirmFinish, so a fast double-tap would save
+  // two distinct workouts. Ref blocks re-entry synchronously; state
+  // disables the button.
+  const [isFinishing, setIsFinishing] = useState(false);
+  const isFinishingRef = useRef(false);
   const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
   const warmupModalRef = useRef<HTMLDivElement>(null); const { dialogProps: warmupDialogProps } = useModalA11y(warmupModalRef, isWarmupModalOpen, () => setIsWarmupModalOpen(false));
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
@@ -978,21 +984,21 @@ export default function ActiveWorkoutScreen({
     if (typeof firstSet?.prescribedWeight === 'number' && Number.isFinite(firstSet.prescribedWeight)) {
       if (isBW) {
         if (firstSet.prescribedWeight === 0) {
-          return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+          return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe };
         } else {
-          return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+          return { text: `+${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`, isUnconfigured: false, targetRpe };
         }
       }
       return {
         text: `${firstSet.prescribedWeight} ${firstSet.prescribedUnit || userUnit} × ${targetReps} reps`,
         isUnconfigured: false,
-        targetRpe: targetRpe ?? 8,
+        targetRpe,
       };
     }
 
     // 2. Bodyweight exercise without explicit extra load:
     if (isBW) {
-      return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe: targetRpe ?? 8 };
+      return { text: `BW × ${targetReps} reps`, isUnconfigured: false, targetRpe };
     }
 
     // 3. Unconfigured non-bodyweight exercise:
@@ -1109,6 +1115,11 @@ export default function ActiveWorkoutScreen({
         numericWeight = isNaN(parsed) ? undefined : parsed;
       }
     }
+    // QA4-026: typed input bypasses the stepper's Math.max(0, …) clamp —
+    // apply the same floor here so a negative weight can never be stored.
+    if (numericWeight !== undefined && Number.isFinite(numericWeight)) {
+      numericWeight = Math.max(0, numericWeight);
+    }
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -1153,6 +1164,17 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleSetRepsChange = (setIdx: number, val: string | number) => {
+    // QA4-026: typed reps were stored raw (`as any`), bypassing the
+    // stepper's floor — a negative or fractional value persisted into
+    // volume math. Normalize: keep '' while typing, otherwise a
+    // non-negative integer.
+    let cleanReps: string | number = val;
+    if (typeof val === 'number') {
+      cleanReps = Number.isFinite(val) ? Math.max(0, Math.floor(val)) : 0;
+    } else if (typeof val === 'string' && val.trim() !== '') {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed)) cleanReps = Math.max(0, Math.floor(parsed));
+    }
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -1160,9 +1182,9 @@ export default function ActiveWorkoutScreen({
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j === setIdx) return { ...s, reps: val as any };
+            if (j === setIdx) return { ...s, reps: cleanReps as any };
             if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
-              return { ...s, reps: val as any };
+              return { ...s, reps: cleanReps as any };
             }
             return s;
           }),
@@ -1492,7 +1514,7 @@ export default function ActiveWorkoutScreen({
             ...nextSets[targetSetIdx],
             weight: result.weight,
             reps: result.reps,
-            rpe: result.rpe ?? nextSets[targetSetIdx].rpe ?? 8,
+            rpe: result.rpe ?? nextSets[targetSetIdx].rpe,
             completed: true,
             status: 'completed',
           };
@@ -1501,12 +1523,12 @@ export default function ActiveWorkoutScreen({
             weight: result.weight,
             reps: result.reps,
             unit: userUnit,
-            rpe: result.rpe ?? 8,
+            rpe: result.rpe,
             completed: true,
             status: 'completed',
             prescribedWeight: result.weight,
             prescribedReps: result.reps,
-            prescribedRpe: result.rpe ?? 8,
+            prescribedRpe: result.rpe,
             prescribedUnit: userUnit,
           });
         }
@@ -1703,6 +1725,9 @@ export default function ActiveWorkoutScreen({
 
   // Finish Workout & detect PRs
   const handleConfirmFinish = () => {
+    // QA4-028: in-flight guard — a second tap while finishing must not
+    // mint and save a duplicate workout (the id is created below).
+    if (isFinishingRef.current) return;
     const today = getLocalTodayStr();
     const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
@@ -1710,6 +1735,9 @@ export default function ActiveWorkoutScreen({
       toast.error(t('workout.toastCannotFinish'), t('workout.toastCannotFinishTitle'));
       return;
     }
+
+    isFinishingRef.current = true;
+    setIsFinishing(true);
 
     // PR detection (only evaluates completed sets)
     let newPRsCount = 0;
@@ -2698,7 +2726,7 @@ export default function ActiveWorkoutScreen({
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
                     title={t('workout.rpeTitle')}
                   >
-                    <span className="text-accent font-black text-xs sm:text-sm">@{currentExercise.sets[activeSetIdx]?.rpe || 8}</span>
+                    <span className="text-accent font-black text-xs sm:text-sm">{currentExercise.sets[activeSetIdx]?.rpe ? `@${currentExercise.sets[activeSetIdx].rpe}` : 'RPE'}</span>
                     <span className="text-text-muted text-2xs font-sans">
                       {t('workout.effortRpe')}
                     </span>
@@ -3784,9 +3812,10 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleConfirmFinish}
-                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md shadow-accent/25"
+                  disabled={isFinishing}
+                  className="btn-primary flex-1 py-2.5 text-xs font-bold shadow-md shadow-accent/25 disabled:opacity-50"
                 >
-                  {t('workout.saveFinish')}
+                  {isFinishing ? t('workout.saving') : t('workout.saveFinish')}
                 </button>
               </div>
             </div>

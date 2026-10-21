@@ -14,10 +14,12 @@ export function getSupabaseCredentials() {
   let localUrl = '';
   let localKey = '';
 
-  // Allow localStorage credentials as fallback when environment variables are not provided
-  // (e.g. Vercel Preview deployments, self-hosted Supabase, or athlete settings).
+  // QA4-034: the localStorage fallback is development-only, exactly as
+  // the header states. In production, credentials resolve from the
+  // environment ONLY — a stored value must never be able to repoint a
+  // production build at a different Supabase project.
   // Security: isValidUrl strictly validates the host against *.supabase.co (or localhost in dev).
-  if (typeof window !== 'undefined') {
+  if (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined') {
     try {
       localUrl = window.localStorage.getItem('ascend_supabase_url')?.trim() || '';
       localKey = window.localStorage.getItem('ascend_supabase_anon_key')?.trim() || '';

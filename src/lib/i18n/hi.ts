@@ -664,6 +664,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'workout.whatChanges': 'अगली बार क्या बदलेगा',
   'workout.why': 'क्यों?',
   'workout.saveFinish': 'सेव करें और समाप्त करें',
+  'workout.saving': 'सेव हो रहा है…',
   'workout.howHardSet': 'वह सेट कितना कठिन था?',
   'workout.rpeExplainer': 'सेट {n} • प्रयास स्कोर (RPE): 10 = एक भी रेप और नहीं हो सकता था, 8 = दो अच्छे रेप बाकी थे, 6 = आसान।',
   'workout.closeEffort': 'प्रयास चयन बंद करें',

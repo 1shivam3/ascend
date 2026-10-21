@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
@@ -18,6 +18,7 @@ import {
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
+import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -61,6 +62,19 @@ export default function FeedbackModal({
       return true;
     }, 120);
   }, [isOpen, registerBackHandler, onClose]);
+
+  // LOOP-3: every close path (X, overlay, Cancel, Done — and now
+  // Escape) must reset the draft; calling the raw onClose prop left a
+  // half-written feedback form behind for the next open.
+  const handleResetAndClose = useCallback(() => {
+    setSubmittedRefId(null);
+    setTitle('');
+    setMessage('');
+    setContactEmail('');
+    onClose();
+  }, [onClose]);
+
+  useEscapeToClose(isOpen, handleResetAndClose);
 
   if (!isOpen) return null;
 
@@ -137,14 +151,6 @@ export default function FeedbackModal({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleResetAndClose = () => {
-    setSubmittedRefId(null);
-    setTitle('');
-    setMessage('');
-    setContactEmail('');
-    onClose();
   };
 
   const categoryPlaceholders = {

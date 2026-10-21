@@ -188,8 +188,7 @@ export interface AppState {
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
-  /** Built-in routine template IDs the user has hidden from the Plans tab */
-  hiddenBuiltinRoutineIds: string[];
+
   /** User-declared muscle groups for custom exercises (name → muscle).
    *  Without this, customs were classified by name keywords alone and
    *  could never be corrected. */
@@ -383,8 +382,7 @@ export interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
-  hideBuiltinRoutine: (id: string) => void;
-  unhideBuiltinRoutine: (id: string) => void;
+
 
   // Weekly Workout Schedule & Body Parts
   weeklySchedule: WeeklySchedule;
@@ -645,7 +643,6 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
-  hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
   customExerciseMuscles: state.customExerciseMuscles,
   deletedPlanIds: state.deletedPlanIds,
   deletedPrIds: state.deletedPrIds,
@@ -775,7 +772,6 @@ export const useAppStore = create<AppState>()(
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
-      hiddenBuiltinRoutineIds: [],
       customExerciseMuscles: {},
       setCustomExerciseMuscle: (name, muscle) => {
         registerCustomExerciseMuscle(name, muscle);
@@ -1038,7 +1034,9 @@ export const useAppStore = create<AppState>()(
         // Stall detection: flag exercises that haven't progressed
         try {
           const stalls = detectStalls(state.workouts);
-          const today = new Date().toISOString().split('T')[0];
+          // QA4-024: local calendar day — a UTC key dates readiness
+          // history to the wrong day around local midnight.
+          const today = getLocalTodayStr();
           const newFlags: Record<string, any> = { ...state.coach.stallFlags };
           for (const stall of stalls) {
             const key = stall.exercise.toLowerCase();
@@ -1596,6 +1594,12 @@ export const useAppStore = create<AppState>()(
       }),
       
       addMeal: (meal) => {
+        // QA4-028: idempotency guard, mirroring addWorkout — a fast
+        // double-tap re-submits the SAME meal id; storing it twice would
+        // duplicate the meal and double-pay its XP.
+        if (meal?.id && get().meals.some((m) => m.id === meal.id)) {
+          return;
+        }
         set((state) => ({
           meals: [...state.meals, meal],
           // Explicitly re-adding a meal clears its deletion tombstone.
@@ -1643,7 +1647,7 @@ export const useAppStore = create<AppState>()(
       }),
 
       copyMealsFromDate: (sourceDate, targetDate) => {
-        const tgt = targetDate || new Date().toISOString().split('T')[0];
+        const tgt = targetDate || getLocalTodayStr();
         let copiedCount = 0;
         set((state) => {
           const sourceMeals = state.meals.filter(m => m.date === sourceDate);
@@ -1863,16 +1867,6 @@ export const useAppStore = create<AppState>()(
           deletedPlanIds: state.deletedPlanIds.filter((d) => !validPlanIds.has(d)),
         };
       }),
-
-      hideBuiltinRoutine: (id) => set((state) => ({
-        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.includes(id)
-          ? state.hiddenBuiltinRoutineIds
-          : [...state.hiddenBuiltinRoutineIds, id],
-      })),
-
-      unhideBuiltinRoutine: (id) => set((state) => ({
-        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.filter((x) => x !== id),
-      })),
 
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [
@@ -2503,7 +2497,6 @@ export const useAppStore = create<AppState>()(
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
-          hiddenBuiltinRoutineIds: [],
           deletedPlanIds: [],
           deletedPrIds: [],
           deletedWorkoutIds: [],
@@ -2685,6 +2678,17 @@ export const useAppStore = create<AppState>()(
                         ? data.profile.age
                         : undefined,
                     unit: data.profile.unit === 'kg' || data.profile.unit === 'lbs' ? data.profile.unit : undefined,
+                    // QA4A-009: dietPreference was missing from the
+                    // validated profile — a backup restore silently lost
+                    // it. Validate against the DietPreference literals,
+                    // same style as gender/unit above.
+                    dietPreference:
+                      data.profile.dietPreference === 'vegetarian' ||
+                      data.profile.dietPreference === 'eggitarian' ||
+                      data.profile.dietPreference === 'non_vegetarian' ||
+                      data.profile.dietPreference === 'vegan'
+                        ? data.profile.dietPreference
+                        : undefined,
                     goals: Array.isArray(data.profile.goals)
                       ? data.profile.goals.filter(
                           (g: any) =>
