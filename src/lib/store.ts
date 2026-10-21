@@ -188,8 +188,7 @@ export interface AppState {
   prTargets: Record<string, number>;
   macroGoals: MacroGoals | null;
   plannedWorkouts: PlannedWorkout[];
-  /** Built-in routine template IDs the user has hidden from the Plans tab */
-  hiddenBuiltinRoutineIds: string[];
+
   /** User-declared muscle groups for custom exercises (name → muscle).
    *  Without this, customs were classified by name keywords alone and
    *  could never be corrected. */
@@ -367,8 +366,7 @@ export interface AppState {
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
-  hideBuiltinRoutine: (id: string) => void;
-  unhideBuiltinRoutine: (id: string) => void;
+
 
   // Weekly Workout Schedule & Body Parts
   weeklySchedule: WeeklySchedule;
@@ -629,7 +627,6 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   prTargets: state.prTargets,
   macroGoals: state.macroGoals,
   plannedWorkouts: state.plannedWorkouts,
-  hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds,
   customExerciseMuscles: state.customExerciseMuscles,
   deletedPlanIds: state.deletedPlanIds,
   favoriteFoods: state.favoriteFoods,
@@ -694,7 +691,6 @@ export const useAppStore = create<AppState>()(
       prTargets: {},
       macroGoals: null,
       plannedWorkouts: [],
-      hiddenBuiltinRoutineIds: [],
       customExerciseMuscles: {},
       setCustomExerciseMuscle: (name, muscle) => {
         registerCustomExerciseMuscle(name, muscle);
@@ -1680,16 +1676,6 @@ export const useAppStore = create<AppState>()(
         };
       }),
 
-      hideBuiltinRoutine: (id) => set((state) => ({
-        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.includes(id)
-          ? state.hiddenBuiltinRoutineIds
-          : [...state.hiddenBuiltinRoutineIds, id],
-      })),
-
-      unhideBuiltinRoutine: (id) => set((state) => ({
-        hiddenBuiltinRoutineIds: state.hiddenBuiltinRoutineIds.filter((x) => x !== id),
-      })),
-
       addFavoriteFood: (food) => set((state) => ({
         favoriteFoods: [
           {
@@ -2319,7 +2305,6 @@ export const useAppStore = create<AppState>()(
           prTargets: {},
           macroGoals: null,
           plannedWorkouts: [],
-          hiddenBuiltinRoutineIds: [],
           deletedPlanIds: [],
           uiPreferences: { ...DEFAULT_UI_PREFERENCES },
           lastActiveTab: 'home',

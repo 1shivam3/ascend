@@ -703,13 +703,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     return Math.round((min + max) / 2);
   }, [goalConfig.defaultRepRange]);
 
-  const adaptiveSplitTemplates = useMemo(() => {
-    return getGoalAdaptiveSplitTemplates(primaryGoal, userUnit, {
-      bodyweightKg: profile?.bodyweightKg,
-      experience: userMode,
-    });
-  }, [primaryGoal, userUnit, profile?.bodyweightKg, userMode]);
-
   // Goal-adaptive default rest period
   const defaultRestSeconds = useMemo(() => {
     return goalConfig.defaultRestSeconds;
@@ -811,7 +804,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
-  const [isTemplateDropdownOpen, setIsTemplateDropdownOpen] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('');
   // Restore the sub-view (Plans vs History) the user was last in, and keep
   // it persisted so a refresh lands back on the same sub-view.
@@ -1783,8 +1775,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     };
   }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek, todayDayOfWeek, plannedWorkouts]);
 
-  // The active routine is always one of the USER's own plans — never a
-  // template. Templates only appear when the user explicitly browses them.
+  // The active routine is always one of the USER's own plans (QA4-023:
+  // Train shows user plans only; no template surfaces remain here).
   const activeRoutinePlan = useMemo(() => {
     if (todaySessionInfo.plannedWorkoutId) {
       const found = plannedWorkouts.find((p) => p.id === todaySessionInfo.plannedWorkoutId);
@@ -1971,7 +1963,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </button>
       </div>
 
-      {/* ── TAB 1: PLANS (merged: your plans + built-in routines) ── */}
+      {/* ── TAB 1: PLANS (user plans only — pre-made templates were
+          removed per the standing Train decision, QA4-023) ── */}
       {trainSubTab === 'plans' && (
         <div className="space-y-4 animate-fade-in">
       {activeWorkoutDraft && !isModalOpen && (
@@ -2041,7 +2034,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
-                <p className="text-2xs text-text-muted">Build your personalized routine or load a ready-made workout</p>
+                <p className="text-2xs text-text-muted">Build your personalized routine to get started</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -2053,14 +2046,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 <Plus className="w-3.5 h-3.5 text-white" />
                 <span>Create My Own</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setIsSuggestedModalOpen(true)}
-                className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Browse Pre-made</span>
-              </button>
+
             </div>
           </div>
         ) : (
@@ -2910,68 +2896,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                   </div>
                 ) : (
                   <p className="text-xs text-text-muted italic py-1">No custom workouts created yet.</p>
-                )}
-              </div>
-
-              {/* Ready-Made Splits & AI Generator - Tucked away in a clean dropdown */}
-              <div className="pt-2 border-t border-border/50">
-                <button
-                  type="button"
-                  onClick={() => setIsTemplateDropdownOpen((prev) => !prev)}
-                  className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary/40 border border-border/60 hover:border-accent/40 text-left flex items-center justify-between transition-colors text-xs font-semibold text-text-muted hover:text-text-primary cursor-pointer"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-accent" />
-                    <span>Browse ready-made splits &amp; workout plan builder</span>
-                  </div>
-                  <ChevronDown
-                    className={`w-4 h-4 transition-transform duration-200 ${
-                      isTemplateDropdownOpen ? 'rotate-180 text-accent' : ''
-                    }`}
-                  />
-                </button>
-
-                {isTemplateDropdownOpen && (
-                  <div className="mt-2.5 space-y-3 p-3 rounded-xl bg-bg-secondary/30 border border-border/50 animate-fade-in">
-                    <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-                      READY-MADE SPLIT TEMPLATES
-                    </span>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {adaptiveSplitTemplates.map((tmpl) => (
-                        <button
-                          key={tmpl.id}
-                          type="button"
-                          onClick={() => {
-                            setIsChangeWorkoutOpen(false);
-                            handleStartPlan(tmpl);
-                          }}
-                          className="p-2.5 rounded-lg bg-bg-card border border-border/80 hover:border-accent/50 text-left flex items-center justify-between transition-colors group"
-                        >
-                          <div className="min-w-0 pr-2">
-                            <span className="font-bold text-xs text-text-primary block group-hover:text-accent">
-                              {tmpl.name}
-                            </span>
-                            <span className="text-3xs text-text-muted line-clamp-1">
-                              {tmpl.exercises.map((e) => e.name).join(', ')}
-                            </span>
-                          </div>
-                          <Play className="w-3.5 h-3.5 text-accent shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsChangeWorkoutOpen(false);
-                        setIsSuggestedModalOpen(true);
-                      }}
-                      className="w-full p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-accent font-semibold text-xs flex items-center justify-center gap-2 hover:bg-accent/20 transition-colors"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Let ASCEND suggest a new plan</span>
-                    </button>
-                  </div>
                 )}
               </div>
 
