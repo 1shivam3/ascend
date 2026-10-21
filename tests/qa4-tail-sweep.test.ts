@@ -393,3 +393,49 @@ describe('QA4-032 delete-account redacts table errors consistently', () => {
     expect(route).toContain('redactSecrets(authPurgeError)');
   });
 });
+
+/* ── QA4-033 remainder: feedback route request-body cap ───────────────── */
+describe('QA4-033 feedback route caps request body size', () => {
+  it('rejects an oversized body with 413 before parsing', async () => {
+    const { POST } = await import('../src/app/api/feedback/route');
+    const big = JSON.stringify({ category: 'general', message: 'x'.repeat(64 * 1024) });
+    const req = new Request('https://example.test/api/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: big,
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(413);
+    const json: any = await res.json();
+    expect(json.error).toBe('PAYLOAD_TOO_LARGE');
+  });
+
+  it('a normal-sized feedback body is not rejected for size', async () => {
+    const { POST } = await import('../src/app/api/feedback/route');
+    const req = new Request('https://example.test/api/feedback', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ category: 'general', title: 'Hi', message: 'Love the app, works great.' }),
+    });
+    const res = await POST(req);
+    expect(res.status).not.toBe(413);
+  });
+});
+
+/* ── QA4-043(b/c): legal copy matches the real AI chain + voice reality ── */
+describe('QA4-043 legal copy accuracy', () => {
+  it('disclaimer names the real provider chain (Groq → OpenRouter → Gemini)', () => {
+    const page = readSrc('src/app/disclaimer/page.tsx');
+    expect(page).not.toContain('utilize heuristic algorithms and Google Gemini large language models');
+    expect(page).toContain('Groq');
+    expect(page).toContain('OpenRouter');
+    expect(page).toContain('Google Gemini');
+  });
+
+  it('privacy page qualifies the browser speech-recognition claim', () => {
+    const page = readSrc('src/app/privacy/page.tsx');
+    expect(page).not.toContain('transcribes speech on-device using your browser');
+    expect(page).not.toContain('never stored or transmitted to third parties');
+    expect(page).toMatch(/browser provider|browser's servers|processed by your browser/i);
+  });
+});
