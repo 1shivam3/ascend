@@ -7,6 +7,7 @@ import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
 import { X, Share2, Download, MessageCircle, Trophy, Flame, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { getWeekRange, parseLocalDate } from '@/lib/formatters';
+import { useTranslation } from '@/lib/i18n';
 
 interface WeeklyRecapModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
   const profile = useStore((state) => state.profile);
   const workouts = useStore((state) => state.workouts);
   const prs = useStore((state) => state.prs);
+  const { t } = useTranslation();
   const toast = useToast();
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -190,11 +192,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     ctx.fillStyle = ACCENT;
     roundRectPath(ctx, width / 2 - 130, 172, 260, 8, 4);
     ctx.fill();
-    drawText(ctx, 'WEEKLY TRAINING RECAP', width / 2, 226, '700 30px system-ui, sans-serif', MUTED);
+    drawText(ctx, t('recap.cardTitle'), width / 2, 226, '700 30px system-ui, sans-serif', MUTED);
     drawText(ctx, weeklyStats.dateRange.toUpperCase(), width / 2, 268, '600 24px ui-monospace, monospace', FAINT);
 
     // ── 3. Athlete name + tier pill ──
-    const athleteName = (profile?.name || 'Athlete').toUpperCase();
+    const athleteName = (profile?.name || t('recap.athlete')).toUpperCase();
     drawText(ctx, athleteName, width / 2, 348, '800 44px system-ui, sans-serif', INK, 'center', 900);
     const tierText = weeklyStats.dotsScore > 0
       ? `${weeklyStats.tier} · ${weeklyStats.dotsScore} DOTS`
@@ -215,13 +217,13 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       ? `${(weeklyStats.totalVolume / 1000).toFixed(1)}t`
       : `${weeklyStats.totalVolume}`;
     drawText(ctx, heroValue, width / 2, 640, '900 200px system-ui, sans-serif', INK);
-    drawText(ctx, `TOTAL VOLUME LIFTED · ${unit.toUpperCase()}`, width / 2, 690, '700 26px ui-monospace, monospace', MUTED);
+    drawText(ctx, `${t('recap.totalVolume')} · ${unit.toUpperCase()}`, width / 2, 690, '700 26px ui-monospace, monospace', MUTED);
 
     // ── 5. Stat tiles: sessions / sets / streak proxy (PR count) ──
     const tiles = [
-      { value: `${weeklyStats.workoutsCount}`, label: weeklyStats.workoutsCount === 1 ? 'SESSION' : 'SESSIONS' },
-      { value: `${weeklyStats.totalSets}`, label: weeklyStats.totalSets === 1 ? 'SET' : 'SETS' },
-      { value: `${weeklyStats.recentPRs.length}`, label: weeklyStats.recentPRs.length === 1 ? 'NEW PR' : 'NEW PRS' },
+      { value: `${weeklyStats.workoutsCount}`, label: weeklyStats.workoutsCount === 1 ? t('recap.session') : t('recap.sessions') },
+      { value: `${weeklyStats.totalSets}`, label: weeklyStats.totalSets === 1 ? t('recap.set') : t('recap.sets') },
+      { value: `${weeklyStats.recentPRs.length}`, label: weeklyStats.recentPRs.length === 1 ? t('recap.newPr') : t('recap.newPrs') },
     ];
     const tileW = 300;
     const tileH = 150;
@@ -247,7 +249,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
 
     // ── 6. Weekly highlights (PRs) ──
     const hlY = 990;
-    drawText(ctx, 'WEEKLY HIGHLIGHTS', 90, hlY, '800 28px system-ui, sans-serif', INK, 'left');
+    drawText(ctx, t('recap.highlights'), 90, hlY, '800 28px system-ui, sans-serif', INK, 'left');
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -284,7 +286,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     } else {
       drawText(
         ctx,
-        '"Consistency builds the foundation. Keep stacking sets."',
+        t('recap.quote'),
         width / 2,
         hlY + 90,
         'italic 400 26px system-ui, sans-serif',
@@ -296,7 +298,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     ctx.fillStyle = ACCENT;
     roundRectPath(ctx, width / 2 - 200, 1236, 400, 4, 2);
     ctx.fill();
-    drawText(ctx, 'TRACKED WITH ASCEND', width / 2, 1280, '800 24px ui-monospace, monospace', 'rgba(249, 115, 22, 0.95)');
+    drawText(ctx, t('recap.trackedWith'), width / 2, 1280, '800 24px ui-monospace, monospace', 'rgba(249, 115, 22, 0.95)');
     drawText(ctx, 'ascendtonext.vercel.app', width / 2, 1312, '500 20px ui-monospace, monospace', FAINT);
 
     // Convert to Image URL
@@ -307,7 +309,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
       console.error(e);
     }
     setIsGenerating(false);
-  }, [isOpen, weeklyStats, profile]);
+  }, [isOpen, weeklyStats, profile, t]);
 
   const handleDownload = () => {
     if (!imagePreviewUrl) return;
@@ -315,16 +317,16 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     a.href = imagePreviewUrl;
     a.download = `ASCEND_Weekly_Recap_${new Date().toISOString().split('T')[0]}.png`;
     a.click();
-    toast.success('Weekly recap image downloaded!', 'Card Saved');
+    toast.success(t('recap.downloadedMsg'), t('recap.cardSaved'));
   };
 
   const handleShareWhatsApp = async () => {
     const text =
-      `*ASCEND — Weekly Training Recap*\n` +
-      `• *Total Volume Lifted*: ${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}\n` +
-      `• *Workouts Completed*: ${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? 'session' : 'sessions'} (${weeklyStats.totalSets} ${weeklyStats.totalSets === 1 ? 'set' : 'sets'})\n` +
-      (weeklyStats.dotsScore > 0 ? `• *DOTS Score*: ${weeklyStats.dotsScore} (${weeklyStats.tier})\n` : '') +
-      `\nTracked with ASCEND Precision Training:\nhttps://ascendtonext.vercel.app/`;
+      `*ASCEND — ${t('recap.shareTitle')}*\n` +
+      `• *${t('recap.shareVolume')}*: ${weeklyStats.totalVolume.toLocaleString()} ${profile?.unit || 'kg'}\n` +
+      `• *${t('recap.shareWorkouts')}*: ${weeklyStats.workoutsCount} ${weeklyStats.workoutsCount === 1 ? t('recap.sessionWord') : t('recap.sessionsWord')} (${weeklyStats.totalSets} ${weeklyStats.totalSets === 1 ? t('recap.setWord') : t('recap.setsWord')})\n` +
+      (weeklyStats.dotsScore > 0 ? `• *${t('recap.shareDots')}*: ${weeklyStats.dotsScore} (${weeklyStats.tier})\n` : '') +
+      `\n${t('recap.shareTracked')}\nhttps://ascendtonext.vercel.app/`;
 
     // Try Web Share API with image file if supported
     if (typeof navigator !== 'undefined' && (navigator as any).share && canvasRef.current) {
@@ -334,11 +336,11 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             const file = new File([blob], 'ascend-weekly-recap.png', { type: 'image/png' });
             if ((navigator as any).canShare({ files: [file] })) {
               await (navigator as any).share({
-                title: 'ASCEND Weekly Training Recap',
+                title: t('recap.shareTitle'),
                 text,
                 files: [file],
               });
-              toast.success('Shared successfully!', 'Recap Shared');
+              toast.success(t('recap.sharedMsg'), t('recap.sharedTitle'));
               return;
             }
           }
@@ -371,9 +373,9 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             </div>
             <div>
               <h3 className="font-bold text-sm text-text-primary leading-tight">
-                Weekly Training Card
+                {t('recap.modalTitle')}
               </h3>
-              <p className="text-3xs text-text-muted font-mono">WhatsApp &amp; Instagram Ready</p>
+              <p className="text-3xs text-text-muted font-mono">{t('recap.modalSubtitle')}</p>
             </div>
           </div>
           <button
@@ -394,13 +396,13 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imagePreviewUrl}
-              alt="Weekly Recap Preview"
+              alt={t('recap.previewAlt')}
               className="w-full h-auto max-h-[380px] object-contain block"
             />
           ) : (
             <div className="h-64 flex flex-col items-center justify-center text-text-muted text-xs font-mono gap-2">
               <Sparkles className="w-5 h-5 text-accent animate-spin" />
-              <span>Generating recap card...</span>
+              <span>{t('recap.generating')}</span>
             </div>
           )}
         </div>
@@ -413,7 +415,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md active:scale-95"
           >
             <MessageCircle className="w-4 h-4" />
-            <span>Share WhatsApp</span>
+            <span>{t('recap.shareWhatsapp')}</span>
           </button>
 
           <button
@@ -422,7 +424,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             className="py-2.5 rounded-xl bg-bg-secondary hover:bg-accent/15 border border-border hover:border-accent/50 text-text-primary hover:text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
           >
             <Download className="w-4 h-4 text-accent" />
-            <span>Save Image</span>
+            <span>{t('recap.saveImage')}</span>
           </button>
         </div>
       </div>
