@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { useToday } from '@/lib/use-today';
@@ -144,6 +145,8 @@ function PlanModal({
   defaultTargetReps = 8,
   onSave,
 }: PlanModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { t } = useTranslation();
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -242,7 +245,7 @@ function PlanModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-border flex justify-between items-center">
@@ -254,7 +257,7 @@ function PlanModal({
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary p-1">
+          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary p-1" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -770,6 +773,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [targetExerciseForDecision, policyDecisionRecords]);
 
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
+  const changeWorkoutRef = useRef<HTMLDivElement>(null); const { dialogProps: changeWorkoutDialogProps } = useModalA11y(changeWorkoutRef, isChangeWorkoutOpen, () => setIsChangeWorkoutOpen(false));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
   const [isGoalSelectorOpen, setIsGoalSelectorOpen] = useState(false);
@@ -827,6 +831,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [isToolsMenuOpen, setIsToolsMenuOpen] = useState(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null); const { dialogProps: toolsMenuDialogProps } = useModalA11y(toolsMenuRef, isToolsMenuOpen, () => setIsToolsMenuOpen(false));
   const [showAllHistory, setShowAllHistory] = useState(false);
   const [isDecisionExpanded, setIsDecisionExpanded] = useState(false);
 
@@ -2786,7 +2791,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
       {/* ── Change Workout Bottom Sheet / Modal ──────────────────────────── */}
       {isChangeWorkoutOpen && (
-        <div className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
+        <div ref={changeWorkoutRef} {...changeWorkoutDialogProps} className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
           <div
             className="modal-content max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -3008,7 +3013,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
       {/* ── Training Tools & Actions Drawer / Sheet ── */}
       {isToolsMenuOpen && (
-        <div
+        <div ref={toolsMenuRef} {...toolsMenuDialogProps}
           className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
           onClick={() => setIsToolsMenuOpen(false)}
         >

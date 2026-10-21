@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Trophy, Sparkles, ChevronRight, Dumbbell, Award, Check } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { calculateDOTS } from '@/lib/dots';
@@ -12,6 +13,8 @@ interface MeetAttemptPlannerModalProps {
 }
 
 export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttemptPlannerModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { profile, prs } = useStore();
   const userUnit = profile?.unit || 'kg';
 
@@ -81,7 +84,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div className="modal-content max-w-lg max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-bg-card z-10">
@@ -92,7 +95,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
               <p className="text-3xs text-text-muted font-mono">Calibrated 90% • 95% • {thirdAttemptPercent}% Game Plan</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary p-1">
+          <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary p-1" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

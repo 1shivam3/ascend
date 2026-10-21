@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Flag, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -27,6 +28,8 @@ export default function ReportAIModal({
   sourceFeature = 'AI Coach',
   onReported,
 }: ReportAIModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [selectedReason, setSelectedReason] = useState<string>('unsafe_exercise');
   const [additionalDetails, setAdditionalDetails] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -66,7 +69,7 @@ export default function ReportAIModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content p-5 space-y-4 max-w-md w-full animate-scale-in"
         onClick={(e) => e.stopPropagation()}
@@ -90,7 +93,7 @@ export default function ReportAIModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
-          >
+           aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>

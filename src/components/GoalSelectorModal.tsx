@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { calculateRecommendedMacroGoals } from '@/lib/macros';
@@ -32,6 +33,8 @@ const GOAL_ICONS: Record<AthleteGoal, React.ElementType> = {
 };
 
 export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const currentGoals = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
   const setGoals = useStore((state) => state.setGoals);
   const profile = useStore((state) => state.profile);
@@ -117,7 +120,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
     selectedGoals.includes('stamina') && selectedGoals.includes('get_stronger');
 
   return (
-    <div className="modal-overlay z-50" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay z-50" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full p-4 sm:p-5 space-y-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -141,7 +144,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

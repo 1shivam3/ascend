@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Shield, Loader2, CheckCircle2, Cloud } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useToast } from '@/components/ui/Toast';
@@ -13,6 +14,8 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { user, signInWithGoogle, signOut } = useSupabaseSync();
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
@@ -46,7 +49,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const isPermanentUser = user && !user.isAnonymous && user.email;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+    <div ref={modalRef} {...dialogProps} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
       <div className="w-full max-w-sm rounded-2xl bg-bg-card border border-border p-5 shadow-2xl space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-border/70">

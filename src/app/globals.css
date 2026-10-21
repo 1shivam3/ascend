@@ -392,3 +392,21 @@ input[type="number"]::-webkit-outer-spin-button {
 :root[data-theme='dark'] .modal-overlay {
   background: rgba(0, 0, 0, 0.72);
 }
+
+/* ── Keyboard focus visibility (QA4-003) ─────────────────────────────── */
+/* Unlayered on purpose: Tailwind's `outline-none` lives in a cascade
+   layer, and unlayered CSS wins over layered CSS — so this one rule
+   restores a visible keyboard-focus indicator across the ~138
+   `outline-none` sites without editing each one. Mouse/touch focus
+   (`:focus` without `:focus-visible`) is unaffected. The accent token
+   is an RGB triplet that already adapts to the dark theme. Elements
+   that carry their own explicit `focus-visible:ring-*` utility get
+   the ring (a box-shadow, layered) plus this outline — same accent
+   colour, so the combined indicator reads as one stronger ring
+   rather than two competing colours. Inputs keep their existing
+   `:focus` border/ring rule above; this outline only adds to it on
+   keyboard focus. */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+}

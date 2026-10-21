@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Mail, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 import { syncEngine } from '@/lib/supabase/sync';
 
@@ -15,6 +16,8 @@ export default function ForgotPasswordModal({
   onClose,
   initialEmail = '',
 }: ForgotPasswordModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [email, setEmail] = useState(initialEmail);
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -42,7 +45,7 @@ export default function ForgotPasswordModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+    <div ref={modalRef} {...dialogProps} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
       <div className="w-full max-w-sm rounded-2xl bg-white border border-[#E2DFD6] p-6 shadow-2xl text-[#171916] space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-[#E2DFD6]">

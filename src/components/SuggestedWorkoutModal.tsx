@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Sparkles,
@@ -339,6 +340,8 @@ export default function SuggestedWorkoutModal({
   onStartWorkout,
   onSavePlan,
 }: SuggestedWorkoutModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const setPlannedWorkouts = useStore((state) => state.setPlannedWorkouts);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
@@ -555,7 +558,7 @@ export default function SuggestedWorkoutModal({
   const currentSplit = SPLIT_PRESETS.find((s) => s.id === selectedSplitId) || SPLIT_PRESETS[0];
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-xl w-full max-h-[90vh] overflow-hidden p-0 bg-bg-card border border-border flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -579,7 +582,7 @@ export default function SuggestedWorkoutModal({
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

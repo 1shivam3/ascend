@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
@@ -39,6 +40,8 @@ export default function PostWorkoutTakeModal({
   onClose,
   completedWorkout,
 }: PostWorkoutTakeModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const store = useStore();
   const [take, setTake] = useState<AIPostWorkoutTake | null>(null);
   const [loading, setLoading] = useState(true);
@@ -122,15 +125,6 @@ export default function PostWorkoutTakeModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   const userUnit = store.profile?.unit || 'kg';
   const totalSets = useMemo(() => {
     return completedWorkout.exercises.reduce((acc, e) => acc + e.sets.filter((s) => isSetCompleted(s as any)).length, 0);
@@ -161,7 +155,7 @@ export default function PostWorkoutTakeModal({
   if (!isOpen) return null;
 
   return (
-    <div
+    <div ref={modalRef} {...dialogProps}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

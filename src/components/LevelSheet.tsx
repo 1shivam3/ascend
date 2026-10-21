@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Trophy, Dumbbell, Utensils, Zap, Droplets, Target, Check } from 'lucide-react';
 import {
   xpForLevel,
@@ -13,7 +14,6 @@ import {
   type LevelProgress,
   type XpActivitySummary,
 } from '@/lib/xp-system';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface LevelSheetProps {
   isOpen: boolean;
@@ -54,7 +54,8 @@ export default function LevelSheet({
   progress,
   weekXp,
 }: LevelSheetProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [animated, setAnimated] = useState(false);
   useEffect(() => {
     if (!isOpen) return;
@@ -76,7 +77,7 @@ export default function LevelSheet({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
+      <div ref={modalRef} {...dialogProps}
         className="modal-content max-w-md w-full p-5 space-y-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

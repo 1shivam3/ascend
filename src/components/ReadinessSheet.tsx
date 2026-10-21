@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Activity } from 'lucide-react';
 import type { ReadinessResult, ManualCheckin } from '@/lib/coach-engine';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface ReadinessSheetProps {
   isOpen: boolean;
@@ -45,12 +45,13 @@ export default function ReadinessSheet({
   todayStr,
   onCheckin,
 }: ReadinessSheetProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   if (!isOpen) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div
+      <div ref={modalRef} {...dialogProps}
         className="modal-content max-w-md w-full p-5 space-y-5"
         onClick={(e) => e.stopPropagation()}
         role="dialog"

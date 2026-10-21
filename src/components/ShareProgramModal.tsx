@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { PlannedWorkout } from '@/lib/types';
 import { useStore } from '@/lib/store';
 import {
@@ -18,6 +19,8 @@ interface ShareProgramModalProps {
 }
 
 export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgramModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const toast = useToast();
 
@@ -71,7 +74,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}
@@ -93,7 +96,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

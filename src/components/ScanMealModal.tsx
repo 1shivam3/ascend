@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { MealAnalysisResult, ScannedFoodItem, MealEntry, FoodItem, OilLevelId } from '@/lib/types';
 import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
@@ -48,6 +49,8 @@ const HIDDEN_INGREDIENT_OPTIONS = [
 ];
 
 export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMealModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const store = useStore();
   const toast = useToast();
 
@@ -697,7 +700,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <div ref={modalRef} {...dialogProps} className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
       {/* Hidden file input for Gallery / Fallback (no capture attribute to prevent OS camera low-memory kills) */}
       <input
         ref={fileInputRef}
@@ -734,7 +737,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             type="button"
             onClick={handleClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

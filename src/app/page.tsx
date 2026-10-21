@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
@@ -179,6 +180,7 @@ export default function AppPage() {
   const [isOffline, setIsOffline] = useState(false);
   const [forcedState, setForcedState] = useState<'error' | 'loading' | 'offline' | null>(null);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
+  const offlineModalRef = useRef<HTMLDivElement>(null); const { dialogProps: offlineDialogProps } = useModalA11y(offlineModalRef, showOfflineModal, () => setShowOfflineModal(false));
 
   // Check for test/debug states in URL (?state=error | loading | offline)
   useEffect(() => {
@@ -404,7 +406,7 @@ export default function AppPage() {
 
       {/* Screen 27: Offline Gym Mode Details Modal */}
       {showOfflineModal && (
-        <div className="fixed inset-0 z-50 bg-bg-primary/95 backdrop-blur-md flex items-center justify-center p-4">
+        <div ref={offlineModalRef} {...offlineDialogProps} className="fixed inset-0 z-50 bg-bg-primary/95 backdrop-blur-md flex items-center justify-center p-4">
           <OfflineState
             fullScreen={false}
             onContinueOffline={() => setShowOfflineModal(false)}

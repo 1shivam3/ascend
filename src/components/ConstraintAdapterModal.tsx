@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { WorkoutExercise, RealWorldConstraint } from '@/lib/types';
 import { adaptWorkoutForConstraints, getStimulusPreservingSwaps } from '@/lib/lifter-twin';
 import {
@@ -34,6 +35,8 @@ export default function ConstraintAdapterModal({
   userUnit = 'kg',
   onApplyAdaptedWorkout,
 }: ConstraintAdapterModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
 
   const [activeConstraintType, setActiveConstraintType] = useState<'time' | 'readiness' | 'equipment'>('time');
@@ -80,7 +83,7 @@ export default function ConstraintAdapterModal({
   };
 
   return (
-    <div
+    <div ref={modalRef} {...dialogProps}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-xs p-0 sm:p-4 animate-fade-in"
       onClick={onClose}
     >
@@ -116,7 +119,7 @@ export default function ConstraintAdapterModal({
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-full text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          >
+           aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   MessageSquare,
@@ -31,6 +32,8 @@ export default function FeedbackModal({
   onClose,
   initialCategory = 'review',
 }: FeedbackModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
@@ -151,7 +154,7 @@ export default function FeedbackModal({
   };
 
   return (
-    <div className="modal-overlay" onClick={handleResetAndClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={handleResetAndClose}>
       <div
         className="modal-content max-w-md w-full p-0 overflow-hidden bg-bg-card border border-border shadow-2xl rounded-2xl animate-fade-in"
         onClick={(e) => e.stopPropagation()}

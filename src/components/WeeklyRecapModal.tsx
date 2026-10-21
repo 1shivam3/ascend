@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { isSetCompleted } from '@/lib/types';
 import { calculateDOTS, getDOTSClassification } from '@/lib/dots';
@@ -14,6 +15,8 @@ interface WeeklyRecapModalProps {
 }
 
 export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const workouts = useStore((state) => state.workouts);
   const prs = useStore((state) => state.prs);
@@ -358,7 +361,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-sm w-full p-4 space-y-3.5"
         onClick={(e) => e.stopPropagation()}
@@ -380,7 +383,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             type="button"
             onClick={onClose}
             className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

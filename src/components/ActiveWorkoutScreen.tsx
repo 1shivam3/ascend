@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Plus,
@@ -308,12 +309,17 @@ export default function ActiveWorkoutScreen({
 
   // Modals & Panels
   const [isPlateModalOpen, setIsPlateModalOpen] = useState(false);
+  const plateModalRef = useRef<HTMLDivElement>(null); const { dialogProps: plateDialogProps } = useModalA11y(plateModalRef, isPlateModalOpen, () => setIsPlateModalOpen(false));
   const [plateTargetWeight, setPlateTargetWeight] = useState<number>(60);
   const [isFinishModalOpen, setIsFinishModalOpen] = useState(false);
+  const finishModalRef = useRef<HTMLDivElement>(null); const { dialogProps: finishDialogProps } = useModalA11y(finishModalRef, isFinishModalOpen, () => setIsFinishModalOpen(false));
   const [isWarmupModalOpen, setIsWarmupModalOpen] = useState(false);
+  const warmupModalRef = useRef<HTMLDivElement>(null); const { dialogProps: warmupDialogProps } = useModalA11y(warmupModalRef, isWarmupModalOpen, () => setIsWarmupModalOpen(false));
   const [isDiscardConfirmOpen, setIsDiscardConfirmOpen] = useState(false);
+  const discardConfirmRef = useRef<HTMLDivElement>(null); const { dialogProps: discardDialogProps } = useModalA11y(discardConfirmRef, isDiscardConfirmOpen, () => setIsDiscardConfirmOpen(false));
   const [isAddExerciseModalOpen, setIsAddExerciseModalOpen] = useState(false);
   const [isSwapModalOpen, setIsSwapModalOpen] = useState(false);
+  const swapModalRef = useRef<HTMLDivElement>(null); const { dialogProps: swapDialogProps } = useModalA11y(swapModalRef, isSwapModalOpen, () => setIsSwapModalOpen(false));
   const [swapReason, setSwapReason] = useState<'equipment' | 'hurts' | 'too_hard' | 'prefer_other'>('equipment');
   const trainingProfile = useStore((state) => state.trainingProfile);
   const setTrainingProfile = useStore((state) => state.setTrainingProfile);
@@ -321,6 +327,7 @@ export default function ActiveWorkoutScreen({
   const [isAdaptModalOpen, setIsAdaptModalOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isExerciseJumpOpen, setIsExerciseJumpOpen] = useState(false);
+  const exerciseJumpRef = useRef<HTMLDivElement>(null); const { dialogProps: exerciseJumpDialogProps } = useModalA11y(exerciseJumpRef, isExerciseJumpOpen, () => setIsExerciseJumpOpen(false));
   // Crowded-gym mode — per session, never persisted. When ON, every
   // remaining exercise gets a one-tap dumbbell/bodyweight swap banner;
   // accepted swaps are real session changes and stay when it's OFF.
@@ -465,6 +472,7 @@ export default function ActiveWorkoutScreen({
   }, [currentExercise?.name]);
 
   const [activeRpePickerSetIdx, setActiveRpePickerSetIdx] = useState<number | null>(null);
+  const rpePickerRef = useRef<HTMLDivElement>(null); const { dialogProps: rpeDialogProps } = useModalA11y(rpePickerRef, activeRpePickerSetIdx !== null, () => setActiveRpePickerSetIdx(null));
 
   // When the Set Complete overlay is dismissed and all sets are done, surface
   // the effort prompt (it was deferred while the overlay was up).
@@ -1010,7 +1018,9 @@ export default function ActiveWorkoutScreen({
   const hasFormSurface = formCues.length > 0 || currentDemo !== null;
 
   const [showFormCues, setShowFormCues] = useState(false);
+  const formCuesRef = useRef<HTMLDivElement>(null); const { dialogProps: formCuesDialogProps } = useModalA11y(formCuesRef, showFormCues, () => setShowFormCues(false));
   const [showWhyTarget, setShowWhyTarget] = useState(false);
+  const whyTargetRef = useRef<HTMLDivElement>(null); const { dialogProps: whyTargetDialogProps } = useModalA11y(whyTargetRef, showWhyTarget, () => setShowWhyTarget(false));
 
   // Close the form-cues / why-target sheets when the exercise changes, so
   // they never show stale content for the wrong exercise.
@@ -3053,7 +3063,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
       {isExerciseJumpOpen && (
-        <div className="modal-overlay" onClick={() => setIsExerciseJumpOpen(false)}>
+        <div ref={exerciseJumpRef} {...exerciseJumpDialogProps} className="modal-overlay" onClick={() => setIsExerciseJumpOpen(false)}>
           <div
             className="modal-content max-w-sm rounded-t-3xl sm:rounded-3xl p-5 space-y-4 animate-scale-in"
             onClick={(e) => e.stopPropagation()}
@@ -3154,7 +3164,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Warm-up Generator Modal ─────────────────────────────────────── */}
       {isWarmupModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsWarmupModalOpen(false)}>
+        <div ref={warmupModalRef} {...warmupDialogProps} className="modal-overlay" onClick={() => setIsWarmupModalOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3223,7 +3233,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Form Cues Sheet ──────────────────────────────────────────────── */}
       {showFormCues && hasFormSurface && (
-        <div className="modal-overlay" onClick={() => setShowFormCues(false)}>
+        <div ref={formCuesRef} {...formCuesDialogProps} className="modal-overlay" onClick={() => setShowFormCues(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3261,7 +3271,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Why This Target Weight Sheet ─────────────────────────────────── */}
       {showWhyTarget && prescription?.whyThisWeight && (
-        <div className="modal-overlay" onClick={() => setShowWhyTarget(false)}>
+        <div ref={whyTargetRef} {...whyTargetDialogProps} className="modal-overlay" onClick={() => setShowWhyTarget(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3301,7 +3311,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Live Plate Calculator Modal ──────────────────────────────────── */}
       {isPlateModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsPlateModalOpen(false)}>
+        <div ref={plateModalRef} {...plateDialogProps} className="modal-overlay" onClick={() => setIsPlateModalOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3436,12 +3446,9 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Swap Exercise Modal (guided substitutes, pain reporting) ──────── */}
       {isSwapModalOpen && currentExercise && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+        <div ref={swapModalRef} {...swapDialogProps} aria-label="Swap this exercise" className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
           <div
             className="w-full max-w-sm bg-bg-card border border-border/80 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 animate-slide-up max-h-[85vh] overflow-y-auto"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Swap this exercise"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -3599,7 +3606,7 @@ export default function ActiveWorkoutScreen({
       />
 
       {isDiscardConfirmOpen && (
-        <div className="modal-overlay" onClick={() => setIsDiscardConfirmOpen(false)}>
+        <div ref={discardConfirmRef} {...discardDialogProps} className="modal-overlay" onClick={() => setIsDiscardConfirmOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 space-y-3 text-center">
               <div className="w-12 h-12 rounded-2xl bg-danger/15 text-danger flex items-center justify-center mx-auto">
@@ -3637,7 +3644,7 @@ export default function ActiveWorkoutScreen({
           : 1;
         const isPartial = doneRatio < 0.8;
         return (
-        <div className="modal-overlay" onClick={() => setIsFinishModalOpen(false)}>
+        <div ref={finishModalRef} {...finishDialogProps} className="modal-overlay" onClick={() => setIsFinishModalOpen(false)}>
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -3754,11 +3761,9 @@ export default function ActiveWorkoutScreen({
 
       {/* 1-Tap RPE / Effort Picker Modal */}
       {activeRpePickerSetIdx !== null && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
+        <div ref={rpePickerRef} {...rpeDialogProps} className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs animate-fade-in">
           <div
             className="w-full max-w-sm bg-bg-card border border-border/80 rounded-t-3xl sm:rounded-2xl p-5 shadow-2xl space-y-4 animate-slide-up"
-            role="dialog"
-            aria-modal="true"
           >
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <div>

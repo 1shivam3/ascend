@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Plus,
@@ -51,6 +52,8 @@ export default function LogPastWorkoutModal({
   onClose,
   onSaved,
 }: LogPastWorkoutModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const prs = useStore((state) => state.prs || []);
@@ -458,7 +461,7 @@ export default function LogPastWorkoutModal({
 
   return (
     <>
-      <div className="modal-overlay z-50" onClick={onClose}>
+      <div ref={modalRef} {...dialogProps} className="modal-overlay z-50" onClick={onClose}>
         <div
           className="modal-content max-w-lg w-full max-h-[92vh] flex flex-col p-0 overflow-hidden animate-scale-in rounded-3xl border border-border shadow-2xl bg-bg-card"
           onClick={(e) => e.stopPropagation()}
@@ -482,7 +485,7 @@ export default function LogPastWorkoutModal({
               type="button"
               onClick={onClose}
               className="p-2 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            >
+             aria-label="Close">
               <X className="w-5 h-5" />
             </button>
           </div>

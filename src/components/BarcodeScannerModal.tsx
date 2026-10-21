@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import {
   X,
   Camera,
@@ -40,6 +41,8 @@ export default function BarcodeScannerModal({
   onClose,
   onAddFood,
 }: BarcodeScannerModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const toast = useToast();
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
 
@@ -557,7 +560,7 @@ export default function BarcodeScannerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay-centered z-50" onClick={handleClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay-centered z-50" onClick={handleClose}>
       <div
         className="modal-content max-w-md w-full overflow-hidden p-0 bg-bg-card border border-border rounded-3xl shadow-2xl animate-scale-in"
         onClick={(e) => e.stopPropagation()}
@@ -577,7 +580,7 @@ export default function BarcodeScannerModal({
             type="button"
             onClick={handleClose}
             className="p-1.5 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

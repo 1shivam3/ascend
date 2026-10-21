@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useAppNavigation } from '@/lib/navigation';
 import {
   Bell,
@@ -293,6 +294,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Modal triggers
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const notificationsRef = useRef<HTMLDivElement>(null); const { dialogProps: notificationsDialogProps } = useModalA11y(notificationsRef, isNotificationsOpen, () => setIsNotificationsOpen(false));
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
@@ -300,6 +302,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
   const [isChangeWorkoutOpen, setIsChangeWorkoutOpen] = useState(false);
+  const changeWorkoutRef = useRef<HTMLDivElement>(null); const { dialogProps: changeWorkoutDialogProps } = useModalA11y(changeWorkoutRef, isChangeWorkoutOpen, () => setIsChangeWorkoutOpen(false));
   const [isCompletedWorkoutModalOpen, setIsCompletedWorkoutModalOpen] = useState(false);
   const [isReadinessSheetOpen, setIsReadinessSheetOpen] = useState(false);
   const [isLevelSheetOpen, setIsLevelSheetOpen] = useState(false);
@@ -1101,7 +1104,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
       {isNotificationsOpen && (
-        <div className="modal-overlay" onClick={() => setIsNotificationsOpen(false)}>
+        <div ref={notificationsRef} {...notificationsDialogProps} className="modal-overlay" onClick={() => setIsNotificationsOpen(false)}>
           <div
             className="modal-content max-w-sm w-full p-5 space-y-4 rounded-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -1157,7 +1160,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       {/* ── CHANGE TODAY'S WORKOUT MODAL (Plan Sync Contract) ─────────────── */}
       {isChangeWorkoutOpen && (
-        <div className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
+        <div ref={changeWorkoutRef} {...changeWorkoutDialogProps} className="modal-overlay" onClick={() => setIsChangeWorkoutOpen(false)}>
           <div
             className="modal-content max-w-md max-h-[85vh] flex flex-col p-0 overflow-hidden rounded-t-2xl sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}

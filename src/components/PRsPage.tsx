@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import {
   getLiftLevel,
@@ -268,6 +269,8 @@ function LevelProgressionModal({
   userUnit,
   onClose,
 }: LevelModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, true, onClose);
   const nextInfo = useMemo(
     () => getNextLevelInfo(exercise, levelInfo.level, bodyweightKg, gender),
     [exercise, levelInfo.level, bodyweightKg, gender]
@@ -292,7 +295,7 @@ function LevelProgressionModal({
   const unitLabel = isBW ? 'kg added' : isDB ? `${userUnit}/hand` : userUnit;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content p-0 overflow-hidden max-w-sm w-full"
         onClick={(e) => e.stopPropagation()}
@@ -303,7 +306,7 @@ function LevelProgressionModal({
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
             <p className="text-2xs text-text-muted font-mono mt-0.5">Level Progression</p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded">
+          <button type="button" onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -691,7 +694,9 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   // ── Existing state ──
   const [showAddModal, setShowAddModal] = useState(false);
+  const addPrRef = useRef<HTMLDivElement>(null); const { dialogProps: addPrDialogProps } = useModalA11y(addPrRef, showAddModal, () => setShowAddModal(false));
   const [targetModalExercise, setTargetModalExercise] = useState<string | null>(null);
+  const targetModalRef = useRef<HTMLDivElement>(null); const { dialogProps: targetDialogProps } = useModalA11y(targetModalRef, targetModalExercise !== null, () => setTargetModalExercise(null));
   const [targetWeightInput, setTargetWeightInput] = useState('');
   const [expandedExercise, setExpandedExercise] = useState<string | null>(null);
   const [plateModalWeight, setPlateModalWeight] = useState<number | null>(null);
@@ -1513,7 +1518,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       {/* ── Target Milestone Modal ── */}
       {targetModalExercise && (
-        <div className="modal-overlay" onClick={() => setTargetModalExercise(null)}>
+        <div ref={targetModalRef} {...targetDialogProps} className="modal-overlay" onClick={() => setTargetModalExercise(null)}>
           <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-bold text-text-primary text-base">Set Target Milestone</h3>
@@ -1560,7 +1565,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
       {/* ── Add PR Modal ── */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div ref={addPrRef} {...addPrDialogProps} className="modal-overlay" onClick={() => setShowAddModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-base font-bold text-text-primary">Record Personal Best</h2>

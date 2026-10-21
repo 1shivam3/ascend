@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { AlertTriangle, Trash2, LogOut, X, Loader2 } from 'lucide-react';
 import { useAppNavigation } from '@/lib/navigation';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 export interface ConfirmationModalProps {
   isOpen: boolean;
@@ -32,9 +32,10 @@ export default function ConfirmationModal({
   requireTypedConfirmation,
   isLoading = false,
 }: ConfirmationModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const [typedValue, setTypedValue] = useState('');
   const { registerBackHandler } = useAppNavigation();
-  useEscapeToClose(isOpen, onClose);
 
   // Register Android / browser back handler to dismiss modal
   useEffect(() => {
@@ -60,7 +61,7 @@ export default function ConfirmationModal({
       typedValue.trim().toUpperCase() !== requireTypedConfirmation?.toUpperCase());
 
   return (
-    <div
+    <div ref={modalRef} {...dialogProps}
       className="modal-overlay z-[100] flex items-center justify-center p-4 backdrop-blur-sm"
       onClick={onClose}
       role="dialog"

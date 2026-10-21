@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -59,6 +60,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const [isWeeklyRecapOpen, setIsWeeklyRecapOpen] = useState(false);
   const [sharePlan, setSharePlan] = useState<(typeof plannedWorkouts)[number] | null>(null);
   const [isSharePickerOpen, setIsSharePickerOpen] = useState(false);
+  const sharePickerRef = useRef<HTMLDivElement>(null); const { dialogProps: sharePickerDialogProps } = useModalA11y(sharePickerRef, isSharePickerOpen, () => setIsSharePickerOpen(false));
 
   // Sharing must never silently pick the first plan — a coach sharing
   // from here sent clients the WRONG program. Ask which plan, unless
@@ -472,7 +474,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
       {/* Plan picker: which program to share (never silently the first) */}
       {isSharePickerOpen && (
-        <div
+        <div ref={sharePickerRef} {...sharePickerDialogProps}
           className="modal-overlay"
           onClick={() => setIsSharePickerOpen(false)}
           role="dialog"

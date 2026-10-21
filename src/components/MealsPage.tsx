@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
@@ -185,13 +186,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
+  const mealModalRef = useRef<HTMLDivElement>(null); const { dialogProps: mealDialogProps } = useModalA11y(mealModalRef, isModalOpen, () => setIsModalOpen(false));
   const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
+  const goalsModalRef = useRef<HTMLDivElement>(null); const { dialogProps: goalsDialogProps } = useModalA11y(goalsModalRef, isGoalsModalOpen, () => setIsGoalsModalOpen(false));
   const [isBarcodeModalOpen,   setIsBarcodeModalOpen]   = useState(false);
   const [isHydrationModalOpen, setIsHydrationModalOpen] = useState(false);
   const [isCreatineModalOpen,  setIsCreatineModalOpen]  = useState(false);
   const [isManagePinnedOpen,   setIsManagePinnedOpen]   = useState(false);
+  const managePinnedRef = useRef<HTMLDivElement>(null); const { dialogProps: managePinnedDialogProps } = useModalA11y(managePinnedRef, isManagePinnedOpen, () => setIsManagePinnedOpen(false));
   const [isEditPinnedOpen,     setIsEditPinnedOpen]     = useState(false);
+  const editPinnedRef = useRef<HTMLDivElement>(null); const { dialogProps: editPinnedDialogProps } = useModalA11y(editPinnedRef, isEditPinnedOpen, () => setIsEditPinnedOpen(false));
   const [editingPinnedFood,    setEditingPinnedFood]    = useState<FavoriteFood | null>(null);
   const [isNewPinned,          setIsNewPinned]          = useState(false);
   const [confirmClearAll,      setConfirmClearAll]      = useState(false);
@@ -202,11 +207,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealToDelete,          setMealToDelete]          = useState<{ id: string; name: string } | null>(null);
+  const deleteMealRef = useRef<HTMLDivElement>(null); const { dialogProps: deleteMealDialogProps } = useModalA11y(deleteMealRef, mealToDelete !== null, () => setMealToDelete(null));
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
   const [showMacroDetails,      setShowMacroDetails]      = useState(false);
   const [isMoreToolsOpen,       setIsMoreToolsOpen]       = useState(false);
   const [isToolsMenuOpen,       setIsToolsMenuOpen]       = useState(false);
+  const mealsToolsRef = useRef<HTMLDivElement>(null); const { dialogProps: mealsToolsDialogProps } = useModalA11y(mealsToolsRef, isToolsMenuOpen, () => setIsToolsMenuOpen(false));
   const [isHabitsExpanded,      setIsHabitsExpanded]      = useState(false);
   const [isPacingExpanded,      setIsPacingExpanded]      = useState(false);
   const [fuelSubTab,            setFuelSubTab]            = useState<'today' | 'meals' | 'macros'>('today');
@@ -2464,7 +2471,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ LOG MEAL MODAL ══════════════════ */}
       {isModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+        <div ref={mealModalRef} {...mealDialogProps} className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
@@ -2895,7 +2902,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ DAILY MACRO TARGETS MODAL ══════════════════ */}
       {isGoalsModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsGoalsModalOpen(false)}>
+        <div ref={goalsModalRef} {...goalsDialogProps} className="modal-overlay" onClick={() => setIsGoalsModalOpen(false)}>
           <div
             className="modal-content p-5 space-y-4 max-w-sm w-full"
             onClick={(e) => e.stopPropagation()}
@@ -3090,7 +3097,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ MANAGE PINNED FOODS MODAL ══════════════════ */}
       {isManagePinnedOpen && (
-        <div className="modal-overlay" onClick={() => setIsManagePinnedOpen(false)}>
+        <div ref={managePinnedRef} {...managePinnedDialogProps} className="modal-overlay" onClick={() => setIsManagePinnedOpen(false)}>
           <div
             className="modal-content max-w-md p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
@@ -3215,7 +3222,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ EDIT / ADD PINNED FOOD MODAL ══════════════════ */}
       {isEditPinnedOpen && (
-        <div className="modal-overlay" onClick={() => setIsEditPinnedOpen(false)}>
+        <div ref={editPinnedRef} {...editPinnedDialogProps} className="modal-overlay" onClick={() => setIsEditPinnedOpen(false)}>
           <div
             className="modal-content max-w-md p-5 space-y-4"
             onClick={(e) => e.stopPropagation()}
@@ -3378,7 +3385,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ── Nutrition Tools & Options Drawer / Sheet ── */}
       {isToolsMenuOpen && (
-        <div
+        <div ref={mealsToolsRef} {...mealsToolsDialogProps}
           className="modal-overlay z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in"
           onClick={() => setIsToolsMenuOpen(false)}
         >
@@ -3541,7 +3548,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ── Meal Deletion Confirmation Dialog ── */}
       {mealToDelete && (
-        <div className="modal-overlay z-50" onClick={() => setMealToDelete(null)}>
+        <div ref={deleteMealRef} {...deleteMealDialogProps} className="modal-overlay z-50" onClick={() => setMealToDelete(null)}>
           <div
             className="modal-content max-w-sm w-full p-5 space-y-4"
             role="dialog"

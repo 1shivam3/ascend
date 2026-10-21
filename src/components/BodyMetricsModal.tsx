@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -12,7 +12,8 @@ interface BodyMetricsModalProps {
 }
 
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
-  useEscapeToClose(isOpen, onClose);
+  const modalRef = useRef<HTMLDivElement>(null);
+  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const updateBodyMetrics = useStore((state) => state.updateBodyMetrics);
@@ -142,7 +143,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   );
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content p-5 space-y-5 max-w-md w-full"
         onClick={(e) => e.stopPropagation()}
@@ -164,7 +165,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             type="button"
             onClick={onClose}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          >
+           aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
