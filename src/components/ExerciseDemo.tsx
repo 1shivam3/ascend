@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { getDemoForExercise } from '@/lib/exercise-media';
+import { useTranslation } from '@/lib/i18n';
 
 /**
  * Animated exercise demos — original stick-figure SVG animations drawn
@@ -481,6 +482,7 @@ function Weight({ spec }: { spec: DemoSpec }) {
  * check `getDemoForExercise(name)` before offering the affordance.
  */
 export default function ExerciseDemo({ name }: { name: string }) {
+  const { t } = useTranslation();
   const entry = getDemoForExercise(name);
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -506,7 +508,7 @@ export default function ExerciseDemo({ name }: { name: string }) {
         viewBox="0 0 120 112"
         className="w-full h-36"
         role="img"
-        aria-label={`Animated demonstration: ${name}`}
+        aria-label={t('demo.aria', { name })}
       >
         {groundY !== null && (
           <line x1="6" y1={groundY} x2="114" y2={groundY} className="text-border" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />

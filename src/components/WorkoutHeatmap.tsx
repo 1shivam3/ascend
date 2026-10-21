@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { WorkoutEntry } from '@/lib/types';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
+import { useTranslation } from '@/lib/i18n';
+import { weekdayNames } from '@/lib/i18n';
 import {
   toLocalDateString,
   calculateHydrationTarget,
@@ -39,6 +41,7 @@ export default function WorkoutHeatmap({
   onOpenHydrationModal,
   onOpenCreatineModal,
 }: WorkoutHeatmapProps) {
+  const { t, language } = useTranslation();
   const profile = useStore((state) => state.profile);
   const workouts = useStore((state) => state.workouts);
   const waterLogs = useStore((state) => state.waterLogs || {});
@@ -168,14 +171,14 @@ export default function WorkoutHeatmap({
       {/* Header with Title and Month Navigation */}
       <div className="flex items-start justify-between">
         <div>
-          <span className="section-title text-[11px] block">{monthName} Habit Matrix</span>
+          <span className="section-title text-[11px] block">{t('heat.matrix', { month: monthName })}</span>
           <div className="mt-0.5">
             <span className="text-xl sm:text-2xl font-black text-text-primary block font-sans">
-              {monthWorkoutsCount} {monthWorkoutsCount === 1 ? 'day' : 'days'} trained
+              {t(monthWorkoutsCount === 1 ? 'heat.dayTrained' : 'heat.daysTrained', { count: monthWorkoutsCount })}
             </span>
             <p className="text-xs text-text-secondary mt-0.5 flex items-center gap-1.5 font-medium">
               <Flame className="w-3.5 h-3.5 text-accent fill-accent" />
-              <span>Streak: <strong>{currentStreak} {currentStreak === 1 ? 'day' : 'days'}</strong></span>
+              <span>{t(currentStreak === 1 ? 'heat.streakOne' : 'heat.streak', { count: currentStreak })}</span>
             </p>
           </div>
         </div>
@@ -189,7 +192,7 @@ export default function WorkoutHeatmap({
               className={`p-1 rounded-md transition-colors ${
                 viewMode === 'calendar' ? 'bg-bg-card text-accent shadow-xs' : 'text-text-muted hover:text-text-primary'
               }`}
-              title="Calendar Grid"
+              title={t('heat.calendarGrid')}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>
@@ -199,7 +202,7 @@ export default function WorkoutHeatmap({
               className={`p-1 rounded-md transition-colors ${
                 viewMode === 'matrix' ? 'bg-bg-card text-accent shadow-xs' : 'text-text-muted hover:text-text-primary'
               }`}
-              title="Multi-Habit Rows"
+              title={t('heat.multiHabit')}
             >
               <List className="w-3.5 h-3.5" />
             </button>
@@ -235,7 +238,7 @@ export default function WorkoutHeatmap({
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
-          All Habits
+          {t('heat.allHabits')}
         </button>
         <button
           type="button"
@@ -247,7 +250,7 @@ export default function WorkoutHeatmap({
           }`}
         >
           <Dumbbell className="w-3 h-3" />
-          <span>Gym</span>
+          <span>{t('heat.gym')}</span>
         </button>
         <button
           type="button"
@@ -259,7 +262,7 @@ export default function WorkoutHeatmap({
           }`}
         >
           <Droplet className="w-3 h-3" />
-          <span>Water</span>
+          <span>{t('heat.water')}</span>
         </button>
         <button
           type="button"
@@ -271,7 +274,7 @@ export default function WorkoutHeatmap({
           }`}
         >
           <Sparkles className="w-3 h-3" />
-          <span>Creatine</span>
+          <span>{t('heat.creatine')}</span>
         </button>
         <button
           type="button"
@@ -283,7 +286,7 @@ export default function WorkoutHeatmap({
           }`}
         >
           <UtensilsCrossed className="w-3 h-3" />
-          <span>Protein</span>
+          <span>{t('heat.protein')}</span>
         </button>
       </div>
 
@@ -291,13 +294,9 @@ export default function WorkoutHeatmap({
       {viewMode === 'calendar' ? (
         <div className="space-y-1.5">
           <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] text-text-muted font-bold">
-            <span>Mo</span>
-            <span>Tu</span>
-            <span>We</span>
-            <span>Th</span>
-            <span>Fr</span>
-            <span>Sa</span>
-            <span>Su</span>
+            {weekdayNames(language, 'short').map((d) => (
+              <span key={d}>{d}</span>
+            ))}
           </div>
 
           <div className="grid grid-cols-7 gap-1.5">
@@ -402,7 +401,7 @@ export default function WorkoutHeatmap({
           <div className="flex justify-between items-center font-mono">
             <div className="flex items-center gap-1.5">
               <span className="font-bold text-text-primary text-sm">
-                {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', {
+                {new Date(selectedDate + 'T00:00:00').toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', {
                   weekday: 'short',
                   month: 'short',
                   day: 'numeric',
@@ -410,7 +409,7 @@ export default function WorkoutHeatmap({
               </span>
               {selectedDate === todayStr && (
                 <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/15 text-accent font-bold">
-                  TODAY
+                  {t('sched.today')}
                 </span>
               )}
             </div>
@@ -420,7 +419,7 @@ export default function WorkoutHeatmap({
               onClick={() => setSelectedDate(null)}
               className="text-text-muted hover:text-text-primary text-xs"
             >
-              Close
+              {t('common.close')}
             </button>
           </div>
 
@@ -430,16 +429,16 @@ export default function WorkoutHeatmap({
             <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Dumbbell className="w-3.5 h-3.5 text-emerald-500" />
-                <span className="font-semibold text-text-primary">Gym Session</span>
+                <span className="font-semibold text-text-primary">{t('heat.gymSession')}</span>
               </div>
               {(() => {
                 const status = selectedWorkouts.length > 0
-                  ? { text: `${selectedWorkouts.length} Done`, cls: 'bg-emerald-500/10 text-emerald-500' }
+                  ? { text: t('heat.done', { count: selectedWorkouts.length }), cls: 'bg-emerald-500/10 text-emerald-500' }
                   : selectedDate === todayStr
-                  ? { text: 'Planned', cls: 'bg-accent/15 text-accent font-bold' }
+                  ? { text: t('heat.planned'), cls: 'bg-accent/15 text-accent font-bold' }
                   : selectedDate > todayStr
-                  ? { text: 'Not planned', cls: 'text-text-muted' }
-                  : { text: 'Rest', cls: 'text-text-muted' };
+                  ? { text: t('heat.notPlanned'), cls: 'text-text-muted' }
+                  : { text: t('heat.rest'), cls: 'text-text-muted' };
 
                 return (
                   <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${status.cls}`}>
@@ -453,7 +452,7 @@ export default function WorkoutHeatmap({
             <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Droplet className="w-3.5 h-3.5 text-sky-500" />
-                <span className="font-semibold text-text-primary">Hydration</span>
+                <span className="font-semibold text-text-primary">{t('heat.hydration')}</span>
               </div>
               <span className="font-bold text-[10px] text-sky-600">
                 {formatWaterLiters(selectedWater)}
@@ -464,7 +463,7 @@ export default function WorkoutHeatmap({
             <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span className="font-semibold text-text-primary">Creatine</span>
+                <span className="font-semibold text-text-primary">{t('heat.creatine')}</span>
               </div>
               <span
                 className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${
@@ -473,7 +472,7 @@ export default function WorkoutHeatmap({
                     : 'text-text-muted'
                 }`}
               >
-                {selectedCreatine?.taken ? `${selectedCreatine.amountG || 5}g Taken` : 'Pending'}
+                {selectedCreatine?.taken ? t('heat.taken', { amount: selectedCreatine.amountG || 5 }) : t('heat.pending')}
               </span>
             </div>
 
@@ -481,7 +480,7 @@ export default function WorkoutHeatmap({
             <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <UtensilsCrossed className="w-3.5 h-3.5 text-orange-500" />
-                <span className="font-semibold text-text-primary">Protein</span>
+                <span className="font-semibold text-text-primary">{t('heat.protein')}</span>
               </div>
               <span className="font-bold text-[10px] text-orange-600">
                 {selectedProtein}g / {proteinTargetG}g
