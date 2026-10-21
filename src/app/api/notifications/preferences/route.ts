@@ -146,6 +146,9 @@ export async function POST(req: Request) {
     const preferences = validatePreferences(body);
 
     if (!supabase) {
+      // No server store configured: explicitly labeled local mode — the
+      // client keeps preferences in localStorage. Nothing is persisted
+      // server-side and the response says so.
       return NextResponse.json({
         success: true,
         offlineMode: true,
@@ -163,21 +166,31 @@ export async function POST(req: Request) {
       }
     }
 
-    if (userId) {
-      const { error } = await supabase.from('notification_preferences').upsert(
-        {
-          user_id: userId,
-          preferences,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
+    // Honest writes (QA4-036): preferences are keyed by user_id, so an
+    // unauthenticated POST cannot persist anything. Previously it returned
+    // {"success":true} while silently discarding the write. Now it returns
+    // 401; the legitimate clients are local-first and treat this sync as
+    // best-effort, so guest UX is unaffected (their prefs live on-device).
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Sign in is required to save notification preferences to the server' },
+        { status: 401 }
       );
-      if (error) {
-        return NextResponse.json(
-          { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
-          { status: 500 }
-        );
-      }
+    }
+
+    const { error } = await supabase.from('notification_preferences').upsert(
+      {
+        user_id: userId,
+        preferences,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' }
+    );
+    if (error) {
+      return NextResponse.json(
+        { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true, preferences });

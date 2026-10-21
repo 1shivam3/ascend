@@ -14,10 +14,22 @@
 import type { BodyMetricEntry, MealEntry, WorkoutEntry } from './types';
 import { isSetCompleted } from './types';
 
-/** RFC 4180 field escaping. */
+/**
+ * RFC 4180 field escaping, plus spreadsheet formula-injection
+ * neutralization (QA4-008): a cell whose first character — after optional
+ * leading whitespace — is one of `= + - @` (or that starts with a tab/CR,
+ * which some spreadsheet apps strip before evaluating) would be executed
+ * as a formula when the export is opened. Prefixing a single quote makes
+ * spreadsheet apps treat the cell as literal text.
+ */
 export function csvField(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
-  const s = String(value);
+  let s = String(value);
+  // Only string cells can carry a formula payload — a JS number is emitted
+  // as a plain numeric literal (e.g. a negative value) and stays untouched.
+  if (typeof value === 'string' && (/^[\t\r]/.test(s) || /^\s*[=+@-]/.test(s))) {
+    s = `'${s}`;
+  }
   if (/[",\n\r]/.test(s)) {
     return `"${s.replace(/"/g, '""')}"`;
   }

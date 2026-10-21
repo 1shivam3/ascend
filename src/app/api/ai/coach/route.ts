@@ -86,7 +86,7 @@ interface CoachRequestBody {
 }
 
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export async function POST(req: Request) {
   // 1. Rate limiting: 25 requests per minute per client IP
@@ -96,6 +96,9 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 25,
       keyPrefix: 'ai-coach',
+      // Fail closed: on limiter-backend outage return 503 instead of
+      // silently degrading to per-instance in-memory counting (QA4-002).
+      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -109,7 +112,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body: CoachRequestBody = await req.json();
+    // Hard body cap (QA4-033): legitimate coach payloads are compact
+    // structured context, well under 64 KB.
+    const body: CoachRequestBody = await readJsonBodyWithLimit(req, 64 * 1024);
     const task = body.task || 'COACH_INSIGHT';
 
     // 2. Input size limits and sanitization
@@ -254,6 +259,9 @@ Schema:
       data: execResult.data,
     });
   } catch (error: any) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return requestBodyTooLargeResponse();
+    }
     const rawMsg = error?.message || 'Failed to process AI Coach request.';
     console.error('Gemini Coach API Error:', redactSecrets(rawMsg));
     return NextResponse.json(

@@ -582,7 +582,7 @@ describe('Web Push Dispatch Route (/api/notifications/dispatch)', () => {
       headers: { 'Content-Type': 'application/json', authorization: 'Bearer user-token' },
       body: JSON.stringify({
         subscription: {
-          endpoint: 'https://push.example.com/sub-1',
+          endpoint: 'https://fcm.googleapis.com/fcm/send/sub-1',
           keys: { p256dh: 'key', auth: 'auth' },
         },
       }),

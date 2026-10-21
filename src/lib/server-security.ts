@@ -76,6 +76,39 @@ export function rateLimitResponse(resetMs: number): NextResponse {
 }
 
 /**
+ * Thrown when a request body exceeds the route's maximum allowed size.
+ * Routes catch this to return a 413 Payload Too Large response.
+ */
+export class RequestBodyTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`Request body exceeds maximum allowed size of ${maxBytes} bytes`);
+    this.name = 'RequestBodyTooLargeError';
+  }
+}
+
+/**
+ * Reads and JSON-parses a request body with a hard byte cap, so oversized
+ * payloads are rejected before parsing instead of being buffered whole
+ * (QA4-033). Returns the parsed value ({} for an empty body).
+ */
+export async function readJsonBodyWithLimit<T = any>(req: Request, maxBytes: number): Promise<T> {
+  const text = await req.text();
+  if (new TextEncoder().encode(text).length > maxBytes) {
+    throw new RequestBodyTooLargeError(maxBytes);
+  }
+  if (!text.trim()) return {} as T;
+  return JSON.parse(text) as T;
+}
+
+/** Standard 413 response for oversized request bodies. */
+export function requestBodyTooLargeResponse(): NextResponse {
+  return NextResponse.json(
+    { error: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' },
+    { status: 413 }
+  );
+}
+
+/**
  * Returns a 503 Service Unavailable response when the rate limiter
  * infrastructure is unavailable. This is used for fail-closed behavior
  * on expensive operations to prevent uncontrolled backend costs.
