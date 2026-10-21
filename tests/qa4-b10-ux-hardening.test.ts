@@ -185,3 +185,13 @@ describe('QA4A-008 ReportAIModal copy tells the truth', () => {
     expect(src).toContain('onReported');
   });
 });
+
+describe('QA4-035(b) CSP hardening', () => {
+  it("script-src no longer allows 'unsafe-eval' (production build verified eval-free)", () => {
+    const cfg = read('next.config.js');
+    const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
+    expect(scriptSrc).not.toContain('unsafe-eval');
+    // 'unsafe-inline' is explicitly out of scope for this batch and stays.
+    expect(scriptSrc).toContain('unsafe-inline');
+  });
+});
