@@ -870,7 +870,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
                   {heroLiftAnalytics.latest1RM ? `${heroLiftAnalytics.latest1RM} ${userUnit}` : displayWeight(heroLift.best1RMKg)}
                 </div>
-                <span className="text-2xs text-text-muted font-mono">{t('progress.current1rm')}</span>
+                <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
               </div>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
                 {heroLiftAnalytics.deltaText}
@@ -1048,7 +1048,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <div className="text-4xl font-black text-text-primary font-sans tabular-nums">
                       {selectedExerciseAnalytics.latest1RM ? `${selectedExerciseAnalytics.latest1RM} ${userUnit}` : '—'}
                     </div>
-                    <span className="text-2xs text-text-muted font-mono">{t('prs.estimated1rm')}</span>
+                    <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
                     {selectedExerciseAnalytics.deltaText}

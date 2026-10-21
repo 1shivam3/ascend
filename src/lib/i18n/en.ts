@@ -156,7 +156,7 @@ export const en = {
 
   // ── %1RM programming ────────────────────────────────────────────────
   'plan.intensityPercent': 'Use % of 1RM',
-  'plan.intensityPercentHint': 'Main lifts get suggested loads from your estimated 1RM (top set 80%, back-offs 70%). RPE stays the default.',
+  'plan.intensityPercentHint': 'Turn this on and ASCEND suggests a weight for your main lifts, based on the heaviest weight you could lift just once: about 80% of that for your hardest set, then about 70% for the easier sets after it. Prefer going by feel? You can always judge each set by how hard it felt instead.',
   'plan.intensityNoData': 'Log a heavy set or a PR for a main lift to enable % suggestions.',
   'plan.suggestedFrom1rm': '≈ {weight} {unit} top set · {pct}% of {e1rm} {unit} est. 1RM',
 

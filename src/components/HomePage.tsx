@@ -632,6 +632,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           role="button"
           tabIndex={0}
           aria-label="View Nutrition Details"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('meals');
+            }
+          }}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.nutrition')}</span>
           <div className="mt-3">
@@ -651,6 +657,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           role="button"
           tabIndex={0}
           aria-label="View Protein Details"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onNavigate('meals');
+            }
+          }}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.protein')}</span>
           <div className="mt-3">
@@ -1117,7 +1129,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1174,7 +1186,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

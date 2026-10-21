@@ -74,7 +74,7 @@ export default function ErrorState({
         <button
           type="button"
           onClick={() => setShowDetails((prev) => !prev)}
-          className="w-full py-1.5 px-3 rounded-lg bg-bg-secondary/70 hover:bg-bg-secondary border border-border/60 text-3xs font-mono text-text-muted flex items-center justify-between transition-colors cursor-pointer"
+          className="w-full py-1.5 px-3 rounded-lg bg-bg-secondary/70 hover:bg-bg-secondary border border-border/60 text-[11px] font-mono text-text-secondary flex items-center justify-between transition-colors cursor-pointer"
           aria-expanded={showDetails}
         >
           <span className="flex items-center gap-1.5 uppercase tracking-wider font-semibold">
@@ -86,11 +86,11 @@ export default function ErrorState({
 
         {showDetails && (
           <div className="mt-2 p-3 rounded-xl bg-bg-secondary border border-border/80 text-left space-y-1 animate-fade-in">
-            <p className="text-3xs font-mono text-text-muted break-words leading-relaxed">
+            <p className="text-[11px] font-mono text-text-secondary break-words leading-relaxed">
               {sanitizedError}
             </p>
             {digest && (
-              <p className="text-3xs font-mono text-text-muted/60 pt-0.5">
+              <p className="text-[11px] font-mono text-text-secondary pt-0.5">
                 Digest: {digest}
               </p>
             )}

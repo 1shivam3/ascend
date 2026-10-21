@@ -294,8 +294,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
           {/* Full Name */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.fullName')}</label>
+            <label htmlFor="edit-profile-name" className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.fullName')}</label>
             <input
+              id="edit-profile-name"
               type="text"
               value={name}
               onChange={(e) => {
@@ -311,8 +312,8 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
           {/* Gender Selection (Supports Male, Female, Other) */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.genderIdentity')}</label>
-            <div className="grid grid-cols-3 gap-2">
+            <span id="edit-profile-gender-label" className="text-xs font-semibold text-text-secondary font-sans block">{t('editProfile.genderIdentity')}</span>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="edit-profile-gender-label">
               {(['male', 'female', 'other'] as Gender[]).map((g) => (
                 <button
                   key={g}
@@ -333,8 +334,8 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           {/* Preferred Unit & Age */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.units')}</label>
-              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
+              <span id="edit-profile-units-label" className="text-xs font-semibold text-text-secondary font-sans block">{t('editProfile.units')}</span>
+              <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border" role="group" aria-labelledby="edit-profile-units-label">
                 <button
                   type="button"
                   onClick={() => handleUnitToggle('lbs')}
@@ -361,8 +362,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.ageYears')}</label>
+              <label htmlFor="edit-profile-age" className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.ageYears')}</label>
               <input
+                id="edit-profile-age"
                 type="number"
                 value={age}
                 onChange={(e) => {
@@ -381,11 +383,12 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           {/* Weight & Height */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
+              <label htmlFor="edit-profile-weight" className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
                 <span>{t('editProfile.bodyweight')}</span>
                 <span className="text-2xs font-mono text-text-muted uppercase">{unit}</span>
               </label>
               <input
+                id="edit-profile-weight"
                 type="number"
                 step="0.1"
                 value={weight}
@@ -400,13 +403,14 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
+              <label htmlFor="edit-profile-height" className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
                 <span>{t('editProfile.height')}</span>
                 <span className="text-2xs font-mono text-text-muted uppercase">
                   {unit === 'lbs' ? t('editProfile.inches') : 'cm'}
                 </span>
               </label>
               <input
+                id="edit-profile-height"
                 type="number"
                 step="0.1"
                 value={height}

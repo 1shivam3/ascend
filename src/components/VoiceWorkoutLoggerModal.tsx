@@ -343,8 +343,9 @@ export default function VoiceWorkoutLoggerModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-             aria-label="Close">
+              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary transition-colors"
+              aria-label="Close voice logger"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -493,7 +494,7 @@ export default function VoiceWorkoutLoggerModal({
                       <button
                         type="button"
                         onClick={() => adjustWeight(-weightStep)}
-                        className="w-6 h-6 rounded bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
                         title={`Decrease ${weightStep}${defaultUnit}`}
                       >
                         <Minus className="w-3 h-3" />
@@ -501,7 +502,7 @@ export default function VoiceWorkoutLoggerModal({
                       <button
                         type="button"
                         onClick={() => adjustWeight(weightStep)}
-                        className="w-6 h-6 rounded bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
                         title={`Increase ${weightStep}${defaultUnit}`}
                       >
                         <Plus className="w-3 h-3" />
@@ -521,7 +522,7 @@ export default function VoiceWorkoutLoggerModal({
                       <button
                         type="button"
                         onClick={() => adjustReps(-1)}
-                        className="w-6 h-6 rounded bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
                         title="Decrease 1 rep"
                       >
                         <Minus className="w-3 h-3" />
@@ -529,7 +530,7 @@ export default function VoiceWorkoutLoggerModal({
                       <button
                         type="button"
                         onClick={() => adjustReps(1)}
-                        className="w-6 h-6 rounded bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
+                        className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-border text-text-primary flex items-center justify-center active:scale-90"
                         title="Increase 1 rep"
                       >
                         <Plus className="w-3 h-3" />
@@ -555,7 +556,7 @@ export default function VoiceWorkoutLoggerModal({
                         key={val}
                         type="button"
                         onClick={() => setRpe(val)}
-                        className={`flex-1 py-1 rounded text-3xs font-mono font-bold transition-all ${
+                        className={`flex-1 py-2 min-h-[40px] rounded text-3xs font-mono font-bold transition-all ${
                           parsedResult.rpe === val
                             ? 'bg-accent text-white shadow-xs'
                             : 'bg-bg-card hover:bg-bg-secondary border border-border/70 text-text-secondary'

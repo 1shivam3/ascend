@@ -581,8 +581,9 @@ export default function SuggestedWorkoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors"
-           aria-label="Close">
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            aria-label="Close workout generator"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -926,7 +927,7 @@ export default function SuggestedWorkoutModal({
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', Math.max(1, ex.targetSets - 1))}
-                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        className="w-7 h-7 tap-40 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
                         aria-label="Decrease sets"
                       >
                         −
@@ -935,7 +936,7 @@ export default function SuggestedWorkoutModal({
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', ex.targetSets + 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        className="w-7 h-7 tap-40 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
                         aria-label="Increase sets"
                       >
                         +
@@ -947,7 +948,7 @@ export default function SuggestedWorkoutModal({
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', Math.max(1, ex.targetReps - 1))}
-                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        className="w-7 h-7 tap-40 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
                         aria-label="Decrease reps"
                       >
                         −
@@ -956,7 +957,7 @@ export default function SuggestedWorkoutModal({
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', ex.targetReps + 1)}
-                        className="w-7 h-7 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
+                        className="w-7 h-7 tap-40 flex items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary active:scale-95 transition-all text-sm font-bold"
                         aria-label="Increase reps"
                       >
                         +
@@ -966,7 +967,7 @@ export default function SuggestedWorkoutModal({
                     <button
                       type="button"
                       onClick={() => handleRemoveExercise(idx)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                      className="w-8 h-8 tap-40 flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
                       title="Remove exercise"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

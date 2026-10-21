@@ -740,8 +740,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           <button
             type="button"
             onClick={handleClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
-           aria-label="Close">
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+          aria-label="Close"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -917,10 +918,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
                 {/* Scan + Describe / Context hints */}
                 <div className="space-y-2">
-                  <label className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                  <label htmlFor="scan-meal-notes" className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
                     {t('scan.describeLabel')}
                   </label>
                   <input
+                    id="scan-meal-notes"
                     type="text"
                     value={userNotes}
                     onChange={(e) => setUserNotes(e.target.value)}
@@ -1255,10 +1257,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
                   {/* Editable Meal Name */}
                   <div>
-                    <label className="text-2xs font-bold uppercase tracking-wider text-text-muted block mb-1">
+                    <label htmlFor="scan-meal-name" className="text-2xs font-bold uppercase tracking-wider text-text-muted block mb-1">
                       {t('scan.mealNameLabel')}
                     </label>
                     <input
+                      id="scan-meal-name"
                       type="text"
                       value={mealName}
                       onChange={(e) => setMealName(e.target.value)}
@@ -1415,8 +1418,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                             {isEditing && (
                               <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in bg-bg-secondary/40 -mx-3 -mb-3 p-3 rounded-b-xl">
                                 <div className="space-y-1">
-                                  <label className="text-[10px] font-mono uppercase tracking-wider text-text-muted block">{t('scan.foodNameLabel')}</label>
+                                  <label htmlFor={`scan-edit-name-${idx}`} className="text-[11px] font-mono uppercase tracking-wider text-text-muted block">{t('scan.foodNameLabel')}</label>
                                   <input
+                                    id={`scan-edit-name-${idx}`}
                                     type="text"
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
@@ -1427,7 +1431,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
                                 <div className="space-y-1">
                                   <div className="flex items-center justify-between">
-                                    <label className="text-[10px] font-mono uppercase tracking-wider text-text-muted">{t('scan.portionWeight')}</label>
+                                    <label htmlFor={`scan-edit-grams-${idx}`} className="text-[11px] font-mono uppercase tracking-wider text-text-muted">{t('scan.portionWeight')}</label>
                                     <span className="text-[10px] text-accent font-mono font-medium">{t('scan.autoScales')}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
@@ -1439,6 +1443,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                       -25g
                                     </button>
                                     <input
+                                      id={`scan-edit-grams-${idx}`}
                                       type="number"
                                       value={editGrams}
                                       onChange={(e) => handleEditGramsChange(Math.max(0, Number(e.target.value)))}
@@ -1457,8 +1462,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 {/* Direct Macro Adjustments */}
                                 <div className="grid grid-cols-4 gap-1.5 pt-1">
                                   <div>
-                                    <label className="text-[9px] font-mono uppercase text-text-muted block">{t('meals.calories')}</label>
+                                    <label htmlFor={`scan-edit-calories-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">Calories</label>
                                     <input
+                                      id={`scan-edit-calories-${idx}`}
                                       type="number"
                                       value={editCalories}
                                       onChange={(e) => setEditCalories(Math.max(0, Number(e.target.value)))}
@@ -1466,8 +1472,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-[9px] font-mono uppercase text-text-muted block">{t('scan.proteinLabel')}</label>
+                                    <label htmlFor={`scan-edit-protein-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.proteinLabel')}</label>
                                     <input
+                                      id={`scan-edit-protein-${idx}`}
                                       type="number"
                                       value={editProtein}
                                       onChange={(e) => setEditProtein(Math.max(0, Number(e.target.value)))}
@@ -1475,8 +1482,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-[9px] font-mono uppercase text-text-muted block">{t('scan.carbsLabel')}</label>
+                                    <label htmlFor={`scan-edit-carbs-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.carbsLabel')}</label>
                                     <input
+                                      id={`scan-edit-carbs-${idx}`}
                                       type="number"
                                       value={editCarbs}
                                       onChange={(e) => setEditCarbs(Math.max(0, Number(e.target.value)))}
@@ -1484,8 +1492,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     />
                                   </div>
                                   <div>
-                                    <label className="text-[9px] font-mono uppercase text-text-muted block">{t('scan.fatLabel')}</label>
+                                    <label htmlFor={`scan-edit-fat-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.fatLabel')}</label>
                                     <input
+                                      id={`scan-edit-fat-${idx}`}
                                       type="number"
                                       value={editFat}
                                       onChange={(e) => setEditFat(Math.max(0, Number(e.target.value)))}

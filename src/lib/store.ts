@@ -975,8 +975,19 @@ export const useAppStore = create<AppState>()(
         if (state.uiPreferences && state.uiPreferences.gamificationEnabled === false) {
           return { leveledUp: false, newLevel: 1, awarded: 0 };
         }
-        const result = awardXp(events, state.xp.totalXp, state.xp.awardedIds);
-        set(() => ({ xp: { totalXp: result.newTotal, awardedIds: result.awardedIds } }));
+        const result = awardXp(
+          events,
+          state.xp.totalXp,
+          state.xp.awardedIds,
+          state.xp.compactedAwardedHashes ?? [],
+        );
+        set(() => ({
+          xp: {
+            totalXp: result.newTotal,
+            awardedIds: result.awardedIds,
+            compactedAwardedHashes: result.compactedAwardedHashes,
+          },
+        }));
         return { leveledUp: result.leveledUp, newLevel: result.newLevel, awarded: result.awarded };
       },
 

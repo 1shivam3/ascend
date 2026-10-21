@@ -1,5 +1,6 @@
 import { FoodItem, MacroTotals, MacroGoals, AthleteGoal, Gender } from './types';
 import { INDIAN_FOOD_VALUES, getHouseholdUnitGrams } from './indian-foods';
+import { containsDevanagari, expandFoodQuery, transliterateDevanagari } from './devanagari';
 
 // Macros per 100g or 100ml (unless noted)
 const FOOD_DB_BASE: Record<string, Omit<FoodItem, 'name'>> = {
@@ -1085,9 +1086,25 @@ export function calculateMealMacros(foods: FoodItem[]): MacroTotals {
 /** Returns food names from DB for autocomplete */
 export function getFoodSuggestions(query: string): string[] {
   if (!query || query.length < 1) return [];
-  const q = query.toLowerCase().trim();
-  return Object.keys(FOOD_DB)
-    .filter(k => k.includes(q) || q.includes(k.split(' ')[0]))
+  // QA4-029: Devanagari queries (दाल, चावल, रोटी) are expanded to their
+  // Latin equivalents first — the DB is Latin-keyed, so matching the raw
+  // script against it always returned [] and looked like "food missing".
+  const queries = expandFoodQuery(query);
+  const keys = Object.keys(FOOD_DB);
+  const matched: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const q of queries) {
+    for (const k of keys) {
+      if (seenKeys.has(k)) continue;
+      if (k.includes(q) || q.includes(k.split(' ')[0])) {
+        seenKeys.add(k);
+        matched.push(k);
+        if (matched.length >= 6) break;
+      }
+    }
+    if (matched.length >= 6) break;
+  }
+  return matched
     .slice(0, 6)
     .map(k => k.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
 }
@@ -1117,8 +1134,13 @@ const HINDI_NUMBER_WORDS: Record<string, number> = {
 export function parseNaturalMealOffline(input: string): FoodItem[] {
   if (!input || !input.trim()) return [];
 
+  // QA4-029: a Devanagari meal ("दो रोटी, एक कटोरी दाल") transliterates
+  // to Latin first ("do roti, ek katori dal") so the Latin-keyed DB and
+  // the Hindi number-word mapping below both work on it.
+  const source = containsDevanagari(input) ? transliterateDevanagari(input) : input;
+
   // Split by commas, plus signs, newlines, " and ", or Hindi " aur "
-  const tokens = input
+  const tokens = source
     .split(/,|\n|\+|\band\b|\baur\b/i)
     .map((t) => t.trim())
     .filter((t) => t.length > 0);

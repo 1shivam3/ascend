@@ -95,7 +95,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
               <p className="text-3xs text-text-muted font-mono">Calibrated 90% • 95% • {thirdAttemptPercent}% Game Plan</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-text-muted hover:text-text-primary p-1" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>

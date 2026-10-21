@@ -1,5 +1,6 @@
 import type { CustomFood } from './types';
 import { getFoodSuggestions } from './macros';
+import { expandFoodQuery } from './devanagari';
 
 /**
  * Unified food search for the meal builder.
@@ -21,10 +22,12 @@ export function searchFoods(
   limit = 6
 ): FoodSearchResult[] {
   if (!query || query.trim().length < 1) return [];
-  const q = query.toLowerCase().trim();
+  // QA4-029: match custom foods against every Latin expansion of a
+  // Devanagari query (दाल → dal), not just the raw script.
+  const queryVariants = expandFoodQuery(query);
 
   const customMatches: FoodSearchResult[] = (customFoods || [])
-    .filter((f) => f.name.toLowerCase().includes(q))
+    .filter((f) => queryVariants.some((q) => f.name.toLowerCase().includes(q)))
     .slice(0, 3)
     .map((f) => ({ kind: 'custom' as const, name: f.name, customFood: f }));
 

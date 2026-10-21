@@ -257,7 +257,7 @@ function PlanModal({
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-secondary hover:text-text-primary p-1" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2809,7 +2809,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -2971,7 +2971,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

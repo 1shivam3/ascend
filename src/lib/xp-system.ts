@@ -26,6 +26,37 @@ export const XP_CHALLENGE_COMPLETE = 200;
 /** Upper bound on remembered award ids so the ledger can't grow forever. */
 export const MAX_AWARDED_IDS = 10_000;
 
+/**
+ * QA4-042: upper bound on the COMPACTED hash index (see awardXp).
+ * When the full-id list overflows MAX_AWARDED_IDS, evicted ids are not
+ * forgotten — they are folded into this index as 64-bit FNV-1a hashes
+ * (16 hex chars each instead of a ~45-char `workout:<uuid>` string).
+ * 10k full ids + 100k hashes ≈ 110k lifetime events; at ~5 XP events a
+ * day that is ~60 years of daily use before the oldest hash itself is
+ * evicted. Only beyond that combined horizon could a replayed ancient
+ * id pay twice — bounded, documented, and unreachable in practice.
+ */
+export const MAX_COMPACTED_AWARD_HASHES = 100_000;
+
+/**
+ * 64-bit FNV-1a hash of an award id, as 16 hex chars. Deterministic and
+ * dependency-free (BigInt arithmetic). Collision odds for 100k stored
+ * hashes are ~1 in 3.7 million (birthday bound over 2^64); a collision
+ * would only ever *skip* a legitimate award, never double-pay.
+ */
+export function hashAwardId(id: string): string {
+  // BigInt constructor calls (not literals) — the tsconfig target
+  // predates ES2020 BigInt literal syntax.
+  let hash = BigInt('0xcbf29ce484222325');
+  const prime = BigInt('0x100000001b3');
+  const mask = BigInt('0xffffffffffffffff');
+  for (let i = 0; i < id.length; i++) {
+    hash ^= BigInt(id.charCodeAt(i));
+    hash = (hash * prime) & mask;
+  }
+  return hash.toString(16).padStart(16, '0');
+}
+
 export type XpEventType =
   | 'workout'
   | 'meal'
@@ -81,24 +112,33 @@ export interface XpAwardResult {
   newLevel: number;
   /** Updated list of awarded ids (trimmed to MAX_AWARDED_IDS). */
   awardedIds: string[];
+  /**
+   * Updated compacted hash index: hashes of ids evicted from
+   * `awardedIds`. They still block replays (QA4-042).
+   */
+  compactedAwardedHashes: string[];
 }
 
 /**
  * Award XP for a batch of events. Idempotent: any event whose id is already in
- * `awardedIds` is skipped, so re-submitting the same workout/meal id can never
- * double-count. Pure — returns new state, mutates nothing.
+ * `awardedIds` — or whose hash survives in `compactedAwardedHashes` after the
+ * id itself was evicted from the full list — is skipped, so re-submitting
+ * the same workout/meal id can never double-count. Pure — returns new
+ * state, mutates nothing.
  */
 export function awardXp(
   events: XpEvent[],
   currentTotal: number,
   awardedIds: string[] | Set<string> = [],
+  compactedAwardedHashes: string[] | Set<string> = [],
 ): XpAwardResult {
   const seen = new Set(awardedIds);
+  const compacted = new Set(compactedAwardedHashes);
   let awarded = 0;
   let skippedDuplicates = 0;
 
   for (const event of events) {
-    if (seen.has(event.id)) {
+    if (seen.has(event.id) || compacted.has(hashAwardId(event.id))) {
       skippedDuplicates++;
       continue;
     }
@@ -111,10 +151,19 @@ export function awardXp(
   const newLevel = getLevel(newTotal);
 
   const trimmed = Array.from(seen);
-  const finalIds =
-    trimmed.length > MAX_AWARDED_IDS
-      ? trimmed.slice(trimmed.length - MAX_AWARDED_IDS)
-      : trimmed;
+  let finalIds = trimmed;
+  if (trimmed.length > MAX_AWARDED_IDS) {
+    const evicted = trimmed.slice(0, trimmed.length - MAX_AWARDED_IDS);
+    finalIds = trimmed.slice(trimmed.length - MAX_AWARDED_IDS);
+    // Compaction, not forgetting: evicted ids fold into the hash index.
+    for (const id of evicted) compacted.add(hashAwardId(id));
+    if (compacted.size > MAX_COMPACTED_AWARD_HASHES) {
+      const hashes = Array.from(compacted);
+      const kept = hashes.slice(hashes.length - MAX_COMPACTED_AWARD_HASHES);
+      compacted.clear();
+      for (const h of kept) compacted.add(h);
+    }
+  }
 
   return {
     awarded,
@@ -123,6 +172,7 @@ export function awardXp(
     leveledUp: newLevel > oldLevel,
     newLevel,
     awardedIds: finalIds,
+    compactedAwardedHashes: Array.from(compacted),
   };
 }
 
@@ -241,8 +291,14 @@ export function summarizeXpInRange(
 export interface XpState {
   totalXp: number;
   awardedIds: string[];
+  /**
+   * QA4-042: hashes of award ids evicted from `awardedIds` by the cap.
+   * Optional so saves/backups written before compaction still load;
+   * treated as empty when absent.
+   */
+  compactedAwardedHashes?: string[];
 }
 
 export function getInitialXState(): XpState {
-  return { totalXp: 0, awardedIds: [] };
+  return { totalXp: 0, awardedIds: [], compactedAwardedHashes: [] };
 }
