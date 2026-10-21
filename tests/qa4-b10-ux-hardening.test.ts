@@ -74,3 +74,57 @@ describe('QA4-015 touch targets ≥40px in workout flows', () => {
     }
   });
 });
+
+describe('QA4-020 remainder — label association + keyboard activation', () => {
+  it('EditProfileModal labels are associated (htmlFor/id or aria-labelledby groups)', () => {
+    const src = read('src/components/EditProfileModal.tsx');
+    for (const id of ['edit-profile-name', 'edit-profile-age', 'edit-profile-weight', 'edit-profile-height']) {
+      expect(src).toContain(`htmlFor="${id}"`);
+      expect(src).toContain(`id="${id}"`);
+    }
+    // Gender / Units are button groups: named via aria-labelledby spans
+    expect(src).toContain('id="edit-profile-gender-label"');
+    expect(src).toContain('aria-labelledby="edit-profile-gender-label"');
+    expect(src).toContain('id="edit-profile-units-label"');
+    expect(src).toContain('aria-labelledby="edit-profile-units-label"');
+    // No bare unassociated <label> remains in the form
+    expect(src).not.toMatch(/<label className=/);
+  });
+
+  it('ScanMealModal labels are associated, including per-item editor ids', () => {
+    const src = read('src/components/ScanMealModal.tsx');
+    expect(src).toContain('htmlFor="scan-meal-notes"');
+    expect(src).toContain('id="scan-meal-notes"');
+    expect(src).toContain('htmlFor="scan-meal-name"');
+    expect(src).toContain('id="scan-meal-name"');
+    for (const field of ['name', 'grams', 'calories', 'protein', 'carbs', 'fat']) {
+      expect(src).toContain(`htmlFor={\`scan-edit-${field}-\${idx}\`}`);
+      expect(src).toContain(`id={\`scan-edit-${field}-\${idx}\`}`);
+    }
+    expect(src).not.toMatch(/<label className=/);
+  });
+
+  it('HomePage nutrition + protein cards are keyboard-activatable like the challenges card', () => {
+    const src = read('src/components/HomePage.tsx');
+    const keyHandlers = src.match(/onKeyDown=\{\(e\) => \{\s*if \(e\.key === 'Enter' \|\| e\.key === ' '\)/g) || [];
+    // challenges card (pre-existing) + nutrition + protein = at least 3
+    expect(keyHandlers.length).toBeGreaterThanOrEqual(3);
+    expect(src).toContain('aria-label="View Nutrition Details"');
+    expect(src).toContain('aria-label="View Protein Details"');
+  });
+});
+
+describe('QA4-030 micro-type floors', () => {
+  it('ScanMealModal carries no 9px text and its macro labels are 11px', () => {
+    const src = read('src/components/ScanMealModal.tsx');
+    expect(src).not.toContain('text-[9px]');
+    expect(src).toContain('text-[11px] font-mono uppercase text-text-muted block">Calories</label>');
+  });
+
+  it('ErrorState diagnostics render full-opacity at 11px (no /60 muted)', () => {
+    const src = read('src/components/ErrorState.tsx');
+    expect(src).not.toContain('text-text-muted/60');
+    expect(src).toContain('text-[11px] font-mono text-text-secondary break-words');
+    expect(src).toContain('text-[11px] font-mono text-text-secondary pt-0.5');
+  });
+});
