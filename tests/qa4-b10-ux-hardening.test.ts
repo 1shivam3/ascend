@@ -157,3 +157,14 @@ describe('QA4-031 jargon glosses in plain language', () => {
     expect(summary).toContain('how much protein to aim for');
   });
 });
+
+describe('QA4-035(a) password floor', () => {
+  it('CreateAccountScreen requires 8 characters with matching copy', () => {
+    const src = read('src/components/onboarding/CreateAccountScreen.tsx');
+    expect(src).toContain('password.length < 8');
+    expect(src).not.toContain('password.length < 6');
+    expect(src).toContain('Password must be at least 8 characters long.');
+    expect(src).toContain('placeholder="At least 8 characters"');
+    expect(src).not.toContain('At least 6 characters');
+  });
+});
