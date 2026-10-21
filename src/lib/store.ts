@@ -2466,6 +2466,17 @@ export const useAppStore = create<AppState>()(
                         ? data.profile.age
                         : undefined,
                     unit: data.profile.unit === 'kg' || data.profile.unit === 'lbs' ? data.profile.unit : undefined,
+                    // QA4A-009: dietPreference was missing from the
+                    // validated profile — a backup restore silently lost
+                    // it. Validate against the DietPreference literals,
+                    // same style as gender/unit above.
+                    dietPreference:
+                      data.profile.dietPreference === 'vegetarian' ||
+                      data.profile.dietPreference === 'eggitarian' ||
+                      data.profile.dietPreference === 'non_vegetarian' ||
+                      data.profile.dietPreference === 'vegan'
+                        ? data.profile.dietPreference
+                        : undefined,
                     goals: Array.isArray(data.profile.goals)
                       ? data.profile.goals.filter(
                           (g: any) =>
