@@ -6,16 +6,28 @@ import { safeRandomId } from '@/lib/formatters';
 
 export type ToastType = 'success' | 'error' | 'info';
 
+/**
+ * Optional inline action for a toast (QA4-014) — e.g. Undo after a
+ * delete. Clicking the action runs `onAction` and dismisses the toast.
+ * Action toasts get a longer default lifetime (6s vs 3.5s) so the user
+ * actually has time to use it.
+ */
+export interface ToastAction {
+  label: string;
+  onAction: () => void;
+}
+
 export interface ToastMessage {
   id: string;
   type: ToastType;
   title?: string;
   message: string;
   durationMs?: number;
+  action?: ToastAction;
 }
 
 interface ToastContextType {
-  showToast: (type: ToastType, message: string, title?: string, durationMs?: number) => void;
+  showToast: (type: ToastType, message: string, title?: string, durationMs?: number, action?: ToastAction) => void;
   success: (message: string, title?: string) => void;
   error: (message: string, title?: string) => void;
   info: (message: string, title?: string) => void;
@@ -31,13 +43,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const showToast = useCallback(
-    (type: ToastType, message: string, title?: string, durationMs = 3500) => {
+    (type: ToastType, message: string, title?: string, durationMs?: number, action?: ToastAction) => {
       const id = safeRandomId('toast');
-      setToasts((prev) => [...prev, { id, type, title, message, durationMs }]);
+      // Action toasts (e.g. Undo) live longer by default so the action
+      // is reachable; an explicit durationMs always wins.
+      const effectiveDuration = durationMs ?? (action ? 6000 : 3500);
+      setToasts((prev) => [...prev, { id, type, title, message, durationMs: effectiveDuration, action }]);
 
       setTimeout(() => {
         removeToast(id);
-      }, durationMs);
+      }, effectiveDuration);
     },
     [removeToast]
   );
@@ -66,46 +81,74 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         aria-live="polite"
       >
         {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
-              toast.type === 'success'
-                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
-                : toast.type === 'error'
-                ? 'bg-rose-950/90 border-rose-500/40 text-rose-200'
-                : 'bg-zinc-900/90 border-accent/40 text-accent'
-            }`}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
-            ) : toast.type === 'error' ? (
-              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
-            ) : (
-              <Info className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
-            )}
-
-            <div className="flex-1 min-w-0">
-              {toast.title && (
-                <h5 className="text-xs font-bold font-mono tracking-tight leading-none mb-1">
-                  {toast.title}
-                </h5>
-              )}
-              <p className="text-2xs font-mono leading-relaxed opacity-90 break-words">
-                {toast.message}
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => removeToast(toast.id)}
-              className="text-white/60 hover:text-white p-0.5 rounded transition-colors flex-shrink-0"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+          <ToastItem key={toast.id} toast={toast} onClose={() => removeToast(toast.id)} />
         ))}
       </div>
     </ToastContext.Provider>
+  );
+}
+
+/**
+ * Presentational toast card (exported for tests). Clicking the action
+ * runs it and dismisses the toast via onClose.
+ */
+export function ToastItem({
+  toast,
+  onClose,
+}: {
+  toast: ToastMessage;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className={`pointer-events-auto flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
+        toast.type === 'success'
+          ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+          : toast.type === 'error'
+          ? 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+          : 'bg-zinc-900/90 border-accent/40 text-accent'
+      }`}
+    >
+      {toast.type === 'success' ? (
+        <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5" />
+      ) : toast.type === 'error' ? (
+        <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+      ) : (
+        <Info className="w-4 h-4 text-accent flex-shrink-0 mt-0.5" />
+      )}
+
+      <div className="flex-1 min-w-0">
+        {toast.title && (
+          <h5 className="text-xs font-bold font-mono tracking-tight leading-none mb-1">
+            {toast.title}
+          </h5>
+        )}
+        <p className="text-2xs font-mono leading-relaxed opacity-90 break-words">
+          {toast.message}
+        </p>
+        {toast.action && (
+          <button
+            type="button"
+            data-toast-action={toast.action.label}
+            onClick={() => {
+              toast.action?.onAction();
+              onClose();
+            }}
+            className="mt-1.5 text-2xs font-mono font-bold underline underline-offset-2 decoration-current/60 hover:decoration-current cursor-pointer"
+          >
+            {toast.action.label}
+          </button>
+        )}
+      </div>
+
+      <button
+        type="button"
+        onClick={onClose}
+        className="text-white/60 hover:text-white p-0.5 rounded transition-colors flex-shrink-0"
+      >
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </div>
   );
 }
 

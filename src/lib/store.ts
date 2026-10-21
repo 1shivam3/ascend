@@ -48,6 +48,7 @@ import {
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { purgeLocalAppData, isRecognizedBackupData } from './storage';
+import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
@@ -357,6 +358,13 @@ export interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+  /** QA4-014 Undo: re-insert a deleted meal at its original index (no-op if present). */
+  insertMealAt: (meal: MealEntry, index: number) => void;
+  /** QA4-014 Undo: restore a food removed by deleteFoodFromMeal — back
+   *  into its meal at the original index, or, when the food was the
+   *  meal's last item (so the meal itself was removed), restore the
+   *  whole meal snapshot at its original index. */
+  restoreFoodToMeal: (mealSnapshot: MealEntry, mealIndex: number, foodIndex: number) => void;
   updateMeal: (id: string, updated: Partial<MealEntry>) => void;
   deleteFoodFromMeal: (mealId: string, foodIndex: number) => void;
   copyMealsFromDate: (sourceDate: string, targetDate?: string) => number;
@@ -381,6 +389,10 @@ export interface AppState {
   addPlannedWorkout: (plan: PlannedWorkout) => void;
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
+  /** QA4-014 Undo: restore a plan deleted by deletePlannedWorkout at
+   *  its original index, with the pre-delete weekly schedule and
+   *  tombstone list (the delete rewires both, so undo must too). */
+  restorePlannedWorkout: (plan: PlannedWorkout, index: number, prevSchedule: WeeklySchedule, prevDeletedPlanIds: string[]) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
 
 
@@ -631,6 +643,69 @@ export function syncWorkoutReminderDays(
   return next;
 }
 
+/**
+ * QA4-012 — persist migration (persist `version: 1`).
+ *
+ * zustand-persist's default rehydration merge is SHALLOW at the top
+ * level: a persisted nested slice REPLACES the in-code default slice
+ * wholesale. So a legacy blob whose `uiPreferences` predates a newer
+ * field (e.g. `showMuscleVolume`, added after the blob was written)
+ * rehydrates with that field `undefined` — and surfaces that treat
+ * missing as OFF silently lost coach / gamification / habit-matrix
+ * after app updates, even though the product defaults are ON.
+ *
+ * This migrate deep-merges the nested slices that carry default-ON
+ * boolean semantics over the CURRENT defaults, so missing fields fall
+ * back to the product default while every value the user actually
+ * chose is preserved:
+ * - uiPreferences (gamificationEnabled / coachEnabled / showHabitMatrix
+ *   / showMuscleVolume default ON)
+ * - notificationPreferences (nested groups; quietHours.enabled and
+ *   lockScreenPrivacy default ON) — merged one group level deep
+ * - streak / xp (filled from their initial states when fields are
+ *   missing, so a legacy blob can't rehydrate a half-shaped slice)
+ *
+ * Flat slices and collections are user data with no defaults to merge
+ * and pass through untouched.
+ */
+export const PERSIST_VERSION = 1;
+
+export function migratePersistedState(
+  persisted: unknown,
+  _version: number,
+): Record<string, unknown> {
+  const state = (persisted ?? {}) as Record<string, any>;
+  const next: Record<string, any> = { ...state };
+
+  if (state.uiPreferences && typeof state.uiPreferences === 'object') {
+    next.uiPreferences = { ...DEFAULT_UI_PREFERENCES, ...state.uiPreferences };
+  }
+
+  if (state.notificationPreferences && typeof state.notificationPreferences === 'object') {
+    const defaults = DEFAULT_NOTIFICATION_PREFERENCES as unknown as Record<string, any>;
+    const saved = state.notificationPreferences as Record<string, any>;
+    const merged: Record<string, any> = { ...defaults, ...saved };
+    for (const key of Object.keys(defaults)) {
+      const d = defaults[key];
+      const s = saved[key];
+      if (d && typeof d === 'object' && !Array.isArray(d) && s && typeof s === 'object' && !Array.isArray(s)) {
+        merged[key] = { ...d, ...s };
+      }
+    }
+    next.notificationPreferences = merged;
+  }
+
+  if (state.streak && typeof state.streak === 'object') {
+    next.streak = { ...getInitialStreakState(), ...state.streak };
+  }
+
+  if (state.xp && typeof state.xp === 'object') {
+    next.xp = { ...getInitialXpState(), ...state.xp };
+  }
+
+  return next;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -726,6 +801,14 @@ export const mainStoreStorage: StateStorage = {
     // SSR/prerender: nothing to write to, and NOT a quota failure —
     // the health flag must only flip on a real failed write.
     if (typeof localStorage === 'undefined') return;
+    // QA4-010: cross-tab guard — a follower tab (ASCEND open in another
+    // tab) must not overwrite the leader's blob. Suppression here is
+    // deliberate, not a write failure, so the health flag stays untouched.
+    try {
+      if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
+    } catch {
+      // The guard must never break persistence.
+    }
     try {
       localStorage.setItem(name, value);
       mainStoreWriteFailed = false;
@@ -904,7 +987,32 @@ export const useAppStore = create<AppState>()(
         const refreshed = refreshFreezeWeek(state.streak);
         const activeDays = buildActiveDays(state.workouts, state.meals);
         const result = calculateStreak({ dailyActivity: activeDays, freezesAvailable: refreshed.freezesAvailable });
-        const next = applyStreakResult(refreshed, result);
+        // QA4-011 guard: calculateStreak is a pure function of history,
+        // so after a Monday refill it would happily consume the FRESH
+        // freeze for the SAME missed day a previous freeze already
+        // bridged. A freeze covers a given calendar day at most once —
+        // if this miss is already the persisted freezeAppliedTo, the
+        // bridge stands and no new freeze is consumed.
+        const effective =
+          result.freezeConsumed &&
+          result.freezeAppliedTo &&
+          refreshed.freezeAppliedTo === result.freezeAppliedTo
+            ? { ...result, freezeConsumed: false, freezesAvailable: refreshed.freezesAvailable }
+            : result;
+        const next = applyStreakResult(refreshed, effective);
+        // Skip the write entirely when nothing changed — refreshStreak
+        // runs on app start, day rollover and every workout log, and a
+        // no-op set would still churn persist + subscribers.
+        const prev = state.streak;
+        if (
+          prev.freezesAvailable === next.freezesAvailable &&
+          prev.freezesUsedThisWeek === next.freezesUsedThisWeek &&
+          prev.weekStart === next.weekStart &&
+          prev.longestStreak === next.longestStreak &&
+          prev.freezeAppliedTo === next.freezeAppliedTo
+        ) {
+          return;
+        }
         set(() => ({ streak: next }));
       },
 
@@ -1579,6 +1687,10 @@ export const useAppStore = create<AppState>()(
         }
         // Run coach engine: stall detection + readiness update (best-effort).
         get().processCoachingAfterWorkout();
+        // QA4-011: a completed workout is a streak lifecycle point —
+        // persist freeze consumption/refill instead of leaving the
+        // streak slice as dead code the UI only reads.
+        get().refreshStreak();
       },
       deleteWorkout: (id) => set((state) => {
         const nextWorkouts = state.workouts.filter(w => w.id !== id);
@@ -1618,6 +1730,42 @@ export const useAppStore = create<AppState>()(
           ? state.deletedMealIds
           : [...(state.deletedMealIds || []), id],
       })),
+      insertMealAt: (meal, index) => set((state) => {
+        if (state.meals.some((m) => m.id === meal.id)) return state;
+        const nextMeals = [...state.meals];
+        nextMeals.splice(Math.max(0, Math.min(index, nextMeals.length)), 0, meal);
+        // Undoing a deletion must also clear its tombstone (QA4-001),
+        // or the next sync would delete the restored meal again.
+        return {
+          meals: nextMeals,
+          deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== meal.id),
+        };
+      }),
+      restoreFoodToMeal: (mealSnapshot, mealIndex, foodIndex) => set((state) => {
+        const food = mealSnapshot.foods[foodIndex];
+        if (!food) return state;
+        const existingIdx = state.meals.findIndex((m) => m.id === mealSnapshot.id);
+        if (existingIdx >= 0) {
+          const nextMeals = state.meals.map((meal, i) => {
+            if (i !== existingIdx) return meal;
+            const foods = [...meal.foods];
+            foods.splice(Math.min(foodIndex, foods.length), 0, food);
+            return { ...meal, foods };
+          });
+          return {
+            meals: nextMeals,
+            deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== mealSnapshot.id),
+          };
+        }
+        // The removed food was the meal's last item, so deleteFoodFromMeal
+        // removed the whole meal — restore the snapshot in place.
+        const nextMeals = [...state.meals];
+        nextMeals.splice(Math.max(0, Math.min(mealIndex, nextMeals.length)), 0, mealSnapshot);
+        return {
+          meals: nextMeals,
+          deletedMealIds: (state.deletedMealIds || []).filter((d) => d !== mealSnapshot.id),
+        };
+      }),
       updateMeal: (id, updated) => set((state) => ({
         meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
       })),
@@ -1849,6 +1997,19 @@ export const useAppStore = create<AppState>()(
           deletedPlanIds: state.deletedPlanIds.includes(id)
             ? state.deletedPlanIds
             : [...state.deletedPlanIds, id],
+        };
+      }),
+
+      restorePlannedWorkout: (plan, index, prevSchedule, prevDeletedPlanIds) => set((state) => {
+        if (state.plannedWorkouts.some((p) => p.id === plan.id)) return state;
+        const nextPlans = [...state.plannedWorkouts];
+        nextPlans.splice(Math.max(0, Math.min(index, nextPlans.length)), 0, plan);
+        return {
+          plannedWorkouts: nextPlans,
+          // deletePlannedWorkout rewired schedule refs to a fallback
+          // plan and tombstoned the id — undo restores both snapshots.
+          weeklySchedule: prevSchedule,
+          deletedPlanIds: prevDeletedPlanIds,
         };
       }),
 
@@ -3013,9 +3174,21 @@ export const useAppStore = create<AppState>()(
     {
       name: 'ascend_store',
       storage: createJSONStorage(() => mainStoreStorage),
+
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);
+
+          // QA4-011: app start is a streak lifecycle point — run the
+          // persisted refresh (weekly freeze refill + silent freeze
+          // consumption for a bridged miss) once per launch. Before
+          // this wiring, refreshStreak had zero callers and the
+          // 1-freeze-per-week cap was never enforced in persisted state.
+          try {
+            state.refreshStreak();
+          } catch {
+            // Streak maintenance must never block hydration.
+          }
 
           // Custom-exercise muscle registry: hydrate the classifier's
           // override map from persisted choices.
@@ -3218,11 +3391,41 @@ export const useAppStore = create<AppState>()(
         }
       },
       partialize: partializeAppState,
+      // QA4-012: versioned migrations — legacy blobs (version 0) are
+      // deep-merged over current defaults so newer default-ON fields
+      // are never lost on rehydration. See migratePersistedState.
+      version: PERSIST_VERSION,
+      migrate: (persistedState: unknown, version: number) =>
+        migratePersistedState(persistedState, version) as unknown as AppState,
     }
   )
 );
 
 export const useStore = useAppStore;
+
+// QA4-011: day-rollover streak refresh. An app left open overnight
+// (or resumed next morning) must run the persisted streak refresh when
+// the local date flips — weekly freeze refill and missed-day bridging
+// are date-driven. Mirrors useToday's triggers (focus / visibility /
+// a slow poll) at the store level so it fires regardless of which tab
+// is mounted.
+if (typeof window !== 'undefined') {
+  let lastStreakDate = getLocalTodayStr();
+  const checkStreakRollover = () => {
+    const today = getLocalTodayStr();
+    if (today !== lastStreakDate) {
+      lastStreakDate = today;
+      try {
+        useAppStore.getState().refreshStreak();
+      } catch {
+        // Never let streak maintenance break the app shell.
+      }
+    }
+  };
+  window.addEventListener('focus', checkStreakRollover);
+  document.addEventListener('visibilitychange', checkStreakRollover);
+  setInterval(checkStreakRollover, 60_000);
+}
 
 // Auto-refresh the Lifter Twin profile whenever workouts or profile unit changes.
 // This ensures the profile stays consistent after cloud sync pulls remote data,
@@ -3265,6 +3468,8 @@ export function getStorageWriteFailed(): boolean {
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
   const unsubscribe = useAppStore.subscribe((state) => {
+    // QA4-010: a follower tab must not overwrite the leader's snapshot.
+    if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
       clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {

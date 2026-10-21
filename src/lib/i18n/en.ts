@@ -100,6 +100,12 @@ export const en = {
   'onboarding.planOfferTitle': 'Want your training plan?',
   'onboarding.acceptPlan': 'Yes, add my plan',
   'onboarding.declinePlan': "No thanks, I'll build my own",
+  'onboarding.dietPreference': 'Diet Preference',
+  'onboarding.dietHint': 'Used by the protein coach for suggestions that fit how you eat.',
+  'onboarding.dietVegetarian': 'Vegetarian',
+  'onboarding.dietEggitarian': 'Eggetarian',
+  'onboarding.dietNonVegetarian': 'Non-Vegetarian',
+  'onboarding.dietVegan': 'Vegan',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'Settings',
@@ -978,7 +984,8 @@ export const en = {
   'meals.toolsCopyYesterdayHint': '{count} meals • ~{kcal} kcal',
   'meals.oneTap': '1-Tap',
   'meals.deleteMealTitle': 'Delete Meal?',
-  'meals.deleteMealMsg': 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+  'meals.deleteMealMsg': 'Are you sure you want to delete "{name}"? You can undo right after deleting.',
+  'common.undo': 'Undo',
   'meals.deleteMealButton': 'Delete Meal',
   'meals.mealTotal': 'MEAL TOTAL',
   'meals.saveMeal': 'Save Meal',

@@ -20,6 +20,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
+import { toUserMessage } from '@/lib/user-error';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
 import { getFoodSuggestions, estimateMacros } from '@/lib/macros';
 import { selectScannerEngine, NATIVE_BARCODE_FORMATS, isValidManualBarcode, validatePer100gMacros } from '@/lib/barcode-scanner';
@@ -540,7 +541,7 @@ export default function BarcodeScannerModal({
         toast.info('Could not identify table clearly. Please adjust macros manually.', 'Label Scan');
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Could not scan label. Please enter macros manually.', 'Label Scan Failed');
+      toast.error(toUserMessage(err, 'image'), 'Label Scan Failed');
     } finally {
       setIsScanningLabel(false);
       if (labelInputRef.current) labelInputRef.current.value = '';

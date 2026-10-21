@@ -145,6 +145,22 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const key = MEAL_NAME_KEYS[name];
     return key ? t(key) : name;
   };
+  // QA4-014: food-item delete with Undo — snapshot the meal + the
+  // food's index BEFORE deleting; the toast action restores via the
+  // store (including the case where the food was the meal's last item
+  // and the whole meal disappeared with it).
+  const handleDeleteFoodWithUndo = (e: React.MouseEvent, meal: MealEntry, idx: number) => {
+    e.stopPropagation();
+    const food = meal.foods[idx];
+    if (!food) return;
+    const mealIndex = meals.findIndex((m) => m.id === meal.id);
+    const snapshot: MealEntry = { ...meal, foods: [...meal.foods] };
+    deleteFoodFromMeal(meal.id, idx);
+    toast.showToast('info', t('meals.deletedFood', { name: food.name }), undefined, undefined, {
+      label: t('common.undo'),
+      onAction: () => restoreFoodToMeal(snapshot, mealIndex, idx),
+    });
+  };
   const profile            = useStore((state) => state.profile);
   const meals              = useStore((state) => state.meals);
   const macroGoals         = useStore((state) => state.macroGoals);
@@ -152,6 +168,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const addMeal            = useStore((state) => state.addMeal);
   const deleteMeal         = useStore((state) => state.deleteMeal);
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
+  const restoreFoodToMeal  = useStore((state) => state.restoreFoodToMeal);
+  const insertMealAt       = useStore((state) => state.insertMealAt);
   const setMacroGoals      = useStore((state) => state.setMacroGoals);
   const copyMealsFromDate  = useStore((state) => state.copyMealsFromDate);
   const uiPreferences      = useStore((state) => state.uiPreferences);
@@ -2138,11 +2156,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             </div>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                deleteFoodFromMeal(meal.id, idx);
-                                toast.info(t('meals.deletedFood', { name: food.name }));
-                              }}
+                              onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
                               className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                               title={t('meals.deleteFoodItem')}
                             >
@@ -2324,11 +2338,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   </div>
                                   <button
                                     type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      deleteFoodFromMeal(meal.id, idx);
-                                      toast.info(t('meals.deletedFood', { name: food.name }));
-                                    }}
+                                    onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
                                     className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
                                     title={t('meals.deleteFoodItem')}
                                   >
@@ -3617,6 +3627,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
                   {t('meals.deleteMealMsg', { name: mealToDelete.name })}
+
                 </p>
               </div>
             </div>
@@ -3632,8 +3643,20 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => {
+                  // QA4-014: snapshot the full meal + its index before
+                  // deleting so the toast's Undo restores it exactly in
+                  // place (mealToDelete itself only carries id + name).
+                  const mealIndex = meals.findIndex((m) => m.id === mealToDelete.id);
+                  const full = mealIndex >= 0 ? meals[mealIndex] : undefined;
+                  const snapshot: MealEntry | undefined = full
+                    ? { ...full, foods: [...full.foods] }
+                    : undefined;
                   deleteMeal(mealToDelete.id);
-                  toast.info(t('meals.deletedFood', { name: mealToDelete.name }));
+                  toast.showToast('info', t('meals.deletedFood', { name: mealToDelete.name }), undefined, undefined,
+                    snapshot
+                      ? { label: t('common.undo'), onAction: () => insertMealAt(snapshot, mealIndex) }
+                      : undefined,
+                  );
                   setMealToDelete(null);
                 }}
                 className="btn-danger flex-1 py-2.5 text-xs font-bold"

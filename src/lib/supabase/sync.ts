@@ -1,5 +1,6 @@
 import { getSupabase } from './client';
 import { useStore, resolveAvatar } from '../store';
+import { getTabLeaderGuard } from '../tab-leader';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
 import {
   mergeRemotePlans,
@@ -93,6 +94,87 @@ type SyncListener = (
   error: string | null,
   user: AuthUser | null
 ) => void;
+
+/**
+ * QA4-018 — synced-content change detection.
+ *
+ * The store subscription used to schedule a push only when `profile`
+ * changed by reference or a collection's LENGTH changed. Content edits
+ * that keep the length constant — updateMeal, updatePR,
+ * updatePlannedWorkout, a same-day body-metric replacement — scheduled
+ * NOTHING, so edits silently never reached the server until some
+ * unrelated length change happened to trigger a push.
+ *
+ * Fix: a cheap per-collection content signature (length + FNV-1a hash
+ * of the serialized entries + hash of the id set). Any difference in
+ * the combined signature schedules the existing debounced push.
+ * Callers should only pay the serialization cost for collections whose
+ * array reference actually changed (zustand updates are immutable, so
+ * an unchanged reference guarantees unchanged content).
+ */
+export function collectionSignature(items: readonly unknown[] | null | undefined): string {
+  if (!items) return '0:0:0';
+  let hash = 0x811c9dc5;
+  let idHash = 0x811c9dc5;
+  for (const item of items) {
+    const serialized = JSON.stringify(item) ?? '';
+    for (let i = 0; i < serialized.length; i++) {
+      hash ^= serialized.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    const id = (item as { id?: unknown })?.id;
+    if (typeof id === 'string') {
+      for (let i = 0; i < id.length; i++) {
+        idHash ^= id.charCodeAt(i);
+        idHash = Math.imul(idHash, 0x01000193);
+      }
+    }
+  }
+  return `${items.length}:${(hash >>> 0).toString(36)}:${(idHash >>> 0).toString(36)}`;
+}
+
+/** Minimal shape of the store state the sync engine watches. */
+export interface SyncedStateSlice {
+  profile: unknown;
+  prs: readonly unknown[];
+  workouts: readonly unknown[];
+  meals: readonly unknown[];
+  bodyMetrics: readonly unknown[];
+  plannedWorkouts: readonly unknown[];
+}
+
+export function syncedStateSignature(state: SyncedStateSlice): string {
+  return [
+    collectionSignature([state.profile]),
+    collectionSignature(state.prs),
+    collectionSignature(state.workouts),
+    collectionSignature(state.meals),
+    collectionSignature(state.bodyMetrics),
+    collectionSignature(state.plannedWorkouts),
+  ].join('|');
+}
+
+/**
+ * True when any of the 6 synced collections changed CONTENT between
+ * two store states. Fast path: identical references / identical
+ * profile reference + identical array references cannot have changed.
+ */
+export function hasSyncedContentChanged(
+  prev: SyncedStateSlice,
+  next: SyncedStateSlice,
+): boolean {
+  if (
+    prev.profile === next.profile &&
+    prev.prs === next.prs &&
+    prev.workouts === next.workouts &&
+    prev.meals === next.meals &&
+    prev.bodyMetrics === next.bodyMetrics &&
+    prev.plannedWorkouts === next.plannedWorkouts
+  ) {
+    return false;
+  }
+  return syncedStateSignature(prev) !== syncedStateSignature(next);
+}
 
 class SupabaseSyncEngine {
   private status: SyncStatus = 'unconfigured';
@@ -202,20 +284,21 @@ class SupabaseSyncEngine {
       }
     });
 
-    // Listen to local store changes for debounced push
+    // Listen to local store changes for debounced push.
+    // QA4-018: content-aware — ANY change to the 6 synced collections
+    // (including same-length edits like updateMeal / updatePR /
+    // updatePlannedWorkout / same-day metric replacement) schedules
+    // the push, not just length changes. hasSyncedContentChanged has
+    // a reference fast path, so unrelated state churn costs ~nothing.
     useStore.subscribe((state, prevState) => {
       if (!this.initialized || this.isSyncing) return;
       if (!navigator.onLine) return;
+      // QA4-010: a follower tab never pushes — its in-memory state is
+      // not the source of truth and pushing it would clobber the
+      // leader's data server-side too.
+      if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
 
-      const hasChanged =
-        state.profile !== prevState.profile ||
-        state.prs.length !== prevState.prs.length ||
-        state.workouts.length !== prevState.workouts.length ||
-        state.meals.length !== prevState.meals.length ||
-        state.bodyMetrics.length !== prevState.bodyMetrics.length ||
-        state.plannedWorkouts.length !== prevState.plannedWorkouts.length;
-
-      if (hasChanged) {
+      if (hasSyncedContentChanged(prevState, state)) {
         this.scheduleDebouncedPush();
       }
     });

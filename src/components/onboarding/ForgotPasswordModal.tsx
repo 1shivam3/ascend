@@ -46,14 +46,14 @@ export default function ForgotPasswordModal({
 
   return (
     <div ref={modalRef} {...dialogProps} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
-      <div className="w-full max-w-sm rounded-2xl bg-white border border-[#E2DFD6] p-6 shadow-2xl text-[#171916] space-y-4">
+      <div className="w-full max-w-sm rounded-2xl bg-bg-card border border-border p-6 shadow-2xl text-text-primary space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#E2DFD6]">
-          <h3 className="text-base font-bold text-[#171916]">Reset Password</h3>
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <h3 className="text-base font-bold text-text-primary">Reset Password</h3>
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-[#F3F0E7] flex items-center justify-center text-[#858076] hover:text-[#171916] transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full hover:bg-bg-primary flex items-center justify-center text-text-muted hover:text-text-primary transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -65,22 +65,22 @@ export default function ForgotPasswordModal({
             <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <h4 className="text-sm font-bold text-[#171916]">Check your inbox</h4>
-            <p className="text-xs text-[#858076] leading-relaxed">
+            <h4 className="text-sm font-bold text-text-primary">Check your inbox</h4>
+            <p className="text-xs text-text-muted leading-relaxed">
               We&apos;ve sent password reset instructions to{' '}
-              <strong className="text-[#171916] font-medium">{email}</strong>.
+              <strong className="text-text-primary font-medium">{email}</strong>.
             </p>
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 w-full py-2.5 px-4 rounded-xl bg-[#E44427] text-white font-semibold text-xs hover:bg-[#d03b20] transition cursor-pointer"
+              className="mt-3 w-full py-2.5 px-4 rounded-xl bg-accent text-white font-semibold text-xs hover:bg-accent-dim transition cursor-pointer"
             >
               Done
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-xs text-[#858076] leading-relaxed">
+            <p className="text-xs text-text-muted leading-relaxed">
               Enter your account email address and we&apos;ll send you a link to reset your password.
             </p>
 
@@ -92,7 +92,7 @@ export default function ForgotPasswordModal({
             )}
 
             <div>
-              <label htmlFor="reset-email" className="block text-xs font-semibold text-[#171916] mb-1.5">
+              <label htmlFor="reset-email" className="block text-xs font-semibold text-text-primary mb-1.5">
                 Email Address
               </label>
               <div className="relative">
@@ -103,9 +103,9 @@ export default function ForgotPasswordModal({
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@example.com"
                   required
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-xs text-[#171916] outline-none transition"
+                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-xs text-text-primary outline-none transition"
                 />
-                <Mail className="w-4 h-4 text-[#858076] absolute left-3 top-3 pointer-events-none" />
+                <Mail className="w-4 h-4 text-text-muted absolute left-3 top-3 pointer-events-none" />
               </div>
             </div>
 
@@ -113,14 +113,14 @@ export default function ForgotPasswordModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-1/2 py-2.5 rounded-xl border border-[#E2DFD6] text-xs font-semibold text-[#858076] hover:bg-[#F3F0E7] transition cursor-pointer"
+                className="w-1/2 py-2.5 rounded-xl border border-border text-xs font-semibold text-text-muted hover:bg-bg-primary transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="w-1/2 py-2.5 rounded-xl bg-[#E44427] hover:bg-[#d03b20] text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-1/2 py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Send Link'}
               </button>

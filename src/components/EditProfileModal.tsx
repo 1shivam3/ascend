@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
@@ -102,7 +103,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setProfile({ ...profile, avatar: dataUrl });
       toast.success(t('editProfile.photoUpdated'), t('editProfile.photoSetTitle'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('editProfile.photoFailedMsg'), t('progress.photoUploadFailedTitle'));
+      toast.error(toUserMessage(err, 'image'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingAvatar(false);
     }

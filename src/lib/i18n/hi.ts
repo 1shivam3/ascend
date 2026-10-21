@@ -97,6 +97,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.planOfferTitle': 'अपना ट्रेनिंग प्लान चाहिए?',
   'onboarding.acceptPlan': 'हां, मेरा प्लान जोड़ें',
   'onboarding.declinePlan': 'नहीं धन्यवाद, मैं खुद बनाऊंगा',
+  'onboarding.dietPreference': 'आहार पसंद',
+  'onboarding.dietHint': 'आपका प्रोटीन कोच इसके आधार पर आपकी खाने की आदतों के अनुसार सुझाव देता है।',
+  'onboarding.dietVegetarian': 'शाकाहारी',
+  'onboarding.dietEggitarian': 'एगिटेरियन (अंडा खाते हैं)',
+  'onboarding.dietNonVegetarian': 'मांसाहारी',
+  'onboarding.dietVegan': 'वीगन',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'सेटिंग्स',
@@ -975,7 +981,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.toolsCopyYesterdayHint': '{count} खाने • ~{kcal} kcal',
   'meals.oneTap': '1-टैप',
   'meals.deleteMealTitle': 'खाना हटाएं?',
-  'meals.deleteMealMsg': 'क्या आप सच में "{name}" हटाना चाहते हैं? यह वापस नहीं होगा।',
+  'meals.deleteMealMsg': 'क्या आप सच में "{name}" हटाना चाहते हैं? हटाने के तुरंत बाद आप इसे वापस ला सकते हैं।',
+  'common.undo': 'वापस लाएँ',
   'meals.deleteMealButton': 'खाना हटाएं',
   'meals.mealTotal': 'खाने का कुल',
   'meals.saveMeal': 'खाना सेव करें',

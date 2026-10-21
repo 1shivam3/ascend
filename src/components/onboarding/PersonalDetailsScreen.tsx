@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { Gender, Unit, DietPreference, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
 import { useTranslation } from '@/lib/i18n';
 
@@ -13,6 +13,7 @@ interface PersonalDetailsData {
   weight: number;
   unit: Unit;
   heightCm: number;
+  dietPreference: DietPreference;
 }
 
 interface PersonalDetailsScreenProps {
@@ -22,6 +23,7 @@ interface PersonalDetailsScreenProps {
   initialAge?: number;
   initialWeight?: number;
   initialHeightCm?: number;
+  initialDietPreference?: DietPreference;
   onContinue: (details: PersonalDetailsData) => void;
   onBack: () => void;
   loading?: boolean;
@@ -34,6 +36,7 @@ export default function PersonalDetailsScreen({
   initialAge = 25,
   initialWeight = 70,
   initialHeightCm = 175,
+  initialDietPreference = 'non_vegetarian',
   onContinue,
   onBack,
   loading = false,
@@ -43,6 +46,9 @@ export default function PersonalDetailsScreen({
   const [genderSelection, setGenderSelection] = useState<'male' | 'female' | 'other'>(
     initialGender || 'male'
   );
+  // QA4-019: diet preference is ASKED here (it silently defaulted to
+  // non_vegetarian before, though the veg-protein coach keys off it).
+  const [dietPreference, setDietPreference] = useState<DietPreference>(initialDietPreference);
   const [unit, setUnit] = useState<Unit>(initialUnit);
   const [age, setAge] = useState<string>(String(initialAge));
 
@@ -151,11 +157,12 @@ export default function PersonalDetailsScreen({
       weight: Math.round(parsedWeight * 10) / 10,
       unit,
       heightCm: calculatedHeightCm,
+      dietPreference,
     });
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
+    <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 3 of 3) */}
       <StepProgressBar currentStep={4} onBack={onBack} />
 
@@ -163,10 +170,10 @@ export default function PersonalDetailsScreen({
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
             {t('onboarding.detailsTitle')}
           </h1>
-          <p className="text-sm text-[#858076]">
+          <p className="text-sm text-text-muted">
             This helps us calculate your strength standards, nutrition targets, and workout progression.
           </p>
         </div>
@@ -182,8 +189,8 @@ export default function PersonalDetailsScreen({
         {/* Details Form */}
         <form id="personal-details-form" onSubmit={handleSubmit} className="space-y-4">
           {/* Athlete Name */}
-          <div className="p-4 rounded-2xl bg-white border border-[#E2DFD6] shadow-2xs space-y-1.5">
-            <label htmlFor="details-name" className="block text-xs font-semibold text-[#171916]">
+          <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
+            <label htmlFor="details-name" className="block text-xs font-semibold text-text-primary">
               Athlete Name
             </label>
             <input
@@ -194,16 +201,16 @@ export default function PersonalDetailsScreen({
               placeholder="e.g. Alex"
               required
               maxLength={MAX_ATHLETE_NAME_LENGTH}
-              className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition"
+              className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition"
             />
           </div>
 
           {/* Gender Segmented Control: Male, Female, Other */}
-          <div className="p-4 rounded-2xl bg-white border border-[#E2DFD6] shadow-2xs space-y-2">
-            <span className="block text-xs font-semibold text-[#171916]">
+          <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-2">
+            <span className="block text-xs font-semibold text-text-primary">
               Gender
             </span>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#F3F0E7] border border-[#E2DFD6]">
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-primary border border-border">
               {(['male', 'female', 'other'] as const).map((g) => {
                 const isActive = genderSelection === g;
                 const label = g.charAt(0).toUpperCase() + g.slice(1);
@@ -215,8 +222,8 @@ export default function PersonalDetailsScreen({
                     onClick={() => setGenderSelection(g)}
                     className={`py-2 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
                       isActive
-                        ? 'bg-white text-[#171916] shadow-2xs border border-[#E2DFD6]'
-                        : 'text-[#858076] hover:text-[#171916]'
+                        ? 'bg-bg-card text-text-primary shadow-2xs border border-border'
+                        : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
                     {label}
@@ -229,8 +236,8 @@ export default function PersonalDetailsScreen({
           {/* Age & Bodyweight Row */}
           <div className="grid grid-cols-2 gap-3">
             {/* Age */}
-            <div className="p-4 rounded-2xl bg-white border border-[#E2DFD6] shadow-2xs space-y-1.5">
-              <label htmlFor="details-age" className="block text-xs font-semibold text-[#171916]">
+            <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
+              <label htmlFor="details-age" className="block text-xs font-semibold text-text-primary">
                 Age
               </label>
               <div className="flex items-center gap-1.5">
@@ -241,24 +248,24 @@ export default function PersonalDetailsScreen({
                   max={100}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition font-medium"
                 />
-                <span className="text-xs text-[#858076] pr-1">yrs</span>
+                <span className="text-xs text-text-muted pr-1">yrs</span>
               </div>
             </div>
 
             {/* Weight with Unit Toggle */}
-            <div className="p-4 rounded-2xl bg-white border border-[#E2DFD6] shadow-2xs space-y-1.5">
+            <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
               <div className="flex items-center justify-between">
-                <label htmlFor="details-weight" className="block text-xs font-semibold text-[#171916]">
+                <label htmlFor="details-weight" className="block text-xs font-semibold text-text-primary">
                   Weight
                 </label>
-                <div className="flex items-center gap-0.5 rounded-lg bg-[#F3F0E7] p-0.5 border border-[#E2DFD6] text-3xs font-semibold">
+                <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-3xs font-semibold">
                   <button
                     type="button"
                     onClick={() => handleUnitToggle('kg')}
                     className={`px-1.5 py-0.5 rounded transition ${
-                      unit === 'kg' ? 'bg-white text-[#171916] shadow-xs' : 'text-[#858076]'
+                      unit === 'kg' ? 'bg-bg-card text-text-primary shadow-xs' : 'text-text-muted'
                     }`}
                   >
                     kg
@@ -267,7 +274,7 @@ export default function PersonalDetailsScreen({
                     type="button"
                     onClick={() => handleUnitToggle('lbs')}
                     className={`px-1.5 py-0.5 rounded transition ${
-                      unit === 'lbs' ? 'bg-white text-[#171916] shadow-xs' : 'text-[#858076]'
+                      unit === 'lbs' ? 'bg-bg-card text-text-primary shadow-xs' : 'text-text-muted'
                     }`}
                   >
                     lbs
@@ -281,25 +288,25 @@ export default function PersonalDetailsScreen({
                   step="0.5"
                   value={weightInput}
                   onChange={(e) => setWeightInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition font-medium"
                 />
-                <span className="text-xs text-[#858076] pr-1">{unit}</span>
+                <span className="text-xs text-text-muted pr-1">{unit}</span>
               </div>
             </div>
           </div>
 
           {/* Height with cm / ft toggle */}
-          <div className="p-4 rounded-2xl bg-white border border-[#E2DFD6] shadow-2xs space-y-1.5">
+          <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
             <div className="flex items-center justify-between">
-              <label htmlFor="details-height-cm" className="block text-xs font-semibold text-[#171916]">
+              <label htmlFor="details-height-cm" className="block text-xs font-semibold text-text-primary">
                 Height
               </label>
-              <div className="flex items-center gap-0.5 rounded-lg bg-[#F3F0E7] p-0.5 border border-[#E2DFD6] text-3xs font-semibold">
+              <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-3xs font-semibold">
                 <button
                   type="button"
                   onClick={() => setHeightUnit('cm')}
                   className={`px-1.5 py-0.5 rounded transition ${
-                    heightUnit === 'cm' ? 'bg-white text-[#171916] shadow-xs' : 'text-[#858076]'
+                    heightUnit === 'cm' ? 'bg-bg-card text-text-primary shadow-xs' : 'text-text-muted'
                   }`}
                 >
                   cm
@@ -308,7 +315,7 @@ export default function PersonalDetailsScreen({
                   type="button"
                   onClick={() => setHeightUnit('ft')}
                   className={`px-1.5 py-0.5 rounded transition ${
-                    heightUnit === 'ft' ? 'bg-white text-[#171916] shadow-xs' : 'text-[#858076]'
+                    heightUnit === 'ft' ? 'bg-bg-card text-text-primary shadow-xs' : 'text-text-muted'
                   }`}
                 >
                   ft/in
@@ -323,9 +330,9 @@ export default function PersonalDetailsScreen({
                   type="number"
                   value={heightCmInput}
                   onChange={(e) => setHeightCmInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition font-medium"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition font-medium"
                 />
-                <span className="text-xs text-[#858076] pr-1">cm</span>
+                <span className="text-xs text-text-muted pr-1">cm</span>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
@@ -335,9 +342,9 @@ export default function PersonalDetailsScreen({
                     type="number"
                     value={heightFt}
                     onChange={(e) => setHeightFt(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition font-medium"
                   />
-                  <span className="text-xs text-[#858076] pr-1">ft</span>
+                  <span className="text-xs text-text-muted pr-1">ft</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -345,12 +352,51 @@ export default function PersonalDetailsScreen({
                     type="number"
                     value={heightIn}
                     onChange={(e) => setHeightIn(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] outline-none transition font-medium"
+                    className="w-full px-3 py-2 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary outline-none transition font-medium"
                   />
-                  <span className="text-xs text-[#858076] pr-1">in</span>
+                  <span className="text-xs text-text-muted pr-1">in</span>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Diet Preference (QA4-019) — same options as the Settings
+              control; one tap, default pre-selected but now explicit. */}
+          <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-2">
+            <span className="block text-xs font-semibold text-text-primary">
+              {t('onboarding.dietPreference')}
+            </span>
+            <span className="block text-3xs text-text-muted">
+              {t('onboarding.dietHint')}
+            </span>
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('onboarding.dietPreference')}>
+              {(
+                [
+                  { id: 'vegetarian', labelKey: 'onboarding.dietVegetarian' },
+                  { id: 'eggitarian', labelKey: 'onboarding.dietEggitarian' },
+                  { id: 'non_vegetarian', labelKey: 'onboarding.dietNonVegetarian' },
+                  { id: 'vegan', labelKey: 'onboarding.dietVegan' },
+                ] as { id: DietPreference; labelKey: 'onboarding.dietVegetarian' | 'onboarding.dietEggitarian' | 'onboarding.dietNonVegetarian' | 'onboarding.dietVegan' }[]
+              ).map((opt) => {
+                const active = dietPreference === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setDietPreference(opt.id)}
+                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
+                      active
+                        ? 'border-accent bg-accent/10 text-accent'
+                        : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
+                    }`}
+                  >
+                    {t(opt.labelKey)}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </form>
       </div>
@@ -361,7 +407,7 @@ export default function PersonalDetailsScreen({
           type="submit"
           form="personal-details-form"
           disabled={loading}
-          className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
         >
           {loading ? (
             <>
@@ -376,7 +422,7 @@ export default function PersonalDetailsScreen({
         <button
           type="button"
           onClick={onBack}
-          className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-[#F3F0E7]/60 active:scale-[0.99] text-[#171916] border border-[#171916]/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
+          className="w-full py-3.5 px-6 rounded-xl bg-bg-card hover:bg-bg-primary/60 active:scale-[0.99] text-text-primary border border-text-primary/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
         >
           {t('common.back')}
         </button>

@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
+import { toUserMessage } from '@/lib/user-error';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
 import {
   TrendingUp,
@@ -277,7 +278,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         toast.success(t('progress.photoAddedMsg'), t('progress.photoAddedTitle'));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t('progress.photoUploadFailedMsg'), t('progress.photoUploadFailedTitle'));
+      toast.error(toUserMessage(err, 'image'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingPhoto(false);
     }

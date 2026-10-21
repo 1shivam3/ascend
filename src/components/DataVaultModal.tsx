@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore, getStorageWriteFailed } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { parseWorkoutCSV } from '@/lib/workout-import';
+import { toUserMessage } from '@/lib/user-error';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import {
   X,
@@ -198,8 +199,11 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
           type: 'success',
         });
       } catch (err: any) {
-        toast.error(err?.message || 'Could not parse CSV file.', 'CSV Import Failed');
-        setMessage({ text: err?.message || 'Invalid workout CSV.', type: 'error' });
+        // QA4-016: route through the central sanitizer — parser errors
+        // can embed file internals that don't belong in the UI.
+        const safe = toUserMessage(err, 'generic');
+        toast.error(safe, 'CSV Import Failed');
+        setMessage({ text: safe, type: 'error' });
       } finally {
         if (csvFileInputRef.current) csvFileInputRef.current.value = '';
         setTimeout(() => setMessage(null), 5000);

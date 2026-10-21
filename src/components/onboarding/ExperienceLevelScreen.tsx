@@ -48,7 +48,7 @@ export default function ExperienceLevelScreen({
 }: ExperienceLevelScreenProps) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
+    <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 2 of 3) */}
       <StepProgressBar currentStep={2} onBack={onBack} />
 
@@ -56,10 +56,10 @@ export default function ExperienceLevelScreen({
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
             {t('onboarding.experienceTitle')}
           </h1>
-          <p className="text-sm text-[#858076]">
+          <p className="text-sm text-text-muted">
             This customizes your starting training volume and progression rate.
           </p>
         </div>
@@ -76,23 +76,23 @@ export default function ExperienceLevelScreen({
                 onClick={() => onSelectLevel(item.id)}
                 role="radio"
                 aria-checked={isSelected}
-                className={`w-full p-5 rounded-2xl bg-white border transition-all flex items-center justify-between text-left cursor-pointer shadow-2xs ${
+                className={`w-full p-5 rounded-2xl bg-bg-card border transition-all flex items-center justify-between text-left cursor-pointer shadow-2xs ${
                   isSelected
-                    ? 'border-[#E44427] ring-1 ring-[#E44427] bg-[#E44427]/[0.02]'
-                    : 'border-[#E2DFD6] hover:border-[#858076]/40'
+                    ? 'border-accent ring-1 ring-accent bg-accent/[0.02]'
+                    : 'border-border hover:border-border-hover/40'
                 }`}
               >
                 {/* Left: Titles & Copy */}
                 <div className="pr-4 space-y-1">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-base font-bold text-[#171916]">
+                    <h2 className="text-base font-bold text-text-primary">
                       {item.title}
                     </h2>
-                    <span className="text-xs font-semibold text-[#E44427]">
+                    <span className="text-xs font-semibold text-accent">
                       &bull; {item.subtitle}
                     </span>
                   </div>
-                  <p className="text-xs text-[#858076] leading-relaxed">
+                  <p className="text-xs text-text-muted leading-relaxed">
                     {item.description}
                   </p>
                 </div>
@@ -101,13 +101,13 @@ export default function ExperienceLevelScreen({
                 <div
                   className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-all ${
                     isSelected
-                      ? 'border-[#E44427] bg-[#E44427]'
-                      : 'border-[#E2DFD6] bg-transparent'
+                      ? 'border-accent bg-accent'
+                      : 'border-border bg-transparent'
                   }`}
                   aria-hidden="true"
                 >
                   {isSelected && (
-                    <div className="w-2 h-2 rounded-full bg-white shadow-xs" />
+                    <div className="w-2 h-2 rounded-full bg-bg-card shadow-xs" />
                   )}
                 </div>
               </button>
@@ -121,7 +121,7 @@ export default function ExperienceLevelScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>
@@ -129,7 +129,7 @@ export default function ExperienceLevelScreen({
         <button
           type="button"
           onClick={onBack}
-          className="w-full py-3.5 px-6 rounded-xl bg-white hover:bg-[#F3F0E7]/60 active:scale-[0.99] text-[#171916] border border-[#171916]/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
+          className="w-full py-3.5 px-6 rounded-xl bg-bg-card hover:bg-bg-primary/60 active:scale-[0.99] text-text-primary border border-text-primary/20 font-semibold text-sm transition-all shadow-2xs cursor-pointer text-center"
         >
           {t('common.back')}
         </button>

@@ -65,7 +65,7 @@ export default function FitnessGoalsScreen({
 }: FitnessGoalsScreenProps) {
   const { t } = useTranslation();
   return (
-    <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
+    <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 1 of 3) */}
       <StepProgressBar currentStep={1} onBack={onBack} />
 
@@ -73,10 +73,10 @@ export default function FitnessGoalsScreen({
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
             {t('onboarding.goalsTitle')}
           </h1>
-          <p className="text-sm text-[#858076]">
+          <p className="text-sm text-text-muted">
             {t('onboarding.goalsSubtitle')}
           </p>
         </div>
@@ -93,10 +93,10 @@ export default function FitnessGoalsScreen({
                 type="button"
                 onClick={() => onToggleGoal(item.id)}
                 aria-pressed={isSelected}
-                className={`w-full p-4 rounded-2xl bg-white border transition-all flex items-center justify-between text-left cursor-pointer shadow-2xs ${
+                className={`w-full p-4 rounded-2xl bg-bg-card border transition-all flex items-center justify-between text-left cursor-pointer shadow-2xs ${
                   isSelected
-                    ? 'border-[#E44427] ring-1 ring-[#E44427] bg-[#E44427]/[0.02]'
-                    : 'border-[#E2DFD6] hover:border-[#858076]/40'
+                    ? 'border-accent ring-1 ring-accent bg-accent/[0.02]'
+                    : 'border-border hover:border-border-hover/40'
                 }`}
               >
                 {/* Left: Icon & Title/Subtitle */}
@@ -104,17 +104,17 @@ export default function FitnessGoalsScreen({
                   <div
                     className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
                       isSelected
-                        ? 'bg-[#E44427]/10 text-[#E44427]'
-                        : 'bg-[#F3F0E7] text-[#858076]'
+                        ? 'bg-accent/10 text-accent'
+                        : 'bg-bg-primary text-text-muted'
                     }`}
                   >
                     <Icon className="w-5 h-5" />
                   </div>
                   <div>
-                    <h2 className="text-sm font-bold text-[#171916] leading-snug">
+                    <h2 className="text-sm font-bold text-text-primary leading-snug">
                       {item.title}
                     </h2>
-                    <p className="text-2xs text-[#858076] leading-snug mt-0.5">
+                    <p className="text-2xs text-text-muted leading-snug mt-0.5">
                       {item.subtitle}
                     </p>
                   </div>
@@ -124,8 +124,8 @@ export default function FitnessGoalsScreen({
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border transition-all ${
                     isSelected
-                      ? 'bg-[#E44427] border-[#E44427] text-white shadow-xs'
-                      : 'border-[#E2DFD6] bg-transparent'
+                      ? 'bg-accent border-accent text-white shadow-xs'
+                      : 'border-border bg-transparent'
                   }`}
                   aria-hidden="true"
                 >
@@ -142,7 +142,7 @@ export default function FitnessGoalsScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full py-4 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>
@@ -151,7 +151,7 @@ export default function FitnessGoalsScreen({
           <button
             type="button"
             onClick={onSkip}
-            className="text-xs text-[#858076] hover:text-[#171916] transition-colors cursor-pointer py-1"
+            className="text-xs text-text-muted hover:text-text-primary transition-colors cursor-pointer py-1"
           >
             Skip for now
           </button>

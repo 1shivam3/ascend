@@ -1624,6 +1624,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const confirmDeletePlan = () => {
     if (!planToDelete) return;
     const plan = planToDelete;
+    // QA4-014: snapshot index + schedule + tombstones BEFORE the delete
+    // rewires them, so the toast's Undo can restore the exact prior
+    // state. (The draft unlink below is NOT reverted by undo — the
+    // draft's logged sets are kept; it just stays unlinked.)
+    const st = useStore.getState();
+    const planIndex = st.plannedWorkouts.findIndex((p) => p.id === plan.id);
+    const prevSchedule = st.weeklySchedule;
+    const prevDeletedPlanIds = [...st.deletedPlanIds];
     // Unlink the in-progress draft from the deleted plan so the resume banner
     // never references a plan that no longer exists. The logged sets are kept.
     if (
@@ -1639,7 +1647,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
     }
     deletePlannedWorkout(plan.id);
-    toast.info(`Plan "${plan.name}" deleted.`, 'Plan Removed');
+    toast.showToast('info', `Plan "${plan.name}" deleted.`, 'Plan Removed', undefined, {
+      label: 'Undo',
+      onAction: () =>
+        useStore.getState().restorePlannedWorkout(plan, planIndex, prevSchedule, prevDeletedPlanIds),
+    });
     setPlanToDelete(null);
     // If the deleted plan was open in the detail view, close that view too.
     if (selectedDetailsPlan && selectedDetailsPlan.id === plan.id) {
@@ -1867,9 +1879,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               activeWorkoutDraft &&
               (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
                 activeWorkoutDraft.planId === planToDelete.id)
-                ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+                ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). You can undo the deletion right after.`
                 : planToDelete
-                  ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+                  ? `"${planToDelete.name}" will be deleted. You can undo right after deleting.`
                   : ''
             }
             confirmText="Delete Plan"
@@ -2688,9 +2700,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           activeWorkoutDraft &&
           (activeWorkoutDraft.startedFromPlanId === planToDelete.id ||
             activeWorkoutDraft.planId === planToDelete.id)
-            ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). This cannot be undone.`
+            ? `"${planToDelete.name}" has a paused session. Deleting it will unlink the in-progress draft (your logged sets are kept). You can undo the deletion right after.`
             : planToDelete
-              ? `"${planToDelete.name}" will be permanently deleted. This cannot be undone.`
+              ? `"${planToDelete.name}" will be deleted. You can undo right after deleting.`
               : ''
         }
         confirmText="Delete Plan"

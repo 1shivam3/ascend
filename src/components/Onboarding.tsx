@@ -245,6 +245,7 @@ export default function Onboarding() {
     weight: number;
     unit: Unit;
     heightCm: number;
+    dietPreference?: DietPreference;
   }) => {
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
@@ -261,6 +262,11 @@ export default function Onboarding() {
       details.unit === 'kg' ? details.weight * 2.20462 : details.weight;
 
     const finalGoals = [...selectedGoals];
+    // QA4-019: the details step now asks diet preference explicitly —
+    // prefer the value from the form over the ( previously silent )
+    // state default, and keep the state in sync for any later reads.
+    const chosenDiet = details.dietPreference ?? dietPreference;
+    setDietPreference(chosenDiet);
     const profileData = {
       id: authUser?.id || getOrCreateGuestId(),
       name: nameToSave,
@@ -270,7 +276,7 @@ export default function Onboarding() {
       heightCm: details.heightCm,
       age: details.age,
       unit: details.unit,
-      dietPreference,
+      dietPreference: chosenDiet,
       createdAt: new Date().toISOString(),
       goals: finalGoals,
       userMode: experienceLevel,
@@ -479,15 +485,15 @@ export default function Onboarding() {
   // If restoring account from OAuth callback
   if (isRestoringAccount) {
     return (
-      <div className="min-h-screen w-full bg-[#171916] text-[#F3F0E7] flex flex-col items-center justify-center p-8 text-center space-y-4">
-        <div className="w-14 h-14 rounded-2xl bg-[#212420] border border-[#2C302B] flex items-center justify-center shadow-xl">
-          <Loader2 className="w-7 h-7 text-[#E44427] animate-spin" />
+      <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col items-center justify-center p-8 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-bg-card border border-border flex items-center justify-center shadow-xl">
+          <Loader2 className="w-7 h-7 text-accent animate-spin" />
         </div>
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-white tracking-tight">
             Restoring Account
           </h2>
-          <p className="text-xs text-[#858076] max-w-xs">
+          <p className="text-xs text-text-muted max-w-xs">
             Connecting to cloud sync and loading your training records...
           </p>
         </div>
@@ -656,6 +662,7 @@ export default function Onboarding() {
         initialAge={age}
         initialWeight={weight}
         initialHeightCm={heightCm}
+        initialDietPreference={dietPreference}
         onContinue={handleFinishCalibration}
         onBack={() => setCurrentScreen('schedule')}
         loading={isFinishing}
@@ -668,14 +675,14 @@ export default function Onboarding() {
     const planCount = pendingPlans?.length || 0;
     const planNames = (pendingPlans || []).slice(0, 4).map((p: any) => p.name || 'Workout').join(', ');
     return (
-      <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between pb-8 animate-fade-in">
+      <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
         <StepProgressBar currentStep={4} onBack={() => setCurrentScreen('details')} />
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
           <div className="text-left space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               {t('onboarding.planOfferTitle')}
             </h1>
-            <p className="text-sm text-[#171916]/70">
+            <p className="text-sm text-text-primary/70">
               Based on your goals, I put together {planCount} workouts{planNames ? ` (${planNames}${planCount > 4 ? ', …' : ''})` : ''}. Add {planCount === 1 ? 'it' : 'them'} to your training, or skip and build your own.
             </p>
           </div>
@@ -686,11 +693,11 @@ export default function Onboarding() {
                 const exNames = (plan.exercises || []).map((e: any) => e.name);
                 const estMin = estimateSessionMinutes(plan);
                 return (
-                  <div key={plan.id || i} className="bg-white border border-[#E2DFD6] rounded-2xl px-4 py-3 shadow-2xs">
+                  <div key={plan.id || i} className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs">
                     <p className="text-sm font-bold">
-                      {plan.name} <span className="text-[#858076] font-medium">· ~{estMin} min · {exNames.length} exercises</span>
+                      {plan.name} <span className="text-text-muted font-medium">· ~{estMin} min · {exNames.length} exercises</span>
                     </p>
-                    <p className="text-xs text-[#858076] mt-1 leading-relaxed">
+                    <p className="text-xs text-text-muted mt-1 leading-relaxed">
                       {exNames.slice(0, 6).join(' · ')}{exNames.length > 6 ? ` · +${exNames.length - 6} more` : ''}
                     </p>
                   </div>
@@ -702,9 +709,9 @@ export default function Onboarding() {
               A fat-loss user previously got a lower number with no
               idea why; a diabetic got no safety framing at all. */}
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
-            <div className="bg-white border border-[#E2DFD6] rounded-2xl px-4 py-3 shadow-2xs space-y-1">
+            <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
               <p className="text-sm font-bold">Your daily food target: {currentMacroGoals.calories.toLocaleString()} kcal</p>
-              <p className="text-xs text-[#171916]/70 leading-relaxed">
+              <p className="text-xs text-text-primary/70 leading-relaxed">
                 Your body burns about {currentMacroGoals.maintenanceCalories.toLocaleString()} kcal a day.
                 {typeof currentMacroGoals.calorieDelta === 'number' && currentMacroGoals.calorieDelta < 0
                   ? ` To lose fat steadily and safely, your target is ${Math.abs(currentMacroGoals.calorieDelta)} kcal less — never below the safe minimum for your body.`
@@ -720,14 +727,14 @@ export default function Onboarding() {
             <button
               type="button"
               onClick={handleAcceptPlans}
-              className="w-full py-4 px-6 rounded-2xl bg-[#171916] text-[#F3F0E7] font-bold text-base active:scale-[0.98] transition-transform"
+              className="w-full py-4 px-6 rounded-2xl bg-text-primary text-bg-primary font-bold text-base active:scale-[0.98] transition-transform"
             >
               {t('onboarding.acceptPlan')}
             </button>
             <button
               type="button"
               onClick={handleDeclinePlans}
-              className="w-full py-4 px-6 rounded-2xl bg-transparent border-2 border-[#171916]/20 text-[#171916] font-semibold text-base active:scale-[0.98] transition-transform"
+              className="w-full py-4 px-6 rounded-2xl bg-transparent border-2 border-text-primary/20 text-text-primary font-semibold text-base active:scale-[0.98] transition-transform"
             >
               {t('onboarding.declinePlan')}
             </button>
