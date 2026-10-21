@@ -342,6 +342,13 @@ export interface AppState {
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
+  /** QA4-014 Undo: re-insert a deleted meal at its original index (no-op if present). */
+  insertMealAt: (meal: MealEntry, index: number) => void;
+  /** QA4-014 Undo: restore a food removed by deleteFoodFromMeal — back
+   *  into its meal at the original index, or, when the food was the
+   *  meal's last item (so the meal itself was removed), restore the
+   *  whole meal snapshot at its original index. */
+  restoreFoodToMeal: (mealSnapshot: MealEntry, mealIndex: number, foodIndex: number) => void;
   updateMeal: (id: string, updated: Partial<MealEntry>) => void;
   deleteFoodFromMeal: (mealId: string, foodIndex: number) => void;
   copyMealsFromDate: (sourceDate: string, targetDate?: string) => number;
@@ -366,6 +373,10 @@ export interface AppState {
   addPlannedWorkout: (plan: PlannedWorkout) => void;
   updatePlannedWorkout: (id: string, plan: PlannedWorkout) => void;
   deletePlannedWorkout: (id: string) => void;
+  /** QA4-014 Undo: restore a plan deleted by deletePlannedWorkout at
+   *  its original index, with the pre-delete weekly schedule and
+   *  tombstone list (the delete rewires both, so undo must too). */
+  restorePlannedWorkout: (plan: PlannedWorkout, index: number, prevSchedule: WeeklySchedule, prevDeletedPlanIds: string[]) => void;
   setPlannedWorkouts: (plans: PlannedWorkout[]) => void;
   hideBuiltinRoutine: (id: string) => void;
   unhideBuiltinRoutine: (id: string) => void;
@@ -1563,6 +1574,31 @@ export const useAppStore = create<AppState>()(
         }
       },
       deleteMeal: (id) => set((state) => ({ meals: state.meals.filter(meal => meal.id !== id) })),
+      insertMealAt: (meal, index) => set((state) => {
+        if (state.meals.some((m) => m.id === meal.id)) return state;
+        const nextMeals = [...state.meals];
+        nextMeals.splice(Math.max(0, Math.min(index, nextMeals.length)), 0, meal);
+        return { meals: nextMeals };
+      }),
+      restoreFoodToMeal: (mealSnapshot, mealIndex, foodIndex) => set((state) => {
+        const food = mealSnapshot.foods[foodIndex];
+        if (!food) return state;
+        const existingIdx = state.meals.findIndex((m) => m.id === mealSnapshot.id);
+        if (existingIdx >= 0) {
+          const nextMeals = state.meals.map((meal, i) => {
+            if (i !== existingIdx) return meal;
+            const foods = [...meal.foods];
+            foods.splice(Math.min(foodIndex, foods.length), 0, food);
+            return { ...meal, foods };
+          });
+          return { meals: nextMeals };
+        }
+        // The removed food was the meal's last item, so deleteFoodFromMeal
+        // removed the whole meal — restore the snapshot in place.
+        const nextMeals = [...state.meals];
+        nextMeals.splice(Math.max(0, Math.min(mealIndex, nextMeals.length)), 0, mealSnapshot);
+        return { meals: nextMeals };
+      }),
       updateMeal: (id, updated) => set((state) => ({
         meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
       })),
@@ -1753,6 +1789,19 @@ export const useAppStore = create<AppState>()(
           deletedPlanIds: state.deletedPlanIds.includes(id)
             ? state.deletedPlanIds
             : [...state.deletedPlanIds, id],
+        };
+      }),
+
+      restorePlannedWorkout: (plan, index, prevSchedule, prevDeletedPlanIds) => set((state) => {
+        if (state.plannedWorkouts.some((p) => p.id === plan.id)) return state;
+        const nextPlans = [...state.plannedWorkouts];
+        nextPlans.splice(Math.max(0, Math.min(index, nextPlans.length)), 0, plan);
+        return {
+          plannedWorkouts: nextPlans,
+          // deletePlannedWorkout rewired schedule refs to a fallback
+          // plan and tombstoned the id — undo restores both snapshots.
+          weeklySchedule: prevSchedule,
+          deletedPlanIds: prevDeletedPlanIds,
         };
       }),
 
