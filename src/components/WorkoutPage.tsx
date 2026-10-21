@@ -524,17 +524,23 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
 
   return (
     <div className="card flex flex-col gap-3">
-      {/* Card top row */}
-      <div className="flex items-start justify-between gap-2">
+      {/* Card top row. Layout contract (QA4 P3): the name block is
+          flex-1 + min-w-0 and the title truncates, so it can only ever
+          occupy the space left over by the shrink-0 action rail — the
+          icons can never paint over the name's last glyphs (a long or
+          unlucky-width name used to render clipped under the first
+          icon, e.g. "Upper A" → "Uppei A"). Full name stays available
+          via the title tooltip and the plan detail view. */}
+      <div className="flex items-start justify-between gap-3">
         <div
-          className="min-w-0 cursor-pointer"
+          className="flex-1 min-w-0 cursor-pointer"
           onClick={onOpen}
           role="button"
           tabIndex={0}
           aria-label={`View details for ${plan.name}`}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
         >
-          <h3 className="font-bold text-text-primary line-clamp-2 leading-tight">{plan.name}</h3>
+          <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
           </p>

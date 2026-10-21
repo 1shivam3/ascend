@@ -249,6 +249,11 @@ describe('Tab URL Synchronization & Refresh Persistence', () => {
   it('migrates the legacy standalone saved-tab key from older builds', () => {
     window.history.replaceState({}, '', '/');
     localStorage.setItem('ascend_active_tab', 'workout');
+    // Scenario under test: an older build left ONLY the legacy key — no
+    // current persist blob. The beforeEach store reset now writes a real
+    // blob through the QA4A-004 storage adapter (persist used to be inert
+    // in this node env), so remove it to set the scenario up explicitly.
+    localStorage.removeItem('ascend_store');
 
     const initial = getInitialNavigationState();
     expect(initial.tab).toBe('workout');
