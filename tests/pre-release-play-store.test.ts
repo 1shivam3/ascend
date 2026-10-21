@@ -31,11 +31,17 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const reminderCenter = fs.readFileSync(
         path.join(rootDir, 'src', 'components', 'ReminderCenterModal.tsx'), 'utf8');
 
+      // DeleteAccountView copy is localized (QA4-004): its English strings
+      // live in the i18n dictionary, so assert against view + dictionary.
+      const enDictionary = fs.readFileSync(
+        path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
+      const deleteAccountCopy = deleteAccountView + enDictionary;
+
       expect(settingsView).toContain('Account &amp; Security');
       expect(settingsView).toContain('Data, Privacy &amp; Legal');
       expect(settingsView).toContain('exportFullBackupJSON'); // Export my data flow
-      expect(deleteAccountView).toContain('Export my data');
-      expect(deleteAccountView).toContain('Delete my account');
+      expect(deleteAccountCopy).toContain('Export my data');
+      expect(deleteAccountCopy).toContain('Delete my account');
       expect(deleteAccountView).toContain('DELETE'); // Confirmation text required
       expect(reminderCenter).toContain('Notification'); // Notification preferences UI
     });
