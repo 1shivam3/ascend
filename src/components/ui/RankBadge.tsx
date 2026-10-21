@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExerciseRank } from '@/lib/types';
+import { useTranslation } from '@/lib/i18n';
 import { 
   CircleDot, 
   Shield, 
@@ -23,55 +24,56 @@ export default function RankBadge({
   size = 'md',
   showLevel = false
 }: RankBadgeProps) {
+  const { t } = useTranslation();
   const getBadgeConfig = () => {
     switch (rank) {
       case 'FOUNDATION':
         return {
           icon: CircleDot,
           containerClass: 'border-border bg-bg-secondary text-text-muted rounded-full',
-          label: 'FOUNDATION',
+          label: t('ui.rankFoundation'),
           accentBorder: 'border-border'
         };
       case 'TRAINED':
         return {
           icon: Shield,
           containerClass: 'border-border-hover bg-bg-elevated text-text-secondary rounded-lg',
-          label: 'TRAINED',
+          label: t('ui.rankTrained'),
           accentBorder: 'border-border-hover'
         };
       case 'SKILLED':
         return {
           icon: Layers,
           containerClass: 'border-info/40 bg-info/10 text-info rounded-md',
-          label: 'SKILLED',
+          label: t('ui.rankSkilled'),
           accentBorder: 'border-info/30 ring-1 ring-info/10'
         };
       case 'ADVANCED':
         return {
           icon: Zap,
           containerClass: 'border-warning/50 bg-warning/10 text-warning rounded-lg',
-          label: 'ADVANCED',
+          label: t('ui.rankAdvanced'),
           accentBorder: 'border-warning/40 ring-1 ring-warning/20'
         };
       case 'ELITE':
         return {
           icon: Crown,
           containerClass: 'border-accent/70 bg-accent/15 text-accent rounded-lg shadow-sm',
-          label: 'ELITE',
+          label: t('ui.rankElite'),
           accentBorder: 'border-accent/60 ring-2 ring-accent/20'
         };
       case 'MASTER':
         return {
           icon: Star,
           containerClass: 'border-accent bg-accent/20 text-accent rounded-md shadow-md ring-2 ring-accent/30',
-          label: 'MASTER',
+          label: t('ui.rankMaster'),
           accentBorder: 'border-accent ring-2 ring-accent/40 shadow-inner'
         };
       case 'GRANDMASTER':
         return {
           icon: Sparkles,
           containerClass: 'border-accent bg-gradient-to-r from-accent/20 via-warning/25 to-accent/20 text-accent rounded-md shadow-lg ring-2 ring-accent/50 animate-pulse',
-          label: 'GRANDMASTER',
+          label: t('ui.rankGrandmaster'),
           accentBorder: 'border-accent ring-2 ring-accent/60 shadow-[0_0_12px_rgba(229,192,123,0.25)]'
         };
     }

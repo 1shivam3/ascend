@@ -471,6 +471,23 @@ export const en = {
   'auth.benefitAuto': 'Existing workouts are linked automatically',
   'auth.googleInitFail': 'Could not initiate Google sign in.',
   'auth.rls': 'Protected by PostgreSQL Row-Level Security',
+  'ui.details': 'Details',
+  'ui.rankFoundation': 'FOUNDATION',
+  'ui.rankTrained': 'TRAINED',
+  'ui.rankSkilled': 'SKILLED',
+  'ui.rankAdvanced': 'ADVANCED',
+  'ui.rankElite': 'ELITE',
+  'ui.rankMaster': 'MASTER',
+  'ui.rankGrandmaster': 'GRANDMASTER',
+  'ui.decrease': 'Decrease {label}',
+  'ui.increase': 'Increase {label}',
+  'ui.switchMode': 'Switch to {mode} mode',
+  'ui.toggleTheme': 'Toggle theme',
+  'ui.dark': 'Dark',
+  'ui.light': 'Light',
+  'ui.toastSuccess': 'Success',
+  'ui.toastError': 'Error',
+  'ui.toastNotice': 'Notice',
 } as const;
 
 export type StringKey = keyof typeof en;
