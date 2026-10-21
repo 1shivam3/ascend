@@ -168,3 +168,20 @@ describe('QA4-035(a) password floor', () => {
     expect(src).not.toContain('At least 6 characters');
   });
 });
+
+describe('QA4A-008 ReportAIModal copy tells the truth', () => {
+  it('default success copy says flagged for review, not suppressed', () => {
+    const src = read('src/components/ReportAIModal.tsx');
+    expect(src).toContain('flagged for review');
+    expect(src).toContain('suppressesOutput = false');
+    // The stronger wording exists only behind the opt-in prop
+    expect(src).toContain('suppressesOutput\n                ? \'This AI response has been flagged and suppressed.');
+    expect(src).toContain('suppressesOutput?: boolean');
+  });
+
+  it('stores the report locally (the behaviour the default copy describes)', () => {
+    const src = read('src/components/ReportAIModal.tsx');
+    expect(src).toContain("localStorage.getItem('ascend_ai_reports')");
+    expect(src).toContain('onReported');
+  });
+});

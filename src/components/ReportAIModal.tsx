@@ -10,6 +10,13 @@ interface ReportAIModalProps {
   aiContentSnippet?: string;
   sourceFeature?: string;
   onReported?: () => void;
+  /**
+   * QA4A-008: set true ONLY when the hosting surface genuinely hides /
+   * suppresses the reported output (e.g. via its onReported handler).
+   * The default success copy says "flagged for review" — which is all
+   * that actually happens when a report is only logged locally.
+   */
+  suppressesOutput?: boolean;
 }
 
 const REPORT_REASONS = [
@@ -26,6 +33,7 @@ export default function ReportAIModal({
   aiContentSnippet = '',
   sourceFeature = 'AI Coach',
   onReported,
+  suppressesOutput = false,
 }: ReportAIModalProps) {
   const [selectedReason, setSelectedReason] = useState<string>('unsafe_exercise');
   const [additionalDetails, setAdditionalDetails] = useState('');
@@ -89,7 +97,8 @@ export default function ReportAIModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+            aria-label="Close report form"
           >
             <X className="w-4 h-4" />
           </button>
@@ -102,7 +111,9 @@ export default function ReportAIModal({
             </div>
             <h4 className="text-sm font-bold text-text-primary">Report Submitted</h4>
             <p className="text-2xs text-text-secondary max-w-xs mx-auto">
-              This AI response has been flagged and suppressed. Thank you for maintaining safety standards.
+              {suppressesOutput
+                ? 'This AI response has been flagged and suppressed. Thank you for maintaining safety standards.'
+                : 'This AI response has been flagged for review. Thank you for helping keep ASCEND safe.'}
             </p>
           </div>
         ) : (
