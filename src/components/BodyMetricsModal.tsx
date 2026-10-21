@@ -11,6 +11,100 @@ interface BodyMetricsModalProps {
   onClose: () => void;
 }
 
+export interface BodyMetricsFormInput {
+  weight: string;
+  height: string;
+  bodyFat: string;
+  chest: string;
+  waist: string;
+  hips: string;
+  unit: 'kg' | 'lbs';
+}
+
+export type BodyMetricsField = 'weight' | 'height' | 'bodyFat' | 'chest' | 'waist' | 'hips';
+
+export interface BodyMetricsFormResult {
+  errors: Partial<Record<BodyMetricsField, string>>;
+  values?: {
+    weightKg: number;
+    heightCm?: number;
+    bodyFatPct?: number;
+    chestIn?: number;
+    waistIn?: number;
+    hipsIn?: number;
+  };
+}
+
+/**
+ * QA4-025: validate the measurement form. Previously every invalid
+ * value failed SILENTLY — an out-of-range weight was a no-op, an
+ * out-of-range height was quietly replaced with the profile height,
+ * and body fat ≥70% was dropped without a word. Now every entered
+ * value is either accepted or produces a visible field error; blank
+ * optional fields stay valid (they mean "not measured").
+ * Weight bounds match onboarding/EditProfile: 30–300 kg.
+ */
+export function validateBodyMetricsForm(input: BodyMetricsFormInput): BodyMetricsFormResult {
+  const errors: Partial<Record<BodyMetricsField, string>> = {};
+  const { unit } = input;
+
+  const parsedWeight = parseFloat(input.weight);
+  const weightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
+  if (isNaN(parsedWeight) || weightKg < 30 || weightKg > 300) {
+    errors.weight =
+      unit === 'lbs'
+        ? 'Please enter a realistic bodyweight between 66 lbs and 660 lbs.'
+        : 'Please enter a realistic bodyweight between 30 kg and 300 kg.';
+  }
+
+  let heightCm: number | undefined;
+  if (input.height.trim() !== '') {
+    const cm = unit === 'lbs' ? parseFloat(input.height) * 2.54 : parseFloat(input.height);
+    if (isNaN(cm) || cm < 100 || cm > 250) {
+      errors.height =
+        unit === 'lbs'
+          ? 'Height must be between 39 and 98 inches.'
+          : 'Height must be between 100 cm and 250 cm.';
+    } else {
+      heightCm = Math.round(cm);
+    }
+  }
+
+  let bodyFatPct: number | undefined;
+  if (input.bodyFat.trim() !== '') {
+    const fat = parseFloat(input.bodyFat);
+    if (isNaN(fat) || fat <= 0 || fat >= 70) {
+      errors.bodyFat = 'Body fat must be greater than 0% and below 70%.';
+    } else {
+      bodyFatPct = fat;
+    }
+  }
+
+  const circumference = (
+    raw: string,
+    field: 'chest' | 'waist' | 'hips',
+    label: string
+  ): number | undefined => {
+    if (raw.trim() === '') return undefined;
+    const parsed = parseFloat(raw);
+    const inches = unit === 'kg' ? parsed / 2.54 : parsed;
+    if (isNaN(parsed) || inches <= 0 || inches > 100) {
+      errors[field] = `${label} looks off — check the value or leave it blank.`;
+      return undefined;
+    }
+    return inches;
+  };
+  const chestIn = circumference(input.chest, 'chest', 'Chest');
+  const waistIn = circumference(input.waist, 'waist', 'Waist');
+  const hipsIn = circumference(input.hips, 'hips', 'Hips');
+
+  if (Object.keys(errors).length > 0) return { errors };
+  return {
+    errors,
+    values: { weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn },
+  };
+}
+
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
   useEscapeToClose(isOpen, onClose);
   const profile = useStore((state) => state.profile);
@@ -30,6 +124,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   const [unit, setUnit] = useState<'kg' | 'lbs'>(preferredUnit);
   const [dateInput, setDateInput] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
+  const [errors, setErrors] = useState<Partial<Record<BodyMetricsField, string>>>({});
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +142,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       );
       setDateInput(getLocalTodayStr());
       setSuccessMsg('');
+      setErrors({});
 
       const latest = bodyMetrics && bodyMetrics.length > 0
         ? [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
@@ -102,33 +198,29 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsedWeight = parseFloat(weightInput);
-    if (isNaN(parsedWeight) || parsedWeight <= 0) return;
+    // QA4-025: no silent failure paths — invalid input shows a field
+    // error and nothing is saved until the form validates.
+    const { errors: formErrors, values } = validateBodyMetricsForm({
+      weight: weightInput,
+      height: heightInput,
+      bodyFat: bodyFatInput,
+      chest: chestInput,
+      waist: waistInput,
+      hips: hipsInput,
+      unit,
+    });
+    setErrors(formErrors);
+    if (!values) return;
 
-    const finalWeightKg = unit === 'lbs' ? parsedWeight * 0.453592 : parsedWeight;
-    const parsedHeight = parseFloat(heightInput);
-    const parsedHeightCm = unit === 'lbs' ? parsedHeight * 2.54 : parsedHeight;
-    const validHeight = !isNaN(parsedHeightCm) && parsedHeightCm >= 100 && parsedHeightCm <= 250 ? Math.round(parsedHeightCm) : profile?.heightCm;
-
-    const parsedFat = parseFloat(bodyFatInput);
-    const validFat = !isNaN(parsedFat) && parsedFat > 0 && parsedFat < 70 ? parsedFat : undefined;
-
-    const parsedChest = parseFloat(chestInput);
-    const validChestIn = !isNaN(parsedChest) && parsedChest > 0
-      ? (unit === 'kg' ? parsedChest / 2.54 : parsedChest)
-      : undefined;
-
-    const parsedWaist = parseFloat(waistInput);
-    const validWaistIn = !isNaN(parsedWaist) && parsedWaist > 0
-      ? (unit === 'kg' ? parsedWaist / 2.54 : parsedWaist)
-      : undefined;
-
-    const parsedHips = parseFloat(hipsInput);
-    const validHipsIn = !isNaN(parsedHips) && parsedHips > 0
-      ? (unit === 'kg' ? parsedHips / 2.54 : parsedHips)
-      : undefined;
-
-    updateBodyMetrics(finalWeightKg, validHeight, validFat, validChestIn, validWaistIn, validHipsIn);
+    updateBodyMetrics(
+      values.weightKg,
+      // A blank height field means "unchanged" — keep the profile height.
+      values.heightCm ?? profile?.heightCm,
+      values.bodyFatPct,
+      values.chestIn,
+      values.waistIn,
+      values.hipsIn
+    );
     setSuccessMsg('Body metrics saved successfully!');
     setTimeout(() => {
       setSuccessMsg('');
@@ -215,8 +307,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 id="modal-weight-input"
                 type="number"
                 step="0.1"
-                min="20"
-                max="500"
+                min={unit === 'kg' ? 30 : 66}
+                max={unit === 'kg' ? 300 : 660}
                 value={weightInput}
                 onChange={(e) => setWeightInput(e.target.value)}
                 placeholder={unit === 'kg' ? '75.0' : '165.0'}
@@ -228,6 +320,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 {unit}
               </span>
             </div>
+            {errors.weight && <p className="text-danger text-xs mt-1.5 font-medium">{errors.weight}</p>}
           </div>
 
           {/* Height Field */}
@@ -254,6 +347,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             <p className="text-3xs text-text-muted mt-1 font-mono">
               Calibrates Mifflin-St Jeor metabolic expenditure and daily macro targets.
             </p>
+            {errors.height && <p className="text-danger text-xs mt-1.5 font-medium">{errors.height}</p>}
           </div>
 
           {/* Circumference & Body Fat Fields (Optional) */}
@@ -277,6 +371,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder="12.5"
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
+                {errors.bodyFat && <p className="text-danger text-xs mt-1 font-medium">{errors.bodyFat}</p>}
               </div>
               <div>
                 <label htmlFor="modal-chest-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
@@ -293,6 +388,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '42' : '107'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
+                {errors.chest && <p className="text-danger text-xs mt-1 font-medium">{errors.chest}</p>}
               </div>
               <div>
                 <label htmlFor="modal-waist-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
@@ -309,6 +405,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '32' : '81'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
+                {errors.waist && <p className="text-danger text-xs mt-1 font-medium">{errors.waist}</p>}
               </div>
               <div>
                 <label htmlFor="modal-hips-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
@@ -325,6 +422,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '38' : '96'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
+                {errors.hips && <p className="text-danger text-xs mt-1 font-medium">{errors.hips}</p>}
               </div>
             </div>
           </div>

@@ -14,6 +14,7 @@ import {
 } from '../src/lib/workout-engine';
 import { useStore, partializeAppState } from '../src/lib/store';
 import type { PlannedWorkout } from '../src/lib/types';
+import { validateBodyMetricsForm } from '../src/components/BodyMetricsModal';
 
 const readSrc = (rel: string) =>
   fs.readFileSync(path.join(process.cwd(), rel), 'utf-8');
@@ -243,5 +244,60 @@ describe('QA4A-009 backup import preserves dietPreference', () => {
       },
     });
     expect(useStore.getState().profile?.dietPreference).toBeUndefined();
+  });
+});
+
+/* ── QA4-025: BodyMetricsModal silent validation failures ─────────────── */
+describe('QA4-025 body metrics validation surfaces errors (no silent drops)', () => {
+  const base = { weight: '80', height: '175', bodyFat: '', chest: '', waist: '', hips: '', unit: 'kg' as const };
+
+  it('accepts a valid form and converts units', () => {
+    const r = validateBodyMetricsForm({ ...base, bodyFat: '15', chest: '100' });
+    expect(r.errors).toEqual({});
+    expect(r.values?.weightKg).toBe(80);
+    expect(r.values?.heightCm).toBe(175);
+    expect(r.values?.bodyFatPct).toBe(15);
+    expect(r.values?.chestIn).toBeCloseTo(100 / 2.54, 5);
+  });
+
+  it('rejects weight outside the onboarding 30–300 kg bounds', () => {
+    for (const w of ['10', '29.9', '300.1', '500', 'abc', '']) {
+      const r = validateBodyMetricsForm({ ...base, weight: w });
+      expect(r.values).toBeUndefined();
+      expect(r.errors.weight).toMatch(/30 kg and 300 kg/);
+    }
+  });
+
+  it('enforces the bounds after lbs→kg conversion too', () => {
+    expect(validateBodyMetricsForm({ ...base, unit: 'lbs', weight: '60' }).errors.weight).toBeTruthy();
+    const ok = validateBodyMetricsForm({ ...base, unit: 'lbs', weight: '176', height: '69' });
+    expect(ok.errors).toEqual({});
+    expect(ok.values?.weightKg).toBeCloseTo(176 * 0.453592, 5);
+    expect(ok.values?.heightCm).toBe(175); // 69in = 175.26cm
+  });
+
+  it('an entered out-of-range height errors instead of silently falling back', () => {
+    const r = validateBodyMetricsForm({ ...base, height: '90' });
+    expect(r.values).toBeUndefined();
+    expect(r.errors.height).toMatch(/100 cm and 250 cm/);
+  });
+
+  it('blank optional fields stay valid (not measured ≠ invalid)', () => {
+    const r = validateBodyMetricsForm({ ...base, height: '', bodyFat: '', chest: '', waist: '', hips: '' });
+    expect(r.errors).toEqual({});
+    expect(r.values?.heightCm).toBeUndefined();
+    expect(r.values?.bodyFatPct).toBeUndefined();
+  });
+
+  it('body fat ≥70 errors instead of being silently dropped', () => {
+    const r = validateBodyMetricsForm({ ...base, bodyFat: '75' });
+    expect(r.values).toBeUndefined();
+    expect(r.errors.bodyFat).toMatch(/below 70%/);
+  });
+
+  it('a non-positive circumference errors instead of being silently dropped', () => {
+    const r = validateBodyMetricsForm({ ...base, waist: '-5' });
+    expect(r.values).toBeUndefined();
+    expect(r.errors.waist).toBeTruthy();
   });
 });
