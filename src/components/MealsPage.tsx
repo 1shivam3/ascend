@@ -1831,7 +1831,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label="Log meal"
-                className="px-3 py-1.5 min-h-[36px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="animate-pulse text-2xs">...</span>
@@ -2915,7 +2915,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsGoalsModalOpen(false)}
-                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3104,7 +3104,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsManagePinnedOpen(false)}
-                className="text-text-muted hover:text-text-primary p-1"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3233,7 +3233,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsEditPinnedOpen(false)}
-                className="text-text-muted hover:text-text-primary p-1"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3394,7 +3394,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-1 rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -1825,7 +1825,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsDiscardConfirmOpen(true)}
-            className="w-9 h-9 min-h-[36px] min-w-[36px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95 cursor-pointer shrink-0"
+            className="w-10 h-10 min-h-[40px] min-w-[40px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95 cursor-pointer shrink-0"
             aria-label="Discard Workout"
             title="Discard Workout"
           >
@@ -1846,7 +1846,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={handlePauseWorkout}
-            className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
             title="Pause and save draft"
             aria-label="Pause and save draft"
           >
@@ -1856,7 +1856,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
-            className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
             title="Finish workout"
             aria-label="Finish workout"
           >
@@ -1871,7 +1871,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setShowFormCues((prev) => !prev)}
-              className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+              className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
               title="How to do this exercise — form cues"
               aria-label="Form cues for this exercise"
             >
@@ -1882,7 +1882,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsWarmupModalOpen(true)}
-            className="px-2.5 py-1.5 rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
             title="Generate warm-up sets"
             aria-label="Warm-up sets"
           >
@@ -1895,7 +1895,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
               aria-label="Workout Tools & Options"
               title="Workout Tools & Options"
             >
@@ -2166,7 +2166,7 @@ export default function ActiveWorkoutScreen({
                           setLocalExerciseName('');
                           renameInputRef.current?.focus();
                         }}
-                        className="absolute right-2.5 p-1 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary transition-colors"
+                        className="absolute right-2.5 p-1 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary transition-colors"
                         title="Clear search"
                         aria-label="Clear search"
                       >
@@ -2403,7 +2403,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleAddSet}
-                  className="w-9 h-9 rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
+                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
                   title="Add set"
                   aria-label="Add set"
                 >
@@ -2661,7 +2661,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveRpePickerSetIdx(activeSetIdx)}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-3 py-2 min-h-[40px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
                     title="Tap to select target effort / RPE"
                   >
                     <span className="text-accent font-black text-xs sm:text-sm">@{currentExercise.sets[activeSetIdx]?.rpe || 8}</span>
@@ -2858,7 +2858,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleSkipSet(sIdx)}
-                      className={`px-2.5 sm:px-3 py-2 min-h-[36px] rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
+                      className={`px-2.5 sm:px-3 py-2 min-h-[40px] rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
                         set.status === 'skipped'
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                           : 'text-text-muted hover:text-text-primary border-transparent hover:border-border/60'
@@ -3856,7 +3856,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setCompletedSetSummary(null)}
-              className="w-9 h-9 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
               aria-label="Dismiss set complete screen"
             >
               <X className="w-4 h-4" />

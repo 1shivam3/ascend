@@ -163,7 +163,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>

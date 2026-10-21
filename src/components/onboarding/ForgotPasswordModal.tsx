@@ -50,7 +50,7 @@ export default function ForgotPasswordModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-[#F3F0E7] flex items-center justify-center text-[#858076] hover:text-[#171916] transition-colors cursor-pointer"
+            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full hover:bg-[#F3F0E7] flex items-center justify-center text-[#858076] hover:text-[#171916] transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-4 h-4" />

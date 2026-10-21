@@ -303,7 +303,7 @@ function LevelProgressionModal({
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
             <p className="text-2xs text-text-muted font-mono mt-0.5">Level Progression</p>
           </div>
-          <button type="button" onClick={onClose} className="text-text-muted p-1 hover:text-text-primary rounded">
+          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
             <X size={18} />
           </button>
         </div>
@@ -1517,7 +1517,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-bold text-text-primary text-base">Set Target Milestone</h3>
-              <button type="button" onClick={() => setTargetModalExercise(null)} className="text-text-muted p-1">
+              <button type="button" onClick={() => setTargetModalExercise(null)} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
@@ -1564,7 +1564,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-base font-bold text-text-primary">Record Personal Best</h2>
-              <button type="button" onClick={() => setShowAddModal(false)} className="text-text-muted p-1">
+              <button type="button" onClick={() => setShowAddModal(false)} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
