@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { SUPPORT_EMAIL } from '@/lib/legal';
+import { useTranslation } from '@/lib/i18n';
 
 export type DeletionStatus =
   | 'idle'
@@ -40,6 +41,7 @@ export interface DeleteAccountViewProps {
 }
 
 export function DeleteAccountView(props: DeleteAccountViewProps) {
+  const { t } = useTranslation();
   const [email, setEmail] = useState<string>(props.initialEmail || '');
   const [verificationToken, setVerificationToken] = useState<string>(props.initialVerificationToken || '');
   const [confirmText, setConfirmText] = useState<string>('');
@@ -126,7 +128,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
   const handleRequestToken = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setErrorMessage('Please enter your registered account email.');
+      setErrorMessage(t('del.emailRequired'));
       return;
     }
 
@@ -149,18 +151,18 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('token_requested');
         setStatusDetails(
           data?.message ||
-            'If an account is associated with this email, a single-use verification link has been sent to your address.'
+            t('del.linkSent')
         );
         if (data.debugToken) {
           setVerificationToken(data.debugToken);
         }
       } else {
         setStatus('error');
-        setErrorMessage(data?.message || 'Failed to request verification link. Please try again.');
+        setErrorMessage(data?.message || t('del.linkFail'));
       }
     } catch (err: any) {
       setStatus('error');
-      setErrorMessage(err?.message || 'Network error while requesting verification link.');
+      setErrorMessage(err?.message || t('del.linkNetwork'));
     }
   };
 
@@ -168,13 +170,13 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
   const handleDeleteAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      setErrorMessage('Registered account email is required.');
+      setErrorMessage(t('del.emailReq2'));
       return;
     }
 
     if (confirmText.trim().toUpperCase() !== 'DELETE') {
       setStatus('error');
-      setErrorMessage('Please type "DELETE" into the confirmation field to confirm.');
+      setErrorMessage(t('del.typeDeleteError'));
       return;
     }
 
@@ -182,7 +184,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
     if (!sessionUser && !verificationToken.trim()) {
       setStatus('error');
       setErrorMessage(
-        'A single-use verification token is required when not signed in. Please click "Request Verification Link" first.'
+        t('del.tokenRequired')
       );
       return;
     }
@@ -215,7 +217,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('complete');
         setStatusDetails(
           data?.message ||
-            'Your ASCEND cloud account and all associated athletic data have been permanently purged.'
+            t('del.purgedMsg')
         );
         wipeLocalData();
       } else if (
@@ -226,7 +228,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('skipped');
         setStatusDetails(
           data.message ||
-            'Cloud deletion skipped: Cloud synchronization is not enabled in this environment. Local device data has been purged.'
+            t('del.skippedMsg')
         );
         wipeLocalData();
       } else if (res.status === 207 || (data.cloudDeleted === false && data.authPurged)) {
@@ -240,7 +242,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         setStatus('error');
         setErrorMessage(
           data?.message ||
-            'Account deletion failed or unauthorized. No data was deleted. Please verify your credentials or request a new verification link.'
+            t('del.failMsg')
         );
       }
     } catch (err: any) {
@@ -307,7 +309,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
           className="btn-secondary py-1.5 px-3 text-xs font-mono flex items-center gap-1.5"
         >
           <ArrowLeft className="size-3.5" />
-          <span>Dashboard</span>
+          <span>{t('del.dashboard')}</span>
         </Link>
       </div>
 
@@ -316,11 +318,11 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         <div className="flex items-center gap-2 text-danger">
           <Trash2 className="size-6" />
           <h1 className="text-xl sm:text-2xl font-black font-mono tracking-tight">
-            ACCOUNT &amp; DATA DELETION
+            {t('del.title')}
           </h1>
         </div>
         <p className="text-xs text-text-muted font-mono">
-          Google Play Store Data Safety &bull; GDPR Article 17 Right to Erasure &bull; CCPA Compliant
+          {t('del.compliance')}
         </p>
       </div>
 
@@ -328,12 +330,10 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       <div className="p-4 rounded-xl bg-danger/10 border border-danger/30 text-xs font-mono space-y-2">
         <div className="flex items-center gap-2 font-bold text-sm text-danger">
           <ShieldAlert className="size-4" />
-          <span>Complete &amp; Permanent Erasure Policy</span>
+          <span>{t('del.policyTitle')}</span>
         </div>
         <p className="text-2xs text-text-secondary leading-relaxed">
-          ASCEND enforces a strict zero-retention policy upon account deletion. When you delete your
-          account, all associated personal and athletic data is permanently eradicated from our
-          systems immediately with <strong>0 days retention</strong>.
+          {t('del.policyBody')}
         </p>
       </div>
 
@@ -341,34 +341,29 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       <div className="space-y-3 font-mono text-xs">
         <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
           <CloudOff className="size-4 text-accent" />
-          Data Destroyed Upon Request
+          {t('del.destroyedTitle')}
         </h2>
         <div className="p-3.5 rounded-xl bg-bg-secondary border border-border/70 space-y-2 text-2xs text-text-secondary">
           <ul className="list-disc list-inside space-y-1.5">
             <li>
-              <strong>Athlete Identity:</strong> User profile, email address, display name, and
-              authentication credentials in Supabase Auth.
+              <strong>{t('del.identityLead')}</strong> {t('del.identityBody')}
             </li>
             <li>
-              <strong>Strength &amp; Performance:</strong> All personal records (PRs), 1RM
-              calculations, and progression milestones.
+              <strong>{t('del.strengthLead')}</strong> {t('del.strengthBody')}
             </li>
             <li>
-              <strong>Workout Records:</strong> All past workout sessions, exercises, sets, reps,
-              RPE ratings, and saved workout plans.
+              <strong>{t('del.workoutLead')}</strong> {t('del.workoutBody')}
             </li>
             <li>
-              <strong>Nutrition &amp; Habits:</strong> Logged meals, macro totals, custom barcode
-              lookups, water intake logs, and creatine records.
+              <strong>{t('del.nutritionLead')}</strong> {t('del.nutritionBody')}
             </li>
             <li>
-              <strong>Notifications &amp; Subscriptions:</strong> Push notification device tokens
-              and reminder schedules.
+              <strong>{t('del.notifLead')}</strong> {t('del.notifBody')}
             </li>
             <li>
-              <strong>Local Cache:</strong> In-app deletion also wipes all browser and device{' '}
+              <strong>{t('del.cacheLead')}</strong> {t('del.cacheBodyA')}{' '}
               <code className="text-text-primary bg-bg-primary px-1 py-0.5 rounded">localStorage</code>{' '}
-              snapshots.
+              {t('del.cacheBodyB')}
             </li>
           </ul>
         </div>
@@ -378,22 +373,22 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       <div className="space-y-3 font-mono text-xs">
         <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
           <HardDrive className="size-4 text-accent" />
-          Method 1: Direct In-App Deletion (Instant)
+          {t('del.method1Title')}
         </h2>
         <div className="p-3.5 rounded-xl bg-bg-secondary border border-border/70 space-y-2 text-2xs text-text-secondary">
-          <p className="font-semibold text-text-primary">If you have the ASCEND app installed:</p>
+          <p className="font-semibold text-text-primary">{t('del.method1Intro')}</p>
           <ol className="list-decimal list-inside space-y-1.5 pl-1">
             <li>
-              Open ASCEND and navigate to <strong>Settings</strong> (gear icon in the top header).
+              {t('del.step1')}
             </li>
             <li>
-              Scroll to the <strong>Account &amp; Privacy</strong> section.
+              {t('del.step2')}
             </li>
             <li>
-              (Optional) Tap <strong>Export my data</strong> to download an offline JSON backup.
+              {t('del.step3')}
             </li>
             <li>
-              Tap <strong>Delete my account</strong>, review the warning, and confirm deletion.
+              {t('del.step4')}
             </li>
           </ol>
         </div>
@@ -403,12 +398,11 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       <div className="space-y-3 font-mono text-xs">
         <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
           <Mail className="size-4 text-danger" />
-          Method 2: External Web Deletion Request Form
+          {t('del.method2Title')}
         </h2>
         <div className="p-4 rounded-xl bg-bg-secondary border border-border/70 space-y-4">
           <p className="text-2xs text-text-secondary leading-relaxed">
-            If you have uninstalled the app or do not have an active session, you can securely delete
-            your account using a verified identity session or a single-use verification link:
+            {t('del.method2Intro')}
           </p>
 
           {/* ACTIVE SESSION BADGE */}
@@ -416,7 +410,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-2xs flex items-center gap-2">
               <UserCheck className="size-4 shrink-0" />
               <span>
-                Authenticated as <strong>{sessionUser.email}</strong>. Deletion is pre-authorized.
+                {t('del.authedAs', { email: sessionUser.email })}
               </span>
             </div>
           )}
@@ -429,7 +423,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             >
               <div className="flex items-center gap-2 font-bold text-xs">
                 <CheckCircle2 className="size-4 shrink-0" />
-                <span>Account &amp; Cloud Data Permanently Purged</span>
+                <span>{t('del.purgedTitle')}</span>
               </div>
               <p className="text-2xs leading-relaxed opacity-90">{statusDetails}</p>
               <div className="pt-2">
@@ -438,7 +432,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                   className="btn-primary inline-flex items-center gap-2 py-1.5 px-3 text-2xs font-mono"
                 >
                   <ArrowLeft className="size-3" />
-                  <span>Return to Home</span>
+                  <span>{t('del.returnHome')}</span>
                 </Link>
               </div>
             </div>
@@ -451,7 +445,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             >
               <div className="flex items-center gap-2 font-bold text-xs">
                 <AlertTriangle className="size-4 shrink-0" />
-                <span>Partial Deletion (207 Multi-Status)</span>
+                <span>{t('del.partialTitle')}</span>
               </div>
               <p className="text-2xs leading-relaxed opacity-90">{statusDetails}</p>
               <div className="pt-1">
@@ -461,11 +455,11 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                   onClick={handleDeleteAccount}
                   className="btn-secondary py-1.5 px-3 text-2xs font-mono font-bold"
                 >
-                  Resume Incomplete Cleanup
+                  {t('del.resumeCleanup')}
                 </button>
               </div>
               <p className="text-3xs text-text-muted">
-                Our privacy response team has been alerted. You can also contact us at{' '}
+                {t('del.partialContactA')}{' '}
                 <a href={`mailto:${SUPPORT_EMAIL}`} rel="noreferrer" className="underline font-mono">
                   {SUPPORT_EMAIL}
                 </a>
@@ -481,7 +475,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             >
               <div className="flex items-center gap-2 font-bold text-xs">
                 <CloudOff className="size-4 shrink-0" />
-                <span>Cloud Deletion Skipped (Offline Environment)</span>
+                <span>{t('del.skippedTitle')}</span>
               </div>
               <p className="text-2xs leading-relaxed opacity-90">{statusDetails}</p>
             </div>
@@ -494,11 +488,10 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                 <div className="p-3.5 rounded-lg bg-bg-primary border border-border space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-accent">
                     <KeyRound className="size-3.5" />
-                    <span>Step 1: Request Single-Use Verification Link</span>
+                    <span>{t('del.step1Title')}</span>
                   </div>
                   <p className="text-3xs text-text-secondary leading-relaxed">
-                    To prevent unauthorized deletion, enter your email to receive a single-use,
-                    15-minute verification link.
+                    {t('del.step1Body')}
                   </p>
                   <form onSubmit={handleRequestToken} className="space-y-2.5">
                     <div>
@@ -506,7 +499,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                         htmlFor="request-email"
                         className="block text-2xs uppercase tracking-wider font-bold text-text-muted mb-1"
                       >
-                        Registered Account Email
+                        {t('del.registeredEmail')}
                       </label>
                       <input
                         id="request-email"
@@ -527,12 +520,12 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                       {status === 'requesting_token' ? (
                         <>
                           <Loader2 className="size-3.5 animate-spin" />
-                          <span>Sending Link...</span>
+                          <span>{t('del.sendingLink')}</span>
                         </>
                       ) : (
                         <>
                           <Send className="size-3.5" />
-                          <span>Send Deletion Verification Link</span>
+                          <span>{t('del.sendLink')}</span>
                         </>
                       )}
                     </button>
@@ -555,7 +548,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     htmlFor="deletion-email"
                     className="block text-2xs uppercase tracking-wider font-bold text-text-muted mb-1"
                   >
-                    Account Email
+                    {t('del.accountEmail')}
                   </label>
                   <input
                     id="deletion-email"
@@ -575,7 +568,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                       htmlFor="deletion-token"
                       className="block text-2xs uppercase tracking-wider font-bold text-text-muted mb-1"
                     >
-                      Verification Token (from email link)
+                      {t('del.tokenLabel')}
                     </label>
                     <input
                       id="deletion-token"
@@ -594,7 +587,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     htmlFor="deletion-confirm"
                     className="block text-2xs uppercase tracking-wider font-bold text-text-muted mb-1"
                   >
-                    Type &quot;DELETE&quot; to Confirm
+                    {t('del.typeDelete')}
                   </label>
                   <input
                     id="deletion-confirm"
@@ -631,12 +624,12 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                   {status === 'deleting' ? (
                     <>
                       <Loader2 className="size-3.5 animate-spin" />
-                      <span>Purging Account &amp; Data...</span>
+                      <span>{t('del.purging')}</span>
                     </>
                   ) : (
                     <>
                       <Trash2 className="size-3.5" />
-                      <span>Permanently Delete Account &amp; Data</span>
+                      <span>{t('del.deleteButton')}</span>
                     </>
                   )}
                 </button>
@@ -645,11 +638,11 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
           )}
 
           <p className="text-3xs text-text-muted">
-            For manual assistance or inquiries, email our privacy team directly at{' '}
+            {t('del.manualHelpA')}{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">
               {SUPPORT_EMAIL}
             </a>
-            . Manual requests are fulfilled within 24 hours.
+            {t('del.manualHelpB')}
           </p>
         </div>
       </div>
@@ -657,14 +650,14 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       {/* Footer Links */}
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <Link href="/privacy" className="text-2xs font-mono text-accent hover:underline">
-          View Full Privacy Policy &rarr;
+          {t('del.viewPolicy')}
         </Link>
         <Link
           href="/"
           className="btn-primary inline-flex items-center justify-center gap-2 py-2 px-5 text-xs font-bold font-mono"
         >
           <ArrowLeft className="size-3.5" />
-          <span>Back to Dashboard</span>
+          <span>{t('del.backDashboard')}</span>
         </Link>
       </div>
     </main>
