@@ -22,17 +22,17 @@ export default function StepProgressBar({
           type="button"
           onClick={onBack}
           aria-label="Go back"
-          className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-white border border-[#E2DFD6] flex items-center justify-center text-[#171916] hover:bg-[#F3F0E7] active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-primary active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
-          <ArrowLeft className="w-5 h-5 text-[#171916]" />
+          <ArrowLeft className="w-5 h-5 text-text-primary" />
         </button>
 
         {title ? (
-          <span className="text-xs font-semibold uppercase tracking-wider text-[#858076]">
+          <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
             {title}
           </span>
         ) : (
-          <span className="text-xs font-medium text-[#858076]">
+          <span className="text-xs font-medium text-text-muted">
             Step {currentStep} of 4
           </span>
         )}
@@ -45,22 +45,22 @@ export default function StepProgressBar({
       <div className="grid grid-cols-4 gap-2 w-full" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={4}>
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 1 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
+            currentStep >= 1 ? 'bg-accent' : 'bg-bg-tertiary'
           }`}
         />
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 2 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
+            currentStep >= 2 ? 'bg-accent' : 'bg-bg-tertiary'
           }`}
         />
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 3 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
+            currentStep >= 3 ? 'bg-accent' : 'bg-bg-tertiary'
           }`}
         />
         <div
           className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 4 ? 'bg-[#E44427]' : 'bg-[#E2DFD6]'
+            currentStep >= 4 ? 'bg-accent' : 'bg-bg-tertiary'
           }`}
         />
       </div>

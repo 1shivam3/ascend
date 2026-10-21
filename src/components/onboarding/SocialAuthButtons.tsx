@@ -55,9 +55,9 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
       {/* Divider */}
       <div className="relative my-4 flex items-center justify-center">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-[#E2DFD6]" />
+          <div className="w-full border-t border-border" />
         </div>
-        <div className="relative bg-white px-3 text-xs text-[#858076]">
+        <div className="relative bg-bg-card px-3 text-xs text-text-muted">
           Or continue with
         </div>
       </div>
@@ -69,10 +69,10 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
           type="button"
           onClick={handleGoogle}
           disabled={loadingProvider !== null}
-          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-white hover:bg-[#F3F0E7] active:scale-[0.98] border border-[#E2DFD6] text-xs font-semibold text-[#171916] transition shadow-2xs cursor-pointer disabled:opacity-50"
+          className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-primary active:scale-[0.98] border border-border text-xs font-semibold text-text-primary transition shadow-2xs cursor-pointer disabled:opacity-50"
         >
           {loadingProvider === 'google' ? (
-            <Loader2 className="w-4 h-4 animate-spin text-[#171916]" />
+            <Loader2 className="w-4 h-4 animate-spin text-text-primary" />
           ) : (
             <GoogleIcon className="w-4 h-4 shrink-0" />
           )}

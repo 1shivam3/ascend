@@ -59,18 +59,18 @@ export default function LoginScreen({
   };
 
   return (
-    <div className="min-h-screen w-full bg-[#F3F0E7] text-[#171916] flex flex-col justify-between p-6 sm:p-8 animate-fade-in">
+    <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between p-6 sm:p-8 animate-fade-in">
       {/* Top Navigation Row */}
       <div className="w-full max-w-md mx-auto pt-2 flex items-center justify-between">
         <button
           type="button"
           onClick={onBack}
           aria-label="Go back"
-          className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-white border border-[#E2DFD6] flex items-center justify-center text-[#171916] hover:bg-[#F3F0E7] active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-primary active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
-          <ArrowLeft className="w-5 h-5 text-[#171916]" />
+          <ArrowLeft className="w-5 h-5 text-text-primary" />
         </button>
-        <span className="text-xs font-semibold tracking-wider text-[#858076] uppercase">
+        <span className="text-xs font-semibold tracking-wider text-text-muted uppercase">
           ASCEND
         </span>
         <div className="w-10 h-10" aria-hidden="true" />
@@ -78,13 +78,13 @@ export default function LoginScreen({
 
       {/* Main Elevated Form Card */}
       <div className="w-full max-w-md mx-auto my-auto py-4">
-        <div className="bg-white rounded-2xl p-6 sm:p-8 border border-[#E2DFD6] shadow-xs space-y-6">
+        <div className="bg-bg-card rounded-2xl p-6 sm:p-8 border border-border shadow-xs space-y-6">
           {/* Header */}
           <div className="text-left space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#171916] tracking-tight">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
               Welcome Back
             </h1>
-            <p className="text-sm text-[#858076]">
+            <p className="text-sm text-text-muted">
               Enter your details to continue
             </p>
           </div>
@@ -101,7 +101,7 @@ export default function LoginScreen({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div>
-              <label htmlFor="login-email" className="block text-xs font-semibold text-[#171916] mb-1.5">
+              <label htmlFor="login-email" className="block text-xs font-semibold text-text-primary mb-1.5">
                 Email
               </label>
               <input
@@ -112,20 +112,20 @@ export default function LoginScreen({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="alex@example.com"
                 required
-                className="w-full px-4 py-3 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] placeholder:text-[#858076]/60 outline-none transition"
+                className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />
             </div>
 
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="login-password" className="block text-xs font-semibold text-[#171916]">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-text-primary">
                   Password
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsForgotOpen(true)}
-                  className="text-xs font-semibold text-[#E44427] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-accent hover:underline cursor-pointer"
                 >
                   Forgot password?
                 </button>
@@ -139,12 +139,12 @@ export default function LoginScreen({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
                   required
-                  className="w-full pl-4 pr-11 py-3 rounded-xl bg-white border border-[#E2DFD6] focus:border-[#E44427] focus:ring-1 focus:ring-[#E44427] text-sm text-[#171916] placeholder:text-[#858076]/60 outline-none transition"
+                  className="w-full pl-4 pr-11 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-3 text-[#858076] hover:text-[#171916] p-1 cursor-pointer transition"
+                  className="absolute right-3 top-3 text-text-muted hover:text-text-primary p-1 cursor-pointer transition"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -156,7 +156,7 @@ export default function LoginScreen({
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 py-3.5 px-6 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+              className="w-full mt-2 py-3.5 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
             >
               {loading ? (
                 <>
@@ -174,12 +174,12 @@ export default function LoginScreen({
 
           {/* Footer Link */}
           <div className="pt-2 text-center">
-            <p className="text-xs text-[#858076]">
+            <p className="text-xs text-text-muted">
               Don&apos;t have an account?{' '}
               <button
                 type="button"
                 onClick={onNavigateToSignup}
-                className="font-semibold text-[#E44427] hover:underline cursor-pointer"
+                className="font-semibold text-accent hover:underline cursor-pointer"
               >
                 Sign up
               </button>

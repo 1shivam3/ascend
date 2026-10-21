@@ -23,7 +23,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
   return (
     <div
       onClick={!isHydrating && onContinue ? onContinue : undefined}
-      className={`relative min-h-screen w-full bg-[#171916] text-[#F3F0E7] flex flex-col items-center justify-between p-8 select-none overflow-hidden transition-opacity duration-500 ${
+      className={`relative min-h-screen w-full bg-brand-graphite text-brand-chalk flex flex-col items-center justify-between p-8 select-none overflow-hidden transition-opacity duration-500 ${
         !isHydrating && onContinue ? 'cursor-pointer' : ''
       }`}
       role="banner"
@@ -40,7 +40,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
           loading="eager"
         />
         {/* Cinematic gradient overlay matching reference darkness and contrast */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#171916]/80 via-[#171916]/40 to-[#171916]/85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-brand-graphite/80 via-brand-graphite/40 to-brand-graphite/85" />
       </div>
 
       {/* Top spacer */}
@@ -54,7 +54,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
         </h1>
 
         {/* Tagline matching reference */}
-        <p className="text-xs sm:text-sm font-medium tracking-widest text-[#F3F0E7]/80 uppercase drop-shadow">
+        <p className="text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase drop-shadow">
           Train. Fuel. Progress. Repeat.
         </p>
       </div>
@@ -62,8 +62,8 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
       {/* Bottom Indicator */}
       <div className="relative z-10 pb-8 flex flex-col items-center text-center">
         {isHydrating ? (
-          <div className="flex items-center gap-2 text-xs text-[#858076] font-mono animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-[#E44427] animate-ping mr-1" />
+          <div className="flex items-center gap-2 text-xs text-brand-chalk/70 font-mono animate-pulse">
+            <span className="w-2 h-2 rounded-full bg-accent animate-ping mr-1" />
             <span>INITIALIZING...</span>
           </div>
         ) : (
@@ -73,7 +73,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
               e.stopPropagation();
               onContinue?.();
             }}
-            className="text-xs tracking-wider text-[#F3F0E7]/70 hover:text-white uppercase font-medium transition-colors cursor-pointer py-2 px-4 rounded-full border border-white/10 hover:border-white/30 backdrop-blur-xs bg-black/20"
+            className="text-xs tracking-wider text-brand-chalk/70 hover:text-white uppercase font-medium transition-colors cursor-pointer py-2 px-4 rounded-full border border-white/10 hover:border-white/30 backdrop-blur-xs bg-black/20"
           >
             Tap to continue
           </button>

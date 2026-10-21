@@ -2877,13 +2877,29 @@ export const useAppStore = create<AppState>()(
       // (or outside the browser) the guard is leader/null and this is
       // exactly the old behavior.
       storage: createJSONStorage(() => ({
-        getItem: (name: string) => localStorage.getItem(name),
-        setItem: (name: string, value: string) => {
-          const guard = getTabLeaderGuard();
-          if (guard?.shouldSuppressWrites()) return;
-          localStorage.setItem(name, value);
+        getItem: (name: string) => {
+          try {
+            return typeof localStorage !== 'undefined' ? localStorage.getItem(name) : null;
+          } catch {
+            return null;
+          }
         },
-        removeItem: (name: string) => localStorage.removeItem(name),
+        setItem: (name: string, value: string) => {
+          try {
+            if (typeof localStorage === 'undefined') return;
+            const guard = getTabLeaderGuard();
+            if (guard?.shouldSuppressWrites()) return;
+            localStorage.setItem(name, value);
+          } catch {
+            // Storage unavailable (private mode / quota) — persist is
+            // best-effort; never let it throw into store actions.
+          }
+        },
+        removeItem: (name: string) => {
+          try {
+            if (typeof localStorage !== 'undefined') localStorage.removeItem(name);
+          } catch {}
+        },
       })),
       onRehydrateStorage: () => (state) => {
         if (state) {
