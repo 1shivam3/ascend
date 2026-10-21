@@ -137,7 +137,7 @@ export default function DisclaimerPage() {
             3. AI Coach &amp; Automated Workout Plans
           </h2>
           <p className="text-2xs">
-            The AI Coach and workout split generators utilize heuristic algorithms and Google Gemini large language models. AI recommendations are synthetic and may not account for individual biomechanics, past injuries, structural asymmetries, or recovery limitations. Always use common sense and cease any exercise that causes sharp, joint, or neurological pain.
+            The AI Coach and workout split generators utilize heuristic algorithms and large language models provided through a multi-provider chain — attempted in order: Groq Cloud, then OpenRouter, then Google Gemini (the same chain described in the Privacy Policy and Terms). AI recommendations are synthetic and may not account for individual biomechanics, past injuries, structural asymmetries, or recovery limitations. Always use common sense and cease any exercise that causes sharp, joint, or neurological pain.
           </p>
         </section>
 
