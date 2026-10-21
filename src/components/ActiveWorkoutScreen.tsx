@@ -2730,7 +2730,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                    className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    className="w-full py-2 min-h-[40px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                     <span>Previous: {exercises[activeExerciseIdx - 1]?.name}</span>
@@ -2890,7 +2890,7 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={handleAddSet}
-                className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 px-3 rounded-xl hover:bg-accent/10 transition-colors"
+                className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 min-h-[40px] px-3 rounded-xl hover:bg-accent/10 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>Add Set</span>
@@ -2899,7 +2899,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => handleRemoveSet(currentExercise.sets.length - 1)}
-                  className="text-xs font-medium text-text-muted hover:text-danger py-2 px-3 rounded-xl hover:bg-danger/10 transition-colors"
+                  className="text-xs font-medium text-text-muted hover:text-danger py-2 min-h-[40px] px-3 rounded-xl hover:bg-danger/10 transition-colors"
                 >
                   Remove Set
                 </button>
@@ -2970,7 +2970,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                  className="w-full py-2 text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-2 min-h-[40px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>Previous: {exercises[activeExerciseIdx - 1]?.name}</span>
@@ -2988,7 +2988,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => adjustTimer(-30)}
-              className="px-2 py-1 rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Subtract 30 seconds"
             >
               -30s
@@ -2996,7 +2996,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => adjustTimer(30)}
-              className="px-2 py-1 rounded-lg bg-bg-secondary text-accent hover:bg-accent/15 text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-accent hover:bg-accent/15 text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Add 30 seconds"
             >
               +30s
@@ -3004,7 +3004,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={togglePauseTimer}
-              className="px-2 py-1 rounded-lg bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold active:scale-95 transition-all cursor-pointer"
             >
               {isRestRunning ? 'Pause' : 'Resume'}
             </button>
@@ -3014,7 +3014,7 @@ export default function ActiveWorkoutScreen({
                 skipTimer();
                 setIsRestPopoverOpen(false);
               }}
-              className="px-2.5 py-1 rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2.5 py-2 min-h-[40px] rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               Skip
             </button>
@@ -3033,7 +3033,7 @@ export default function ActiveWorkoutScreen({
               setIsRestPopoverOpen((prev) => !prev);
             }
           }}
-          className={`flex items-center gap-1.5 px-3 py-2 rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+          className={`flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
             isRestFinished
               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
               : isRestRunning
@@ -3908,14 +3908,14 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => adjustTimer(-30)}
-                  className="px-3 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
                 >
                   -30s
                 </button>
                 <button
                   type="button"
                   onClick={togglePauseTimer}
-                  className="px-4 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{isRestRunning ? 'Pause' : 'Resume'}</span>
@@ -3923,7 +3923,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => adjustTimer(30)}
-                  className="px-3 py-1.5 rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
                 >
                   +30s
                 </button>
