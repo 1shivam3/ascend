@@ -29,6 +29,7 @@ import {
 import { useStore } from '@/lib/store';
 import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 
 interface WeeklyScheduleModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function WeeklyScheduleModal({
   plannedWorkouts,
   initialDay,
 }: WeeklyScheduleModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const currentWeeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
@@ -85,7 +87,7 @@ export default function WeeklyScheduleModal({
         ...prev,
         [day]: {
           workoutPlanId: 'rest',
-          customTitle: 'Rest Day',
+          customTitle: t('home.restDay'),
           bodyParts: [],
         },
       }));
@@ -99,7 +101,7 @@ export default function WeeklyScheduleModal({
       ...prev,
       [day]: {
         workoutPlanId: planId,
-        customTitle: matched?.name || 'Workout',
+        customTitle: matched?.name || t('sched.workoutFallback'),
         bodyParts,
       },
     }));
@@ -153,7 +155,7 @@ export default function WeeklyScheduleModal({
       useStore.getState().setPlannedWorkouts([...existing, ...missing]);
     }
     setDraft(result.schedule);
-    toast.success(`Applied ${result.daysPerWeek}-day ${result.splitName} schedule!`, 'Preset Loaded');
+    toast.success(t('sched.presetMsg', { days: result.daysPerWeek, split: result.splitName }), t('sched.presetTitle'));
   };
 
   const handleSave = () => {
@@ -161,7 +163,7 @@ export default function WeeklyScheduleModal({
     if (activeTrainingDays > 0) {
       useStore.getState().setTrainingProfile({ daysPerWeek: activeTrainingDays });
     }
-    toast.success('Your weekly training schedule has been saved!', 'Schedule Updated');
+    toast.success(t('sched.savedMsg'), t('sched.savedTitle'));
     onClose();
   };
 
@@ -184,10 +186,10 @@ export default function WeeklyScheduleModal({
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-text-primary tracking-tight">
-                Weekly Training Schedule
+                {t('sched.title')}
               </h2>
               <p className="text-2xs sm:text-xs text-text-muted">
-                Choose which day of the week you train which body parts
+                {t('sched.subtitle')}
               </p>
             </div>
           </div>
@@ -203,13 +205,13 @@ export default function WeeklyScheduleModal({
         {/* Schedule Presets bar */}
         <div className="px-4 py-2.5 bg-bg-secondary/60 border-b border-border/60 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
           <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted shrink-0">
-            PRESETS:
+            {t('sched.presets')}
           </span>
           {[
-            { label: '3-Day Full Body', days: 3 },
-            { label: '4-Day Upper/Lower', days: 4 },
-            { label: '5-Day Split', days: 5 },
-            { label: '6-Day PPL', days: 6 },
+            { label: t('sched.preset3'), days: 3 },
+            { label: t('sched.preset4'), days: 4 },
+            { label: t('sched.preset5'), days: 5 },
+            { label: t('sched.preset6'), days: 6 },
           ].map((p) => (
             <button
               key={p.days}
@@ -230,15 +232,15 @@ export default function WeeklyScheduleModal({
               setDraft(() => {
                 const cleared = {} as WeeklySchedule;
                 for (const day of DAYS_OF_WEEK) {
-                  cleared[day] = { workoutPlanId: 'rest', customTitle: 'Rest Day', bodyParts: [] };
+                  cleared[day] = { workoutPlanId: 'rest', customTitle: t('home.restDay'), bodyParts: [] };
                 }
                 return cleared;
               });
-              toast.info('All days set to rest. Save to clear your week.', 'Schedule Cleared');
+              toast.info(t('sched.clearedMsg'), t('sched.clearedTitle'));
             }}
             className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border border-border/80 bg-bg-card text-text-secondary hover:border-danger/50 hover:text-danger transition-all ml-auto"
           >
-            Clear all
+            {t('sched.clearAll')}
           </button>
         </div>
 
@@ -271,7 +273,7 @@ export default function WeeklyScheduleModal({
                     </span>
                     {isToday && (
                       <span className="px-1.5 py-0.5 rounded-md bg-accent text-white text-3xs font-bold font-mono">
-                        TODAY
+                        {t('sched.today')}
                       </span>
                     )}
                   </div>
@@ -291,7 +293,7 @@ export default function WeeklyScheduleModal({
                       }`}
                     >
                       <Dumbbell className="w-3 h-3" />
-                      <span>Train</span>
+                      <span>{t('sched.train')}</span>
                     </button>
                     <button
                       type="button"
@@ -303,7 +305,7 @@ export default function WeeklyScheduleModal({
                       }`}
                     >
                       <Coffee className="w-3 h-3" />
-                      <span>Rest</span>
+                      <span>{t('sched.rest')}</span>
                     </button>
                   </div>
                 </div>
@@ -314,7 +316,7 @@ export default function WeeklyScheduleModal({
                     {/* Workout plan dropdown */}
                     <div className="flex items-center gap-2">
                       <span className="text-3xs font-mono font-bold uppercase text-text-muted shrink-0">
-                        ROUTINE:
+                        {t('sched.routine')}
                       </span>
                       <div className="relative flex-1">
                         <select
@@ -324,11 +326,11 @@ export default function WeeklyScheduleModal({
                         >
                           {plannedWorkouts.map((plan) => (
                             <option key={plan.id} value={plan.id}>
-                              {plan.name} ({plan.exercises.length} exercises)
+                              {t('sched.planOption', { name: plan.name, count: plan.exercises.length })}
                             </option>
                           ))}
                           {plannedWorkouts.length === 0 && (
-                            <option value="custom">Custom Workout</option>
+                            <option value="custom">{t('sched.customWorkout')}</option>
                           )}
                         </select>
                         <ChevronDown className="w-3.5 h-3.5 text-text-muted absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -338,7 +340,7 @@ export default function WeeklyScheduleModal({
                     {/* Body Parts selector chips */}
                     <div className="space-y-1">
                       <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
-                        TARGET BODY PARTS:
+                        {t('sched.bodyParts')}
                       </span>
                       <div className="flex flex-wrap gap-1.5">
                         {AVAILABLE_BODY_PARTS.map((part) => {
@@ -364,7 +366,7 @@ export default function WeeklyScheduleModal({
                 ) : (
                   <div className="flex items-center gap-2 text-2xs text-text-muted pt-1">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-border" />
-                    <span>Scheduled rest day for systemic recovery and protein synthesis</span>
+                    <span>{t('sched.restBody')}</span>
                   </div>
                 )}
               </div>
@@ -375,7 +377,7 @@ export default function WeeklyScheduleModal({
         {/* Footer */}
         <footer className="p-4 border-t border-border bg-bg-card flex items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-text-secondary">
-            <span className="font-bold text-accent">{activeTrainingDays} {activeTrainingDays === 1 ? 'day' : 'days'}</span> scheduled
+            <span className="font-bold text-accent">{t(activeTrainingDays === 1 ? 'sched.dayScheduled' : 'sched.daysScheduled', { count: activeTrainingDays })}</span>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -383,7 +385,7 @@ export default function WeeklyScheduleModal({
               onClick={onClose}
               className="btn-secondary py-2 px-3 text-xs"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -391,7 +393,7 @@ export default function WeeklyScheduleModal({
               className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 shadow-md shadow-accent/20"
             >
               <Check className="w-3.5 h-3.5 stroke-[3]" />
-              <span>Save Schedule</span>
+              <span>{t('sched.save')}</span>
             </button>
           </div>
         </footer>
