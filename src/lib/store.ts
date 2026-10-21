@@ -617,6 +617,69 @@ export function syncWorkoutReminderDays(
   return next;
 }
 
+/**
+ * QA4-012 — persist migration (persist `version: 1`).
+ *
+ * zustand-persist's default rehydration merge is SHALLOW at the top
+ * level: a persisted nested slice REPLACES the in-code default slice
+ * wholesale. So a legacy blob whose `uiPreferences` predates a newer
+ * field (e.g. `showMuscleVolume`, added after the blob was written)
+ * rehydrates with that field `undefined` — and surfaces that treat
+ * missing as OFF silently lost coach / gamification / habit-matrix
+ * after app updates, even though the product defaults are ON.
+ *
+ * This migrate deep-merges the nested slices that carry default-ON
+ * boolean semantics over the CURRENT defaults, so missing fields fall
+ * back to the product default while every value the user actually
+ * chose is preserved:
+ * - uiPreferences (gamificationEnabled / coachEnabled / showHabitMatrix
+ *   / showMuscleVolume default ON)
+ * - notificationPreferences (nested groups; quietHours.enabled and
+ *   lockScreenPrivacy default ON) — merged one group level deep
+ * - streak / xp (filled from their initial states when fields are
+ *   missing, so a legacy blob can't rehydrate a half-shaped slice)
+ *
+ * Flat slices and collections are user data with no defaults to merge
+ * and pass through untouched.
+ */
+export const PERSIST_VERSION = 1;
+
+export function migratePersistedState(
+  persisted: unknown,
+  _version: number,
+): Record<string, unknown> {
+  const state = (persisted ?? {}) as Record<string, any>;
+  const next: Record<string, any> = { ...state };
+
+  if (state.uiPreferences && typeof state.uiPreferences === 'object') {
+    next.uiPreferences = { ...DEFAULT_UI_PREFERENCES, ...state.uiPreferences };
+  }
+
+  if (state.notificationPreferences && typeof state.notificationPreferences === 'object') {
+    const defaults = DEFAULT_NOTIFICATION_PREFERENCES as unknown as Record<string, any>;
+    const saved = state.notificationPreferences as Record<string, any>;
+    const merged: Record<string, any> = { ...defaults, ...saved };
+    for (const key of Object.keys(defaults)) {
+      const d = defaults[key];
+      const s = saved[key];
+      if (d && typeof d === 'object' && !Array.isArray(d) && s && typeof s === 'object' && !Array.isArray(s)) {
+        merged[key] = { ...d, ...s };
+      }
+    }
+    next.notificationPreferences = merged;
+  }
+
+  if (state.streak && typeof state.streak === 'object') {
+    next.streak = { ...getInitialStreakState(), ...state.streak };
+  }
+
+  if (state.xp && typeof state.xp === 'object') {
+    next.xp = { ...getInitialXpState(), ...state.xp };
+  }
+
+  return next;
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -2935,6 +2998,12 @@ export const useAppStore = create<AppState>()(
         }
       },
       partialize: partializeAppState,
+      // QA4-012: versioned migrations — legacy blobs (version 0) are
+      // deep-merged over current defaults so newer default-ON fields
+      // are never lost on rehydration. See migratePersistedState.
+      version: PERSIST_VERSION,
+      migrate: (persistedState: unknown, version: number) =>
+        migratePersistedState(persistedState, version) as AppState,
     }
   )
 );
