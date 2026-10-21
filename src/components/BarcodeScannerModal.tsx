@@ -25,6 +25,7 @@ import { saveCustomBarcode } from '@/lib/storage';
 import { analyzeMealPhoto } from '@/lib/ai-scan-meal';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { useAppNavigation } from '@/lib/navigation';
 import { Capacitor } from '@capacitor/core';
 import PermissionHelp from '@/components/ui/PermissionHelp';
@@ -40,6 +41,7 @@ export default function BarcodeScannerModal({
   onClose,
   onAddFood,
 }: BarcodeScannerModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const addFavoriteFood = useStore((state) => state.addFavoriteFood);
 
@@ -214,9 +216,9 @@ export default function BarcodeScannerModal({
       });
       setTorchOn(next);
     } catch {
-      toast.error('Flashlight is not available on this camera.', 'Torch');
+      toast.error(t('scan2.torchFail'), t('scan2.torch'));
     }
-  }, [torchOn, toast]);
+  }, [torchOn, toast, t]);
 
   // Start Camera: native BarcodeDetector fast path, ZXing fallback
   const startCamera = useCallback(async () => {
@@ -266,9 +268,7 @@ export default function BarcodeScannerModal({
         if (v.readyState < 2 || v.videoWidth === 0) {
           stopCamera();
           setHasCamera(false);
-          setCameraError(
-            'Camera started but no video is coming through (another app may be using the camera). You can still type the barcode manually below.'
-          );
+          setCameraError(t('scan2.noVideo'));
         }
       }, 2500);
 
@@ -334,12 +334,10 @@ export default function BarcodeScannerModal({
       const denied = err.name === 'NotAllowedError';
       setCameraDenied(denied);
       setCameraError(
-        denied
-          ? 'Camera permission denied. You can still enter the barcode manually below.'
-          : `Camera error (${err.name || 'unknown'}). You can still type the barcode manually below.`
+        denied ? t('scan2.denied') : t('scan2.error', { name: err.name || t('scan2.unknown') })
       );
     }
-  }, [handleBarcodeFound, toast]);
+  }, [handleBarcodeFound, toast, t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -424,10 +422,7 @@ export default function BarcodeScannerModal({
         Number(carbPer100.toFixed(1)) === 0 &&
         Number(fatPer100.toFixed(1)) === 0;
       if (allZero) {
-        toast.error(
-          'Enter at least the calories from the product label before saving — otherwise this barcode would be remembered with no nutrition data.',
-          'Nutrition Needed'
-        );
+        toast.error(t('scan2.nutritionNeededMsg'), t('scan2.nutritionNeeded'));
         return;
       }
     }
@@ -449,12 +444,9 @@ export default function BarcodeScannerModal({
         servingQuantity: customQty,
         updatedAt: Date.now(),
       });
-      toast.success(
-        `Added "${currentFoodItem.name}" & saved barcode for future scans!`,
-        'Barcode Remembered'
-      );
+      toast.success(t('scan2.rememberedMsg', { name: currentFoodItem.name }), t('scan2.remembered'));
     } else {
-      toast.success(`Added "${currentFoodItem.name}" to today's meals!`, 'Meal Logged');
+      toast.success(t('scan2.loggedMsg', { name: currentFoodItem.name }), t('scan2.mealLogged'));
     }
 
     if (isFavorite && scannedProduct) {
@@ -490,19 +482,19 @@ export default function BarcodeScannerModal({
         if (item.proteinG !== undefined) setManualProtein(String(item.proteinG));
         if (item.carbsG !== undefined) setManualCarbs(String(item.carbsG));
         if (item.fatG !== undefined) setManualFat(String(item.fatG));
-        toast.success(`Extracted: ${item.name || 'Product'} (${Math.round(item.calories)} kcal, ${item.proteinG}g protein)`, 'Label Scanned');
+        toast.success(t('scan2.extractedMsg', { name: item.name || t('scan2.product'), cal: Math.round(item.calories), protein: item.proteinG }), t('scan2.labelScanned'));
       } else if (result && result.totalCalories !== undefined) {
         if (result.mealName) setManualName(result.mealName);
         setManualCalories(String(Math.round(result.totalCalories)));
         setManualProtein(String(result.totalProtein));
         setManualCarbs(String(result.totalCarbs));
         setManualFat(String(result.totalFat));
-        toast.success('Extracted nutrition facts from packaging label!', 'Label Scanned');
+        toast.success(t('scan2.extractedFacts'), t('scan2.labelScanned'));
       } else {
-        toast.info('Could not identify table clearly. Please adjust macros manually.', 'Label Scan');
+        toast.info(t('scan2.unclearMsg'), t('scan2.labelScan'));
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Could not scan label. Please enter macros manually.', 'Label Scan Failed');
+      toast.error(err?.message || t('scan2.labelFailMsg'), t('scan2.labelFail'));
     } finally {
       setIsScanningLabel(false);
       if (labelInputRef.current) labelInputRef.current.value = '';
@@ -569,8 +561,8 @@ export default function BarcodeScannerModal({
               <BarcodeIcon className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary leading-tight">Barcode Scanner</h2>
-              <span className="text-2xs text-text-muted font-mono">Scan package to log food</span>
+              <h2 className="text-base font-bold text-text-primary leading-tight">{t('scan2.title')}</h2>
+              <span className="text-2xs text-text-muted font-mono">{t('scan2.subtitle')}</span>
             </div>
           </div>
           <button
@@ -599,7 +591,7 @@ export default function BarcodeScannerModal({
                 {isStartingCamera && !cameraError && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-black z-10">
                     <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                    <p className="text-xs font-semibold text-white/90 font-mono">Starting camera…</p>
+                    <p className="text-xs font-semibold text-white/90 font-mono">{t('scan2.starting')}</p>
                   </div>
                 )}
 
@@ -608,7 +600,7 @@ export default function BarcodeScannerModal({
                   <button
                     type="button"
                     onClick={toggleTorch}
-                    aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+                    aria-label={torchOn ? t('scan2.torchOff') : t('scan2.torchOn')}
                     className={`absolute top-3 right-3 z-10 p-2.5 rounded-full backdrop-blur-xs border transition-colors cursor-pointer ${
                       torchOn
                         ? 'bg-accent text-black border-accent'
@@ -630,7 +622,7 @@ export default function BarcodeScannerModal({
                       <span className="absolute bottom-1 right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-accent" />
                     </div>
                     <span className="absolute bottom-3 text-center text-3xs font-mono font-semibold text-white/90 bg-black/70 px-3 py-1 rounded-full backdrop-blur-xs">
-                      Align barcode inside frame • Scans once
+                      {t('scan2.align')}
                     </span>
                   </div>
                 )}
@@ -654,7 +646,7 @@ export default function BarcodeScannerModal({
                         onClick={startCamera}
                         className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
                       >
-                        <RefreshCw className="w-3.5 h-3.5" /> Retry Camera
+                        <RefreshCw className="w-3.5 h-3.5" /> {t('scan2.retryCamera')}
                       </button>
                     )}
                   </div>
@@ -665,7 +657,7 @@ export default function BarcodeScannerModal({
               {
                 <div className="p-3 rounded-2xl bg-bg-secondary/40 border border-border/70 space-y-2">
                   <span className="text-3xs font-mono text-text-muted uppercase font-semibold block">
-                    Or Enter Barcode Manually
+                    {t('scan2.manualTitle')}
                   </span>
                   <div className="flex gap-2">
                     <input
@@ -684,7 +676,7 @@ export default function BarcodeScannerModal({
                       disabled={!manualBarcode.trim()}
                       className="btn-primary px-3.5 py-1.5 text-xs font-mono disabled:opacity-40 flex items-center gap-1 shrink-0 rounded-xl cursor-pointer"
                     >
-                      <Search className="w-3.5 h-3.5" /> Lookup
+                      <Search className="w-3.5 h-3.5" /> {t('scan2.lookup')}
                     </button>
                   </div>
                 </div>
@@ -696,8 +688,8 @@ export default function BarcodeScannerModal({
           {isLoadingProduct && (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
               <Loader2 className="w-8 h-8 text-accent animate-spin" />
-              <p className="text-sm font-semibold text-text-primary">Searching nutrition database...</p>
-              <p className="text-2xs text-text-muted font-mono">Verifying nutrition facts &amp; macros</p>
+              <p className="text-sm font-semibold text-text-primary">{t('scan2.searching')}</p>
+              <p className="text-2xs text-text-muted font-mono">{t('scan2.verifying')}</p>
             </div>
           )}
 
@@ -714,7 +706,7 @@ export default function BarcodeScannerModal({
                     <span className={`text-2xs font-mono font-bold uppercase tracking-wider ${
                       isNotFoundInDB ? 'text-amber-400' : 'text-emerald-500'
                     }`}>
-                      {isNotFoundInDB ? 'NEW / CUSTOM BARCODE' : 'PRODUCT VERIFIED'}
+                      {isNotFoundInDB ? t('scan2.newBarcode') : t('scan2.verified')}
                     </span>
                   </div>
                   <button
@@ -722,7 +714,7 @@ export default function BarcodeScannerModal({
                     onClick={handleScanAgain}
                     className="text-2xs font-mono text-text-muted hover:text-accent flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-card border border-border cursor-pointer transition-colors"
                   >
-                    <RefreshCw className="w-3 h-3" /> Scan Another
+                    <RefreshCw className="w-3 h-3" /> {t('scan2.scanAnother')}
                   </button>
                 </div>
 
@@ -733,10 +725,10 @@ export default function BarcodeScannerModal({
                       <div>
                         <p className="font-semibold text-amber-300 flex items-center gap-1.5 text-xs">
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                          Barcode not in global database yet
+                          {t('scan2.notInDb')}
                         </p>
                         <p className="text-3xs text-text-muted leading-relaxed mt-0.5">
-                          Snap the nutrition table with camera, or enter macros manually. ASCEND will remember this barcode for all future scans!
+                          {t('scan2.notInDbBody')}
                         </p>
                       </div>
 
@@ -750,12 +742,12 @@ export default function BarcodeScannerModal({
                         {isScanningLabel ? (
                           <>
                             <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                            <span>Reading nutrition label...</span>
+                            <span>{t('scan2.readingLabel')}</span>
                           </>
                         ) : (
                           <>
                             <Camera className="w-4 h-4 text-accent" />
-                            <span>Scan Nutrition Label with Camera</span>
+                            <span>{t('scan2.scanLabel')}</span>
                           </>
                         )}
                       </button>
@@ -772,13 +764,13 @@ export default function BarcodeScannerModal({
                     {/* Food Name input with autocomplete */}
                     <div className="relative">
                       <label className="text-2xs font-mono font-semibold text-text-muted uppercase block mb-1">
-                        Food Name <span className="text-accent">*</span>
+                        {t('scan2.foodName')} <span className="text-accent">*</span>
                       </label>
                       <input
                         type="text"
                         value={manualName}
                         onChange={(e) => handleManualNameChange(e.target.value)}
-                        placeholder="e.g. Paneer, Peanut Butter, Oats, Chicken..."
+                        placeholder={t('scan2.foodNamePlaceholder')}
                         className="w-full bg-bg-card border border-border rounded-xl px-3 py-2 text-sm text-text-primary font-bold outline-none focus:border-accent"
                         autoFocus
                       />
@@ -792,7 +784,7 @@ export default function BarcodeScannerModal({
                               className="w-full text-left px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-secondary flex items-center justify-between cursor-pointer"
                             >
                               <span>{s}</span>
-                              <span className="text-3xs font-mono text-accent">Auto-fill macros</span>
+                              <span className="text-3xs font-mono text-accent">{t('scan2.autoFill')}</span>
                             </button>
                           ))}
                         </div>
@@ -802,13 +794,13 @@ export default function BarcodeScannerModal({
                     {/* Brand input (optional) */}
                     <div>
                       <label className="text-2xs font-mono font-semibold text-text-muted uppercase block mb-1">
-                        Brand (Optional)
+                        {t('scan2.brand')}
                       </label>
                       <input
                         type="text"
                         value={manualBrand}
                         onChange={(e) => setManualBrand(e.target.value)}
-                        placeholder="e.g. Amul, MuscleBlaze, Britannia, Local Dairy"
+                        placeholder={t('scan2.brandPlaceholder')}
                         className="w-full bg-bg-card border border-border rounded-xl px-3 py-1.5 text-xs text-text-primary outline-none focus:border-accent"
                       />
                     </div>
@@ -817,13 +809,13 @@ export default function BarcodeScannerModal({
                     <div className="pt-1">
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-2xs font-mono font-semibold text-text-muted uppercase">
-                          Nutrition per 100g
+                          {t('scan2.per100')}
                         </label>
-                        <span className="text-3xs font-mono text-accent">Editable</span>
+                        <span className="text-3xs font-mono text-accent">{t('scan2.editable')}</span>
                       </div>
                       <div className="grid grid-cols-4 gap-2">
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Calories</span>
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.calories')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -834,7 +826,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Protein</span>
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.protein')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -845,7 +837,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Carbs</span>
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.carbs')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -856,7 +848,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">Fat</span>
+                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.fat')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -881,7 +873,7 @@ export default function BarcodeScannerModal({
                       {scannedProduct.name}
                     </h3>
                     <span className="text-3xs text-text-muted font-mono block mt-0.5">
-                      Barcode: {scannedProduct.barcode}
+                      {t('scan2.barcodeLabel')} {scannedProduct.barcode}
                     </span>
                   </div>
                 )}
@@ -901,7 +893,7 @@ export default function BarcodeScannerModal({
                           : 'bg-bg-card border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      Per Serving {scannedProduct.servingSize ? `(${scannedProduct.servingSize})` : ''}
+                      {t('scan2.perServing')} {scannedProduct.servingSize ? `(${scannedProduct.servingSize})` : ''}
                     </button>
                     <button
                       type="button"
@@ -915,14 +907,14 @@ export default function BarcodeScannerModal({
                           : 'bg-bg-card border-border text-text-muted hover:text-text-primary'
                       }`}
                     >
-                      Per 100g
+                      {t('scan2.per100g')}
                     </button>
                   </div>
                 )}
 
                 {/* Portion Quantity Stepper */}
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-card border border-border/70">
-                  <span className="text-xs font-semibold text-text-secondary">Your Portion:</span>
+                  <span className="text-xs font-semibold text-text-secondary">{t('scan2.yourPortion')}</span>
                   <div className="flex items-center gap-2">
                     <input
                       type="number"
@@ -933,7 +925,7 @@ export default function BarcodeScannerModal({
                       className="w-24 bg-bg-secondary border border-border rounded-lg py-1 px-2 text-center text-xs font-mono font-bold text-text-primary outline-none focus:border-accent tabular-nums"
                     />
                     <span className="text-xs font-mono text-text-muted">
-                      {servingMode === 'serving' && !isNotFoundInDB ? 'serving(s)' : 'g'}
+                      {servingMode === 'serving' && !isNotFoundInDB ? t('scan2.servings') : 'g'}
                     </span>
                   </div>
                 </div>
@@ -976,7 +968,7 @@ export default function BarcodeScannerModal({
                   />
                   <span className="text-xs text-text-secondary flex items-center gap-1 font-mono">
                     <Star className={`w-3.5 h-3.5 ${isFavorite ? 'text-accent fill-accent' : 'text-text-muted'}`} />
-                    Pin to Frequent Favorites for 1-tap logging
+                    {t('scan2.pinFavorites')}
                   </span>
                 </label>
               </div>
@@ -984,10 +976,10 @@ export default function BarcodeScannerModal({
               {/* Question: Add to Today's Meals? */}
               <div className="p-3 rounded-2xl bg-accent/10 border border-accent/30 text-center space-y-1">
                 <p className="text-xs font-bold text-text-primary">
-                  Add <span className="text-accent">{currentFoodItem.name}</span> to today&apos;s meals?
+                  {t('scan2.addQuestion', { name: currentFoodItem.name })}
                 </p>
                 <p className="text-2xs text-text-muted">
-                  Adds ~{currentFoodItem.calories} kcal &amp; {currentFoodItem.proteinG}g protein to your daily macro fuel.
+                  {t('scan2.addDetail', { cal: currentFoodItem.calories, protein: currentFoodItem.proteinG })}
                 </p>
               </div>
 
@@ -998,7 +990,7 @@ export default function BarcodeScannerModal({
                   onClick={handleScanAgain}
                   className="btn-secondary flex-1 py-2.5 text-xs font-semibold rounded-xl cursor-pointer"
                 >
-                  Scan Another
+                  {t('scan2.scanAnother')}
                 </button>
                 <button
                   type="button"
@@ -1006,7 +998,7 @@ export default function BarcodeScannerModal({
                   className="btn-primary flex-1 py-2.5 text-xs font-bold flex items-center justify-center gap-2 rounded-xl shadow-lg shadow-accent/20 cursor-pointer"
                 >
                   <Check className="w-4 h-4 stroke-[3]" />
-                  <span>Add to Today&apos;s Meals</span>
+                  <span>{t('scan2.addToMeals')}</span>
                 </button>
               </div>
             </div>
