@@ -4,6 +4,8 @@ import React from 'react';
 import { X, Activity } from 'lucide-react';
 import type { ReadinessResult, ManualCheckin } from '@/lib/coach-engine';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 interface ReadinessSheetProps {
   isOpen: boolean;
@@ -15,20 +17,20 @@ interface ReadinessSheetProps {
   onCheckin: (date: string, checkin: ManualCheckin) => void;
 }
 
-const BAND_LABEL: Record<ReadinessResult['band'], string> = {
-  primed: 'Primed',
-  ready: 'Ready',
-  caution: 'Easy day',
-  rest: 'Rest',
+const BAND_LABEL: Record<ReadinessResult['band'], StringKey> = {
+  primed: 'ready.bandPrimed',
+  ready: 'ready.bandReady',
+  caution: 'ready.bandCaution',
+  rest: 'ready.bandRest',
 };
 
 /** One line on what each band means — presentation copy for the score bands
  *  the engine returns; the numbers themselves are computed internally. */
-const BAND_MEANING: Record<ReadinessResult['band'], string> = {
-  primed: 'Fully recovered — a good day to push if you want to.',
-  ready: 'Recovered and ready for the session you planned.',
-  caution: 'Some fatigue is hanging around — solid work is still on, just keep the top end honest.',
-  rest: 'Recovery is the priority today — resting now pays back more than training through it.',
+const BAND_MEANING: Record<ReadinessResult['band'], StringKey> = {
+  primed: 'ready.meaningPrimed',
+  ready: 'ready.meaningReady',
+  caution: 'ready.meaningCaution',
+  rest: 'ready.meaningRest',
 };
 
 /**
@@ -45,6 +47,7 @@ export default function ReadinessSheet({
   todayStr,
   onCheckin,
 }: ReadinessSheetProps) {
+  const { t } = useTranslation();
   useEscapeToClose(isOpen, onClose);
   if (!isOpen) return null;
 
@@ -55,7 +58,7 @@ export default function ReadinessSheet({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Readiness details"
+        aria-label={t('ready.aria')}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -63,13 +66,13 @@ export default function ReadinessSheet({
             <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
               <Activity className="w-4 h-4" />
             </span>
-            <h3 className="text-base font-bold text-text-primary">Readiness</h3>
+            <h3 className="text-base font-bold text-text-primary">{t('ready.title')}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close readiness details"
+            aria-label={t('ready.closeAria')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -80,11 +83,11 @@ export default function ReadinessSheet({
           <span className="text-4xl font-bold text-text-primary tabular-nums leading-none">
             {readiness.score}
             <span className="text-base font-semibold text-text-muted ml-2">
-              {BAND_LABEL[readiness.band] || 'Ready'}
+              {t(BAND_LABEL[readiness.band] ?? 'ready.bandReady')}
             </span>
           </span>
           <p className="text-xs text-text-muted leading-relaxed mt-2">
-            {BAND_MEANING[readiness.band]}
+            {t(BAND_MEANING[readiness.band])}
           </p>
         </div>
 
@@ -92,7 +95,7 @@ export default function ReadinessSheet({
         {readiness.factors && readiness.factors.length > 0 && (
           <div className="space-y-2">
             <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-              Why this score
+              {t('ready.why')}
             </span>
             <ul className="space-y-1.5">
               {readiness.factors.map((factor, i) => (
@@ -110,13 +113,13 @@ export default function ReadinessSheet({
         {/* Optional feel check-in — fine-tunes the internal score */}
         <div className="space-y-1.5 pt-1">
           <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-            Fine-tune (optional)
+            {t('ready.finetune')}
           </span>
           {(
             [
-              ['sleep', 'Sleep'],
-              ['soreness', 'Soreness'],
-              ['energy', 'Energy'],
+              ['sleep', t('ready.sleep')],
+              ['soreness', t('ready.soreness')],
+              ['energy', t('ready.energy')],
             ] as const
           ).map(([key, label]) => (
             <div key={key} className="flex items-center justify-between gap-2">
@@ -128,7 +131,7 @@ export default function ReadinessSheet({
                     <button
                       key={v}
                       type="button"
-                      aria-label={`${label}: ${v} of 5`}
+                      aria-label={t('ready.factorAria', { label, value: v })}
                       onClick={() => {
                         const next: ManualCheckin = {
                           sleep: todayCheckin?.sleep ?? 3,
@@ -155,8 +158,8 @@ export default function ReadinessSheet({
           ))}
           <p className="text-3xs text-text-muted pt-0.5">
             {todayCheckin
-              ? 'Checked in — readiness updated.'
-              : 'How do you feel? Readiness is calculated for you either way — this just adjusts it.'}
+              ? t('ready.checkedIn')
+              : t('ready.howFeel')}}
           </p>
         </div>
       </div>
