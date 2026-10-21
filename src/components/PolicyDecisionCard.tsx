@@ -572,7 +572,7 @@ export default function PolicyDecisionCard({
               size="sm"
               onClick={() => setIsOverriding(false)}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -828,7 +828,7 @@ export default function PolicyDecisionCard({
                     <span className="text-sm font-bold text-text-primary block mt-1">
                       {selectedTargetExercise?.targetWeight !== undefined
                         ? `${selectedTargetExercise.targetWeight} ${selectedTargetExercise.targetUnit || userUnit}`
-                          : t('pdc.unsetCap'))}{' '}
+                          : t('pdc.unsetCap')}{' '}
                       × {selectedTargetExercise?.targetReps ?? '—'} {t('pdc.reps').toLowerCase()}
                     </span>
                     <span className="text-[10px] text-text-muted block mt-0.5">
@@ -910,7 +910,7 @@ export default function PolicyDecisionCard({
                     size="sm"
                     onClick={() => setIsApplyModalOpen(false)}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     variant="primary"
