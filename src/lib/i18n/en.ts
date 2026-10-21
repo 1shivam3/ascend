@@ -100,6 +100,12 @@ export const en = {
   'onboarding.planOfferTitle': 'Want your training plan?',
   'onboarding.acceptPlan': 'Yes, add my plan',
   'onboarding.declinePlan': "No thanks, I'll build my own",
+  'onboarding.dietPreference': 'Diet Preference',
+  'onboarding.dietHint': 'Used by the protein coach for suggestions that fit how you eat.',
+  'onboarding.dietVegetarian': 'Vegetarian',
+  'onboarding.dietEggitarian': 'Eggetarian',
+  'onboarding.dietNonVegetarian': 'Non-Vegetarian',
+  'onboarding.dietVegan': 'Vegan',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'Settings',

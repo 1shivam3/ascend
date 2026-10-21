@@ -97,6 +97,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.planOfferTitle': 'अपना ट्रेनिंग प्लान चाहिए?',
   'onboarding.acceptPlan': 'हां, मेरा प्लान जोड़ें',
   'onboarding.declinePlan': 'नहीं धन्यवाद, मैं खुद बनाऊंगा',
+  'onboarding.dietPreference': 'आहार पसंद',
+  'onboarding.dietHint': 'आपका प्रोटीन कोच इसके आधार पर आपकी खाने की आदतों के अनुसार सुझाव देता है।',
+  'onboarding.dietVegetarian': 'शाकाहारी',
+  'onboarding.dietEggitarian': 'एगिटेरियन (अंडा खाते हैं)',
+  'onboarding.dietNonVegetarian': 'मांसाहारी',
+  'onboarding.dietVegan': 'वीगन',
 
   // ── Settings ────────────────────────────────────────────────────────
   'settings.title': 'सेटिंग्स',
