@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { Button } from '@/components/ui/Button';
+import { useTranslation } from '@/lib/i18n';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
@@ -32,6 +33,7 @@ export default function TrainingDecisionCard({
 }: TrainingDecisionCardProps) {
   const acceptTrainingDecision = useStore((state) => state.acceptTrainingDecision);
   const overrideTrainingDecision = useStore((state) => state.overrideTrainingDecision);
+  const { t } = useTranslation();
   const toast = useToast();
 
   const [isOverriding, setIsOverriding] = useState(false);
@@ -42,13 +44,13 @@ export default function TrainingDecisionCard({
 
   const handleAccept = () => {
     acceptTrainingDecision(decision.exerciseName, decision);
-    toast.success(`Accepted ${decision.nextPrescription.weight}${userUnit} target for ${decision.exerciseName}`, 'Target Accepted');
+    toast.success(t('decision.acceptedMsg', { weight: decision.nextPrescription.weight, unit: userUnit, exercise: decision.exerciseName }), t('decision.acceptedTitle'));
     if (onAccepted) onAccepted({ ...decision, status: 'accepted' });
   };
 
   const handleOverride = () => {
     overrideTrainingDecision(decision.exerciseName, customWeight, decision);
-    toast.info(`Set ${decision.exerciseName} prescription to ${customWeight}${userUnit}`, 'Target Overridden');
+    toast.info(t('decision.overriddenMsg', { exercise: decision.exerciseName, weight: customWeight, unit: userUnit }), t('decision.overriddenTitle'));
     setIsOverriding(false);
     if (onOverridden) onOverridden({ ...decision, userOverrideWeight: customWeight, status: 'overridden' });
   };
@@ -62,7 +64,7 @@ export default function TrainingDecisionCard({
       <div className="flex items-center justify-between">
         <div>
           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
-            DECISION LEDGER
+            {t('decision.ledger')}
           </span>
           <h3 className="text-base font-black font-display text-text-primary tracking-tight">
             {decision.exerciseName.toUpperCase()}
@@ -80,7 +82,7 @@ export default function TrainingDecisionCard({
             </Badge>
           ) : (
             <Badge variant="neutral" size="sm">
-              LOAD HELD
+              {t('decision.loadHeld')}
             </Badge>
           )}
         </div>
@@ -89,7 +91,7 @@ export default function TrainingDecisionCard({
       {/* Comparison: Previous vs Next (Understandable in 3 seconds) */}
       <div className="grid grid-cols-2 gap-2.5 font-mono">
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 text-center">
-          <span className="text-[9px] uppercase font-bold text-text-muted block">PREVIOUS</span>
+          <span className="text-[9px] uppercase font-bold text-text-muted block">{t('decision.previous')}</span>
           <span className="text-sm font-bold text-text-primary block mt-0.5">
             {decision.previousPerformance.weight} {userUnit} × {decision.previousPerformance.reps}
           </span>
@@ -101,14 +103,14 @@ export default function TrainingDecisionCard({
         </div>
 
         <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 text-center">
-          <span className="text-[9px] uppercase font-bold text-accent block">NEXT PRESCRIPTION</span>
+          <span className="text-[9px] uppercase font-bold text-accent block">{t('decision.next')}</span>
           <span className="text-sm font-black text-text-primary block mt-0.5">
             {isOverridden
-              ? `${decision.userOverrideWeight} ${userUnit} (Manual)`
+              ? t('decision.manual', { weight: decision.userOverrideWeight ?? '', unit: userUnit })
               : `${decision.nextPrescription.weight} ${userUnit} × ${decision.nextPrescription.reps}`}
           </span>
           <span className="text-[10px] text-accent block">
-            @{decision.expectedRpe || decision.nextPrescription.targetRpe || 8} target
+            {t('decision.target', { rpe: decision.expectedRpe || decision.nextPrescription.targetRpe || 8 })}
           </span>
         </div>
       </div>
@@ -116,9 +118,9 @@ export default function TrainingDecisionCard({
       {/* Why? Audit & Evidence */}
       <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/60 text-left space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono font-bold text-accent uppercase">WHY?</span>
+          <span className="text-[10px] font-mono font-bold text-accent uppercase">{t('decision.why')}</span>
           <span className="text-[10px] font-mono text-text-muted">
-            Evidence: {decision.evidenceCount} comparable {decision.evidenceCount === 1 ? 'session' : 'sessions'}
+            {t(decision.evidenceCount === 1 ? 'decision.evidenceOne' : 'decision.evidence', { count: decision.evidenceCount })}
           </span>
         </div>
         <p className="text-xs text-text-secondary leading-snug">
@@ -130,7 +132,7 @@ export default function TrainingDecisionCard({
       {isOverriding ? (
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/80 space-y-2 animate-fade-in text-left">
           <span className="text-[10px] font-mono font-bold uppercase text-text-muted block">
-            Set custom target weight ({userUnit}):
+            {t('decision.customWeight', { unit: userUnit })}
           </span>
           <div className="flex items-center gap-2">
             <input
@@ -141,10 +143,10 @@ export default function TrainingDecisionCard({
               className="flex-1 bg-bg-card border border-border rounded-lg py-1.5 px-3 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent"
             />
             <Button variant="primary" size="sm" onClick={handleOverride}>
-              Save
+              {t('common.save')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setIsOverriding(false)}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -153,16 +155,16 @@ export default function TrainingDecisionCard({
           {isAccepted ? (
             <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-mono font-bold">
               <ShieldCheck className="w-4 h-4" />
-              <span>Target Accepted</span>
+              <span>{t('decision.targetAccepted')}</span>
             </div>
           ) : isOverridden ? (
             <div className="flex items-center gap-1.5 text-amber-400 text-xs font-mono font-bold">
               <Sparkles className="w-4 h-4" />
-              <span>Manual Override Active</span>
+              <span>{t('decision.manualActive')}</span>
             </div>
           ) : (
             <span className="text-[10px] text-text-muted font-mono">
-              Suggested by engine
+              {t('decision.suggested')}
             </span>
           )}
 
@@ -174,7 +176,7 @@ export default function TrainingDecisionCard({
                 onClick={handleAccept}
                 leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
               >
-                Accept
+                {t('decision.accept')}
               </Button>
             )}
             <Button
@@ -189,7 +191,7 @@ export default function TrainingDecisionCard({
                 setIsOverriding(true);
               }}
             >
-              {isOverridden ? 'Edit Override' : 'Override'}
+              {isOverridden ? t('decision.editOverride') : t('decision.override')}
             </Button>
           </div>
         </div>
