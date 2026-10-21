@@ -46,6 +46,7 @@ import {
   Zap,
   Leaf,
   Calendar,
+  Flag,
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, MealDayKind, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { resolveIndianMeta } from '@/lib/indian-foods';
@@ -68,6 +69,7 @@ const BarcodeScannerModal = dynamic(() => import('@/components/BarcodeScannerMod
   ssr: false,
 });
 import ScanMealModal from '@/components/ScanMealModal';
+import ReportAIModal from '@/components/ReportAIModal';
 import HydrationModal from '@/components/HydrationModal';
 import CreatineModal from '@/components/CreatineModal';
 import { calculateHydrationTarget } from '@/lib/habits';
@@ -334,6 +336,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Natural language meal logging ──────────────────────────────────────────
   const [naturalQuery, setNaturalQuery] = useState('');
   const [isNaturalParsing, setIsNaturalParsing] = useState(false);
+  // Most recent AI (provider) meal parse — kept visible next to the
+  // quick-log input so the AI output has the report affordance the
+  // privacy policy promises (QA4-043), instead of vanishing in a toast.
+  const [lastAiMealParse, setLastAiMealParse] = useState<{
+    mealName: string;
+    snippet: string;
+  } | null>(null);
+  const [showReportAI, setShowReportAI] = useState(false);
 
   // ── Autocomplete state ────────────────────────────────────────────────────
   const [foodSuggestions,        setFoodSuggestions]        = useState<Record<number, FoodSearchResult[]>>({});
@@ -1128,6 +1138,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         const sourceBadge = data.source === 'gemini' || data.source === 'groq' || data.source === 'openrouter'
           ? 'Smart Macro Analysis'
           : 'Calibrated IFCT';
+        if (sourceBadge === 'Smart Macro Analysis') {
+          setLastAiMealParse({
+            mealName: data.mealName || 'Quick Meal',
+            snippet: [
+              q,
+              data.foods.map((f: FoodItem) => f.name).join(', '),
+              `~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
+            ]
+              .filter(Boolean)
+              .join(' — '),
+          });
+        }
         warnUnmatched(data.foods);
         toast.success(
           `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
@@ -1844,6 +1866,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </button>
             </div>
           </form>
+
+          {/* Last AI meal parse — persistent surface for the report button */}
+          {lastAiMealParse && (
+            <div className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl bg-accent/10 border border-accent/25">
+              <span className="text-2xs text-text-secondary truncate">
+                <strong className="text-text-primary">AI logged:</strong> {lastAiMealParse.mealName} — {lastAiMealParse.snippet}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowReportAI(true)}
+                aria-label="Report AI content"
+                title="Report AI content"
+                data-testid="report-ai-meal-parse"
+                className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors shrink-0"
+              >
+                <Flag className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Secondary Tools Dropdown ("More") */}
           <div className="flex items-center justify-between text-xs text-text-secondary px-1 pt-0.5">
@@ -3066,6 +3107,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         isOpen={isScanModalOpen}
         onClose={() => setIsScanModalOpen(false)}
       />
+
+      {lastAiMealParse && (
+        <ReportAIModal
+          isOpen={showReportAI}
+          onClose={() => setShowReportAI(false)}
+          sourceFeature="AI Meal Parse (Quick Log)"
+          aiContentSnippet={lastAiMealParse.snippet}
+          onReported={() => setLastAiMealParse(null)}
+        />
+      )}
 
       {/* ══════════════════ BARCODE SCANNER MODAL ══════════════════ */}
       {isBarcodeModalOpen && (

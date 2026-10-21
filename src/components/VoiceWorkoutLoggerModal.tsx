@@ -19,7 +19,9 @@ import {
   Minus,
   Globe,
   SlidersHorizontal,
+  Flag,
 } from 'lucide-react';
+import ReportAIModal from '@/components/ReportAIModal';
 import { useToast } from './ui/Toast';
 import PermissionHelp from './ui/PermissionHelp';
 
@@ -47,6 +49,7 @@ export default function VoiceWorkoutLoggerModal({
   const [autoApplyCountdown, setAutoApplyCountdown] = useState<number | null>(null);
   const [speechLang, setSpeechLang] = useState<'en-IN' | 'hi-IN'>('en-IN');
   const [parseError, setParseError] = useState<string | null>(null);
+  const [showReportAI, setShowReportAI] = useState(false);
   // Explicit recognizer failure states — never fail silently.
   const [voiceError, setVoiceError] = useState<'denied' | 'unavailable' | null>(null);
 
@@ -445,6 +448,16 @@ export default function VoiceWorkoutLoggerModal({
                   <span className="text-3xs font-mono font-black uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded tracking-wide">
                     RECOGNIZED SET
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowReportAI(true)}
+                    aria-label="Report AI content"
+                    title="Report AI content"
+                    data-testid="report-ai-voice-parse"
+                    className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                  >
+                    <Flag className="w-3.5 h-3.5" />
+                  </button>
                   {autoApplyCountdown !== null && autoApplyCountdown > 0 ? (
                     <span className="text-3xs font-mono text-text-muted animate-pulse">
                       Auto-logging in <strong>{autoApplyCountdown}s</strong>...
@@ -604,6 +617,14 @@ export default function VoiceWorkoutLoggerModal({
           </div>
         )}
       </div>
+      {parsedResult && (
+        <ReportAIModal
+          isOpen={showReportAI}
+          onClose={() => setShowReportAI(false)}
+          sourceFeature="Voice Workout Logger"
+          aiContentSnippet={parsedResult.summary || transcript}
+        />
+      )}
     </div>
   );
 }

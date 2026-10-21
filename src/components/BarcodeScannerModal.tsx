@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Utensils,
   Flashlight,
+  Flag,
 } from 'lucide-react';
 import { FoodItem } from '@/lib/types';
 import { fetchProductByBarcode, ScannedProduct, scannedProductToFoodItem } from '@/lib/openfoodfacts';
@@ -28,6 +29,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
 import { Capacitor } from '@capacitor/core';
 import PermissionHelp from '@/components/ui/PermissionHelp';
+import ReportAIModal from '@/components/ReportAIModal';
 
 interface BarcodeScannerModalProps {
   isOpen: boolean;
@@ -75,6 +77,9 @@ export default function BarcodeScannerModal({
   const [manualCarbs, setManualCarbs] = useState('');
   const [manualFat, setManualFat] = useState('');
   const [isNotFoundInDB, setIsNotFoundInDB] = useState(false);
+  // AI label-scan extraction, kept so its output has a report affordance.
+  const [aiLabelSnippet, setAiLabelSnippet] = useState<string | null>(null);
+  const [showReportAI, setShowReportAI] = useState(false);
   const [foodSuggestions, setFoodSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -490,6 +495,7 @@ export default function BarcodeScannerModal({
         if (item.proteinG !== undefined) setManualProtein(String(item.proteinG));
         if (item.carbsG !== undefined) setManualCarbs(String(item.carbsG));
         if (item.fatG !== undefined) setManualFat(String(item.fatG));
+        setAiLabelSnippet(`${item.name || 'Product'} — ${Math.round(item.calories)} kcal, ${item.proteinG}g protein, ${item.carbsG}g carbs, ${item.fatG}g fat`);
         toast.success(`Extracted: ${item.name || 'Product'} (${Math.round(item.calories)} kcal, ${item.proteinG}g protein)`, 'Label Scanned');
       } else if (result && result.totalCalories !== undefined) {
         if (result.mealName) setManualName(result.mealName);
@@ -497,6 +503,7 @@ export default function BarcodeScannerModal({
         setManualProtein(String(result.totalProtein));
         setManualCarbs(String(result.totalCarbs));
         setManualFat(String(result.totalFat));
+        setAiLabelSnippet(`${result.mealName || 'Product label'} — ${Math.round(result.totalCalories)} kcal, ${result.totalProtein}g protein, ${result.totalCarbs}g carbs, ${result.totalFat}g fat`);
         toast.success('Extracted nutrition facts from packaging label!', 'Label Scanned');
       } else {
         toast.info('Could not identify table clearly. Please adjust macros manually.', 'Label Scan');
@@ -526,6 +533,7 @@ export default function BarcodeScannerModal({
     setManualCarbs('');
     setManualFat('');
     setIsScanningLabel(false);
+    setAiLabelSnippet(null);
     setShowSuggestions(false);
     isProcessingRef.current = false;
     startCamera();
@@ -767,6 +775,19 @@ export default function BarcodeScannerModal({
                         className="hidden"
                         onChange={handleLabelImageSelected}
                       />
+                      {aiLabelSnippet && (
+                        <button
+                          type="button"
+                          onClick={() => setShowReportAI(true)}
+                          aria-label="Report AI content"
+                          title="Report AI content"
+                          data-testid="report-ai-label-scan"
+                          className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-danger transition-colors"
+                        >
+                          <Flag className="w-3 h-3" />
+                          <span>Report this AI extraction</span>
+                        </button>
+                      )}
                     </div>
 
                     {/* Food Name input with autocomplete */}
@@ -1013,6 +1034,14 @@ export default function BarcodeScannerModal({
           )}
         </div>
       </div>
+      {aiLabelSnippet && (
+        <ReportAIModal
+          isOpen={showReportAI}
+          onClose={() => setShowReportAI(false)}
+          sourceFeature="AI Nutrition Label Scan"
+          aiContentSnippet={aiLabelSnippet}
+        />
+      )}
     </div>
   );
 }

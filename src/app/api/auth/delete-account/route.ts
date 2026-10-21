@@ -113,41 +113,57 @@ export async function POST(req: Request) {
       let matchedUserEmail: string | null = null;
 
       if (adminClient) {
+        // 1. Look up in Supabase Auth admin, paginating through ALL
+        // accounts. listUsers() defaults to the first 50 users, so a
+        // single unpaginated call silently misses everyone past
+        // position 50 (QA4-007). Loop pages until the user is found
+        // or a short page shows the list is exhausted. The page cap
+        // is a safety bound against a misbehaving API returning full
+        // pages forever (100 pages × 100 = 10,000 accounts).
         try {
-          // 1. Look up in Supabase Auth admin
-          const { data: usersData } = await adminClient.auth.admin.listUsers();
-          const authMatch = usersData?.users?.find(
-            (u) => u.email?.trim().toLowerCase() === requestEmail
-          );
-          if (authMatch) {
-            matchedUserId = authMatch.id;
-            matchedUserEmail = authMatch.email || requestEmail;
-          } else {
-            // 2. Fallback check profiles table
-            const { data: profile } = await adminClient
-              .from('profiles')
-              .select('id, email')
-              .eq('email', requestEmail)
-              .maybeSingle();
-            if (profile) {
-              matchedUserId = profile.id;
-              matchedUserEmail = profile.email || requestEmail;
-            } else {
-              // 3. Fallback check partial deletion recovery ledger
-              const { data: partialRow } = await adminClient
-                .from('consumed_deletion_nonces')
-                .select('user_id, email')
-                .eq('email', requestEmail)
-                .eq('status', 'partial')
-                .maybeSingle();
-              if (partialRow) {
-                matchedUserId = partialRow.user_id;
-                matchedUserEmail = partialRow.email || requestEmail;
-              }
+          const PER_PAGE = 100;
+          const MAX_PAGES = 100;
+          for (let page = 1; page <= MAX_PAGES && !matchedUserId; page++) {
+            const { data: usersData } = await adminClient.auth.admin.listUsers({
+              page,
+              perPage: PER_PAGE,
+            });
+            const users = usersData?.users ?? [];
+            const authMatch = users.find(
+              (u) => u.email?.trim().toLowerCase() === requestEmail
+            );
+            if (authMatch) {
+              matchedUserId = authMatch.id;
+              matchedUserEmail = authMatch.email || requestEmail;
+              break;
             }
+            if (users.length < PER_PAGE) break;
           }
         } catch {
           // Swallow lookup error to prevent timing and enumeration attacks
+        }
+
+        if (!matchedUserId) {
+          // 2. Fallback check partial deletion recovery ledger — in its
+          // own try so an Auth-listing failure above cannot skip the
+          // recovery path for an already-purged account.
+          // (There is deliberately no profiles-table fallback: the
+          // production profiles table has no email column, so such a
+          // query could only ever error — QA4A-002.)
+          try {
+            const { data: partialRow } = await adminClient
+              .from('consumed_deletion_nonces')
+              .select('user_id, email')
+              .eq('email', requestEmail)
+              .eq('status', 'partial')
+              .maybeSingle();
+            if (partialRow) {
+              matchedUserId = partialRow.user_id;
+              matchedUserEmail = partialRow.email || requestEmail;
+            }
+          } catch {
+            // Swallow lookup error to prevent timing and enumeration attacks
+          }
         }
       }
 
