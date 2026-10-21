@@ -16,28 +16,22 @@ import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { useToast } from '@/components/ui/Toast';
 import FriendChallengesSection from '@/components/FriendChallengesSection';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 interface ChallengesSheetProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-function goalText(target: number, metric: ChallengeMetric): string {
-  switch (metric) {
-    case 'workouts':
-      return `Goal: ${target} workouts this month`;
-    case 'breakfasts':
-      return `Goal: log breakfast on ${target} days`;
-    case 'streak_days':
-      return `Goal: reach a ${target}-day streak`;
-    case 'prs':
-      return `Goal: ${target} personal records this month`;
-    case 'meals':
-      return `Goal: ${target} meals this month`;
-    case 'water_days':
-      return `Goal: log water on ${target} days`;
-  }
-}
+const GOAL_KEY: Record<ChallengeMetric, StringKey> = {
+  workouts: 'chal.goalWorkouts',
+  breakfasts: 'chal.goalBreakfasts',
+  streak_days: 'chal.goalStreak',
+  prs: 'chal.goalPrs',
+  meals: 'chal.goalMeals',
+  water_days: 'chal.goalWater',
+};
 
 function formatDate(dateStr: string): string {
   const d = new Date(`${dateStr}T12:00:00`);
@@ -51,6 +45,7 @@ function formatDate(dateStr: string): string {
  */
 export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProps) {
   useEscapeToClose(isOpen, onClose);
+  const { t } = useTranslation();
   const toast = useToast();
   const {
     workouts,
@@ -117,7 +112,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Monthly challenges"
+        aria-label={t('chal.aria')}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -126,15 +121,15 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
               <Trophy className="w-4 h-4" />
             </span>
             <div>
-              <h3 className="text-base font-bold text-text-primary">Challenges</h3>
-              <p className="text-2xs text-text-muted">{monthLabel} · optional side quests</p>
+              <h3 className="text-base font-bold text-text-primary">{t('chal.title')}</h3>
+              <p className="text-2xs text-text-muted">{t('chal.subtitle', { month: monthLabel })}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close challenges"
+            aria-label={t('chal.closeAria')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -152,12 +147,12 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                   +{XP_CHALLENGE_COMPLETE} XP
                 </span>
               </div>
-              <p className="text-3xs font-semibold text-text-secondary">{goalText(def.target, def.metric)}</p>
+              <p className="text-3xs font-semibold text-text-secondary">{t(GOAL_KEY[def.metric], { target: def.target })}</p>
 
               {optedIn && evaluation.completed ? (
                 <p className="text-xs font-bold text-emerald-500">
-                  Complete — {XP_CHALLENGE_COMPLETE} XP earned
-                  {evaluation.completedDate ? ` · finished ${formatDate(evaluation.completedDate)}` : ''}
+                  {t('chal.complete', { xp: XP_CHALLENGE_COMPLETE })}
+                  {evaluation.completedDate ? ` ${t('chal.finished', { date: formatDate(evaluation.completedDate) })}` : ''}
                 </p>
               ) : optedIn ? (
                 <>
@@ -169,17 +164,17 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-3xs text-text-muted tabular-nums">
-                      {evaluation.progress} of {evaluation.target} · {evaluation.pct}% · {daysLeftInMonth} day{daysLeftInMonth === 1 ? '' : 's'} left this month
+                      {t(daysLeftInMonth === 1 ? 'chal.progressOne' : 'chal.progress', { progress: evaluation.progress, target: evaluation.target, pct: evaluation.pct, days: daysLeftInMonth })}
                     </p>
                     <button
                       type="button"
                       onClick={() => {
                         optOutChallenge(key);
-                        toast.info('Challenge left. No hard feelings — it will be here next month too.', 'Challenge Left');
+                        toast.info(t('chal.leftMsg'), t('chal.leftTitle'));
                       }}
                       className="text-3xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0"
                     >
-                      Leave
+                      {t('chal.leave')}
                     </button>
                   </div>
                 </>
@@ -188,11 +183,11 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                   type="button"
                   onClick={() => {
                     optInChallenge(key);
-                    toast.success('Challenge joined. Progress counts what you already log.', 'Challenge Accepted');
+                    toast.success(t('chal.joinedMsg'), t('chal.joinedTitle'));
                   }}
                   className="py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
-                  Join challenge
+                  {t('chal.join')}
                 </button>
               )}
             </div>
@@ -200,7 +195,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
         </div>
 
         <p className="text-3xs text-text-muted leading-relaxed">
-          Challenges never add new chores — progress comes only from workouts, meals, and PRs you log anyway. Join or leave anytime.
+          {t('chal.footer')}
         </p>
 
         <div className="border-t border-border/60 pt-4">

@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { PlannedWorkout } from '@/lib/types';
 import { Download, Play, X, User, Dumbbell, Sparkles } from 'lucide-react';
 import { useToast } from './ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 
 interface ImportProgramModalProps {
   program: DecodedProgram | null;
@@ -21,6 +22,7 @@ export default function ImportProgramModal({
   onStartWorkout,
 }: ImportProgramModalProps) {
   const addPlannedWorkout = useStore((state) => state.addPlannedWorkout);
+  const { t } = useTranslation();
   const toast = useToast();
 
   if (!isOpen || !program) return null;
@@ -43,13 +45,13 @@ export default function ImportProgramModal({
 
   const handleImportOnly = () => {
     if (existingDuplicate()) {
-      toast.info(`"${program.name}" is already in your Workout Plans.`, 'Already Imported');
+      toast.info(t('import.alreadyMsg', { name: program.name }), t('import.alreadyTitle'));
       onClose();
       return;
     }
     const newPlan = createPlanObject();
     addPlannedWorkout(newPlan);
-    toast.success(`Imported "${program.name}" to your Workout Plans!`, 'Program Saved');
+    toast.success(t('import.savedMsg', { name: program.name }), t('import.savedTitle'));
     onClose();
   };
 
@@ -59,7 +61,7 @@ export default function ImportProgramModal({
       planToStart = createPlanObject();
       addPlannedWorkout(planToStart);
     }
-    toast.success(`Imported "${program.name}". Starting workout!`, 'Session Started');
+    toast.success(t('import.startedMsg', { name: program.name }), t('import.startedTitle'));
     onClose();
     if (onStartWorkout) {
       onStartWorkout(planToStart);
@@ -80,9 +82,9 @@ export default function ImportProgramModal({
             </div>
             <div>
               <h3 className="font-bold text-base text-text-primary leading-tight">
-                Import Shared Routine
+                {t('import.title')}
               </h3>
-              <p className="text-2xs text-text-muted font-mono">1-Tap program import</p>
+              <p className="text-2xs text-text-muted font-mono">{t('import.subtitle')}</p>
             </div>
           </div>
           <button
@@ -101,14 +103,14 @@ export default function ImportProgramModal({
               {program.name}
             </h4>
             <span className="text-3xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
-              {program.exercises.length} EXERCISES
+              {t('import.exercises', { count: program.exercises.length })}
             </span>
           </div>
 
           {program.coachName && (
             <div className="flex items-center gap-1.5 text-xs text-text-secondary font-mono">
               <User className="w-3.5 h-3.5 text-accent" />
-              <span>Shared by Coach <strong className="text-text-primary">{program.coachName}</strong></span>
+              <span>{t('import.sharedBy')} <strong className="text-text-primary">{program.coachName}</strong></span>
             </div>
           )}
 
@@ -122,7 +124,7 @@ export default function ImportProgramModal({
         {/* Exercises List */}
         <div className="p-3 rounded-xl bg-bg-secondary border border-border/70 space-y-2 max-h-56 overflow-y-auto">
           <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
-            Routine Breakdown
+            {t('import.breakdown')}
           </span>
           <div className="space-y-1.5">
             {program.exercises.map((ex, idx) => (
@@ -135,8 +137,7 @@ export default function ImportProgramModal({
                   <span className="font-bold text-text-primary">{ex.name}</span>
                 </div>
                 <div className="text-2xs text-text-secondary">
-                  <span className="font-bold text-text-primary">{ex.targetSets}</span> sets ×{' '}
-                  <span className="font-bold text-text-primary">{ex.targetReps}</span> reps
+                  {t('import.setsReps', { sets: ex.targetSets, reps: ex.targetReps })}
                   {ex.targetWeight ? (
                     <span className="text-accent ml-1 font-bold">
                       @{ex.targetWeight}{ex.targetUnit || 'kg'}
@@ -157,7 +158,7 @@ export default function ImportProgramModal({
               className="btn-primary w-full py-2.5 text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:brightness-110 active:scale-[0.98] transition-all"
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>Import &amp; Start Workout Now</span>
+              <span>{t('import.startNow')}</span>
             </button>
           )}
 
@@ -167,7 +168,7 @@ export default function ImportProgramModal({
             className="btn-secondary w-full py-2 text-xs font-semibold flex items-center justify-center gap-2"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Save to My Workout Plans</span>
+            <span>{t('import.savePlans')}</span>
           </button>
         </div>
       </div>
