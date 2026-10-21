@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { syncEngine } from '@/lib/supabase/sync';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 
 export function GoogleIcon({ className = 'w-4 h-4' }: { className?: string }) {
   return (
@@ -33,6 +34,7 @@ interface SocialAuthButtonsProps {
 }
 
 export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthButtonsProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const [loadingProvider, setLoadingProvider] = useState<'google' | null>(null);
 
@@ -41,11 +43,11 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
     try {
       const res = await syncEngine.signInWithGoogle();
       if (res.error) {
-        toast.error(res.error, 'Google Sign-In Failed');
+        toast.error(res.error, t('auth.googleFailed'));
         setLoadingProvider(null);
       }
     } catch {
-      toast.error('Could not connect to Google', 'Sign-In Error');
+      toast.error(t('auth.googleConnectFail'), t('auth.signInError'));
       setLoadingProvider(null);
     }
   };
@@ -58,7 +60,7 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
           <div className="w-full border-t border-[#E2DFD6]" />
         </div>
         <div className="relative bg-white px-3 text-xs text-[#858076]">
-          Or continue with
+          {t('auth.orContinue')}
         </div>
       </div>
 
@@ -76,7 +78,7 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
           ) : (
             <GoogleIcon className="w-4 h-4 shrink-0" />
           )}
-          <span>Continue with Google</span>
+          <span>{t('auth.continueGoogle')}</span>
         </button>
       </div>
     </div>

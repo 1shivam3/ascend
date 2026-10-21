@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 interface StepProgressBarProps {
   currentStep: 1 | 2 | 3 | 4;
@@ -14,6 +15,7 @@ export default function StepProgressBar({
   onBack,
   title,
 }: StepProgressBarProps) {
+  const { t } = useTranslation();
   return (
     <div className="w-full max-w-md mx-auto pt-4 pb-6 px-4">
       {/* Top Navigation Row */}
@@ -21,7 +23,7 @@ export default function StepProgressBar({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Go back"
+          aria-label={t('auth.goBack')}
           className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-white border border-[#E2DFD6] flex items-center justify-center text-[#171916] hover:bg-[#F3F0E7] active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5 text-[#171916]" />
@@ -33,7 +35,7 @@ export default function StepProgressBar({
           </span>
         ) : (
           <span className="text-xs font-medium text-[#858076]">
-            Step {currentStep} of 4
+            {t('auth.stepOf', { step: currentStep })}
           </span>
         )}
 
