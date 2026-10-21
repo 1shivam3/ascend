@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
@@ -18,6 +19,7 @@ export interface EditProfileModalProps {
 export default function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
@@ -90,7 +92,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Could not read the photo.'));
+        reader.onerror = () => reject(new Error(t('editProfile.readPhotoError')));
         reader.readAsDataURL(processed.blob);
       });
       setAvatar(dataUrl);
@@ -98,9 +100,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       // says "Photo Set", so the photo must actually be set, even if the user
       // closes the modal without saving other fields.
       setProfile({ ...profile, avatar: dataUrl });
-      toast.success('Profile photo updated.', 'Photo Set');
+      toast.success(t('editProfile.photoUpdated'), t('editProfile.photoSetTitle'));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not set the photo.', 'Upload Failed');
+      toast.error(err instanceof Error ? err.message : t('editProfile.photoFailedMsg'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -134,7 +136,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
     const trimmedName = sanitizeAthleteName(name.trim(), MAX_ATHLETE_NAME_LENGTH);
     if (!trimmedName) {
-      newErrors.name = 'Full name is required';
+      newErrors.name = t('editProfile.errNameRequired');
     } else if (trimmedName.length > MAX_ATHLETE_NAME_LENGTH) {
       newErrors.name = `Please keep your name under ${MAX_ATHLETE_NAME_LENGTH} characters`;
     }
@@ -144,15 +146,15 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     if (isNaN(parsedWeight) || parsedWeightKg < 30 || parsedWeightKg > 300) {
       newErrors.weight =
         unit === 'kg'
-          ? 'Please enter a realistic bodyweight between 30 kg and 300 kg.'
-          : 'Please enter a realistic bodyweight between 66 lbs and 660 lbs.';
+          ? t('editProfile.errWeightKg')
+          : t('editProfile.errWeightLbs');
     }
 
     let parsedAge: number | undefined = undefined;
     if (age.trim()) {
       parsedAge = parseInt(age, 10);
       if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
-        newErrors.age = 'Age must be between 13 and 120';
+        newErrors.age = t('editProfile.errAge');
       }
     }
 
@@ -164,8 +166,8 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       if (isNaN(val) || valCm < 100 || valCm > 250) {
         newErrors.height =
           unit === 'lbs'
-            ? 'Please enter a valid height between 39 in and 98 in.'
-            : 'Please enter a valid height between 100 cm and 250 cm.';
+            ? t('editProfile.errHeightIn')
+            : t('editProfile.errHeightCm');
       } else {
         parsedHeightCm = Math.round(valCm);
       }
@@ -194,7 +196,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     // Also update body metrics entry
     updateBodyMetrics(weightKg, parsedHeightCm);
 
-    toast.success('Profile details saved successfully!', 'Profile Updated');
+    toast.success(t('editProfile.savedToast'), t('editProfile.updatedTitle'));
     onClose();
   };
 
@@ -217,16 +219,16 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-text-primary leading-tight font-sans">
-                Edit Profile
+                {t('editProfile.title')}
               </h2>
-              <p className="text-2xs text-text-muted font-mono">Calibrate Personal Athlete Details</p>
+              <p className="text-2xs text-text-muted font-mono">{t('editProfile.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary transition-colors flex items-center justify-center cursor-pointer"
-            aria-label="Close"
+            aria-label={t('editProfile.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -240,7 +242,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={avatar}
-                  alt="Profile"
+                  alt={t('editProfile.profileAlt')}
                   className="w-16 h-16 rounded-full object-cover border-2 border-accent/40"
                 />
               ) : (
@@ -253,8 +255,8 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploadingAvatar}
                 className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
-                title="Change profile photo"
-                aria-label="Change profile photo"
+                title={t('editProfile.changePhoto')}
+                aria-label={t('editProfile.changePhoto')}
               >
                 <Camera className="w-3.5 h-3.5" />
               </button>
@@ -266,7 +268,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 disabled={isUploadingAvatar}
                 className="text-xs font-bold text-accent hover:underline text-left cursor-pointer disabled:opacity-50"
               >
-                {isUploadingAvatar ? 'Uploading…' : avatar ? 'Change photo' : 'Add photo'}
+                {isUploadingAvatar ? t('editProfile.uploading') : avatar ? t('editProfile.changePhotoShort') : t('editProfile.addPhoto')}
               </button>
               {avatar && (
                 <button
@@ -275,7 +277,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                   className="text-2xs font-semibold text-text-muted hover:text-danger flex items-center gap-1 text-left cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
-                  Remove photo
+                  {t('editProfile.removePhoto')}
                 </button>
               )}
             </div>
@@ -285,13 +287,13 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
               accept="image/*"
               className="hidden"
               onChange={handleAvatarSelect}
-              aria-label="Profile photo picker"
+              aria-label={t('editProfile.photoPicker')}
             />
           </div>
 
           {/* Full Name */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary font-sans">Full Name</label>
+            <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.fullName')}</label>
             <input
               type="text"
               value={name}
@@ -299,7 +301,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 setName(e.target.value);
                 if (errors.name) setErrors((prev) => ({ ...prev, name: '' }));
               }}
-              placeholder="Your name"
+              placeholder={t('editProfile.namePlaceholder')}
               maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
             />
@@ -308,7 +310,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
           {/* Gender Selection (Supports Male, Female, Other) */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-text-secondary font-sans">Gender Identity</label>
+            <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.genderIdentity')}</label>
             <div className="grid grid-cols-3 gap-2">
               {(['male', 'female', 'other'] as Gender[]).map((g) => (
                 <button
@@ -330,7 +332,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           {/* Preferred Unit & Age */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans">Units</label>
+              <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.units')}</label>
               <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
                 <button
                   type="button"
@@ -358,7 +360,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-text-secondary font-sans">Age (years)</label>
+              <label className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.ageYears')}</label>
               <input
                 type="number"
                 value={age}
@@ -379,7 +381,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
-                <span>Bodyweight</span>
+                <span>{t('editProfile.bodyweight')}</span>
                 <span className="text-2xs font-mono text-text-muted uppercase">{unit}</span>
               </label>
               <input
@@ -398,9 +400,9 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-text-secondary font-sans flex items-center justify-between">
-                <span>Height</span>
+                <span>{t('editProfile.height')}</span>
                 <span className="text-2xs font-mono text-text-muted uppercase">
-                  {unit === 'lbs' ? 'inches' : 'cm'}
+                  {unit === 'lbs' ? t('editProfile.inches') : 'cm'}
                 </span>
               </label>
               <input
@@ -425,13 +427,13 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
               onClick={onClose}
               className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary transition-all cursor-pointer"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-accent hover:bg-accent-dim text-white text-xs font-bold transition-all shadow-sm shadow-accent/20 cursor-pointer"
             >
-              Save Changes
+              {t('scan.saveChanges')}
             </button>
           </div>
         </form>

@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
+import { useTranslation } from '@/lib/i18n';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -14,6 +15,7 @@ interface BodyMetricsModalProps {
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const profile = useStore((state) => state.profile);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const updateBodyMetrics = useStore((state) => state.updateBodyMetrics);
@@ -130,7 +132,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       : undefined;
 
     updateBodyMetrics(finalWeightKg, validHeight, validFat, validChestIn, validWaistIn, validHipsIn);
-    setSuccessMsg('Body metrics saved successfully!');
+    setSuccessMsg(t('bodyMetrics.savedMsg'));
     setTimeout(() => {
       setSuccessMsg('');
       onClose();
@@ -156,9 +158,9 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </div>
             <div>
               <h2 className="font-bold text-base text-text-primary leading-tight">
-                Log Measurement
+                {t('progress.logMeasurement')}
               </h2>
-              <p className="text-2xs text-text-muted font-mono">Calibrate Strength Standard Ratios &amp; Track Progress</p>
+              <p className="text-2xs text-text-muted font-mono">{t('bodyMetrics.subtitle')}</p>
             </div>
           </div>
           <button
@@ -184,7 +186,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           <div>
             <div className="flex justify-between items-center mb-1.5">
               <label htmlFor="modal-weight-input" className="section-title text-2xs font-mono uppercase text-text-muted">
-                BODYWEIGHT
+                {t('bodyMetrics.bodyweight')}
               </label>
               <div className="flex rounded-md bg-bg-secondary p-0.5 border border-border/80">
                 <button
@@ -234,7 +236,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           {/* Height Field */}
           <div>
             <label htmlFor="modal-height-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
-              HEIGHT {unit === 'lbs' ? '(IN)' : '(CM)'}
+              {unit === 'lbs' ? t('bodyMetrics.heightIn') : t('bodyMetrics.heightCm')}
             </label>
             <div className="relative">
               <input
@@ -253,19 +255,19 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
               </span>
             </div>
             <p className="text-3xs text-text-muted mt-1 font-mono">
-              Calibrates Mifflin-St Jeor metabolic expenditure and daily macro targets.
+              {t('bodyMetrics.heightHint')}
             </p>
           </div>
 
           {/* Circumference & Body Fat Fields (Optional) */}
           <div className="pt-2 border-t border-border/50 space-y-3">
             <span className="section-title text-2xs font-mono uppercase text-text-muted block">
-              BODY MEASUREMENTS (OPTIONAL)
+              {t('bodyMetrics.measurementsOptional')}
             </span>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="modal-fat-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
-                  BODY FAT (%)
+                  {t('bodyMetrics.bodyFatPct')}
                 </label>
                 <input
                   id="modal-fat-input"
@@ -281,7 +283,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
               </div>
               <div>
                 <label htmlFor="modal-chest-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
-                  CHEST ({unit === 'lbs' ? 'IN' : 'CM'})
+                  {t('bodyMetrics.chestUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input
                   id="modal-chest-input"
@@ -297,7 +299,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
               </div>
               <div>
                 <label htmlFor="modal-waist-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
-                  WAIST ({unit === 'lbs' ? 'IN' : 'CM'})
+                  {t('bodyMetrics.waistUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input
                   id="modal-waist-input"
@@ -313,7 +315,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
               </div>
               <div>
                 <label htmlFor="modal-hips-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
-                  HIPS ({unit === 'lbs' ? 'IN' : 'CM'})
+                  {t('bodyMetrics.hipsUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input
                   id="modal-hips-input"
@@ -333,7 +335,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           {/* Date Field */}
           <div>
             <label htmlFor="modal-date-input" className="section-title text-2xs font-mono uppercase text-text-muted block mb-1">
-              ENTRY DATE
+              {t('bodyMetrics.entryDate')}
             </label>
             <div className="relative">
               <input
@@ -351,7 +353,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             className="btn-primary w-full py-2.5 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Save Measurements</span>
+            <span>{t('bodyMetrics.save')}</span>
           </button>
         </form>
 
@@ -360,16 +362,16 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           <div className="flex items-center justify-between">
             <span className="text-2xs font-mono uppercase font-bold text-text-muted flex items-center gap-1.5">
               <History className="w-3.5 h-3.5 text-accent" />
-              WEIGHT LOG HISTORY
+              {t('bodyMetrics.historyTitle')}
             </span>
             <span className="text-2xs font-mono text-text-muted">
-              {sortedMetrics.length} entries
+              {t('bodyMetrics.entries', { count: sortedMetrics.length })}
             </span>
           </div>
 
           {sortedMetrics.length === 0 ? (
             <p className="text-2xs text-text-muted font-mono italic text-center py-3 bg-bg-secondary/40 rounded-xl">
-              No historical entries recorded yet. Today&apos;s weigh-in will be logged.
+              {t('bodyMetrics.noEntries')}
             </p>
           ) : (
             <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
@@ -424,7 +426,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                       type="button"
                       onClick={() => deleteBodyMetric(entry.id)}
                       className="p-1 text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
-                      title="Delete record"
+                      title={t('bodyMetrics.deleteRecord')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

@@ -17,6 +17,7 @@ import {
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import {
   toLocalDateString,
   calculateHydrationTarget,
@@ -32,6 +33,7 @@ interface HydrationModalProps {
 export default function HydrationModal({ isOpen, onClose }: HydrationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const toast = useToast();
   const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
   const todayStr = useToday();
@@ -84,8 +86,8 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
 
   const handleQuickAdd = (amt: number) => {
     logWater(amt, activeDateStr);
-    const dayLabel = selectedDay === 'today' ? 'today' : 'yesterday';
-    toast.success(`+${amt} ml logged for ${dayLabel}!`, 'Hydration Updated');
+    const dayLabel = t(selectedDay === 'today' ? 'hydration.dayToday' : 'hydration.dayYesterday');
+    toast.success(t('hydration.loggedForDay', { amt, day: dayLabel }), t('hydration.updatedTitle'));
   };
 
   const handleManualAdd = (e: React.FormEvent) => {
@@ -94,15 +96,14 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
     if (isNaN(amt) || amt <= 0) return;
     logWater(amt, activeDateStr);
     setManualLogAmount('');
-    const dayLabel = selectedDay === 'today' ? 'today' : 'yesterday';
-    toast.success(`+${amt} ml logged for ${dayLabel}!`, 'Hydration Updated');
+    const dayLabel = t(selectedDay === 'today' ? 'hydration.dayToday' : 'hydration.dayYesterday');
+    toast.success(t('hydration.loggedForDay', { amt, day: dayLabel }), t('hydration.updatedTitle'));
   };
 
   const handleReset = () => {
-    const dayLabel = selectedDay === 'today' ? 'today’s' : 'yesterday’s';
-    if (confirm(`Reset ${dayLabel} logged water to 0 ml?`)) {
+    if (confirm(t(selectedDay === 'today' ? 'hydration.resetConfirmToday' : 'hydration.resetConfirmYesterday'))) {
       resetWater(activeDateStr);
-      toast.info(`${selectedDay === 'today' ? 'Today’s' : 'Yesterday’s'} water reset to 0 ml`, 'Hydration Reset');
+      toast.info(t(selectedDay === 'today' ? 'hydration.resetDoneToday' : 'hydration.resetDoneYesterday'), t('hydration.resetTitle2'));
     }
   };
 
@@ -114,7 +115,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
       climateAdjustmentMl: isHotEnvironment ? 300 : 0,
     });
     setShowConfig(false);
-    toast.success('Hydration target saved!', 'Preferences Updated');
+    toast.success(t('hydration.targetSaved'), t('hydration.prefsUpdated'));
   };
 
   return (
@@ -131,9 +132,9 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             </div>
             <div>
               <h2 className="text-lg font-bold text-text-primary leading-tight">
-                Hydration Target
+                {t('hydration.title')}
               </h2>
-              <p className="text-xs text-text-muted">Daily fluid &amp; recovery baseline</p>
+              <p className="text-xs text-text-muted">{t('hydration.subtitle')}</p>
             </div>
           </div>
           <button
@@ -156,7 +157,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            <span>Today</span>
+            <span>{t('common.today')}</span>
             <span className="text-3xs opacity-80 font-mono">({todayStr})</span>
           </button>
           <button
@@ -168,7 +169,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                 : 'text-text-muted hover:text-text-primary'
             }`}
           >
-            <span>Yesterday</span>
+            <span>{t('meals.yesterday')}</span>
             <span className="text-3xs opacity-80 font-mono">({yesterdayStr})</span>
           </button>
         </div>
@@ -177,10 +178,10 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         <div className="card p-4 bg-gradient-to-br from-bg-card to-sky-500/5 border border-sky-500/20 space-y-3">
           <div className="flex items-baseline justify-between">
             <span className="section-title text-[10px] text-sky-600 block mb-0">
-              {selectedDay === 'today' ? "TODAY'S HYDRATION TARGET" : "YESTERDAY'S HYDRATION TARGET"}
+              {selectedDay === 'today' ? t('hydration.todayTarget') : t('hydration.yesterdayTarget')}
             </span>
             <span className="text-xs font-semibold text-text-muted">
-              {currentDayType === 'training' ? 'Training Day (+500ml)' : 'Rest Day'}
+              {currentDayType === 'training' ? t('hydration.trainingDay') : t('hydration.restDay')}
             </span>
           </div>
 
@@ -194,7 +195,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               </span>
             </div>
             <span className="text-xs font-bold text-sky-600 bg-sky-500/10 px-2 py-0.5 rounded-full">
-              {remainingMl === 0 ? 'Target Hit' : `${formatWaterLiters(remainingMl)} remaining`}
+              {remainingMl === 0 ? t('hydration.targetHit') : t('hydration.remaining', { amount: formatWaterLiters(remainingMl) })}
             </span>
           </div>
 
@@ -208,7 +209,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             </div>
             <div className="flex justify-between items-center text-[10px] text-text-muted font-mono font-medium">
               <span>0 ml</span>
-              <span>{pct}% saturated</span>
+              <span>{t('hydration.saturated', { pct })}</span>
               <span>{formatWaterLiters(currentTargetMl)}</span>
             </div>
           </div>
@@ -217,7 +218,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         {/* 1-Tap Quick Log Strip */}
         <div className="space-y-1.5">
           <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block px-1">
-            QUICK 1-TAP LOG
+            {t('hydration.quickLog')}
           </span>
           <div className="grid grid-cols-4 gap-2">
             {[250, 500, 750, 1000].map((amt) => (
@@ -243,7 +244,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             min="10"
             max="3000"
             step="10"
-            placeholder="Custom ml (e.g. 350)"
+            placeholder={t('hydration.customPlaceholder')}
             value={manualLogAmount}
             onChange={(e) => setManualLogAmount(e.target.value)}
             className="flex-1 px-3 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-text-primary focus:outline-none focus:border-accent"
@@ -253,12 +254,12 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             disabled={!manualLogAmount}
             className="btn-secondary px-3 py-2 text-xs font-bold disabled:opacity-50"
           >
-            Add Water
+            {t('hydration.addWater')}
           </button>
           <button
             type="button"
             onClick={handleReset}
-            title="Reset Today's Water"
+            title={t('hydration.resetTitle')}
             className="p-2 rounded-xl border border-border text-text-muted hover:text-red-500 hover:border-red-500/30 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
@@ -274,10 +275,10 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
           >
             <div className="flex items-center gap-1.5">
               <Sliders className="w-3.5 h-3.5 text-accent" />
-              <span>Target Estimator Inputs</span>
+              <span>{t('hydration.estimator')}</span>
             </div>
             <span className="text-[11px] text-accent font-medium">
-              {showConfig ? 'Hide' : 'Customize Target'}
+              {showConfig ? t('hydration.hide') : t('hydration.customize')}
             </span>
           </button>
 
@@ -285,8 +286,8 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             <div className="mt-3 p-3 rounded-xl bg-bg-secondary space-y-3 text-xs animate-fade-in">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-text-primary block">Hot Environment / Heat</span>
-                  <span className="text-[11px] text-text-muted">+300 ml for heavy sweating</span>
+                  <span className="font-semibold text-text-primary block">{t('hydration.hotEnv')}</span>
+                  <span className="text-[11px] text-text-muted">{t('hydration.hotEnvHint')}</span>
                 </div>
                 <input
                   type="checkbox"
@@ -298,8 +299,8 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
 
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="font-semibold text-text-primary block">Manual Custom Target</span>
-                  <span className="text-[11px] text-text-muted">Override automatic estimation</span>
+                  <span className="font-semibold text-text-primary block">{t('hydration.manualTarget')}</span>
+                  <span className="text-[11px] text-text-muted">{t('hydration.manualTargetHint')}</span>
                 </div>
                 <input
                   type="checkbox"
@@ -312,7 +313,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               {isCustom && (
                 <div className="space-y-1">
                   <label className="text-[11px] font-semibold text-text-secondary block">
-                    Daily Target (ml)
+                    {t('hydration.dailyTargetMl')}
                   </label>
                   <input
                     type="number"
@@ -332,7 +333,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                 onClick={handleSaveConfig}
                 className="btn-primary w-full py-2 text-xs font-bold mt-1"
               >
-                Save Target Preferences
+                {t('hydration.savePrefs')}
               </button>
             </div>
           )}
@@ -342,11 +343,11 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         {waterBatches.length > 0 && (
           <div className="border-t border-border pt-3 space-y-2">
             <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
-              {selectedDay === 'today' ? "TODAY'S LOG ENTRIES" : "YESTERDAY'S LOG ENTRIES"} ({waterBatches.length})
+              {selectedDay === 'today' ? t('hydration.todayEntries') : t('hydration.yesterdayEntries')} ({waterBatches.length})
             </span>
             <div className="max-h-28 overflow-y-auto space-y-1 text-xs pr-1">
               {waterBatches.map((b) => {
-                let timeStr = 'Logged';
+                let timeStr = t('hydration.loggedWord');
                 try {
                   timeStr = new Date(b.timestamp).toLocaleTimeString('en-US', {
                     hour: 'numeric',

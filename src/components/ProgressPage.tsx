@@ -36,6 +36,7 @@ import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { resizeAndCompressImage } from '@/lib/image-processing';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import type { ProgressPhoto } from '@/lib/types';
@@ -230,6 +231,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
   const trainingProfile = useStore((state) => state.trainingProfile);
   const toast = useToast();
+  const { t } = useTranslation();
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [photoPose, setPhotoPose] = useState<'Front' | 'Side' | 'Back'>('Front');
@@ -264,18 +266,18 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         // Storage is full: the photo shows now but will NOT survive a
         // restart. Never claim it was saved.
         toast.error(
-          'Device storage is full — this photo is kept for this session only and will be gone when the app restarts. Free up space or delete older photos.',
-          'Photo Not Saved'
+          t('progress.photoNotSavedMsg'),
+          t('progress.photoNotSavedTitle')
         );
       } else if (progressPhotos.length >= 24) {
         // The store keeps the newest 24 — say so instead of silently
         // evicting the oldest check-in photo.
-        toast.info('Photo saved. Your oldest photo was removed — 24 photos are kept on this device.', 'Photo Limit');
+        toast.info(t('progress.photoLimitMsg'), t('progress.photoLimitTitle'));
       } else {
-        toast.success('Progress photo saved locally.', 'Photo Added');
+        toast.success(t('progress.photoAddedMsg'), t('progress.photoAddedTitle'));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not add the photo.', 'Upload Failed');
+      toast.error(err instanceof Error ? err.message : t('progress.photoUploadFailedMsg'), t('progress.photoUploadFailedTitle'));
     } finally {
       setIsUploadingPhoto(false);
     }
@@ -755,7 +757,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               type="button"
               onClick={() => setStrengthSubView('overview')}
               className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Back to Progress Overview"
+              aria-label={t('progress.backProgress')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
@@ -764,7 +766,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               type="button"
               onClick={() => setActiveTab('strength')}
               className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Back to Strength Overview"
+              aria-label={t('progress.backStrength')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
@@ -773,7 +775,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               type="button"
               onClick={goBack}
               className="p-2 min-h-[44px] min-w-[44px] -ml-1 rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-card border border-border/50 hover:border-accent/40 transition-colors flex items-center justify-center shrink-0 cursor-pointer"
-              aria-label="Go back"
+              aria-label={t('progress.goBack')}
             >
               <ChevronLeft className="w-5 h-5 text-accent" />
             </button>
@@ -782,12 +784,12 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
               {activeTab === 'strength' && strengthSubView === 'overview'
-                ? 'Progress'
+                ? t('progress.title')
                 : activeTab === 'strength'
-                ? 'Strength'
+                ? t('progress.strength')
                 : activeTab === 'body'
-                ? 'Body'
-                : 'Consistency'}
+                ? t('progress.body')
+                : t('progress.consistency')}
             </h1>
           </div>
         </div>
@@ -798,8 +800,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             type="button"
             onClick={() => setIsWeeklyRecapOpen(true)}
             className="p-2 min-h-[44px] min-w-[44px] rounded-xl bg-bg-card border border-border text-text-secondary hover:text-accent transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-            title="Generate Weekly Training Card"
-            aria-label="Generate Weekly Training Card"
+            title={t('progress.weeklyCard')}
+            aria-label={t('progress.weeklyCard')}
           >
             <Share2 className="w-4 h-4 text-accent" />
           </button>
@@ -807,8 +809,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             type="button"
             onClick={() => setIsToolsMenuOpen(true)}
             className="p-2 min-h-[44px] min-w-[44px] rounded-xl bg-bg-card border border-border text-text-secondary hover:text-text-primary transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-            title="Analytics Tools & Actions"
-            aria-label="Analytics Tools"
+            title={t('progress.toolsTitle')}
+            aria-label={t('progress.toolsAria')}
           >
             <SlidersHorizontal className="w-4 h-4 text-accent" />
           </button>
@@ -818,7 +820,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TOP SEGMENTED CONTROL: STRENGTH | BODY | CONSISTENCY ───────────── */}
       {/* Visible on Screen 14 overview */}
       {activeTab === 'strength' && strengthSubView === 'overview' && (
-        <div role="tablist" aria-label="Progress views" className="segmented-control">
+        <div role="tablist" aria-label={t('progress.viewsAria')} className="segmented-control">
           {(['strength', 'body', 'consistency'] as const).map((tabKey) => (
             <button
               key={tabKey}
@@ -835,7 +837,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               }}
               className={`segmented-item ${activeTab === tabKey ? 'active' : ''}`}
             >
-              {tabKey === 'strength' ? 'Strength' : tabKey === 'body' ? 'Body' : 'Consistency'}
+              {tabKey === 'strength' ? t('progress.strength') : tabKey === 'body' ? t('progress.body') : t('progress.consistency')}
             </button>
           ))}
         </div>
@@ -856,7 +858,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           >
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-text-primary">Strength Progress</h2>
+                <h2 className="text-base font-bold text-text-primary">{t('progress.strengthProgress')}</h2>
                 <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
@@ -867,7 +869,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
                   {heroLiftAnalytics.latest1RM ? `${heroLiftAnalytics.latest1RM} ${userUnit}` : displayWeight(heroLift.best1RMKg)}
                 </div>
-                <span className="text-2xs text-text-muted font-mono">Current 1RM</span>
+                <span className="text-2xs text-text-muted font-mono">{t('progress.current1rm')}</span>
               </div>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
                 {heroLiftAnalytics.deltaText}
@@ -912,7 +914,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </>
                 ) : (
                   <text x="160" y="60" textAnchor="middle" className="text-xs fill-text-muted font-sans">
-                    Log workout sessions to render progression curve
+                    {t('progress.chartEmptyWorkouts')}
                   </text>
                 )}
               </svg>
@@ -929,10 +931,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <div className="card p-5 bg-bg-card border border-border space-y-3 shadow-xs">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-base font-bold text-text-primary">Personal Records</h2>
+                <h2 className="text-base font-bold text-text-primary">{t('progress.personalRecords')}</h2>
                 <p className="text-3xs text-text-muted mt-0.5">
-                  Your best-ever lifts. &ldquo;1RM&rdquo; = the most weight you could lift once;
-                  when you haven&apos;t tested it, we estimate it from your best sets.
+                  {t('progress.prExplainer')}
                 </p>
               </div>
               <button
@@ -940,7 +941,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 onClick={() => setStrengthSubView('records')}
                 className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
               >
-                <span>View All</span>
+                <span>{t('progress.viewAll')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -977,7 +978,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'strength' && strengthSubView !== 'overview' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Progress | Records */}
-          <div role="tablist" aria-label="Strength views" className="segmented-control">
+          <div role="tablist" aria-label={t('progress.strengthViewsAria')} className="segmented-control">
             <button
               type="button"
               role="tab"
@@ -985,7 +986,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setStrengthSubView('analytics')}
               className={`segmented-item ${strengthSubView === 'analytics' ? 'active' : ''}`}
             >
-              Progress
+              {t('progress.tabProgress')}
             </button>
             <button
               type="button"
@@ -994,7 +995,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setStrengthSubView('records')}
               className={`segmented-item ${strengthSubView === 'records' ? 'active' : ''}`}
             >
-              Records
+              {t('progress.tabRecords')}
             </button>
           </div>
 
@@ -1046,7 +1047,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <div className="text-4xl font-black text-text-primary font-sans tabular-nums">
                       {selectedExerciseAnalytics.latest1RM ? `${selectedExerciseAnalytics.latest1RM} ${userUnit}` : '—'}
                     </div>
-                    <span className="text-2xs text-text-muted font-mono">Estimated 1RM</span>
+                    <span className="text-2xs text-text-muted font-mono">{t('prs.estimated1rm')}</span>
                   </div>
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
                     {selectedExerciseAnalytics.deltaText}
@@ -1093,7 +1094,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </>
                     ) : (
                       <text x="160" y="70" textAnchor="middle" className="text-xs fill-text-muted font-sans">
-                        No session data in this timeframe
+                        {t('progress.chartEmptySessions')}
                       </text>
                     )}
                   </svg>
@@ -1107,7 +1108,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
               {/* Last 5 Sessions Card */}
               <div className="card p-5 bg-bg-card border border-border space-y-3 shadow-xs">
-                <h3 className="text-base font-bold text-text-primary font-sans">Last 5 Sessions</h3>
+                <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last5Sessions')}</h3>
 
                 {selectedExerciseSessions.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-4 font-sans">
@@ -1153,7 +1154,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'body' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Measurements | Photos */}
-          <div role="tablist" aria-label="Body views" className="segmented-control">
+          <div role="tablist" aria-label={t('progress.bodyViewsAria')} className="segmented-control">
             <button
               type="button"
               role="tab"
@@ -1161,7 +1162,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setBodySubView('measurements')}
               className={`segmented-item ${bodySubView === 'measurements' ? 'active' : ''}`}
             >
-              Measurements
+              {t('progress.tabMeasurements')}
             </button>
             <button
               type="button"
@@ -1170,7 +1171,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setBodySubView('photos')}
               className={`segmented-item ${bodySubView === 'photos' ? 'active' : ''}`}
             >
-              Photos
+              {t('progress.tabPhotos')}
             </button>
           </div>
 
@@ -1181,7 +1182,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div className="flex justify-between items-center">
                   <div>
                     <span className="text-xs font-semibold text-text-muted uppercase tracking-wider font-mono">
-                      CURRENT BODYWEIGHT
+                      {t('progress.currentBodyweight')}
                     </span>
                     <div className="text-3xl sm:text-4xl font-black text-text-primary font-sans tabular-nums mt-0.5">
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
@@ -1253,7 +1254,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </>
                     ) : (
                       <text x="160" y="60" textAnchor="middle" className="text-xs fill-text-muted font-sans">
-                        Log bodyweight check-ins to track trend
+                        {t('progress.chartEmptyBodyweight')}
                       </text>
                     )}
                   </svg>
@@ -1268,26 +1269,26 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               {/* Card 2: Body Measurements */}
               <div className="card p-5 bg-bg-card border border-border space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-text-primary">Body Measurements</h3>
+                  <h3 className="text-base font-bold text-text-primary">{t('progress.bodyMeasurements')}</h3>
                   <button
                     type="button"
                     onClick={() => setIsWeightModalOpen(true)}
                     className="btn-secondary py-1.5 px-3 text-xs font-semibold flex items-center gap-1.5 text-text-secondary hover:text-text-primary cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 text-accent" />
-                    <span>Log Measurement</span>
+                    <span>{t('progress.logMeasurement')}</span>
                   </button>
                 </div>
 
                 <div className="divide-y divide-border/60">
                   <div className="py-3 flex items-center justify-between text-xs">
-                    <span className="text-text-secondary">Body Fat</span>
+                    <span className="text-text-secondary">{t('progress.bodyFat')}</span>
                     <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
                       {latestMetrics.bodyFatPct !== undefined ? `${latestMetrics.bodyFatPct}%` : '—'}
                     </span>
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
-                    <span className="text-text-secondary">Chest</span>
+                    <span className="text-text-secondary">{t('progress.chest')}</span>
                     <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
                       {latestMetrics.chestIn !== undefined
                         ? userUnit === 'lbs'
@@ -1297,7 +1298,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
-                    <span className="text-text-secondary">Waist</span>
+                    <span className="text-text-secondary">{t('progress.waist')}</span>
                     <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
                       {latestMetrics.waistIn !== undefined
                         ? userUnit === 'lbs'
@@ -1307,7 +1308,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </span>
                   </div>
                   <div className="py-3 flex items-center justify-between text-xs">
-                    <span className="text-text-secondary">Hips</span>
+                    <span className="text-text-secondary">{t('progress.hips')}</span>
                     <span className="font-bold text-text-primary font-mono tabular-nums text-sm">
                       {latestMetrics.hipsIn !== undefined
                         ? userUnit === 'lbs'
@@ -1327,7 +1328,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 type="file"
                 accept="image/*"
                 className="hidden"
-                aria-label="Add progress photo"
+                aria-label={t('progress.addPhoto')}
                 onChange={handlePhotoFileSelect}
               />
               {progressPhotos.length === 0 ? (
@@ -1336,10 +1337,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <Camera className="w-6 h-6" />
                   </div>
                   <div className="space-y-1">
-                    <h3 className="text-base font-bold text-text-primary font-sans">Progress Photos</h3>
+                    <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.photos')}</h3>
                     <p className="text-xs text-text-muted max-w-xs mx-auto">
-                      Take front, side, and back photos to track muscular definition and body transformation over time.
-                      Photos stay on this device.
+                      {t('progress.photosHint')}
                     </p>
                   </div>
                   <button
@@ -1356,10 +1356,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <>
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <h3 className="text-base font-bold text-text-primary font-sans">
-                      Progress Photos <span className="text-text-muted font-mono text-xs">({progressPhotos.length}/24)</span>
+                      {t('progress.photos')} <span className="text-text-muted font-mono text-xs">({progressPhotos.length}/24)</span>
                     </h3>
                     <div className="flex items-center gap-2">
-                      <div className="flex rounded-full bg-bg-secondary p-0.5" role="radiogroup" aria-label="Pose for next photo">
+                      <div className="flex rounded-full bg-bg-secondary p-0.5" role="radiogroup" aria-label={t('progress.poseAria')}>
                         {(['Front', 'Side', 'Back'] as const).map((pose) => (
                           <button
                             key={pose}
@@ -1404,7 +1404,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     ))}
                   </div>
                   <p className="text-2xs text-text-muted font-mono text-center">
-                    Photos are stored only on this device and never uploaded.
+                    {t('progress.photosDeviceNote')}
                   </p>
                 </>
               )}
@@ -1419,7 +1419,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'consistency' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Overview | Streaks */}
-          <div role="tablist" aria-label="Consistency views" className="segmented-control">
+          <div role="tablist" aria-label={t('progress.consistencyViewsAria')} className="segmented-control">
             <button
               type="button"
               role="tab"
@@ -1427,7 +1427,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setConsistencySubView('overview')}
               className={`segmented-item ${consistencySubView === 'overview' ? 'active' : ''}`}
             >
-              Overview
+              {t('progress.tabOverview')}
             </button>
             <button
               type="button"
@@ -1436,7 +1436,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setConsistencySubView('streaks')}
               className={`segmented-item ${consistencySubView === 'streaks' ? 'active' : ''}`}
             >
-              Streaks
+              {t('progress.tabStreaks')}
             </button>
           </div>
 
@@ -1446,13 +1446,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <div className="card p-5 bg-bg-card border border-border space-y-4 shadow-xs">
                 <div>
                   <span className="text-xs font-semibold text-text-muted uppercase tracking-wider font-mono">
-                    CURRENT STREAK
+                    {t('progress.currentStreak')}
                   </span>
                   <div className="text-4xl font-black text-text-primary font-sans tabular-nums mt-0.5">
-                    {consistencyStats.streakDays} {consistencyStats.streakDays === 1 ? 'day' : 'days'}
+                    {consistencyStats.streakDays} {t(consistencyStats.streakDays === 1 ? 'progress.dayOne' : 'progress.dayMany')}
                   </div>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    {consistencyStats.streakDays > 0 ? 'Keep the momentum going' : 'Log a workout today to start your streak!'}
+                    {consistencyStats.streakDays > 0 ? t('progress.streakKeepGoing') : t('progress.streakStart')}
                   </p>
                 </div>
 
@@ -1478,7 +1478,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               {/* Card 2: Last 7 Days (Bar Chart) */}
               <div className="card p-5 bg-bg-card border border-border space-y-4 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-text-primary font-sans">Last 7 Days</h3>
+                  <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last7Days')}</h3>
                   <span className="text-xs font-mono font-bold text-text-secondary">
                     {consistencyStats.thisWeekCompleted}/{consistencyStats.thisWeekTarget} workouts
                   </span>
@@ -1508,7 +1508,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               {/* Card 3: Last 4 Weeks */}
               <div className="card p-5 bg-bg-card border border-border space-y-3.5 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-text-primary font-sans">Last 4 Weeks</h3>
+                  <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last4Weeks')}</h3>
                   <span className="text-xs font-mono font-bold text-[#858076]">
                     {consistencyStats.fourWeeksCompleted}/{consistencyStats.fourWeeksTarget} workouts ({consistencyStats.consistencyPct}%)
                   </span>
@@ -1540,8 +1540,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <div className="card p-4 bg-bg-card border border-border space-y-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-base font-bold text-text-primary">Habit &amp; Workout Matrix</h3>
-                  <p className="text-2xs text-text-muted">Accountability across gym, water, protein, creatine</p>
+                  <h3 className="text-base font-bold text-text-primary">{t('progress.habitMatrix')}</h3>
+                  <p className="text-2xs text-text-muted">{t('progress.habitMatrixHint')}</p>
                 </div>
               </div>
               <WorkoutHeatmap />
@@ -1562,14 +1562,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         onConfirm={() => {
           if (photoPendingDelete) {
             removeProgressPhoto(photoPendingDelete.id);
-            toast.info('Progress photo deleted.', 'Photo Removed');
+            toast.info(t('progress.photoDeletedMsg'), t('progress.photoRemovedTitle'));
           }
           setPhotoPendingDelete(null);
         }}
-        title="Delete this photo?"
-        message="This progress photo will be permanently removed from this device. This can't be undone."
-        confirmText="Delete"
-        cancelText="Cancel"
+        title={t('progress.deletePhotoTitle')}
+        message={t('progress.deletePhotoMsg')}
+        confirmText={t('common.delete')}
+        cancelText={t('common.cancel')}
         variant="danger"
         icon="trash"
       />
@@ -1587,13 +1587,13 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <div className="flex items-center justify-between border-b border-border/80 pb-3">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-accent" />
-                <h3 className="font-bold text-text-primary text-base">Progress Tools</h3>
+                <h3 className="font-bold text-text-primary text-base">{t('progress.tools')}</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-                aria-label="Close progress tools"
+                aria-label={t('progress.closeTools')}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1602,8 +1602,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <div className="space-y-2">
               <div className="p-3 rounded-xl bg-bg-secondary border border-border flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-bold text-text-primary">Display Units</h4>
-                  <p className="text-2xs text-text-muted">Currently displaying in {userUnit.toUpperCase()}</p>
+                  <h4 className="text-xs font-bold text-text-primary">{t('progress.displayUnits')}</h4>
+                  <p className="text-2xs text-text-muted">{t('progress.displayUnitsHint', { unit: userUnit.toUpperCase() })}</p>
                 </div>
                 <div className="flex rounded-lg bg-bg-card p-0.5 border border-border/80">
                   <button
@@ -1645,9 +1645,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
-                      Weekly Share Card
+                      {t('progress.weeklyShareCard')}
                     </h4>
-                    <p className="text-2xs text-text-muted">Export visual progress card for WhatsApp &amp; Instagram</p>
+                    <p className="text-2xs text-text-muted">{t('progress.exportCardHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -1667,9 +1667,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
-                      Log Bodyweight &amp; Measurements
+                      {t('progress.logBodyweightMeasurements')}
                     </h4>
-                    <p className="text-2xs text-text-muted">Weight, chest, waist, and hips measurements</p>
+                    <p className="text-2xs text-text-muted">{t('progress.measurementsHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -1689,9 +1689,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
-                      Meet Attempt Planner
+                      {t('progress.meetPlanner')}
                     </h4>
-                    <p className="text-2xs text-text-muted">Plan competition attempts: Opener, 2nd &amp; 3rd lifts</p>
+                    <p className="text-2xs text-text-muted">{t('progress.meetHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -1711,10 +1711,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
-                      DOTS Score &amp; Standards
+                      {t('progress.dotsStandards')}
                     </h4>
                     <p className="text-2xs text-text-muted">
-                      {dotsScore > 0 ? `Current: ${Math.round(dotsScore)} (${dotsClassification.tier})` : 'Pound-for-pound strength formula'}
+                      {dotsScore > 0 ? t('progress.dotsCurrent', { score: Math.round(dotsScore), tier: dotsClassification.tier }) : t('progress.dotsFormulaShort')}
                     </p>
                   </div>
                 </div>
@@ -1738,15 +1738,15 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <Award className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-text-primary">What is the DOTS Score?</h3>
-                  <p className="text-2xs text-text-muted">Standardized pound-for-pound strength formula</p>
+                  <h3 className="text-sm font-bold text-text-primary">{t('progress.dotsTitle')}</h3>
+                  <p className="text-2xs text-text-muted">{t('progress.dotsHint')}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsDotsInfoOpen(false)}
                 className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
-                aria-label="Close DOTS info"
+                aria-label={t('progress.closeDots')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1754,28 +1754,28 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
             <div className="space-y-3 text-xs text-text-secondary leading-relaxed font-sans">
               <p>
-                The <strong>DOTS formula</strong> is the official standard used by the International Powerlifting Federation (IPF). It normalizes strength against bodyweight using a polynomial curve, allowing lifters of different bodyweights and genders to fairly compare strength.
+                {t('progress.dotsExplainer')}
               </p>
               <div className="card p-3 bg-bg-secondary/70 border border-border/80 space-y-1 text-2xs font-mono">
                 <div className="flex justify-between py-0.5 border-b border-border/40">
                   <span className="text-text-muted">&lt; 250</span>
-                  <span className="font-semibold text-text-primary">Novice</span>
+                  <span className="font-semibold text-text-primary">{t('progress.tierNovice')}</span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-border/40">
                   <span className="text-text-muted">250 – 349</span>
-                  <span className="font-semibold text-text-primary">Intermediate</span>
+                  <span className="font-semibold text-text-primary">{t('progress.tierIntermediate')}</span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-border/40">
                   <span className="text-text-muted">350 – 424</span>
-                  <span className="font-semibold text-accent">Advanced</span>
+                  <span className="font-semibold text-accent">{t('progress.tierAdvanced')}</span>
                 </div>
                 <div className="flex justify-between py-0.5 border-b border-border/40">
                   <span className="text-text-muted">425 – 499</span>
-                  <span className="font-semibold text-amber-500">Elite</span>
+                  <span className="font-semibold text-amber-500">{t('progress.tierElite')}</span>
                 </div>
                 <div className="flex justify-between py-0.5">
                   <span className="text-text-muted">500+</span>
-                  <span className="font-bold text-emerald-500">World Class</span>
+                  <span className="font-bold text-emerald-500">{t('progress.tierWorldClass')}</span>
                 </div>
               </div>
             </div>
@@ -1785,7 +1785,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               onClick={() => setIsDotsInfoOpen(false)}
               className="w-full btn-primary py-2.5 text-xs font-bold"
             >
-              Got it
+              {t('progress.gotIt')}
             </button>
           </div>
         </div>
