@@ -500,7 +500,7 @@ function LiftCard({
             <span className="text-xs font-normal text-text-muted">{userUnit}</span>
           </span>
           <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
-            Estimated 1RM
+            Estimated 1RM (best single lift)
           </span>
         </div>
       </div>

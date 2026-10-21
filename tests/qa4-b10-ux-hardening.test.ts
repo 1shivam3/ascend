@@ -128,3 +128,32 @@ describe('QA4-030 micro-type floors', () => {
     expect(src).toContain('text-[11px] font-mono text-text-secondary pt-0.5');
   });
 });
+
+describe('QA4-031 jargon glosses in plain language', () => {
+  it('plan % hint no longer defines the feature using 1RM/RPE/back-off (en + hi)', () => {
+    const enSrc = read('src/lib/i18n/en.ts');
+    const hiSrc = read('src/lib/i18n/hi.ts');
+    const enHint = enSrc.match(/'plan\.intensityPercentHint': '([^']+)'/)?.[1] ?? '';
+    const hiHint = hiSrc.match(/'plan\.intensityPercentHint': '([^']+)'/)?.[1] ?? '';
+    expect(enHint).toContain('heaviest weight you could lift just once');
+    expect(enHint).not.toMatch(/1RM|RPE|back-off/);
+    expect(hiHint.length).toBeGreaterThan(20);
+    expect(hiHint).not.toMatch(/1RM|RPE|बैक-ऑफ़/);
+  });
+
+  it('Progress 1RM labels carry a plain-English gloss', () => {
+    const progress = read('src/components/ProgressPage.tsx');
+    expect(progress).toContain('Current 1RM (your estimated best single lift)');
+    expect(progress).toContain('Estimated 1RM (best single lift, worked out from your sets)');
+    const prs = read('src/components/PRsPage.tsx');
+    expect(prs).toContain('Estimated 1RM (best single lift)');
+  });
+
+  it('GoalSelectorModal explains impact without DOTS/tonnage/velocity jargon', () => {
+    const src = read('src/components/GoalSelectorModal.tsx');
+    const summary = src.slice(src.indexOf('How ASCEND Personalizes'), src.indexOf('Recalculate Nutrition'));
+    expect(summary).not.toMatch(/DOTS|Tonnage|Weight Velocity|Prescription Engine/);
+    expect(summary).toContain('how many reps you aim for');
+    expect(summary).toContain('how much protein to aim for');
+  });
+});

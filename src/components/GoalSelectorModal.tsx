@@ -152,10 +152,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             <Zap className="w-4 h-4 shrink-0" />
             <span>
               {isPowerbuilding
-                ? 'Powerbuilding Synergy: Heavy compound singles/triples paired with hypertrophy accessory volume.'
+                ? 'Strength + muscle: very heavy sets of the big lifts for strength, plus lighter extra work to build muscle.'
                 : isRecomp
-                ? 'Lean Recomposition: Strength retention in a calibrated deficit with elevated protein intake.'
-                : 'Hybrid Performance: Heavy compound progression with condensed rest intervals.'}
+                ? 'Lose fat, keep muscle: eat a little less than usual, keep protein high, and keep lifting so you hold on to your strength.'
+                : 'Fit and strong: keep adding weight to the big lifts while keeping rests short, so fitness improves alongside strength.'}
             </span>
           </div>
         )}
@@ -233,9 +233,9 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             Your selection dynamically calibrates:
           </p>
           <ul className="text-3xs text-text-muted space-y-0.5 list-disc list-inside">
-            <li><strong>Prescription Engine:</strong> Modifies target rep brackets and RPE progression.</li>
-            <li><strong>Nutrition Engine:</strong> Recalculates maintenance, surplus (+250 kcal), or deficit (-450 kcal) with target protein ratios.</li>
-            <li><strong>Dashboard Focus:</strong> Highlights 1RM PRs &amp; DOTS vs. Volume Tonnage vs. Deficit &amp; Weight Velocity.</li>
+            <li><strong>Your workouts:</strong> Changes how many reps you aim for in each set and how long you rest between sets.</li>
+            <li><strong>Your food targets:</strong> Recalculates how much to eat each day — a little extra (+250 kcal) to gain, or less (-450 kcal) to lose fat — and how much protein to aim for.</li>
+            <li><strong>Your home screen:</strong> Shows the progress that matters for this goal — your strongest lifts, the total weight you have lifted, or how your body weight is changing.</li>
           </ul>
         </div>
 
