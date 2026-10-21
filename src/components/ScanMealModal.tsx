@@ -10,6 +10,7 @@ import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE
 import { estimateMacros } from '@/lib/macros';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
+import { toUserMessage } from '@/lib/user-error';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useAppNavigation } from '@/lib/navigation';
 import {
@@ -332,15 +333,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setProcessedBlob(blob);
     } catch (err: any) {
       console.error('Image compression failed:', err);
-      // REQUIREMENT 13: Handle low-memory/processing failure gracefully with user-friendly message
-      const isMemError =
-        err?.message?.toLowerCase().includes('memory') ||
-        err?.name === 'QuotaExceededError' ||
-        err?.message?.toLowerCase().includes('quota');
-
-      const message = isMemError
-        ? 'Unable to process photo due to low device memory. Try closing background apps, or estimate with the offline database below.'
-        : err?.message || 'Failed to process camera image. Please try again.';
+      // REQUIREMENT 13 + QA4-016: never render raw err.message — the
+      // central sanitizer maps memory/quota and everything else to
+      // safe, actionable copy (no URLs, status codes, provider names).
+      const message = toUserMessage(err, 'image', false);
 
       setScanError(message);
       toast.error(message, 'Photo Notice');
@@ -436,24 +432,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         return;
       }
       console.error('Meal scan failed:', err);
-      const rawErrorMsg =
-        err?.message || 'Failed to analyze meal photo. Please try again.';
-      const isKeyErr =
-        err?.code === 'NO_API_KEY' ||
-        err?.status === 503 ||
-        rawErrorMsg.toLowerCase().includes('api key') ||
-        rawErrorMsg.toLowerCase().includes('gemini_api_key') ||
-        rawErrorMsg.toLowerCase().includes('api_key') ||
-        rawErrorMsg.toLowerCase().includes('unconfigured') ||
-        rawErrorMsg.toLowerCase().includes('key configured') ||
-        rawErrorMsg.toLowerCase().includes('all vision ai providers failed') ||
-        rawErrorMsg.toLowerCase().includes('groq') ||
-        rawErrorMsg.toLowerCase().includes('openrouter') ||
-        rawErrorMsg.toLowerCase().includes('gemini') ||
-        rawErrorMsg.toLowerCase().includes('no_api_key');
-      const errorMsg = isKeyErr
-        ? 'Meal photo recognition is temporarily unavailable. You can use manual food search or instant offline food estimation below.'
-        : rawErrorMsg;
+      // QA4-016: ALL errors go through the central sanitizer now — the
+      // old code only sanitized provider-named errors and rendered
+      // err.message raw for everything else (URLs, status codes, JSON).
+      const errorMsg = toUserMessage(err, 'scan', false);
       setScanError(errorMsg);
       toast.error(errorMsg, 'Notice');
       setStep('select');

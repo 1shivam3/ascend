@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
 import { SUPPORT_EMAIL } from '@/lib/legal';
+import { toUserMessage } from '@/lib/user-error';
 
 export type DeletionStatus =
   | 'idle'
@@ -160,7 +161,8 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       }
     } catch (err: any) {
       setStatus('error');
-      setErrorMessage(err?.message || 'Network error while requesting verification link.');
+      // QA4-016: sanitize — raw fetch errors don't belong in the UI.
+      setErrorMessage(toUserMessage(err, 'generic'));
     }
   };
 
@@ -245,9 +247,9 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
       }
     } catch (err: any) {
       setStatus('error');
+      // QA4-016: sanitize raw errors; keep the support path in the copy.
       setErrorMessage(
-        err?.message ||
-          `Unable to complete deletion request. Please contact ${SUPPORT_EMAIL} for manual processing.`
+        `${toUserMessage(err, 'generic')} If it keeps happening, contact ${SUPPORT_EMAIL} for manual processing.`
       );
     }
   };
