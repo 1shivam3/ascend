@@ -458,7 +458,10 @@ export function createWorkoutExercisesFromPlan(
           weight: suggested !== undefined ? suggested : assignedWeight,
           reps: pe.targetReps ?? 8,
           unit: targetUnit,
-          rpe: hasConfiguredRpe ? (pe.targetRpe as number) : 8,
+          // QA4-022: no configured targetRpe means UNRATED — never invent
+          // an RPE 8 the athlete never reported (prescribedRpe below
+          // already follows this rule).
+          rpe: hasConfiguredRpe ? (pe.targetRpe as number) : undefined,
           completed: false,
           status: 'pending' as const,
           prescribedWeight: suggested !== undefined ? suggested : prescribedWeight,

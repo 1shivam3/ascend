@@ -1005,10 +1005,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         unit: s.unit || userUnit,
         completed: false,
         status: 'pending' as const,
-        rpe: s.rpe || 8,
+        rpe: s.rpe,
         prescribedWeight: s.weight,
         prescribedReps: s.reps,
-        prescribedRpe: s.rpe || 8,
+        prescribedRpe: s.rpe,
         prescribedUnit: s.unit || userUnit,
       })),
     }));

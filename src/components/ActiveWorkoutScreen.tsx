@@ -1466,7 +1466,7 @@ export default function ActiveWorkoutScreen({
             ...nextSets[targetSetIdx],
             weight: result.weight,
             reps: result.reps,
-            rpe: result.rpe ?? nextSets[targetSetIdx].rpe ?? 8,
+            rpe: result.rpe ?? nextSets[targetSetIdx].rpe,
             completed: true,
             status: 'completed',
           };
@@ -1475,12 +1475,12 @@ export default function ActiveWorkoutScreen({
             weight: result.weight,
             reps: result.reps,
             unit: userUnit,
-            rpe: result.rpe ?? 8,
+            rpe: result.rpe,
             completed: true,
             status: 'completed',
             prescribedWeight: result.weight,
             prescribedReps: result.reps,
-            prescribedRpe: result.rpe ?? 8,
+            prescribedRpe: result.rpe,
             prescribedUnit: userUnit,
           });
         }
@@ -2664,7 +2664,7 @@ export default function ActiveWorkoutScreen({
                     className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
                     title="Tap to select target effort / RPE"
                   >
-                    <span className="text-accent font-black text-xs sm:text-sm">@{currentExercise.sets[activeSetIdx]?.rpe || 8}</span>
+                    <span className="text-accent font-black text-xs sm:text-sm">{currentExercise.sets[activeSetIdx]?.rpe ? `@${currentExercise.sets[activeSetIdx].rpe}` : 'RPE'}</span>
                     <span className="text-text-muted text-2xs font-sans">
                       Effort (RPE) • Tap to adjust
                     </span>
