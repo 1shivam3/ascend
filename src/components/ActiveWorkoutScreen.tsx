@@ -2384,7 +2384,7 @@ export default function ActiveWorkoutScreen({
                       setActiveSetIdx(idx);
                       setShowEffortPrompt(false);
                     }}
-                    className={`w-9 h-9 rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
+                    className={`w-10 h-10 min-w-[40px] min-h-[40px] rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
                         ? 'bg-[#E44427] text-white font-black shadow-xs'
                         : isActiveSetCompleted(s)
@@ -2416,7 +2416,7 @@ export default function ActiveWorkoutScreen({
                       handleRemoveSet(currentExercise.sets.length - 1);
                       setActiveSetIdx((prev) => Math.min(prev, currentExercise.sets.length - 2));
                     }}
-                    className="h-8 px-2.5 rounded-full bg-bg-secondary text-text-muted border border-border/60 hover:text-danger hover:border-danger/40 flex items-center justify-center text-[11px] font-bold font-mono ml-1 cursor-pointer"
+                    className="h-10 min-h-[40px] px-2.5 rounded-full bg-bg-secondary text-text-muted border border-border/60 hover:text-danger hover:border-danger/40 flex items-center justify-center text-[11px] font-bold font-mono ml-1 cursor-pointer"
                     title="Remove last set"
                     aria-label="Remove last set"
                   >
