@@ -116,7 +116,22 @@ describe('Authentication & Login Recovery Flow', () => {
       expect(creds.isConfigured).toBe(true);
     });
 
-    it('falls back to localStorage credentials when env vars are missing even in production mode', () => {
+    it('falls back to localStorage credentials when env vars are missing outside production', () => {
+      delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+      delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      (process.env as any).NODE_ENV = 'development';
+
+      saveCustomSupabaseCredentials(
+        'https://preview-staging.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.staging_key_for_testing_1234567890'
+      );
+
+      const creds = getSupabaseCredentials();
+      expect(creds.url).toBe('https://preview-staging.supabase.co');
+      expect(creds.isConfigured).toBe(true);
+    });
+
+    it('QA4-034: ignores localStorage credentials in production (env-only)', () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       (process.env as any).NODE_ENV = 'production';
@@ -127,8 +142,8 @@ describe('Authentication & Login Recovery Flow', () => {
       );
 
       const creds = getSupabaseCredentials();
-      expect(creds.url).toBe('https://preview-staging.supabase.co');
-      expect(creds.isConfigured).toBe(true);
+      expect(creds.url).toBeFalsy();
+      expect(creds.isConfigured).toBe(false);
     });
 
     it('rejects invalid or non-supabase domains in credentials', () => {
