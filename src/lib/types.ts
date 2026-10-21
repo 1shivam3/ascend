@@ -145,6 +145,13 @@ export interface UserProfile {
   age?: number;
   unit: Unit;
   createdAt: string;
+  /**
+   * Local last-edit stamp (ISO). Sync compares it against the server
+   * row's `updated_at` so a pull never clobbers a newer local edit
+   * (QA4A-001, last-write-wins). Absent on profiles created before the
+   * stamp existed — those lose to the server, as before.
+   */
+  updatedAt?: string;
   goals?: AthleteGoal[];
   userMode?: UserMode;
   dietPreference?: DietPreference;

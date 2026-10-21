@@ -214,6 +214,13 @@ const BACKUP_STATE_FIELDS = [
   'bodyMetrics',
   'plannedWorkouts',
   'deletedPlanIds',
+  'deletedPrIds',
+  'deletedWorkoutIds',
+  'deletedMealIds',
+  'deletedBodyMetricIds',
+  'customFoods',
+  'mealDayKinds',
+  'userPortionPreferences',
   'favoriteFoods',
   'prTargets',
   'macroGoals',
@@ -254,6 +261,34 @@ const BACKUP_STATE_FIELDS = [
 ] as const;
 
 const SENSITIVE_BACKUP_KEYS = ['customGeminiKey', 'apiKey', 'token', 'password', 'secret'];
+
+/**
+ * Keys a payload may carry and still count as ASCEND data. The union of
+ * the backup field list plus the extras that travel outside it
+ * (customBarcodes / progressPhotos) and store-only slices that partial
+ * imports legitimately carry (e.g. the Policy v0 ledger).
+ */
+const RECOGNIZED_BACKUP_KEYS: ReadonlySet<string> = new Set<string>([
+  ...BACKUP_STATE_FIELDS,
+  'customBarcodes',
+  'progressPhotos',
+  'hiddenBuiltinRoutineIds',
+  'activeWorkoutDraft',
+  'lastActiveTab',
+  'lastProgressSubTab',
+  'lastTrainSubTab',
+]);
+
+/**
+ * Backup shape gate (QA4-013). True only when the payload is a plain
+ * object carrying at least one recognized ASCEND field. Before this,
+ * `{"hello":1}` passed every import path and reported success while
+ * restoring nothing.
+ */
+export function isRecognizedBackupData(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false;
+  return Object.keys(data as Record<string, unknown>).some((k) => RECOGNIZED_BACKUP_KEYS.has(k));
+}
 
 export function buildFullBackup(
   state: Record<string, any>,
@@ -352,6 +387,9 @@ export function importFullBackupJSON(jsonString: string): boolean {
 
     const rawData = JSON.parse(jsonString);
     if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return false;
+    // Shape gate (QA4-013): reject payloads with no recognized ASCEND
+    // fields instead of merging nothing and reporting success.
+    if (!isRecognizedBackupData(rawData)) return false;
 
     // Deep sanitize imported object to prevent prototype pollution and unauthorized credential injection
     const data = sanitizeImportObject(rawData);

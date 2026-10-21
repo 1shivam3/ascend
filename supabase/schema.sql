@@ -91,6 +91,10 @@ CREATE TABLE IF NOT EXISTS public.planned_workouts (
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   exercises JSONB NOT NULL DEFAULT '[]'::JSONB,
+  -- QA4-006: plan fields with no dedicated column (description, goalTag,
+  -- intensityMode) ride in this payload. Existing installs get the column
+  -- from the migration at the bottom of this file.
+  extras JSONB,
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -562,3 +566,11 @@ REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM anon;
 REVOKE ALL ON FUNCTION public.cleanup_expired_deletion_nonces() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.cleanup_expired_deletion_nonces() TO service_role;
+
+-- ==============================================================================
+-- MIGRATION (QA4-006): planned_workouts extras payload
+-- ==============================================================================
+-- Run this in the Supabase Dashboard -> SQL Editor (safe to re-run).
+-- Until it runs, the app degrades gracefully: plans still sync, but
+-- description / goalTag / intensityMode stay local-only.
+ALTER TABLE public.planned_workouts ADD COLUMN IF NOT EXISTS extras JSONB;
