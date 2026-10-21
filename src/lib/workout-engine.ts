@@ -51,7 +51,10 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
       w = parsed;
     }
   }
-  const r = parseInt(String(set.reps), 10) || 0;
+  // QA4-026 finalize guard: a typed negative must never persist — it
+  // would subtract from session volume. Clamp to 0 (the stepper floor).
+  if (w !== undefined && w < 0) w = 0;
+  const r = Math.max(0, parseInt(String(set.reps), 10) || 0);
   const isCompleted = isActiveSetCompleted(set) && r > 0;
 
   let finalStatus: SetExecutionStatus;

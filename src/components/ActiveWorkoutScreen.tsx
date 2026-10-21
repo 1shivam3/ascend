@@ -1099,6 +1099,11 @@ export default function ActiveWorkoutScreen({
         numericWeight = isNaN(parsed) ? undefined : parsed;
       }
     }
+    // QA4-026: typed input bypasses the stepper's Math.max(0, …) clamp —
+    // apply the same floor here so a negative weight can never be stored.
+    if (numericWeight !== undefined && Number.isFinite(numericWeight)) {
+      numericWeight = Math.max(0, numericWeight);
+    }
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -1143,6 +1148,17 @@ export default function ActiveWorkoutScreen({
   };
 
   const handleSetRepsChange = (setIdx: number, val: string | number) => {
+    // QA4-026: typed reps were stored raw (`as any`), bypassing the
+    // stepper's floor — a negative or fractional value persisted into
+    // volume math. Normalize: keep '' while typing, otherwise a
+    // non-negative integer.
+    let cleanReps: string | number = val;
+    if (typeof val === 'number') {
+      cleanReps = Number.isFinite(val) ? Math.max(0, Math.floor(val)) : 0;
+    } else if (typeof val === 'string' && val.trim() !== '') {
+      const parsed = parseInt(val, 10);
+      if (!isNaN(parsed)) cleanReps = Math.max(0, Math.floor(parsed));
+    }
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== activeExerciseIdx) return ex;
@@ -1150,9 +1166,9 @@ export default function ActiveWorkoutScreen({
         return {
           ...ex,
           sets: ex.sets.map((s, j) => {
-            if (j === setIdx) return { ...s, reps: val as any };
+            if (j === setIdx) return { ...s, reps: cleanReps as any };
             if (j > setIdx && !isActiveSetCompleted(s) && s.reps === oldReps) {
-              return { ...s, reps: val as any };
+              return { ...s, reps: cleanReps as any };
             }
             return s;
           }),
