@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
+import { toUserMessage } from '@/lib/user-error';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
 import {
   TrendingUp,
@@ -272,7 +273,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
         toast.success('Progress photo saved locally.', 'Photo Added');
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not add the photo.', 'Upload Failed');
+      toast.error(toUserMessage(err, 'image'), 'Upload Failed');
     } finally {
       setIsUploadingPhoto(false);
     }

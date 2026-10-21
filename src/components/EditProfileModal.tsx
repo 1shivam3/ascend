@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, User, Check, Scale, Ruler, Camera, Trash2 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
@@ -99,7 +100,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setProfile({ ...profile, avatar: dataUrl });
       toast.success('Profile photo updated.', 'Photo Set');
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not set the photo.', 'Upload Failed');
+      toast.error(toUserMessage(err, 'image'), 'Upload Failed');
     } finally {
       setIsUploadingAvatar(false);
     }

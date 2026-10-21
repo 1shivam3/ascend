@@ -2876,31 +2876,27 @@ export const useAppStore = create<AppState>()(
       // leader's blob. Reads/removals are unaffected; in a single tab
       // (or outside the browser) the guard is leader/null and this is
       // exactly the old behavior.
-      storage: createJSONStorage(() => ({
-        getItem: (name: string) => {
-          try {
-            return typeof localStorage !== 'undefined' ? localStorage.getItem(name) : null;
-          } catch {
-            return null;
-          }
-        },
-        setItem: (name: string, value: string) => {
-          try {
-            if (typeof localStorage === 'undefined') return;
-            const guard = getTabLeaderGuard();
-            if (guard?.shouldSuppressWrites()) return;
-            localStorage.setItem(name, value);
-          } catch {
-            // Storage unavailable (private mode / quota) — persist is
-            // best-effort; never let it throw into store actions.
-          }
-        },
-        removeItem: (name: string) => {
-          try {
-            if (typeof localStorage !== 'undefined') localStorage.removeItem(name);
-          } catch {}
-        },
-      })),
+      // NOTE: zustand evaluates this factory ONCE at store creation
+      // and treats a throw as "storage unavailable" (noop persist) —
+      // the bare `localStorage` reference below preserves exactly the
+      // availability semantics of the previous `() => localStorage`.
+      storage: createJSONStorage(() => {
+        const ls = localStorage;
+        return {
+          getItem: (name: string) => ls.getItem(name),
+          setItem: (name: string, value: string) => {
+            try {
+              const guard = getTabLeaderGuard();
+              if (guard?.shouldSuppressWrites()) return;
+              ls.setItem(name, value);
+            } catch {
+              // Quota / private-mode write failures: persist is
+              // best-effort; never throw into store actions.
+            }
+          },
+          removeItem: (name: string) => ls.removeItem(name),
+        };
+      }),
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.setHasHydrated(true);

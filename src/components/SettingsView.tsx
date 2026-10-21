@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
+import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import {
   ChevronLeft,
@@ -296,7 +297,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         setShowDeleteConfirm(false);
       }
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to delete account.');
+      toast.error(toUserMessage(err, 'generic'));
     } finally {
       setIsDeleting(false);
     }
