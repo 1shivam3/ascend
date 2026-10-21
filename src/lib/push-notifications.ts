@@ -1,5 +1,45 @@
 'use client';
 
+/**
+ * localStorage key for the per-subscription delete token issued by
+ * /api/notifications/subscribe. The server stores only a hash of it;
+ * presenting it on DELETE proves this device owns the subscription.
+ */
+const PUSH_DELETE_TOKEN_KEY = 'ascend_push_delete_token';
+
+function storePushDeleteToken(token: string) {
+  try {
+    localStorage.setItem(PUSH_DELETE_TOKEN_KEY, token);
+  } catch {}
+}
+
+function readPushDeleteToken(): string | null {
+  try {
+    return localStorage.getItem(PUSH_DELETE_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function clearPushDeleteToken() {
+  try {
+    localStorage.removeItem(PUSH_DELETE_TOKEN_KEY);
+  } catch {}
+}
+
+async function buildAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  try {
+    const { getSupabase } = await import('./supabase/client');
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase!.auth.getSession();
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+  } catch {}
+  return headers;
+}
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -69,16 +109,8 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<PushSubs
     // can link the subscription to the signed-in user (not a guest).
     try {
       const subJson = subscription.toJSON();
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      try {
-        const { getSupabase } = await import('./supabase/client');
-        const supabase = getSupabase();
-        const { data: { session } } = await supabase!.auth.getSession();
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-      } catch {}
-      await fetch('/api/notifications/subscribe', {
+      const headers = await buildAuthHeaders();
+      const res = await fetch('/api/notifications/subscribe', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -87,6 +119,12 @@ export async function subscribeToPush(vapidPublicKey?: string): Promise<PushSubs
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
+      // The server issues a delete token on first registration (and rotates
+      // it for the owning signed-in user); persist it for unsubscribe.
+      const data = await res.json().catch(() => null);
+      if (data?.deleteToken) {
+        storePushDeleteToken(data.deleteToken);
+      }
     } catch (err) {
       console.warn('Could not sync push subscription to server:', err);
     }
@@ -108,13 +146,18 @@ export async function unsubscribeFromPush(): Promise<boolean> {
       const endpoint = subscription.endpoint;
       await subscription.unsubscribe();
 
-      // Notify server
+      // Notify server — the DELETE requires proof of ownership: the delete
+      // token issued at subscribe time and/or the signed-in session.
       try {
-        await fetch('/api/notifications/subscribe', {
+        const headers = await buildAuthHeaders();
+        const res = await fetch('/api/notifications/subscribe', {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint }),
+          headers,
+          body: JSON.stringify({ endpoint, deleteToken: readPushDeleteToken() }),
         });
+        if (res.ok) {
+          clearPushDeleteToken();
+        }
       } catch {}
       return true;
     }

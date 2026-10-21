@@ -39,6 +39,49 @@ const workouts: WorkoutEntry[] = [
   },
 ];
 
+describe('csvField formula-injection neutralization (QA4-008)', () => {
+  it('prefixes a single quote for cells starting with = + - @', () => {
+    expect(csvField('=2+5')).toBe("'=2+5");
+    expect(csvField('+SUM(A1:A9)')).toBe("'+SUM(A1:A9)");
+    expect(csvField('-2+3')).toBe("'-2+3");
+    expect(csvField('@SUM(1+1)')).toBe("'@SUM(1+1)");
+  });
+
+  it('neutralizes when the trigger follows leading whitespace or a tab/CR', () => {
+    expect(csvField('  =cmd')).toBe("'  =cmd");
+    expect(csvField('\t=1')).toBe("'\t=1");
+    expect(csvField('\r=1')).toBe('"\'\r=1"'); // CR forces RFC-4180 quoting too
+  });
+
+  it('still applies RFC-4180 quoting after neutralization', () => {
+    expect(csvField('=a,b')).toBe('"\'=a,b"');
+  });
+
+  it('leaves safe strings and all numbers untouched', () => {
+    expect(csvField('Bench Press')).toBe('Bench Press');
+    expect(csvField('a=b')).toBe('a=b'); // trigger not in first position
+    expect(csvField(-5)).toBe('-5'); // numeric literal, not a formula string
+    expect(csvField(42)).toBe('42');
+  });
+
+  it('neutralizes formula payloads inside exported rows', () => {
+    const evil: WorkoutEntry[] = [
+      {
+        id: 'w9',
+        date: '2026-10-19',
+        name: '=HYPERLINK("https://evil.example","click")',
+        exercises: [
+          { name: '@cmd', sets: [{ reps: 5, weight: 10, unit: 'kg', completed: true }] },
+        ],
+      },
+    ];
+    const csv = workoutsToCsv(evil);
+    expect(csv).toContain('"\'=HYPERLINK(""https://evil.example"",""click"")"');
+    expect(csv).toContain("'@cmd");
+    expect(csv).not.toContain(',=HYPERLINK');
+  });
+});
+
 describe('workoutsToCsv', () => {
   it('emits a documented header and one row per set', () => {
     const csv = workoutsToCsv(workouts);

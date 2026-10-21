@@ -34,6 +34,7 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 20,
       keyPrefix: 'ai-scan-meal',
+      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { executeMultiProviderText } from '@/lib/ai-provider';
-import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +14,7 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 25,
       keyPrefix: 'ai-parse-voice',
+      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -27,7 +28,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json();
+    // Hard body cap (QA4-033): the transcript is bounded to 1,000 chars.
+    const body = await readJsonBodyWithLimit(req, 4 * 1024);
     const rawTranscript = body?.transcript?.trim();
     const fallbackExercise = String(body?.currentExercise || 'Unknown').slice(0, 100);
     const userUnit = body?.userUnit === 'lbs' ? 'lbs' : 'kg';
@@ -94,6 +96,9 @@ Respond with ONLY raw JSON matching this schema:
       },
     });
   } catch (err: any) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return requestBodyTooLargeResponse();
+    }
     const rawMsg = err?.message || 'Failed to parse voice';
     return NextResponse.json({ error: 'AI_PARSE_FAILED', message: redactSecrets(rawMsg) }, { status: 500 });
   }

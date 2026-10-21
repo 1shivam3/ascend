@@ -5,6 +5,58 @@ import {
   getServerOpenRouterApiKey,
   redactSecrets,
 } from './server-security';
+import { checkGlobalRateLimit } from './rate-limit';
+
+/**
+ * Global daily AI circuit breaker (QA4-002 / RB-2).
+ *
+ * Per-IP route limits alone cannot stop distributed quota burn (many IPs,
+ * each under its own limit). This breaker counts EVERY provider execution
+ * against one fleet-wide key in the shared rate-limit store, over a 24h
+ * window. When the cap trips, AI calls fail fast with a clear error until
+ * the window resets — no provider is contacted, so no quota is spent.
+ *
+ * Default cap: 2,000 executions/day. Real usage is a small user base making
+ * at most a few dozen AI calls per person per day, so 2,000 sits orders of
+ * magnitude above legitimate traffic while still bounding worst-case daily
+ * burn to a fraction of one day of abusive per-IP traffic. Tune with the
+ * AI_DAILY_GLOBAL_CAP env var (set <= 0 to disable the breaker).
+ */
+export const DEFAULT_AI_DAILY_GLOBAL_CAP = 2000;
+
+export class AiGlobalCapExceededError extends Error {
+  constructor(cap: number) {
+    super(
+      `AI service daily limit reached (${cap} requests per 24h). AI features are paused until the daily window resets.`
+    );
+    this.name = 'AiGlobalCapExceededError';
+  }
+}
+
+export function getAiDailyGlobalCap(): number {
+  const raw = Number(process.env.AI_DAILY_GLOBAL_CAP);
+  if (Number.isFinite(raw) && raw > 0) return Math.floor(raw);
+  if (Number.isFinite(raw) && raw <= 0 && process.env.AI_DAILY_GLOBAL_CAP !== undefined) return 0;
+  return DEFAULT_AI_DAILY_GLOBAL_CAP;
+}
+
+async function assertAiDailyBudget(): Promise<void> {
+  const cap = getAiDailyGlobalCap();
+  if (cap <= 0) return; // breaker explicitly disabled via env
+  const result = await checkGlobalRateLimit({
+    windowMs: 24 * 60 * 60 * 1000,
+    maxRequests: cap,
+    keyPrefix: 'ai-global-daily',
+    // If the limiter backend itself is down we do NOT fail closed here:
+    // the AI routes already fail closed (503) on limiter outage before
+    // reaching the provider layer, so a failure at this point can only
+    // degrade to per-instance in-memory counting, never to unbounded use.
+    failClosed: false,
+  });
+  if (!result.success) {
+    throw new AiGlobalCapExceededError(cap);
+  }
+}
 
 export interface VisionOptions {
   imageBase64: string;
@@ -320,6 +372,7 @@ async function callOpenRouterVision<T>(
 export async function executeMultiProviderVision<T>(
   opts: VisionOptions
 ): Promise<ProviderExecutionResult<T>> {
+  await assertAiDailyBudget();
   const errors: string[] = [];
   const overallTimeoutMs = opts.timeoutMs ?? DEFAULT_AI_TIMEOUT_MS;
   const startTime = Date.now();
@@ -576,6 +629,7 @@ async function callOpenRouterText<T>(
 export async function executeMultiProviderText<T>(
   opts: TextOptions
 ): Promise<ProviderExecutionResult<T>> {
+  await assertAiDailyBudget();
   const errors: string[] = [];
   const overallTimeoutMs = opts.timeoutMs ?? DEFAULT_AI_TIMEOUT_MS;
   const startTime = Date.now();

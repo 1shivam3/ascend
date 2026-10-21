@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
 import { executeMultiProviderText } from '@/lib/ai-provider';
-import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
 import { FoodItem } from '@/lib/types';
 
@@ -20,6 +20,7 @@ export async function POST(req: Request) {
       windowMs: 60 * 1000,
       maxRequests: 25,
       keyPrefix: 'ai-parse-meal',
+      failClosed: true,
     });
   } catch (err) {
     if (err instanceof RateLimitUnavailableError) {
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body: ParseMealRequestBody = await req.json();
+    // Hard body cap (QA4-033): the only field is a ≤500-char query.
+    const body: ParseMealRequestBody = await readJsonBodyWithLimit(req, 4 * 1024);
     const rawQuery = body?.query?.trim();
 
     if (!rawQuery) {
@@ -145,6 +147,9 @@ RULES FOR PRECISION:
       totalFatG: totals.fatG,
     });
   } catch (err: any) {
+    if (err instanceof RequestBodyTooLargeError) {
+      return requestBodyTooLargeResponse();
+    }
     const rawMsg = err?.message || 'Failed to parse meal.';
     console.error('Parse meal API error:', redactSecrets(rawMsg));
     return NextResponse.json(

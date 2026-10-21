@@ -211,13 +211,10 @@ try {
  * if the distributed limiter cannot be reached, so the caller can return
  * a 503 Service Unavailable instead of silently relying on a weaker policy.
  */
-export async function checkRateLimit(
-  req: Request,
+async function checkRateLimitByKey(
+  key: string,
   options: RateLimitOptions
 ): Promise<RateLimitResult> {
-  const ip = getClientIp(req);
-  const key = `${options.keyPrefix || 'global'}:${ip}`;
-
   // Attempt distributed check first if Supabase is configured
   const supabase = getRateLimiterSupabase();
   if (supabase) {
@@ -234,6 +231,27 @@ export async function checkRateLimit(
 
   // Fall back to in-process memory when Supabase is not configured
   return checkRateLimitInMemory(key, options);
+}
+
+export async function checkRateLimit(
+  req: Request,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  const ip = getClientIp(req);
+  const key = `${options.keyPrefix || 'global'}:${ip}`;
+  return checkRateLimitByKey(key, options);
+}
+
+/**
+ * Global (not per-IP) rate limit check sharing the same backing store.
+ * Used for fleet-wide circuit breakers — e.g. the AI daily spend cap —
+ * where the limit must apply across all clients and instances combined.
+ */
+export async function checkGlobalRateLimit(
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  const key = `${options.keyPrefix || 'global'}:global`;
+  return checkRateLimitByKey(key, options);
 }
 
 /**

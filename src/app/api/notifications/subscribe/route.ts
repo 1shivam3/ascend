@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import {
+  generateSubscriptionDeleteToken,
+  hashSubscriptionDeleteToken,
+  isValidPushEndpoint,
+  verifySubscriptionDeleteToken,
+} from '@/lib/push-subscription-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,6 +22,26 @@ function getSupabaseServerClient() {
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+async function resolveUserId(supabase: any, req: Request): Promise<string | null> {
+  const authHeader = req.headers.get('authorization');
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    const token = authHeader.substring(7).trim();
+    const { data: { user } } = await supabase.auth.getUser(token);
+    if (user) return user.id;
+  }
+  return null;
+}
+
+async function findSubscription(supabase: any, endpoint: string) {
+  const { data, error } = await supabase
+    .from('push_subscriptions')
+    .select('endpoint, user_id, delete_token_hash')
+    .eq('endpoint', endpoint)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
 }
 
 export async function POST(req: Request) {
@@ -40,6 +66,25 @@ export async function POST(req: Request) {
       );
     }
 
+    // Reject anything a real web-push service would never issue (QA4-009):
+    // previously ANY string (e.g. "not-a-url") was stored with a 200.
+    if (!isValidPushEndpoint(subscription.endpoint)) {
+      return NextResponse.json(
+        { error: 'INVALID_ENDPOINT', message: 'Subscription endpoint is not a recognized web-push service URL' },
+        { status: 400 }
+      );
+    }
+
+    const endpoint = subscription.endpoint;
+    const p256dh = subscription.keys?.p256dh;
+    const auth = subscription.keys?.auth;
+    if (typeof p256dh !== 'string' || !p256dh || typeof auth !== 'string' || !auth) {
+      return NextResponse.json(
+        { error: 'INVALID_SUBSCRIPTION', message: 'Missing subscription encryption keys' },
+        { status: 400 }
+      );
+    }
+
     const supabase = getSupabaseServerClient();
     if (!supabase) {
       // Offline-first: return success
@@ -51,29 +96,50 @@ export async function POST(req: Request) {
     }
 
     // Optional user authentication via Bearer token
-    let userId: string | null = null;
-    const authHeader = req.headers.get('authorization');
-    if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
-      const token = authHeader.substring(7).trim();
-      const { data: { user } } = await supabase.auth.getUser(token);
-      if (user) {
-        userId = user.id;
-      }
+    const userId = await resolveUserId(supabase, req);
+
+    // Ownership guard (QA4A-003): an upsert keyed on endpoint must never let
+    // an anonymous or different user overwrite — or null out — the user_id
+    // of a subscription that already belongs to a signed-in user.
+    let existing: any = null;
+    try {
+      existing = await findSubscription(supabase, endpoint);
+    } catch {
+      existing = null; // upsert below surfaces any real database error
     }
 
-    const endpoint = subscription.endpoint;
-    const p256dh = subscription.keys?.p256dh || '';
-    const auth = subscription.keys?.auth || '';
+    if (existing?.user_id && existing.user_id !== userId) {
+      return NextResponse.json(
+        { error: 'ENDPOINT_OWNED', message: 'This subscription belongs to another account' },
+        { status: 403 }
+      );
+    }
 
-    // Upsert into push_subscriptions table
+    // Per-subscription delete token: issued when the row is first created
+    // (or has none yet, e.g. legacy rows), and rotated when the owning
+    // signed-in user re-subscribes. Only its SHA-256 hash is stored; the
+    // client persists the raw token and presents it on DELETE. An anonymous
+    // re-register of a guest row never rotates the token, so knowing an
+    // endpoint alone is not enough to take over its deletion rights.
+    let deleteToken: string | undefined;
+    let deleteTokenHash: string | null = existing?.delete_token_hash ?? null;
+    if (!deleteTokenHash || (userId && existing?.user_id === userId)) {
+      deleteToken = generateSubscriptionDeleteToken();
+      deleteTokenHash = hashSubscriptionDeleteToken(deleteToken);
+    }
+
+    // Upsert into push_subscriptions table. user_id is only ever set from a
+    // verified session or preserved from the existing row — never nulled by
+    // an unauthenticated request.
     const { error } = await supabase.from('push_subscriptions').upsert(
       {
         endpoint,
         p256dh,
         auth,
-        user_id: userId,
+        user_id: userId ?? existing?.user_id ?? null,
         user_agent: userAgent || null,
         timezone: timezone || 'UTC',
+        delete_token_hash: deleteTokenHash,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'endpoint' }
@@ -90,6 +156,7 @@ export async function POST(req: Request) {
       success: true,
       endpoint,
       registeredAt: new Date().toISOString(),
+      ...(deleteToken ? { deleteToken } : {}),
     });
   } catch (err: any) {
     return NextResponse.json(
@@ -100,23 +167,73 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // Rate limiting (QA4-009): DELETE previously had none at all.
+  const rateLimit = await checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    keyPrefix: 'push-sub-delete',
+  });
+
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
-    const { endpoint } = body;
+    const { endpoint, deleteToken } = body;
 
     if (!endpoint) {
       return NextResponse.json({ error: 'MISSING_ENDPOINT' }, { status: 400 });
     }
 
+    if (!isValidPushEndpoint(endpoint)) {
+      return NextResponse.json({ error: 'INVALID_ENDPOINT' }, { status: 400 });
+    }
+
     const supabase = getSupabaseServerClient();
-    if (supabase) {
-      const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
-      if (error) {
-        return NextResponse.json(
-          { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
-          { status: 500 }
-        );
-      }
+    if (!supabase) {
+      // No server-side store configured: nothing to delete.
+      return NextResponse.json({ success: true, offlineMode: true, message: 'Unsubscribed from push' });
+    }
+
+    let existing: any = null;
+    try {
+      existing = await findSubscription(supabase, endpoint);
+    } catch {
+      return NextResponse.json(
+        { error: 'DATABASE_ERROR', message: 'Could not look up subscription' },
+        { status: 500 }
+      );
+    }
+
+    if (!existing) {
+      // Idempotent: the subscription is already gone.
+      return NextResponse.json({ success: true, message: 'Unsubscribed from push' });
+    }
+
+    // Proof of ownership (QA4-009): the caller must either present the
+    // per-subscription delete token issued at subscribe time, or be
+    // signed in as the user the subscription belongs to. Legacy rows with
+    // no token and no owner cannot be deleted through this route by
+    // strangers — the browser-side unsubscribe still works, and stale
+    // rows are reaped by the dispatcher when the push service returns 410.
+    const userId = await resolveUserId(supabase, req);
+    const tokenOk = verifySubscriptionDeleteToken(deleteToken, existing.delete_token_hash);
+    const ownerOk = Boolean(userId && existing.user_id && userId === existing.user_id);
+
+    if (!tokenOk && !ownerOk) {
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Proof of subscription ownership is required to unsubscribe' },
+        { status: 401 }
+      );
+    }
+
+    const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint);
+    if (error) {
+      return NextResponse.json(
+        { error: 'DATABASE_ERROR', message: redactSecrets(error.message) },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true, message: 'Unsubscribed from push' });

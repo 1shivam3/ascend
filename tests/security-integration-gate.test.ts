@@ -510,7 +510,7 @@ describe('ASCEND Security Integration Gate — Real Local Database Tests', () =>
       const { POST: subPost, DELETE: subDelete } = await import(
         '../src/app/api/notifications/subscribe/route'
       );
-      const testEndpoint = 'https://test.push/guest-e2e-' + Date.now();
+      const testEndpoint = 'https://fcm.googleapis.com/fcm/send/guest-e2e-' + Date.now();
 
       // 1. Guest Registration (POST)
       const regReq = new Request('http://localhost:3000/api/notifications/subscribe', {
@@ -560,11 +560,11 @@ describe('ASCEND Security Integration Gate — Real Local Database Tests', () =>
       );
       expect(updatedRow).toBe('Europe/London');
 
-      // 3. Unsubscription (DELETE)
+      // 3. Unsubscription (DELETE) — requires the delete token issued at registration
       const delReq = new Request('http://localhost:3000/api/notifications/subscribe', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint: testEndpoint }),
+        body: JSON.stringify({ endpoint: testEndpoint, deleteToken: regData.deleteToken }),
       });
 
       const delRes = await subDelete(delReq);
@@ -609,7 +609,7 @@ describe('ASCEND Security Integration Gate — Real Local Database Tests', () =>
       const { POST: subPost, DELETE: subDelete } = await import(
         '../src/app/api/notifications/subscribe/route'
       );
-      const testEndpoint = 'https://test.push/auth-e2e-' + Date.now();
+      const testEndpoint = 'https://fcm.googleapis.com/fcm/send/auth-e2e-' + Date.now();
 
       const req = new Request('http://localhost:3000/api/notifications/subscribe', {
         method: 'POST',
@@ -635,10 +635,13 @@ describe('ASCEND Security Integration Gate — Real Local Database Tests', () =>
       );
       expect(authRow).toBe(`${testEndpoint}|${testUserId}`);
 
-      // Unsubscribe
+      // Unsubscribe — owner-authenticated DELETE
       const delReq = new Request('http://localhost:3000/api/notifications/subscribe', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: JSON.stringify({ endpoint: testEndpoint }),
       });
       await subDelete(delReq);
