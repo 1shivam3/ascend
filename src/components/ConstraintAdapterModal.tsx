@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
 import { Button } from '@/components/ui/Button';
+import { useTranslation } from '@/lib/i18n';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 
@@ -34,6 +35,7 @@ export default function ConstraintAdapterModal({
   userUnit = 'kg',
   onApplyAdaptedWorkout,
 }: ConstraintAdapterModalProps) {
+  const { t } = useTranslation();
   const toast = useToast();
 
   const [activeConstraintType, setActiveConstraintType] = useState<'time' | 'readiness' | 'equipment'>('time');
@@ -75,7 +77,7 @@ export default function ConstraintAdapterModal({
 
   const handleConfirm = () => {
     onApplyAdaptedWorkout(adaptedExercises);
-    toast.success(`Adapted session applied!`, 'Workout Adapted');
+    toast.success(t('adapt.appliedMsg'), t('adapt.appliedTitle'));
     onClose();
   };
 
@@ -105,10 +107,10 @@ export default function ConstraintAdapterModal({
             )}
             <div>
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
-                ADAPTIVE SYSTEM
+                {t('adapt.system')}
               </span>
               <h2 className="text-xl font-black text-text-primary tracking-tight font-display">
-                {step === 'swap_picker' ? 'Choose Alternative' : 'Adapt Session'}
+                {step === 'swap_picker' ? t('adapt.chooseAlt') : t('adapt.title')}
               </h2>
             </div>
           </div>
@@ -126,7 +128,7 @@ export default function ConstraintAdapterModal({
             {/* 1. Why? Reason selector */}
             <div className="space-y-1.5">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                WHY ADAPT TODAY?
+                {t('adapt.why')}
               </span>
               <div className="grid grid-cols-3 gap-2">
                 <button
@@ -139,8 +141,8 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <Clock className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'time' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">{selectedMinutes}m limit</span>
-                  <span className="text-[10px] text-text-muted">Short on time</span>
+                  <span className="text-xs font-bold block">{t('adapt.minLimit', { minutes: selectedMinutes })}</span>
+                  <span className="text-[10px] text-text-muted">{t('adapt.shortTime')}</span>
                 </button>
 
                 <button
@@ -153,8 +155,8 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <BatteryLow className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'readiness' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">Feeling tired</span>
-                  <span className="text-[10px] text-text-muted">Low energy</span>
+                  <span className="text-xs font-bold block">{t('adapt.tired')}</span>
+                  <span className="text-[10px] text-text-muted">{t('adapt.lowEnergy')}</span>
                 </button>
 
                 <button
@@ -170,15 +172,15 @@ export default function ConstraintAdapterModal({
                   }`}
                 >
                   <Dumbbell className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'equipment' ? 'text-accent' : 'text-text-muted'}`} />
-                  <span className="text-xs font-bold block">Equipment busy</span>
-                  <span className="text-[10px] text-text-muted">Station taken</span>
+                  <span className="text-xs font-bold block">{t('adapt.equipmentBusy')}</span>
+                  <span className="text-[10px] text-text-muted">{t('adapt.stationTaken')}</span>
                 </button>
               </div>
 
               {/* Time limits quick selector */}
               {activeConstraintType === 'time' && (
                 <div className="flex items-center gap-2 pt-1.5">
-                  <span className="text-xs text-text-muted font-medium">Minutes available:</span>
+                  <span className="text-xs text-text-muted font-medium">{t('adapt.minutesAvailable')}</span>
                   {[20, 30, 45, 60].map((m) => (
                     <button
                       key={m}
@@ -200,29 +202,29 @@ export default function ConstraintAdapterModal({
             {/* 2. ASCEND will: Clean bullet list */}
             <div className="space-y-1.5 pt-1">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                ASCEND WILL:
+                {t('adapt.will')}
               </span>
               <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
                 <div className="flex items-start gap-2 text-xs text-text-secondary">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-                  <span>Preserve main compound lifts &amp; movement patterns</span>
+                  <span>{t('adapt.will1')}</span>
                 </div>
                 <div className="flex items-start gap-2 text-xs text-text-secondary">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-                  <span>Prune accessory volume to fit target duration</span>
+                  <span>{t('adapt.will2')}</span>
                 </div>
                 <div className="flex items-start gap-2 text-xs text-text-secondary">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
-                  <span>Keep today&apos;s primary neuromuscular training stimulus</span>
+                  <span>{t('adapt.will3')}</span>
                 </div>
               </div>
             </div>
 
             {/* 3. Estimated session duration */}
             <div className="flex items-center justify-between px-1 text-xs">
-              <span className="text-text-muted font-medium">Estimated workout time:</span>
+              <span className="text-text-muted font-medium">{t('adapt.estimated')}</span>
               <span className="font-mono font-black text-text-primary text-sm">
-                ~{estimatedTotalMinutes} min
+                {t('adapt.minUnit', { minutes: estimatedTotalMinutes })}
               </span>
             </div>
 
@@ -233,7 +235,7 @@ export default function ConstraintAdapterModal({
                 onClick={() => setShowDetailedExplanation((prev) => !prev)}
                 className="text-xs text-accent hover:underline flex items-center gap-1 cursor-pointer font-semibold"
               >
-                <span>{showDetailedExplanation ? 'Hide decision details' : 'View decision details'}</span>
+                <span>{showDetailedExplanation ? t('adapt.hideDetails') : t('adapt.viewDetails')}</span>
                 {showDetailedExplanation ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
 
@@ -246,7 +248,7 @@ export default function ConstraintAdapterModal({
                   ))}
                   {timeSavedMinutes > 0 && (
                     <div className="text-accent font-semibold pt-1">
-                      Time saved: ~{timeSavedMinutes} minutes vs original plan
+                      {t('adapt.timeSaved', { minutes: timeSavedMinutes })}
                     </div>
                   )}
                 </div>
@@ -261,7 +263,7 @@ export default function ConstraintAdapterModal({
               onClick={handleConfirm}
               leftIcon={<Check className="w-4 h-4 stroke-[3]" />}
             >
-              Apply Adaptation
+              {t('adapt.apply')}
             </Button>
           </>
         ) : (
@@ -269,7 +271,7 @@ export default function ConstraintAdapterModal({
           <div className="space-y-4">
             <div className="space-y-1.5">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                WHICH EXERCISE IS OCCUPIED?
+                {t('adapt.whichOccupied')}
               </span>
               <select
                 value={selectedExName}
@@ -281,7 +283,7 @@ export default function ConstraintAdapterModal({
               >
                 {exercises.map((ex, i) => (
                   <option key={i} value={ex.name}>
-                    {ex.name} ({ex.sets.length} sets)
+                    {t('adapt.setsCount', { name: ex.name, sets: ex.sets.length })}
                   </option>
                 ))}
               </select>
@@ -289,7 +291,7 @@ export default function ConstraintAdapterModal({
 
             <div className="space-y-1.5">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
-                SELECT STIMULUS-PRESERVING SUBSTITUTE:
+                {t('adapt.selectSub')}
               </span>
               {availableSwaps.length > 0 ? (
                 <div className="space-y-2 max-h-56 overflow-y-auto">
@@ -321,7 +323,7 @@ export default function ConstraintAdapterModal({
                 </div>
               ) : (
                 <div className="p-3 rounded-xl bg-bg-secondary/50 text-2xs text-text-muted">
-                  No automated swap registered. A dumbbell or cable variation will preserve training stimulus.
+                  {t('adapt.noSwap')}
                 </div>
               )}
             </div>
@@ -332,7 +334,7 @@ export default function ConstraintAdapterModal({
               fullWidth
               onClick={() => setStep('summary')}
             >
-              Back to Summary
+              {t('adapt.backSummary')}
             </Button>
           </div>
         )}

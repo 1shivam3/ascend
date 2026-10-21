@@ -3,6 +3,8 @@
 import React, { useState } from 'react';
 import { X, Flag, AlertTriangle, ShieldCheck, Check } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 interface ReportAIModalProps {
   isOpen: boolean;
@@ -12,12 +14,12 @@ interface ReportAIModalProps {
   onReported?: () => void;
 }
 
-const REPORT_REASONS = [
-  { id: 'unsafe_exercise', label: 'Unsafe or dangerous exercise advice' },
-  { id: 'medical_claim', label: 'Inappropriate medical diagnosis or health claim' },
-  { id: 'offensive_content', label: 'Offensive, harmful, or inappropriate content' },
-  { id: 'inaccurate_data', label: 'Hallucinated or completely inaccurate figures' },
-  { id: 'other', label: 'Other policy or safety violation' },
+const REPORT_REASONS: { id: string; labelKey: StringKey }[] = [
+  { id: 'unsafe_exercise', labelKey: 'report.reasonUnsafe' },
+  { id: 'medical_claim', labelKey: 'report.reasonMedical' },
+  { id: 'offensive_content', labelKey: 'report.reasonOffensive' },
+  { id: 'inaccurate_data', labelKey: 'report.reasonInaccurate' },
+  { id: 'other', labelKey: 'report.reasonOther' },
 ];
 
 export default function ReportAIModal({
@@ -30,6 +32,7 @@ export default function ReportAIModal({
   const [selectedReason, setSelectedReason] = useState<string>('unsafe_exercise');
   const [additionalDetails, setAdditionalDetails] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const { t } = useTranslation();
   const toast = useToast();
 
   if (!isOpen) return null;
@@ -55,7 +58,7 @@ export default function ReportAIModal({
     }
 
     setSubmitted(true);
-    toast.success('Thank you for helping keep ASCEND safe. This response has been flagged.', 'Report Received');
+    toast.success(t('report.thanksMsg'), t('report.receivedTitle'));
 
     setTimeout(() => {
       setSubmitted(false);
@@ -79,10 +82,10 @@ export default function ReportAIModal({
             </div>
             <div>
               <h3 className="font-bold text-sm text-text-primary">
-                Report AI Content
+                {t('report.title')}
               </h3>
               <p className="text-3xs text-text-muted font-mono">
-                Google Play AI Safety &amp; Content Review
+                {t('report.subtitle')}
               </p>
             </div>
           </div>
@@ -100,16 +103,16 @@ export default function ReportAIModal({
             <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
               <Check className="w-6 h-6 stroke-[3]" />
             </div>
-            <h4 className="text-sm font-bold text-text-primary">Report Submitted</h4>
+            <h4 className="text-sm font-bold text-text-primary">{t('report.submitted')}</h4>
             <p className="text-2xs text-text-secondary max-w-xs mx-auto">
-              This AI response has been flagged and suppressed. Thank you for maintaining safety standards.
+              {t('report.submittedBody')}
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border text-2xs space-y-1">
               <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
-                Flagged Source: {sourceFeature}
+                {t('report.flaggedSource', { source: sourceFeature })}
               </span>
               {aiContentSnippet && (
                 <p className="text-text-secondary italic line-clamp-2">
@@ -120,7 +123,7 @@ export default function ReportAIModal({
 
             <div className="space-y-2">
               <label className="text-2xs font-semibold text-text-primary block">
-                Why are you reporting this AI response?
+                {t('report.why')}
               </label>
               <div className="space-y-1.5">
                 {REPORT_REASONS.map((r) => (
@@ -140,7 +143,7 @@ export default function ReportAIModal({
                       onChange={() => setSelectedReason(r.id)}
                       className="text-accent focus:ring-accent"
                     />
-                    <span className="text-2xs">{r.label}</span>
+                    <span className="text-2xs">{t(r.labelKey)}</span>
                   </label>
                 ))}
               </div>
@@ -148,12 +151,12 @@ export default function ReportAIModal({
 
             <div className="space-y-1">
               <label className="text-2xs font-semibold text-text-primary block">
-                Additional context (optional)
+                {t('report.context')}
               </label>
               <textarea
                 value={additionalDetails}
                 onChange={(e) => setAdditionalDetails(e.target.value)}
-                placeholder="Explain why this response was problematic or inaccurate..."
+                placeholder={t('report.contextPlaceholder')}
                 rows={2}
                 className="w-full bg-bg-secondary border border-border rounded-lg p-2 text-xs text-text-primary outline-none focus:border-accent resize-none"
               />
@@ -165,14 +168,14 @@ export default function ReportAIModal({
                 onClick={onClose}
                 className="btn-secondary py-2 px-3 text-xs"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
                 className="btn-primary py-2 px-4 text-xs font-bold flex items-center gap-1.5 bg-danger hover:bg-danger/90 border-transparent text-white"
               >
                 <Flag className="w-3.5 h-3.5" />
-                <span>Submit Report</span>
+                <span>{t('report.submit')}</span>
               </button>
             </div>
           </form>

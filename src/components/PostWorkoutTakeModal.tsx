@@ -7,6 +7,7 @@ import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/li
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration } from '@/lib/formatters';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import { useTranslation } from '@/lib/i18n';
 import {
   Trophy,
   X,
@@ -39,6 +40,7 @@ export default function PostWorkoutTakeModal({
   onClose,
   completedWorkout,
 }: PostWorkoutTakeModalProps) {
+  const { t } = useTranslation();
   const store = useStore();
   const [take, setTake] = useState<AIPostWorkoutTake | null>(null);
   const [loading, setLoading] = useState(true);
@@ -104,8 +106,8 @@ export default function PostWorkoutTakeModal({
               setTake(generateDeterministicPostWorkoutTake(completedWorkout));
             } catch {
               setTake({
-                headline: 'Session complete.',
-                summary: 'Workout logged. Your next session targets are calculated from your completed sets.',
+                headline: t('take.fallbackHeadline'),
+                summary: t('take.fallbackSummary'),
                 nextSessionTarget: '',
                 source: 'offline_heuristic',
               } as unknown as AIPostWorkoutTake);
@@ -168,7 +170,7 @@ export default function PostWorkoutTakeModal({
       }}
       role="dialog"
       aria-modal="true"
-      aria-label="Workout session summary"
+      aria-label={t('take.aria')}
     >
       <div className="bg-bg-card border border-border rounded-2xl w-full max-w-md max-h-[88dvh] flex flex-col shadow-2xl relative animate-scale-in overflow-hidden">
         {/* Sticky Header */}
@@ -179,10 +181,10 @@ export default function PostWorkoutTakeModal({
             </div>
             <div>
               <h3 className="font-black text-base text-text-primary leading-tight">
-                Session Complete!
+                {t('take.title')}
               </h3>
               <p className="text-2xs text-text-muted truncate max-w-[220px]">
-                {completedWorkout.name || 'Workout'} logged to history
+                {t('take.loggedTo', { name: completedWorkout.name || t('take.workoutFallback') })}
               </p>
             </div>
           </div>
@@ -190,7 +192,7 @@ export default function PostWorkoutTakeModal({
             type="button"
             onClick={onClose}
             className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer transition-colors"
-            aria-label="Close summary"
+            aria-label={t('take.closeAria')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -201,7 +203,7 @@ export default function PostWorkoutTakeModal({
           {/* Quick Numbers Bar: 4 Core Athletic Metrics */}
         <div className="grid grid-cols-4 gap-1.5 py-2.5 border-y border-border text-center bg-bg-secondary/30 rounded-xl px-2">
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Duration</span>
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.duration')}</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.durationSeconds !== undefined
                 ? formatDuration(completedWorkout.durationSeconds)
@@ -211,19 +213,19 @@ export default function PostWorkoutTakeModal({
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Volume</span>
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.volume')}</span>
             <span className="font-bold text-xs sm:text-sm text-accent font-mono truncate block" title={totalVolume}>
               {totalVolume}
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Lifts</span>
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.lifts')}</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.exercises.length}
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">Sets</span>
+            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.sets')}</span>
             <span className="font-bold text-xs sm:text-sm text-emerald-500 font-mono">
               {totalSets}
             </span>
@@ -235,7 +237,7 @@ export default function PostWorkoutTakeModal({
           <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 animate-scale-in">
             <div className="flex items-center gap-1.5 text-xs font-bold text-amber-500">
               <Zap className="w-4 h-4 fill-amber-500" />
-              <span>{todayPRs.length} NEW PERSONAL RECORD{todayPRs.length > 1 ? 'S' : ''} DETECTED!</span>
+              <span>{t(todayPRs.length > 1 ? 'take.newPrs' : 'take.newPr', { count: todayPRs.length })}</span>
             </div>
             <div className="space-y-1.5">
               {todayPRs.map((pr) => {
@@ -257,7 +259,7 @@ export default function PostWorkoutTakeModal({
                       <div>
                         <span className="font-bold text-text-primary block">{pr.exercise}</span>
                         <span className="text-3xs text-text-muted font-mono">
-                          {isRepPR ? (pr.notes || 'Rep Milestone') : `1RM: ${userUnit === 'lbs' ? Math.round(pr.oneRepMax * 2.20462) : pr.oneRepMax} ${userUnit}`}
+                          {isRepPR ? (pr.notes || t('take.repMilestone')) : `1RM: ${userUnit === 'lbs' ? Math.round(pr.oneRepMax * 2.20462) : pr.oneRepMax} ${userUnit}`}
                         </span>
                       </div>
                     </div>
@@ -266,7 +268,7 @@ export default function PostWorkoutTakeModal({
                         {displayWeight} {userUnit} × {pr.reps}
                       </span>
                       <span className="text-[10px] text-text-muted uppercase font-sans font-semibold">
-                        {isRepPR ? 'Rep PR' : '1RM PR'}
+                        {isRepPR ? t('take.repPr') : t('take.oneRmPr')}
                       </span>
                     </div>
                   </div>
@@ -281,22 +283,22 @@ export default function PostWorkoutTakeModal({
           <div className="py-6 text-center space-y-2 animate-pulse">
             <Sparkles className="w-5 h-5 text-accent animate-spin mx-auto" />
             <p className="text-xs text-text-muted font-medium">
-              Generating Coach&apos;s Take...
+              {t('take.generating')}
             </p>
           </div>
         ) : take ? (
           <div className="p-4 rounded-xl bg-accent/10 border border-accent/20 space-y-3 animate-fade-in">
             <div className="flex items-center justify-between text-2xs">
               <span className="font-bold uppercase tracking-wider text-accent flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5" /> Coach&apos;s Take
+                <Sparkles className="w-3.5 h-3.5" /> {t('take.coachTake')}
               </span>
               {take.source === 'gemini' ? (
                 <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
-                  Autoregulated Coach
+                  {t('take.autoregulated')}
                 </span>
               ) : (
                 <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
-                  Local Coach
+                  {t('take.localCoach')}
                 </span>
               )}
             </div>
@@ -313,13 +315,13 @@ export default function PostWorkoutTakeModal({
             <div className="p-3 rounded-lg bg-bg-secondary border border-border space-y-1">
               <div className="flex items-center gap-1 text-2xs font-bold text-text-muted uppercase tracking-wider">
                 <Target className="w-3.5 h-3.5 text-accent" />
-                <span>Next Session Target</span>
+                <span>{t('take.nextTarget')}</span>
               </div>
               <p className="text-xs font-semibold text-text-primary">
                 {take.nextSessionTarget}
               </p>
               {targetRationale && (
-                <CollapsibleDetails label="Why this target?">
+                <CollapsibleDetails label={t('take.whyTarget')}>
                   <p>{targetRationale}</p>
                 </CollapsibleDetails>
               )}
@@ -334,10 +336,10 @@ export default function PostWorkoutTakeModal({
             type="button"
             onClick={onClose}
             className="w-full py-3.5 rounded-xl bg-[#E44427] text-white font-bold text-xs hover:bg-[#d03b20] active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
-            aria-label="Done and return to workouts"
+            aria-label={t('take.doneAria')}
           >
             <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-            <span>Done & Return to Workouts</span>
+            <span>{t('take.done')}</span>
           </button>
         </div>
       </div>
