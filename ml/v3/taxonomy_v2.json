@@ -1,0 +1,6567 @@
+{
+ "version": 2,
+ "generated": "2026-10-20",
+ "builder": "v2_work/finalize_taxonomy.py (inputs + evidence in v2_work/, audit in DATASETS_V2.md)",
+ "rules": {
+  "merge": "same dish in multiple sources = one canonical class; merges are explicit in build_taxonomy.ALIASES + this file's merge_note fields",
+  "floor_R1": "drop canonical classes with verified total < 80 images (dropped: 0; smallest kept verified class is marble cake, 83)",
+  "no_further_trim_R2": "per-class counts are near-uniform in every source, so higher thresholds delete major dishes; balance is enforced by the prep-time per-class cap instead",
+  "cap": "data_prep_v2 caps each class at MAX_PER_CLASS=400 images after dedupe",
+  "region": "indian = Indian-subcontinent dish identity (all Khana classes except its world items, the v1 Indian sets, chicken curry); world = everything else"
+ },
+ "summary": {
+  "classes": 544,
+  "indian": 85,
+  "world": 459,
+  "verified_image_pool_precap": 410827,
+  "projected_images_at_cap400": 150989,
+  "dropped_by_floor_rule": []
+ },
+ "classes": [
+  {
+   "name": "adobo",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "adobo"
+    ],
+    "uec": [
+     "adobo"
+    ]
+   },
+   "est_images": 655
+  },
+  {
+   "name": "almond jelly",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "almond jelly"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "aloo gobi",
+   "region": "indian",
+   "ascend_name": "aloo gobi",
+   "sources": {
+    "khana": [
+     "aloo gobi"
+    ]
+   },
+   "est_images": 1007
+  },
+  {
+   "name": "aloo methi",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "aloo methi"
+    ]
+   },
+   "est_images": 125
+  },
+  {
+   "name": "aloo mutter",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "aloo mutter"
+    ]
+   },
+   "est_images": 350
+  },
+  {
+   "name": "aloo paratha",
+   "region": "indian",
+   "ascend_name": "aloo paratha",
+   "sources": {
+    "khana": [
+     "aloo paratha"
+    ]
+   },
+   "est_images": 3155
+  },
+  {
+   "name": "ambrosia",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "ambrosia_food"
+    ]
+   },
+   "est_images": 604
+  },
+  {
+   "name": "amritsari kulcha",
+   "region": "indian",
+   "ascend_name": "amritsari kulcha",
+   "sources": {
+    "khana": [
+     "amritsari kulcha"
+    ]
+   },
+   "est_images": 267
+  },
+  {
+   "name": "anda curry",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "anda curry"
+    ]
+   },
+   "est_images": 3248
+  },
+  {
+   "name": "apple pie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "apple_pie"
+    ],
+    "foodx": [
+     "apple_pie"
+    ],
+    "uec": [
+     "apple pie"
+    ]
+   },
+   "est_images": 1691
+  },
+  {
+   "name": "apple turnover",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "apple_turnover"
+    ]
+   },
+   "est_images": 547
+  },
+  {
+   "name": "applesauce",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "applesauce"
+    ]
+   },
+   "est_images": 523
+  },
+  {
+   "name": "applesauce cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "applesauce_cake"
+    ]
+   },
+   "est_images": 622
+  },
+  {
+   "name": "ayam bakar",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ayam bakar"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "ayam goreng",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ayam goreng"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "babi guling",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "babi guling"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "baby back ribs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "baby_back_ribs"
+    ],
+    "foodx": [
+     "baby_back_rib"
+    ]
+   },
+   "est_images": 1569
+  },
+  {
+   "name": "bacon and eggs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "bacon_and_eggs"
+    ]
+   },
+   "est_images": 621
+  },
+  {
+   "name": "bagel",
+   "region": "world",
+   "ascend_name": "bagel",
+   "sources": {
+    "uec": [
+     "bagel"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "bak kut teh",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "bak kut teh"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "baked alaska",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "baked_alaska"
+    ]
+   },
+   "est_images": 514
+  },
+  {
+   "name": "baked salmon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "baked salmon"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "baklava",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "baklava"
+    ],
+    "foodx": [
+     "baklava"
+    ]
+   },
+   "est_images": 1583
+  },
+  {
+   "name": "ball shaped bun with pork",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ball shaped bun with pork"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "balushahi",
+   "region": "indian",
+   "ascend_name": "balushahi",
+   "sources": {
+    "khana": [
+     "balushahi"
+    ]
+   },
+   "est_images": 179
+  },
+  {
+   "name": "banana chips",
+   "region": "indian",
+   "ascend_name": "banana chips",
+   "sources": {
+    "khana": [
+     "banana chips"
+    ]
+   },
+   "est_images": 170
+  },
+  {
+   "name": "barbecued red pork in sauce with rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Barbecued red pork in sauce with rice"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "barbecued spareribs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "barbecued_spareribs"
+    ]
+   },
+   "est_images": 575
+  },
+  {
+   "name": "bean curd family style",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "bean curd family style"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "beef bourguignon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "beef_bourguignonne"
+    ]
+   },
+   "est_images": 488
+  },
+  {
+   "name": "beef bowl",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "beef bowl"
+    ]
+   },
+   "est_images": 167
+  },
+  {
+   "name": "beef carpaccio",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "beef_carpaccio"
+    ],
+    "foodx": [
+     "beef_carpaccio"
+    ]
+   },
+   "est_images": 1531
+  },
+  {
+   "name": "beef curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "beef curry"
+    ]
+   },
+   "est_images": 246
+  },
+  {
+   "name": "beef in oyster sauce",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "beef in oyster sauce"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "beef noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "beef noodle"
+    ]
+   },
+   "est_images": 139
+  },
+  {
+   "name": "beef noodle soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "beef noodle soup"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "beef stroganoff",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "beef_stroganoff"
+    ]
+   },
+   "est_images": 562
+  },
+  {
+   "name": "beef tartare",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "beef_tartare"
+    ],
+    "foodx": [
+     "beef_tartare",
+     "steak_tartare"
+    ]
+   },
+   "est_images": 1753,
+   "merge_note": "FoodX's 'steak tartare' merged in: same dish, two names."
+  },
+  {
+   "name": "beef wellington",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "beef_wellington"
+    ]
+   },
+   "est_images": 496
+  },
+  {
+   "name": "beet salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "beet_salad"
+    ],
+    "foodx": [
+     "beet_salad"
+    ]
+   },
+   "est_images": 1664
+  },
+  {
+   "name": "beignet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "beignets"
+    ],
+    "foodx": [
+     "beignet"
+    ]
+   },
+   "est_images": 1596
+  },
+  {
+   "name": "besan laddu",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "besan laddu"
+    ]
+   },
+   "est_images": 483
+  },
+  {
+   "name": "bhindi masala",
+   "region": "indian",
+   "ascend_name": "bhindi masala",
+   "sources": {
+    "khana": [
+     "bhindi masala"
+    ]
+   },
+   "est_images": 598
+  },
+  {
+   "name": "bibimbap",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "bibimbap"
+    ],
+    "foodx": [
+     "bibimbap"
+    ],
+    "uec": [
+     "bibimbap"
+    ]
+   },
+   "est_images": 1648
+  },
+  {
+   "name": "biryani",
+   "region": "indian",
+   "ascend_name": "biryani",
+   "sources": {
+    "foodx": [
+     "biryani"
+    ],
+    "khana": [
+     "biryani"
+    ],
+    "v1cc0": [
+     "biryani"
+    ]
+   },
+   "est_images": 7221,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "blancmange",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "blancmange"
+    ]
+   },
+   "est_images": 383
+  },
+  {
+   "name": "blt sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "bacon_lettuce_tomato_sandwich"
+    ]
+   },
+   "est_images": 586
+  },
+  {
+   "name": "boiled chicken and vegetables",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "boiled chicken and vegetables"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "boiled egg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "boiled_egg"
+    ]
+   },
+   "est_images": 582
+  },
+  {
+   "name": "boiled fish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "boiled fish"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "boned, sliced hainan style chicken with marinated rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "boned, sliced Hainan-style chicken with marinated rice"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "boondi laddu",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "boondi laddu"
+    ]
+   },
+   "est_images": 226
+  },
+  {
+   "name": "boston cream pie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "boston_cream_pie"
+    ]
+   },
+   "est_images": 564
+  },
+  {
+   "name": "braised pork meat ball with napa cabbage",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "braised pork meat ball with napa cabbage"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "bread pudding",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "bread_pudding"
+    ],
+    "foodx": [
+     "bread_pudding"
+    ]
+   },
+   "est_images": 1633
+  },
+  {
+   "name": "breakfast burrito",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "breakfast_burrito"
+    ]
+   },
+   "est_images": 1000
+  },
+  {
+   "name": "brisket",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "brisket"
+    ]
+   },
+   "est_images": 552
+  },
+  {
+   "name": "broiled eel bowl",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "broiled eel bowl"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "brownie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "brownie"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "bruschetta",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "bruschetta"
+    ],
+    "foodx": [
+     "bruschetta"
+    ]
+   },
+   "est_images": 1608
+  },
+  {
+   "name": "bubble and squeak",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "bubble_and_squeak"
+    ]
+   },
+   "est_images": 543
+  },
+  {
+   "name": "bubur ayam",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "bubur ayam"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "buffalo wings",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "buffalo_wing"
+    ]
+   },
+   "est_images": 513
+  },
+  {
+   "name": "burger",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "hamburger"
+    ],
+    "foodx": [
+     "hamburger"
+    ],
+    "uec": [
+     "hamburger"
+    ],
+    "v1mit": [
+     "burger"
+    ]
+   },
+   "est_images": 1559,
+   "merge_note": "Food-101/FoodX/UEC 'hamburger' and the v1 set's 'burger' are one class.",
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "burrito",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "burrito"
+    ]
+   },
+   "est_images": 638
+  },
+  {
+   "name": "butter naan",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "v1mit": [
+     "butter_naan"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "cabbage roll",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "cabbage roll"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "caesar salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "caesar_salad"
+    ],
+    "foodx": [
+     "caesar_salad"
+    ],
+    "uec": [
+     "Caesar salad"
+    ]
+   },
+   "est_images": 1675
+  },
+  {
+   "name": "cannelloni",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "cannelloni"
+    ]
+   },
+   "est_images": 580
+  },
+  {
+   "name": "cannoli",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "cannoli"
+    ],
+    "foodx": [
+     "cannoli"
+    ]
+   },
+   "est_images": 1587
+  },
+  {
+   "name": "caprese salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "caprese_salad"
+    ],
+    "foodx": [
+     "caprese_salad"
+    ]
+   },
+   "est_images": 1610
+  },
+  {
+   "name": "carbonnade flamande",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "carbonnade_flamande"
+    ]
+   },
+   "est_images": 491
+  },
+  {
+   "name": "carrot cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "carrot_cake"
+    ],
+    "foodx": [
+     "carrot_cake"
+    ]
+   },
+   "est_images": 1602
+  },
+  {
+   "name": "casserole",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "casserole"
+    ]
+   },
+   "est_images": 686
+  },
+  {
+   "name": "ceviche",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "ceviche"
+    ],
+    "foodx": [
+     "ceviche"
+    ]
+   },
+   "est_images": 1650
+  },
+  {
+   "name": "chaas",
+   "region": "indian",
+   "ascend_name": "chaas",
+   "sources": {
+    "khana": [
+     "chaas"
+    ]
+   },
+   "est_images": 999
+  },
+  {
+   "name": "chai",
+   "region": "indian",
+   "ascend_name": "chai",
+   "sources": {
+    "v1mit": [
+     "chai"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "champon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "champon"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "chana masala",
+   "region": "indian",
+   "ascend_name": "chana masala",
+   "sources": {
+    "khana": [
+     "chana masala"
+    ]
+   },
+   "est_images": 2873
+  },
+  {
+   "name": "chapati",
+   "region": "indian",
+   "ascend_name": "chapati",
+   "sources": {
+    "khana": [
+     "chapati"
+    ],
+    "v1mit": [
+     "chapati"
+    ]
+   },
+   "est_images": 2238,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "charcoal boiled pork neck",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "charcoal-boiled pork neck"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "chawanmushi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "steamed egg hotchpotch"
+    ]
+   },
+   "est_images": 108,
+   "merge_note": "UEC's 'steamed egg hotchpotch' is chawanmushi; canonical uses the standard name."
+  },
+  {
+   "name": "cheese plate",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "cheese_plate"
+    ]
+   },
+   "est_images": 1000
+  },
+  {
+   "name": "cheesecake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "cheesecake"
+    ],
+    "foodx": [
+     "cheesecake"
+    ]
+   },
+   "est_images": 1463
+  },
+  {
+   "name": "chicken cordon bleu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chicken_cordon_bleu"
+    ]
+   },
+   "est_images": 603
+  },
+  {
+   "name": "chicken curry",
+   "region": "indian",
+   "ascend_name": "chicken curry",
+   "sources": {
+    "food101": [
+     "chicken_curry"
+    ],
+    "foodx": [
+     "chicken_curry"
+    ]
+   },
+   "est_images": 1512
+  },
+  {
+   "name": "chicken cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chicken cutlet"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "chicken kiev",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chicken_kiev"
+    ]
+   },
+   "est_images": 553
+  },
+  {
+   "name": "chicken marengo",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chicken_marengo"
+    ]
+   },
+   "est_images": 413
+  },
+  {
+   "name": "chicken nugget",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chicken nugget"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "chicken pizza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "chicken pizza"
+    ]
+   },
+   "est_images": 3014
+  },
+  {
+   "name": "chicken provencale",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chicken_provencale"
+    ]
+   },
+   "est_images": 508
+  },
+  {
+   "name": "chicken quesadilla",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "chicken_quesadilla"
+    ],
+    "foodx": [
+     "chicken_quesadilla"
+    ]
+   },
+   "est_images": 1580
+  },
+  {
+   "name": "chicken rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chicken rice"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "chicken rice curry with coconut",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Chicken Rice Curry With Coconut"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "chicken wings",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "chicken_wings"
+    ],
+    "foodx": [
+     "barbecued_wing",
+     "chicken_wing"
+    ],
+    "khana": [
+     "chicken wings"
+    ]
+   },
+   "est_images": 4732
+  },
+  {
+   "name": "chiffon cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chiffon_cake"
+    ]
+   },
+   "est_images": 671
+  },
+  {
+   "name": "chikki",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "chikki"
+    ]
+   },
+   "est_images": 201
+  },
+  {
+   "name": "chili",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chili"
+    ]
+   },
+   "est_images": 553
+  },
+  {
+   "name": "chilled noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chilled noodle"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "chinese pumpkin pie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chinese pumpkin pie"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "chinese soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chinese soup"
+    ]
+   },
+   "est_images": 165
+  },
+  {
+   "name": "chip butty",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chip butty"
+    ]
+   },
+   "est_images": 148
+  },
+  {
+   "name": "chivda",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "chivda"
+    ]
+   },
+   "est_images": 277
+  },
+  {
+   "name": "chocolate cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "chocolate_cake"
+    ],
+    "foodx": [
+     "chocolate_cake"
+    ]
+   },
+   "est_images": 1419
+  },
+  {
+   "name": "chocolate mousse",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "chocolate_mousse"
+    ],
+    "foodx": [
+     "chocolate_mousse"
+    ]
+   },
+   "est_images": 1634
+  },
+  {
+   "name": "chole bhature",
+   "region": "indian",
+   "ascend_name": "chole bhature",
+   "sources": {
+    "khana": [
+     "chole bhature"
+    ],
+    "v1cc0": [
+     "cholebhature"
+    ],
+    "v1mit": [
+     "chole_bhature"
+    ]
+   },
+   "est_images": 1181,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "chop suey",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chop_suey"
+    ],
+    "uec": [
+     "chop suey"
+    ]
+   },
+   "est_images": 649
+  },
+  {
+   "name": "chow mein",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "chow_mein"
+    ],
+    "uec": [
+     "chow mein"
+    ]
+   },
+   "est_images": 676
+  },
+  {
+   "name": "churros",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "churros"
+    ],
+    "foodx": [
+     "churro"
+    ],
+    "uec": [
+     "churro"
+    ]
+   },
+   "est_images": 1801
+  },
+  {
+   "name": "clam chowder",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "clam_chowder"
+    ],
+    "foodx": [
+     "clam_chowder"
+    ]
+   },
+   "est_images": 1483
+  },
+  {
+   "name": "clams",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "clam_food"
+    ]
+   },
+   "est_images": 626
+  },
+  {
+   "name": "clear soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "clear soup"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "club sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "club_sandwich"
+    ],
+    "foodx": [
+     "club_sandwich"
+    ]
+   },
+   "est_images": 1561
+  },
+  {
+   "name": "cockles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "cockle_food"
+    ]
+   },
+   "est_images": 618
+  },
+  {
+   "name": "coconut cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "coconut_cake"
+    ]
+   },
+   "est_images": 609
+  },
+  {
+   "name": "coconut milk flavored crepes with shrimp and beef",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Coconut milk-flavored crepes with shrimp and beef"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "coconut milk soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "coconut milk soup"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "coffee cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "coffee_cake"
+    ]
+   },
+   "est_images": 676
+  },
+  {
+   "name": "cold tofu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "cold tofu"
+    ]
+   },
+   "est_images": 158
+  },
+  {
+   "name": "compote",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "compote"
+    ]
+   },
+   "est_images": 668
+  },
+  {
+   "name": "confit",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "confit"
+    ]
+   },
+   "est_images": 558
+  },
+  {
+   "name": "coq au vin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "coq_au_vin"
+    ]
+   },
+   "est_images": 518
+  },
+  {
+   "name": "coquilles saint jacques",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "coquilles_saint_jacques"
+    ]
+   },
+   "est_images": 570
+  },
+  {
+   "name": "cottage pie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "cottage_pie"
+    ]
+   },
+   "est_images": 571
+  },
+  {
+   "name": "couscous",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "couscous"
+    ]
+   },
+   "est_images": 651
+  },
+  {
+   "name": "crab",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "crab_food"
+    ]
+   },
+   "est_images": 644
+  },
+  {
+   "name": "crab cakes",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "crab_cakes"
+    ],
+    "foodx": [
+     "crab_cake"
+    ]
+   },
+   "est_images": 1587
+  },
+  {
+   "name": "crayfish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "crayfish_food"
+    ]
+   },
+   "est_images": 595
+  },
+  {
+   "name": "cream puff",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "cream puff"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "creme brulee",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "creme_brulee"
+    ],
+    "foodx": [
+     "creme_brulee"
+    ]
+   },
+   "est_images": 1600
+  },
+  {
+   "name": "crepe",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "crape"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "crispy noodles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Crispy Noodles"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "croissant",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "croissant"
+    ]
+   },
+   "est_images": 120
+  },
+  {
+   "name": "croque madame",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "croque_madame"
+    ],
+    "foodx": [
+     "croque_madame"
+    ]
+   },
+   "est_images": 1578
+  },
+  {
+   "name": "croquette",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "croquette"
+    ],
+    "uec": [
+     "croquette"
+    ]
+   },
+   "est_images": 749
+  },
+  {
+   "name": "cruller",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "cruller"
+    ],
+    "uec": [
+     "crullers"
+    ]
+   },
+   "est_images": 606
+  },
+  {
+   "name": "crumb cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "crumb_cake"
+    ]
+   },
+   "est_images": 663
+  },
+  {
+   "name": "crumpet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "crumpet"
+    ]
+   },
+   "est_images": 553
+  },
+  {
+   "name": "cupcake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "cup_cakes"
+    ],
+    "foodx": [
+     "cupcake"
+    ]
+   },
+   "est_images": 1504
+  },
+  {
+   "name": "curry puff",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "curry puff"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "custard",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "custard"
+    ]
+   },
+   "est_images": 598
+  },
+  {
+   "name": "custard tart",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "custard tart"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "cutlet curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "cutlet curry"
+    ]
+   },
+   "est_images": 142
+  },
+  {
+   "name": "dabeli",
+   "region": "indian",
+   "ascend_name": "dabeli",
+   "sources": {
+    "khana": [
+     "dabeli"
+    ],
+    "v1cc0": [
+     "dabeli"
+    ]
+   },
+   "est_images": 1856,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "dak galbi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "dak galbi"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "dal",
+   "region": "indian",
+   "ascend_name": "dal",
+   "sources": {
+    "v1cc0": [
+     "dal"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "dal khichdi",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "dal khichdi"
+    ]
+   },
+   "est_images": 1252
+  },
+  {
+   "name": "dal makhani",
+   "region": "indian",
+   "ascend_name": "dal makhani",
+   "sources": {
+    "v1mit": [
+     "dal_makhani"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "deep fried chicken wing",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Deep Fried Chicken Wing"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "deviled eggs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "deviled_eggs"
+    ],
+    "foodx": [
+     "deviled_egg"
+    ]
+   },
+   "est_images": 1632
+  },
+  {
+   "name": "dhokla",
+   "region": "indian",
+   "ascend_name": "dhokla",
+   "sources": {
+    "khana": [
+     "dhokla"
+    ],
+    "v1cc0": [
+     "dhokla"
+    ]
+   },
+   "est_images": 1211,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "dipping noodles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "dipping noodles"
+    ]
+   },
+   "est_images": 126
+  },
+  {
+   "name": "dish consisting of stir fried potato, eggplant and green pepper",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "dish consisting of stir-fried potato, eggplant and green pepper"
+    ]
+   },
+   "est_images": 119
+  },
+  {
+   "name": "dolmas",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "dolmas"
+    ]
+   },
+   "est_images": 588
+  },
+  {
+   "name": "donut",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "donuts"
+    ],
+    "foodx": [
+     "donut"
+    ],
+    "uec": [
+     "doughnut"
+    ]
+   },
+   "est_images": 1685
+  },
+  {
+   "name": "dosa",
+   "region": "indian",
+   "ascend_name": "dosa",
+   "sources": {
+    "v1cc0": [
+     "dosa"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "dried fish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "dried fish"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "dry curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "dry curry"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "dumplings",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "dumplings"
+    ],
+    "foodx": [
+     "dumpling"
+    ],
+    "uec": [
+     "jiaozi"
+    ]
+   },
+   "est_images": 1807,
+   "merge_note": "UEC's 'jiaozi' merged in: jiaozi are dumplings; gyoza (seared potstickers) stays separate."
+  },
+  {
+   "name": "eccles cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "eccles_cake"
+    ]
+   },
+   "est_images": 438
+  },
+  {
+   "name": "edamame",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "edamame"
+    ],
+    "foodx": [
+     "edamame"
+    ]
+   },
+   "est_images": 1587
+  },
+  {
+   "name": "eels on rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "eels on rice"
+    ]
+   },
+   "est_images": 130
+  },
+  {
+   "name": "egg roll",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "egg_roll"
+    ],
+    "uec": [
+     "egg roll"
+    ]
+   },
+   "est_images": 730,
+   "merge_note": "FoodX and UEC 'egg roll' merged on name identity; the two sources' rolls are visually similar fried rolls. Judgment call, recorded."
+  },
+  {
+   "name": "eggplant with garlic sauce",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "eggplant with garlic sauce"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "eggs benedict",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "eggs_benedict"
+    ],
+    "foodx": [
+     "eggs_benedict"
+    ]
+   },
+   "est_images": 1586
+  },
+  {
+   "name": "eight treasure rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "eight treasure rice"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "enchilada",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "enchilada"
+    ]
+   },
+   "est_images": 644
+  },
+  {
+   "name": "entrecote",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "entrecote"
+    ]
+   },
+   "est_images": 463
+  },
+  {
+   "name": "escargots",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "escargots"
+    ],
+    "foodx": [
+     "escargot"
+    ]
+   },
+   "est_images": 1467
+  },
+  {
+   "name": "falafel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "falafel"
+    ],
+    "foodx": [
+     "falafel"
+    ]
+   },
+   "est_images": 1542
+  },
+  {
+   "name": "falooda",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "falooda"
+    ]
+   },
+   "est_images": 2483
+  },
+  {
+   "name": "farfalle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "farfalle"
+    ]
+   },
+   "est_images": 617
+  },
+  {
+   "name": "fettuccine",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fettuccine"
+    ]
+   },
+   "est_images": 592
+  },
+  {
+   "name": "filet mignon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "filet_mignon"
+    ],
+    "foodx": [
+     "filet_mignon"
+    ]
+   },
+   "est_images": 1526
+  },
+  {
+   "name": "fine white noodles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fine white noodles"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "fish and chips",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "fish_and_chips"
+    ],
+    "foodx": [
+     "fish_and_chips"
+    ]
+   },
+   "est_images": 1480
+  },
+  {
+   "name": "fish ball soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fish ball soup"
+    ]
+   },
+   "est_images": 119
+  },
+  {
+   "name": "fish curry",
+   "region": "indian",
+   "ascend_name": "fish curry",
+   "sources": {
+    "khana": [
+     "fish curry"
+    ]
+   },
+   "est_images": 1553
+  },
+  {
+   "name": "fish stick",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fish_stick"
+    ]
+   },
+   "est_images": 503
+  },
+  {
+   "name": "flan",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "flan"
+    ]
+   },
+   "est_images": 505
+  },
+  {
+   "name": "foie gras",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "foie_gras"
+    ],
+    "foodx": [
+     "foie_gras"
+    ]
+   },
+   "est_images": 1549
+  },
+  {
+   "name": "fondue",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fondue"
+    ]
+   },
+   "est_images": 586
+  },
+  {
+   "name": "french bread",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "french bread"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "french fries",
+   "region": "world",
+   "ascend_name": "french fries",
+   "sources": {
+    "food101": [
+     "french_fries"
+    ],
+    "foodx": [
+     "french_fries"
+    ],
+    "uec": [
+     "french fries"
+    ]
+   },
+   "est_images": 1521
+  },
+  {
+   "name": "french onion soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "french_onion_soup"
+    ],
+    "foodx": [
+     "french_onion_soup"
+    ]
+   },
+   "est_images": 1486
+  },
+  {
+   "name": "french toast",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "french_toast"
+    ],
+    "foodx": [
+     "french_toast"
+    ],
+    "uec": [
+     "french toast"
+    ]
+   },
+   "est_images": 1713
+  },
+  {
+   "name": "fried calamari",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "fried_calamari"
+    ],
+    "foodx": [
+     "fried_calamari"
+    ]
+   },
+   "est_images": 1487
+  },
+  {
+   "name": "fried chicken",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried chicken"
+    ]
+   },
+   "est_images": 154
+  },
+  {
+   "name": "fried egg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fried_egg"
+    ],
+    "uec": [
+     "egg sunny-side up"
+    ]
+   },
+   "est_images": 711
+  },
+  {
+   "name": "fried fish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried fish"
+    ]
+   },
+   "est_images": 121
+  },
+  {
+   "name": "fried mussel pancakes",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried mussel pancakes"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "fried noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried noodle"
+    ]
+   },
+   "est_images": 131
+  },
+  {
+   "name": "fried pork in scoop",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried pork in scoop"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "fried rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "fried_rice"
+    ],
+    "foodx": [
+     "fried_rice"
+    ],
+    "uec": [
+     "fried rice"
+    ],
+    "v1mit": [
+     "fried_rice"
+    ]
+   },
+   "est_images": 1738,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "fried shrimp",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fried shrimp"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "frittata",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "frittata"
+    ]
+   },
+   "est_images": 576
+  },
+  {
+   "name": "fritter",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fritter"
+    ]
+   },
+   "est_images": 642
+  },
+  {
+   "name": "frozen yogurt",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "frozen_yogurt"
+    ],
+    "foodx": [
+     "frozen_yogurt"
+    ]
+   },
+   "est_images": 1528
+  },
+  {
+   "name": "fruitcake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "fruitcake"
+    ]
+   },
+   "est_images": 454
+  },
+  {
+   "name": "gajar ka halwa",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "gajar ka halwa"
+    ]
+   },
+   "est_images": 357
+  },
+  {
+   "name": "galantine",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "galantine"
+    ]
+   },
+   "est_images": 476
+  },
+  {
+   "name": "ganmodoki",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ganmodoki"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "garlic bread",
+   "region": "world",
+   "ascend_name": "garlic bread",
+   "sources": {
+    "food101": [
+     "garlic_bread"
+    ],
+    "foodx": [
+     "garlic_bread"
+    ],
+    "khana": [
+     "garlic bread"
+    ]
+   },
+   "est_images": 7222
+  },
+  {
+   "name": "garlic naan",
+   "region": "indian",
+   "ascend_name": "garlic naan",
+   "sources": {
+    "khana": [
+     "garlic naan"
+    ]
+   },
+   "est_images": 5730
+  },
+  {
+   "name": "ghevar",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "ghevar"
+    ]
+   },
+   "est_images": 294
+  },
+  {
+   "name": "ginger pork saute",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ginger pork saute"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "gingerbread",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "gingerbread"
+    ]
+   },
+   "est_images": 563
+  },
+  {
+   "name": "glutinous oil rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "glutinous oil rice"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "glutinous rice balls",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Glutinous Rice Balls"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "gnocchi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "gnocchi"
+    ],
+    "foodx": [
+     "gnocchi"
+    ]
+   },
+   "est_images": 1644
+  },
+  {
+   "name": "goya chanpuru",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "goya chanpuru"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "gratin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "gratin"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "greek salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "greek_salad"
+    ],
+    "foodx": [
+     "greek_salad"
+    ]
+   },
+   "est_images": 1527
+  },
+  {
+   "name": "green curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "green curry"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "green salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "green salad"
+    ]
+   },
+   "est_images": 342
+  },
+  {
+   "name": "grilled cheese sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "grilled_cheese_sandwich"
+    ],
+    "foodx": [
+     "grilled_cheese_sandwich"
+    ]
+   },
+   "est_images": 1610
+  },
+  {
+   "name": "grilled eggplant",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "grilled eggplant"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "grilled pacific saury",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "grilled pacific saury"
+    ]
+   },
+   "est_images": 181
+  },
+  {
+   "name": "grilled salmon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "grilled_salmon"
+    ],
+    "foodx": [
+     "grilled_salmon"
+    ],
+    "uec": [
+     "grilled salmon"
+    ]
+   },
+   "est_images": 1666
+  },
+  {
+   "name": "grilled sandwich",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "grilled sandwich"
+    ]
+   },
+   "est_images": 5705
+  },
+  {
+   "name": "guacamole",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "guacamole"
+    ],
+    "foodx": [
+     "guacamole"
+    ]
+   },
+   "est_images": 1523
+  },
+  {
+   "name": "gujhia",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "gujhia"
+    ]
+   },
+   "est_images": 269
+  },
+  {
+   "name": "gulab jamun",
+   "region": "indian",
+   "ascend_name": "gulab jamun",
+   "sources": {
+    "khana": [
+     "gulab jamun"
+    ]
+   },
+   "est_images": 2962
+  },
+  {
+   "name": "gulai",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "gulai"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "gyoza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "gyoza"
+    ],
+    "foodx": [
+     "gyoza"
+    ]
+   },
+   "est_images": 1566
+  },
+  {
+   "name": "gyro",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "gyro"
+    ]
+   },
+   "est_images": 490
+  },
+  {
+   "name": "haggis",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "haggis"
+    ]
+   },
+   "est_images": 430
+  },
+  {
+   "name": "ham and eggs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "ham_and_eggs"
+    ]
+   },
+   "est_images": 582
+  },
+  {
+   "name": "ham cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "ham cutlet"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "ham sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "ham_sandwich"
+    ]
+   },
+   "est_images": 536
+  },
+  {
+   "name": "hambarg steak",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "hambarg steak"
+    ]
+   },
+   "est_images": 135
+  },
+  {
+   "name": "hara bhara kabab",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "hara bhara kabab"
+    ]
+   },
+   "est_images": 1621
+  },
+  {
+   "name": "haupia",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "haupia"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "hot and sour soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "hot_and_sour_soup"
+    ],
+    "foodx": [
+     "hot_and_sour_soup"
+    ],
+    "uec": [
+     "hot & sour soup"
+    ]
+   },
+   "est_images": 1516
+  },
+  {
+   "name": "hot and sour, fish and vegetable ragout",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "hot and sour, fish and vegetable ragout"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "hot dog",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "hot_dog"
+    ],
+    "foodx": [
+     "hot_dog"
+    ],
+    "uec": [
+     "hot dog"
+    ]
+   },
+   "est_images": 1477
+  },
+  {
+   "name": "hot pot",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "hot pot"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "hue beef rice vermicelli soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Hue beef rice vermicelli soup"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "huevos rancheros",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "huevos_rancheros"
+    ],
+    "foodx": [
+     "huevos_rancheros"
+    ]
+   },
+   "est_images": 1504
+  },
+  {
+   "name": "hummus",
+   "region": "world",
+   "ascend_name": "hummus",
+   "sources": {
+    "food101": [
+     "hummus"
+    ],
+    "foodx": [
+     "hummus"
+    ]
+   },
+   "est_images": 1559
+  },
+  {
+   "name": "ice cream",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "ice_cream"
+    ],
+    "foodx": [
+     "ice_cream"
+    ]
+   },
+   "est_images": 1538
+  },
+  {
+   "name": "idiyappam",
+   "region": "indian",
+   "ascend_name": "idiyappam",
+   "sources": {
+    "khana": [
+     "idiyappam"
+    ]
+   },
+   "est_images": 371
+  },
+  {
+   "name": "idli",
+   "region": "indian",
+   "ascend_name": "idli",
+   "sources": {
+    "khana": [
+     "idli"
+    ],
+    "v1mit": [
+     "idli"
+    ]
+   },
+   "est_images": 5835,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "inarizushi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "inarizushi"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "jalebi",
+   "region": "indian",
+   "ascend_name": "jalebi",
+   "sources": {
+    "khana": [
+     "jalebi"
+    ],
+    "v1cc0": [
+     "jalebi"
+    ]
+   },
+   "est_images": 962,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "jambalaya",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "jambalaya"
+    ],
+    "uec": [
+     "jambalaya"
+    ]
+   },
+   "est_images": 591
+  },
+  {
+   "name": "japanese tofu and vegetable chowder",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Japanese tofu and vegetable chowder"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "jerky",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "jerky"
+    ]
+   },
+   "est_images": 491
+  },
+  {
+   "name": "jjigae",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "jjigae"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "kadai paneer",
+   "region": "indian",
+   "ascend_name": "kadai paneer",
+   "sources": {
+    "v1mit": [
+     "kadai_paneer"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "kaju katli",
+   "region": "indian",
+   "ascend_name": "kaju katli",
+   "sources": {
+    "khana": [
+     "kaju katli"
+    ]
+   },
+   "est_images": 705
+  },
+  {
+   "name": "kamameshi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "kamameshi"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "kathi roll",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "v1cc0": [
+     "kathiroll"
+    ],
+    "v1mit": [
+     "kaathi_rolls"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "kaya toast",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "kaya toast"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "kebab",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "kabob"
+    ]
+   },
+   "est_images": 569
+  },
+  {
+   "name": "kedgeree",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "kedgeree"
+    ]
+   },
+   "est_images": 421
+  },
+  {
+   "name": "khakhra",
+   "region": "indian",
+   "ascend_name": "khakhra",
+   "sources": {
+    "khana": [
+     "khakhra"
+    ]
+   },
+   "est_images": 256
+  },
+  {
+   "name": "khao soi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Egg Noodle In Chicken Yellow Curry",
+     "khao soi"
+    ]
+   },
+   "est_images": 228,
+   "merge_note": "UEC's 'Egg Noodle In Chicken Yellow Curry' merged in: that is khao soi (UEC also lists khao soi separately)."
+  },
+  {
+   "name": "kheer",
+   "region": "indian",
+   "ascend_name": "kheer",
+   "sources": {
+    "khana": [
+     "kheer"
+    ]
+   },
+   "est_images": 670
+  },
+  {
+   "name": "kinpira style sauteed burdock",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "kinpira-style sauteed burdock"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "knish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "knish"
+    ]
+   },
+   "est_images": 388
+  },
+  {
+   "name": "kofta",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "v1cc0": [
+     "kofta"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "kulfi",
+   "region": "indian",
+   "ascend_name": "kulfi",
+   "sources": {
+    "khana": [
+     "kulfi"
+    ],
+    "v1mit": [
+     "kulfi"
+    ]
+   },
+   "est_images": 3033,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "kung pao chicken",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "kung pao chicken"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "kushikatsu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "kushikatu"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "laksa",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "laksa"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "lamb kebabs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "lamb kebabs"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "lasagna",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "lasagna"
+    ],
+    "foodx": [
+     "lasagna"
+    ],
+    "uec": [
+     "lasagna"
+    ]
+   },
+   "est_images": 1762
+  },
+  {
+   "name": "laulau",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "laulau"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "lemon fig jelly",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "lemon fig jelly"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "lightly roasted fish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "lightly roasted fish"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "limpet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "limpet_food"
+    ]
+   },
+   "est_images": 560
+  },
+  {
+   "name": "linguine",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "linguine"
+    ]
+   },
+   "est_images": 599
+  },
+  {
+   "name": "lobster",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "lobster_food"
+    ]
+   },
+   "est_images": 559
+  },
+  {
+   "name": "lobster bisque",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "lobster_bisque"
+    ],
+    "foodx": [
+     "lobster_bisque"
+    ]
+   },
+   "est_images": 1390
+  },
+  {
+   "name": "lobster roll sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "lobster_roll_sandwich"
+    ],
+    "foodx": [
+     "lobster_roll_sandwich"
+    ]
+   },
+   "est_images": 1477
+  },
+  {
+   "name": "lobster thermidor",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "lobster_thermidor"
+    ]
+   },
+   "est_images": 370
+  },
+  {
+   "name": "loco moco",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "loco moco"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "lumpia",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "lumpia"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "lutefisk",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "lutefisk"
+    ]
+   },
+   "est_images": 346
+  },
+  {
+   "name": "macaron",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "macarons"
+    ],
+    "foodx": [
+     "macaron"
+    ]
+   },
+   "est_images": 1688
+  },
+  {
+   "name": "macaroni and cheese",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "macaroni_and_cheese"
+    ],
+    "foodx": [
+     "macaroni_and_cheese"
+    ]
+   },
+   "est_images": 1643
+  },
+  {
+   "name": "macaroni salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "macaroni salad"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "malasada",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "malasada"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "mango pudding",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mango pudding"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "manicotti",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "manicotti"
+    ]
+   },
+   "est_images": 500
+  },
+  {
+   "name": "marble cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "marble_cake"
+    ]
+   },
+   "est_images": 83
+  },
+  {
+   "name": "margherita pizza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "margherita pizza"
+    ]
+   },
+   "est_images": 2460
+  },
+  {
+   "name": "masala dosa",
+   "region": "indian",
+   "ascend_name": "masala dosa",
+   "sources": {
+    "khana": [
+     "masala dosa"
+    ],
+    "v1mit": [
+     "masala_dosa"
+    ]
+   },
+   "est_images": 11788,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "masala papad",
+   "region": "indian",
+   "ascend_name": "masala papad",
+   "sources": {
+    "khana": [
+     "masala papad"
+    ]
+   },
+   "est_images": 1069
+  },
+  {
+   "name": "matzo ball",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "matzo_ball"
+    ]
+   },
+   "est_images": 382
+  },
+  {
+   "name": "meat loaf",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "meat_loaf_food"
+    ],
+    "uec": [
+     "meat loaf"
+    ]
+   },
+   "est_images": 680
+  },
+  {
+   "name": "meatball",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "meatball"
+    ]
+   },
+   "est_images": 601
+  },
+  {
+   "name": "medu vada",
+   "region": "indian",
+   "ascend_name": "medu vada",
+   "sources": {
+    "khana": [
+     "medu vada"
+    ]
+   },
+   "est_images": 541
+  },
+  {
+   "name": "mie ayam",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mie ayam"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "mie goreng",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mie goreng"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "minced meat cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "minced meat cutlet"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "minced pork rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "minced pork rice"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "minestrone",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "minestrone"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "misal pav",
+   "region": "indian",
+   "ascend_name": "misal pav",
+   "sources": {
+    "khana": [
+     "misal pav"
+    ]
+   },
+   "est_images": 1086
+  },
+  {
+   "name": "miso soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "miso_soup"
+    ],
+    "foodx": [
+     "miso_soup"
+    ],
+    "uec": [
+     "miso soup"
+    ]
+   },
+   "est_images": 2219
+  },
+  {
+   "name": "mixed rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mixed rice"
+    ]
+   },
+   "est_images": 138
+  },
+  {
+   "name": "modak",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "modak"
+    ]
+   },
+   "est_images": 226
+  },
+  {
+   "name": "momos",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "steamed momo"
+    ],
+    "v1mit": [
+     "momos"
+    ]
+   },
+   "est_images": 1790,
+   "merge_note": "Khana's 'steamed momo' merged in (v1 canonical name kept).",
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "moo goo gai pan",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "moo_goo_gai_pan"
+    ]
+   },
+   "est_images": 388
+  },
+  {
+   "name": "moon cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "moon cake"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "moong dal halwa",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "moong dal halwa"
+    ]
+   },
+   "est_images": 204
+  },
+  {
+   "name": "mostaccioli",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "mostaccioli"
+    ]
+   },
+   "est_images": 432
+  },
+  {
+   "name": "moussaka",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "moussaka"
+    ]
+   },
+   "est_images": 450
+  },
+  {
+   "name": "mozuku",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mozuku"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "muffin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "muffin"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "murukku",
+   "region": "indian",
+   "ascend_name": "murukku",
+   "sources": {
+    "khana": [
+     "murukku"
+    ]
+   },
+   "est_images": 228
+  },
+  {
+   "name": "mushroom risotto",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "mushroom risotto"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "mussel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "mussels"
+    ],
+    "foodx": [
+     "mussel"
+    ]
+   },
+   "est_images": 1540
+  },
+  {
+   "name": "mysore pak",
+   "region": "indian",
+   "ascend_name": "mysore pak",
+   "sources": {
+    "khana": [
+     "mysore pak"
+    ]
+   },
+   "est_images": 306
+  },
+  {
+   "name": "naan",
+   "region": "indian",
+   "ascend_name": "naan",
+   "sources": {
+    "v1cc0": [
+     "naan"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "nachos",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "nachos"
+    ],
+    "foodx": [
+     "nacho"
+    ],
+    "uec": [
+     "nachos"
+    ]
+   },
+   "est_images": 1680
+  },
+  {
+   "name": "namero",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "namero"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "nanbanzuke",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "nanbanzuke"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "nasi campur",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "nasi campur"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "nasi goreng",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "nasi goreng"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "nasi padang",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "nasi padang"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "nasi uduk",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "nasi uduk"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "natto",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "natto"
+    ]
+   },
+   "est_images": 147
+  },
+  {
+   "name": "navratan korma",
+   "region": "indian",
+   "ascend_name": "navratan korma",
+   "sources": {
+    "khana": [
+     "navratan korma"
+    ]
+   },
+   "est_images": 369
+  },
+  {
+   "name": "neer dosa",
+   "region": "indian",
+   "ascend_name": "neer dosa",
+   "sources": {
+    "khana": [
+     "neer dosa"
+    ]
+   },
+   "est_images": 215
+  },
+  {
+   "name": "noodles with fish curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "noodles with fish curry"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "oatmeal",
+   "region": "world",
+   "ascend_name": "oatmeal",
+   "sources": {
+    "uec": [
+     "oatmeal"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "oden",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "oden"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "okinawa soba",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "okinawa soba"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "okonomiyaki",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Japanese-style pancake"
+    ]
+   },
+   "est_images": 137,
+   "merge_note": "UEC's 'Japanese-style pancake' is okonomiyaki; canonical uses the standard name."
+  },
+  {
+   "name": "omelette",
+   "region": "world",
+   "ascend_name": "omelette",
+   "sources": {
+    "food101": [
+     "omelette"
+    ],
+    "foodx": [
+     "omelette"
+    ],
+    "uec": [
+     "omelet"
+    ]
+   },
+   "est_images": 1731
+  },
+  {
+   "name": "omurice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "omelet with fried rice"
+    ]
+   },
+   "est_images": 126
+  },
+  {
+   "name": "onion rings",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "onion_rings"
+    ],
+    "foodx": [
+     "onion_rings"
+    ]
+   },
+   "est_images": 1554
+  },
+  {
+   "name": "orzo",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "orzo"
+    ]
+   },
+   "est_images": 665
+  },
+  {
+   "name": "oshiruko",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "oshiruko"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "osso buco",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "osso_buco"
+    ]
+   },
+   "est_images": 457
+  },
+  {
+   "name": "oxtail soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "oxtail soup"
+    ]
+   },
+   "est_images": 119
+  },
+  {
+   "name": "oyakodon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "chicken-'n'-egg on rice"
+    ]
+   },
+   "est_images": 121,
+   "merge_note": "UEC's \"chicken-'n'-egg on rice\" is oyakodon; canonical uses the standard name."
+  },
+  {
+   "name": "oyster omelette",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "oyster omelette"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "oysters",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "oysters"
+    ],
+    "foodx": [
+     "huitre",
+     "oyster"
+    ]
+   },
+   "est_images": 2249,
+   "merge_note": "FoodX's 'huitre' (French for oyster) merged in."
+  },
+  {
+   "name": "pad thai",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "pad_thai"
+    ],
+    "foodx": [
+     "pad_thai"
+    ]
+   },
+   "est_images": 1568
+  },
+  {
+   "name": "paella",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "paella"
+    ],
+    "foodx": [
+     "paella"
+    ],
+    "uec": [
+     "paella"
+    ]
+   },
+   "est_images": 1606
+  },
+  {
+   "name": "pakora",
+   "region": "indian",
+   "ascend_name": "pakora",
+   "sources": {
+    "khana": [
+     "onion pakoda"
+    ],
+    "v1cc0": [
+     "pakora"
+    ],
+    "v1mit": [
+     "pakode"
+    ]
+   },
+   "est_images": 292,
+   "merge_note": "Khana's 'onion pakoda' merged in: same dish family; ASCEND's DB has one pakora entry.",
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "palak paneer",
+   "region": "indian",
+   "ascend_name": "palak paneer",
+   "sources": {
+    "khana": [
+     "palak paneer"
+    ]
+   },
+   "est_images": 3385
+  },
+  {
+   "name": "pancakes",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "pancakes"
+    ],
+    "foodx": [
+     "pancake"
+    ],
+    "uec": [
+     "pancake"
+    ]
+   },
+   "est_images": 1525
+  },
+  {
+   "name": "paneer",
+   "region": "indian",
+   "ascend_name": "paneer",
+   "sources": {
+    "v1cc0": [
+     "paneer"
+    ]
+   },
+   "est_images": null,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "paneer masala",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "paneer masala"
+    ]
+   },
+   "est_images": 7884
+  },
+  {
+   "name": "paneer pizza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "paneer pizza"
+    ]
+   },
+   "est_images": 2491
+  },
+  {
+   "name": "pani puri",
+   "region": "indian",
+   "ascend_name": "pani puri",
+   "sources": {
+    "khana": [
+     "pani puri"
+    ],
+    "v1cc0": [
+     "panipuri"
+    ],
+    "v1mit": [
+     "paani_puri"
+    ]
+   },
+   "est_images": 784,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "paniyaram",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "paniyaram"
+    ]
+   },
+   "est_images": 267
+  },
+  {
+   "name": "panna cotta",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "panna_cotta"
+    ],
+    "foodx": [
+     "panna_cotta"
+    ]
+   },
+   "est_images": 1597
+  },
+  {
+   "name": "papdi chaat",
+   "region": "indian",
+   "ascend_name": "papdi chaat",
+   "sources": {
+    "khana": [
+     "papdi chaat"
+    ]
+   },
+   "est_images": 999
+  },
+  {
+   "name": "parfait",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "parfait"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "pate",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pate"
+    ]
+   },
+   "est_images": 513
+  },
+  {
+   "name": "patrode",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "patrode"
+    ]
+   },
+   "est_images": 218
+  },
+  {
+   "name": "pav bhaji",
+   "region": "indian",
+   "ascend_name": "pav bhaji",
+   "sources": {
+    "khana": [
+     "pav bhaji"
+    ],
+    "v1cc0": [
+     "pavbhaji"
+    ],
+    "v1mit": [
+     "pav_bhaji"
+    ]
+   },
+   "est_images": 8848,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "pavlova",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pavlova"
+    ]
+   },
+   "est_images": 509
+  },
+  {
+   "name": "peach melba",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "peach_melba"
+    ]
+   },
+   "est_images": 518
+  },
+  {
+   "name": "peking duck",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "peking_duck"
+    ],
+    "foodx": [
+     "peking_duck"
+    ]
+   },
+   "est_images": 1499
+  },
+  {
+   "name": "penne",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "penne"
+    ]
+   },
+   "est_images": 517
+  },
+  {
+   "name": "pepper steak",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pepper_steak",
+     "steak_au_poivre"
+    ]
+   },
+   "est_images": 859,
+   "merge_note": "FoodX's 'steak au poivre' merged in: au poivre is pepper steak."
+  },
+  {
+   "name": "pepperoni pizza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "pepperoni pizza"
+    ]
+   },
+   "est_images": 321
+  },
+  {
+   "name": "phirni",
+   "region": "indian",
+   "ascend_name": "phirni",
+   "sources": {
+    "khana": [
+     "phirni"
+    ]
+   },
+   "est_images": 353
+  },
+  {
+   "name": "pho",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "pho"
+    ],
+    "foodx": [
+     "pho"
+    ],
+    "uec": [
+     "pho"
+    ]
+   },
+   "est_images": 1516
+  },
+  {
+   "name": "pilaf",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pilaf"
+    ],
+    "uec": [
+     "pilaf"
+    ]
+   },
+   "est_images": 588
+  },
+  {
+   "name": "pirogi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pirogi"
+    ]
+   },
+   "est_images": 436
+  },
+  {
+   "name": "pizza",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "pizza"
+    ],
+    "foodx": [
+     "pizza"
+    ],
+    "uec": [
+     "pizza"
+    ],
+    "v1mit": [
+     "pizza"
+    ]
+   },
+   "est_images": 1530,
+   "merge_note": "Generic pizza (Food-101/FoodX/UEC/v1 set). Khana's four specific pizzas stay separate classes.",
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "pizza toast",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pizza toast"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "poached egg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "poached_egg"
+    ]
+   },
+   "est_images": 509
+  },
+  {
+   "name": "poha",
+   "region": "indian",
+   "ascend_name": "poha",
+   "sources": {
+    "khana": [
+     "poha"
+    ]
+   },
+   "est_images": 1483
+  },
+  {
+   "name": "poi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "poi"
+    ]
+   },
+   "est_images": 502
+  },
+  {
+   "name": "pongal",
+   "region": "indian",
+   "ascend_name": "pongal",
+   "sources": {
+    "khana": [
+     "pongal"
+    ]
+   },
+   "est_images": 522
+  },
+  {
+   "name": "popcorn",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "popcorn"
+    ]
+   },
+   "est_images": 116
+  },
+  {
+   "name": "pork belly",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork belly"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "pork chop",
+   "region": "world",
+   "ascend_name": "pork chop",
+   "sources": {
+    "food101": [
+     "pork_chop"
+    ],
+    "foodx": [
+     "pork_chop"
+    ]
+   },
+   "est_images": 1523
+  },
+  {
+   "name": "pork cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork cutlet"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "pork cutlet on rice",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork cutlet on rice"
+    ]
+   },
+   "est_images": 150
+  },
+  {
+   "name": "pork fillet cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork fillet cutlet"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "pork loin cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork loin cutlet"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "pork miso soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork miso soup"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "pork satay",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pork satay"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "pork sticky noodles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Pork Sticky Noodles"
+    ]
+   },
+   "est_images": 120
+  },
+  {
+   "name": "pork with lemon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Pork with lemon"
+    ]
+   },
+   "est_images": 100
+  },
+  {
+   "name": "porridge",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "porridge"
+    ]
+   },
+   "est_images": 486
+  },
+  {
+   "name": "pot au feu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "pot au feu"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "potage",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "potage"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "potato salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "potato salad"
+    ]
+   },
+   "est_images": 128
+  },
+  {
+   "name": "potpie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "potpie"
+    ]
+   },
+   "est_images": 482
+  },
+  {
+   "name": "pound cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "pound_cake"
+    ]
+   },
+   "est_images": 551
+  },
+  {
+   "name": "poutine",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "poutine"
+    ],
+    "foodx": [
+     "poutine"
+    ]
+   },
+   "est_images": 1409
+  },
+  {
+   "name": "prime rib",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "prime_rib"
+    ],
+    "foodx": [
+     "prime_rib"
+    ]
+   },
+   "est_images": 1451
+  },
+  {
+   "name": "profiterole",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "profiterole"
+    ]
+   },
+   "est_images": 535
+  },
+  {
+   "name": "pulled pork sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "pulled_pork_sandwich"
+    ],
+    "foodx": [
+     "pulled_pork_sandwich"
+    ]
+   },
+   "est_images": 1525
+  },
+  {
+   "name": "puri bhaji",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "puri bhaji"
+    ]
+   },
+   "est_images": 563
+  },
+  {
+   "name": "raisin bread",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "raisin bread"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "rajma chawal",
+   "region": "indian",
+   "ascend_name": "rajma chawal",
+   "sources": {
+    "khana": [
+     "rajma chawal"
+    ]
+   },
+   "est_images": 715
+  },
+  {
+   "name": "ramen",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "ramen"
+    ],
+    "foodx": [
+     "ramen"
+    ],
+    "uec": [
+     "ramen noodle"
+    ]
+   },
+   "est_images": 1808
+  },
+  {
+   "name": "rare cheesecake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "rare cheese cake"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "rasgulla",
+   "region": "indian",
+   "ascend_name": "rasgulla",
+   "sources": {
+    "khana": [
+     "rasgulla"
+    ]
+   },
+   "est_images": 2302
+  },
+  {
+   "name": "rava dosa",
+   "region": "indian",
+   "ascend_name": "rava dosa",
+   "sources": {
+    "khana": [
+     "rava dosa"
+    ]
+   },
+   "est_images": 868
+  },
+  {
+   "name": "ravioli",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "ravioli"
+    ],
+    "foodx": [
+     "ravioli"
+    ]
+   },
+   "est_images": 1524
+  },
+  {
+   "name": "red velvet cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "red_velvet_cake"
+    ],
+    "foodx": [
+     "red_velvet_cake"
+    ]
+   },
+   "est_images": 1427
+  },
+  {
+   "name": "reuben",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "reuben"
+    ]
+   },
+   "est_images": 494
+  },
+  {
+   "name": "rice",
+   "region": "world",
+   "ascend_name": "rice",
+   "sources": {
+    "uec": [
+     "rice"
+    ]
+   },
+   "est_images": 620
+  },
+  {
+   "name": "rice ball",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "rice ball"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "rice crispy pork",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Rice crispy pork"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "rice gratin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "rice gratin"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "rice gruel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "rice gruel"
+    ]
+   },
+   "est_images": 116
+  },
+  {
+   "name": "rice vermicelli",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "rice vermicelli"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "rice with roast duck",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Rice with roast duck"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "rigatoni",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "rigatoni"
+    ]
+   },
+   "est_images": 513
+  },
+  {
+   "name": "risotto",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "risotto"
+    ],
+    "foodx": [
+     "risotto"
+    ]
+   },
+   "est_images": 1540
+  },
+  {
+   "name": "rissole",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "rissole"
+    ]
+   },
+   "est_images": 442
+  },
+  {
+   "name": "roast chicken",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "roast chicken"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "roast duck",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "roast duck"
+    ]
+   },
+   "est_images": 116
+  },
+  {
+   "name": "rock cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "rock_cake"
+    ]
+   },
+   "est_images": 481
+  },
+  {
+   "name": "roll bread",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "roll bread"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "roulade",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "roulade"
+    ]
+   },
+   "est_images": 517
+  },
+  {
+   "name": "rugulah",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "rugulah"
+    ]
+   },
+   "est_images": 387
+  },
+  {
+   "name": "sabudana khichdi",
+   "region": "indian",
+   "ascend_name": "sabudana khichdi",
+   "sources": {
+    "khana": [
+     "sabudana khichdi"
+    ]
+   },
+   "est_images": 391
+  },
+  {
+   "name": "sabudana vada",
+   "region": "indian",
+   "ascend_name": "sabudana vada",
+   "sources": {
+    "khana": [
+     "sabudana vada"
+    ]
+   },
+   "est_images": 457
+  },
+  {
+   "name": "salisbury steak",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "salisbury_steak"
+    ]
+   },
+   "est_images": 408
+  },
+  {
+   "name": "salmon meuniere",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "salmon meuniere"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "salt and pepper fried shrimp with shell",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "salt & pepper fried shrimp with shell"
+    ]
+   },
+   "est_images": 119
+  },
+  {
+   "name": "samosa",
+   "region": "indian",
+   "ascend_name": "samosa",
+   "sources": {
+    "food101": [
+     "samosa"
+    ],
+    "foodx": [
+     "samosa"
+    ],
+    "khana": [
+     "samosa"
+    ],
+    "v1mit": [
+     "samosa"
+    ]
+   },
+   "est_images": 5548,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "samul",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "samul"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sandwiches"
+    ]
+   },
+   "est_images": 163
+  },
+  {
+   "name": "sashimi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "sashimi"
+    ],
+    "foodx": [
+     "sashimi"
+    ],
+    "uec": [
+     "sashimi"
+    ]
+   },
+   "est_images": 1625
+  },
+  {
+   "name": "sashimi bowl",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sashimi bowl"
+    ]
+   },
+   "est_images": 147
+  },
+  {
+   "name": "sauerbraten",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sauerbraten"
+    ]
+   },
+   "est_images": 342
+  },
+  {
+   "name": "sauerkraut",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sauerkraut"
+    ]
+   },
+   "est_images": 478
+  },
+  {
+   "name": "sausage",
+   "region": "world",
+   "ascend_name": "sausage",
+   "sources": {
+    "uec": [
+     "sausage"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "sausage roll",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sausage_roll"
+    ]
+   },
+   "est_images": 488
+  },
+  {
+   "name": "sauteed spinach",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sauteed spinach"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "sauteed vegetables",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sauteed vegetables"
+    ]
+   },
+   "est_images": 120
+  },
+  {
+   "name": "savarin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "savarin"
+    ]
+   },
+   "est_images": 502
+  },
+  {
+   "name": "scallop",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "scallops"
+    ],
+    "foodx": [
+     "scallop"
+    ]
+   },
+   "est_images": 1511
+  },
+  {
+   "name": "scampi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "scampi"
+    ]
+   },
+   "est_images": 516
+  },
+  {
+   "name": "schnitzel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "schnitzel"
+    ]
+   },
+   "est_images": 423
+  },
+  {
+   "name": "scone",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "scone"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "scotch egg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "scotch_egg"
+    ]
+   },
+   "est_images": 446
+  },
+  {
+   "name": "scrambled eggs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "scrambled_eggs"
+    ],
+    "uec": [
+     "scrambled egg"
+    ]
+   },
+   "est_images": 587
+  },
+  {
+   "name": "scrapple",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "scrapple"
+    ]
+   },
+   "est_images": 347
+  },
+  {
+   "name": "seasoned beef with potatoes",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "seasoned beef with potatoes"
+    ]
+   },
+   "est_images": 116
+  },
+  {
+   "name": "seaweed salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "seaweed_salad"
+    ],
+    "foodx": [
+     "seaweed_salad"
+    ]
+   },
+   "est_images": 1383
+  },
+  {
+   "name": "seekh kebab",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "seekh kebab"
+    ]
+   },
+   "est_images": 4326
+  },
+  {
+   "name": "set dosa",
+   "region": "indian",
+   "ascend_name": "set dosa",
+   "sources": {
+    "khana": [
+     "set dosa"
+    ]
+   },
+   "est_images": 588
+  },
+  {
+   "name": "sev puri",
+   "region": "indian",
+   "ascend_name": "sev puri",
+   "sources": {
+    "khana": [
+     "sev puri"
+    ]
+   },
+   "est_images": 1188
+  },
+  {
+   "name": "shirred egg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "shirred_egg"
+    ]
+   },
+   "est_images": 482
+  },
+  {
+   "name": "shrimp and grits",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "shrimp_and_grits"
+    ],
+    "foodx": [
+     "shrimp_and_grits"
+    ]
+   },
+   "est_images": 1446
+  },
+  {
+   "name": "shrimp patties",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Shrimp patties"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "shrimp with chill source",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "shrimp with chill source"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "simmered pork",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "simmered pork"
+    ]
+   },
+   "est_images": 109
+  },
+  {
+   "name": "sirloin cutlet",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sirloin cutlet"
+    ]
+   },
+   "est_images": 140
+  },
+  {
+   "name": "sloppy joe",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sloppy_joe"
+    ]
+   },
+   "est_images": 476
+  },
+  {
+   "name": "small steamed savory rice pancake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Small steamed savory rice pancake"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "soba noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "soba noodle"
+    ]
+   },
+   "est_images": 163
+  },
+  {
+   "name": "solkadhi",
+   "region": "indian",
+   "ascend_name": "solkadhi",
+   "sources": {
+    "khana": [
+     "solkadhi"
+    ]
+   },
+   "est_images": 243
+  },
+  {
+   "name": "souffle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "souffle"
+    ]
+   },
+   "est_images": 530
+  },
+  {
+   "name": "sour prawn soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Sour prawn soup"
+    ]
+   },
+   "est_images": 108
+  },
+  {
+   "name": "spaghetti",
+   "region": "world",
+   "ascend_name": "spaghetti",
+   "sources": {
+    "uec": [
+     "spaghetti"
+    ]
+   },
+   "est_images": 151
+  },
+  {
+   "name": "spaghetti bolognese",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "spaghetti_bolognese"
+    ],
+    "foodx": [
+     "spaghetti_bolognese"
+    ],
+    "uec": [
+     "spaghetti meat sauce"
+    ]
+   },
+   "est_images": 1536,
+   "merge_note": "UEC's 'spaghetti meat sauce' merged in: same dish."
+  },
+  {
+   "name": "spaghetti carbonara",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "spaghetti_carbonara"
+    ],
+    "foodx": [
+     "spaghetti_carbonara"
+    ]
+   },
+   "est_images": 1446
+  },
+  {
+   "name": "spam musubi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "spam musubi"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "spicy chicken salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "spicy chicken salad"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "spicy chili flavored tofu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "spicy chili-flavored tofu"
+    ]
+   },
+   "est_images": 120
+  },
+  {
+   "name": "sponge cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sponge_cake"
+    ]
+   },
+   "est_images": 482
+  },
+  {
+   "name": "spring roll",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "spring_rolls"
+    ],
+    "foodx": [
+     "spring_roll"
+    ],
+    "uec": [
+     "Fried spring rolls"
+    ]
+   },
+   "est_images": 1632
+  },
+  {
+   "name": "steak",
+   "region": "world",
+   "ascend_name": "steak",
+   "sources": {
+    "food101": [
+     "steak"
+    ],
+    "uec": [
+     "steak"
+    ]
+   },
+   "est_images": 1108
+  },
+  {
+   "name": "steamed meat dumpling",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "steamed meat dumpling"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "steamed rice roll",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Steamed rice roll"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "steamed spareribs",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "steamed spareribs"
+    ]
+   },
+   "est_images": 116
+  },
+  {
+   "name": "stew",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "stew"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "stewed pork leg",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "stewed pork leg"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "stinky tofu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "stinky tofu"
+    ]
+   },
+   "est_images": 103
+  },
+  {
+   "name": "stir fried beef and peppers",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "stir-fried beef and peppers"
+    ]
+   },
+   "est_images": 107
+  },
+  {
+   "name": "stir fried mixed vegetables",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "stir-fried mixed vegetables"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "strawberry shortcake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "strawberry_shortcake"
+    ],
+    "foodx": [
+     "strawberry_shortcake"
+    ],
+    "uec": [
+     "shortcake"
+    ]
+   },
+   "est_images": 1599,
+   "merge_note": "UEC's 'shortcake' merged in: Japanese shortcake is strawberry shortcake."
+  },
+  {
+   "name": "streusel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "streusel"
+    ]
+   },
+   "est_images": 464
+  },
+  {
+   "name": "strudel",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "strudel"
+    ]
+   },
+   "est_images": 579
+  },
+  {
+   "name": "stuffed cabbage",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "stuffed_cabbage"
+    ]
+   },
+   "est_images": 496
+  },
+  {
+   "name": "stuffed peppers",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "stuffed_peppers"
+    ]
+   },
+   "est_images": 533
+  },
+  {
+   "name": "stuffed tomato",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "stuffed_tomato"
+    ]
+   },
+   "est_images": 506
+  },
+  {
+   "name": "succotash",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "succotash"
+    ]
+   },
+   "est_images": 431
+  },
+  {
+   "name": "sukiyaki",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "sukiyaki"
+    ],
+    "uec": [
+     "sukiyaki"
+    ]
+   },
+   "est_images": 571
+  },
+  {
+   "name": "sushi",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "sushi"
+    ],
+    "foodx": [
+     "sushi"
+    ],
+    "uec": [
+     "sushi"
+    ]
+   },
+   "est_images": 1596
+  },
+  {
+   "name": "sushi bowl",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sushi bowl"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "sweet and sour pork",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "sweet and sour pork"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "syllabub",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "syllabub"
+    ]
+   },
+   "est_images": 458
+  },
+  {
+   "name": "tacos",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "tacos"
+    ],
+    "foodx": [
+     "taco"
+    ],
+    "uec": [
+     "tacos"
+    ]
+   },
+   "est_images": 1593
+  },
+  {
+   "name": "tagliatelle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tagliatelle"
+    ]
+   },
+   "est_images": 462
+  },
+  {
+   "name": "taiyaki",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "fish-shaped pancake with bean jam"
+    ]
+   },
+   "est_images": 122,
+   "merge_note": "UEC's 'fish-shaped pancake with bean jam' is taiyaki; canonical uses the standard name."
+  },
+  {
+   "name": "takoyaki",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "takoyaki"
+    ],
+    "foodx": [
+     "takoyaki"
+    ],
+    "uec": [
+     "takoyaki"
+    ]
+   },
+   "est_images": 1558
+  },
+  {
+   "name": "tamale",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tamale"
+    ]
+   },
+   "est_images": 443
+  },
+  {
+   "name": "tamale pie",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tamale_pie"
+    ]
+   },
+   "est_images": 436
+  },
+  {
+   "name": "tanmen",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "tanmen"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "tapenade",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tapenade"
+    ]
+   },
+   "est_images": 489
+  },
+  {
+   "name": "tempura",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tempura"
+    ],
+    "uec": [
+     "tempura"
+    ]
+   },
+   "est_images": 677
+  },
+  {
+   "name": "tempura bowl",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "tempura bowl"
+    ]
+   },
+   "est_images": 136
+  },
+  {
+   "name": "tempura udon",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "tempura udon"
+    ]
+   },
+   "est_images": 106
+  },
+  {
+   "name": "tenderloin",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tenderloin"
+    ]
+   },
+   "est_images": 560
+  },
+  {
+   "name": "tenshin noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "tensin noodle"
+    ]
+   },
+   "est_images": 112
+  },
+  {
+   "name": "teriyaki grilled fish",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "teriyaki grilled fish"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "terrine",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "terrine"
+    ]
+   },
+   "est_images": 595
+  },
+  {
+   "name": "tetrazzini",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tetrazzini"
+    ]
+   },
+   "est_images": 460
+  },
+  {
+   "name": "thai papaya salad",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Thai papaya salad"
+    ]
+   },
+   "est_images": 119
+  },
+  {
+   "name": "thali",
+   "region": "indian",
+   "ascend_name": "veg thali",
+   "sources": {
+    "khana": [
+     "thali"
+    ]
+   },
+   "est_images": 1632
+  },
+  {
+   "name": "thinly sliced raw horsemeat",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "thinly sliced raw horsemeat"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "three cup chicken",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "three cup chicken"
+    ]
+   },
+   "est_images": 117
+  },
+  {
+   "name": "thukpa",
+   "region": "indian",
+   "ascend_name": null,
+   "sources": {
+    "khana": [
+     "thukpa"
+    ]
+   },
+   "est_images": 607
+  },
+  {
+   "name": "tiramisu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "tiramisu"
+    ],
+    "foodx": [
+     "tiramisu"
+    ],
+    "uec": [
+     "tiramisu"
+    ]
+   },
+   "est_images": 1573
+  },
+  {
+   "name": "toad in the hole",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "toad_in_the_hole"
+    ]
+   },
+   "est_images": 400
+  },
+  {
+   "name": "toast",
+   "region": "world",
+   "ascend_name": "toast",
+   "sources": {
+    "uec": [
+     "toast"
+    ]
+   },
+   "est_images": 218
+  },
+  {
+   "name": "torte",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "torte"
+    ]
+   },
+   "est_images": 618
+  },
+  {
+   "name": "tortellini",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tortellini"
+    ]
+   },
+   "est_images": 492
+  },
+  {
+   "name": "tortilla",
+   "region": "world",
+   "ascend_name": "tortilla",
+   "sources": {
+    "uec": [
+     "tortilla"
+    ]
+   },
+   "est_images": 102
+  },
+  {
+   "name": "tostada",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "tostada"
+    ]
+   },
+   "est_images": 518
+  },
+  {
+   "name": "trunip pudding",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "trunip pudding"
+    ]
+   },
+   "est_images": 105
+  },
+  {
+   "name": "tuna tartare",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "tuna_tartare"
+    ],
+    "foodx": [
+     "tuna_tartare"
+    ]
+   },
+   "est_images": 1470
+  },
+  {
+   "name": "twice cooked pork",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "twice cooked pork"
+    ]
+   },
+   "est_images": 113
+  },
+  {
+   "name": "udon noodle",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "udon noodle"
+    ]
+   },
+   "est_images": 152
+  },
+  {
+   "name": "upside down cake",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "upside_down_cake"
+    ]
+   },
+   "est_images": 536
+  },
+  {
+   "name": "uttapam",
+   "region": "indian",
+   "ascend_name": "uttapam",
+   "sources": {
+    "khana": [
+     "uttapam"
+    ]
+   },
+   "est_images": 4007
+  },
+  {
+   "name": "vada pav",
+   "region": "indian",
+   "ascend_name": "vada pav",
+   "sources": {
+    "khana": [
+     "vada pav"
+    ],
+    "v1cc0": [
+     "vadapav"
+    ]
+   },
+   "est_images": 5432,
+   "count_note": "includes v1 HF source(s) whose per-class counts are card-level only; data_prep_v2 reports real pooled counts"
+  },
+  {
+   "name": "veal cordon bleu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "veal_cordon_bleu"
+    ]
+   },
+   "est_images": 300
+  },
+  {
+   "name": "vegetable tempura",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "vegetable tempura"
+    ]
+   },
+   "est_images": 115
+  },
+  {
+   "name": "vermicelli",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "vermicelli"
+    ]
+   },
+   "est_images": 470
+  },
+  {
+   "name": "vermicelli noodles with snails",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Vermicelli noodles with snails"
+    ]
+   },
+   "est_images": 101
+  },
+  {
+   "name": "victoria sandwich",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "victoria_sandwich"
+    ]
+   },
+   "est_images": 468
+  },
+  {
+   "name": "vol au vent",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "vol_au_vent"
+    ]
+   },
+   "est_images": 504
+  },
+  {
+   "name": "waffles",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "food101": [
+     "waffles"
+    ],
+    "foodx": [
+     "waffle"
+    ],
+    "uec": [
+     "waffle"
+    ]
+   },
+   "est_images": 1522
+  },
+  {
+   "name": "welsh rarebit",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "welsh_rarebit"
+    ]
+   },
+   "est_images": 360
+  },
+  {
+   "name": "winter melon soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "winter melon soup"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "wonton",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "wonton"
+    ]
+   },
+   "est_images": 561
+  },
+  {
+   "name": "wonton soup",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "Wonton soup",
+     "fried pork dumplings served in soup"
+    ]
+   },
+   "est_images": 234,
+   "merge_note": "UEC's 'fried pork dumplings served in soup' merged in: that is wonton soup."
+  },
+  {
+   "name": "xiao long bao",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "xiao long bao"
+    ]
+   },
+   "est_images": 114
+  },
+  {
+   "name": "yakitori",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "yakitori"
+    ]
+   },
+   "est_images": 111
+  },
+  {
+   "name": "yellow curry",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "yellow curry"
+    ]
+   },
+   "est_images": 104
+  },
+  {
+   "name": "yudofu",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "yudofu"
+    ]
+   },
+   "est_images": 118
+  },
+  {
+   "name": "zha jiang mian",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "zha jiang mian"
+    ]
+   },
+   "est_images": 110
+  },
+  {
+   "name": "ziti",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "foodx": [
+     "ziti"
+    ]
+   },
+   "est_images": 443
+  },
+  {
+   "name": "zoni",
+   "region": "world",
+   "ascend_name": null,
+   "sources": {
+    "uec": [
+     "zoni"
+    ]
+   },
+   "est_images": 117
+  }
+ ]
+}
