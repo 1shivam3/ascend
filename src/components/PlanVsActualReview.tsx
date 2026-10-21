@@ -154,7 +154,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                 </span>
                 {exSummary.hasPrescriptionData && exSummary.setCompletionPercentage !== null && (
                   <span className="text-3xs font-mono text-text-secondary">
-                    {t('pva.completedCount', { done: exSummary.completedPrescribedSets, total: exSummary.totalPrescribedSets, pct: exSummary.setCompletionPercentage })}
+                    {t('pva.completedCount', { done: exSummary.completedPrescribedSets, total: exSummary.totalPrescribedSets, pct: exSummary.setCompletionPercentage ?? 0 })}
                   </span>
                 )}
               </div>
