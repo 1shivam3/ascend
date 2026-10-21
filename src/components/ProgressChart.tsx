@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { TrendingUp, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
 import { calculateOneRepMax } from '@/lib/strength-standards';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
+import { useTranslation } from '@/lib/i18n';
 
 const PRIMARY_EXERCISES = ['Squat', 'Bench Press', 'Deadlift', 'Overhead Press'];
 
@@ -12,6 +13,7 @@ type Timeframe = '30d' | '3m' | 'all';
 type MetricMode = 'e1rm' | 'volume';
 
 export default function ProgressChart() {
+  const { t, language } = useTranslation();
   const { prs, profile, workouts } = useStore();
   const userUnit = profile?.unit || 'kg';
 
@@ -171,32 +173,32 @@ export default function ProgressChart() {
     const valDelta = latest.value - previous.value;
 
     if (latest.effortTrend === 'high' || latest.hasEffortSpike || (latest.rpeDrift !== undefined && latest.rpeDrift >= 1.5)) {
-      const rpeRef = latest.avgRpe !== undefined ? ` (Avg @${latest.avgRpe} RPE)` : '';
+      const rpeRef = latest.avgRpe !== undefined ? t('chart.rpeRef', { rpe: latest.avgRpe }) : '';
       return {
-        headline: 'Fatigue Accumulation Detected',
-        explanation: `Latest session logged high within-session effort drift (+${latest.rpeDrift ?? 1.5} RPE${rpeRef}). Central nervous system exertion is elevated. Maintain current load or take a deload buffer before pushing volume.`,
+        headline: t('chart.headFatigue'),
+        explanation: t('chart.expFatigue', { drift: latest.rpeDrift ?? 1.5, rpeRef }),
       };
     }
 
     if (valDelta > 0 && latest.avgRpe !== undefined && latest.avgRpe <= 8.5) {
       return {
-        headline: 'Positive Progressive Overload',
-        explanation: `Tonnage expanded by +${valDelta.toLocaleString()} ${userUnit} while exertion remained controlled (Avg @${latest.avgRpe} RPE). Your training stimulus is driving muscular adaptation without neuromuscular exhaustion.`,
+        headline: t('chart.headOverload'),
+        explanation: t('chart.expOverload', { delta: valDelta.toLocaleString(), unit: userUnit, rpe: latest.avgRpe ?? '' }),
       };
     }
 
     if (latest.avgRpe !== undefined && latest.avgRpe < 7.5 && latest.effortTrend === 'low') {
       return {
-        headline: 'High Neuromuscular Reserve',
-        explanation: `Working sets completed with comfortable reserve (Avg @${latest.avgRpe} RPE, negligible drift). You are in an optimal recovery window to increment load or reps next session.`,
+        headline: t('chart.headReserve'),
+        explanation: t('chart.expReserve', { rpe: latest.avgRpe ?? '' }),
       };
     }
 
     return {
-      headline: 'Controlled Volume Maintenance',
-      explanation: `Work capacity is stable at ${latest.value.toLocaleString()} ${userUnit} (Avg @${latest.avgRpe ?? 8} RPE). Solidifying motor efficiency and work capacity at this load.`,
+      headline: t('chart.headMaintenance'),
+      explanation: t('chart.expMaintenance', { value: latest.value.toLocaleString(), unit: userUnit, rpe: latest.avgRpe ?? 8 }),
     };
-  }, [currentChartData, userUnit]);
+  }, [currentChartData, userUnit, t]);
 
   // SVG dimensions
   const width = 380;
@@ -260,7 +262,7 @@ export default function ProgressChart() {
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-accent" />
           <h2 className="section-title text-[11px] mb-0">
-            {metricMode === 'e1rm' ? 'STRENGTH TREND (1RM)' : 'VOLUME & EFFORT DRIFT'}
+            {metricMode === 'e1rm' ? t('chart.strengthTrend') : t('chart.volumeDrift')}
           </h2>
         </div>
 
@@ -293,7 +295,7 @@ export default function ProgressChart() {
                   : 'text-text-muted hover:text-text-primary'
               }`}
             >
-              <span>Volume &amp; Fatigue</span>
+              <span>{t('chart.volumeFatigue')}</span>
             </button>
           </div>
 
@@ -313,7 +315,7 @@ export default function ProgressChart() {
                     : 'text-text-muted hover:text-text-primary'
                 }`}
               >
-                {tf === '30d' ? '30D' : tf === '3m' ? '3M' : 'All'}
+                {tf === '30d' ? '30D' : tf === '3m' ? '3M' : t('chart.all')}
               </button>
             ))}
           </div>
@@ -359,25 +361,28 @@ export default function ProgressChart() {
                   {activePoint ? activePoint.value.toLocaleString() : latestVal.toLocaleString()}
                 </span>
                 <span className="text-xs text-text-muted">
-                  {userUnit} {metricMode === 'volume' ? 'Volume' : '1RM'}
+                  {userUnit} {metricMode === 'volume' ? t('chart.volume') : '1RM'}
                 </span>
               </div>
               <p className="text-2xs text-text-muted mt-0.5">
                 {activePoint
                   ? metricMode === 'volume'
-                    ? `${new Date(activePoint.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })} • ${activePoint.setsCount || 1} sets • Top: ${activePoint.weight} ${userUnit} × ${
-                        activePoint.reps
-                      } • Avg @${activePoint.avgRpe || 8} RPE (${
-                        (activePoint.rpeDrift ?? 0) >= 0 ? `+${activePoint.rpeDrift ?? 0}` : activePoint.rpeDrift
-                      } drift)`
-                    : `${new Date(activePoint.date).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })} • ${activePoint.weight} ${userUnit} × ${activePoint.reps} reps`
-                  : `${currentChartData.length} records in this period`}
+                    ? t('chart.pointVolume', {
+                        date: new Date(activePoint.date).toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' }),
+                        sets: activePoint.setsCount || 1,
+                        weight: activePoint.weight,
+                        unit: userUnit,
+                        reps: activePoint.reps,
+                        rpe: activePoint.avgRpe || 8,
+                        drift: (activePoint.rpeDrift ?? 0) >= 0 ? `+${activePoint.rpeDrift ?? 0}` : (activePoint.rpeDrift ?? 0),
+                      })
+                    : t('chart.point1rm', {
+                        date: new Date(activePoint.date).toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' }),
+                        weight: activePoint.weight,
+                        unit: userUnit,
+                        reps: activePoint.reps,
+                      })
+                  : t('chart.records', { count: currentChartData.length })}
               </p>
             </div>
 
@@ -394,10 +399,10 @@ export default function ProgressChart() {
                   {delta > 0 ? `+${delta.toLocaleString()}` : delta.toLocaleString()} {userUnit}
                 </span>
               ) : (
-                <span className="text-xs text-text-muted font-medium">Consistent</span>
+                <span className="text-xs text-text-muted font-medium">{t('chart.consistent')}</span>
               )}
               <p className="text-2xs text-text-muted mt-0.5">
-                Peak: {maxVal.toLocaleString()} {userUnit}
+                {t('chart.peak', { value: maxVal.toLocaleString(), unit: userUnit })}
               </p>
             </div>
           </div>
@@ -488,19 +493,19 @@ export default function ProgressChart() {
             <div className="pt-2 border-t border-border/50 space-y-2">
               {/* RPE & Fatigue Legend */}
               <div className="flex items-center justify-between text-3xs font-mono text-text-muted flex-wrap gap-2">
-                <span className="font-semibold text-text-secondary">Autoregulation Status:</span>
+                <span className="font-semibold text-text-secondary">{t('chart.autoregStatus')}</span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                    <span>Low Drift (Reserve)</span>
+                    <span>{t('chart.lowDrift')}</span>
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-accent" />
-                    <span>Target Effort (@8-8.5)</span>
+                    <span>{t('chart.targetEffort')}</span>
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-full bg-amber-500" />
-                    <span>High Drift / Deload Signal</span>
+                    <span>{t('chart.highDrift')}</span>
                   </span>
                 </div>
               </div>
@@ -510,7 +515,7 @@ export default function ProgressChart() {
                 <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border/70 text-2xs space-y-1">
                   <div className="flex items-center gap-1.5 font-bold font-mono text-accent">
                     <Activity className="w-3.5 h-3.5" />
-                    <span>AUTOREGULATION INSIGHT:</span>
+                    <span>{t('chart.insight')}</span>
                     <span className="text-text-primary">{autoregulationInsight.headline}</span>
                   </div>
                   <p className="text-text-secondary text-3xs leading-relaxed">
@@ -525,13 +530,13 @@ export default function ProgressChart() {
         <div className="py-6 px-4 text-center rounded-xl bg-bg-secondary/40 border border-border/50">
           <p className="text-xs font-semibold text-text-primary">
             {currentChartData.length === 0
-              ? `No records logged for ${selectedExercise} in this timeframe.`
-              : 'Not enough workout history yet.'}
+              ? t('chart.noRecords', { exercise: selectedExercise })
+              : t('chart.notEnough')}
           </p>
           <p className="text-2xs text-text-muted mt-1">
             {currentChartData.length === 0
-              ? 'Log PRs or workouts to track your strength over time.'
-              : 'Complete a few sessions to see your trend.'}
+              ? t('chart.logToTrack')
+              : t('chart.completeFew')}
           </p>
         </div>
       )}
