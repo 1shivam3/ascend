@@ -10,6 +10,7 @@ import {
   formatSetCount,
 } from '@/lib/workout-adherence-presentation';
 import { ChevronDown, ChevronUp, Target } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 export interface PlanVsActualReviewProps {
   workout: WorkoutEntry;
@@ -29,6 +30,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
   defaultExpanded = false,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const [isDetailsOpen, setIsDetailsOpen] = useState(defaultExpanded);
 
   const adherence = calculateWorkoutAdherence(workout);
@@ -43,7 +45,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
       >
         <div className="flex items-center gap-1.5 font-mono text-2xs uppercase tracking-wider text-text-muted">
           <Target className="w-3.5 h-3.5 text-text-muted shrink-0" />
-          <span>Plan vs Actual</span>
+          <span>{t('pva.title')}</span>
         </div>
         <span className="text-2xs text-text-secondary truncate">
           {completionSummary.detailText}
@@ -62,16 +64,16 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
           <div className="flex items-center gap-2">
             <Target className="w-4 h-4 text-accent shrink-0" />
             <span className="text-xs font-bold uppercase tracking-wider font-mono text-text-primary">
-              Plan vs Actual Review
+              {t('pva.reviewTitle')}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
             <span
               className="text-2xs font-mono px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold"
-              title="Prescribed set completion rate"
+              title={t('pva.completionTitle')}
             >
-              Set completion: {completionSummary.completionRateFormatted}
+              {t('pva.setCompletion', { rate: completionSummary.completionRateFormatted })}
             </span>
 
             <button
@@ -79,10 +81,10 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
               onClick={() => setIsDetailsOpen((prev) => !prev)}
               className="text-xs font-mono text-text-secondary hover:text-accent flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded hover:bg-bg-primary"
               aria-expanded={isDetailsOpen}
-              aria-label={isDetailsOpen ? 'Collapse set comparison details' : 'Expand set comparison details'}
+              aria-label={isDetailsOpen ? t('pva.collapseAria') : t('pva.expandAria')}
             >
               <span className="text-3xs uppercase hidden sm:inline">
-                {isDetailsOpen ? 'Hide details' : 'View details'}
+                {isDetailsOpen ? t('pva.hideDetails') : t('pva.viewDetails')}
               </span>
               {isDetailsOpen ? (
                 <ChevronUp className="w-3.5 h-3.5" />
@@ -96,28 +98,28 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
         {/* ── Key Summary Metric Pills ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-1.5 mt-2.5">
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Prescribed</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.prescribed')}</span>
             <span className="text-xs font-bold font-mono text-text-primary block mt-0.5 tabular-nums">
               {formatSetCount(adherence.totalPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Completed</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.completed')}</span>
             <span className="text-xs font-bold font-mono text-emerald-400 block mt-0.5 tabular-nums">
               {formatSetCount(adherence.completedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Skipped</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.skipped')}</span>
             <span className="text-xs font-bold font-mono text-rose-400 block mt-0.5 tabular-nums">
               {formatSetCount(adherence.skippedPrescribedSets)}
             </span>
           </div>
 
           <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center">
-            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Not Attempted</span>
+            <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.notAttempted')}</span>
             <span className="text-xs font-bold font-mono text-text-muted block mt-0.5 tabular-nums">
               {formatSetCount(adherence.notAttemptedPrescribedSets)}
             </span>
@@ -125,7 +127,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
 
           {adherence.extraCompletedSets > 0 && (
             <div className="px-2 py-1.5 rounded-lg bg-bg-primary border border-border text-center col-span-2 sm:col-span-1">
-              <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">Extra Sets</span>
+              <span className="text-3xs uppercase font-mono text-text-muted block whitespace-normal leading-tight">{t('pva.extraSets')}</span>
               <span className="text-xs font-bold font-mono text-amber-400 block mt-0.5 tabular-nums">
                 {formatSetCount(adherence.extraCompletedSets)}
               </span>
@@ -138,7 +140,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
       {isDetailsOpen && (
         <div className="p-3 space-y-3.5 bg-bg-elevated/30">
           <div className="text-2xs font-mono uppercase tracking-wider text-text-muted">
-            Target vs Actual Set Comparisons
+            {t('pva.comparisons')}
           </div>
 
           {adherence.exercises.map((exSummary) => (
@@ -152,7 +154,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                 </span>
                 {exSummary.hasPrescriptionData && exSummary.setCompletionPercentage !== null && (
                   <span className="text-3xs font-mono text-text-secondary">
-                    {exSummary.completedPrescribedSets}/{exSummary.totalPrescribedSets} completed ({exSummary.setCompletionPercentage}%)
+                    {t('pva.completedCount', { done: exSummary.completedPrescribedSets, total: exSummary.totalPrescribedSets, pct: exSummary.setCompletionPercentage })}
                   </span>
                 )}
               </div>
@@ -172,14 +174,14 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                       <div className="flex items-center justify-between text-2xs">
                         <div className="flex items-center gap-1.5">
                           <span className="font-mono font-bold text-text-primary">
-                            Set {setComp.setIndex + 1}
+                            {t('pva.set', { n: setComp.setIndex + 1 })}
                           </span>
                           {setComp.isWarmup && (
                             <span
                               className="text-[9px] font-mono px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30"
-                              title="Warm-up Set"
+                              title={t('pva.warmupTitle')}
                             >
-                              WARMUP
+                              {t('pva.warmup')}
                             </span>
                           )}
                         </div>
@@ -194,7 +196,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                         {repStr && (
                           <div className="px-2 py-1 rounded bg-bg-secondary/60 border border-border/40">
                             <span className="text-3xs uppercase font-sans text-text-muted block">
-                              Reps
+                              {t('pva.reps')}
                             </span>
                             <span className="text-text-primary block break-words">
                               {repStr}
@@ -205,7 +207,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                         {loadStr && (
                           <div className="px-2 py-1 rounded bg-bg-secondary/60 border border-border/40">
                             <span className="text-3xs uppercase font-sans text-text-muted block">
-                              Load
+                              {t('pva.load')}
                             </span>
                             <span className="text-text-primary block break-words">
                               {loadStr}
