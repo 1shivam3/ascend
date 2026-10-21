@@ -7,6 +7,7 @@ import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
 import { useAppNavigation } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,6 +18,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { user, signInWithGoogle, signOut } = useSupabaseSync();
+  const { t } = useTranslation();
   const toast = useToast();
   const { registerBackHandler } = useAppNavigation();
   const [loading, setLoading] = useState(false);
@@ -36,12 +38,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        toast.error(error, 'Google Sign-In Failed');
+        toast.error(error, t('auth.googleFailed'));
         setLoading(false);
       }
       // On success, browser will redirect to Google's official OAuth consent
     } catch {
-      toast.error('Could not initiate Google sign in.', 'Sign-In Error');
+      toast.error(t('auth.googleInitFail'), t('auth.signInError'));
       setLoading(false);
     }
   };
@@ -59,10 +61,10 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </div>
             <div>
               <h2 className="text-sm font-bold text-text-primary tracking-tight font-sans">
-                {isPermanentUser ? 'Cloud Account' : 'Link Google Account'}
+                {isPermanentUser ? t('auth.cloudAccount') : t('auth.linkGoogle')}
               </h2>
               <p className="text-3xs text-text-muted font-mono">
-                {isPermanentUser ? 'Cloud Backup Active' : 'Never lose your workouts'}
+                {isPermanentUser ? t('auth.backupActive') : t('auth.neverLose')}
               </p>
             </div>
           </div>
@@ -70,7 +72,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             type="button"
             onClick={onClose}
             className="w-10 h-10 min-h-[44px] min-w-[44px] rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Close Authentication"
+            aria-label={t('auth.closeAuth')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -82,13 +84,13 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-emerald-500/30 space-y-1.5">
               <div className="flex items-center gap-2 text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span className="text-xs font-bold">Google Account Connected</span>
+                <span className="text-xs font-bold">{t('auth.connected')}</span>
               </div>
               <p className="text-2xs text-text-primary font-mono truncate">
                 {user.email}
               </p>
               <p className="text-3xs text-text-muted leading-relaxed">
-                All your PRs, workouts, meals, and body metrics are safely synced with PostgreSQL.
+                {t('auth.syncedBody')}
               </p>
             </div>
 
@@ -98,32 +100,32 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               fullWidth
               onClick={async () => {
                 await signOut();
-                toast.info('Signed out of cloud account.');
+                toast.info(t('auth.signedOut'));
                 onClose();
               }}
             >
-              Sign Out of Cloud Account
+              {t('auth.signOut')}
             </Button>
           </div>
         ) : (
           /* Sign-In With Google */
           <div className="space-y-4 pt-1">
             <p className="text-2xs text-text-secondary leading-relaxed">
-              Link your Google account in 1 tap to save all your PRs, workouts, and meals permanently.
+              {t('auth.linkBody')}
             </p>
 
             <div className="space-y-2 p-3 rounded-xl bg-bg-secondary/40 border border-border/60 text-2xs text-text-muted">
               <div className="flex items-center gap-2 text-text-primary">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
-                <span>Instant cross-device sync (phone &amp; laptop)</span>
+                <span>{t('auth.benefitSync')}</span>
               </div>
               <div className="flex items-center gap-2 text-text-primary">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
-                <span>Zero data loss when clearing browser cache</span>
+                <span>{t('auth.benefitNoLoss')}</span>
               </div>
               <div className="flex items-center gap-2 text-text-primary">
                 <CheckCircle2 className="w-3.5 h-3.5 text-accent shrink-0" />
-                <span>Existing workouts are linked automatically</span>
+                <span>{t('auth.benefitAuto')}</span>
               </div>
             </div>
 
@@ -156,12 +158,12 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
                   />
                 </svg>
               )}
-              <span>Continue with Google</span>
+              <span>{t('auth.continueGoogle')}</span>
             </button>
 
             <div className="flex items-center justify-center gap-1.5 text-3xs text-text-muted pt-1">
               <Shield className="w-3 h-3 text-emerald-500 shrink-0" />
-              <span>Protected by PostgreSQL Row-Level Security</span>
+              <span>{t('auth.rls')}</span>
             </div>
           </div>
         )}

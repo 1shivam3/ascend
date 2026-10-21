@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 interface CollapsibleDetailsProps {
   /** Row label shown next to the chevron (e.g. "Details", "Why?"). */
@@ -16,7 +17,8 @@ interface CollapsibleDetailsProps {
  * expands on tap. Use for explanation paragraphs that shouldn't fight
  * the primary actions for attention.
  */
-export function CollapsibleDetails({ label = 'Details', children, className = '' }: CollapsibleDetailsProps) {
+export function CollapsibleDetails({ label, children, className = '' }: CollapsibleDetailsProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className={className}>
@@ -26,7 +28,7 @@ export function CollapsibleDetails({ label = 'Details', children, className = ''
         aria-expanded={open}
         className="flex items-center gap-1 py-1 text-3xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
       >
-        {label}
+        {label ?? t('ui.details')}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
       {open && <div className="text-xs text-text-muted leading-relaxed pt-0.5">{children}</div>}

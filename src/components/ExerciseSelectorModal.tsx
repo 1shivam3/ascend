@@ -12,6 +12,7 @@ import {
   getExerciseMuscle,
 } from '@/lib/exercise-library';
 import { useStore } from '@/lib/store';
+import { useTranslation } from '@/lib/i18n';
 
 interface ExerciseSelectorModalProps {
   isOpen: boolean;
@@ -26,10 +27,11 @@ export default function ExerciseSelectorModal({
   onClose,
   onSelectExercise,
   defaultMuscle = 'All',
-  title = 'Add Exercise',
+  title,
 }: ExerciseSelectorModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleGroup | 'All'>(defaultMuscle);
   const [customMuscle, setCustomMuscle] = useState<MuscleGroup | null>(null);
@@ -89,8 +91,8 @@ export default function ExerciseSelectorModal({
               <Dumbbell className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-sm text-text-primary">{title}</h3>
-              <p className="text-3xs text-text-muted">Select movement or search exercise</p>
+              <h3 className="font-bold text-sm text-text-primary">{title ?? t('exsel.addExercise')}</h3>
+              <p className="text-3xs text-text-muted">{t('exsel.subtitle')}</p>
             </div>
           </div>
           <button
@@ -110,7 +112,7 @@ export default function ExerciseSelectorModal({
             <Search className="w-3.5 h-3.5 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Search exercise (e.g. Incline Bench, Pull-up)..."
+              placeholder={t('exsel.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
@@ -138,7 +140,7 @@ export default function ExerciseSelectorModal({
                   : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border/60'
               }`}
             >
-              All Muscles
+              {t('exsel.allMuscles')}
             </button>
             {MUSCLE_GROUPS.map((m) => (
               <button
@@ -161,7 +163,7 @@ export default function ExerciseSelectorModal({
               instead of a keyword guess. */}
           {searchQuery.trim() && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
-              <span className="text-text-muted shrink-0 font-semibold">Custom muscle:</span>
+              <span className="text-text-muted shrink-0 font-semibold">{t('exsel.customMuscle')}</span>
               {MUSCLE_GROUPS.map((m) => {
                 const active = effectiveCustomMuscle(searchQuery.trim()) === m;
                 return (
@@ -188,7 +190,7 @@ export default function ExerciseSelectorModal({
           {filteredExercises.length === 0 ? (
             <div className="py-8 px-4 text-center space-y-3">
               <p className="text-xs text-text-muted">
-                No matching exercise found for &ldquo;{searchQuery}&rdquo;
+                {t('exsel.noMatch', { query: searchQuery })}
               </p>
               {searchQuery.trim() && (
                 <button
@@ -197,7 +199,7 @@ export default function ExerciseSelectorModal({
                   className="btn-primary py-2 px-4 text-xs font-bold inline-flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add &ldquo;{searchQuery.trim()}&rdquo; as Custom Exercise</span>
+                  <span>{t('exsel.addAsCustom', { name: searchQuery.trim() })}</span>
                 </button>
               )}
             </div>
@@ -222,7 +224,7 @@ export default function ExerciseSelectorModal({
                     {ex.isBodyweight && (
                       <>
                         <span>•</span>
-                        <span className="text-accent font-semibold">Bodyweight</span>
+                        <span className="text-accent font-semibold">{t('exsel.bodyweight')}</span>
                       </>
                     )}
                   </div>
@@ -244,7 +246,7 @@ export default function ExerciseSelectorModal({
                 className="w-full p-2 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add custom: &ldquo;{searchQuery.trim()}&rdquo;</span>
+                <span>{t('exsel.addCustom', { name: searchQuery.trim() })}</span>
               </button>
             </div>
           )}

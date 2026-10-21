@@ -14,6 +14,7 @@ import {
   type LevelProgress,
   type XpActivitySummary,
 } from '@/lib/xp-system';
+import { useTranslation } from '@/lib/i18n';
 
 interface LevelSheetProps {
   isOpen: boolean;
@@ -31,12 +32,13 @@ const TIER_LEVELS = [0, 1, 5, 10, 15, 20, 25, 30];
 
 /** How XP is earned — values read straight from the XP ledger constants so
  *  this list can never drift from what the app actually awards. */
-const EARN_ROWS = [
-  { icon: Dumbbell, label: 'Complete a workout', detail: 'At least one finished set', xp: XP_WORKOUT },
-  { icon: Utensils, label: 'Log a meal', detail: 'Any meal with food in it', xp: XP_MEAL },
-  { icon: Zap, label: 'Set a personal record', detail: 'Any lift, any rep range', xp: XP_PR },
-  { icon: Droplets, label: 'Log water', detail: 'Once a day', xp: XP_WATER },
-  { icon: Target, label: 'Complete a monthly challenge', detail: 'Opt-in side quests', xp: XP_CHALLENGE_COMPLETE },
+type EarnRow = { icon: typeof Dumbbell; labelKey: Parameters<ReturnType<typeof useTranslation>['t']>[0]; detailKey: Parameters<ReturnType<typeof useTranslation>['t']>[0]; xp: number };
+const EARN_ROWS: EarnRow[] = [
+  { icon: Dumbbell, labelKey: 'level.earnWorkout', detailKey: 'level.earnWorkoutDetail', xp: XP_WORKOUT },
+  { icon: Utensils, labelKey: 'level.earnMeal', detailKey: 'level.earnMealDetail', xp: XP_MEAL },
+  { icon: Zap, labelKey: 'level.earnPr', detailKey: 'level.earnPrDetail', xp: XP_PR },
+  { icon: Droplets, labelKey: 'level.earnWater', detailKey: 'level.earnWaterDetail', xp: XP_WATER },
+  { icon: Target, labelKey: 'level.earnChallenge', detailKey: 'level.earnChallengeDetail', xp: XP_CHALLENGE_COMPLETE },
 ];
 
 /**
@@ -56,6 +58,7 @@ export default function LevelSheet({
 }: LevelSheetProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const [animated, setAnimated] = useState(false);
   useEffect(() => {
     if (!isOpen) return;
@@ -69,10 +72,10 @@ export default function LevelSheet({
   const remaining = progress.needed - progress.current;
   const ladderLevels = Array.from(new Set([...TIER_LEVELS, level])).sort((a, b) => a - b);
   const weekRows = [
-    { label: 'Workouts', xp: weekXp.workoutXp },
-    { label: 'Meals', xp: weekXp.mealXp },
-    { label: 'Personal records', xp: weekXp.prXp },
-    { label: 'Water days', xp: weekXp.waterXp },
+    { label: t('level.rowWorkouts'), xp: weekXp.workoutXp },
+    { label: t('level.rowMeals'), xp: weekXp.mealXp },
+    { label: t('level.rowPrs'), xp: weekXp.prXp },
+    { label: t('level.rowWater'), xp: weekXp.waterXp },
   ].filter((r) => r.xp > 0);
 
   return (
@@ -82,7 +85,7 @@ export default function LevelSheet({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Level details"
+        aria-label={t('level.aria')}
       >
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -90,13 +93,13 @@ export default function LevelSheet({
             <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
               <Trophy className="w-4 h-4" />
             </span>
-            <h3 className="text-base font-bold text-text-primary">Your Level</h3>
+            <h3 className="text-base font-bold text-text-primary">{t('level.yourLevel')}</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
             className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close level details"
+            aria-label={t('level.closeAria')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -105,11 +108,11 @@ export default function LevelSheet({
         {/* Current level + progress */}
         <div>
           <span className="text-4xl font-bold text-text-primary tabular-nums leading-none">
-            Level {level}
+            {t('level.levelWord', { level })}
             <span className="text-base font-semibold text-text-muted ml-2">{name}</span>
           </span>
           <p className="text-xs text-text-muted tabular-nums mt-2">
-            {total.toLocaleString()} XP total · {remaining.toLocaleString()} XP to Level {level + 1}
+            {t('level.summary', { total: total.toLocaleString(), remaining: remaining.toLocaleString(), next: level + 1 })}
           </p>
           <div className="w-full h-2 rounded-full bg-border/60 overflow-hidden mt-3">
             <div
@@ -118,41 +121,41 @@ export default function LevelSheet({
             />
           </div>
           <p className="text-3xs text-text-muted tabular-nums mt-1.5">
-            {progress.current.toLocaleString()} of {progress.needed.toLocaleString()} XP in this level
+            {t('level.inLevel', { current: progress.current.toLocaleString(), needed: progress.needed.toLocaleString() })}
           </p>
         </div>
 
         {/* How to earn XP */}
         <div className="space-y-2">
           <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-            How XP is earned
+            {t('level.howEarned')}
           </span>
           <div className="space-y-1.5">
             {EARN_ROWS.map((row) => (
               <div
-                key={row.label}
+                key={row.labelKey}
                 className="flex items-center gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60"
               >
                 <span className="w-8 h-8 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
                   <row.icon className="w-4 h-4" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-text-primary">{row.label}</p>
-                  <p className="text-3xs text-text-muted">{row.detail}</p>
+                  <p className="text-xs font-bold text-text-primary">{t(row.labelKey)}</p>
+                  <p className="text-3xs text-text-muted">{t(row.detailKey)}</p>
                 </div>
                 <span className="text-xs font-bold text-accent tabular-nums shrink-0">+{row.xp} XP</span>
               </div>
             ))}
           </div>
           <p className="text-3xs text-text-muted leading-relaxed">
-            XP never expires and is never taken away. It simply adds up as you train.
+            {t('level.neverExpires')}
           </p>
         </div>
 
         {/* This week's XP from logged activity */}
         <div className="space-y-2">
           <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-            This week
+            {t('level.thisWeek')}
           </span>
           {weekXp.total > 0 ? (
             <div className="p-3 rounded-xl bg-bg-secondary border border-border/60 space-y-1">
@@ -163,13 +166,13 @@ export default function LevelSheet({
                 </div>
               ))}
               <div className="flex items-center justify-between text-xs pt-1 border-t border-border/60">
-                <span className="font-bold text-text-primary">Total this week</span>
+                <span className="font-bold text-text-primary">{t('level.totalWeek')}</span>
                 <span className="font-bold text-accent tabular-nums">+{weekXp.total.toLocaleString()} XP</span>
               </div>
             </div>
           ) : (
             <p className="text-xs text-text-muted leading-relaxed">
-              Nothing logged yet this week — XP shows up here as you train, eat, and log.
+              {t('level.nothingWeek')}
             </p>
           )}
         </div>
@@ -177,7 +180,7 @@ export default function LevelSheet({
         {/* Level ladder */}
         <div className="space-y-2">
           <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
-            Level ladder
+            {t('level.ladder')}
           </span>
           <div className="space-y-1.5">
             {ladderLevels.map((lvl) => {
@@ -203,8 +206,8 @@ export default function LevelSheet({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-text-primary">
-                      Level {lvl} · {getLevelName(lvl)}
-                      {isCurrent && <span className="text-accent font-semibold"> · You are here</span>}
+                      {t('level.levelWord', { level: lvl })} · {getLevelName(lvl)}
+                      {isCurrent && <span className="text-accent font-semibold"> {t('level.youAreHere')}</span>}
                     </p>
                   </div>
                   <span className="text-3xs text-text-muted tabular-nums shrink-0">

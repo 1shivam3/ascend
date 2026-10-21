@@ -5,6 +5,7 @@ import { ArrowLeft, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
 import { syncEngine } from '@/lib/supabase/sync';
 import { useToast } from '@/components/ui/Toast';
 import SocialAuthButtons from './SocialAuthButtons';
+import { useTranslation } from '@/lib/i18n';
 
 interface CreateAccountScreenProps {
   onBack: () => void;
@@ -17,6 +18,7 @@ export default function CreateAccountScreen({
   onSuccess,
   onNavigateToLogin,
 }: CreateAccountScreenProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
@@ -33,11 +35,11 @@ export default function CreateAccountScreen({
     const trimmedEmail = email.trim();
 
     if (!trimmedName) {
-      setError('Please enter your full name.');
+      setError(t('auth.nameRequired'));
       return;
     }
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError('Please enter a valid email address.');
+      setError(t('auth.validEmail'));
       return;
     }
     if (password.length < 8) {
@@ -52,21 +54,21 @@ export default function CreateAccountScreen({
 
       if (res.error) {
         setError(res.error);
-        toast.error(res.error, 'Sign Up Failed');
+        toast.error(res.error, t('auth.signUpFailed'));
       } else {
         if (res.requiresEmailVerification) {
           toast.info(
-            'Account created! A confirmation email has been sent. You can proceed with calibrating your profile now.',
-            'Verification Sent'
+            t('auth.verifyMsg'),
+            t('auth.verifyTitle')
           );
         } else {
-          toast.success('Account created successfully!', 'Welcome to ASCEND');
+          toast.success(t('auth.createdMsg'), t('auth.welcomeTitle'));
         }
         onSuccess(trimmedName, trimmedEmail);
       }
     } catch (err: any) {
       setLoading(false);
-      setError(err?.message || 'Could not create account');
+      setError(err?.message || t('auth.createFailed'));
     }
   };
 
@@ -77,7 +79,7 @@ export default function CreateAccountScreen({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Go back"
+          aria-label={t('auth.goBack')}
           className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-primary active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5 text-text-primary" />
@@ -94,10 +96,10 @@ export default function CreateAccountScreen({
           {/* Header */}
           <div className="text-left space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
-              Create Account
+              {t('auth.createTitle')}
             </h1>
             <p className="text-sm text-text-muted">
-              Start your fitness journey today
+              {t('auth.createSubtitle')}
             </p>
           </div>
 
@@ -114,7 +116,7 @@ export default function CreateAccountScreen({
             {/* Full Name */}
             <div>
               <label htmlFor="create-full-name" className="block text-xs font-semibold text-text-primary mb-1.5">
-                Full Name
+                {t('auth.fullName')}
               </label>
               <input
                 id="create-full-name"
@@ -122,7 +124,7 @@ export default function CreateAccountScreen({
                 autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="e.g. Alex Miller"
+                placeholder={t('auth.namePlaceholder')}
                 required
                 className="w-full px-4 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
               />
@@ -131,7 +133,7 @@ export default function CreateAccountScreen({
             {/* Email */}
             <div>
               <label htmlFor="create-email" className="block text-xs font-semibold text-text-primary mb-1.5">
-                Email
+                {t('auth.email')}
               </label>
               <input
                 id="create-email"
@@ -148,7 +150,7 @@ export default function CreateAccountScreen({
             {/* Password */}
             <div>
               <label htmlFor="create-password" className="block text-xs font-semibold text-text-primary mb-1.5">
-                Password
+                {t('auth.password')}
               </label>
               <div className="relative">
                 <input
@@ -165,7 +167,7 @@ export default function CreateAccountScreen({
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-text-muted hover:text-text-primary p-1 cursor-pointer transition"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -181,10 +183,10 @@ export default function CreateAccountScreen({
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Creating Account...</span>
+                  <span>{t('auth.creating')}</span>
                 </>
               ) : (
-                'Create Account'
+                t('auth.createTitle')
               )}
             </button>
           </form>
@@ -195,13 +197,13 @@ export default function CreateAccountScreen({
           {/* Footer Link */}
           <div className="pt-2 text-center">
             <p className="text-xs text-text-muted">
-              Already have an account?{' '}
+              {t('auth.alreadyHave')}{' '}
               <button
                 type="button"
                 onClick={onNavigateToLogin}
                 className="font-semibold text-accent hover:underline cursor-pointer"
               >
-                Log in
+                {t('auth.logIn')}
               </button>
             </p>
           </div>

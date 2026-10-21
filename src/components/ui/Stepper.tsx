@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { useTranslation } from '@/lib/i18n';
 
 export interface StepperProps {
   label: string;
@@ -28,6 +29,7 @@ export function Stepper({
   quickIncrements,
   className = '',
 }: StepperProps) {
+  const { t } = useTranslation();
   const numericValue = typeof value === 'number' ? value : parseFloat(String(value)) || 0;
 
   const handleDecrement = (delta: number) => {
@@ -66,7 +68,7 @@ export function Stepper({
           type="button"
           onClick={() => handleDecrement(step)}
           disabled={numericValue <= min}
-          aria-label={`Decrease ${label}`}
+          aria-label={t('ui.decrease', { label })}
           className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-bg-secondary hover:bg-bg-tertiary active:scale-90 disabled:opacity-30 disabled:pointer-events-none text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer shrink-0"
         >
           <Minus className="w-5 h-5 stroke-[2.5]" />
@@ -95,7 +97,7 @@ export function Stepper({
           type="button"
           onClick={() => handleIncrement(step)}
           disabled={numericValue >= max}
-          aria-label={`Increase ${label}`}
+          aria-label={t('ui.increase', { label })}
           className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-bg-secondary hover:bg-bg-tertiary active:scale-90 disabled:opacity-30 disabled:pointer-events-none text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer shrink-0"
         >
           <Plus className="w-5 h-5 stroke-[2.5]" />

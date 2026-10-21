@@ -18,6 +18,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 
 interface GoalSelectorModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
   const setProfile = useStore((state) => state.setProfile);
   const setMacroGoals = useStore((state) => state.setMacroGoals);
   const setTrainingProfile = useStore((state) => state.setTrainingProfile);
+  const { t } = useTranslation();
   const toast = useToast();
 
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>(currentGoals);
@@ -63,7 +65,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
     setSelectedGoals((prev) => {
       if (prev.includes(goal)) {
         if (prev.length <= 1) {
-          toast.info('You must select at least one primary goal.', 'Goal Required');
+          toast.info(t('goals.requiredMsg'), t('goals.requiredTitle'));
           return prev;
         }
         return prev.filter((g) => g !== goal);
@@ -96,16 +98,16 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
       );
       setMacroGoals(newMacros);
       toast.success(
-        `Calibrated nutrition targets (${newMacros.calories} kcal, ${newMacros.proteinG}g P) to match ${ATHLETE_GOAL_CONFIGS[primaryGoal].label}.`,
-        'Nutrition Recalibrated'
+        t('goals.recalcedMsg', { cal: newMacros.calories, protein: newMacros.proteinG, goal: ATHLETE_GOAL_CONFIGS[primaryGoal].label }),
+        t('goals.recalcedTitle')
       );
     } else {
       const count = selectedGoals.length;
       toast.success(
-        `Updated active goal${count > 1 ? 's' : ''} to: ${selectedGoals
-          .map((g) => ATHLETE_GOAL_CONFIGS[g].label)
-          .join(' + ')}`,
-        'Goals Calibrated'
+        t(count > 1 ? 'goals.updatedMsg' : 'goals.updatedMsgOne', {
+          goals: selectedGoals.map((g) => ATHLETE_GOAL_CONFIGS[g].label).join(' + '),
+        }),
+        t('goals.updatedTitle')
       );
     }
     onClose();
@@ -133,10 +135,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             </div>
             <div>
               <h2 className="text-base font-bold text-text-primary leading-tight">
-                Active Training &amp; Nutrition Goals
+                {t('goals.title')}
               </h2>
               <p className="text-3xs text-text-muted font-mono">
-                Select one or combine multiple goals to adapt ASCEND
+                {t('goals.subtitle')}
               </p>
             </div>
           </div>
@@ -215,10 +217,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
                   {/* Impact preview pills */}
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     <span className="text-4xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
-                      Reps: {config.defaultRepRange.min}–{config.defaultRepRange.max}
+                      {t('goals.reps')} {config.defaultRepRange.min}–{config.defaultRepRange.max}
                     </span>
                     <span className="text-4xs font-mono px-1.5 py-0.2 rounded bg-bg-secondary/80 text-text-muted border border-border/60">
-                      Rest: {config.defaultRestSeconds}s
+                      {t('goals.rest')} {config.defaultRestSeconds}s
                     </span>
                   </div>
                 </div>
@@ -231,10 +233,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
         <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5 text-left">
           <div className="flex items-center gap-1.5 text-3xs font-mono font-bold uppercase text-accent">
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>How ASCEND Personalizes to Your Selection</span>
+            <span>{t('goals.howTitle')}</span>
           </div>
           <p className="text-2xs text-text-secondary leading-relaxed">
-            Your selection dynamically calibrates:
+            {t('goals.howIntro')}
           </p>
           <ul className="text-3xs text-text-muted space-y-0.5 list-disc list-inside">
             <li><strong>Your workouts:</strong> Changes how many reps you aim for in each set and how long you rest between sets.</li>
@@ -254,10 +256,10 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             />
             <div className="text-left text-xs leading-tight">
               <span className="font-semibold text-text-primary block">
-                Auto-recalculate daily nutrition targets
+                {t('goals.recalcTitle')}
               </span>
               <span className="text-3xs text-text-muted">
-                Calibrates calories &amp; protein to your new primary goal
+                {t('goals.recalcHint')}
               </span>
             </div>
           </label>
@@ -271,14 +273,14 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
           >
             <Check className="w-4 h-4" />
-            <span>Apply Goals</span>
+            <span>{t('goals.apply')}</span>
           </button>
           <button
             type="button"
             onClick={onClose}
             className="btn-secondary py-2.5 text-xs font-semibold"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </div>

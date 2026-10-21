@@ -15,6 +15,8 @@ import {
 import { WorkoutEntry, PersonalRecord } from '@/lib/types';
 import { getExercisesByCategory, calculateOneRepMax } from '@/lib/strength-standards';
 import { getLastExercisePerformance } from '@/lib/workout-engine';
+import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
 
 interface ExerciseLibraryModalProps {
   isOpen: boolean;
@@ -92,6 +94,7 @@ export default function ExerciseLibraryModal({
 }: ExerciseLibraryModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
   const [selectedMuscle, setSelectedMuscle] = useState<string>('all');
@@ -159,8 +162,8 @@ export default function ExerciseLibraryModal({
               <Dumbbell className="w-4 h-4 stroke-[2.2]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-text-primary">Exercise Library</h2>
-              <p className="text-3xs text-text-muted">Browse movements, equipment &amp; your lift history</p>
+              <h2 className="text-base font-bold text-text-primary">{t('lib.title')}</h2>
+              <p className="text-3xs text-text-muted">{t('lib.subtitle')}</p>
             </div>
           </div>
           <button
@@ -179,7 +182,7 @@ export default function ExerciseLibraryModal({
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
-              placeholder="Search exercise (e.g. Bench, Squat, Curl)..."
+              placeholder={t('lib.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-bg-card border border-border rounded-xl pl-9 pr-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:border-accent outline-none"
@@ -198,14 +201,14 @@ export default function ExerciseLibraryModal({
 
           {/* Equipment Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-            {[
-              { id: 'all', label: 'All' },
-              { id: 'barbell', label: 'Barbell' },
-              { id: 'dumbbell', label: 'Dumbbell' },
-              { id: 'bodyweight', label: 'Bodyweight' },
-              { id: 'cable', label: 'Cable' },
-              { id: 'machine', label: 'Machine' },
-            ].map((tab) => (
+            {([
+              { id: 'all', labelKey: 'lib.all' },
+              { id: 'barbell', labelKey: 'lib.barbell' },
+              { id: 'dumbbell', labelKey: 'lib.dumbbell' },
+              { id: 'bodyweight', labelKey: 'lib.bodyweight' },
+              { id: 'cable', labelKey: 'lib.cable' },
+              { id: 'machine', labelKey: 'lib.machine' },
+            ] as { id: string; labelKey: StringKey }[]).map((tab) => (
               <button
                 key={tab.id}
                 type="button"
@@ -216,21 +219,21 @@ export default function ExerciseLibraryModal({
                     : 'bg-bg-card border border-border text-text-muted hover:text-text-primary'
                 }`}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </button>
             ))}
           </div>
 
           {/* Muscle Group Filter Chips */}
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-            {[
-              { id: 'all', label: 'All Muscles' },
-              { id: 'chest', label: 'Chest' },
-              { id: 'back', label: 'Back' },
-              { id: 'legs', label: 'Legs' },
-              { id: 'shoulders', label: 'Shoulders' },
-              { id: 'arms', label: 'Arms' },
-            ].map((muscle) => (
+            {([
+              { id: 'all', labelKey: 'lib.allMuscles' },
+              { id: 'chest', labelKey: 'lib.chest' },
+              { id: 'back', labelKey: 'lib.back' },
+              { id: 'legs', labelKey: 'lib.legs' },
+              { id: 'shoulders', labelKey: 'lib.shoulders' },
+              { id: 'arms', labelKey: 'lib.arms' },
+            ] as { id: string; labelKey: StringKey }[]).map((muscle) => (
               <button
                 key={muscle.id}
                 type="button"
@@ -241,7 +244,7 @@ export default function ExerciseLibraryModal({
                     : 'text-text-muted hover:text-text-secondary'
                 }`}
               >
-                {muscle.label}
+                {t(muscle.labelKey)}
               </button>
             ))}
           </div>
@@ -252,7 +255,7 @@ export default function ExerciseLibraryModal({
           {filteredExercises.length === 0 ? (
             <div className="text-center py-10 space-y-2">
               <Dumbbell className="w-8 h-8 text-text-muted mx-auto stroke-1" />
-              <p className="text-xs text-text-muted">No exercises match &quot;{searchQuery}&quot;</p>
+              <p className="text-xs text-text-muted">{t('lib.noMatch', { query: searchQuery })}</p>
               <button
                 type="button"
                 onClick={() => {
@@ -262,7 +265,7 @@ export default function ExerciseLibraryModal({
                 className="btn-primary text-xs py-1.5 px-3 inline-flex items-center gap-1.5"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Add &quot;{searchQuery}&quot; as custom exercise</span>
+                <span>{t('lib.addCustom', { name: searchQuery })}</span>
               </button>
             </div>
           ) : (
@@ -295,10 +298,10 @@ export default function ExerciseLibraryModal({
                       {lastPerf ? (
                         <span className="flex items-center gap-1 text-text-secondary">
                           <History className="w-3 h-3 text-text-muted shrink-0" />
-                          Last: {lastPerf.summary}
+                          {t('lib.last', { summary: lastPerf.summary })}
                         </span>
                       ) : (
-                        <span>No history logged</span>
+                        <span>{t('lib.noHistory')}</span>
                       )}
 
                       {matchingPR && (
@@ -319,7 +322,7 @@ export default function ExerciseLibraryModal({
                     className="btn-secondary py-1.5 px-3 text-xs font-semibold shrink-0 flex items-center gap-1 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Select</span>
+                    <span>{t('lib.select')}</span>
                   </button>
                 </div>
               );
@@ -329,13 +332,13 @@ export default function ExerciseLibraryModal({
 
         {/* Footer */}
         <div className="p-3 border-t border-border bg-bg-card flex items-center justify-between text-2xs text-text-muted">
-          <span>{filteredExercises.length} exercises found</span>
+          <span>{t('lib.found', { count: filteredExercises.length })}</span>
           <button
             type="button"
             onClick={onClose}
             className="text-text-primary hover:underline font-semibold"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

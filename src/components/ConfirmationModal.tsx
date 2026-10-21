@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { AlertTriangle, Trash2, LogOut, X, Loader2 } from 'lucide-react';
 import { useAppNavigation } from '@/lib/navigation';
+import { useTranslation } from '@/lib/i18n';
 
 export interface ConfirmationModalProps {
   isOpen: boolean;
@@ -25,8 +26,8 @@ export default function ConfirmationModal({
   onConfirm,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   variant = 'danger',
   icon = 'alert',
   requireTypedConfirmation,
@@ -34,6 +35,7 @@ export default function ConfirmationModal({
 }: ConfirmationModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const [typedValue, setTypedValue] = useState('');
   const { registerBackHandler } = useAppNavigation();
 
@@ -96,7 +98,7 @@ export default function ConfirmationModal({
         {requireTypedConfirmation && (
           <div className="space-y-1.5 text-left pt-1">
             <label className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
-              Type <span className="text-accent">{requireTypedConfirmation}</span> to confirm:
+              {t('confirm.typeToConfirm', { word: requireTypedConfirmation })}
             </label>
             <input
               type="text"
@@ -117,7 +119,7 @@ export default function ConfirmationModal({
             disabled={isLoading}
             className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border/80 text-xs font-bold text-text-primary transition-all cursor-pointer disabled:opacity-50"
           >
-            {cancelText}
+            {cancelText ?? t('common.cancel')}
           </button>
           <button
             type="button"
@@ -130,7 +132,7 @@ export default function ConfirmationModal({
             }`}
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-            <span>{confirmText}</span>
+            <span>{confirmText ?? t('confirm.confirm')}</span>
           </button>
         </div>
       </div>

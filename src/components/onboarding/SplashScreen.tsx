@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 interface SplashScreenProps {
   onContinue?: () => void;
@@ -8,6 +9,7 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({ onContinue, isHydrating = false }: SplashScreenProps) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (isHydrating || !onContinue) return;
     if (typeof window !== 'undefined' && window.location.search.includes('no_auto_advance=true')) {
@@ -27,7 +29,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
         !isHydrating && onContinue ? 'cursor-pointer' : ''
       }`}
       role="banner"
-      aria-label="ASCEND Fitness Application"
+      aria-label={t('auth.splashAria')}
     >
       {/* Background Photograph with Vignette & Fallback */}
       <div className="absolute inset-0 z-0 pointer-events-none select-none">
@@ -55,7 +57,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
 
         {/* Tagline matching reference */}
         <p className="text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase drop-shadow">
-          Train. Fuel. Progress. Repeat.
+          {t('auth.tagline')}
         </p>
       </div>
 
@@ -64,7 +66,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
         {isHydrating ? (
           <div className="flex items-center gap-2 text-xs text-brand-chalk/70 font-mono animate-pulse">
             <span className="w-2 h-2 rounded-full bg-accent animate-ping mr-1" />
-            <span>INITIALIZING...</span>
+            <span>{t('auth.initializing')}</span>
           </div>
         ) : (
           <button
@@ -75,7 +77,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
             }}
             className="text-xs tracking-wider text-brand-chalk/70 hover:text-white uppercase font-medium transition-colors cursor-pointer py-2 px-4 rounded-full border border-white/10 hover:border-white/30 backdrop-blur-xs bg-black/20"
           >
-            Tap to continue
+            {t('auth.tapContinue')}
           </button>
         )}
       </div>

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { safeRandomId } from '@/lib/formatters';
+import { useTranslation } from '@/lib/i18n';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -36,6 +37,7 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const removeToast = useCallback((id: string) => {
@@ -58,18 +60,18 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   );
 
   const success = useCallback(
-    (message: string, title = 'Success') => showToast('success', message, title),
-    [showToast]
+    (message: string, title?: string) => showToast('success', message, title ?? t('ui.toastSuccess')),
+    [showToast, t]
   );
 
   const error = useCallback(
-    (message: string, title = 'Error') => showToast('error', message, title, 4500),
-    [showToast]
+    (message: string, title?: string) => showToast('error', message, title ?? t('ui.toastError'), 4500),
+    [showToast, t]
   );
 
   const info = useCallback(
-    (message: string, title = 'Notice') => showToast('info', message, title),
-    [showToast]
+    (message: string, title?: string) => showToast('info', message, title ?? t('ui.toastNotice')),
+    [showToast, t]
   );
 
   return (

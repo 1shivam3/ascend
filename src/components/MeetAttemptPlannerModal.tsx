@@ -6,6 +6,7 @@ import { X, Trophy, Sparkles, ChevronRight, Dumbbell, Award, Check } from 'lucid
 import { useStore } from '@/lib/store';
 import { calculateDOTS } from '@/lib/dots';
 import { calculatePlates } from '@/lib/plate-calculator';
+import { useTranslation } from '@/lib/i18n';
 
 interface MeetAttemptPlannerModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface MeetAttemptPlannerModalProps {
 export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttemptPlannerModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const { profile, prs } = useStore();
   const userUnit = profile?.unit || 'kg';
 
@@ -91,8 +93,8 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-accent" />
             <div>
-              <h3 className="font-extrabold text-text-primary text-base">Powerlifting Meet Attempt Planner</h3>
-              <p className="text-3xs text-text-muted font-mono">Calibrated 90% • 95% • {thirdAttemptPercent}% Game Plan</p>
+              <h3 className="font-extrabold text-text-primary text-base">{t('meet.title')}</h3>
+              <p className="text-3xs text-text-muted font-mono">{t('meet.subtitle', { pct: thirdAttemptPercent })}</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
@@ -105,18 +107,18 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           <div className="card p-3 bg-accent/10 border border-accent/25 space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>THE 9-FOR-9 MEET STRATEGY</span>
+              <span>{t('meet.strategy')}</span>
             </div>
             <p className="text-2xs text-text-secondary leading-relaxed">
-              • <strong>1st Attempt (90%)</strong>: An effortless triple. Guarantees a total on the board.<br />
-              • <strong>2nd Attempt (95%)</strong>: Smooth build-up that sets up your competition PR.<br />
-              • <strong>3rd Attempt ({thirdAttemptPercent}%)</strong>: Your peak target or match-day PR attempt.
+              • <strong>{t('meet.tip1')}</strong>: {t('meet.tip1Body')}<br />
+              • <strong>{t('meet.tip2')}</strong>: {t('meet.tip2Body')}<br />
+              • <strong>{t('meet.tip3', { pct: thirdAttemptPercent })}</strong>: {t('meet.tip3Body')}
             </p>
           </div>
 
           {/* Third Attempt Aggression Selector */}
           <div className="flex items-center justify-between px-1">
-            <span className="text-2xs font-mono text-text-muted">3RD ATTEMPT STRATEGY:</span>
+            <span className="text-2xs font-mono text-text-muted">{t('meet.thirdStrategy')}</span>
             <div className="flex gap-1.5">
               {[100, 102.5].map((pct) => (
                 <button
@@ -129,7 +131,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                       : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
                   }`}
                 >
-                  {pct === 100 ? 'Conservative (100%)' : 'Aggressive PR (102.5%)'}
+                  {pct === 100 ? t('meet.conservative') : t('meet.aggressive')}
                 </button>
               ))}
             </div>
@@ -138,9 +140,9 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           {/* Squat Plan Card */}
           <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black font-mono text-accent">1. SQUAT</span>
+              <span className="text-xs font-black font-mono text-accent">{t('meet.squat')}</span>
               <div className="flex items-center gap-1.5 text-2xs">
-                <span className="text-text-muted">Max:</span>
+                <span className="text-text-muted">{t('meet.max')}</span>
                 <input
                   type="number"
                   step={stepSize}
@@ -154,19 +156,19 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.opener')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.squat.opener} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.second')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.squat.second} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-accent/15 border border-accent/30">
-                <span className="text-3xs font-mono text-accent font-bold block">3RD ({thirdAttemptPercent}%)</span>
+                <span className="text-3xs font-mono text-accent font-bold block">{t('meet.third', { pct: thirdAttemptPercent })}</span>
                 <span className="text-sm font-black font-mono text-accent block mt-0.5">
                   {plan.squat.third} {userUnit}
                 </span>
@@ -177,9 +179,9 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           {/* Bench Plan Card */}
           <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black font-mono text-[#38BDF8]">2. BENCH PRESS</span>
+              <span className="text-xs font-black font-mono text-[#38BDF8]">{t('meet.bench')}</span>
               <div className="flex items-center gap-1.5 text-2xs">
-                <span className="text-text-muted">Max:</span>
+                <span className="text-text-muted">{t('meet.max')}</span>
                 <input
                   type="number"
                   step={stepSize}
@@ -193,19 +195,19 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.opener')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.bench.opener} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.second')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.bench.second} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-[#38BDF8]/15 border border-[#38BDF8]/30">
-                <span className="text-3xs font-mono text-[#38BDF8] font-bold block">3RD ({thirdAttemptPercent}%)</span>
+                <span className="text-3xs font-mono text-[#38BDF8] font-bold block">{t('meet.third', { pct: thirdAttemptPercent })}</span>
                 <span className="text-sm font-black font-mono text-[#38BDF8] block mt-0.5">
                   {plan.bench.third} {userUnit}
                 </span>
@@ -216,9 +218,9 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           {/* Deadlift Plan Card */}
           <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black font-mono text-[#22C55E]">3. DEADLIFT</span>
+              <span className="text-xs font-black font-mono text-[#22C55E]">{t('meet.deadlift')}</span>
               <div className="flex items-center gap-1.5 text-2xs">
-                <span className="text-text-muted">Max:</span>
+                <span className="text-text-muted">{t('meet.max')}</span>
                 <input
                   type="number"
                   step={stepSize}
@@ -232,19 +234,19 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">OPENER (90%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.opener')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.deadlift.opener} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-bg-secondary border border-border">
-                <span className="text-3xs font-mono text-text-muted block">2ND (95%)</span>
+                <span className="text-3xs font-mono text-text-muted block">{t('meet.second')}</span>
                 <span className="text-sm font-black font-mono text-text-primary block mt-0.5">
                   {plan.deadlift.second} {userUnit}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-[#22C55E]/15 border border-[#22C55E]/30">
-                <span className="text-3xs font-mono text-[#22C55E] font-bold block">3RD ({thirdAttemptPercent}%)</span>
+                <span className="text-3xs font-mono text-[#22C55E] font-bold block">{t('meet.third', { pct: thirdAttemptPercent })}</span>
                 <span className="text-sm font-black font-mono text-[#22C55E] block mt-0.5">
                   {plan.deadlift.third} {userUnit}
                 </span>
@@ -256,7 +258,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           <div className="p-4 rounded-2xl bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between">
             <div>
               <span className="text-3xs font-mono uppercase font-bold text-accent block">
-                PROJECTED COMPETITION TOTAL
+                {t('meet.projectedTotal')}
               </span>
               <span className="text-2xl font-black font-mono text-text-primary mt-0.5 block">
                 {plan.projectedTotal} {userUnit}
@@ -264,7 +266,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
             </div>
             <div className="text-right">
               <span className="text-3xs font-mono uppercase font-bold text-text-muted block">
-                PROJECTED DOTS
+                {t('meet.projectedDots')}
               </span>
               <span className="text-2xl font-black font-mono text-accent mt-0.5 block">
                 {plan.projectedDots}
@@ -277,7 +279,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
             onClick={onClose}
             className="btn-primary w-full py-2.5 text-xs font-bold shadow-md shadow-accent/25"
           >
-            Close Planner
+            {t('meet.close')}
           </button>
         </div>
       </div>

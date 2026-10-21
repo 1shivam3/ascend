@@ -151,7 +151,9 @@ describe('QA4-031 jargon glosses in plain language', () => {
 
   it('GoalSelectorModal explains impact without DOTS/tonnage/velocity jargon', () => {
     const src = read('src/components/GoalSelectorModal.tsx');
-    const summary = src.slice(src.indexOf('How ASCEND Personalizes'), src.indexOf('Recalculate Nutrition'));
+    // Anchors updated at the #31 merge: the section heading and the
+    // recalculate option are i18n-wired now, so slice on their keys.
+    const summary = src.slice(src.indexOf("t('goals.howTitle')"), src.indexOf("t('goals.recalcTitle')"));
     expect(summary).not.toMatch(/DOTS|Tonnage|Weight Velocity|Prescription Engine/);
     expect(summary).toContain('how many reps you aim for');
     expect(summary).toContain('how much protein to aim for');

@@ -40,9 +40,14 @@ describe('Google Play Store Launch Readiness Verification', () => {
       expect(enDict).toContain("'settings.dataPrivacyLegal': 'Data, Privacy & Legal'");
       expect(settingsView).toContain("t('settings.accountSecurity')");
       expect(settingsView).toContain("t('settings.dataPrivacyLegal')");
+
+      // DeleteAccountView copy is localized (QA4-004): its English strings
+      // live in the i18n dictionary, so assert against view + dictionary.
+      const enDictionary = enDict;
+      const deleteAccountCopy = deleteAccountView + enDictionary;
       expect(settingsView).toContain('exportFullBackupJSON'); // Export my data flow
-      expect(deleteAccountView).toContain('Export my data');
-      expect(deleteAccountView).toContain('Delete my account');
+      expect(deleteAccountCopy).toContain('Export my data');
+      expect(deleteAccountCopy).toContain('Delete my account');
       expect(deleteAccountView).toContain('DELETE'); // Confirmation text required
       expect(reminderCenter).toContain('Notification'); // Notification preferences UI
     });

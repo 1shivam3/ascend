@@ -23,6 +23,7 @@ import {
   CheckCheck,
 } from 'lucide-react';
 import { useToast } from './ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -44,6 +45,7 @@ export default function PolicyDecisionCard({
   onDismissed,
   onApplied,
 }: PolicyDecisionCardProps) {
+  const { t } = useTranslation();
   const acceptPolicyDecision = useStore((state) => state.acceptPolicyDecision);
   const overridePolicyDecision = useStore((state) => state.overridePolicyDecision);
   const dismissPolicyDecision = useStore((state) => state.dismissPolicyDecision);
@@ -141,7 +143,7 @@ export default function PolicyDecisionCard({
 
   const handleConfirmApply = () => {
     if (!currentSelectedPlan) {
-      toast.error('No target workout plan selected.', 'Application Failed');
+      toast.error(t('pdc.toastNoPlan'), t('pdc.toastAppFailed'));
       return;
     }
 
@@ -154,7 +156,7 @@ export default function PolicyDecisionCard({
     });
 
     if (res.success) {
-      toast.success(res.message, 'Plan Target Updated');
+      toast.success(res.message, t('pdc.toastUpdated'));
       setIsApplyModalOpen(false);
       if (onApplied) {
         onApplied({
@@ -167,19 +169,19 @@ export default function PolicyDecisionCard({
         });
       }
     } else {
-      toast.error(res.message, 'Application Failed');
+      toast.error(res.message, t('pdc.toastAppFailed'));
     }
   };
 
   const handleAccept = () => {
     if (!isPending) {
-      toast.info(`Decision is already ${decision.status}.`, 'Action Unavailable');
+      toast.info(t('pdc.toastAlready', { status: decision.status }), t('pdc.toastUnavailable'));
       return;
     }
     acceptPolicyDecision(decision.id);
     toast.success(
-      `Accepted recommendation for ${decision.exerciseName}: ${decision.proposedPrescription.weight} ${userUnit} × ${decision.proposedPrescription.reps} reps.`,
-      'Recommendation Accepted'
+      t('pdc.toastAccepted', { name: decision.exerciseName, weight: decision.proposedPrescription.weight, unit: userUnit, reps: decision.proposedPrescription.reps }),
+      t('pdc.toastAcceptedT')
     );
     if (onAccepted) {
       onAccepted({
@@ -192,13 +194,13 @@ export default function PolicyDecisionCard({
 
   const handleSaveOverride = () => {
     if (!isPending) {
-      toast.info(`Decision is already ${decision.status}.`, 'Action Unavailable');
+      toast.info(t('pdc.toastAlready', { status: decision.status }), t('pdc.toastUnavailable'));
       setIsOverriding(false);
       return;
     }
 
     if (customWeight <= 0 || customReps <= 0) {
-      toast.error('Weight and reps must be positive numbers.', 'Invalid Override');
+      toast.error(t('pdc.toastInvalid'), t('pdc.toastInvalidT'));
       return;
     }
 
@@ -209,8 +211,8 @@ export default function PolicyDecisionCard({
     });
 
     toast.info(
-      `Recorded manual override for ${decision.exerciseName}: ${customWeight} ${userUnit} × ${customReps} reps.`,
-      'Target Overridden'
+      t('pdc.toastOverridden', { name: decision.exerciseName, weight: customWeight, unit: userUnit, reps: customReps }),
+      t('pdc.toastOverriddenT')
     );
     setIsOverriding(false);
     if (onOverridden) {
@@ -229,11 +231,11 @@ export default function PolicyDecisionCard({
 
   const handleDismiss = () => {
     if (!isPending) {
-      toast.info(`Decision is already ${decision.status}.`, 'Action Unavailable');
+      toast.info(t('pdc.toastAlready', { status: decision.status }), t('pdc.toastUnavailable'));
       return;
     }
     dismissPolicyDecision(decision.id);
-    toast.info(`Dismissed decision for ${decision.exerciseName}.`, 'Decision Dismissed');
+    toast.info(t('pdc.toastDismissed', { name: decision.exerciseName }), t('pdc.toastDismissedT'));
     if (onDismissed) {
       onDismissed({
         ...decision,
@@ -260,7 +262,7 @@ export default function PolicyDecisionCard({
       padding="md"
       className="space-y-3.5 font-sans border-border/80 text-left relative overflow-hidden"
       role="region"
-      aria-label={`Training decision for ${decision.exerciseName}`}
+      aria-label={t('pdc.aria', { name: decision.exerciseName })}
     >
       {/* ── Top Header: Exercise, Session Date, Status Badge ── */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
@@ -270,7 +272,7 @@ export default function PolicyDecisionCard({
               POLICY V{decision.policyVersion}
             </span>
             <span className="text-[10px] font-mono text-text-muted">
-              • Session: {sessionDate}
+              • {t('pdc.session', { date: sessionDate })}
             </span>
           </div>
           <h3 className="text-base font-black font-display text-text-primary tracking-tight">
@@ -284,58 +286,58 @@ export default function PolicyDecisionCard({
           {isPending && (
             <Badge variant="warning" size="sm" className="flex items-center gap-1">
               <Clock className="w-3 h-3 text-amber-400" />
-              <span>PENDING REVIEW</span>
+              <span>{t('pdc.pendingReview')}</span>
             </Badge>
           )}
           {isAccepted && !isApplied && (
             <Badge variant="success" size="sm" className="flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-              <span>ACCEPTED</span>
+              <span>{t('pdc.accepted')}</span>
             </Badge>
           )}
           {isAccepted && isApplied && (
             <Badge variant="success" size="sm" className="flex items-center gap-1 font-mono">
               <CheckCheck className="w-3 h-3 text-emerald-400" />
-              <span>APPLIED</span>
+              <span>{t('pdc.applied')}</span>
             </Badge>
           )}
           {isOverridden && (
             <Badge variant="brand" size="sm" className="flex items-center gap-1">
               <Sparkles className="w-3 h-3 text-accent" />
-              <span>OVERRIDDEN</span>
+              <span>{t('pdc.overridden')}</span>
             </Badge>
           )}
           {isDismissed && (
             <Badge variant="neutral" size="sm" className="flex items-center gap-1">
               <XCircle className="w-3 h-3 text-text-muted" />
-              <span>DISMISSED</span>
+              <span>{t('pdc.dismissed')}</span>
             </Badge>
           )}
 
           {/* Action Category Badge */}
           {decision.actionCategory === 'candidate_load_progression' && (
             <Badge variant="success" size="sm">
-              +{decision.proposedPrescription.deltaWeight} {userUnit} LOAD
+              {t('pdc.load', { delta: decision.proposedPrescription.deltaWeight ?? 0, unit: userUnit })}
             </Badge>
           )}
           {decision.actionCategory === 'candidate_rep_progression' && (
             <Badge variant="success" size="sm">
-              +{decision.proposedPrescription.deltaReps} REPS
+              {t('pdc.repsBadge', { delta: decision.proposedPrescription.deltaReps ?? 0 })}
             </Badge>
           )}
           {decision.actionCategory === 'hold_current_target' && (
             <Badge variant="neutral" size="sm">
-              HOLD TARGET
+              {t('pdc.holdTarget')}
             </Badge>
           )}
           {decision.actionCategory === 'review_required' && (
             <Badge variant="warning" size="sm">
-              REVIEW REQUIRED
+              {t('pdc.reviewRequired')}
             </Badge>
           )}
           {decision.actionCategory === 'insufficient_evidence' && (
             <Badge variant="neutral" size="sm">
-              INSUFFICIENT EVIDENCE
+              {t('pdc.insufficient')}
             </Badge>
           )}
         </div>
@@ -346,16 +348,16 @@ export default function PolicyDecisionCard({
         {/* Current Target */}
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70">
           <span className="text-[9px] uppercase font-bold text-text-muted block">
-            CURRENT TARGET
+            {t('pdc.currentTarget')}
           </span>
           <span className="text-sm font-bold text-text-primary block mt-0.5">
             {hasCurrentTargets
-              ? `${decision.currentPrescription.weight} ${userUnit} × ${decision.currentPrescription.reps} reps`
-              : 'Unconfigured / Initial'}
+              ? t('pdc.wxr', { weight: decision.currentPrescription.weight ?? 0, unit: userUnit, reps: decision.currentPrescription.reps ?? 0 })
+              : t('pdc.unconfigured')}
           </span>
           {decision.currentPrescription.targetRpe && (
             <span className="text-[10px] text-text-muted block">
-              @{decision.currentPrescription.targetRpe} Target RPE
+              {t('pdc.targetRpe', { rpe: decision.currentPrescription.targetRpe })}
             </span>
           )}
         </div>
@@ -376,25 +378,23 @@ export default function PolicyDecisionCard({
             }`}
           >
             {isOverridden
-              ? 'ATHLETE OVERRIDE'
+              ? t('pdc.athleteOverride')
               : isAccepted
-              ? 'ACCEPTED TARGET'
-              : 'PROPOSED TARGET'}
+              ? t('pdc.acceptedTarget')
+              : t('pdc.proposedTarget')}
           </span>
           <span className="text-sm font-black text-text-primary block mt-0.5">
             {isOverridden && decision.userOverride
-              ? `${decision.userOverride.customWeight ?? decision.proposedPrescription.weight} ${userUnit} × ${
-                  decision.userOverride.customReps ?? decision.proposedPrescription.reps
-                } reps`
-              : `${decision.proposedPrescription.weight} ${userUnit} × ${decision.proposedPrescription.reps} reps`}
+              ? t('pdc.wxr', { weight: decision.userOverride.customWeight ?? decision.proposedPrescription.weight ?? 0, unit: userUnit, reps: decision.userOverride.customReps ?? decision.proposedPrescription.reps ?? 0 })
+              : t('pdc.wxr', { weight: decision.proposedPrescription.weight ?? 0, unit: userUnit, reps: decision.proposedPrescription.reps ?? 0 })}
           </span>
           {isOverridden && decision.userOverride?.overrideReason ? (
             <span className="text-[10px] text-accent block truncate" title={decision.userOverride.overrideReason}>
-              Reason: {decision.userOverride.overrideReason}
+              {t('pdc.reason', { reason: decision.userOverride.overrideReason })}
             </span>
           ) : (
             <span className="text-[10px] text-text-muted block">
-              @{decision.proposedPrescription.targetRpe ?? 8} Target RPE
+              {t('pdc.targetRpe', { rpe: decision.proposedPrescription.targetRpe ?? 8 })}
             </span>
           )}
         </div>
@@ -417,17 +417,17 @@ export default function PolicyDecisionCard({
           onClick={() => setShowEvidenceDetails((prev) => !prev)}
           className="w-full px-3 py-2 flex items-center justify-between text-left hover:bg-bg-secondary/40 transition-colors"
           aria-expanded={showEvidenceDetails}
-          aria-label="Toggle evidence audit and limitations details"
+          aria-label={t('pdc.toggleEvidence')}
         >
           <div className="flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-accent" />
             <span className="text-[11px] font-mono font-bold text-text-secondary">
-              Supporting Evidence ({decision.evidenceCount} comparable sessions)
+              {t('pdc.evidence', { count: decision.evidenceCount })}
             </span>
           </div>
           <div className="flex items-center gap-1 text-text-muted">
             <span className="text-[10px] font-mono hidden sm:inline">
-              {showEvidenceDetails ? 'Hide' : 'Details'}
+              {showEvidenceDetails ? t('pdc.hide') : t('pdc.details')}
             </span>
             {showEvidenceDetails ? (
               <ChevronUp className="w-3.5 h-3.5 text-accent" />
@@ -442,20 +442,20 @@ export default function PolicyDecisionCard({
             {/* Metric Breakdown */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[10px]">
               <div className="p-2 rounded-lg bg-bg-secondary border border-border/60">
-                <span className="text-text-muted block">Prescribed Sets</span>
+                <span className="text-text-muted block">{t('pdc.prescribedSets')}</span>
                 <span className="font-bold text-text-primary">
                   {decision.evidenceAudit.completedPrescribedSets} /{' '}
                   {decision.evidenceAudit.totalPrescribedSetsEvaluated}
                 </span>
               </div>
               <div className="p-2 rounded-lg bg-bg-secondary border border-border/60">
-                <span className="text-text-muted block">Rep Comparisons</span>
+                <span className="text-text-muted block">{t('pdc.repComparisons')}</span>
                 <span className="font-bold text-text-primary">
                   {decision.evidenceAudit.usableRepComparisons}
                 </span>
               </div>
               <div className="p-2 rounded-lg bg-bg-secondary border border-border/60 col-span-2 sm:col-span-1">
-                <span className="text-text-muted block">Sufficiency Tier</span>
+                <span className="text-text-muted block">{t('pdc.suffTier')}</span>
                 <span className="font-bold text-accent capitalize">
                   {decision.evidenceSufficiencyTier.replace('_', ' ')}
                 </span>
@@ -464,9 +464,9 @@ export default function PolicyDecisionCard({
 
             {/* Technical Rule ID & Policy Version (kept secondary) */}
             <div className="text-[10px] font-mono text-text-muted pt-1 border-t border-border/40 flex items-center justify-between flex-wrap gap-1">
-              <span>Rule ID: {decision.ruleId}</span>
-              <span>Model: {decision.progressionModel}</span>
-              <span>Schema: {decision.policyVersion}</span>
+              <span>{t('pdc.ruleId', { id: decision.ruleId })}</span>
+              <span>{t('pdc.model', { model: decision.progressionModel })}</span>
+              <span>{t('pdc.schema', { version: decision.policyVersion })}</span>
             </div>
 
             {/* Relevant Limitations & Missing Data */}
@@ -474,7 +474,7 @@ export default function PolicyDecisionCard({
               <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 space-y-1">
                 <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px] uppercase font-mono">
                   <AlertTriangle className="w-3 h-3" />
-                  <span>Evidence Limitations & Configuration Notes</span>
+                  <span>{t('pdc.limitations')}</span>
                 </div>
                 <ul className="space-y-1 text-[11px] text-text-secondary list-disc pl-4">
                   {decision.evidenceAudit.limitations.map((lim, idx) => (
@@ -494,20 +494,20 @@ export default function PolicyDecisionCard({
         <div
           className="p-3 rounded-xl bg-bg-secondary border border-accent/40 space-y-2.5 animate-fade-in text-left"
           role="group"
-          aria-label="Target override form"
+          aria-label={t('pdc.overrideFormAria')}
           onKeyDown={(e) => {
             if (e.key === 'Escape') setIsOverriding(false);
           }}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-mono font-bold uppercase text-accent">
-              Athlete Target Override
+              {t('pdc.athleteTargetOverride')}
             </span>
             <button
               type="button"
               onClick={() => setIsOverriding(false)}
               className="text-text-muted hover:text-text-primary p-1 rounded-md"
-              aria-label="Close override form"
+              aria-label={t('pdc.closeOverride')}
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -519,7 +519,7 @@ export default function PolicyDecisionCard({
                 htmlFor={`override-weight-${decision.id}`}
                 className="text-[10px] font-mono text-text-muted block mb-1"
               >
-                Weight ({userUnit})
+                {t('pdc.weightLabel', { unit: userUnit })}
               </label>
               <input
                 id={`override-weight-${decision.id}`}
@@ -537,7 +537,7 @@ export default function PolicyDecisionCard({
                 htmlFor={`override-reps-${decision.id}`}
                 className="text-[10px] font-mono text-text-muted block mb-1"
               >
-                Reps
+                {t('pdc.reps')}
               </label>
               <input
                 id={`override-reps-${decision.id}`}
@@ -556,12 +556,12 @@ export default function PolicyDecisionCard({
               htmlFor={`override-reason-${decision.id}`}
               className="text-[10px] font-mono text-text-muted block mb-1"
             >
-              Optional Reason
+              {t('pdc.optionalReason')}
             </label>
             <input
               id={`override-reason-${decision.id}`}
               type="text"
-              placeholder="e.g. Deload week, travel equipment, joint caution"
+              placeholder={t('pdc.reasonPlaceholder')}
               value={overrideReason}
               onChange={(e) => setOverrideReason(e.target.value)}
               className="w-full bg-bg-card border border-border rounded-lg py-1.5 px-2.5 text-xs text-text-primary outline-none focus:border-accent"
@@ -574,14 +574,14 @@ export default function PolicyDecisionCard({
               size="sm"
               onClick={() => setIsOverriding(false)}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               variant="primary"
               size="sm"
               onClick={handleSaveOverride}
             >
-              Save Override
+              {t('pdc.saveOverride')}
             </Button>
           </div>
         </div>
@@ -595,20 +595,20 @@ export default function PolicyDecisionCard({
                   <>
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
                       <CheckCheck className="w-3.5 h-3.5 inline shrink-0" />
-                      Applied to plan template &apos;{appliedPlanName}&apos; on {decision.appliedAt?.split('T')[0]}.
+                      {t('pdc.appliedTo', { plan: appliedPlanName, date: decision.appliedAt?.split('T')[0] ?? '' })}
                     </span>
                     <span className="text-[10px] text-text-muted block">
-                      Future sessions loaded from this plan template will use the applied targets. Completed workouts are untouched.
+                      {t('pdc.appliedNote')}
                     </span>
                   </>
                 ) : (
                   <>
                     <span className="text-emerald-400 font-bold flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5 inline shrink-0" />
-                      Target accepted on {decision.acceptedAt ? decision.acceptedAt.split('T')[0] : 'recent review'}.
+                      {t('pdc.acceptedOn', { date: decision.acceptedAt ? decision.acceptedAt.split('T')[0] : t('pdc.recentReview') })}
                     </span>
                     <span className="text-[10px] text-text-muted block">
-                      Recorded in ledger. Ready to apply to a future workout plan template.
+                      {t('pdc.acceptedNote')}
                     </span>
                   </>
                 )}
@@ -618,10 +618,10 @@ export default function PolicyDecisionCard({
               <div className="space-y-0.5">
                 <span className="text-accent font-bold flex items-center gap-1">
                   <Sparkles className="w-3.5 h-3.5 inline shrink-0" />
-                  Target manually overridden by athlete.
+                  {t('pdc.overriddenMsg')}
                 </span>
                 <span className="text-[10px] text-text-muted block">
-                  Override recorded in ledger. Does not alter workout plan templates automatically.
+                  {t('pdc.overriddenNote')}
                 </span>
               </div>
             )}
@@ -629,15 +629,15 @@ export default function PolicyDecisionCard({
               <div className="space-y-0.5">
                 <span className="text-text-muted flex items-center gap-1">
                   <XCircle className="w-3.5 h-3.5 inline shrink-0" />
-                  Recommendation dismissed.
+                  {t('pdc.dismissedMsg')}
                 </span>
                 <span className="text-[10px] text-text-muted block">
-                  Existing plan templates preserved.
+                  {t('pdc.dismissedNote')}
                 </span>
               </div>
             )}
             {isPending && (
-              <span>Action required: review recommended targets.</span>
+              <span>{t('pdc.actionRequired')}</span>
             )}
           </div>
 
@@ -649,27 +649,27 @@ export default function PolicyDecisionCard({
                   variant="primary"
                   size="sm"
                   onClick={handleAccept}
-                  aria-label={`Accept recommendation for ${decision.exerciseName}`}
+                  aria-label={t('pdc.acceptAria', { name: decision.exerciseName })}
                   leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
                 >
-                  Accept
+                  {t('pdc.accept')}
                 </Button>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={() => setIsOverriding(true)}
-                  aria-label={`Override recommendation for ${decision.exerciseName}`}
+                  aria-label={t('pdc.overrideAria', { name: decision.exerciseName })}
                   leftIcon={<Sliders className="w-3.5 h-3.5" />}
                 >
-                  Override
+                  {t('pdc.override')}
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={handleDismiss}
-                  aria-label={`Dismiss recommendation for ${decision.exerciseName}`}
+                  aria-label={t('pdc.dismissAria', { name: decision.exerciseName })}
                 >
-                  Dismiss
+                  {t('pdc.dismiss')}
                 </Button>
               </>
             ) : isAccepted && isApplicableAction ? (
@@ -681,17 +681,17 @@ export default function PolicyDecisionCard({
                   className="opacity-80 cursor-not-allowed font-mono text-emerald-400 border-emerald-500/40 text-xs"
                   aria-disabled="true"
                 >
-                  Applied to Plan
+                  {t('pdc.appliedToPlan')}
                 </Button>
               ) : (
                 <Button
                   variant="primary"
                   size="sm"
                   onClick={handleOpenApplyModal}
-                  aria-label={`Apply accepted recommendation for ${decision.exerciseName} to future workout plan template`}
+                  aria-label={t('pdc.applyAria', { name: decision.exerciseName })}
                   leftIcon={<Calendar className="w-3.5 h-3.5" />}
                 >
-                  Apply to Future Plan Template
+                  {t('pdc.applyTemplate')}
                 </Button>
               )
             ) : (
@@ -702,7 +702,7 @@ export default function PolicyDecisionCard({
                 className="opacity-60 cursor-not-allowed"
                 aria-disabled="true"
               >
-                Decision Resolved
+                {t('pdc.resolved')}
               </Button>
             )}
           </div>
@@ -725,21 +725,21 @@ export default function PolicyDecisionCard({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">
-                    DELIBERATE APPLICATION
+                    {t('pdc.deliberate')}
                   </span>
                 </div>
                 <h3
                   id={`apply-modal-title-${decision.id}`}
                   className="text-base font-black font-display text-text-primary tracking-tight mt-0.5"
                 >
-                  Apply to Future Workout Plan Template
+                  {t('pdc.applyTitle')}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsApplyModalOpen(false)}
                 className="text-text-muted hover:text-text-primary p-1 rounded-md transition-colors"
-                aria-label="Close modal"
+                aria-label={t('pdc.closeModal')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -749,17 +749,17 @@ export default function PolicyDecisionCard({
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 text-xs">
                 <div className="flex items-center gap-2 font-bold text-amber-400 font-mono">
                   <AlertTriangle className="w-4 h-4" />
-                  <span>No Matching Workout Plans Found</span>
+                  <span>{t('pdc.noPlans')}</span>
                 </div>
                 <p className="text-text-secondary leading-relaxed">
-                  None of your saved workout plans currently contain <strong>{decision.exerciseName}</strong>.
+                  {t('pdc.noPlansBody', { exercise: decision.exerciseName })}
                 </p>
                 <p className="text-text-muted text-[11px] leading-relaxed">
-                  To apply this recommendation, add <strong>{decision.exerciseName}</strong> to a planned workout in the Workouts tab first.
+                  {t('pdc.noPlansHint', { exercise: decision.exerciseName })}
                 </p>
                 <div className="pt-2 flex justify-end">
                   <Button variant="ghost" size="sm" onClick={() => setIsApplyModalOpen(false)}>
-                    Close
+                    {t('common.close')}
                   </Button>
                 </div>
               </div>
@@ -771,7 +771,7 @@ export default function PolicyDecisionCard({
                     htmlFor={`select-plan-${decision.id}`}
                     className="text-[11px] font-mono font-bold text-text-secondary block"
                   >
-                    Select Target Workout Plan Template
+                    {t('pdc.selectPlan')}
                   </label>
                   <select
                     id={`select-plan-${decision.id}`}
@@ -791,7 +791,7 @@ export default function PolicyDecisionCard({
                   >
                     {candidatePlans.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.exercises.length} exercises)
+                        {t('pdc.planOption', { name: p.name, count: p.exercises.length })}
                       </option>
                     ))}
                   </select>
@@ -804,7 +804,7 @@ export default function PolicyDecisionCard({
                       htmlFor={`select-ex-instance-${decision.id}`}
                       className="text-[11px] font-mono font-bold text-text-secondary block"
                     >
-                      Select Exercise Instance in Template
+                      {t('pdc.selectInstance')}
                     </label>
                     <select
                       id={`select-ex-instance-${decision.id}`}
@@ -814,7 +814,7 @@ export default function PolicyDecisionCard({
                     >
                       {matchingExercisesInSelectedPlan.map(({ exercise, index }) => (
                         <option key={index} value={index}>
-                          Instance #{index + 1}: {exercise.targetSets} sets × {exercise.targetReps} reps @ {exercise.targetWeight ?? 'unset'} {exercise.targetUnit || userUnit}
+                          {t('pdc.instanceOption', { n: index + 1, sets: exercise.targetSets, reps: exercise.targetReps, weight: exercise.targetWeight ?? t('pdc.unset'), unit: exercise.targetUnit || userUnit })}
                         </option>
                       ))}
                     </select>
@@ -825,49 +825,49 @@ export default function PolicyDecisionCard({
                 <div className="grid grid-cols-2 gap-2 font-mono text-center">
                   <div className="p-3 rounded-xl bg-bg-secondary border border-border/80">
                     <span className="text-[9px] uppercase font-bold text-text-muted block">
-                      CURRENT TEMPLATE TARGET
+                      {t('pdc.currentTemplate')}
                     </span>
                     <span className="text-sm font-bold text-text-primary block mt-1">
                       {selectedTargetExercise?.targetWeight !== undefined
                         ? `${selectedTargetExercise.targetWeight} ${selectedTargetExercise.targetUnit || userUnit}`
-                        : 'Unset'}{' '}
-                      × {selectedTargetExercise?.targetReps ?? '—'} reps
+                          : t('pdc.unsetCap')}{' '}
+                      × {selectedTargetExercise?.targetReps ?? '—'} {t('pdc.reps').toLowerCase()}
                     </span>
                     <span className="text-[10px] text-text-muted block mt-0.5">
-                      {selectedTargetExercise?.targetSets ?? 3} sets
+                      {t('pdc.sets', { sets: selectedTargetExercise?.targetSets ?? 3 })}
                       {selectedTargetExercise?.targetRpe ? ` @ RPE ${selectedTargetExercise.targetRpe}` : ''}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
                     <span className="text-[9px] uppercase font-bold text-emerald-400 block">
-                      NEW TEMPLATE TARGET
+                      {t('pdc.newTemplate')}
                     </span>
                     <span className="text-sm font-black text-text-primary block mt-1">
-                      {decision.proposedPrescription.weight} {decision.proposedPrescription.unit} × {decision.proposedPrescription.reps} reps
+                      {t('pdc.wxr', { weight: decision.proposedPrescription.weight ?? 0, unit: decision.proposedPrescription.unit ?? userUnit, reps: decision.proposedPrescription.reps ?? 0 })}
                     </span>
                     <span className="text-[10px] text-emerald-400 block mt-0.5">
-                      {decision.proposedPrescription.sets} sets @ RPE {decision.proposedPrescription.targetRpe ?? 8}
+                      {t('pdc.setsRpe', { sets: decision.proposedPrescription.sets ?? 0, rpe: decision.proposedPrescription.targetRpe ?? 8 })}
                     </span>
                   </div>
                 </div>
 
                 {/* Progression Delta */}
                 <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/70 border border-border/60 font-mono text-[11px]">
-                  <span className="text-text-muted">Target Progression:</span>
+                  <span className="text-text-muted">{t('pdc.progression')}</span>
                   <span className="font-bold text-accent">
                     {decision.proposedPrescription.deltaWeight && decision.proposedPrescription.deltaWeight > 0
-                      ? `+${decision.proposedPrescription.deltaWeight} ${decision.proposedPrescription.unit} Load`
+                      ? t('pdc.deltaLoad', { delta: decision.proposedPrescription.deltaWeight, unit: decision.proposedPrescription.unit ?? userUnit })
                       : decision.proposedPrescription.deltaReps && decision.proposedPrescription.deltaReps > 0
-                      ? `+${decision.proposedPrescription.deltaReps} Reps`
-                      : 'Hold Target'}
+                      ? t('pdc.deltaReps', { delta: decision.proposedPrescription.deltaReps })
+                      : t('pdc.holdTarget')}
                   </span>
                 </div>
 
                 {/* Plain-Language Explanation */}
                 <div className="p-2.5 rounded-xl bg-bg-secondary/50 border border-border/50 space-y-1">
                   <span className="text-[10px] font-mono font-bold text-text-muted uppercase block">
-                    Policy Rationale
+                    {t('pdc.rationale')}
                   </span>
                   <p className="text-[11px] text-text-secondary leading-relaxed">
                     {decision.explanation}
@@ -879,7 +879,7 @@ export default function PolicyDecisionCard({
                   <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 space-y-1 text-xs">
                     <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
                       <AlertTriangle className="w-3.5 h-3.5" />
-                      <span>Application Blocked</span>
+                      <span>{t('pdc.blocked')}</span>
                     </div>
                     <p className="text-[11px] leading-relaxed text-rose-300">
                       {validationResult.message}
@@ -892,17 +892,17 @@ export default function PolicyDecisionCard({
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1 text-xs">
                     <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
                       <CheckCheck className="w-3.5 h-3.5" />
-                      <span>Target Already Applied</span>
+                      <span>{t('pdc.alreadyApplied')}</span>
                     </div>
                     <p className="text-[11px] leading-relaxed text-emerald-300">
-                      This workout plan template already reflects the proposed prescription.
+                      {t('pdc.alreadyBody')}
                     </p>
                   </div>
                 )}
 
                 {/* Explicit Invariant Disclaimer */}
                 <div className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/40 text-[10px] text-text-muted leading-relaxed font-mono">
-                  Deliberate Application Guard: Applying updates only the future plan template for &apos;{currentSelectedPlan?.name}&apos;. Active workout drafts, scheduled calendar events, and completed workout logs are never modified.
+                  {t('pdc.guard', { plan: currentSelectedPlan?.name ?? '' })}
                 </div>
 
                 {/* Modal Actions */}
@@ -912,7 +912,7 @@ export default function PolicyDecisionCard({
                     size="sm"
                     onClick={() => setIsApplyModalOpen(false)}
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     variant="primary"
@@ -921,7 +921,7 @@ export default function PolicyDecisionCard({
                     onClick={handleConfirmApply}
                     leftIcon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
                   >
-                    Confirm & Apply to Template
+                    {t('pdc.confirmApply')}
                   </Button>
                 </div>
               </div>

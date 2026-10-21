@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toLocalDateString } from '@/lib/habits';
 import { useToday } from '@/lib/use-today';
 import type { WorkoutEntry, MealEntry, CreatineLog } from '@/lib/types';
+import { useTranslation, weekdayNames } from '@/lib/i18n';
 
 interface WeeklyHabitMatrixProps {
   workouts: WorkoutEntry[];
@@ -47,15 +48,16 @@ export default function WeeklyHabitMatrix({
   compact = false,
   showCreatine = true,
 }: WeeklyHabitMatrixProps) {
+  const { t, language } = useTranslation();
   const todayStr = useToday();
 
   const days = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(weekStart);
       d.setDate(d.getDate() + i);
-      return { date: d, dateStr: toLocalDateString(d), letter: DAY_LETTERS[i] };
+      return { date: d, dateStr: toLocalDateString(d), letter: weekdayNames(language, 'short')[i] };
     });
-  }, [weekStart]);
+  }, [weekStart, language]);
 
   const workoutDays = useMemo(() => {
     const set = new Set<string>();
@@ -77,15 +79,15 @@ export default function WeeklyHabitMatrix({
   }, [meals]);
 
   const rows: { label: string; color: string; done: (dateStr: string) => boolean }[] = [
-    { label: 'GYM', color: '#FF6A1A', done: (d) => workoutDays.has(d) },
-    { label: 'WATER', color: '#38BDF8', done: (d) => (waterLogs[d] || 0) >= waterTargetMl * 0.85 },
+    { label: t('habit.gym'), color: '#FF6A1A', done: (d) => workoutDays.has(d) },
+    { label: t('habit.water'), color: '#38BDF8', done: (d) => (waterLogs[d] || 0) >= waterTargetMl * 0.85 },
     ...(showCreatine
-      ? [{ label: 'CREAT', color: '#F5B301', done: (d: string) => !!creatineLogs[d]?.taken }]
+      ? [{ label: t('habit.creatine'), color: '#F5B301', done: (d: string) => !!creatineLogs[d]?.taken }]
       : []),
-    { label: 'PROT', color: '#22C55E', done: (d) => (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
+    { label: t('habit.protein'), color: '#22C55E', done: (d) => (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
   ];
 
-  const rangeLabel = `${days[0].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${days[6].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[6].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;
 
   return (
     <div className="space-y-1.5 text-xs font-mono">
@@ -95,7 +97,7 @@ export default function WeeklyHabitMatrix({
             type="button"
             onClick={() => onWeekChange?.(-1)}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Previous week"
+            aria-label={t('habit.prevWeek')}
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -104,7 +106,7 @@ export default function WeeklyHabitMatrix({
             type="button"
             onClick={() => onWeekChange?.(1)}
             className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Next week"
+            aria-label={t('habit.nextWeek')}
           >
             <ChevronRight className="w-4 h-4" />
           </button>

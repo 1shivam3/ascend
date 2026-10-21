@@ -25,6 +25,7 @@ import {
 import ReportAIModal from '@/components/ReportAIModal';
 import { useToast } from './ui/Toast';
 import PermissionHelp from './ui/PermissionHelp';
+import { useTranslation } from '@/lib/i18n';
 
 interface VoiceWorkoutLoggerModalProps {
   isOpen: boolean;
@@ -43,6 +44,7 @@ export default function VoiceWorkoutLoggerModal({
 }: VoiceWorkoutLoggerModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
+  const { t } = useTranslation();
   const toast = useToast();
 
   const [isListening, setIsListening] = useState(false);
@@ -156,10 +158,10 @@ export default function VoiceWorkoutLoggerModal({
           setParsedResult(aiResult);
           setAutoApplyCountdown(4);
         } else {
-          setParseError('Could not detect weight and reps. Say e.g. "80 pe 5" or "100 x 3"');
+          setParseError(t('voice.parseNoDetect'));
         }
       } catch {
-        setParseError('Voice parsing error. Tap retry and speak clearly.');
+        setParseError(t('voice.parseError'));
       } finally {
         setIsAiParsing(false);
       }
@@ -250,7 +252,7 @@ export default function VoiceWorkoutLoggerModal({
     if (countdownTimerRef.current) clearTimeout(countdownTimerRef.current);
     if (!parsedResult) return;
     onApplySet(parsedResult);
-    toast.success(`Logged: ${parsedResult.summary}`, 'Set Completed');
+    toast.success(t('voice.loggedMsg', { summary: parsedResult.summary }), t('voice.setCompleted'));
     onClose();
   };
 
@@ -317,10 +319,10 @@ export default function VoiceWorkoutLoggerModal({
             </div>
             <div>
               <h3 className="font-bold text-sm text-text-primary leading-tight">
-                Voice Log Set
+                {t('voice.title')}
               </h3>
               <p className="text-3xs text-text-muted font-mono truncate max-w-[140px]">
-                {currentExerciseName || 'Active Workout'}
+                {currentExerciseName || t('voice.activeWorkout')}
               </p>
             </div>
           </div>
@@ -334,7 +336,7 @@ export default function VoiceWorkoutLoggerModal({
                 setSpeechLang(nextLang);
               }}
               className="py-1 px-2 rounded-lg bg-bg-secondary border border-border/80 text-3xs font-mono font-bold text-text-secondary hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
-              title="Toggle speech recognition language"
+              title={t('voice.toggleLang')}
             >
               <Globe className="w-2.5 h-2.5 text-accent" />
               <span>{speechLang === 'en-IN' ? 'Hinglish' : 'हिन्दी'}</span>
@@ -355,10 +357,10 @@ export default function VoiceWorkoutLoggerModal({
           <div className="py-4 space-y-2 text-text-muted">
             <MicOff className="w-9 h-9 mx-auto text-rose-400" />
             <p className="text-xs font-mono font-semibold text-text-primary">
-              Voice recognition not available
+              {t('voice.notAvailable')}
             </p>
             <p className="text-3xs font-mono text-text-secondary">
-              This browser doesn&apos;t support speech recognition. Please use <strong>Google Chrome</strong> for hands-free voice logging in the gym.
+              {t('voice.unsupported')}
             </p>
           </div>
         ) : voiceError === 'denied' ? (
@@ -373,10 +375,10 @@ export default function VoiceWorkoutLoggerModal({
           <div className="py-4 space-y-2.5 text-text-muted">
             <MicOff className="w-9 h-9 mx-auto text-rose-400" />
             <p className="text-xs font-mono font-semibold text-text-primary">
-              Voice recognition not available on this device
+              {t('voice.notOnDevice')}
             </p>
             <p className="text-3xs font-mono text-text-secondary leading-relaxed">
-              This device has no speech recognition service, so voice logging can&rsquo;t run here. You can still log sets manually.
+              {t('voice.noService')}
             </p>
           </div>
         ) : (
@@ -400,7 +402,7 @@ export default function VoiceWorkoutLoggerModal({
                     ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse scale-105'
                     : 'bg-accent/20 text-accent hover:bg-accent/30 border-2 border-accent'
                 }`}
-                title={isListening ? 'Tap to finish speaking' : 'Tap to start voice input'}
+                title={isListening ? t('voice.finishTitle') : t('voice.startTitle')}
               >
                 {isListening ? (
                   <Mic className="w-8 h-8 animate-bounce" />
@@ -409,7 +411,7 @@ export default function VoiceWorkoutLoggerModal({
                 )}
               </button>
               <span className="text-3xs font-mono font-bold mt-2 text-text-secondary uppercase tracking-wider">
-                {isListening ? 'Listening... Speak now' : 'Tap mic to speak'}
+                {isListening ? t('voice.listening') : t('voice.tapMic')}
               </span>
             </div>
 
@@ -421,11 +423,11 @@ export default function VoiceWorkoutLoggerModal({
                 </p>
               ) : isListening ? (
                 <p className="text-2xs font-mono text-text-muted animate-pulse">
-                  Say: &quot;80 pe 5, RPE 8&quot; or &quot;100 x 3&quot;
+                  {t('voice.sayExample')}
                 </p>
               ) : (
                 <p className="text-2xs font-mono text-text-muted">
-                  Ready. Tap mic and say weight and reps.
+                  {t('voice.ready')}
                 </p>
               )}
             </div>
@@ -434,7 +436,7 @@ export default function VoiceWorkoutLoggerModal({
             {isAiParsing && (
               <div className="flex items-center justify-center gap-1.5 text-accent text-2xs font-mono py-1">
                 <Sparkles className="w-3.5 h-3.5 animate-spin" />
-                <span>Interpreting gym slang with AI...</span>
+                <span>{t('voice.interpreting')}</span>
               </div>
             )}
 
@@ -450,7 +452,7 @@ export default function VoiceWorkoutLoggerModal({
               <div className="p-3 rounded-xl bg-emerald-500/10 border-2 border-emerald-500/40 space-y-2.5 text-left animate-fade-in">
                 <div className="flex items-center justify-between">
                   <span className="text-3xs font-mono font-black uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded tracking-wide">
-                    RECOGNIZED SET
+                    {t('voice.recognized')}
                   </span>
                   <button
                     type="button"
@@ -464,11 +466,11 @@ export default function VoiceWorkoutLoggerModal({
                   </button>
                   {autoApplyCountdown !== null && autoApplyCountdown > 0 ? (
                     <span className="text-3xs font-mono text-text-muted animate-pulse">
-                      Auto-logging in <strong>{autoApplyCountdown}s</strong>...
+                      {t('voice.autoLogging', { seconds: autoApplyCountdown })}
                     </span>
                   ) : (
                     <span className="text-3xs font-mono text-text-muted">
-                      Ready to apply
+                      {t('voice.readyApply')}
                     </span>
                   )}
                 </div>
@@ -476,7 +478,7 @@ export default function VoiceWorkoutLoggerModal({
                 {/* Target Exercise */}
                 {parsedResult.exerciseName && (
                   <p className="text-2xs text-text-secondary font-mono truncate">
-                    Target: <strong className="text-text-primary">{parsedResult.exerciseName}</strong>
+                    {t('voice.target')} <strong className="text-text-primary">{parsedResult.exerciseName}</strong>
                   </p>
                 )}
 
@@ -485,7 +487,7 @@ export default function VoiceWorkoutLoggerModal({
                   {/* Weight Stepper */}
                   <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
                     <div>
-                      <span className="text-3xs text-text-muted block uppercase">Weight</span>
+                      <span className="text-3xs text-text-muted block uppercase">{t('voice.weight')}</span>
                       <span className="text-sm font-black text-text-primary">
                         {parsedResult.weight} {defaultUnit}
                       </span>
@@ -513,7 +515,7 @@ export default function VoiceWorkoutLoggerModal({
                   {/* Reps Stepper */}
                   <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
                     <div>
-                      <span className="text-3xs text-text-muted block uppercase">Reps</span>
+                      <span className="text-3xs text-text-muted block uppercase">{t('voice.reps')}</span>
                       <span className="text-sm font-black text-text-primary">
                         {parsedResult.reps}
                       </span>
@@ -544,10 +546,10 @@ export default function VoiceWorkoutLoggerModal({
                   <div className="flex items-center justify-between text-3xs font-mono text-text-muted">
                     <span className="flex items-center gap-1">
                       <SlidersHorizontal className="w-2.5 h-2.5" />
-                      <span>RPE (Effort Rating):</span>
+                      <span>{t('voice.rpeLabel')}</span>
                     </span>
                     <span className="font-bold text-accent">
-                      {parsedResult.rpe ? `@ RPE ${parsedResult.rpe}` : 'Optional'}
+                      {parsedResult.rpe ? `@ RPE ${parsedResult.rpe}` : t('voice.optional')}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-1">
@@ -576,7 +578,7 @@ export default function VoiceWorkoutLoggerModal({
                     className="btn-primary py-2 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm"
                   >
                     <Check className="w-4 h-4" />
-                    <span>Apply Set</span>
+                    <span>{t('voice.applySet')}</span>
                   </button>
                   <button
                     type="button"
@@ -584,7 +586,7 @@ export default function VoiceWorkoutLoggerModal({
                     className="btn-secondary py-2 text-xs font-semibold flex items-center justify-center gap-1.5"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
-                    <span>Retry Voice</span>
+                    <span>{t('voice.retry')}</span>
                   </button>
                 </div>
               </div>
@@ -593,7 +595,7 @@ export default function VoiceWorkoutLoggerModal({
             {/* Quick Example Chips */}
             <div className="pt-1 text-left">
               <span className="text-3xs uppercase font-mono text-text-muted block mb-1">
-                Voice Examples (Tap to test):
+                {t('voice.examples')}
               </span>
               <div className="flex flex-wrap gap-1">
                 {[

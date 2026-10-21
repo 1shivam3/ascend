@@ -6,6 +6,7 @@ import { syncEngine } from '@/lib/supabase/sync';
 import { useToast } from '@/components/ui/Toast';
 import SocialAuthButtons from './SocialAuthButtons';
 import ForgotPasswordModal from './ForgotPasswordModal';
+import { useTranslation } from '@/lib/i18n';
 
 interface LoginScreenProps {
   onBack: () => void;
@@ -18,6 +19,7 @@ export default function LoginScreen({
   onSuccess,
   onNavigateToSignup,
 }: LoginScreenProps) {
+  const { t } = useTranslation();
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,11 +34,11 @@ export default function LoginScreen({
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      setError('Please enter a valid email address.');
+      setError(t('auth.validEmail'));
       return;
     }
     if (!password) {
-      setError('Please enter your password.');
+      setError(t('auth.passwordRequired'));
       return;
     }
 
@@ -47,14 +49,14 @@ export default function LoginScreen({
 
       if (res.error) {
         setError(res.error);
-        toast.error(res.error, 'Login Failed');
+        toast.error(res.error, t('auth.loginFailed'));
       } else {
-        toast.success('Welcome back to ASCEND!', 'Logged In');
+        toast.success(t('auth.welcomeBackMsg'), t('auth.loggedIn'));
         onSuccess();
       }
     } catch (err: any) {
       setLoading(false);
-      setError(err?.message || 'Could not sign in');
+      setError(err?.message || t('auth.signInFailed'));
     }
   };
 
@@ -65,7 +67,7 @@ export default function LoginScreen({
         <button
           type="button"
           onClick={onBack}
-          aria-label="Go back"
+          aria-label={t('auth.goBack')}
           className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-primary active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5 text-text-primary" />
@@ -82,10 +84,10 @@ export default function LoginScreen({
           {/* Header */}
           <div className="text-left space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
-              Welcome Back
+              {t('auth.welcomeBack')}
             </h1>
             <p className="text-sm text-text-muted">
-              Enter your details to continue
+              {t('auth.loginSubtitle')}
             </p>
           </div>
 
@@ -102,7 +104,7 @@ export default function LoginScreen({
             {/* Email */}
             <div>
               <label htmlFor="login-email" className="block text-xs font-semibold text-text-primary mb-1.5">
-                Email
+                {t('auth.email')}
               </label>
               <input
                 id="login-email"
@@ -120,14 +122,14 @@ export default function LoginScreen({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label htmlFor="login-password" className="block text-xs font-semibold text-text-primary">
-                  Password
+                  {t('auth.password')}
                 </label>
                 <button
                   type="button"
                   onClick={() => setIsForgotOpen(true)}
                   className="text-xs font-semibold text-accent hover:underline cursor-pointer"
                 >
-                  Forgot password?
+                  {t('auth.forgot')}
                 </button>
               </div>
               <div className="relative">
@@ -137,7 +139,7 @@ export default function LoginScreen({
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder={t('auth.passwordPlaceholder')}
                   required
                   className="w-full pl-4 pr-11 py-3 rounded-xl bg-bg-card border border-border focus:border-accent focus:ring-1 focus:ring-accent text-sm text-text-primary placeholder:text-text-muted/60 outline-none transition"
                 />
@@ -145,7 +147,7 @@ export default function LoginScreen({
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-3 text-text-muted hover:text-text-primary p-1 cursor-pointer transition"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -161,10 +163,10 @@ export default function LoginScreen({
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Logging in...</span>
+                  <span>{t('auth.loggingIn')}</span>
                 </>
               ) : (
-                'Log in'
+                t('auth.logIn')
               )}
             </button>
           </form>
@@ -175,13 +177,13 @@ export default function LoginScreen({
           {/* Footer Link */}
           <div className="pt-2 text-center">
             <p className="text-xs text-text-muted">
-              Don&apos;t have an account?{' '}
+              {t('auth.noAccount')}{' '}
               <button
                 type="button"
                 onClick={onNavigateToSignup}
                 className="font-semibold text-accent hover:underline cursor-pointer"
               >
-                Sign up
+                {t('auth.signUp')}
               </button>
             </p>
           </div>
