@@ -870,7 +870,32 @@ export const useAppStore = create<AppState>()(
         const refreshed = refreshFreezeWeek(state.streak);
         const activeDays = buildActiveDays(state.workouts, state.meals);
         const result = calculateStreak({ dailyActivity: activeDays, freezesAvailable: refreshed.freezesAvailable });
-        const next = applyStreakResult(refreshed, result);
+        // QA4-011 guard: calculateStreak is a pure function of history,
+        // so after a Monday refill it would happily consume the FRESH
+        // freeze for the SAME missed day a previous freeze already
+        // bridged. A freeze covers a given calendar day at most once —
+        // if this miss is already the persisted freezeAppliedTo, the
+        // bridge stands and no new freeze is consumed.
+        const effective =
+          result.freezeConsumed &&
+          result.freezeAppliedTo &&
+          refreshed.freezeAppliedTo === result.freezeAppliedTo
+            ? { ...result, freezeConsumed: false, freezesAvailable: refreshed.freezesAvailable }
+            : result;
+        const next = applyStreakResult(refreshed, effective);
+        // Skip the write entirely when nothing changed — refreshStreak
+        // runs on app start, day rollover and every workout log, and a
+        // no-op set would still churn persist + subscribers.
+        const prev = state.streak;
+        if (
+          prev.freezesAvailable === next.freezesAvailable &&
+          prev.freezesUsedThisWeek === next.freezesUsedThisWeek &&
+          prev.weekStart === next.weekStart &&
+          prev.longestStreak === next.longestStreak &&
+          prev.freezeAppliedTo === next.freezeAppliedTo
+        ) {
+          return;
+        }
         set(() => ({ streak: next }));
       },
 
@@ -1517,6 +1542,10 @@ export const useAppStore = create<AppState>()(
         }
         // Run coach engine: stall detection + readiness update (best-effort).
         get().processCoachingAfterWorkout();
+        // QA4-011: a completed workout is a streak lifecycle point —
+        // persist freeze consumption/refill instead of leaving the
+        // streak slice as dead code the UI only reads.
+        get().refreshStreak();
       },
       deleteWorkout: (id) => set((state) => {
         const nextWorkouts = state.workouts.filter(w => w.id !== id);
@@ -2797,6 +2826,17 @@ export const useAppStore = create<AppState>()(
         if (state) {
           state.setHasHydrated(true);
 
+          // QA4-011: app start is a streak lifecycle point — run the
+          // persisted refresh (weekly freeze refill + silent freeze
+          // consumption for a bridged miss) once per launch. Before
+          // this wiring, refreshStreak had zero callers and the
+          // 1-freeze-per-week cap was never enforced in persisted state.
+          try {
+            state.refreshStreak();
+          } catch {
+            // Streak maintenance must never block hydration.
+          }
+
           // Custom-exercise muscle registry: hydrate the classifier's
           // override map from persisted choices.
           registerCustomExerciseMuscles(state.customExerciseMuscles);
@@ -3009,6 +3049,30 @@ export const useAppStore = create<AppState>()(
 );
 
 export const useStore = useAppStore;
+
+// QA4-011: day-rollover streak refresh. An app left open overnight
+// (or resumed next morning) must run the persisted streak refresh when
+// the local date flips — weekly freeze refill and missed-day bridging
+// are date-driven. Mirrors useToday's triggers (focus / visibility /
+// a slow poll) at the store level so it fires regardless of which tab
+// is mounted.
+if (typeof window !== 'undefined') {
+  let lastStreakDate = getLocalTodayStr();
+  const checkStreakRollover = () => {
+    const today = getLocalTodayStr();
+    if (today !== lastStreakDate) {
+      lastStreakDate = today;
+      try {
+        useAppStore.getState().refreshStreak();
+      } catch {
+        // Never let streak maintenance break the app shell.
+      }
+    }
+  };
+  window.addEventListener('focus', checkStreakRollover);
+  document.addEventListener('visibilitychange', checkStreakRollover);
+  setInterval(checkStreakRollover, 60_000);
+}
 
 // Auto-refresh the Lifter Twin profile whenever workouts or profile unit changes.
 // This ensures the profile stays consistent after cloud sync pulls remote data,

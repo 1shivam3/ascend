@@ -170,6 +170,13 @@ export interface StreakState {
   /** YYYY-MM-DD of the Monday that started the current freeze week. */
   weekStart: string;
   longestStreak: number;
+  /**
+   * The missed day (YYYY-MM-DD) the most recent freeze covered.
+   * Persisted so a weekly refill can never re-consume a fresh freeze
+   * for the SAME already-bridged miss (QA4-011): a freeze covers a
+   * given calendar day at most once, ever.
+   */
+  freezeAppliedTo?: string;
 }
 
 export function getInitialStreakState(): StreakState {
@@ -214,6 +221,9 @@ export function applyStreakResult(
     freezesUsedThisWeek:
       state.freezesUsedThisWeek + (result.freezeConsumed ? 1 : 0),
     longestStreak: Math.max(state.longestStreak, result.longestStreak),
+    ...(result.freezeConsumed && result.freezeAppliedTo
+      ? { freezeAppliedTo: result.freezeAppliedTo }
+      : {}),
   };
 }
 
