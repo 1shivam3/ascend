@@ -420,7 +420,11 @@ export async function POST(req: Request) {
         tableResults: Object.fromEntries(
           Object.entries(deleteResults).map(([table, result]) => [
             table,
-            result.deleted ? 'deleted' : `failed: ${result.error}`,
+            // QA4-032: per-table DB errors went out RAW while
+            // authPurgeError beside them was redacted — redact both.
+            result.deleted
+              ? 'deleted'
+              : `failed: ${redactSecrets(result.error || 'unknown error')}`,
           ])
         ),
         userId,

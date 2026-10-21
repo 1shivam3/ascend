@@ -383,3 +383,13 @@ describe('LOOP-3 Escape invokes cleanup wrappers', () => {
     expect(modal).not.toContain('useEscapeToClose(isOpen, onClose)');
   });
 });
+
+/* ── QA4-032: delete-account leaks raw per-table DB errors ────────────── */
+describe('QA4-032 delete-account redacts table errors consistently', () => {
+  it('tableResults passes errors through redactSecrets like authPurgeError', () => {
+    const route = readSrc('src/app/api/auth/delete-account/route.ts');
+    expect(route).toContain("redactSecrets(result.error || 'unknown error')");
+    expect(route).not.toContain('`failed: ${result.error}`');
+    expect(route).toContain('redactSecrets(authPurgeError)');
+  });
+});
