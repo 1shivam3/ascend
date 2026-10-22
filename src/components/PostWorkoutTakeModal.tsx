@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { AIPostWorkoutTake, isSetCompleted } from '@/lib/types';
 import { fetchPostWorkoutTake, generateDeterministicPostWorkoutTake } from '@/lib/ai-coach';
+import { buildSessionDebrief } from '@/lib/weekly-review';
 import { getNextSessionTarget, exerciseHadPain } from '@/lib/workout-engine';
 import { formatDuration, getLocalTodayStr } from '@/lib/formatters';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
@@ -47,6 +48,24 @@ export default function PostWorkoutTakeModal({
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { t } = useTranslation();
   const store = useStore();
+  // "Vs your block" (PR-C): deterministic, local, and only present when
+  // this workout belongs to a coach-managed plan. Never blocks the take.
+  const blockDebrief = useMemo(() => {
+    if (!isOpen) return null;
+    try {
+      return buildSessionDebrief({
+        workoutName: completedWorkout.name,
+        exercises: completedWorkout.exercises,
+        plannedWorkouts: store.plannedWorkouts,
+        coachBlocks: store.coachBlocks,
+        dateStr: getLocalTodayStr(),
+        unit: store.profile?.unit ?? 'kg',
+      });
+    } catch {
+      return null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, completedWorkout]);
   const [take, setTake] = useState<AIPostWorkoutTake | null>(null);
   const [showReportAI, setShowReportAI] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -339,6 +358,21 @@ export default function PostWorkoutTakeModal({
             </div>
           </div>
         ) : null}
+
+        {/* Vs your block (PR-C) — coach-managed workouts only */}
+        {blockDebrief && (
+          <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2 animate-fade-in">
+            <span className="font-bold uppercase tracking-wider text-accent flex items-center gap-1 text-2xs">
+              <Flag className="w-3.5 h-3.5" /> {t('weeklyReview.vsBlockTitle')}
+            </span>
+            {blockDebrief.lines.map((line, i) => (
+              <p key={i} className="text-xs text-text-secondary leading-relaxed">
+                {line}
+              </p>
+            ))}
+            <p className="text-xs font-semibold text-text-primary">{blockDebrief.cue}</p>
+          </div>
+        )}
         </div>
 
         {take && (
