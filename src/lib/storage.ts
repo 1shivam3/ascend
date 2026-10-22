@@ -246,6 +246,9 @@ const BACKUP_STATE_FIELDS = [
   'trainingDecisions',
   'decisionsLedgerHistory',
   'lifterProfile',
+  // NOTE: athleteModel is deliberately NOT a backup field — it is fully
+  // derived and recomputed on import from the restored inputs, so
+  // exporting the blob would ship dead bytes in every backup.
   'notificationPreferences',
   'xp',
   'streak',
