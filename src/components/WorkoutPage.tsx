@@ -80,6 +80,9 @@ import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
+import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
+import BlockDebriefModal from '@/components/BlockDebriefModal';
+import { isBlockEnded } from '@/lib/weekly-review';
 import { weekTypeForDate } from '@/lib/block-engine';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
@@ -696,6 +699,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const applyPlateauProposal = useStore((state) => state.applyPlateauProposal);
   const dismissPlateauProposal = useStore((state) => state.dismissPlateauProposal);
   const refreshPlateauProposals = useStore((state) => state.refreshPlateauProposals);
+  const weeklyReviews = useStore((state) => state.weeklyReviews);
+  const refreshWeeklyReview = useStore((state) => state.refreshWeeklyReview);
   const trainingProfile = useStore((state) => state.trainingProfile);
   // User's weekly-target override from Settings (null = automatic, 0 = off).
   const weeklyTargetOverride = useStore((state) => state.uiPreferences?.weeklyTargetDays ?? null);
@@ -857,6 +862,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isCoachBlockOpen, setIsCoachBlockOpen] = useState(false);
   const [coachBlockAtReview, setCoachBlockAtReview] = useState(false);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [isDebriefOpen, setIsDebriefOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [historyFilter, setHistoryFilter] = useState('');
@@ -937,11 +944,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
   }, [isCoachBlockOpen, registerBackHandler]);
 
+  useEffect(() => {
+    if (isReviewOpen) {
+      return registerBackHandler(() => { setIsReviewOpen(false); return true; }, 100);
+    }
+  }, [isReviewOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isDebriefOpen) {
+      return registerBackHandler(() => { setIsDebriefOpen(false); return true; }, 100);
+    }
+  }, [isDebriefOpen, registerBackHandler]);
+
   // Plateau proposals for coach-managed lifts are (re)built when the
   // Train tab mounts — cheap, deterministic, and dismissal-safe (the
-  // engine never re-proposes a dismissed change).
+  // engine never re-proposes a dismissed change). The weekly review for
+  // the last completed week is generated the same way.
   useEffect(() => {
     refreshPlateauProposals();
+    refreshWeeklyReview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2189,6 +2210,48 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </div>
             </div>
           ))}
+        {/* Block debrief (PR-C): the block ran its course — results first. */}
+        {coachBlocks.activeBlock &&
+          coachBlocks.activeBlock.status === 'active' &&
+          isBlockEnded(coachBlocks.activeBlock, getLocalTodayStr()) && (
+            <div className="card p-4 flex items-center justify-between gap-3 border-accent/40">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-text-primary">
+                  {t('weeklyReview.debriefCardTitle', { name: coachBlocks.activeBlock.name })}
+                </p>
+                <p className="text-2xs text-text-muted">{t('weeklyReview.debriefCardHint')}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDebriefOpen(true)}
+                className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
+              >
+                {t('weeklyReview.debriefOpen')}
+              </button>
+            </div>
+          )}
+
+        {/* Weekly review row (PR-C) */}
+        {weeklyReviews.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsReviewOpen(true)}
+            className="card w-full p-4 flex items-center justify-between gap-3 text-left cursor-pointer"
+          >
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                {t('weeklyReview.cardTitle')}
+                {!weeklyReviews[weeklyReviews.length - 1].seen && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="New" />
+                )}
+              </p>
+              <p className="text-2xs text-text-muted truncate">
+                {weeklyReviews[weeklyReviews.length - 1].focus.headline}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
+          </button>
+        )}
       </section>
 
       {/* ── Your Plans ── */}
@@ -2946,6 +3009,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         isOpen={isCoachBlockOpen}
         onClose={() => setIsCoachBlockOpen(false)}
         startAtReview={coachBlockAtReview}
+      />
+
+      {/* Weekly Review + Block Debrief Modals (PR-C) */}
+      <CoachWeeklyReviewModal
+        isOpen={isReviewOpen}
+        onClose={() => setIsReviewOpen(false)}
+        review={weeklyReviews[weeklyReviews.length - 1] ?? null}
+      />
+      <BlockDebriefModal
+        isOpen={isDebriefOpen}
+        onClose={() => setIsDebriefOpen(false)}
+        block={coachBlocks.activeBlock}
+        onStartNextBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
       />
 
       {/* Exercise Library Modal (Item 21) */}

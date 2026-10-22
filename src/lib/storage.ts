@@ -253,6 +253,8 @@ const BACKUP_STATE_FIELDS = [
   // (approved blocks, adopted plans, plateau choices) that cannot be
   // re-derived from history.
   'coachBlocks',
+  // weeklyReviews (PR-C): seen/applied state is user data.
+  'weeklyReviews',
   'notificationPreferences',
   'xp',
   'streak',
