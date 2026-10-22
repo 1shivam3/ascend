@@ -51,6 +51,7 @@ import { purgeLocalAppData, isRecognizedBackupData } from './storage';
 import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
+import { buildAthleteModel, type AthleteModel } from './athlete-model';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
 import {
@@ -428,10 +429,12 @@ export interface AppState {
   trainingDecisions: Record<string, TrainingDecision>;
   decisionsLedgerHistory: TrainingDecision[];
   lifterProfile: LifterTwinProfile | null;
+  athleteModel: AthleteModel | null;
   acceptTrainingDecision: (exerciseName: string, decision?: TrainingDecision) => void;
   overrideTrainingDecision: (exerciseName: string, customWeight?: number, decision?: TrainingDecision) => void;
   recordTrainingDecision: (decision: TrainingDecision) => void;
   refreshLifterProfile: () => void;
+  refreshAthleteModel: () => void;
 
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
@@ -744,6 +747,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   trainingDecisions: state.trainingDecisions,
   decisionsLedgerHistory: state.decisionsLedgerHistory,
   lifterProfile: state.lifterProfile,
+  athleteModel: state.athleteModel,
   notificationPreferences: state.notificationPreferences,
   uiPreferences: state.uiPreferences,
   xp: state.xp,
@@ -1208,6 +1212,7 @@ export const useAppStore = create<AppState>()(
       trainingDecisions: {},
       decisionsLedgerHistory: [],
       lifterProfile: null,
+      athleteModel: null,
 
       // Policy v0 Decisions Ledger State
       policyDecisionRecords: {},
@@ -2373,6 +2378,21 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      refreshAthleteModel: () => {
+        set((state) => ({
+          athleteModel: buildAthleteModel(
+            {
+              workouts: state.workouts,
+              dailyCheckins: state.dailyCheckins,
+              weeklySchedule: state.weeklySchedule,
+              plannedWorkouts: state.plannedWorkouts,
+              readinessHistory: state.coach?.readinessHistory || [],
+            },
+            getLocalTodayStr()
+          ),
+        }));
+      },
+
       // Policy v0 Decisions Ledger Handlers
       acceptPolicyDecision: (id: string) => {
         set((state) => {
@@ -2696,6 +2716,7 @@ export const useAppStore = create<AppState>()(
           trainingDecisions: {},
           decisionsLedgerHistory: [],
           lifterProfile: null,
+          athleteModel: null,
           xp: getInitialXpState(),
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
@@ -2749,6 +2770,7 @@ export const useAppStore = create<AppState>()(
             trainingDecisions: {},
             decisionsLedgerHistory: [],
             lifterProfile: null,
+            athleteModel: null,
             policyDecisionRecords: {},
             policyDecisionsLedgerHistory: [],
             policyDecisionApplications: [],
@@ -2768,6 +2790,7 @@ export const useAppStore = create<AppState>()(
           todaysAIWorkoutPlan: undefined,
           latestWeeklyReview: undefined,
           lifterProfile: null,
+          athleteModel: null,
         });
       },
 
@@ -2988,6 +3011,10 @@ export const useAppStore = create<AppState>()(
             trainingDecisions: data.trainingDecisions || state.trainingDecisions,
             decisionsLedgerHistory: Array.isArray(data.decisionsLedgerHistory) ? data.decisionsLedgerHistory : state.decisionsLedgerHistory,
             lifterProfile: data.lifterProfile || state.lifterProfile,
+            // Athlete model is derived: set null here and recompute AFTER
+            // this set lands (below), from the sanitized/merged state the
+            // store actually keeps — never from the raw payload.
+            athleteModel: null,
             policyDecisionRecords:
               data.policyDecisionRecords && typeof data.policyDecisionRecords === 'object'
                 ? data.policyDecisionRecords
@@ -3176,6 +3203,9 @@ export const useAppStore = create<AppState>()(
               return valid;
             })(),
           }});
+          // Recompute the derived athlete model from the restored state
+          // (sanitized workouts, merged check-ins, stored readiness).
+          get().refreshAthleteModel();
           return true;
         } catch {
           return false;
@@ -3374,6 +3404,16 @@ export const useAppStore = create<AppState>()(
                 if (currentState.workouts && currentState.workouts.length > 0 && !currentState.lifterProfile) {
                   currentState.refreshLifterProfile();
                 }
+
+                // Athlete model: refresh when missing or anchored to a
+                // previous day — its windows (28d pain, 8wk adherence)
+                // are relative to today, so a stale todayStr is wrong data.
+                if (
+                  (currentState.workouts?.length || Object.keys(currentState.dailyCheckins || {}).length) &&
+                  (!currentState.athleteModel || currentState.athleteModel.todayStr !== getLocalTodayStr())
+                ) {
+                  currentState.refreshAthleteModel();
+                }
               } catch (recoveryErr) {
                 console.warn('Disaster recovery check error:', recoveryErr);
               }
@@ -3448,6 +3488,53 @@ useAppStore.subscribe((state) => {
     lastLifterProfileWorkoutCount = workoutCount;
     if (workoutCount > 0 && state.hasCompletedOnboarding) {
       state.refreshLifterProfile();
+    }
+  }
+});
+
+// Auto-refresh the athlete model when any of its inputs change — workouts
+// (log/delete/import/sync pull), check-ins, schedule, plans, or readiness
+// history. The signature is a content hash, not a length: editing a
+// check-in value, a set's weight, or a pain flag at an unchanged count
+// must still recompute — a stale pain flag is a safety bug, not a nit.
+// The model itself is not part of the signature, so a refresh cannot loop.
+function athleteModelSignature(state: AppState): string {
+  const projection = {
+    w: (state.workouts || []).map((w) => [
+      w.id,
+      w.date,
+      w.reportsPain ? 1 : 0,
+      (w.exercises || []).map((e) => [
+        e?.name,
+        e?.painfulExerciseName || '',
+        e?.reportsPain ? 1 : 0,
+        (e?.sets || []).map((s) => [s?.weight, s?.reps, s?.status || '', s?.isWarmup ? 1 : 0]),
+      ]),
+    ]),
+    c: state.dailyCheckins || {},
+    s: state.weeklySchedule || {},
+    p: (state.plannedWorkouts || []).map((p) => p.id),
+    r: (state.coach?.readinessHistory || []).map((e) => [e.date, e.band]),
+  };
+  const str = JSON.stringify(projection);
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `${str.length}:${(h >>> 0).toString(36)}`;
+}
+let lastAthleteModelSignature = '';
+useAppStore.subscribe((state) => {
+  const signature = athleteModelSignature(state);
+  if (signature !== lastAthleteModelSignature) {
+    lastAthleteModelSignature = signature;
+    // No hasInputs gate: deleting the last workout/check-in must refresh
+    // to the honest empty model, not leave the old one (and its pain
+    // facts) on screen. Logout/clear-all set hasCompletedOnboarding
+    // false, which keeps their explicit null in place.
+    if (state.hasCompletedOnboarding) {
+      state.refreshAthleteModel();
     }
   }
 });

@@ -281,10 +281,13 @@ export function getCustomExerciseMuscle(name: string): MuscleGroup | undefined {
 }
 
 /**
- * Resolves any exercise name (including custom or partial names) to its target MuscleGroup.
+ * Resolves any exercise name (including custom or partial names) to its
+ * target MuscleGroup, or null when NOTHING matches — no library entry, no
+ * keyword signal. Callers that must not guess (learned statistics) use
+ * this; display callers use getExerciseMuscle, which keeps the default.
  */
-export function getExerciseMuscle(name: string): MuscleGroup {
-  if (!name || typeof name !== 'string') return 'Chest';
+export function resolveExerciseMuscle(name: string): MuscleGroup | null {
+  if (!name || typeof name !== 'string') return null;
   const clean = name.toLowerCase().trim();
   const override = customMuscleOverrides.get(clean);
   if (override) return override;
@@ -315,7 +318,11 @@ export function getExerciseMuscle(name: string): MuscleGroup {
   if (clean.includes('curl') || clean.includes('tricep') || clean.includes('bicep') || clean.includes('skull') || clean.includes('dip') || clean.includes('arm')) return 'Arms';
   if (clean.includes('abs') || clean.includes('crunch') || clean.includes('plank') || clean.includes('core') || clean.includes('twist')) return 'Core';
 
-  return 'Chest';
+  return null;
+}
+
+export function getExerciseMuscle(name: string): MuscleGroup {
+  return resolveExerciseMuscle(name) ?? 'Chest';
 }
 
 /**

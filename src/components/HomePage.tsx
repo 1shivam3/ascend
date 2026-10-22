@@ -45,6 +45,7 @@ import {
   getChallengeMonth,
 } from '@/lib/challenges';
 import ReadinessSheet from '@/components/ReadinessSheet';
+import AthleteModelCard from '@/components/AthleteModelCard';
 import LevelSheet from '@/components/LevelSheet';
 import ChallengesSheet from '@/components/ChallengesSheet';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
@@ -743,6 +744,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         )}
       </div>
       )}
+
+      {/* ── 4b. ATHLETE MODEL — what the coach has learned about you ──── */}
+      {uiPreferences.coachEnabled && <AthleteModelCard />}
 
       {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-2.5">
