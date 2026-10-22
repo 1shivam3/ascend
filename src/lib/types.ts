@@ -357,6 +357,28 @@ export interface ActiveWorkoutDraft {
  *  Levels in tsp: none=0, tsp=1, tbsp=3, tbsp2=6. */
 export type OilLevelId = 'none' | 'tsp' | 'tbsp' | 'tbsp2';
 
+/** Explicit per-food diet classification (food schema v2, see food-meta.ts).
+ *  One value per DB entry: 'vegan' ⊂ 'veg', 'egg' = eggetarian, 'non-veg'. */
+export type DietTag = 'vegan' | 'veg' | 'egg' | 'non-veg';
+
+/** Controlled allergen vocabulary (food schema v2). Entries list only
+ *  allergens that are ingredients of the standard recipe. */
+export type AllergenTag =
+  | 'milk'
+  | 'egg'
+  | 'peanut'
+  | 'tree-nut'
+  | 'soy'
+  | 'wheat/gluten'
+  | 'fish'
+  | 'shellfish'
+  | 'sesame'
+  | 'mustard';
+
+/** Provenance of a DB entry's values (food schema v2). 'estimated' marks
+ *  recipe-composition estimates — never presented as measured data. */
+export type FoodSourceRef = 'IFCT 2017' | 'USDA FDC' | 'label' | 'estimated';
+
 export interface FoodItem {
   name: string;
   calories: number;
@@ -366,6 +388,16 @@ export interface FoodItem {
   /** Sugar in grams, when the source provides it (barcode/OFF). Optional:
    *  most DB entries don't carry it — absence means "unknown", not zero. */
   sugarG?: number;
+  /** Dietary fiber in grams (food schema v2). For FOOD_DB entries the
+   *  canonical value lives in FOOD_META (food-meta.ts); this field carries
+   *  it on materialized items. Per the quantity's own basis. */
+  fiberG?: number;
+  /** Diet classification (food schema v2, canonical copy in FOOD_META). */
+  dietTag?: DietTag;
+  /** Allergens present as ingredients (food schema v2, FOOD_META). */
+  allergenTags?: AllergenTag[];
+  /** Provenance of the entry's values (food schema v2, FOOD_META). */
+  sourceRef?: FoodSourceRef;
   quantity?: number;
   unit?: string;
   isUnmatched?: boolean;
