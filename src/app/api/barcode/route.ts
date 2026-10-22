@@ -385,20 +385,40 @@ export async function GET(req: Request) {
           const fat100 = Number((n['fat_100g'] ?? n['fat'] ?? 0).toFixed(1));
           // Sugar was fetched and silently dropped — it matters (diabetes,
           // added-sugar awareness), so pass it through when OFF provides it.
-          const sugar100 = n['sugars_100g'] !== undefined ? Number((n['sugars_100g'] ?? 0).toFixed(1)) : undefined;
+          // Fall back to the unsuffixed field like the other macros do:
+          // products that report only `sugars` used to lose it entirely.
+          const sugarRaw = n['sugars_100g'] ?? n['sugars'];
+          const sugar100 = sugarRaw !== undefined ? Number(sugarRaw.toFixed(1)) : undefined;
+
+          // Serving size in grams, for deriving per-serving values OFF
+          // didn't provide (below).
+          const servingG =
+            typeof p.serving_quantity === 'number' && p.serving_quantity > 0
+              ? p.serving_quantity
+              : (() => {
+                  const m = String(p.serving_size ?? '').match(/([\d.]+)\s*g\b/);
+                  const v = m ? parseFloat(m[1]) : NaN;
+                  return Number.isFinite(v) && v > 0 ? v : undefined;
+                })();
+          const scale100 = (v100: number) =>
+            servingG ? Number(((v100 * servingG) / 100).toFixed(1)) : 0;
 
           let perServing = undefined;
           if (n['energy-kcal_serving'] !== undefined || n['proteins_serving'] !== undefined) {
+            // Fill any macro OFF left out from the per-100g values instead
+            // of reporting a hard zero (a whey with only energy-kcal_serving
+            // used to scan as 0 g protein per serving).
+            const sugarServRaw = n['sugars_serving'] ?? (sugar100 !== undefined ? (sugar100 * (servingG ?? 0)) / 100 : undefined);
             perServing = {
               calories: Math.round(
                 n['energy-kcal_serving'] ??
                 (n['energy_serving'] ? n['energy_serving'] / 4.184 : 0)
-              ),
-              proteinG: Number((n['proteins_serving'] ?? 0).toFixed(1)),
-              carbsG: Number((n['carbohydrates_serving'] ?? 0).toFixed(1)),
-              fatG: Number((n['fat_serving'] ?? 0).toFixed(1)),
-              ...(n['sugars_serving'] !== undefined
-                ? { sugarG: Number((n['sugars_serving'] ?? 0).toFixed(1)) }
+              ) || (servingG ? Math.round((kcal100 * servingG) / 100) : 0),
+              proteinG: Number((n['proteins_serving'] ?? scale100(prot100)).toFixed(1)),
+              carbsG: Number((n['carbohydrates_serving'] ?? scale100(carbs100)).toFixed(1)),
+              fatG: Number((n['fat_serving'] ?? scale100(fat100)).toFixed(1)),
+              ...(sugarServRaw !== undefined && (n['sugars_serving'] !== undefined || servingG)
+                ? { sugarG: Number(sugarServRaw.toFixed(1)) }
                 : {}),
             };
           }
@@ -440,7 +460,8 @@ export async function GET(req: Request) {
           const p = v0Data.product;
           const n = p.nutriments || {};
           const name = (p.product_name || p.product_name_en || `Item ${code}`).trim();
-          const kcal100 = Math.round(n['energy-kcal_100g'] ?? (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0));
+          const kcal100 = Math.round(n['energy-kcal_100g'] ?? n['energy-kcal'] ?? (n['energy_100g'] ? n['energy_100g'] / 4.184 : 0));
+          const v0SugarRaw = n['sugars_100g'] ?? n['sugars'];
           return NextResponse.json({
             found: true,
             source: 'open_food_facts_v0',
@@ -449,11 +470,11 @@ export async function GET(req: Request) {
             brand: p.brands,
             per100g: {
               calories: Math.max(0, kcal100),
-              proteinG: Number((n['proteins_100g'] ?? 0).toFixed(1)),
-              carbsG: Number((n['carbohydrates_100g'] ?? 0).toFixed(1)),
-              fatG: Number((n['fat_100g'] ?? 0).toFixed(1)),
-              ...(n['sugars_100g'] !== undefined
-                ? { sugarG: Number((n['sugars_100g'] ?? 0).toFixed(1)) }
+              proteinG: Number((n['proteins_100g'] ?? n['proteins'] ?? 0).toFixed(1)),
+              carbsG: Number((n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0).toFixed(1)),
+              fatG: Number((n['fat_100g'] ?? n['fat'] ?? 0).toFixed(1)),
+              ...(v0SugarRaw !== undefined
+                ? { sugarG: Number(Number(v0SugarRaw).toFixed(1)) }
                 : {}),
             },
           });
