@@ -100,6 +100,8 @@ export interface PlanExtras {
   description?: string;
   goalTag?: string;
   intensityMode?: 'rpe' | 'percent';
+  /** PR-B: coach block that created this plan (grouping label only). */
+  coachBlockId?: string;
 }
 
 /**
@@ -110,12 +112,16 @@ export function buildPlanExtras(plan: {
   description?: string;
   goalTag?: string;
   intensityMode?: 'rpe' | 'percent';
+  coachBlockId?: string;
 }): PlanExtras | undefined {
   const extras: PlanExtras = {};
   if (typeof plan.description === 'string' && plan.description) extras.description = plan.description;
   if (typeof plan.goalTag === 'string' && plan.goalTag) extras.goalTag = plan.goalTag;
   if (plan.intensityMode === 'rpe' || plan.intensityMode === 'percent') {
     extras.intensityMode = plan.intensityMode;
+  }
+  if (typeof plan.coachBlockId === 'string' && plan.coachBlockId) {
+    extras.coachBlockId = plan.coachBlockId;
   }
   return Object.keys(extras).length > 0 ? extras : undefined;
 }
@@ -133,6 +139,9 @@ export function planFieldsFromExtras(extras: unknown): PlanExtras {
   if (typeof e.goalTag === 'string' && e.goalTag) out.goalTag = e.goalTag;
   if (e.intensityMode === 'rpe' || e.intensityMode === 'percent') {
     out.intensityMode = e.intensityMode;
+  }
+  if (typeof e.coachBlockId === 'string' && e.coachBlockId) {
+    out.coachBlockId = e.coachBlockId;
   }
   return out;
 }

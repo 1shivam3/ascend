@@ -475,6 +475,14 @@ export interface PlannedWorkout {
    * Absent/'rpe' = the long-standing default; nothing changes.
    */
   intensityMode?: 'rpe' | 'percent';
+  /**
+   * PR-B: id of the coach block that created this plan, when materialized
+   * from an approved block proposal. Purely a grouping label (drives the
+   * "Coach block" badge); management itself lives in the store's
+   * coachBlocks slice. Rides the `extras` jsonb column like the other
+   * column-less fields, so it degrades gracefully until the column exists.
+   */
+  coachBlockId?: string;
 }
 
 export interface FavoriteFood {
