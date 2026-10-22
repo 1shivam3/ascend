@@ -54,7 +54,9 @@ describe('getPackedGymSwap', () => {
     expect(getPackedGymSwap('Deadlift')?.name).toBe('Dumbbell Romanian Deadlift');
     expect(getPackedGymSwap('Lat Pulldown')?.name).toBe('Single-Arm Dumbbell Row');
     expect(getPackedGymSwap('Cable Fly')?.name).toBe('Dumbbell Chest Fly');
-    expect(getPackedGymSwap('Overhead Press')?.name).toBe('Dumbbell Shoulder Press');
+    // PR-A2: the old table's target "Dumbbell Shoulder Press" never existed
+    // in the library — the real exercise is the seated variant.
+    expect(getPackedGymSwap('Overhead Press')?.name).toBe('Seated Dumbbell Shoulder Press');
   });
 
   it('returns null for exercises that are already minimal-equipment', () => {
@@ -141,7 +143,7 @@ describe('applyPackedSwapsToPlan (preview toggle semantics)', () => {
     expect(swapped).not.toBe(plan);
     expect(swapped.exercises[0].name).toBe('Dumbbell Bench Press');
     expect(swapped.exercises[1].name).toBe('Push-ups'); // already minimal — untouched
-    expect(swapped.exercises[2].name).toBe('Dumbbell Shoulder Press');
+    expect(swapped.exercises[2].name).toBe('Seated Dumbbell Shoulder Press'); // PR-A2: real library name
   });
 
   it('leaves the original plan intact — toggling OFF restores the original view', () => {

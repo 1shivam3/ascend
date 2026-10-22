@@ -345,10 +345,10 @@ describe('Workout Engine — Exercise Prescriptions & Substitutions', () => {
     // Empty input returns empty array
     expect(getQuickSubstitutes('')).toEqual([]);
 
-    // Unmatched exercise provides standard fallback alternatives
+    // PR-A2 contract: an exercise the library doesn't know gets NO
+    // substitutes — never placeholder inventions ("Dumbbell alternative").
     const unknownSubs = getQuickSubstitutes('Unknown Lift');
-    expect(unknownSubs.length).toBe(2);
-    expect(unknownSubs[0].equipment).toBe('dumbbell');
+    expect(unknownSubs).toEqual([]);
   });
 
   it('compresses workouts by prioritizing compound lifts for shorter durations', () => {
