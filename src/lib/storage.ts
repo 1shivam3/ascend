@@ -249,6 +249,10 @@ const BACKUP_STATE_FIELDS = [
   // NOTE: athleteModel is deliberately NOT a backup field — it is fully
   // derived and recomputed on import from the restored inputs, so
   // exporting the blob would ship dead bytes in every backup.
+  // coachBlocks IS a backup field (PR-B): it holds user decisions
+  // (approved blocks, adopted plans, plateau choices) that cannot be
+  // re-derived from history.
+  'coachBlocks',
   'notificationPreferences',
   'xp',
   'streak',

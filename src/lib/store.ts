@@ -52,6 +52,20 @@ import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildAthleteModel, type AthleteModel } from './athlete-model';
+import {
+  applyPlateauProposalToPlan,
+  buildPlateauProposals,
+  deriveAdoptionSchemes,
+  generateBlockProposal,
+  getInitialCoachBlocksState,
+  managedPlanIdByExerciseKey,
+  materializeProposal,
+  resolveManagedPolicy,
+  snapshotPlateauExpectations,
+  type BlockProposal,
+  type CoachBlocksState,
+} from './block-engine';
+import type { BlockIntake } from './block-intake';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
 import {
@@ -436,6 +450,25 @@ export interface AppState {
   refreshLifterProfile: () => void;
   refreshAthleteModel: () => void;
 
+  // Coach blocks (PR-B): proposals, the active block, adopted plans,
+  // plateau proposals. User-decision state (persisted + backed up),
+  // unlike the derived athleteModel.
+  coachBlocks: CoachBlocksState;
+  /** Generate a block proposal from an intake. Returns it (also stored as pending). */
+  proposeCoachBlock: (intake: BlockIntake) => BlockProposal;
+  /** Discard the pending proposal without touching any plan (D3). */
+  dismissBlockProposal: () => void;
+  /** Approve the pending proposal (or an edited copy of it from the
+   *  review step): materialize plans + schedule + block state atomically. */
+  approveBlockProposal: (editedProposal?: BlockProposal) => void;
+  /** Coach adopts an existing user plan (schemes derived; plan untouched). */
+  adoptPlanForCoaching: (planId: string) => void;
+  unadoptPlanForCoaching: (planId: string) => void;
+  /** Build pending plateau proposals for managed lifts from stall flags. */
+  refreshPlateauProposals: () => void;
+  applyPlateauProposal: (proposalId: string) => void;
+  dismissPlateauProposal: (proposalId: string) => void;
+
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
   policyDecisionsLedgerHistory: TrainingDecisionRecord[];
@@ -748,6 +781,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   decisionsLedgerHistory: state.decisionsLedgerHistory,
   lifterProfile: state.lifterProfile,
   athleteModel: state.athleteModel,
+  coachBlocks: state.coachBlocks,
   notificationPreferences: state.notificationPreferences,
   uiPreferences: state.uiPreferences,
   xp: state.xp,
@@ -1213,6 +1247,7 @@ export const useAppStore = create<AppState>()(
       decisionsLedgerHistory: [],
       lifterProfile: null,
       athleteModel: null,
+      coachBlocks: getInitialCoachBlocksState(),
 
       // Policy v0 Decisions Ledger State
       policyDecisionRecords: {},
@@ -1606,6 +1641,38 @@ export const useAppStore = create<AppState>()(
           const targetRepsVal = currentTarget.targetReps ?? 8;
           const repRange = { min: targetRepsVal, max: targetRepsVal };
 
+          // PR-B §4.5 (D2): coach-managed lifts ONLY. When this exercise
+          // belongs to an approved coach block or an adopted plan, Policy
+          // v0 arbitrates with the scheme's real rep range, the scheme's
+          // coach-approved increment (converted to the lift's unit), and
+          // the block's week type. For everything else `managedPolicy` is
+          // null and the options below are byte-identical to before.
+          const managedPolicy = matchedPlan
+            ? resolveManagedPolicy(state.coachBlocks, matchedPlan.id, ex.name, workout.date)
+            : null;
+          const managedOptions = managedPolicy
+            ? {
+                repRange: {
+                  min: managedPolicy.scheme.repMin,
+                  max: managedPolicy.scheme.repMax,
+                },
+                ...(managedPolicy.scheme.incrementKg != null
+                  ? {
+                      incrementConfig: {
+                        stepIncrement:
+                          Math.round(
+                            (targetUnit === 'lbs'
+                              ? managedPolicy.scheme.incrementKg * 2.20462
+                              : managedPolicy.scheme.incrementKg) * 2
+                          ) / 2,
+                        approvalSource: 'coach_approved' as const,
+                      },
+                    }
+                  : {}),
+                blockContext: { weekType: managedPolicy.weekType },
+              }
+            : null;
+
           const sameCanonicalCount = workout.exercises.filter(
             (e) => e && canonicalizeExerciseName(e.name) === canonicalizeExerciseName(ex.name)
           ).length;
@@ -1624,8 +1691,11 @@ export const useAppStore = create<AppState>()(
               sessionIndex,
               targetExerciseId: ex.planExerciseId || plannedEx?.id,
               planExerciseId: ex.planExerciseId || plannedEx?.id,
-              // CRITICAL: Never pass hardcoded incrementApprovalSource or incrementConfig here.
-              // Equipment increments remain unconfigured until explicit user/coach configuration.
+              // Unmanaged lifts: never pass increment config — equipment
+              // increments remain unconfigured until explicit user/coach
+              // configuration. Managed lifts (PR-B) pass the scheme's
+              // coach-approved increment via managedOptions above.
+              ...(managedOptions ?? {}),
             }
           );
 
@@ -2393,6 +2463,193 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      // ── Coach blocks (PR-B) ──────────────────────────────────────────────
+      proposeCoachBlock: (intake) => {
+        const state = get();
+        const todayStr = getLocalTodayStr();
+        const proposal = generateBlockProposal({
+          intake,
+          athleteModel: state.athleteModel,
+          prs: state.prs,
+          workouts: state.workouts,
+          existingPlans: state.plannedWorkouts,
+          unit: state.profile?.unit ?? 'kg',
+          todayStr,
+          nutritionPhase: intake.goal === 'lose_fat' ? 'deficit' : null,
+          bodyweightKg: state.profile?.bodyweightKg,
+          ageYears: state.profile?.age,
+          dislikedExercises: state.trainingProfile?.dislikedExercises ?? [],
+        });
+        set({ coachBlocks: { ...state.coachBlocks, pendingProposal: proposal } });
+        return proposal;
+      },
+
+      dismissBlockProposal: () => {
+        set((state) => ({
+          coachBlocks: { ...state.coachBlocks, pendingProposal: null },
+        }));
+      },
+
+      approveBlockProposal: (editedProposal) => {
+        const state = get();
+        const pending = state.coachBlocks.pendingProposal;
+        if (!pending) return;
+        // An edited copy is only honoured when it IS the pending
+        // proposal (same id) — anything else is ignored, never trusted.
+        const proposal =
+          editedProposal && editedProposal.id === pending.id ? editedProposal : pending;
+        const todayStr = getLocalTodayStr();
+        const { plans, schedule, activeBlock } = materializeProposal(
+          proposal,
+          state.plannedWorkouts,
+          state.weeklySchedule,
+          todayStr
+        );
+        const previous = state.coachBlocks.activeBlock;
+        set({
+          plannedWorkouts: plans,
+          weeklySchedule: schedule,
+          coachBlocks: {
+            ...state.coachBlocks,
+            pendingProposal: null,
+            activeBlock,
+            pastBlocks: previous
+              ? [
+                  { ...previous, status: 'completed' as const },
+                  ...state.coachBlocks.pastBlocks,
+                ].slice(0, 8)
+              : state.coachBlocks.pastBlocks,
+          },
+        });
+        // The schedule changed shape — rebuild through the store's own
+        // action so its invariants (and any schedule-keyed derivations)
+        // stay the single source of truth.
+        get().refreshAthleteModel();
+      },
+
+      adoptPlanForCoaching: (planId) => {
+        const state = get();
+        const plan = state.plannedWorkouts.find((p) => p.id === planId);
+        if (!plan) return;
+        set({
+          coachBlocks: {
+            ...state.coachBlocks,
+            adoptedPlans: {
+              ...state.coachBlocks.adoptedPlans,
+              [planId]: {
+                planId,
+                adoptedOn: getLocalTodayStr(),
+                schemes: deriveAdoptionSchemes(plan, state.athleteModel),
+              },
+            },
+          },
+        });
+      },
+
+      unadoptPlanForCoaching: (planId) => {
+        set((state) => {
+          const adoptedPlans = { ...state.coachBlocks.adoptedPlans };
+          delete adoptedPlans[planId];
+          return { coachBlocks: { ...state.coachBlocks, adoptedPlans } };
+        });
+      },
+
+      refreshPlateauProposals: () => {
+        const state = get();
+        try {
+          const stalls = detectStalls(state.workouts);
+          const acknowledgedKeys = new Set<string>(
+            Object.entries(state.coach?.stallFlags ?? {})
+              .filter(([, v]) => (v as { acknowledged?: boolean })?.acknowledged)
+              .map(([k]) => k.trim().toLowerCase())
+          );
+          const planIdByExerciseKey = managedPlanIdByExerciseKey(
+            state.coachBlocks,
+            state.plannedWorkouts
+          );
+          const fresh = buildPlateauProposals({
+            stalls,
+            blocks: state.coachBlocks,
+            planIdByExerciseKey,
+            acknowledgedKeys,
+            todayStr: getLocalTodayStr(),
+          });
+          if (fresh.length === 0) return;
+          const withSnapshots = snapshotPlateauExpectations(fresh, state.plannedWorkouts);
+          set({
+            coachBlocks: {
+              ...state.coachBlocks,
+              plateauProposals: [...state.coachBlocks.plateauProposals, ...withSnapshots].slice(-12),
+            },
+          });
+        } catch {
+          /* plateau proposals are best-effort, never block the app */
+        }
+      },
+
+      applyPlateauProposal: (proposalId) => {
+        const state = get();
+        const proposal = state.coachBlocks.plateauProposals.find((p) => p.id === proposalId);
+        if (!proposal || proposal.status !== 'pending') return;
+        const plan = state.plannedWorkouts.find((p) => p.id === proposal.planId);
+        if (!plan) return;
+        const active = state.coachBlocks.activeBlock;
+        const inBlock = active && active.status === 'active' && active.planIds.includes(plan.id);
+        const schemes = inBlock
+          ? active.schemes
+          : state.coachBlocks.adoptedPlans[plan.id]?.schemes;
+        if (!schemes) return;
+        const result = applyPlateauProposalToPlan(plan, schemes, proposal, getLocalTodayStr());
+        if ('error' in result) {
+          // Stale (plan changed since the proposal) or the exercise is
+          // gone: retire the proposal instead of editing blind.
+          set({
+            coachBlocks: {
+              ...state.coachBlocks,
+              plateauProposals: state.coachBlocks.plateauProposals.map((p) =>
+                p.id === proposalId ? { ...p, status: 'dismissed' as const } : p
+              ),
+            },
+          });
+          return;
+        }
+        const planChanged =
+          JSON.stringify(result.plan.exercises) !== JSON.stringify(plan.exercises);
+        set({
+          ...(planChanged
+            ? { plannedWorkouts: state.plannedWorkouts.map((p) => (p.id === plan.id ? result.plan : p)) }
+            : {}),
+          coachBlocks: {
+            ...state.coachBlocks,
+            activeBlock: inBlock && active ? { ...active, schemes: result.schemes } : active,
+            adoptedPlans:
+              !inBlock && state.coachBlocks.adoptedPlans[plan.id]
+                ? {
+                    ...state.coachBlocks.adoptedPlans,
+                    [plan.id]: {
+                      ...state.coachBlocks.adoptedPlans[plan.id],
+                      schemes: result.schemes,
+                    },
+                  }
+                : state.coachBlocks.adoptedPlans,
+            plateauProposals: state.coachBlocks.plateauProposals.map((p) =>
+              p.id === proposalId ? { ...p, status: 'applied' as const } : p
+            ),
+          },
+        });
+      },
+
+      dismissPlateauProposal: (proposalId) => {
+        set((state) => ({
+          coachBlocks: {
+            ...state.coachBlocks,
+            plateauProposals: state.coachBlocks.plateauProposals.map((p) =>
+              p.id === proposalId ? { ...p, status: 'dismissed' as const } : p
+            ),
+          },
+        }));
+      },
+
       // Policy v0 Decisions Ledger Handlers
       acceptPolicyDecision: (id: string) => {
         set((state) => {
@@ -2717,6 +2974,7 @@ export const useAppStore = create<AppState>()(
           decisionsLedgerHistory: [],
           lifterProfile: null,
           athleteModel: null,
+          coachBlocks: getInitialCoachBlocksState(),
           xp: getInitialXpState(),
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
@@ -2771,6 +3029,7 @@ export const useAppStore = create<AppState>()(
             decisionsLedgerHistory: [],
             lifterProfile: null,
             athleteModel: null,
+            coachBlocks: getInitialCoachBlocksState(),
             policyDecisionRecords: {},
             policyDecisionsLedgerHistory: [],
             policyDecisionApplications: [],
@@ -3015,6 +3274,17 @@ export const useAppStore = create<AppState>()(
             // this set lands (below), from the sanitized/merged state the
             // store actually keeps — never from the raw payload.
             athleteModel: null,
+            // Coach blocks are user-decision state: restore from backup
+            // when present and well-formed, else keep current.
+            coachBlocks:
+              data.coachBlocks &&
+              typeof data.coachBlocks === 'object' &&
+              !Array.isArray(data.coachBlocks)
+                ? {
+                    ...getInitialCoachBlocksState(),
+                    ...(data.coachBlocks as Partial<CoachBlocksState>),
+                  }
+                : state.coachBlocks,
             policyDecisionRecords:
               data.policyDecisionRecords && typeof data.policyDecisionRecords === 'object'
                 ? data.policyDecisionRecords
