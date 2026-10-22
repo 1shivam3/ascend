@@ -66,6 +66,11 @@ import {
   type CoachBlocksState,
 } from './block-engine';
 import type { BlockIntake } from './block-intake';
+import {
+  buildWeeklyReview,
+  lastCompletedWeekMonday,
+  type WeeklyReview,
+} from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
 import { safeRandomId } from './formatters';
 import {
@@ -469,6 +474,17 @@ export interface AppState {
   applyPlateauProposal: (proposalId: string) => void;
   dismissPlateauProposal: (proposalId: string) => void;
 
+  // Weekly reviews (PR-C): one per completed Mon–Sun week, generated
+  // lazily and kept (≤12). Seen/applied state makes them user data.
+  weeklyReviews: WeeklyReview[];
+  /** Build the review for the most recent completed week, if missing. */
+  refreshWeeklyReview: () => void;
+  markWeeklyReviewSeen: (weekMonday: string) => void;
+  /** Apply a review's schedule-move revision (user-confirmed; D3). */
+  applyScheduleRevision: (weekMonday: string) => void;
+  /** Close out the active block (debrief acknowledged / next block starts). */
+  completeActiveBlock: () => void;
+
   // Policy v0 Decisions Ledger
   policyDecisionRecords: Record<string, TrainingDecisionRecord>;
   policyDecisionsLedgerHistory: TrainingDecisionRecord[];
@@ -782,6 +798,7 @@ export function partializeAppState(state: AppState): Record<string, unknown> {
   lifterProfile: state.lifterProfile,
   athleteModel: state.athleteModel,
   coachBlocks: state.coachBlocks,
+  weeklyReviews: state.weeklyReviews,
   notificationPreferences: state.notificationPreferences,
   uiPreferences: state.uiPreferences,
   xp: state.xp,
@@ -1248,6 +1265,7 @@ export const useAppStore = create<AppState>()(
       lifterProfile: null,
       athleteModel: null,
       coachBlocks: getInitialCoachBlocksState(),
+      weeklyReviews: [],
 
       // Policy v0 Decisions Ledger State
       policyDecisionRecords: {},
@@ -2650,6 +2668,96 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      // ── Weekly reviews (PR-C) ────────────────────────────────────────────
+      refreshWeeklyReview: () => {
+        const state = get();
+        const todayStr = getLocalTodayStr();
+        const monday = lastCompletedWeekMonday(todayStr);
+        if (state.weeklyReviews.some((r) => r.weekMonday === monday)) return;
+        try {
+          const review = buildWeeklyReview({
+            anyDateInWeek: monday,
+            workouts: state.workouts,
+            plannedWorkouts: state.plannedWorkouts,
+            weeklySchedule: state.weeklySchedule,
+            athleteModel: state.athleteModel,
+            coachBlocks: state.coachBlocks,
+            prs: state.prs,
+            dailyCheckins: state.dailyCheckins ?? {},
+            policyRecords: Object.values(state.policyDecisionRecords ?? {}),
+            stalls: detectStalls(state.workouts),
+            unit: state.profile?.unit ?? 'kg',
+            bodyweightKg: state.profile?.bodyweightKg,
+            todayStr,
+          });
+          set({ weeklyReviews: [...state.weeklyReviews, review].slice(-12) });
+        } catch {
+          /* reviews are best-effort, never block the app */
+        }
+      },
+
+      markWeeklyReviewSeen: (weekMonday) => {
+        set((state) => ({
+          weeklyReviews: state.weeklyReviews.map((r) =>
+            r.weekMonday === weekMonday ? { ...r, seen: true } : r
+          ),
+        }));
+      },
+
+      applyScheduleRevision: (weekMonday) => {
+        const state = get();
+        const review = state.weeklyReviews.find((r) => r.weekMonday === weekMonday);
+        const revision = review?.revisions.find(
+          (r) => r.kind === 'schedule_move' && !r.applied
+        );
+        if (!review || !revision || revision.kind !== 'schedule_move') return;
+        const plan = state.plannedWorkouts.find((p) => p.id === revision.planId);
+        if (!plan) return;
+        // The proposal was made when toDay was free. If the athlete has
+        // since scheduled something else there, the proposal is stale —
+        // never overwrite a newer decision silently.
+        const currentTarget = state.weeklySchedule[revision.toDay]?.workoutPlanId;
+        if (currentTarget && currentTarget !== 'rest' && currentTarget !== revision.planId) {
+          return;
+        }
+        const nextSchedule: WeeklySchedule = { ...state.weeklySchedule };
+        nextSchedule[revision.fromDay] = { workoutPlanId: 'rest' };
+        nextSchedule[revision.toDay] = {
+          workoutPlanId: revision.planId,
+          bodyParts: getWorkoutBodyParts(plan.exercises),
+        };
+        set({
+          weeklySchedule: nextSchedule,
+          weeklyReviews: state.weeklyReviews.map((r) =>
+            r.weekMonday === weekMonday
+              ? {
+                  ...r,
+                  revisions: r.revisions.map((rev) =>
+                    rev.kind === 'schedule_move' ? { ...rev, applied: true } : rev
+                  ),
+                }
+              : r
+          ),
+        });
+      },
+
+      completeActiveBlock: () => {
+        set((state) => {
+          const active = state.coachBlocks.activeBlock;
+          if (!active) return state;
+          return {
+            coachBlocks: {
+              ...state.coachBlocks,
+              activeBlock: null,
+              pastBlocks: [
+                { ...active, status: 'completed' as const },
+                ...state.coachBlocks.pastBlocks,
+              ].slice(0, 8),
+            },
+          };
+        });
+      },
+
       // Policy v0 Decisions Ledger Handlers
       acceptPolicyDecision: (id: string) => {
         set((state) => {
@@ -2975,6 +3083,7 @@ export const useAppStore = create<AppState>()(
           lifterProfile: null,
           athleteModel: null,
           coachBlocks: getInitialCoachBlocksState(),
+          weeklyReviews: [],
           xp: getInitialXpState(),
           streak: getInitialStreakXState(),
           challenges: getInitialChallengesXState(),
@@ -3030,6 +3139,7 @@ export const useAppStore = create<AppState>()(
             lifterProfile: null,
             athleteModel: null,
             coachBlocks: getInitialCoachBlocksState(),
+            weeklyReviews: [],
             policyDecisionRecords: {},
             policyDecisionsLedgerHistory: [],
             policyDecisionApplications: [],
@@ -3285,6 +3395,9 @@ export const useAppStore = create<AppState>()(
                     ...(data.coachBlocks as Partial<CoachBlocksState>),
                   }
                 : state.coachBlocks,
+            weeklyReviews: Array.isArray(data.weeklyReviews)
+              ? (data.weeklyReviews as WeeklyReview[])
+              : state.weeklyReviews,
             policyDecisionRecords:
               data.policyDecisionRecords && typeof data.policyDecisionRecords === 'object'
                 ? data.policyDecisionRecords
