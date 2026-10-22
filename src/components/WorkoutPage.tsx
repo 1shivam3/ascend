@@ -79,6 +79,8 @@ import PlateCalculatorModal from '@/components/PlateCalculatorModal';
 import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
+import CoachBlockModal from '@/components/CoachBlockModal';
+import { weekTypeForDate } from '@/lib/block-engine';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
@@ -105,7 +107,7 @@ import {
   getWorkoutBodyParts,
   getScheduledWorkoutForDay,
 } from '@/lib/workout-schedule';
-import { plural, safeRandomId, getLocalTodayStr, formatLocalDate } from '@/lib/formatters';
+import { plural, safeRandomId, getLocalTodayStr, formatLocalDate, parseLocalDate } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 
 interface WorkoutPageProps {
@@ -521,6 +523,14 @@ interface PlanCardProps {
 
 function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
   const { t } = useTranslation();
+  const coachBlocks = useStore((state) => state.coachBlocks);
+  const adoptPlanForCoaching = useStore((state) => state.adoptPlanForCoaching);
+  const unadoptPlanForCoaching = useStore((state) => state.unadoptPlanForCoaching);
+  const isBlockPlan =
+    Boolean(plan.coachBlockId) &&
+    coachBlocks.activeBlock?.status === 'active' &&
+    coachBlocks.activeBlock.planIds.includes(plan.id);
+  const isAdopted = Boolean(coachBlocks.adoptedPlans?.[plan.id]);
   const MAX_VISIBLE = 3;
   const visibleExercises = plan.exercises.slice(0, MAX_VISIBLE);
   const remainder = plan.exercises.length - MAX_VISIBLE;
@@ -616,6 +626,34 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
         ))}
       </div>
 
+      {/* Coach management (PR-B): a block plan is labelled; any other
+          plan can be adopted by the coach without changing it. */}
+      {(isBlockPlan || isAdopted) && (
+        <div className="flex items-center gap-1.5">
+          <span className="text-3xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+            {isBlockPlan ? t('coachBlock.badgeBlock') : t('coachBlock.badgeManaged')}
+          </span>
+          {isAdopted && !isBlockPlan && (
+            <button
+              type="button"
+              onClick={() => unadoptPlanForCoaching(plan.id)}
+              className="text-2xs text-text-muted hover:text-danger cursor-pointer"
+            >
+              {t('coachBlock.stopCoaching')}
+            </button>
+          )}
+        </div>
+      )}
+      {!isBlockPlan && !isAdopted && (
+        <button
+          type="button"
+          onClick={() => adoptPlanForCoaching(plan.id)}
+          className="self-start text-2xs font-semibold text-accent hover:underline cursor-pointer"
+        >
+          {t('coachBlock.coachThisPlan')}
+        </button>
+      )}
+
       {/* Start button */}
       <button
         type="button"
@@ -653,6 +691,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
+  // Coach blocks (PR-B)
+  const coachBlocks = useStore((state) => state.coachBlocks);
+  const applyPlateauProposal = useStore((state) => state.applyPlateauProposal);
+  const dismissPlateauProposal = useStore((state) => state.dismissPlateauProposal);
+  const refreshPlateauProposals = useStore((state) => state.refreshPlateauProposals);
   const trainingProfile = useStore((state) => state.trainingProfile);
   // User's weekly-target override from Settings (null = automatic, 0 = off).
   const weeklyTargetOverride = useStore((state) => state.uiPreferences?.weeklyTargetDays ?? null);
@@ -812,6 +855,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [planToDelete, setPlanToDelete] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
+  const [isCoachBlockOpen, setIsCoachBlockOpen] = useState(false);
+  const [coachBlockAtReview, setCoachBlockAtReview] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [targetScheduleDay, setTargetScheduleDay] = useState<DayOfWeek | undefined>(undefined);
   const [historyFilter, setHistoryFilter] = useState('');
@@ -885,6 +930,20 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       return registerBackHandler(() => { setIsSuggestedModalOpen(false); return true; }, 100);
     }
   }, [isSuggestedModalOpen, registerBackHandler]);
+
+  useEffect(() => {
+    if (isCoachBlockOpen) {
+      return registerBackHandler(() => { setIsCoachBlockOpen(false); return true; }, 100);
+    }
+  }, [isCoachBlockOpen, registerBackHandler]);
+
+  // Plateau proposals for coach-managed lifts are (re)built when the
+  // Train tab mounts — cheap, deterministic, and dismissal-safe (the
+  // engine never re-proposes a dismissed change).
+  useEffect(() => {
+    refreshPlateauProposals();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isScheduleModalOpen) {
@@ -1911,6 +1970,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             onClose={() => setSharingPlan(null)}
           />
         </div>
+
+        {/* ── Coach Block Modal (also reachable from detail view) ────────── */}
+        <div className="relative z-[70]">
+          <CoachBlockModal
+            isOpen={isCoachBlockOpen}
+            onClose={() => setIsCoachBlockOpen(false)}
+            startAtReview={coachBlockAtReview}
+          />
+        </div>
       </>
     );
   }
@@ -2025,6 +2093,103 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </div>
         </div>
       )}
+
+      {/* ── Your Coach (PR-B) ── */}
+      <section className="space-y-2.5" aria-label={t('coachBlock.sectionTitle')}>
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent" />
+          <h2 className="section-title text-[11px] mb-0">{t('coachBlock.sectionTitle').toUpperCase()}</h2>
+        </div>
+
+        {coachBlocks.pendingProposal ? (
+          <div className="card p-4 flex items-center justify-between gap-3 border-accent/40">
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-text-primary">
+                {t('coachBlock.pendingTitle', { name: coachBlocks.pendingProposal.name })}
+              </p>
+              <p className="text-2xs text-text-muted">{t('coachBlock.pendingHint')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
+              className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
+            >
+              {t('coachBlock.reviewButton')}
+            </button>
+          </div>
+        ) : (
+          <div className="card p-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              {coachBlocks.activeBlock && coachBlocks.activeBlock.status === 'active' ? (
+                <>
+                  <p className="text-xs font-bold text-text-primary">
+                    {coachBlocks.activeBlock.name} ·{' '}
+                    {t('coachBlock.weekOf', {
+                      n: Math.min(
+                        coachBlocks.activeBlock.weeks.length,
+                        Math.max(
+                          1,
+                          Math.floor(
+                            (parseLocalDate(getLocalTodayStr()).getTime() -
+                              parseLocalDate(coachBlocks.activeBlock.startMonday).getTime()) /
+                              (7 * 86_400_000)
+                          ) + 1
+                        )
+                      ),
+                      total: coachBlocks.activeBlock.weeks.length,
+                    })}
+                  </p>
+                  <p className="text-2xs text-text-muted">
+                    {t('coachBlock.activeHint', {
+                      type: t(`coachBlock.week_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.week_build'),
+                    })}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-bold text-text-primary">{t('coachBlock.buildTitle')}</p>
+                  <p className="text-2xs text-text-muted">{t('coachBlock.buildHint')}</p>
+                </>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
+              className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
+            >
+              {coachBlocks.activeBlock ? t('coachBlock.buildNext') : t('coachBlock.buildButton')}
+            </button>
+          </div>
+        )}
+
+        {coachBlocks.plateauProposals
+          .filter((p) => p.status === 'pending')
+          .map((p) => (
+            <div key={p.id} className="card p-4 space-y-2 border-warning/40">
+              <p className="text-xs font-bold text-text-primary">
+                {t('coachBlock.plateauTitle', { name: p.displayName })}
+              </p>
+              <p className="text-2xs text-text-secondary">{p.evidence}</p>
+              <p className="text-2xs text-text-primary font-semibold">{p.changeText}</p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyPlateauProposal(p.id)}
+                  className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer"
+                >
+                  {t('coachBlock.plateauApply')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => dismissPlateauProposal(p.id)}
+                  className="btn-secondary py-1.5 px-3 text-xs font-semibold cursor-pointer"
+                >
+                  {t('coachBlock.plateauDismiss')}
+                </button>
+              </div>
+            </div>
+          ))}
+      </section>
 
       {/* ── Your Plans ── */}
       <section className="space-y-2.5" aria-label={t('train.yourPlans')}>
@@ -2774,6 +2939,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         defaultIntensity={primaryGoal === 'get_stronger' ? 'high' : primaryGoal === 'stamina' ? 'low' : 'medium'}
         onStartWorkout={handleStartSuggestedWorkout}
         onSavePlan={handleSaveSuggestedPlan}
+      />
+
+      {/* Coach Block Modal (PR-B) */}
+      <CoachBlockModal
+        isOpen={isCoachBlockOpen}
+        onClose={() => setIsCoachBlockOpen(false)}
+        startAtReview={coachBlockAtReview}
       />
 
       {/* Exercise Library Modal (Item 21) */}
