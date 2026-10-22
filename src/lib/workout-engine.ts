@@ -19,7 +19,14 @@ import {
   UserMode,
 } from './types';
 import { getEquipmentType, isMainCompoundLift, calculateOneRepMax, suggestLoad, isBodyweightExercise } from './strength-standards';
-import { getExerciseMuscle } from './exercise-library';
+import {
+  findLibraryExercise,
+  getExerciseMuscle,
+  getLibrarySubstitutes,
+  type MovementFamily,
+} from './exercise-library';
+
+export type { MovementFamily } from './exercise-library';
 import { getTodayDayOfWeek, getWorkoutBodyParts } from './workout-schedule';
 import { calculateSetEffortDrift } from './lifter-twin';
 import { canonicalizeExerciseName } from './workout-outcome-evidence';
@@ -1286,112 +1293,24 @@ export interface ExerciseSubstitute {
   rationale?: string;
 }
 
-const SUBSTITUTION_MAP: Record<string, ExerciseSubstitute[]> = {
-  'bench press': [
-    { name: 'Dumbbell Bench Press', equipment: 'dumbbell', reason: 'Better shoulder freedom & stabilizer engagement' },
-    { name: 'Incline Barbell Bench', equipment: 'barbell', reason: 'Upper chest emphasis with barbell power' },
-    { name: 'Chest Press Machine', equipment: 'machine', reason: 'Controlled path when spotter/barbell unavailable' },
-  ],
-  'dumbbell bench press': [
-    { name: 'Barbell Bench Press', equipment: 'barbell', reason: 'Heavier overload potential' },
-    { name: 'Incline Dumbbell Press', equipment: 'dumbbell', reason: 'Upper clavicular chest focus' },
-    { name: 'Dips', equipment: 'bodyweight', reason: 'High tricep and lower chest mass builder' },
-  ],
-  'incline dumbbell press': [
-    { name: 'Incline Barbell Bench', equipment: 'barbell', reason: 'Direct barbell compound substitute' },
-    { name: 'Low-to-High Cable Fly', equipment: 'cable', reason: 'Continuous tension on upper chest' },
-    { name: 'Landmine Press', equipment: 'barbell', reason: 'Very shoulder-friendly clavicular press' },
-  ],
-  'squat': [
-    { name: 'Leg Press', equipment: 'machine', reason: 'Heavy quad loading without spinal compression' },
-    { name: 'Hack Squat', equipment: 'machine', reason: 'Deep quad stretch with fixed lumbar support' },
-    { name: 'Goblet Squat', equipment: 'dumbbell', reason: 'Great upright posture & hip mobility' },
-  ],
-  'leg press': [
-    { name: 'Hack Squat', equipment: 'machine', reason: 'Same quad-dominant loading angle' },
-    { name: 'Barbell Squat', equipment: 'barbell', reason: 'Full systemic core & leg builder' },
-    { name: 'Bulgarian Split Squat', equipment: 'dumbbell', reason: 'Unilateral quad and glute focus' },
-  ],
-  'leg extension': [
-    { name: 'Hack Squat', equipment: 'machine', reason: 'Heavy quad focus when extension machine is taken' },
-    { name: 'Sissy Squat', equipment: 'bodyweight', reason: 'Intense rectus femoris isolation' },
-    { name: 'Walking Lunges', equipment: 'dumbbell', reason: 'Quad pump and active stabilizer work' },
-  ],
-  'deadlift': [
-    { name: 'Romanian Deadlift', equipment: 'barbell', reason: 'Pure hamstring & glute tension without floor reset' },
-    { name: 'Trap Bar Deadlift', equipment: 'barbell', reason: 'More quad engagement, lower lumbar strain' },
-    { name: 'Barbell Row', equipment: 'barbell', reason: 'Posterior chain loading with back thickness focus' },
-  ],
-  'romanian deadlift': [
-    { name: 'Dumbbell Romanian Deadlift', equipment: 'dumbbell', reason: 'Easier grip setup & natural hip hinge' },
-    { name: 'Seated Leg Curl', equipment: 'machine', reason: 'Isolated knee flexion hamstring work' },
-    { name: 'Good Mornings', equipment: 'barbell', reason: 'Hamstring and lower back erector loading' },
-  ],
-  'overhead press': [
-    { name: 'Dumbbell Shoulder Press', equipment: 'dumbbell', reason: 'Greater range of motion & wrist comfort' },
-    { name: 'Arnold Press', equipment: 'dumbbell', reason: 'Rotational delt recruitment' },
-    { name: 'Pike Push-ups', equipment: 'bodyweight', reason: 'Bodyweight overhead pressing movement' },
-  ],
-  'dumbbell shoulder press': [
-    { name: 'Barbell Overhead Press', equipment: 'barbell', reason: 'Raw progressive overload strength builder' },
-    { name: 'Machine Shoulder Press', equipment: 'machine', reason: 'Stable deltoid burnout' },
-    { name: 'Lateral Raises', equipment: 'dumbbell', reason: 'Direct side deltoid hypertrophy' },
-  ],
-  'barbell row': [
-    { name: 'Chest Supported Row', equipment: 'machine', reason: 'Zero lower back fatigue, pure upper back' },
-    { name: 'One-Arm Dumbbell Row', equipment: 'dumbbell', reason: 'Huge stretch on lats with unilateral focus' },
-    { name: 'Cable Seated Row', equipment: 'cable', reason: 'Constant cable tension through entire stroke' },
-  ],
-  'pull-ups': [
-    { name: 'Lat Pulldown', equipment: 'cable', reason: 'Micro-adjustable weight for precise rep targets' },
-    { name: 'Underhand Chin-ups', equipment: 'bodyweight', reason: 'Higher bicep leverage' },
-    { name: 'Straight Arm Pulldown', equipment: 'cable', reason: 'Pure lat isolation without arm fatigue' },
-  ],
-  'lat pulldown': [
-    { name: 'Pull-ups', equipment: 'bodyweight', reason: 'The gold standard vertical pulling movement' },
-    { name: 'Underhand Cable Pulldown', equipment: 'cable', reason: 'Closer grip for lower lat sweep' },
-    { name: 'One-Arm Cable Pulldown', equipment: 'cable', reason: 'Deep lateral flexion and full stretch' },
-  ],
-  'dumbbell curl': [
-    { name: 'Incline Dumbbell Curl', equipment: 'dumbbell', reason: 'Maximum stretch on the long head of biceps' },
-    { name: 'Barbell Bicep Curl', equipment: 'barbell', reason: 'Heavy bilateral bicep overload' },
-    { name: 'Hammer Curl', equipment: 'dumbbell', reason: 'Brachialis and forearm thickness' },
-  ],
-  'tricep pushdown': [
-    { name: 'Overhead Cable Tricep Extension', equipment: 'cable', reason: 'Target long head of triceps in stretched position' },
-    { name: 'Skull Crushers', equipment: 'barbell', reason: 'Heavy mass builder for tricep belly' },
-    { name: 'Dips', equipment: 'bodyweight', reason: 'Compound tricep press with bodyweight' },
-  ],
-};
-
+/**
+ * Substitutes for an exercise, backed by the library's id-keyed data
+ * (PR-A2: EXERCISE_SUBSTITUTIONS + pattern derivation in
+ * exercise-library.ts). Every returned name is a REAL library exercise —
+ * the old name-string table (27/41 targets dangling) and its placeholder
+ * fallbacks ("Dumbbell alternative") are gone. An exercise the library
+ * doesn't know gets NO substitutes here; callers fall back to their
+ * movement-pattern / muscle paths instead of inventing names.
+ */
 export function getQuickSubstitutes(exerciseName: string): ExerciseSubstitute[] {
   if (!exerciseName) return [];
-  const clean = exerciseName.trim().toLowerCase();
-
-  // Direct match
-  if (SUBSTITUTION_MAP[clean]) {
-    return SUBSTITUTION_MAP[clean];
-  }
-
-  // Partial match
-  for (const key of Object.keys(SUBSTITUTION_MAP)) {
-    if (clean.includes(key) || key.includes(clean)) {
-      return SUBSTITUTION_MAP[key];
-    }
-  }
-
-  // Fallback by movement category
-  const eq = getEquipmentType(exerciseName);
-  if (eq === 'dumbbell') {
-    return [
-      { name: 'Barbell equivalent', equipment: 'barbell', reason: 'Heavier bilateral overload' },
-      { name: 'Cable variation', equipment: 'cable', reason: 'Smooth resistance curve' },
-    ];
-  }
-  return [
-    { name: 'Dumbbell alternative', equipment: 'dumbbell', reason: 'Independent arm freedom' },
-    { name: 'Machine alternative', equipment: 'machine', reason: 'High stability and controlled path' },
-  ];
+  const item = findLibraryExercise(exerciseName);
+  if (!item) return [];
+  return getLibrarySubstitutes(item).map(({ target, reason }) => ({
+    name: target.name,
+    equipment: target.equipment.toLowerCase(),
+    reason,
+  }));
 }
 
 /**
@@ -1494,17 +1413,6 @@ export function exerciseMatchesExclusion(name: string, exclusions: string[] = []
   return exclusions.some((e) => normalizeExerciseKey(e) === key);
 }
 
-export type MovementFamily =
-  | 'hinge'
-  | 'squat'
-  | 'horizontal_push'
-  | 'vertical_push'
-  | 'horizontal_pull'
-  | 'vertical_pull'
-  | 'carry'
-  | 'core'
-  | 'other';
-
 const MOVEMENT_FAMILY_PATTERNS: [MovementFamily, RegExp][] = [
   ['hinge', /(deadlift|romanian|good morning|hip thrust|glute bridge|kettlebell swing|hyperextension|back extension)/],
   ['squat', /(squat|lunge|leg press|hack|step[- ]?up|leg extension)/],
@@ -1517,6 +1425,12 @@ const MOVEMENT_FAMILY_PATTERNS: [MovementFamily, RegExp][] = [
 ];
 
 export function getMovementFamily(name: string): MovementFamily {
+  // Data first (PR-A2): a library exercise's declared movementPattern is
+  // the answer — the regexes below survive only for custom/imported names
+  // the library doesn't know. (Regex-only classification misfiled
+  // rear-delt fly as a push and shrugs as a carry.)
+  const item = findLibraryExercise(name);
+  if (item) return item.movementPattern;
   const clean = (name || '').trim().toLowerCase();
   for (const [family, pattern] of MOVEMENT_FAMILY_PATTERNS) {
     if (pattern.test(clean)) return family;
