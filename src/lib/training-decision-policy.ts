@@ -307,6 +307,15 @@ export interface EvaluateDecisionOptions {
     requestHold?: boolean;
     notes?: string;
   };
+  /**
+   * Optional coach-block context (PR-B §4.5). Only ever passed for
+   * coach-managed lifts; when absent, behaviour is byte-identical to
+   * the pre-block policy. Test weeks hold progression (a test week is
+   * for measuring, not grinding); on deload weeks the policy proposes
+   * the standard deload cut as a reviewable decision when the evidence
+   * shows the lift is arriving hot, and holds progression otherwise.
+   */
+  blockContext?: { weekType: 'build' | 'deload' | 'test' };
   referenceDate?: string;
   workoutId?: string;
   sessionId?: string;
@@ -812,6 +821,64 @@ export function evaluateTrainingDecisionPolicyV0(
       headline: 'Athlete Requested Target Hold — Targets Maintained',
       explanation:
         'Athlete requested target hold. Maintaining current load and repetitions without progression.',
+      proposedWeight: targetWeight,
+      proposedReps: targetReps,
+      deltaWeight: 0,
+      deltaReps: 0,
+    });
+  }
+
+  // ── RULE 0.5: Coach-Block Week Discipline (PR-B §4.5) ──────────────────────
+  // Runs AFTER the safety rules (pain/hold always win) and BEFORE every
+  // progression branch. Only reached when a caller passed blockContext,
+  // which the store does exclusively for coach-managed lifts (D2); when
+  // blockContext is absent this whole block is skipped and behaviour is
+  // byte-identical to the pre-block policy.
+  // Test weeks hold progression: the week exists to measure what the
+  // block built. Deload weeks hold progression too, and when the latest
+  // evidence shows the lift arriving hot (above-target effort), the
+  // policy proposes the standard 10% deload cut as a reviewable decision
+  // — never an auto-edit (D3): its negative delta cannot pass
+  // validatePolicyDecisionApplication, so it can only ever be shown.
+  const blockWeekType = options?.blockContext?.weekType;
+  if (blockWeekType === 'test') {
+    return buildRecord({
+      actionCategory: 'hold_current_target',
+      ruleId: 'HOLD-BLOCK-TEST',
+      headline: 'Test Week — Load Held for Measurement',
+      explanation:
+        'It is test week in your coach block, so this load stays where it is: the session measures what the block built. Progressions resume after the test.',
+      proposedWeight: targetWeight,
+      proposedReps: targetReps,
+      deltaWeight: 0,
+      deltaReps: 0,
+    });
+  }
+  if (blockWeekType === 'deload') {
+    const arrivingHot =
+      latestComparableExp !== null &&
+      (latestComparableExp.rpeOutcomes.above_target > 0 ||
+        (latestComparableExp.averageRpeDelta !== null &&
+          latestComparableExp.averageRpeDelta > 0.5));
+    if (arrivingHot && targetWeight > 0) {
+      return buildRecord({
+        actionCategory: 'review_required',
+        ruleId: 'BLOCK-DELOAD-01',
+        headline: 'Deload Week — Review the Standard 10% Cut',
+        explanation:
+          'Deload week in your coach block, and recent sets on this lift have been running above target effort, so the coach proposes the standard 10% deload cut. It is shown for review and never applied silently.',
+        proposedWeight: targetWeight * 0.9,
+        proposedReps: targetReps,
+        deltaWeight: -(targetWeight * 0.1),
+        deltaReps: 0,
+      });
+    }
+    return buildRecord({
+      actionCategory: 'hold_current_target',
+      ruleId: 'HOLD-BLOCK-DELOAD',
+      headline: 'Deload Week — Progression Paused',
+      explanation:
+        'Deload week in your coach block: progression is paused on this lift so fatigue can clear before the test week.',
       proposedWeight: targetWeight,
       proposedReps: targetReps,
       deltaWeight: 0,
