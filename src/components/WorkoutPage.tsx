@@ -87,6 +87,8 @@ import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
+import FormCheckSection from '@/components/FormCheckSection';
+import CoachChatSection from '@/components/CoachChatSection';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
 import { isBlockEnded } from '@/lib/weekly-review';
 import { weekTypeForDate } from '@/lib/block-engine';
@@ -2295,6 +2297,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </button>
         )}
       </section>
+
+      {/* ── Live Form Check (Coach area; NOT the removed 'Ask Coach' drawer) ── */}
+      <FormCheckSection />
+      <CoachChatSection />
 
       {/* ── Your Plans ── */}
       <section className="space-y-2.5" aria-label={t('train.yourPlans')}>

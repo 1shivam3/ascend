@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Activity } from 'lucide-react';
 import type { ReadinessResult, ManualCheckin } from '@/lib/coach-engine';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
+import { RESISTANCE_MUSCLE_GROUPS } from '@/lib/exercise-library';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
@@ -139,6 +140,9 @@ export default function ReadinessSheet({
                           sleep: todayCheckin?.sleep ?? 3,
                           soreness: todayCheckin?.soreness ?? 3,
                           energy: todayCheckin?.energy,
+                          // Preserve any per-muscle ratings: tapping a
+                          // global row must never wipe them.
+                          sorenessByMuscle: todayCheckin?.sorenessByMuscle,
                         };
                         if (key === 'sleep') next.sleep = v;
                         else if (key === 'soreness') next.soreness = v;
@@ -163,6 +167,74 @@ export default function ReadinessSheet({
               ? t('ready.checkedIn')
               : t('ready.howFeel')}
           </p>
+
+          {/* Optional per-muscle freshness — collapsible, never required,
+              never blocks the check-in above. Blank muscles fall back to
+              the overall soreness rating. 1 = still sore, 5 = fresh. */}
+          <details className="pt-2">
+            <summary className="text-xs font-semibold text-text-secondary cursor-pointer">
+              Per-muscle freshness (optional)
+            </summary>
+            <p className="text-3xs text-text-muted pt-1 pb-2">
+              Only fill in muscles that feel different from your overall
+              soreness — blank ones just use that rating. This only
+              fine-tunes per-muscle readiness for planning; it never
+              replaces the check-in above.
+            </p>
+            {RESISTANCE_MUSCLE_GROUPS.map((muscle) => (
+              <div key={muscle} className="flex items-center justify-between gap-2 py-0.5">
+                <span className="text-xs font-semibold text-text-secondary">{muscle}</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((v) => {
+                    const current = todayCheckin?.sorenessByMuscle?.[muscle] ?? 0;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-label={`${muscle} freshness ${v} of 5`}
+                        onClick={() => {
+                          const next: ManualCheckin = {
+                            sleep: todayCheckin?.sleep ?? 3,
+                            soreness: todayCheckin?.soreness ?? 3,
+                            energy: todayCheckin?.energy,
+                            sorenessByMuscle: {
+                              ...todayCheckin?.sorenessByMuscle,
+                              [muscle]: v,
+                            },
+                          };
+                          onCheckin(todayStr, next);
+                        }}
+                        className={`w-8 h-8 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                          current === v
+                            ? 'bg-accent text-white'
+                            : 'bg-bg-secondary text-text-muted hover:text-text-primary border border-border/60'
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {todayCheckin?.sorenessByMuscle &&
+              Object.keys(todayCheckin.sorenessByMuscle).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next: ManualCheckin = {
+                      sleep: todayCheckin?.sleep ?? 3,
+                      soreness: todayCheckin?.soreness ?? 3,
+                      energy: todayCheckin?.energy,
+                    };
+                    onCheckin(todayStr, next);
+                  }}
+                  className="text-xs font-semibold text-text-muted hover:text-text-primary pt-1 cursor-pointer"
+                >
+                  Clear per-muscle ratings
+                </button>
+              )}
+          </details>
         </div>
       </div>
     </div>
