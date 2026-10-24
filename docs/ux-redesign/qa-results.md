@@ -4,11 +4,15 @@
 > **Base:** `master` @ `2c6512d7` (untouched throughout; never pushed to, never merged into).
 > **Method (this phase):** full check suite re-run on the tip in a fresh clone; static code
 > inspection + targeted greps for the regression tasks and preservation claims; targeted
-> re-run of the gate test file to confine the failures. **No browser was operated, no
-> screenshots were taken or faked** (no screenshot tooling exists in the repo) — the live
-> visual acceptance in §3 is **PENDING the parent-run browser phase** and is not claimed here.
-> No sign-in, no credentials, no Supabase/production state touched. This phase changed no
-> app code; its only commit is this document.
+> re-run of the gate test file to confine the failures. **Live browser verification has since
+> completed** (parent-run, §3) on the Vercel preview deployment of this branch
+> (https://ascend-r88thrl2y-1shivam3s-projects.vercel.app, commit `5ad6faf`) — guest-only,
+> no sign-in, no production site visited. The app code at `5ad6faf` is identical to this tip
+> (this tip adds only documentation), so the browser results apply to the tip. The browser's
+> test state (Cobalt, Simple, English, Beginner, 1 logged set, 1 logged meal) lived only in
+> that browser's localStorage on the preview origin — no server-side data, no cleanup needed.
+> No credentials, no Supabase/production state touched. This phase changed no app code; its
+> commits are this document only (part A + this live-visual update).
 > **Headline: zero deviation from Stage 10.** Every check reproduces Stage 10's numbers
 > exactly, which is expected: the tip is Stage 10 code plus one documentation commit.
 
@@ -30,63 +34,113 @@ weakened to pass: no test, threshold, or config was altered in this phase.
 ## 2. Eighteen-task regression (brief's named tasks)
 
 Verdict key: **Pass** = code + test evidence on the tip. **Partial** = code/test evidence
-holds but the task needs live eyes to close (see §3). Evidence marked "(this phase)" was
+holds but the task needs live eyes to close, or live evidence is mixed (verified working
+with open live defects, see §3). Evidence marked "(this phase)" was
 re-verified by grep/diff in Phase 12; evidence marked "(Stage 10/11)" is taken from
 `implementation-summary.md` / `synthetic-personas-round-2.md`, which this phase spot-checked
 but did not fully re-derive.
 
 | # | Task | Verdict | Evidence |
 |---|---|---|---|
-| 1 | Onboarding | Pass | Stage 7: summary screen, labeled guest path, Skip visually equal to Accept (Stage 7 tests 7/7). |
-| 2 | Start/resume workout | Pass | Resume handler in `WorkoutPage.tsx:1098,2149` (this phase); Stage 2/4; persistent Resume affordance. Live phone feel still owed (§3). |
-| 3 | Set recording | Pass (logic) | Stage 4 touched only `ActiveWorkoutScreen`, `SettingsView`, `WorkoutPage`, i18n, new `workout-mode.ts`, + tests (this phase, commit `68fac43` file list) — no set-logging engine lib changed. Behavioral proof on a real phone is §3's job. |
+| 1 | Onboarding | Partial | Stage 7 tests 7/7. LIVE: labeled "Continue as Guest" path and equally-sized plan Skip ("Yes, add my plan" vs "No thanks, I'll build my own") verified — but NO summary screen observed after plan acceptance, straight to Today (live defect L1). `SummaryScreen.tsx` exists in Stage 7, so this is a discrepancy to resolve, not a missing file. |
+| 2 | Start/resume workout | Pass | Resume handler in `WorkoutPage.tsx:1098,2149` (this phase); Stage 2/4; persistent Resume affordance. LIVE: Train logging verified end-to-end (set → rest timer counting down → SESSION SAVED → Session Complete with 1RM PR detection → history + Today updates). Rest-timer defects L4 open; widths still pending (§3). |
+| 3 | Set recording | Pass (logic) | Stage 4 touched only `ActiveWorkoutScreen`, `SettingsView`, `WorkoutPage`, i18n, new `workout-mode.ts`, + tests (this phase, commit `68fac43` file list) — no set-logging engine lib changed. LIVE: set logging verified end-to-end (set → rest timer → SESSION SAVED → Session Complete with 1RM PR detection). Rest-timer preset/duplication/Escape defects L4 open. |
 | 4 | Plan / weekly review | Pass | Stages 3/4; Coach section + notes content; plan Start lands directly on the perform surface. |
-| 5 | Settings / personalization | Pass | Stage 6 tests 8/8; ThemePicker + accent wiring, density, CustomizeSheet (this phase: sheet reachable from `HomePage` + `SettingsView`, same component). |
-| 6 | Progress / chart exploration | Pass | Stage 5 + Stage 10 chart re-verification (units via `userUnit`, real date windows, measured solid vs estimated dashed + "est." badge); spotlight pin persists, goal change clears pin + toast (`ProgressPage.tsx:804,863-868`, this phase). Volume-title phrasing nuance (descriptive, not a question) remains a confirm-or-convert item. |
-| 7 | Nutrition scan / manual | Pass | Stage 5; scan/manual/barcode land on the same meal list with per-item exact/estimated chips. Voice meal path does not exist — recorded, not invented (Stage 10). |
+| 5 | Settings / personalization | Pass (with open defect) | Stage 6 tests 8/8. LIVE: Customize sheet from BOTH Today and Settings verified (hide removes immediately, up/down reorder visibly works, Restore layout shows success toast and restores); accent presets recolor the app (Cobalt verified); custom accent #F5EFE0 correctly REJECTED with inline error and Apply disabled; density Simple → Detailed adds nutrition detail, "What your coach has learned" card, weekly-review item, full 7-column habit grid, monthly-challenge card. Open: Athlete Experience showed "Advanced· Auto" after the density switch although onboarding was Beginner and Advanced was never selected — causation UNPROVEN, live defect L3. |
+| 6 | Progress / chart exploration | Pass | Stage 5 + Stage 10 chart re-verification (units via `userUnit`, real date windows, measured solid vs estimated dashed + "est." badge); spotlight pin persists, goal change clears pin + toast (`ProgressPage.tsx:804,863-868`, this phase). LIVE: spotlight pin switching verified (Strength trend / Volume by muscle / Auto all restore correctly); measured-solid vs estimated-dashed distinction verified in principle on charts. Volume-title phrasing nuance (descriptive, not a question) remains a confirm-or-convert item. |
+| 7 | Nutrition scan / manual | Partial | Stage 5; scan/manual/barcode land on the same meal list with per-item exact/estimated chips. LIVE: Fuel food-item Exact chip verified — BUT the same Exact item's numbers still carry the "~" prefix, and meal totals are "~" with no Estimated label (live defect L8: Exact/estimated honesty contradiction). Voice meal path does not exist — recorded, not invented (Stage 10). |
 | 8 | Cross-tab navigation | Pass | TabIds/routes unchanged (`navigation.tsx:8,61` — home/workout/progress/meals/prs/profile/settings, this phase); `/?tab=` deep links preserved (`:57`, URL tab wins, `:138`); last-tab restore unchanged. "You" is presentation-only (`page.tsx:61-63,340,348,415`, this phase). |
-| 9 | Modal / error / empty / offline states | Pass (code) | New `Sheet`, `EmptyState` components exist in `src/components/ui/` (this phase); sync caption + offline banner per Stage 10. Modal-stack behavior: `use-modal-a11y` untouched (this phase). Live Escape/layering check is §3. |
-| 10 | Keyboard + focus | Pass (code) | Global `:focus-visible` rule added (`globals.css:149+`, this phase); `use-modal-a11y` untouched (this phase). Live keyboard pass is §3. |
-| 11 | Responsive widths | Partial | Stage 9 code checks (fluid `viewBox` charts, rem scaling, nav labels wrap); 390 px + xlarge visual checks owed to §3. Desktop = rail + centered `max-w-md` column, NOT the decided `max-w-3xl` wide grids (see P1). |
+| 9 | Modal / error / empty / offline states | Partial | New `Sheet`, `EmptyState` components exist in `src/components/ui/` (this phase); sync caption + offline banner per Stage 10. Modal-stack behavior: `use-modal-a11y` untouched (this phase). LIVE: Customize dialog closes via Escape, backdrop, and X — but Escape does NOT close the rest overlay (live defect L4). Full Escape/layering verdict stays open. |
+| 10 | Keyboard + focus | Partial | Global `:focus-visible` rule added (`globals.css:149+`, this phase); `use-modal-a11y` untouched (this phase). LIVE: skip-to-content focus pill visible on Tab — but focus rings beyond the skip-link pill were not clearly distinguishable (live defect L12). Full keyboard pass stays open. |
+| 11 | Responsive widths | Partial — widths NOT verified | Stage 9 code checks (fluid `viewBox` charts, rem scaling, nav labels wrap). LIVE: the browser session offered no resize control, so 390 px / 1024 px / 1440 px are explicitly NOT verified and stay pending. At the rendered desktop width there IS a left rail and content is a narrow centered column (Train excepted: 2-column grid inside it). Desktop = rail + centered `max-w-md` column, NOT the decided `max-w-3xl` wide grids (see P1). |
 | 12 | Dark-mode consistency | Pass (code) | Contrast audit loops `light`/`dark` modes (`stage9` tests, this phase); 6 presets × 2 modes, zero failing rows (Stage 1/9). Live dark-mode eyes are §3. |
 | 13 | Performance / bundle | Pass | Build passes; shared First Load JS 88.2 kB, unchanged from baseline (this phase). No new dependencies (package.json diff empty, this phase). |
 | 14 | Data integrity / persistence | Pass | Store sanitize + persist-version bump + `migrate()` (new accounts Simple, existing Detailed); six new keys validated on read, invalid → defaults (store.ts, this phase); ranges local-only, SSR-guarded. |
 | 15 | Multi-persona task re-verification | Pass (simulation) | Phase 11 doc: same 12 personas × same 36 tasks → **2.76 → 3.71 (+0.95)**; Fixed 12, Partial 19, Unchanged 3, Still failing 2 (the two P0s). Scores are simulated, not measured — labeled as such in that doc. Re-running personas on unchanged code would reproduce them. |
-| 16 | Visual consistency | Partial | Tokens applied globally (Stage 1); zero `text-3xs` remaining, zero `animate-pulse`/`animate-ping` remaining (this phase). Full visual pass is §3 — this row cannot close on code alone. |
-| 17 | Accessibility | Partial (code-level) | See §4. Whole-claim WCAG 2.2 AA is NOT made here. |
+| 16 | Visual consistency | Partial | Tokens applied globally (Stage 1); zero `text-3xs` remaining, zero `animate-pulse`/`animate-ping` remaining (this phase). LIVE: Today Simple fold renders with no major clipping; but live defects L5 (cramped/truncated Train plan cards), L7 (accent leaks), L9 (clipping + toast overlap) are open. |
+| 17 | Accessibility | Partial | See §4. LIVE: Hindi Devanagari renders cleanly with no layout break; skip-link pill visible on Tab; focus rings beyond it not clearly distinguishable (L12). Whole-claim WCAG 2.2 AA is NOT made here. |
 | 18 | Plan offer / guest path / summary screen | Pass | Covered under onboarding (Stage 7); summary screen + labeled guest + equal Skip verified in Stage 7 tests. |
 
 **No task regressed against Stage 10. No task failed outright in code/test evidence.**
 The two "Still failing" Phase 11 tasks are the P0s in §6 — pre-existing behavior defects
 the redesign deliberately did not fix without approval, not regressions.
 
-## 3. Visual acceptance — ⏳ PENDING (parent-run browser phase, NOT claimed)
+## 3. Visual acceptance — LIVE BROWSER VERIFICATION COMPLETE except widths
 
-This section is intentionally unfilled. The following MUST be done live against the running
-branch app (guest test data only, no sign-in, localhost — never production, never mockups)
-before the PR is finalized, and the results appended to this document:
+Parent-run live browser verification on the Vercel preview deployment of this branch
+(https://ascend-r88thrl2y-1shivam3s-projects.vercel.app, commit `5ad6faf`), guest-only,
+test data only, no sign-in, no production site visited. The app code at `5ad6faf` is
+identical to this tip (this tip adds only documentation), so these results apply to the tip.
+The browser's test state lived only in that browser's localStorage on the preview origin —
+no server-side data, no cleanup needed. Nothing in this section is claimed beyond what the
+browser session listed.
 
-- **Tap-throughs (highest-risk flows):** full workout in Beginner AND Advanced; finish +
-  post-finish stack; rest-timer occlusion during a real set; keyboard covering the next set;
-  logger → selector → active keyboard chain + Escape layering; Customize sheet hide / order /
-  restore; density switch for an existing user; accent pick + custom accent including a
-  near-background rejection (e.g. `#F5EFE0`); spotlight pin + goal change; onboarding
-  end-to-end; scan → review → save with exact/estimated chips.
-- **Screenshots of the running app:** Today fold in Simple AND Detailed; You tab + Settings;
-  spotlight + pin; Fuel chips; onboarding summary; desktop rail at 1024 px and 1440 px.
-- **Layout checks:** 390 px + xlarge text scale (clipping / overlap / scroll); desktop wide
-  grids verdict — build them or explicitly accept rail + centered column (P1).
-- **Typography check:** Barlow mixed-script coherence in Hindi mode (Inter-only fallback is
-  reserved and reversible; sandbox font downloads may fall back — report font status honestly).
-- **Motion feel:** low-end-phone feel, including the data-bar-transition judgment (kept as data).
-- **Live sign-in observation:** Google consent-screen app name still unproven (needs a real
-  sign-in observation; guest-only browser work cannot close it).
-- **Copy reads:** "est." comprehension, set-type/RPE first use, streak tone, DataVault coverage
-  wording (after its fix), volume inclusion rules (after its fix).
-- **Native-speaker review:** ~94 new Hindi keys (listed by stage in the implementation summary).
+### Verified working (guest, test data only)
 
-Until those land, any claim of visual or whole-product accessibility acceptance would be
-fabrication. This document does not make it.
+- Guest onboarding with labeled "Continue as Guest" path and equally-sized plan Skip
+  ("Yes, add my plan" vs "No thanks, I'll build my own").
+- Today Simple fold (header, workout card, nutrition strip, ONE Coach section, habit matrix,
+  quick actions, hydration, Customize Today) with no major clipping.
+- Customize Today sheet from BOTH Today and Settings (hide removes immediately, up/down
+  reorder visibly works, Restore layout shows success toast and restores).
+- You tab with Profile | Settings segmented control.
+- Accent presets recolor the app (Cobalt verified).
+- Custom accent #F5EFE0 correctly REJECTED with inline error and Apply disabled.
+- Density Simple → Detailed adds nutrition detail, "What your coach has learned" card,
+  weekly-review item, full 7-column habit grid, monthly-challenge card.
+- Train logging end-to-end (set → rest timer counting down → SESSION SAVED → Session
+  Complete with 1RM PR detection → history + Today updates).
+- Progress spotlight pin switching (Strength trend / Volume by muscle / Auto all restore
+  correctly).
+- Measured-solid vs estimated-dashed distinction in principle on charts.
+- Fuel food-item Exact chip.
+- Hindi switching with clean Devanagari rendering and no layout break.
+- Customize dialog Escape / backdrop / X close.
+- Skip-to-content focus pill visible on Tab.
+
+### Live defects — recorded as found; triage and fixes are a later phase, not this one
+
+- **L1 — No summary screen observed after plan acceptance** — went straight to Today.
+  Note: `SummaryScreen.tsx` EXISTS in Stage 7, so this is a discrepancy to resolve, not a
+  missing file.
+- **L2 — Simple-mode habit matrix shows only the Sun column** despite the MON—SUN label,
+  rendering as one long empty bar per row (Detailed shows the full grid).
+- **L3 — Athlete Experience showed "Advanced· Auto" after the density switch** although
+  onboarding was Beginner and Advanced was never selected — causation UNPROVEN, recorded
+  as such (trace whether density writes experience or only workout mode).
+- **L4 — Rest timer inconsistencies:** floating pill read 1:30 but post-set overlay timer
+  was 2:00 (inconsistent presets); pill duplicates the overlay and keeps counting after
+  Next Set; overlay is a centered panel not covering full desktop width; Escape does NOT
+  close the rest overlay.
+- **L5 — Train plan cards cramped/truncated in their 2-column layout** ("Bench Pr…",
+  "Est. 32–54 min" wrapping).
+- **L6 — Coach note stayed "4 planned sessions didn't get logged"** after one session was
+  logged.
+- **L7 — Accent leaks:** Session Complete "Done & Return to Workouts" stayed Vermilion
+  under Cobalt; Muscle Volume legend says "Orange" while the bar renders the active accent;
+  "View Completed Workout" pale blue with white text (low contrast).
+- **L8 — Exact chip contradiction:** the same Exact food item's numbers still carry the "~"
+  prefix, and meal totals are "~" with no Estimated label.
+- **L9 — Clipping and overlap:** Settings jump-button row horizontally clipped at desktop
+  width; Log Meal favorites row clipped; toasts overlap headings (Meal Logged over
+  "FUEL THE WORK.").
+- **L10 — Mixed Hindi strings remain** (e.g. "Today कस्टमाइज़ करें", workout names stay
+  English) — pre-existing i18n gaps, not redesign regressions.
+- **L11 — WIDTHS NOT VERIFIED:** the browser session offered no resize control, so 390 px /
+  1024 px / 1440 px are explicitly NOT verified and stay pending. At the rendered desktop
+  width there IS a left rail and content is a narrow centered column (Train excepted:
+  2-column grid inside it).
+- **L12 — Focus rings beyond the skip-link pill were not clearly distinguishable.**
+
+### Still open after this session (NOT claimed here)
+
+Screenshots of the running app as review artifacts; low-end-phone motion feel; live sign-in
+observation (Google consent-screen app name still unproven — guest-only work cannot close
+it); copy reads ("est." comprehension, set-type/RPE first use, streak tone, DataVault
+coverage wording after its fix, volume inclusion rules after its fix); native-speaker review
+of the ~94 new Hindi keys; full keyboard pass; 390 px + xlarge layout; desktop wide-grids
+verdict (build or explicitly accept rail + centered column). None of these are claimed by
+this document.
 
 ## 4. Accessibility acceptance (code-level only)
 
@@ -109,6 +163,10 @@ fabrication. This document does not make it.
   the global `prefers-reduced-motion` rule is the control and is preserved/extended.
 - **Text alternatives:** heatmap counts + cell summaries are text; measured vs estimated is
   never color alone (solid vs dashed + "est." badge) — per Stage 10 chart re-verification.
+- **LIVE (browser phase):** skip-to-content focus pill visible on Tab; Hindi Devanagari
+  renders cleanly with no layout break; focus rings beyond the skip-link pill were not
+  clearly distinguishable (L12). These narrow the gap but do not close the caveat below —
+  widths, full keyboard pass, and screen-reader behavior remain untested.
 - **⚠️ Explicit caveat: WCAG 2.2 AA as a whole is NOT claimed.** Code-level passes above do
   not substitute for the live checks in §3 (390 px + xlarge, keyboard pass, Barlow
   mixed-script, low-end motion feel, screen-reader behavior). The claim stays open until
@@ -181,6 +239,12 @@ Diff `2c6512d7..HEAD`: **116 files changed, +8,650 / −1,077** — exactly Stag
     transitions kept as data, preset opaque subtles vs custom rgba washes (both
     audit-passing, not harmonized), translucent `bg-accent/85` contrast-audit limitation.
 
+### Live defects (browser phase) — recorded, untriaged
+
+L1–L12 are recorded in full in §3. Triage and fixes are a separate worker after this push;
+this phase changes no app code. Until triaged (fixed or explicitly accepted each), the PR
+should not be finalized on visual grounds alone.
+
 ### Not fixed, shipped as known issues (unchanged from Stage 10/11)
 
 D1, D6, D5 (removing `public/ui-mockups.html` from serving), Supabase custom domain
@@ -189,12 +253,17 @@ D1, D6, D5 (removing `public/ui-mockups.html` from serving), Supabase custom dom
 
 ## 7. Quality-gate readiness (Phase 14 input)
 
-**Ready for the PR once §3 lands and its results are appended:** checks green with zero
-deviation from Stage 10; preservation holds (no data/auth/schema/sync change, no new deps,
-boundaries intact); simulation improved 2.76 → 3.71 with the two still-failing tasks honestly
+**Ready for the PR once the following close:** checks green with zero deviation from
+Stage 10; preservation holds (no data/auth/schema/sync change, no new deps, boundaries
+intact); simulation improved 2.76 → 3.71 with the two still-failing tasks honestly
 attributed to pre-existing defects, not the redesign; all decision-doc deviations documented
 in the implementation summary (Sheet migration, SetRow/SetTable, desktop grids, sub-44
 chips, data-bar transitions, rest-timer placement, finish-flow order, subtle harmonization).
+Visual acceptance is now substantially filled (§3) EXCEPT widths. What still blocks
+finalization: (a) triage + fixes for live defects L1–L12 (separate worker after this push)
+or explicit acceptance of each; (b) widths verification (390/1024/1440); (c) the still-open
+items in §3 (screenshots as artifacts, low-end motion feel, live sign-in, copy reads,
+Hindi-keys review, full keyboard pass); (d) the user decisions below.
 
 **Blocked on user decisions (NOT decidable by this program):** P0-1 D1, P0-2 D6,
 D5 ui-mockups removal, Supabase custom domain ($25/mo Pro), in-Settings Apple/OTP/email
@@ -209,5 +278,6 @@ header note remains flagged for his awareness; progress sub-tab display-label re
 is implemented display-only with `?sub=` params unchanged (deep links keep working).
 
 **Phase 14 gate questions (product / brand / interaction / personalization / engineering /
-honesty) are deferred to the parent** until §3's live results exist — answering them on code
-evidence alone would repeat the exact fabrication this document refuses in §3.
+honesty) remain deferred to the parent.** They can now be judged against live results (§3),
+but the gate itself is not run in this phase — it should run after the fixes worker lands,
+not before.
