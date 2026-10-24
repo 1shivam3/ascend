@@ -58,7 +58,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
       <StepProgressBar currentStep={3} onBack={onBack} />
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <h1 className="page-title">
             Your week, your setup
           </h1>
           <p className="text-sm text-text-muted">

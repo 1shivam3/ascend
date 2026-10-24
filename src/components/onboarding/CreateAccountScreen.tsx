@@ -172,6 +172,8 @@ export default function CreateAccountScreen({
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {/* Password rule shown before submit, not only after failure. */}
+              <p className="mt-1.5 text-2xs text-text-muted">{t('auth.passwordLength')}</p>
             </div>
 
             {/* Primary Action Button */}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '@/lib/store';
 import type { AuthUser } from '@/lib/supabase/sync';
-import { AthleteGoal, Gender, Unit, UserMode, DietPreference, AITrainingProfile, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { AthleteGoal, Gender, Unit, UserMode, DietPreference, AITrainingProfile, ATHLETE_GOAL_CONFIGS, resolvePrimaryGoal, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/formatters';
 import { getOrCreateGuestId } from '@/lib/storage';
@@ -21,6 +21,7 @@ import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
 import ExperienceLevelScreen from './onboarding/ExperienceLevelScreen';
 import PersonalDetailsScreen from './onboarding/PersonalDetailsScreen';
 import ScheduleScreen from './onboarding/ScheduleScreen';
+import SummaryScreen from './onboarding/SummaryScreen';
 import StepProgressBar from './onboarding/StepProgressBar';
 
 type OnboardingScreenId =
@@ -32,7 +33,8 @@ type OnboardingScreenId =
   | 'experience'
   | 'schedule'
   | 'details'
-  | 'plan_offer';
+  | 'plan_offer'
+  | 'summary';
 
 export default function Onboarding() {
   const { t } = useTranslation();
@@ -90,6 +92,8 @@ export default function Onboarding() {
     setCreatineConfig,
   } = useStore();
   const currentMacroGoals = useStore((s) => s.macroGoals);
+  const profile = useStore((s) => s.profile);
+  const trainingProfile = useStore((s) => s.trainingProfile);
 
   // Detect Google auth session or local snapshots on-demand
   useEffect(() => {
@@ -100,7 +104,7 @@ export default function Onboarding() {
     const screenParam = searchParams.get('screen') as OnboardingScreenId;
     if (
       screenParam &&
-      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'schedule', 'details', 'plan_offer'].includes(
+      ['splash', 'welcome', 'create_account', 'login', 'goals', 'experience', 'schedule', 'details', 'plan_offer', 'summary'].includes(
         screenParam
       )
     ) {
@@ -411,7 +415,7 @@ export default function Onboarding() {
       setCurrentScreen('plan_offer');
     } else {
       applyProfileWithAgeGuards(profileData);
-      completeOnboarding();
+      setCurrentScreen('summary');
     }
   };
 
@@ -419,6 +423,15 @@ export default function Onboarding() {
     toast.success(t('toast.welcome', { name: savedFirstName }), pendingPlans ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
     try {
       navigate('home', { clearHistory: true });
+    } catch {}
+  };
+
+  // Summary edit link: finish onboarding (the profile is already applied)
+  // and land on You → Settings, where Training Preferences holds the editors.
+  const handleSummaryEdit = () => {
+    toast.success(t('toast.welcome', { name: savedFirstName }), t('toast.titleAllSet'));
+    try {
+      navigate('settings', { clearHistory: true });
     } catch {}
   };
 
@@ -449,14 +462,14 @@ export default function Onboarding() {
     }
     setPendingPlans(null);
     setPendingSchedule(null);
-    completeOnboarding();
+    setCurrentScreen('summary');
   };
 
   const handleDeclinePlans = () => {
     applyPendingProfile();
     setPendingPlans(null);
     setPendingSchedule(null);
-    completeOnboarding();
+    setCurrentScreen('summary');
   };
 
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -678,7 +691,7 @@ export default function Onboarding() {
         <StepProgressBar currentStep={4} onBack={() => setCurrentScreen('details')} />
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
           <div className="text-left space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h1 className="page-title">
               {t('onboarding.planOfferTitle')}
             </h1>
             <p className="text-sm text-text-primary/70">
@@ -733,13 +746,46 @@ export default function Onboarding() {
             <button
               type="button"
               onClick={handleDeclinePlans}
-              className="w-full py-4 px-6 rounded-2xl bg-transparent border-2 border-text-primary/20 text-text-primary font-semibold text-base active:scale-[0.98] transition-transform"
+              className="w-full py-4 px-6 rounded-2xl bg-bg-card border-2 border-border text-text-primary font-bold text-base active:scale-[0.98] transition-transform"
             >
               {t('onboarding.declinePlan')}
             </button>
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ── SUMMARY SCREEN (UX redesign Stage 7) ─────────────────────────────────
+  // Shown after the plan offer (or directly after details when no plan was
+  // generated) and before the tabs. Rows restate stored choices only.
+  if (currentScreen === 'summary') {
+    const summaryGoal = resolvePrimaryGoal(profile?.goals);
+    const summaryLevelKey =
+      trainingProfile?.experience === 'advanced'
+        ? 'settings.modeAdvanced'
+        : trainingProfile?.experience === 'intermediate'
+          ? 'settings.modeIntermediate'
+          : 'settings.modeBeginner';
+    const summaryDiet = profile?.dietPreference ?? 'non_vegetarian';
+    const summaryDietKey =
+      summaryDiet === 'vegetarian'
+        ? 'settings.dietVegetarian'
+        : summaryDiet === 'eggitarian'
+          ? 'settings.dietEggetarian'
+          : summaryDiet === 'vegan'
+            ? 'settings.dietVegan'
+            : 'settings.dietNonVegetarian';
+    return (
+      <SummaryScreen
+        goal={ATHLETE_GOAL_CONFIGS[summaryGoal].label}
+        level={t(summaryLevelKey)}
+        daysPerWeek={trainingProfile?.daysPerWeek ?? 4}
+        diet={t(summaryDietKey)}
+        injuries={trainingProfile?.injuriesOrLimitations ?? []}
+        onContinue={completeOnboarding}
+        onEdit={handleSummaryEdit}
+      />
     );
   }
 

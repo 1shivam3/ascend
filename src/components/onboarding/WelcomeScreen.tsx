@@ -44,7 +44,7 @@ export default function WelcomeScreen({
 
       {/* Hero Content */}
       <div className="w-full max-w-md mx-auto my-auto text-center py-8">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-text-primary tracking-tight leading-tight">
+        <h1 className="display-title leading-tight">
           {t('onboarding.welcomeTitle')}
         </h1>
         <p className="mt-4 text-base text-text-muted leading-relaxed max-w-sm mx-auto font-normal">
@@ -94,16 +94,15 @@ export default function WelcomeScreen({
           {t('onboarding.haveAccount')}
         </button>
 
-        {/* Discreet Guest Access Option */}
-        <div className="pt-3 text-center">
-          <button
-            type="button"
-            onClick={onContinueAsGuest}
-            className="text-xs text-text-muted hover:text-text-primary transition-colors underline underline-offset-4 cursor-pointer"
-          >
-            {t('onboarding.continueAsGuest')}
-          </button>
-        </div>
+        {/* Guest path: a labeled, first-class button — not a discreet link. */}
+        <button
+          type="button"
+          onClick={onContinueAsGuest}
+          className="w-full py-3.5 px-6 rounded-xl bg-bg-card hover:bg-bg-primary/60 active:scale-[0.99] text-text-primary border border-text-primary/20 font-semibold text-base transition-all shadow-2xs cursor-pointer text-center"
+        >
+          {t('onboarding.continueAsGuest')}
+        </button>
+        <p className="text-2xs text-text-muted text-center">{t('onboarding.guestNote')}</p>
       </div>
     </div>
   );

@@ -73,7 +73,7 @@ export default function FitnessGoalsScreen({
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
+          <h1 className="page-title">
             {t('onboarding.goalsTitle')}
           </h1>
           <p className="text-sm text-text-muted">
