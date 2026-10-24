@@ -552,6 +552,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'toast.foodPinned': '{name} Frequent Favorites में पिन हुआ!',
   'toast.foodUnpinned': '{name} Favorites से अनपिन हुआ।',
   'toast.addedToMeal': '{name} मौजूदा भोजन में जुड़ा!',
+  'tabGuard.message': 'ASCEND दूसरे टैब में खुला है — यहाँ एडिट करने से वहाँ के बदलाव ओवरराइट हो सकते हैं।',
+  'tabGuard.useThisTab': 'इसी टैब का इस्तेमाल करें',
 
   'toast.titleInvalidQty': 'गलत मात्रा',
   'toast.titleMyVersion': 'मेरा वर्शन',

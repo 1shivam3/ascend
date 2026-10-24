@@ -556,6 +556,8 @@ export const en = {
   'toast.foodPinned': 'Pinned {name} to Frequent Favorites!',
   'toast.foodUnpinned': 'Unpinned {name} from Favorites.',
   'toast.addedToMeal': 'Added {name} to current meal!',
+  'tabGuard.message': 'ASCEND is open in another tab — editing here may overwrite changes there.',
+  'tabGuard.useThisTab': 'Use this tab instead',
   'toast.titleInvalidQty': 'Invalid Quantity',
   'toast.titleMyVersion': 'My Version',
   'toast.titleMissingName': 'Missing Name',

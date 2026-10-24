@@ -1015,8 +1015,8 @@ export default function ActiveWorkoutScreen({
 
   const formCues = useMemo(() => {
     if (!currentExercise?.name) return [];
-    return getExerciseFormCues(currentExercise.name);
-  }, [currentExercise?.name]);
+    return getExerciseFormCues(currentExercise.name, language);
+  }, [currentExercise?.name, language]);
 
   // Animated demo (original SVG artwork — see lib/exercise-media). Most
   // exercises have none; the Form affordance then stays exactly as it was,

@@ -52,6 +52,7 @@ export interface ExerciseItem {
   defaultReps?: number;
   defaultWeightKg?: number;
   howTo?: string[];
+  howToHi?: string[];
   // Coach metadata — optional on the general type (custom/user items may
   // lack it); guaranteed present on every EXERCISE_LIBRARY entry, which is
   // typed LibraryExercise and test-asserted for completeness.
@@ -67,8 +68,8 @@ export type LibraryExercise = ExerciseItem & ExerciseMeta;
 
 const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
   // ── CHEST ─────────────────────────────────────────────────────────────
-  { id: 'bench_press', name: 'Barbell Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 60, howTo: ['Lie with eyes under the bar, shoulder blades pinched back and down into the bench, feet planted hard on the floor.', 'Unrack and lower the bar to mid-chest with elbows at roughly 45–60 degrees, forearms vertical.', 'Press up and slightly back to lockout; keep your backside on the bench for every rep.'] },
-  { id: 'incline_bench', name: 'Incline Barbell Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 50, howTo: ['Set the bench to 30–45 degrees; pin shoulder blades into the pad and plant your feet.', 'Lower the bar to your upper chest, just below the collarbone, elbows at 45–60 degrees.', 'Press up to lockout without shrugging; keep the path smooth and controlled.'] },
+  { id: 'bench_press', name: 'Barbell Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 60, howTo: ['Lie with eyes under the bar, shoulder blades pinched back and down into the bench, feet planted hard on the floor.', 'Unrack and lower the bar to mid-chest with elbows at roughly 45–60 degrees, forearms vertical.', 'Press up and slightly back to lockout; keep your backside on the bench for every rep.'] , howToHi: ['बार के ठीक नीचे आँखें रखकर लेट जाएँ, शोल्डर ब्लेड्स को पीछे और नीचे दबाकर बेंच से सटाएँ, और पैर ज़मीन पर मज़बूती से टिकाएँ।', 'बार को अनरैक करके मिड-चेस्ट तक नीचे लाएँ — कोहनियाँ लगभग 45–60 डिग्री पर रखें, फोरआर्म्स सीधे (वर्टिकल) रहें।', 'ऊपर और थोड़ा पीछे की ओर प्रेस करके लॉकआउट तक पहुँचें; हर रेप में कूल्हे बेंच पर टिके रहें।'] },
+  { id: 'incline_bench', name: 'Incline Barbell Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 50, howTo: ['Set the bench to 30–45 degrees; pin shoulder blades into the pad and plant your feet.', 'Lower the bar to your upper chest, just below the collarbone, elbows at 45–60 degrees.', 'Press up to lockout without shrugging; keep the path smooth and controlled.'] , howToHi: ['बेंच को 30–45 डिग्री पर सेट करें; शोल्डर ब्लेड्स को पैड में दबाएँ और पैर ज़मीन पर टिकाएँ।', 'बार को अपर चेस्ट तक नीचे लाएँ — कॉलरबोन के ठीक नीचे — कोहनियाँ 45–60 डिग्री पर रखें।', 'बिना शोल्डर उचकाए लॉकआउट तक प्रेस करें; मूवमेंट स्मूद और कंट्रोल में रखें।'] },
   { id: 'decline_bench', name: 'Decline Barbell Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 55 },
   { id: 'close_grip_bench', name: 'Close-Grip Bench Press', muscle: 'Chest', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 50 },
   { id: 'db_press', name: 'Dumbbell Bench Press', muscle: 'Chest', equipment: 'Dumbbell', defaultReps: 10, defaultWeightKg: 22 },
@@ -88,13 +89,13 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
   { id: 'smith_incline_bench', name: 'Smith Machine Incline Press', muscle: 'Chest', equipment: 'Smith Machine', defaultReps: 8, defaultWeightKg: 45 },
 
   // ── BACK ──────────────────────────────────────────────────────────────
-  { id: 'deadlift', name: 'Conventional Deadlift', muscle: 'Back', equipment: 'Barbell', defaultReps: 5, defaultWeightKg: 100, howTo: ['Stand with the bar over mid-foot, shins close; grip just outside your legs and drop your hips until shins touch the bar.', 'Flatten your back, take the slack out of the bar, and brace your stomach hard — like you are about to be punched.', 'Push the floor away and stand tall by squeezing your backside; the bar drags up your legs. Lower by pushing hips back first.'] },
-  { id: 'sumo_deadlift', name: 'Sumo Deadlift', muscle: 'Back', equipment: 'Barbell', defaultReps: 5, defaultWeightKg: 100, howTo: ['Take a wide stance with toes turned out about 45 degrees, shins vertical, grip inside your knees.', 'Chest tall and back flat, push your knees out in line with your toes as you take the slack out.', 'Drive the floor apart and stand tall; keep the bar glued to your legs the whole way.'] },
-  { id: 'barbell_row', name: 'Barbell Bent-Over Row', muscle: 'Back', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 60, howTo: ['Hinge to about 45 degrees with a flat back and soft knees; let the bar hang below your chest.', 'Row the bar to your lower ribs/upper stomach, driving elbows to the ceiling.', 'Lower under control to straight arms; your torso angle should not bounce between reps.'] },
-  { id: 'pendlay_row', name: 'Pendlay Row', muscle: 'Back', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 60, howTo: ['Set up hinged with your back parallel to the floor, bar resting on the floor under your chest.', 'Explode the bar into your lower ribs — every rep starts from a dead stop.', 'Return the bar fully to the floor and reset your brace before the next rep.'] },
+  { id: 'deadlift', name: 'Conventional Deadlift', muscle: 'Back', equipment: 'Barbell', defaultReps: 5, defaultWeightKg: 100, howTo: ['Stand with the bar over mid-foot, shins close; grip just outside your legs and drop your hips until shins touch the bar.', 'Flatten your back, take the slack out of the bar, and brace your stomach hard — like you are about to be punched.', 'Push the floor away and stand tall by squeezing your backside; the bar drags up your legs. Lower by pushing hips back first.'] , howToHi: ['बार को मिड-फ़ुट के ऊपर रखकर खड़े हों, शिन्स बार के पास रखें; पैरों के ठीक बाहर से ग्रिप करें और हिप्स तब तक नीचे करें जब तक शिन्स बार को छू न लें।', 'पीठ सीधी करें, बार की स्लैक निकालें, और पेट को ज़ोर से टाइट करें — जैसे कोई आपको मुक्का मारने वाला हो।', 'ज़मीन को धकेलकर सीधे खड़े हों, कूल्हे सिकोड़ते हुए; बार पैरों से रगड़ता हुआ ऊपर आए। नीचे लाते समय पहले हिप्स पीछे धकेलें।'] },
+  { id: 'sumo_deadlift', name: 'Sumo Deadlift', muscle: 'Back', equipment: 'Barbell', defaultReps: 5, defaultWeightKg: 100, howTo: ['Take a wide stance with toes turned out about 45 degrees, shins vertical, grip inside your knees.', 'Chest tall and back flat, push your knees out in line with your toes as you take the slack out.', 'Drive the floor apart and stand tall; keep the bar glued to your legs the whole way.'] , howToHi: ['पैर चौड़े फैलाकर खड़े हों, पंजे लगभग 45 डिग्री बाहर की ओर, शिन्स वर्टिकल, ग्रिप घुटनों के अंदर से करें।', 'छाती ऊँची और पीठ सीधी रखें, घुटनों को पंजों की दिशा में बाहर धकेलते हुए बार की स्लैक निकालें।', 'ज़मीन को दोनों ओर धकेलकर सीधे खड़े हों; बार पूरे समय पैरों से चिपका रहे।'] },
+  { id: 'barbell_row', name: 'Barbell Bent-Over Row', muscle: 'Back', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 60, howTo: ['Hinge to about 45 degrees with a flat back and soft knees; let the bar hang below your chest.', 'Row the bar to your lower ribs/upper stomach, driving elbows to the ceiling.', 'Lower under control to straight arms; your torso angle should not bounce between reps.'] , howToHi: ['लगभग 45 डिग्री तक हिंज करें, पीठ सीधी और घुटने हल्के मुड़े रखें; बार को चेस्ट के नीचे लटकने दें।', 'बार को लोअर रिब्स/अपर पेट तक रो करें, कोहनियों को छत की ओर धकेलते हुए।', 'कंट्रोल के साथ सीधी बाँहों तक नीचे लाएँ; रेप्स के बीच टॉर्सो का एंगल ऊपर-नीचे नहीं होना चाहिए।'] },
+  { id: 'pendlay_row', name: 'Pendlay Row', muscle: 'Back', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 60, howTo: ['Set up hinged with your back parallel to the floor, bar resting on the floor under your chest.', 'Explode the bar into your lower ribs — every rep starts from a dead stop.', 'Return the bar fully to the floor and reset your brace before the next rep.'] , howToHi: ['पीठ को ज़मीन के समानांतर रखकर हिंज करें, बार चेस्ट के नीचे ज़मीन पर टिका हो।', 'बार को लोअर रिब्स तक ज़ोर से खींचें — हर रेप डेड स्टॉप से शुरू होता है।', 'बार को पूरी तरह ज़मीन पर वापस लाएँ और अगले रेप से पहले ब्रेस फिर से सेट करें।'] },
   { id: 't_bar_row', name: 'T-Bar Row', muscle: 'Back', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 45 },
-  { id: 'romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscle: 'Back', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 80, howTo: ['Stand tall holding the bar at hip height, feet hip-width, knees soft.', 'Push your hips back like closing a door with your backside, bar sliding down your thighs, back flat.', 'Stop when you feel a deep stretch in the back of your thighs (usually just below the knees), then stand by squeezing your backside.'] },
-  { id: 'pull_ups', name: 'Pull-ups', muscle: 'Back', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 8, defaultWeightKg: 0, howTo: ['Grip the bar just outside shoulder width, palms away; hang with arms straight and shoulders engaged, not shrugged to your ears.', 'Pull your chest to the bar by driving elbows down to your ribs.', 'Lower slowly to a full hang — no swinging or kicking; if you cannot complete a rep yet, use slow negatives.'] },
+  { id: 'romanian_deadlift', name: 'Romanian Deadlift (RDL)', muscle: 'Back', equipment: 'Barbell', defaultReps: 8, defaultWeightKg: 80, howTo: ['Stand tall holding the bar at hip height, feet hip-width, knees soft.', 'Push your hips back like closing a door with your backside, bar sliding down your thighs, back flat.', 'Stop when you feel a deep stretch in the back of your thighs (usually just below the knees), then stand by squeezing your backside.'] , howToHi: ['बार को हिप हाइट पर पकड़कर सीधे खड़े हों, पैर हिप-विड्थ पर, घुटने हल्के मुड़े।', 'हिप्स को पीछे धकेलें — जैसे कूल्हों से दरवाज़ा बंद कर रहे हों — बार थाइज़ से फिसलता हुआ नीचे आए, पीठ सीधी रहे।', 'जैसे ही थाइज़ के पीछे गहरा स्ट्रेच महसूस हो (आमतौर पर घुटनों के ठीक नीचे), कूल्हे सिकोड़कर सीधे खड़े हो जाएँ।'] },
+  { id: 'pull_ups', name: 'Pull-ups', muscle: 'Back', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 8, defaultWeightKg: 0, howTo: ['Grip the bar just outside shoulder width, palms away; hang with arms straight and shoulders engaged, not shrugged to your ears.', 'Pull your chest to the bar by driving elbows down to your ribs.', 'Lower slowly to a full hang — no swinging or kicking; if you cannot complete a rep yet, use slow negatives.'] , howToHi: ['शोल्डर विड्थ से थोड़ा बाहर से बार पकड़ें, हथेलियाँ बाहर की ओर; सीधी बाँहों से लटकें, शोल्डर एंगेज रखें — कानों तक सिकुड़े हुए नहीं।', 'कोहनियों को पसलियों तक नीचे धकेलते हुए चेस्ट को बार तक खींचें।', 'धीरे-धीरे फुल हैंग तक नीचे आएँ — झूलना या पैर मारना नहीं; अगर पूरा रेप न हो पाए तो स्लो नेगेटिव्स करें।'] },
   { id: 'chin_ups', name: 'Chin-ups', muscle: 'Back', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 8, defaultWeightKg: 0 },
   { id: 'inverted_row', name: 'Inverted Bodyweight Row', muscle: 'Back', equipment: 'Bodyweight', isBodyweight: true, defaultReps: 12, defaultWeightKg: 0 },
   { id: 'lat_pulldown', name: 'Lat Pulldown', muscle: 'Back', equipment: 'Cable', defaultReps: 10, defaultWeightKg: 50 },
@@ -111,14 +112,14 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
   { id: 'db_shrug', name: 'Dumbbell Shrug', muscle: 'Back', equipment: 'Dumbbell', defaultReps: 12, defaultWeightKg: 26 },
 
   // ── LEGS ──────────────────────────────────────────────────────────────
-  { id: 'squat', name: 'Barbell Back Squat', muscle: 'Legs', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 80, howTo: ['Bar resting on your upper back (not your neck), hands pulling it down into you; unrack and take two small steps back.', 'Big breath into your belly, brace, then bend hips and knees together, knees tracking out over your toes.', 'Descend until hips are at least level with knees, then drive up through mid-foot, chest and hips rising together.'] },
-  { id: 'front_squat', name: 'Barbell Front Squat', muscle: 'Legs', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 60, howTo: ['Bar sits on the front of your shoulders, fingertips under it, elbows pointing forward and up.', 'Stay tall: ribs down, brace, and break at the knees and hips together.', 'Descend with your torso as upright as possible; drive up keeping elbows high so the bar never rolls.'] },
-  { id: 'leg_press', name: 'Leg Press', muscle: 'Legs', equipment: 'Machine', defaultReps: 10, defaultWeightKg: 140, howTo: ['Sit with your whole back and hips flat against the pads; feet hip-width on the plate, heels down.', 'Lower the plate until your knees reach about 90 degrees — stop before your lower back rounds off the pad.', 'Press through your whole foot without locking your knees hard at the top.'] },
+  { id: 'squat', name: 'Barbell Back Squat', muscle: 'Legs', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 80, howTo: ['Bar resting on your upper back (not your neck), hands pulling it down into you; unrack and take two small steps back.', 'Big breath into your belly, brace, then bend hips and knees together, knees tracking out over your toes.', 'Descend until hips are at least level with knees, then drive up through mid-foot, chest and hips rising together.'] , howToHi: ['बार को अपर बैक पर रखें (गर्दन पर नहीं), हाथों से उसे अपनी ओर खींचते हुए; अनरैक करके दो छोटे कदम पीछे लें।', 'पेट में गहरी साँस भरकर ब्रेस करें, फिर हिप्स और घुटने एक साथ मोड़ें, घुटने पंजों की दिशा में बाहर निकलें।', 'हिप्स के घुटनों के लेवल तक (या नीचे) आने तक नीचे जाएँ, फिर मिड-फ़ुट से धकेलकर ऊपर आएँ — छाती और हिप्स एक साथ उठें।'] },
+  { id: 'front_squat', name: 'Barbell Front Squat', muscle: 'Legs', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 60, howTo: ['Bar sits on the front of your shoulders, fingertips under it, elbows pointing forward and up.', 'Stay tall: ribs down, brace, and break at the knees and hips together.', 'Descend with your torso as upright as possible; drive up keeping elbows high so the bar never rolls.'] , howToHi: ['बार शोल्डर्स के सामने टिका हो, उँगलियाँ उसके नीचे, कोहनियाँ आगे और ऊपर की ओर।', 'सीधे रहें: पसलियाँ नीचे, ब्रेस करें, और घुटनों व हिप्स को एक साथ मोड़कर नीचे जाएँ।', 'टॉर्सो को जितना हो सके सीधा रखकर नीचे जाएँ; ऊपर आते समय कोहनियाँ ऊँची रखें ताकि बार कभी लुढ़के नहीं।'] },
+  { id: 'leg_press', name: 'Leg Press', muscle: 'Legs', equipment: 'Machine', defaultReps: 10, defaultWeightKg: 140, howTo: ['Sit with your whole back and hips flat against the pads; feet hip-width on the plate, heels down.', 'Lower the plate until your knees reach about 90 degrees — stop before your lower back rounds off the pad.', 'Press through your whole foot without locking your knees hard at the top.'] , howToHi: ['पूरी पीठ और हिप्स को पैड्स से सटाकर बैठें; पैर प्लेट पर हिप-विड्थ पर, एड़ियाँ नीचे टिकी हों।', 'प्लेट को तब तक नीचे लाएँ जब तक घुटने लगभग 90 डिग्री पर न आ जाएँ — लोअर बैक के पैड से उठने से पहले रुकें।', 'पूरे पैर से प्रेस करें, ऊपर घुटनों को ज़ोर से लॉक न करें।'] },
   { id: 'hack_squat_machine', name: 'Hack Squat Machine', muscle: 'Legs', equipment: 'Machine', defaultReps: 8, defaultWeightKg: 70 },
   { id: 'leg_extension', name: 'Leg Extension', muscle: 'Legs', equipment: 'Machine', defaultReps: 12, defaultWeightKg: 45 },
   { id: 'lying_leg_curl', name: 'Lying Leg Curl', muscle: 'Legs', equipment: 'Machine', defaultReps: 12, defaultWeightKg: 40 },
   { id: 'seated_leg_curl', name: 'Seated Leg Curl', muscle: 'Legs', equipment: 'Machine', defaultReps: 12, defaultWeightKg: 45 },
-  { id: 'barbell_hip_thrust', name: 'Barbell Hip Thrust', muscle: 'Legs', equipment: 'Barbell', defaultReps: 10, defaultWeightKg: 90, howTo: ['Upper back braced against a bench, bar padded over your hip crease, feet flat and close enough that shins are vertical at the top.', 'Tuck your chin and brace; drive through your heels to lift your hips.', 'Finish level with your shoulders and knees, backside squeezed hard — do not arch your lower back to get higher.'] },
+  { id: 'barbell_hip_thrust', name: 'Barbell Hip Thrust', muscle: 'Legs', equipment: 'Barbell', defaultReps: 10, defaultWeightKg: 90, howTo: ['Upper back braced against a bench, bar padded over your hip crease, feet flat and close enough that shins are vertical at the top.', 'Tuck your chin and brace; drive through your heels to lift your hips.', 'Finish level with your shoulders and knees, backside squeezed hard — do not arch your lower back to get higher.'] , howToHi: ['अपर बैक को बेंच से सटाएँ, बार हिप क्रीज़ पर पैड के साथ, पैर ज़मीन पर इस तरह कि ऊपर पहुँचने पर शिन्स वर्टिकल रहें।', 'ठुड्डी अंदर करें और ब्रेस करें; एड़ियों से धकेलकर हिप्स ऊपर उठाएँ।', 'शोल्डर्स और घुटनों के लेवल तक पहुँचकर खत्म करें, कूल्हे ज़ोर से सिकोड़ें — ज़्यादा ऊपर जाने के लिए लोअर बैक को आर्च न करें।'] },
   { id: 'bulgarian_split_squat', name: 'Bulgarian Split Squat', muscle: 'Legs', equipment: 'Dumbbell', defaultReps: 10, defaultWeightKg: 14 },
   { id: 'goblet_squat', name: 'Goblet Squat', muscle: 'Legs', equipment: 'Dumbbell', defaultReps: 12, defaultWeightKg: 20 },
   { id: 'db_walking_lunge', name: 'Dumbbell Walking Lunge', muscle: 'Legs', equipment: 'Dumbbell', defaultReps: 12, defaultWeightKg: 14 },
@@ -130,7 +131,7 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
   { id: 'smith_squat', name: 'Smith Machine Squat', muscle: 'Legs', equipment: 'Smith Machine', defaultReps: 8, defaultWeightKg: 60 },
 
   // ── SHOULDERS ─────────────────────────────────────────────────────────
-  { id: 'overhead_press', name: 'Overhead Press (Barbell OHP)', muscle: 'Shoulders', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 40, howTo: ['Grip just outside shoulders, forearms vertical, bar resting on the heel of your palms; squeeze your backside and brace your stomach so your lower back cannot arch.', 'Tuck your chin back slightly and press the bar in a straight line, directly over your mid-foot.', 'Finish with arms locked by your ears and give a small shrug at the top; lower to your upper chest under control.'] },
+  { id: 'overhead_press', name: 'Overhead Press (Barbell OHP)', muscle: 'Shoulders', equipment: 'Barbell', defaultReps: 6, defaultWeightKg: 40, howTo: ['Grip just outside shoulders, forearms vertical, bar resting on the heel of your palms; squeeze your backside and brace your stomach so your lower back cannot arch.', 'Tuck your chin back slightly and press the bar in a straight line, directly over your mid-foot.', 'Finish with arms locked by your ears and give a small shrug at the top; lower to your upper chest under control.'] , howToHi: ['शोल्डर्स के ठीक बाहर से ग्रिप करें, फोरआर्म्स वर्टिकल, बार हथेलियों के निचले हिस्से पर; कूल्हे सिकोड़ें और पेट टाइट करें ताकि लोअर बैक आर्च न हो।', 'ठुड्डी को हल्का पीछे करके बार को सीधी लाइन में, ठीक मिड-फ़ुट के ऊपर, प्रेस करें।', 'बाँहें कानों के पास लॉक करके खत्म करें और ऊपर हल्का श्रग दें; फिर अपर चेस्ट तक कंट्रोल के साथ नीचे लाएँ।'] },
   { id: 'push_press', name: 'Barbell Push Press', muscle: 'Shoulders', equipment: 'Barbell', defaultReps: 5, defaultWeightKg: 50 },
   { id: 'db_shoulder_press', name: 'Seated Dumbbell Shoulder Press', muscle: 'Shoulders', equipment: 'Dumbbell', defaultReps: 10, defaultWeightKg: 18 },
   { id: 'arnold_press', name: 'Arnold Press', muscle: 'Shoulders', equipment: 'Dumbbell', defaultReps: 10, defaultWeightKg: 16 },
@@ -188,6 +189,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Heart rate should stay in aerobic zone (120–135 bpm, conversational pace).',
       'Breathe through nose or maintain steady rhythm without gasping.',
     ],
+    howToHi: [
+      'हल्की-मध्यम रेज़िस्टेंस के साथ स्थिर कैडेंस (80–90 RPM) बनाए रखें।',
+      'हार्ट रेट एरोबिक ज़ोन में रहे (120–135 bpm — बात करते हुए चल सकने वाली गति)।',
+      'नाक से साँस लें या बिना हाँफ़े स्थिर लय बनाए रखें।',
+    ],
   },
   {
     id: 'incline_treadmill_walk',
@@ -200,6 +206,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Set treadmill to 10–12% incline at 4.5–5.0 km/h walking speed.',
       'Do not hold onto handrails; pump arms naturally to maximize caloric burn.',
       'Maintain upright posture with chest proud and hips engaged.',
+    ],
+    howToHi: [
+      'ट्रेडमिल को 10–12% इंक्लाइन और 4.5–5.0 km/h वॉकिंग स्पीड पर सेट करें।',
+      'हैंडरेल्स को पकड़ें नहीं; कैलोरी बर्न बढ़ाने के लिए बाँहें नैचुरली हिलाएँ।',
+      'सीधी पोस्चर बनाए रखें — छाती ऊँची, हिप्स एंगेज्ड।',
     ],
   },
   {
@@ -214,6 +225,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Perform 1 minute hard sprint effort followed by 1 minute easy paddle recovery.',
       'Keep core braced and spine neutral throughout stroke.',
     ],
+    howToHi: [
+      'पहले पैरों से ज़ोर से धकेलें, हल्का पीछे झुकें, फिर हैंडल को स्टर्नम तक खींचें।',
+      '1 मिनट तेज़ स्प्रिंट के बाद 1 मिनट हल्की पैडल रिकवरी करें।',
+      'पूरे स्ट्रोक में कोर ब्रेस्ड और स्पाइन न्यूट्रल रखें।',
+    ],
   },
   {
     id: 'jump_rope',
@@ -226,6 +242,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Bounce lightly on balls of feet, keeping knees softly bent.',
       'Rotate rope using wrists rather than whole arms.',
       'Maintain rhythmic breathing through short work intervals.',
+    ],
+    howToHi: [
+      'पैरों के अगले हिस्से पर हल्के उछलें, घुटने हल्के मुड़े रखें।',
+      'पूरी बाँहों के बजाय कलाईयों से रस्सी घुमाएँ।',
+      'छोटे वर्क इंटरवल्स में लयबद्ध साँस बनाए रखें।',
     ],
   },
   {
@@ -240,6 +261,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Avoid leaning heavily on handrails; keep weight centered over hips.',
       'Maintain consistent pace between level 5–8.',
     ],
+    howToHi: [
+      'हर ट्रेड पर पूरा फ्लैट पैर रखें; सिर्फ़ पंजों पर कदम न रखें।',
+      'हैंडरेल्स पर भारी भरकम झुकें नहीं; वज़न हिप्स के ऊपर केंद्रित रखें।',
+      'लेवल 5–8 के बीच एक समान गति बनाए रखें।',
+    ],
   },
   {
     id: 'kettlebell_swings',
@@ -253,6 +279,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Snap hips forward violently to project bell to chest height.',
       'Keep core locked and spine neutral at the top lock-out.',
     ],
+    howToHi: [
+      'घुटने हल्के मोड़कर हिप्स पीछे हिंज करें; स्क्वाट की तरह नीचे न बैठें।',
+      'हिप्स को तेज़ी से आगे झटककर बेल को चेस्ट हाइट तक पहुँचाएँ।',
+      'टॉप लॉक-आउट पर कोर लॉक्ड और स्पाइन न्यूट्रल रखें।',
+    ],
   },
   {
     id: 'farmers_walk',
@@ -265,6 +296,11 @@ const EXERCISE_LIBRARY_RAW: ExerciseItem[] = [
       'Deadlift heavy dumbbells or trap bar with flat back.',
       'Walk forward with short, deliberate, controlled strides.',
       'Brace core, pull shoulders back and down, resist any torso sway.',
+    ],
+    howToHi: [
+      'फ्लैट बैक के साथ भारी डम्बल्स या ट्रैप बार को डेडलिफ्ट करें।',
+      'छोटे, जानबूझकर और कंट्रोल किए गए कदमों से आगे चलें।',
+      'कोर ब्रेस करें, शोल्डर्स को पीछे-नीचे खींचें, और टॉर्सो के किसी भी झुकाव का विरोध करें।',
     ],
   },
 ];
@@ -1025,11 +1061,17 @@ export function getExerciseSecondaryMuscles(name: string): MuscleGroup[] {
 /**
  * Returns beginner execution form cues (3 crisp bullet points) for any exercise.
  */
-export function getExerciseFormCues(name: string): string[] {
+export function getExerciseFormCues(name: string, language?: string): string[] {
   if (!name) return [];
   const clean = name.toLowerCase().trim();
   const direct = EXERCISE_LIBRARY.find((e) => e.name.toLowerCase() === clean);
   if (direct && direct.howTo && direct.howTo.length > 0) {
+    // Hindi mode: prefer the hand-written Hindi steps when they exist;
+    // otherwise fall through to the English steps (honest fallback —
+    // exercises without howToHi still show English cues, never blanks).
+    if (language === 'hi' && direct.howToHi && direct.howToHi.length === direct.howTo.length) {
+      return direct.howToHi;
+    }
     return direct.howTo;
   }
 

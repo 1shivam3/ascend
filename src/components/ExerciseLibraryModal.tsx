@@ -360,7 +360,7 @@ export default function ExerciseLibraryModal({
                       demo when one exists, steps when written, and an
                       honest fallback when neither exists. */}
                   {isExpanded && (() => {
-                    const cues = getExerciseFormCues(ex.name);
+                    const cues = getExerciseFormCues(ex.name, language);
                     const demo = getDemoForExercise(ex.name);
                     return (
                       <div className="px-2 pb-3 space-y-2.5">
