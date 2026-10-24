@@ -466,6 +466,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            isApproximateMatch: est.isApproximateMatch,
+            matchedEntry: est.matchedEntry,
             customFoodId: undefined,
             oilAssumedTsp: oil?.assumedTsp,
             oilLevel: oil?.level,
@@ -497,6 +499,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            isApproximateMatch: est.isApproximateMatch,
+            matchedEntry: est.matchedEntry,
           };
         }
       }
@@ -511,6 +515,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           [field]: val,
           calories: Math.round(4 * p + 4 * c + 9 * f),
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
         };
       }
 
@@ -519,6 +525,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ...next[index],
           calories: Math.max(0, Math.round(Number(value) || 0)),
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
         };
       }
 
@@ -544,6 +552,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           carbsG: cf.carbsG,
           fatG: cf.fatG,
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
           customFoodId: cf.id,
           oilAssumedTsp: oil?.assumedTsp,
           oilLevel: cf.oilLevel ?? oil?.level,
@@ -583,6 +593,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG:   est.carbsG,
         fatG:     est.fatG,
         isUnmatched: est.isUnmatched,
+        isApproximateMatch: est.isApproximateMatch,
+        matchedEntry: est.matchedEntry,
         customFoodId: undefined,
         oilAssumedTsp: oil?.assumedTsp,
         oilLevel: oil?.level,
@@ -2810,10 +2822,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 </p>
                               ) : (
                                 <div className="space-y-1.5">
-                                  {food.isUnmatched && (
+                                  {(food.isUnmatched || food.isApproximateMatch) && (
                                     <div className="flex items-center gap-1.5 text-2xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
                                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
-                                      <span>{t('meals.notInDb')}</span>
+                                      {/* Approximate rows carry another entry's values: name the
+                                          entry so the estimate is never mistaken for a match. */}
+                                      <span>{food.isUnmatched ? t('meals.notInDb') : t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}</span>
                                     </div>
                                   )}
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">

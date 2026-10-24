@@ -1107,6 +1107,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'meals.foods': 'खाने',
   'meals.qtyPlaceholder': 'मात्रा (राशि डालें)',
   'meals.notInDb': 'ऑफ़लाइन डेटाबेस में नहीं मिला — नीचे अपने मैक्रो डालें',
+  'meals.estimatedFrom': 'अनुमानित मान — {entry} के आधार पर',
   'meals.pinFavorite': 'पसंदीदा में पिन करें',
   'meals.unpinFavorite': 'पसंदीदा से हटाएं',
   'meals.deleteMyVersion': '{name} का मेरा संस्करण हटाएं',

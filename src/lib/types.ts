@@ -401,6 +401,16 @@ export interface FoodItem {
   quantity?: number;
   unit?: string;
   isUnmatched?: boolean;
+  /** Set when the estimator matched via the weak word-overlap fallback
+   *  (not an exact or substring match): the values come from a real
+   *  entry, but a DIFFERENT food than the typed name (e.g. "Zqxwv
+   *  fruit" → "dragon fruit" via the shared generic word "fruit").
+   *  The dialog must label such rows as estimates. */
+  isApproximateMatch?: boolean;
+  /** The library entry the values actually came from, when
+   *  isApproximateMatch is true. Food names are never translated, so
+   *  this stays in the entry's own (English) form. */
+  matchedEntry?: string;
   /** User-selected ghee/oil level for Indian dishes (see OilLevelId). */
   oilLevel?: OilLevelId;
   /** tsp of ghee/oil the database values already assume for this dish,

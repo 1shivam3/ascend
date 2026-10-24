@@ -915,11 +915,13 @@ const PIECE_WEIGHTS: Record<string, number> = {
   'roasted papad': 15,
 };
 
-function findBestMatch(normalizedName: string): string {
-  if (normalizedName.length < 2) return '';
+type MatchTier = 'exact' | 'substring' | 'overlap' | 'none';
+
+function findBestMatch(normalizedName: string): { key: string; tier: MatchTier } {
+  if (normalizedName.length < 2) return { key: '', tier: 'none' };
 
   // 1) Exact match
-  if (FOOD_DB[normalizedName]) return normalizedName;
+  if (FOOD_DB[normalizedName]) return { key: normalizedName, tier: 'exact' };
 
   // 2) Check if user input contains a known DB key
   let bestKey = '';
@@ -938,7 +940,7 @@ function findBestMatch(normalizedName: string): string {
     }
   }
 
-  if (bestKey && bestScore >= 0.25) return bestKey;
+  if (bestKey && bestScore >= 0.25) return { key: bestKey, tier: 'substring' };
 
   // 3) Word overlap fallback
   const inputWords = normalizedName.split(/\s+/).filter(w => w.length >= 3);
@@ -951,7 +953,7 @@ function findBestMatch(normalizedName: string): string {
     }
   }
 
-  return bestScore >= 0.25 ? bestKey : '';
+  return bestScore >= 0.25 ? { key: bestKey, tier: 'overlap' } : { key: '', tier: 'none' };
 }
 
 export function estimateMacros(foodName: string, quantity?: number, unit: string = 'g'): FoodItem {
@@ -1000,8 +1002,14 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     }
   }
 
-  const matchedKey = findBestMatch(cleanFoodName);
+  const { key: matchedKey, tier: matchTier } = findBestMatch(cleanFoodName);
   const isUnmatched = !matchedKey || !FOOD_DB[matchedKey];
+  // Word-overlap matches resolve to a real entry, but a DIFFERENT food
+  // than the typed name (e.g. "Zqxwv fruit" → "dragon fruit" via the
+  // shared generic word "fruit"). Those values must be labeled as
+  // estimates in the dialog, never presented as a match.
+  const isApproximateMatch = !isUnmatched && matchTier === 'overlap';
+  const matchedEntry = isApproximateMatch ? matchedKey : undefined;
   const baseMacros = !isUnmatched ? FOOD_DB[matchedKey] : EMPTY_MACROS;
 
   // If still no quantity provided, return raw per-100g data without scaling
@@ -1015,6 +1023,8 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
       quantity: undefined,
       unit: effectiveUnit,
       isUnmatched,
+      isApproximateMatch,
+      matchedEntry,
     };
   }
 
@@ -1076,6 +1086,8 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     quantity: safeQty,
     unit: effectiveUnit,
     isUnmatched,
+    isApproximateMatch,
+    matchedEntry,
   };
 }
 
@@ -1109,7 +1121,8 @@ export function nextFoodItemOnQuantityChange(prevItem: FoodItem, rawQty: number 
       round1(prevItem.proteinG || 0) === round1(prevEst.proteinG || 0) &&
       round1(prevItem.carbsG || 0) === round1(prevEst.carbsG || 0) &&
       round1(prevItem.fatG || 0) === round1(prevEst.fatG || 0) &&
-      (prevItem.isUnmatched === true) === (prevEst.isUnmatched === true);
+      (prevItem.isUnmatched === true) === (prevEst.isUnmatched === true) &&
+      (prevItem.isApproximateMatch === true) === (prevEst.isApproximateMatch === true);
     if (clean) {
       const est = estimateMacros(prevItem.name, rawQty, prevItem.unit);
       return {
@@ -1120,6 +1133,8 @@ export function nextFoodItemOnQuantityChange(prevItem: FoodItem, rawQty: number 
         carbsG: est.carbsG,
         fatG: est.fatG,
         isUnmatched: est.isUnmatched,
+        isApproximateMatch: est.isApproximateMatch,
+        matchedEntry: est.matchedEntry,
       };
     }
   }
@@ -1142,6 +1157,8 @@ export function nextFoodItemOnQuantityChange(prevItem: FoodItem, rawQty: number 
       carbsG: est.carbsG,
       fatG: est.fatG,
       isUnmatched: est.isUnmatched,
+      isApproximateMatch: est.isApproximateMatch,
+      matchedEntry: est.matchedEntry,
     };
   }
 }

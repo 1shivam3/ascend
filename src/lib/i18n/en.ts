@@ -1110,6 +1110,7 @@ export const en = {
   'meals.foods': 'Foods',
   'meals.qtyPlaceholder': 'Qty (enter amount)',
   'meals.notInDb': 'Not found in offline database — enter custom macros below',
+  'meals.estimatedFrom': 'Estimated values — based on {entry}',
   'meals.pinFavorite': 'Pin to favorites',
   'meals.unpinFavorite': 'Unpin favorite',
   'meals.deleteMyVersion': 'Delete my version of {name}',
