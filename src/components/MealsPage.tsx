@@ -2205,6 +2205,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             <span className="text-text-muted text-2xs">
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
+                            {food.isUnmatched ? (
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                            ) : food.isApproximateMatch ? (
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                            ) : (
+                              <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
                             <div className="text-2xs font-mono text-text-muted shrink-0">
@@ -2393,6 +2400,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <span className="text-text-muted text-2xs">
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
+                                  {food.isUnmatched ? (
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                                  ) : food.isApproximateMatch ? (
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                                  ) : (
+                                    <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
                                   <div className="text-2xs font-mono text-text-muted shrink-0">
