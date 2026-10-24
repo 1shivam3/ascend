@@ -106,7 +106,7 @@ describe('UX discoverability: placement wiring (source assertions)', () => {
   it('Train collapses the non-enrolled Running intro and keeps the ledger advanced-gated', () => {
     const workout = src('src/components/WorkoutPage.tsx');
     expect(workout).toContain('isRunIntroOpen');
-    expect(workout).toContain('{userMode === \'advanced\' && (activePolicyDecision');
+    expect(workout).toContain('{workoutMode === \'advanced\' && (activePolicyDecision');
   });
 
   it('OAuth errors map to neutral copy; honest inventory text is untouched', () => {

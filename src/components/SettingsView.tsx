@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStore } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
+import { resolveWorkoutMode } from '@/lib/workout-mode';
 import {
   ChevronLeft,
   ChevronRight,
@@ -73,8 +74,6 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const storeProfile = useStore((state) => state.profile);
   const profile = storeProfile ?? useStore.getState().profile;
   const setProfile = useStore((state) => state.setProfile);
-  const userMode = useStore((state) => state.userMode) || 'beginner';
-  const setUserMode = useStore((state) => state.setUserMode);
   const theme = useStore((state) => state.theme);
   const setTheme = useStore((state) => state.setTheme);
   const resetThemeToSystem = useStore((state) => state.resetThemeToSystem);
@@ -83,6 +82,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const importAllData = useStore((state) => state.importAllData);
   const uiPreferences = useStore((state) => state.uiPreferences);
   const setUiPreferences = useStore((state) => state.setUiPreferences);
+  // UX redesign Stage 4 — this row drives the density-following workout
+  // view (override null = Auto), not the legacy userMode key.
+  const workoutMode = resolveWorkoutMode(uiPreferences.density, uiPreferences.workoutModeOverride);
   const plannedWorkouts = useStore((state) => state.plannedWorkouts);
   const toast = useToast();
   const { t } = useTranslation();
@@ -548,24 +550,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.experience')}</span>
-              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(userMode)}</span>
+              <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}{uiPreferences.workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
-              {(['beginner', 'intermediate', 'advanced'] as const).map((m) => (
+              {(['auto', 'beginner', 'advanced'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => {
-                    setUserMode(m);
-                    toast.info(t('settings.modeSetMsg', { mode: modeLabel(m) }), t('settings.modeUpdatedTitle'));
+                    setUiPreferences({ workoutModeOverride: m === 'auto' ? null : m });
+                    toast.info(t('settings.modeSetMsg', { mode: m === 'auto' ? t('workout.viewAuto') : modeLabel(m) }), t('settings.modeUpdatedTitle'));
                   }}
                   className={`py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
-                    userMode === m
+                    (uiPreferences.workoutModeOverride ?? 'auto') === m
                       ? 'bg-bg-card text-text-primary shadow-xs border border-border'
                       : 'text-text-muted hover:text-text-primary'
                   }`}
                 >
-                  {modeLabel(m)}
+                  {m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}
                 </button>
               ))}
             </div>

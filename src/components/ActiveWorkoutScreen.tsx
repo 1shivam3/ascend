@@ -59,6 +59,7 @@ import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calcula
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import { resolveWorkoutMode } from '@/lib/workout-mode';
 import { getPackedGymSwapsForNames } from '@/lib/crowded-gym';
 import { useTranslation, type StringKey } from '@/lib/i18n';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
@@ -156,8 +157,10 @@ export default function ActiveWorkoutScreen({
   onCancel,
   onPause,
 }: ActiveWorkoutScreenProps) {
-  const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions } = useStore();
-  const userMode = useStore((state) => state.userMode) || 'beginner';
+  const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions, uiPreferences } = useStore();
+  // UX redesign Stage 4 — perform view follows app density unless pinned.
+  const workoutMode = resolveWorkoutMode(uiPreferences.density, uiPreferences.workoutModeOverride);
+  const density = uiPreferences.density === 'detailed' ? 'detailed' : 'simple';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
@@ -951,6 +954,25 @@ export default function ActiveWorkoutScreen({
   const lastPerf = useMemo(() => {
     if (!currentExercise?.name) return null;
     return getLastExercisePerformance(currentExercise.name, workouts);
+  }, [currentExercise?.name, workouts]);
+
+  // UX redesign Stage 4 — last 3 sessions for the current lift, shown
+  // in a Detailed-only expander below the target card. Matching mirrors
+  // getLastExercisePerformance (trim + lowercase, exact or contains).
+  const previousSessions = useMemo(() => {
+    if (!currentExercise?.name) return [];
+    const target = currentExercise.name.trim().toLowerCase();
+    return [...workouts]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map((w) => ({
+        date: w.date,
+        sets: (w.exercises.find((e) => {
+          const n = e.name.trim().toLowerCase();
+          return n === target || n.includes(target) || target.includes(n);
+        })?.sets ?? []).filter((set) => set.reps > 0),
+      }))
+      .filter((entry) => entry.sets.length > 0)
+      .slice(0, 3);
   }, [currentExercise?.name, workouts]);
 
   const fallbackPR = useMemo(() => {
@@ -2095,7 +2117,7 @@ export default function ActiveWorkoutScreen({
             <span className="text-xs font-mono font-bold text-text-secondary">
               {exercises.length}
             </span>
-            <span className="text-[10px] text-accent font-sans">▾</span>
+            <span className="text-2xs text-accent font-sans">▾</span>
           </div>
           {/* Hairline progress track */}
           <div className="w-24 h-1 bg-bg-secondary rounded-full overflow-hidden mt-1">
@@ -2275,7 +2297,7 @@ export default function ActiveWorkoutScreen({
                                   {item.name}
                                 </span>
                                 {isCurrent && (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-accent/20 text-accent font-semibold shrink-0">
+                                  <span className="text-2xs px-1.5 py-0.2 rounded bg-accent/20 text-accent font-semibold shrink-0">
                                     {t('workout.current')}
                                   </span>
                                 )}
@@ -2374,7 +2396,7 @@ export default function ActiveWorkoutScreen({
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
                     <Edit2 className="w-3 h-3" />
-                    <span className="text-[10px] font-semibold hidden sm:inline">{t('workout.change')}</span>
+                    <span className="text-2xs font-semibold hidden sm:inline">{t('workout.change')}</span>
                   </div>
                 </button>
               )}
@@ -2397,14 +2419,14 @@ export default function ActiveWorkoutScreen({
           <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 mt-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
                   {t('workout.todaysTarget')}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-base sm:text-lg font-bold font-sans text-accent">
                     {targetDisplay.text}
                   </span>
-                  {userMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
+                  {workoutMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
                     <span className="text-xs font-mono text-text-muted">
                       @{targetDisplay.targetRpe}
                     </span>
@@ -2413,7 +2435,7 @@ export default function ActiveWorkoutScreen({
               </div>
 
               <div className="text-right space-y-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
                   {t('workout.lastTime')}
                 </span>
                 <span className="text-xs font-semibold text-text-secondary block">
@@ -2438,7 +2460,27 @@ export default function ActiveWorkoutScreen({
           </div>
         </section>
 
-        {userMode === 'beginner' ? (
+        {density === 'detailed' && previousSessions.length > 0 && (
+          <CollapsibleDetails label={t('workout.previousSessions')}>
+            <ul className="space-y-2">
+              {previousSessions.map((entry, i) => (
+                <li key={`${entry.date}-${i}`} className="text-xs">
+                  <span className="font-mono text-text-muted">{entry.date.split('T')[0]} · </span>
+                  <span className="text-text-secondary">
+                    {entry.sets.map((set, j) => (
+                      <span key={j}>
+                        {j > 0 ? ', ' : ''}
+                        {set.weight ? `${set.weight}${set.unit} × ${set.reps}` : `BW × ${set.reps}`}
+                      </span>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleDetails>
+        )}
+
+        {workoutMode === 'beginner' ? (
           /* ── BEGINNER MODE: ONE SET AT A TIME (Idea 4 & 5) ── */
           <section className="space-y-4">
             {/* Set pills navigator */}
@@ -2822,11 +2864,11 @@ export default function ActiveWorkoutScreen({
                   {/* Set number */}
                   <div className="w-8 sm:w-12 shrink-0 flex items-center gap-1">
                     {set.status === 'skipped' ? (
-                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.skippedSetTitle')}>
+                      <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.skippedSetTitle')}>
                         S{sIdx + 1}
                       </span>
                     ) : set.isWarmup ? (
-                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.warmupRampTitle')}>
+                      <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.warmupRampTitle')}>
                         W{sIdx + 1}
                       </span>
                     ) : (
@@ -3779,7 +3821,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Post-Workout Adaptation Ledger */}
               <div className="space-y-2 pt-1 text-left">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
                   {t('workout.adaptationSummary')}
                 </span>
 
@@ -3907,14 +3949,14 @@ export default function ActiveWorkoutScreen({
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono font-black text-sm">@{item.rpe}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-2xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         isSelected ? 'bg-accent/20 text-accent' : 'bg-bg-tertiary text-text-muted'
                       }`}>
                         {t(item.rirKey as StringKey)}
                       </span>
                     </div>
                     <div className="text-2xs font-bold truncate">{t(item.labelKey as StringKey)}</div>
-                    <div className="text-[10px] text-text-muted truncate">{t(item.descKey as StringKey)}</div>
+                    <div className="text-2xs text-text-muted truncate">{t(item.descKey as StringKey)}</div>
                   </button>
                 );
               })}

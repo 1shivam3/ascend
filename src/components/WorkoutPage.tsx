@@ -95,6 +95,8 @@ import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAU
 import { useToast } from '@/components/ui/Toast';
 
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import { resolveWorkoutMode } from '@/lib/workout-mode';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
@@ -261,7 +263,7 @@ function PlanModal({
         <div className="p-4 border-b border-border flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-text-primary">
-              {initial ? 'Edit Plan' : 'Create Workout Plan'}
+              {initial ? 'Edit Plan' : 'Build workout plan'}
             </h2>
             <p className="text-2xs text-text-muted font-mono mt-0.5">
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
@@ -739,8 +741,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const goals = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
   const trainingDecisions = useStore((state) => state.trainingDecisions);
   const policyDecisionRecords = useStore((state) => state.policyDecisionRecords);
-  const userMode = useStore((state) => state.userMode) || 'beginner';
-  const toggleUserMode = useStore((state) => state.toggleUserMode);
+  // UX redesign Stage 4 — workout view follows app density unless the
+  // user pinned an explicit override (null = Auto, follows density).
+  const density = useStore((state) => state.uiPreferences?.density ?? 'simple');
+  const workoutModeOverride = useStore((state) => state.uiPreferences?.workoutModeOverride ?? null);
+  const setUiPreferences = useStore((state) => state.setUiPreferences);
+  const workoutMode = resolveWorkoutMode(density, workoutModeOverride);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   // Coach blocks (PR-B)
@@ -2064,7 +2070,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </div>
 
           <div className="flex items-center gap-2">
-            {userMode === 'advanced' && (
+            {workoutMode === 'advanced' && (
               <button
                 type="button"
                 onClick={() => setIsPlateModalOpen(true)}
@@ -2574,7 +2580,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </section>
 
       {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode) ── */}
-      {userMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
+      {workoutMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
         <section className="space-y-2" aria-label="Progression Policy Recommendation">
           <div
             className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-bg-card border border-border/70 hover:border-accent/40 transition-colors shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -2819,7 +2825,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                       )}
                                       {isDone && rpeVal !== undefined && (
                                         <span
-                                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
+                                          className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
                                           title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
                                         >
                                           @{rpeVal}
@@ -3379,7 +3385,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Create Workout Plan</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Build workout plan</h4>
                     <p className="text-2xs text-text-muted">Design a reusable custom workout routine</p>
                   </div>
                 </div>
@@ -3387,21 +3393,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </button>
             </div>
 
-            {/* Display Mode Switch */}
-            <div className="pt-3 border-t border-border/80 flex items-center justify-between">
+            {/* Workout view — follows app density unless overridden (Stage 4) */}
+            <div className="pt-3 border-t border-border/80 space-y-2">
               <div>
-                <span className="text-xs font-bold text-text-primary block">Display Mode</span>
+                <span className="text-xs font-bold text-text-primary block">{t('workout.viewMode')}</span>
                 <span className="text-2xs text-text-muted">
-                  {userMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                  {workoutMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                  {workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => toggleUserMode()}
-                className="px-3 py-1.5 rounded-lg border border-border bg-bg-secondary text-xs font-bold text-accent hover:border-accent/40 transition-colors cursor-pointer"
-              >
-                Switch to {userMode === 'advanced' ? 'Simple' : 'Advanced'}
-              </button>
+              <SegmentedControl
+                ariaLabel={t('workout.viewMode')}
+                value={workoutModeOverride ?? 'auto'}
+                options={[
+                  { value: 'auto', label: t('workout.viewAuto') },
+                  { value: 'beginner', label: t('workout.viewSimple') },
+                  { value: 'advanced', label: t('workout.viewAdvanced') },
+                ]}
+                onChange={(v) => setUiPreferences({ workoutModeOverride: v === 'auto' ? null : v })}
+              />
             </div>
           </div>
         </div>
