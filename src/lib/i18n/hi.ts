@@ -2810,6 +2810,11 @@ export const hi: Partial<Record<StringKey, string>> = {
     'पीछे हटें ताकि आपका पूरा शरीर दिखे, और सुनिश्चित करें कि कैमरे के सामने कुछ न हो।',
   'formcheck.slowNote':
     'यह डिवाइस साथ नहीं दे पा रहा है — दूसरे ऐप बंद करें और स्थिर ट्रैकिंग के लिए फिर से कोशिश करें।',
+  'formcheck.debugToggle': 'विज़िबिलिटी नंबर दिखाएँ (डीबग)',
+  'formcheck.debugTitle': 'विज़िबिलिटी रीडआउट (डीबग)',
+  'formcheck.debugModel': 'मॉडल: {model}',
+  'formcheck.debugVerdictClear': 'गेट: स्पष्ट',
+  'formcheck.debugVerdictUnclear': 'गेट: अस्पष्ट',
   'formcheck.endSet': 'सेट खत्म करें',
   'formcheck.painStop': 'दर्द हो रहा है — रुकें',
   'formcheck.painStopAria': 'दर्द हो रहा है — सेट रोकें',

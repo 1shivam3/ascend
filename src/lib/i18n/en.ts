@@ -2815,6 +2815,11 @@ export const en = {
     'Step back so your full body is visible, and make sure nothing blocks the camera.',
   'formcheck.slowNote':
     'This device is struggling to keep up — close other apps and try again for steadier tracking.',
+  'formcheck.debugToggle': 'Show visibility numbers (debug)',
+  'formcheck.debugTitle': 'Visibility readout (debug)',
+  'formcheck.debugModel': 'Model: {model}',
+  'formcheck.debugVerdictClear': 'Gate: clear',
+  'formcheck.debugVerdictUnclear': 'Gate: unclear',
   'formcheck.endSet': 'End set',
   'formcheck.painStop': 'I feel pain — stop',
   'formcheck.painStopAria': 'I feel pain — stop the set',

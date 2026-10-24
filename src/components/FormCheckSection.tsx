@@ -46,14 +46,17 @@ import {
   LIFT_CONFIGS,
   LIFT_ORDER,
   RepCounter,
+  buildVisibilityDiagnostic,
   type IssueCode,
   type JointGroup,
   type LiftId,
   type SetSummary,
   type UnclearDetail,
   type UnclearReason,
+  type VisibilityDiagnostic,
 } from '@/lib/form-check';
 import {
+  POSE_MODEL_VARIANT,
   emptyLandmarks,
   loadPoseLandmarker,
   PoseEngineError,
@@ -193,6 +196,11 @@ export default function FormCheckSection() {
   const [summary, setSummary] = useState<SetSummary | null>(null);
   const [error, setError] = useState<UiError | null>(null);
   const [slowNote, setSlowNote] = useState(false);
+  // Diagnostic readout: OFF by default. When on, the loop below only
+  // ADDS a throttled display snapshot — it never touches detection,
+  // gating, or counting (buildVisibilityDiagnostic is pure).
+  const [showDebug, setShowDebug] = useState(false);
+  const [diag, setDiag] = useState<VisibilityDiagnostic | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -205,6 +213,9 @@ export default function FormCheckSection() {
   const detectErrorStreakRef = useRef(0);
   const phaseRef = useRef<UiPhase>('idle');
   phaseRef.current = phase;
+  const showDebugRef = useRef(false);
+  showDebugRef.current = showDebug;
+  const lastDiagAtRef = useRef(0);
 
   const stopTracks = useCallback(() => {
     if (streamRef.current) {
@@ -273,6 +284,16 @@ export default function FormCheckSection() {
           lastLiveRef.current = key;
           setLive(next);
         }
+        // Diagnostic snapshot only: throttled to ~4/s so the readout
+        // can never jank the detection loop, and skipped entirely
+        // when the toggle is off (zero extra work, zero behavior
+        // change). Display-only — the counter already ran above.
+        if (showDebugRef.current && t0 - lastDiagAtRef.current >= 250) {
+          lastDiagAtRef.current = t0;
+          setDiag(
+            buildVisibilityDiagnostic(counter.liftId, marks, frameResult, detected === null)
+          );
+        }
       } catch {
         // A failed detection frame is skipped, never fabricated. If
         // detection keeps failing, surface a non-crash error state.
@@ -297,6 +318,8 @@ export default function FormCheckSection() {
     setError(null);
     setSummary(null);
     setSlowNote(false);
+    setDiag(null);
+    lastDiagAtRef.current = 0;
     setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, noPerson: false, phase: 'top', angleDeg: null });
     lastLiveRef.current = '';
     detectMsRef.current = [];
@@ -350,6 +373,7 @@ export default function FormCheckSection() {
       const counter = counterRef.current;
       stopLoop();
       stopTracks();
+      setDiag(null);
       const result = counter
         ? pain
           ? counter.requestPainStop(performance.now())
@@ -543,7 +567,59 @@ export default function FormCheckSection() {
               <p className="text-2xs text-text-muted">{t('formcheck.slowNote')}</p>
             )}
 
+            {/* TEMPORARY diagnostic readout: off by default, display-only.
+                Shows the exact visibility values the gate consumes, so a
+                phone test yields measurements instead of a binary box.
+                Remove before any merge — PR #42 is review-only. */}
+            {showDebug && diag && (
+              <div className="rounded-xl border border-border p-3 font-mono text-2xs space-y-1">
+                <p className="font-bold text-text-primary">
+                  {t('formcheck.debugTitle')} ·{' '}
+                  {t('formcheck.debugModel', { model: POSE_MODEL_VARIANT })}
+                </p>
+                <p className="text-text-secondary">
+                  {diag.verdict === 'no-person'
+                    ? t('formcheck.noPerson')
+                    : diag.verdict === 'clear'
+                      ? t('formcheck.debugVerdictClear')
+                      : `${t('formcheck.debugVerdictUnclear')}${
+                          diag.unclearReason ? ` (${diag.unclearReason})` : ''
+                        }`}
+                </p>
+                {diag.groups.map((row) => (
+                  <p key={row.group} className="text-text-secondary">
+                    {t(JOINT_LABEL_KEYS[row.group])}: L{' '}
+                    {row.left !== null ? row.left.toFixed(2) : '—'}{' '}
+                    {row.leftTrusted ? '✓' : '✗'} · R{' '}
+                    {row.right !== null ? row.right.toFixed(2) : '—'}{' '}
+                    {row.rightTrusted ? '✓' : '✗'}
+                  </p>
+                ))}
+                <p className="text-text-muted">
+                  L {diag.leftTrustedCount}/{diag.groups.length} · R{' '}
+                  {diag.rightTrustedCount}/{diag.groups.length} · better{' '}
+                  {diag.betterSide === 'left' ? 'L' : 'R'} · {t('formcheck.reps')}:{' '}
+                  {diag.repCount} · {t(PRIMARY_LABEL_KEYS[cfg.primaryAngle])}:{' '}
+                  {diag.primaryAngleDeg !== null ? `${diag.primaryAngleDeg}°` : '—'} ·
+                  gate ≥ 0.50
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                type="button"
+                aria-pressed={showDebug}
+                onClick={() => {
+                  if (showDebug) setDiag(null);
+                  setShowDebug(!showDebug);
+                }}
+                className={`py-1.5 px-3 text-xs font-bold cursor-pointer ${
+                  showDebug ? 'btn-primary' : 'card border border-border'
+                }`}
+              >
+                {t('formcheck.debugToggle')}
+              </button>
               <button
                 type="button"
                 onClick={() => void switchCamera()}

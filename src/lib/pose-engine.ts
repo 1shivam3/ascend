@@ -69,6 +69,9 @@ const WASM_URL = `${TASKS_VISION_CDN}/wasm`;
 const MODEL_URL =
   'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
+/** Short model name for the diagnostic readout; must match MODEL_URL. */
+export const POSE_MODEL_VARIANT = 'full';
+
 /** Shape of the runtime-loaded tasks-vision module (CDN import). */
 interface VisionModule {
   FilesetResolver: { forVisionTasks: (wasmUrl: string) => Promise<unknown> };

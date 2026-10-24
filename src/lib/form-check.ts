@@ -603,6 +603,95 @@ export function unclearDetail(liftId: LiftId, landmarks: PoseLandmark[]): Unclea
   return { reason, outOfFrame, lowVisibility, side };
 }
 
+/**
+ * DIAGNOSTIC VISIBILITY READOUT (temporary, for phone debugging).
+ *
+ * Pure mapping from one frame's landmarks + its counter result to the
+ * numbers the debug readout displays. It reads ONLY — it never feeds
+ * the counter, never changes the gate, and never counts anything.
+ *
+ * Mapping honesty: the gate has NO per-group aggregate — each joint
+ * group is exactly one landmark per side, and the gate's trusted test
+ * is `sideLandmarkTrusted` (finite + visibility defined and >= 0.5).
+ * So the raw per-landmark visibility values below ARE the gate's
+ * inputs, and the trusted flags reuse the gate's own predicate, not
+ * a second implementation. A null value means the landmark is not
+ * finite or carries no visibility (the gate treats both as untrusted).
+ * noPerson is passed in by the section (it alone knows detection
+ * found nobody); the counter result carries everything else.
+ */
+export interface DiagnosticGroupRow {
+  group: JointGroup;
+  /** Raw visibility of the side's landmark; null when not finite or no visibility. */
+  left: number | null;
+  right: number | null;
+  leftTrusted: boolean;
+  rightTrusted: boolean;
+}
+
+export type DiagnosticVerdict = 'no-person' | 'clear' | 'unclear';
+
+export interface VisibilityDiagnostic {
+  liftId: LiftId;
+  groups: DiagnosticGroupRow[];
+  leftTrustedCount: number;
+  rightTrustedCount: number;
+  /** Sides with every required group trusted; empty when neither side is complete. */
+  trustedSides: BodySide[];
+  /** The gate's better side (left wins ties) — the side unclear detail describes. */
+  betterSide: BodySide;
+  verdict: DiagnosticVerdict;
+  unclearReason: UnclearReason | null;
+  /** Rounded primary angle from the frame result, null on unclear frames. */
+  primaryAngleDeg: number | null;
+  repCount: number;
+  phase: RepPhase;
+}
+
+export function buildVisibilityDiagnostic(
+  liftId: LiftId,
+  landmarks: PoseLandmark[],
+  frameResult: FrameResult,
+  noPerson: boolean
+): VisibilityDiagnostic {
+  const groups: DiagnosticGroupRow[] = requiredGroups(liftId).map((group) => {
+    const lIdx = SIDE_LANDMARKS[group].left;
+    const rIdx = SIDE_LANDMARKS[group].right;
+    const lLm = landmarks[lIdx];
+    const rLm = landmarks[rIdx];
+    return {
+      group,
+      left:
+        isFiniteLandmark(lLm) && lLm.visibility !== undefined ? lLm.visibility : null,
+      right:
+        isFiniteLandmark(rLm) && rLm.visibility !== undefined ? rLm.visibility : null,
+      leftTrusted: sideLandmarkTrusted(landmarks, lIdx),
+      rightTrusted: sideLandmarkTrusted(landmarks, rIdx),
+    };
+  });
+  const leftTrustedCount = groups.filter((g) => g.leftTrusted).length;
+  const rightTrustedCount = groups.filter((g) => g.rightTrusted).length;
+  const trustedSides: BodySide[] = [];
+  if (leftTrustedCount === groups.length) trustedSides.push('left');
+  if (rightTrustedCount === groups.length) trustedSides.push('right');
+  const primary = frameResult.angles
+    ? frameResult.angles[LIFT_CONFIGS[liftId].primaryAngle]
+    : null;
+  return {
+    liftId,
+    groups,
+    leftTrustedCount,
+    rightTrustedCount,
+    trustedSides,
+    betterSide: betterSide(liftId, landmarks),
+    verdict: noPerson ? 'no-person' : frameResult.status === 'clear' ? 'clear' : 'unclear',
+    unclearReason: noPerson ? null : frameResult.unclearReason,
+    primaryAngleDeg: primary !== null && primary !== undefined ? Math.round(primary) : null,
+    repCount: frameResult.repCount,
+    phase: frameResult.phase,
+  };
+}
+
 function primaryValue(angles: ComputedAngles, primary: PrimaryAngle): number | null {
   return angles[primary];
 }
