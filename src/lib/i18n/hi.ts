@@ -2784,7 +2784,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.switchCamera': 'कैमरा बदलें',
   'formcheck.heuristicsNote':
     'दिखाए गए कोण फोन कैमरे से मिले कोचिंग अनुमान हैं, मेडिकल माप नहीं। साइड से फिल्म करें, पूरा शरीर फ्रेम में रहे।',
-  'formcheck.loading': 'कैमरा शुरू हो रहा है और पोज़ मॉडल लोड हो रहा है…',
+  'formcheck.loading': 'कैमरा शुरू हो रहा है और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
   'formcheck.reps': 'रेप्स',
   'formcheck.atTop': 'टॉप पर हैं — अगला रेप शुरू करें।',
   'formcheck.repInProgress': 'रेप चल रहा है…',

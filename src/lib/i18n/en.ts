@@ -2787,7 +2787,7 @@ export const en = {
   'formcheck.switchCamera': 'Switch camera',
   'formcheck.heuristicsNote':
     'Angles shown are coaching heuristics from a phone camera, not medical measurements. Film from the side with your full body in frame.',
-  'formcheck.loading': 'Starting camera and loading the pose model…',
+  'formcheck.loading': 'Starting camera and loading the pose model… First load can take a few seconds — several MB to download.',
   'formcheck.reps': 'Reps',
   'formcheck.atTop': 'At the top — start your next rep.',
   'formcheck.repInProgress': 'Rep in progress…',
