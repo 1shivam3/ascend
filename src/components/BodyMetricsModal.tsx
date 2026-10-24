@@ -3,9 +3,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
-import { X, Scale, History, Trash2, Plus, CheckCircle2 } from 'lucide-react';
+import { X, Scale, History, Trash2, Plus } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
 import { useTranslation } from '@/lib/i18n';
+import { useToast } from '@/components/ui/Toast';
 
 interface BodyMetricsModalProps {
   isOpen: boolean;
@@ -106,10 +107,55 @@ export function validateBodyMetricsForm(input: BodyMetricsFormInput): BodyMetric
   };
 }
 
+export interface BodyMetricSnapshot {
+  weightKg?: number;
+  heightCm?: number;
+  bodyFatPct?: number;
+  chestIn?: number;
+  waistIn?: number;
+  hipsIn?: number;
+}
+
+/**
+ * LIVE-P1-04: did the submitted form actually change anything?
+ * A guest opening the modal sees weight/height pre-filled from the
+ * profile and grey placeholder examples in the other fields, saves
+ * unchanged, and then finds Body still showing "—" — with no feedback
+ * at all. Comparing canonical values (weight kg, height cm, inches,
+ * all rounded the way the store rounds them) lets the modal answer
+ * honestly: "no changes to save" instead of silently writing a
+ * duplicate entry, and a real toast when something did change.
+ * `undefined` on both sides means "not measured" and is not a change;
+ * `undefined` vs a value is a change (a measurement was added).
+ */
+export function hasBodyMetricChanges(
+  current: BodyMetricSnapshot,
+  submitted: BodyMetricSnapshot
+): boolean {
+  const same = (
+    a: number | undefined,
+    b: number | undefined,
+    round: (n: number) => number
+  ): boolean => {
+    if (a === undefined && b === undefined) return true;
+    if (a === undefined || b === undefined) return false;
+    return round(a) === round(b);
+  };
+  const round1dp = (n: number) => Math.round(n * 10) / 10;
+  if (!same(current.weightKg, submitted.weightKg, round1dp)) return true;
+  if (!same(current.heightCm, submitted.heightCm, Math.round)) return true;
+  if (!same(current.bodyFatPct, submitted.bodyFatPct, round1dp)) return true;
+  if (!same(current.chestIn, submitted.chestIn, round1dp)) return true;
+  if (!same(current.waistIn, submitted.waistIn, round1dp)) return true;
+  if (!same(current.hipsIn, submitted.hipsIn, round1dp)) return true;
+  return false;
+}
+
 export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const { t } = useTranslation();
+  const toast = useToast();
   const profile = useStore((state) => state.profile);
   const bodyMetrics = useStore((state) => state.bodyMetrics || []);
   const updateBodyMetrics = useStore((state) => state.updateBodyMetrics);
@@ -126,7 +172,6 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
   const [hipsInput, setHipsInput] = useState<string>('');
   const [unit, setUnit] = useState<'kg' | 'lbs'>(preferredUnit);
   const [dateInput, setDateInput] = useState<string>('');
-  const [successMsg, setSuccessMsg] = useState<string>('');
   const [errors, setErrors] = useState<Partial<Record<BodyMetricsField, string>>>({});
 
   useEffect(() => {
@@ -144,7 +189,6 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           : ''
       );
       setDateInput(getLocalTodayStr());
-      setSuccessMsg('');
       setErrors({});
 
       const latest = bodyMetrics && bodyMetrics.length > 0
@@ -215,6 +259,38 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     setErrors(formErrors);
     if (!values) return;
 
+    // LIVE-P1-04: never save silently, never pretend. If nothing
+    // differs from the profile + last saved entry, say so and write
+    // nothing (no duplicate same-day entry). Otherwise save and
+    // confirm with a real toast that survives the modal closing —
+    // the old in-modal message vanished with the modal after 700 ms,
+    // which is why a save looked like it did nothing.
+    const latestForCompare =
+      bodyMetrics && bodyMetrics.length > 0
+        ? [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+        : null;
+    const submitted: BodyMetricSnapshot = {
+      weightKg: values.weightKg,
+      heightCm: values.heightCm ?? profile?.heightCm,
+      bodyFatPct: values.bodyFatPct,
+      chestIn: values.chestIn,
+      waistIn: values.waistIn,
+      hipsIn: values.hipsIn,
+    };
+    const current: BodyMetricSnapshot = {
+      weightKg: profile?.bodyweightKg,
+      heightCm: profile?.heightCm,
+      bodyFatPct: latestForCompare?.bodyFatPct,
+      chestIn: latestForCompare?.chestIn,
+      waistIn: latestForCompare?.waistIn,
+      hipsIn: latestForCompare?.hipsIn,
+    };
+    if (!hasBodyMetricChanges(current, submitted)) {
+      toast.info(t('bodyMetrics.noChanges'));
+      onClose();
+      return;
+    }
+
     updateBodyMetrics(
       values.weightKg,
       // A blank height field means "unchanged" — keep the profile height.
@@ -224,11 +300,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       values.waistIn,
       values.hipsIn
     );
-    setSuccessMsg(t('bodyMetrics.savedMsg'));
-    setTimeout(() => {
-      setSuccessMsg('');
-      onClose();
-    }, 700);
+    toast.success(t('bodyMetrics.savedMsg'));
+    onClose();
   };
 
   // Sort history newest first
@@ -265,13 +338,13 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           </button>
         </div>
 
-        {/* Success Alert */}
-        {successMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono flex items-center gap-2 animate-fade-in">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            <span>{successMsg}</span>
-          </div>
-        )}
+        {/* LIVE-P1-04: say what is pre-filled and what blank means, so
+            grey placeholder examples are never mistaken for saved
+            values. Weight/height come from the profile; a blank field
+            means "not measured", not zero. */}
+        <p className="text-3xs text-text-muted leading-relaxed">
+          {t('bodyMetrics.prefillHint')}
+        </p>
 
         {/* Input Form */}
         <form onSubmit={handleSave} className="space-y-4">

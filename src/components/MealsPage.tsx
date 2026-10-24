@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import {
   estimateMacros,
   calculateMealMacros,
@@ -16,6 +17,7 @@ import {
   isJunkMealParse,
   scaleFoodByQuantity,
   getSafeMinCalories,
+  normalizeCalorieDelta,
 } from '@/lib/macros';
 import {
   Plus,
@@ -1072,7 +1074,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       ),
       calorieDelta: 0, // set below
     };
-    newGoals.calorieDelta = newGoals.calories - (newGoals.maintenanceCalories as number);
+    newGoals.calorieDelta = normalizeCalorieDelta(newGoals.calories - (newGoals.maintenanceCalories as number));
 
     setMacroGoals(newGoals);
     toast.success(carbsAdjusted ? t('toast.goalsSavedCarbs', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }) : t('toast.goalsSaved', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }), t('toast.titleGoalsSaved'));
@@ -1777,7 +1779,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.proteinCoach')}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
-                    {proteinSuggestion.message}
+                    {renderLocalizedSentence(t, language, proteinSuggestion.messageI18n, proteinSuggestion.message)}
                   </p>
                 </div>
                 <button

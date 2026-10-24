@@ -35,6 +35,7 @@ import { canonicalizeExerciseName } from './workout-outcome-evidence';
 import { isSetCompleted } from './types';
 import type { AthleteModel } from './athlete-model';
 import type { ManualCheckin, StallFlag } from './coach-engine';
+import type { LocalizedSentence } from './coach-i18n';
 import type { TrainingDecisionRecord } from './training-decision-policy';
 import {
   resolveManagedPolicy,
@@ -75,7 +76,16 @@ export interface WeeklyReview {
   recoveryLines: string[];
   coachLines: string[];
   painEscalation: string | null;
-  focus: { kind: ReviewFocusKind; headline: string; detail: string };
+  /** LIVE-P1-03: same escalation as a localizable struct (family ids, not display text). */
+  painEscalationI18n?: LocalizedSentence | null;
+  focus: {
+    kind: ReviewFocusKind;
+    headline: string;
+    detail: string;
+    /** LIVE-P1-03: same focus as localizable structs (rendered via coach-i18n). */
+    headlineI18n?: LocalizedSentence;
+    detailI18n?: LocalizedSentence;
+  };
   revisions: RevisionProposal[];
   seen: boolean;
 }
@@ -324,9 +334,12 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
 
   // Pain escalation (D6).
   let painEscalation: string | null = null;
+  let painEscalationI18n: LocalizedSentence | null = null;
   if (model && model.pain.flaggedFamilies.length > 0) {
     const fams = model.pain.flaggedFamilies.map((f) => f.replace('_', ' ')).join(', ');
     painEscalation = `Pain pattern flagged on ${fams} movements (2+ reports in 28 days). Those patterns stay out of new plans — if it keeps happening, get it checked by a professional.`;
+    // Raw family ids — the renderer localizes each one (see coach-i18n).
+    painEscalationI18n = { key: 'weeklyReview.painEscalation', params: { fams: model.pain.flaggedFamilies.join(', ') } };
   }
 
   // ONE focus, by rule priority.
@@ -348,6 +361,8 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       kind: 'safety',
       headline: 'Look after the pain pattern first',
       detail: painEscalation,
+      headlineI18n: { key: 'weeklyReview.focusSafetyHeadline' },
+      detailI18n: painEscalationI18n ?? undefined,
     };
   } else if (scheduledDays.length > 0 && sessionsCompleted / scheduledDays.length < 0.75 && missedDays.length > 0) {
     const day = missedDays[0];
@@ -355,30 +370,59 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
       kind: 'adherence',
       headline: `Protect your ${day} session`,
       detail: `You completed ${sessionsCompleted} of ${scheduledDays.length} planned sessions, and ${day} was missed. One protected session beats a perfect plan that keeps slipping — the revision below can move it.`,
+      headlineI18n: { key: 'weeklyReview.focusAdherenceHeadline', params: { day } },
+      detailI18n: {
+        key: 'weeklyReview.focusAdherenceDetail',
+        params: { day, completed: sessionsCompleted, planned: scheduledDays.length },
+      },
     };
   } else if (managedStall) {
     focus = {
       kind: 'stall',
       headline: `Break the ${managedStall.exercise} plateau`,
       detail: `${managedStall.exercise} has not moved in ${managedStall.sessionsStalled} of the last ${managedStall.sessionsAnalyzed} sessions. A stimulus change is proposed — approve it in Train when you are ready.`,
+      headlineI18n: { key: 'weeklyReview.focusStallHeadline', params: { exercise: managedStall.exercise } },
+      detailI18n: {
+        key: 'weeklyReview.focusStallDetail',
+        params: {
+          exercise: managedStall.exercise,
+          stalled: managedStall.sessionsStalled,
+          analyzed: managedStall.sessionsAnalyzed,
+        },
+      },
     };
   } else if (progressions.length > 0) {
     focus = {
       kind: 'progression',
       headline: 'Progression is working — keep the rhythm',
       detail: `${progressions[0].exerciseName} earned a progression this week. The block is doing its job; next week, same plan, executed the same way.`,
+      headlineI18n: { key: 'weeklyReview.focusProgressHeadline' },
+      detailI18n: {
+        key: 'weeklyReview.focusProgressDetail',
+        params: { exercise: progressions[0].exerciseName },
+      },
     };
   } else if (sessionsCompleted > 0) {
     focus = {
       kind: 'consistency',
       headline: 'Consistency is the win this week',
       detail: `You showed up for ${sessionsCompleted} session${sessionsCompleted === 1 ? '' : 's'}. No stalls, no flags — stacking weeks like this is exactly how the numbers move.`,
+      headlineI18n: { key: 'weeklyReview.focusConsistencyHeadline' },
+      detailI18n: {
+        key:
+          sessionsCompleted === 1
+            ? 'weeklyReview.focusConsistencyDetailOne'
+            : 'weeklyReview.focusConsistencyDetailMany',
+        params: { count: sessionsCompleted },
+      },
     };
   } else {
     focus = {
       kind: 'consistency',
       headline: 'A quiet week — no judgement, just a restart',
       detail: 'No sessions were logged this week, so there is nothing to analyse and nothing to fix. The plan is still there; the next session is the only target.',
+      headlineI18n: { key: 'weeklyReview.focusQuietHeadline' },
+      detailI18n: { key: 'weeklyReview.focusQuietDetail' },
     };
   }
 
@@ -449,6 +493,7 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
     recoveryLines,
     coachLines,
     painEscalation,
+    painEscalationI18n,
     focus,
     revisions,
     seen: false,
@@ -547,6 +592,8 @@ export function buildSessionDebrief(input: {
 export interface BlockDebrief {
   blockName: string;
   completionLine: string;
+  /** LIVE-P1-03: same line as a localizable struct. */
+  completionI18n?: LocalizedSentence;
   liftChanges: { name: string; fromKg: number | null; toKg: number | null; line: string }[];
   learned: string[];
   endDate: string;
@@ -615,5 +662,18 @@ export function buildBlockDebrief(input: {
     .slice(0, 3)
     .map((f) => f.text);
 
-  return { blockName: block.name, completionLine, liftChanges, learned, endDate };
+  return {
+    blockName: block.name,
+    completionLine,
+    completionI18n:
+      plannedTotal > 0
+        ? {
+            key: 'weeklyReview.debriefCompletion',
+            params: { completed: completedTotal, planned: plannedTotal, pct },
+          }
+        : { key: 'weeklyReview.debriefNoPlan' },
+    liftChanges,
+    learned,
+    endDate,
+  };
 }

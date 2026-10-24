@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
@@ -230,24 +231,22 @@ function PlanModal({
       toast.error(t('toast.planNeedExercise'), t('toast.titleNoExercises'));
       return;
     }
-    for (const ex of validExercises) {
-      const sets = Number(ex.targetSets);
-      if (!Number.isFinite(sets) || sets < 1) {
-        toast.error(t('toast.planSetsMin', { name: ex.name.trim() }), t('toast.titleInvalidSets'));
-        return;
+    // LIVE-P1-01: validation lives in lib/plan-validation (unit-tested).
+    // A blank TARGET WEIGHT is valid — it means bodyweight / no
+    // prescribed load — and must not fail as "weight cannot be negative".
+    const validation = validatePlanExercises(planExercises);
+    if (!validation.ok) {
+      const { name, kind } = validation.error;
+      if (kind === 'sets') {
+        toast.error(t('toast.planSetsMin', { name }), t('toast.titleInvalidSets'));
+      } else if (kind === 'reps') {
+        toast.error(t('toast.planRepsMin', { name }), t('toast.titleInvalidReps'));
+      } else {
+        toast.error(t('toast.planWeightNeg', { name }), t('toast.titleInvalidWeight'));
       }
-      const reps = Number(ex.targetReps);
-      if (!Number.isFinite(reps) || reps < 1) {
-        toast.error(t('toast.planRepsMin', { name: ex.name.trim() }), t('toast.titleInvalidReps'));
-        return;
-      }
-      const weight = Number(ex.targetWeight);
-      if (!Number.isFinite(weight) || weight < 0) {
-        toast.error(t('toast.planWeightNeg', { name: ex.name.trim() }), t('toast.titleInvalidWeight'));
-        return;
-      }
+      return;
     }
-    onSave({ name: trimmedName, exercises: validExercises, intensityMode });
+    onSave({ name: trimmedName, exercises: validation.exercises, intensityMode });
     onClose();
   };
 

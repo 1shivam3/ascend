@@ -98,7 +98,13 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const homePagePath = path.join(rootDir, 'src', 'components', 'HomePage.tsx');
       const homeContent = fs.readFileSync(homePagePath, 'utf8');
       expect(homeContent).not.toContain('AI Routine');
-      expect(homeContent).toContain('Adaptive Split');
+      // LIVE-P1-03: 'Adaptive Split' moved into the i18n dictionary and
+      // HomePage renders it via t('home.adaptiveSplit') — same precedent
+      // as QA4-004's 'Macro Lens' below. The rendered English is unchanged.
+      expect(homeContent).toContain('home.adaptiveSplit');
+      expect(
+        fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
+      ).toContain("'home.adaptiveSplit': 'Adaptive Split'");
 
       const mealsPagePath = path.join(rootDir, 'src', 'components', 'MealsPage.tsx');
       const mealsContent = fs.readFileSync(mealsPagePath, 'utf8');

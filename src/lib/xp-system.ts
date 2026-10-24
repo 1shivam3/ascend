@@ -13,6 +13,7 @@
  */
 import { isSetCompleted } from './types';
 import type { WorkoutEntry, MealEntry } from './types';
+import type { StringKey } from './i18n/en';
 
 /** Fixed XP values — deliberately coarse so the system stays legible. */
 export const XP_WORKOUT = 100;
@@ -233,6 +234,28 @@ export function getLevelName(level: number): string {
     if (level >= tier) return name;
   }
   return 'Initiate';
+}
+
+/**
+ * LIVE-P1-03 — i18n key for a level title. UI renders
+ * `t(getLevelNameKey(level))` so the ladder localizes; `getLevelName`
+ * stays as the English-only fallback for non-UI callers and tests.
+ */
+export function getLevelNameKey(level: number): StringKey {
+  if (level <= 0) return 'level.nameNewcomer';
+  const TITLES: Array<[number, StringKey]> = [
+    [30, 'level.nameLegend'],
+    [25, 'level.nameMaster'],
+    [20, 'level.nameElite'],
+    [15, 'level.nameDedicated'],
+    [10, 'level.nameAthlete'],
+    [5, 'level.nameDisciplined'],
+    [1, 'level.nameInitiate'],
+  ];
+  for (const [tier, key] of TITLES) {
+    if (level >= tier) return key;
+  }
+  return 'level.nameInitiate';
 }
 
 export interface XpActivitySummary {

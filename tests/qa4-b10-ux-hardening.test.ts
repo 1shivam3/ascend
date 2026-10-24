@@ -109,8 +109,14 @@ describe('QA4-020 remainder — label association + keyboard activation', () => 
     const keyHandlers = src.match(/onKeyDown=\{\(e\) => \{\s*if \(e\.key === 'Enter' \|\| e\.key === ' '\)/g) || [];
     // challenges card (pre-existing) + nutrition + protein = at least 3
     expect(keyHandlers.length).toBeGreaterThanOrEqual(3);
-    expect(src).toContain('aria-label="View Nutrition Details"');
-    expect(src).toContain('aria-label="View Protein Details"');
+    // LIVE-P1-03: these aria labels moved into i18n (HomePage renders
+    // them via t('home.viewNutritionDetails') / t('home.viewProteinDetails'));
+    // the rendered English strings are unchanged.
+    expect(src).toContain('home.viewNutritionDetails');
+    expect(src).toContain('home.viewProteinDetails');
+    const enDict = read('src/lib/i18n/en.ts');
+    expect(enDict).toContain("'home.viewNutritionDetails': 'View Nutrition Details'");
+    expect(enDict).toContain("'home.viewProteinDetails': 'View Protein Details'");
   });
 });
 

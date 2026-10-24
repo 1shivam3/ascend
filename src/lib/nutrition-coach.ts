@@ -1,5 +1,6 @@
 import { FOOD_DB } from './macros';
 import type { DietPreference, MacroGoals, MealDayKind } from './types';
+import type { LocalizedSentence } from './coach-i18n';
 
 /**
  * Nutrition coach — vegetarian protein guidance, whole-day adaptation,
@@ -92,6 +93,8 @@ export interface ProteinGapSuggestion {
   gapG: number;
   anchor: ProteinAnchor;
   message: string;
+  /** LIVE-P1-03: same message as a localizable key + params. */
+  messageI18n?: LocalizedSentence;
 }
 
 /**
@@ -140,10 +143,29 @@ export function getProteinGapSuggestion(input: {
       : anchor.proteinG >= gapG / 2
         ? 'would close most of the gap'
         : `is a strong start — about ${remainingAfter} g would still be left, so pair it with another protein food at your next meal`;
+  // LIVE-P1-03: same sentence as a localizable struct. `detail` is a
+  // food portion description and passes through untranslated by design
+  // (food names are never machine-translated).
+  const messageI18n: LocalizedSentence =
+    remainingAfter <= 2
+      ? {
+          key: 'nutritionCoach.proteinGapFull',
+          params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG },
+        }
+      : anchor.proteinG >= gapG / 2
+        ? {
+            key: 'nutritionCoach.proteinGapMost',
+            params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG },
+          }
+        : {
+            key: 'nutritionCoach.proteinGapPartial',
+            params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG, remaining: remainingAfter },
+          };
   return {
     gapG,
     anchor,
     message: `Protein is tracking low today — about ${gapG} g to go. Adding ${anchor.detail} (~${anchor.proteinG} g protein) ${closing}.`,
+    messageI18n,
   };
 }
 

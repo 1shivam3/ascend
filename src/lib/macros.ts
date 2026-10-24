@@ -1349,6 +1349,27 @@ export function getSafeMinCalories(gender: Gender = 'male'): number {
 }
 
 /**
+ * Atwater rounding band for calorie deltas.
+ *
+ * LIVE-P1-02: reconciling a target to 4P+4C+9F with integer grams moves
+ * the total by at most ~9 kcal (protein ±2, fat ±4.5, carbs ±2). A delta
+ * inside that band is rounding noise, NOT a prescribed deficit or
+ * surplus. Before this fix, a General Fitness guest (maintenance 2,301
+ * kcal, reconciled target 2,300 kcal) got delta −1, which the UI
+ * rendered as a fake "−1 deficit • ≈0.00 kg/week" and onboarding
+ * narrated as "to lose fat steadily" — a fat-loss promise for a
+ * maintenance goal. Normalizing |delta| ≤ 10 to 0 makes every
+ * explanation line say maintenance instead of inventing a 1 kcal diet.
+ * Real deficits/surpluses (100+ kcal) are untouched.
+ */
+export const CALORIE_DELTA_ROUNDING_BAND_KCAL = 10;
+
+export function normalizeCalorieDelta(delta: number): number {
+  if (!Number.isFinite(delta)) return 0;
+  return Math.abs(delta) <= CALORIE_DELTA_ROUNDING_BAND_KCAL ? 0 : delta;
+}
+
+/**
  * Mifflin-St Jeor maintenance estimate.
  * Single source of truth for maintenance — used by both the auto
  * calibration and manual Edit Targets, so the deficit/surplus explanation
@@ -1456,7 +1477,7 @@ export function calculateRecommendedMacroGoals(
     fatG,
     carbsG,
     maintenanceCalories: maintenance,
-    calorieDelta: exactCalories - maintenance,
+    calorieDelta: normalizeCalorieDelta(exactCalories - maintenance),
   };
 }
 
@@ -1491,7 +1512,7 @@ export function scaleMacroGoalsToCalories(current: MacroGoals, newCalories: numb
       fatG,
       carbsG,
       maintenanceCalories: maintenance,
-      calorieDelta: exact - maintenance,
+      calorieDelta: normalizeCalorieDelta(exact - maintenance),
     };
   }
 
@@ -1509,7 +1530,7 @@ export function scaleMacroGoalsToCalories(current: MacroGoals, newCalories: numb
     fatG,
     carbsG,
     maintenanceCalories: maintenance,
-    calorieDelta: exact - maintenance,
+    calorieDelta: normalizeCalorieDelta(exact - maintenance),
   };
 }
 

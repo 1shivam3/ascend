@@ -141,8 +141,8 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
             <div key={key} className="p-3.5 rounded-2xl bg-bg-secondary border border-border/60 space-y-2">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-text-primary">{def.title}</p>
-                  <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{def.description}</p>
+                  <p className="text-sm font-bold text-text-primary">{def.titleKey ? t(def.titleKey) : def.title}</p>
+                  <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{def.descriptionKey ? t(def.descriptionKey) : def.description}</p>
                 </div>
                 <span className="text-3xs font-bold text-amber-500 tabular-nums shrink-0 pt-0.5">
                   +{XP_CHALLENGE_COMPLETE} XP

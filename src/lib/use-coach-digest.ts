@@ -8,6 +8,7 @@ import {
   detectMissedSessions,
   detectPatterns,
   generateCheckIn,
+  generateCheckInDetails,
   analyzeWeightTrend,
   suggestCalorieAdjustment,
   getWeightLogStats,
@@ -20,7 +21,7 @@ import { getWeekRange, getLocalTodayStr } from './formatters';
 import { buildHealthSignals } from './health-connect';
 import { resolvePrimaryGoal } from './types';
 import { calculateStreak, buildActiveDays } from './streak-freeze';
-import { getLevel, progressToNext, getLevelName } from './xp-system';
+import { getLevel, progressToNext, getLevelName, getLevelNameKey } from './xp-system';
 
 /**
  * useCoachDigest — single hook that computes everything the UI needs
@@ -72,7 +73,7 @@ export function useCoachDigest() {
 
   const levelInfo = useMemo(() => {
     const prog = progressToNext(xp.totalXp);
-    return { ...prog, name: getLevelName(prog.level) };
+    return { ...prog, name: getLevelName(prog.level), nameKey: getLevelNameKey(prog.level) };
   }, [xp.totalXp]);
 
   const checkIn = useMemo(() => {
@@ -95,7 +96,7 @@ export function useCoachDigest() {
       (m) => !coach.dismissedCheckIns.includes(`missed:${m.date}:${m.name}`)
     );
     if (active.length === 0) return null;
-    return { message: generateCheckIn(active), sessions: active };
+    return { message: generateCheckIn(active), details: generateCheckInDetails(active), sessions: active };
   }, [weeklySchedule, workouts, coach.dismissedCheckIns]);
 
   const patterns = useMemo(

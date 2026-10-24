@@ -5,7 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Trophy, Dumbbell, Utensils, Zap, Droplets, Target, Check } from 'lucide-react';
 import {
   xpForLevel,
-  getLevelName,
+  getLevelNameKey,
   XP_WORKOUT,
   XP_MEAL,
   XP_PR,
@@ -206,7 +206,7 @@ export default function LevelSheet({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-bold text-text-primary">
-                      {t('level.levelWord', { level: lvl })} · {getLevelName(lvl)}
+                      {t('level.levelWord', { level: lvl })} · {t(getLevelNameKey(lvl))}
                       {isCurrent && <span className="text-accent font-semibold"> {t('level.youAreHere')}</span>}
                     </p>
                   </div>

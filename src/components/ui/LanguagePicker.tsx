@@ -3,11 +3,6 @@
 import { useTranslation } from '@/lib/i18n';
 import type { Language } from '@/lib/i18n/en';
 
-const OPTIONS: { id: Language; label: string }[] = [
-  { id: 'en', label: 'English' },
-  { id: 'hi', label: 'हिंदी' },
-];
-
 /**
  * English / हिंदी segmented picker. Writes straight to the persisted
  * uiPreferences.language, so the whole app re-renders in the chosen
@@ -17,13 +12,22 @@ const OPTIONS: { id: Language; label: string }[] = [
  *
  * variant 'theme' follows the app theme tokens (Settings); variant
  * 'light' matches the onboarding screens' fixed light palette.
+ *
+ * LIVE-P1-03: option labels come from i18n keys, so in Hindi mode the
+ * picker itself localizes (English → अंग्रेज़ी) instead of leaking English.
  */
 export default function LanguagePicker({
   variant = 'theme',
 }: {
   variant?: 'theme' | 'light';
 }) {
-  const { language, setLanguage } = useTranslation();
+  const { t, language, setLanguage } = useTranslation();
+
+  // LIVE-P1-03: labels via i18n (see module doc comment).
+  const OPTIONS: { id: Language; label: string }[] = [
+    { id: 'en', label: t('language.english') },
+    { id: 'hi', label: t('language.hindi') },
+  ];
 
   const container =
     variant === 'light'
