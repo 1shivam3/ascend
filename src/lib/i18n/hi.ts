@@ -2479,4 +2479,22 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.errTrackingTitle': 'पोज़ ट्रैकिंग रुक गई',
   'formcheck.errTrackingMessage': 'इस डिवाइस पर पोज़ पहचान बार-बार फेल हो रही थी।',
   'formcheck.errTrackingTry': 'फिर से कोशिश करें, या दूसरे ऐप बंद करके दोबारा कोशिश करें।',
+
+  // ── बातचीत वाला कोच ─────────────────────────────────────────────────
+  'coachChat.title': 'कोच चैट',
+  'coachChat.sectionAria': 'कोच चैट',
+  'coachChat.subtitle':
+    'अपने कोच से पूछें — हर जवाब सामान्य सलाह पर नहीं, बल्कि आपके अपने लॉग किए गए प्रशिक्षण पर आधारित होता है।',
+  'coachChat.placeholder': 'अपनी ट्रेनिंग के बारे में पूछें…',
+  'coachChat.send': 'भेजें',
+  'coachChat.sending': 'सोच रहे हैं…',
+  'coachChat.basedOn': 'आपके डेटा पर आधारित:',
+  'coachChat.coldStart':
+    'आपके कोच के पास अभी आपका कोई प्रशिक्षण इतिहास नहीं है — पहला वर्कआउट लॉग करें, फिर जवाब आपके अपने डेटा पर आधारित होंगे।',
+  'coachChat.errorGeneric': 'आपके कोच से संपर्क नहीं हो सका। फिर से कोशिश करें।',
+  'coachChat.errorCap': 'आज की चैट सीमा पूरी हो गई है। कल वापस आएँ।',
+  'coachChat.errorRateLimit': 'बहुत जल्दी बहुत सारे संदेश। थोड़ी देर रुककर फिर से कोशिश करें।',
+  'coachChat.you': 'आप',
+  'coachChat.coach': 'कोच',
+  'coachChat.dailyLeft': 'आज {n} संदेश बाकी हैं',
 };

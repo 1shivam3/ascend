@@ -2490,6 +2490,24 @@ export const en = {
   'formcheck.errTrackingTitle': 'Pose tracking stopped',
   'formcheck.errTrackingMessage': 'Pose detection kept failing on this device.',
   'formcheck.errTrackingTry': 'Retry, or close other apps and try again.',
+
+  // ── Conversational coach (Train tab, Coach area; text chat only) ─────
+  'coachChat.title': 'COACH CHAT',
+  'coachChat.sectionAria': 'Coach chat',
+  'coachChat.subtitle':
+    'Ask your coach — every answer is based on your own logged training, not generic advice.',
+  'coachChat.placeholder': 'Ask about your training…',
+  'coachChat.send': 'Send',
+  'coachChat.sending': 'Thinking…',
+  'coachChat.basedOn': 'Based on your data:',
+  'coachChat.coldStart':
+    'Your coach has no training history for you yet — log your first workout, and answers will be based on your own data.',
+  'coachChat.errorGeneric': 'Could not reach your coach. Try again.',
+  'coachChat.errorCap': "You have reached today's chat limit. Come back tomorrow.",
+  'coachChat.errorRateLimit': 'Too many messages too fast. Wait a moment and try again.',
+  'coachChat.you': 'You',
+  'coachChat.coach': 'Coach',
+  'coachChat.dailyLeft': '{n} messages left today',
 } as const;
 
 export type StringKey = keyof typeof en;
