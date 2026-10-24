@@ -288,10 +288,9 @@
 
   /* Native Bottom Navigation Bar */
   .native-tab-bar {
-    @apply fixed left-0 right-0 bottom-0 z-40;
     @apply bg-bg-primary/95 backdrop-blur-xl;
     @apply border-t border-border/60;
-    @apply grid grid-cols-4 px-2 pt-1.5;
+    @apply grid grid-cols-5 px-2 pt-1.5;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0.5rem));
   }
 

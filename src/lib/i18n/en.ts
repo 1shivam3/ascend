@@ -36,6 +36,7 @@ export const en = {
   'nav.train': 'Train',
   'nav.progress': 'Progress',
   'nav.fuel': 'Fuel',
+  'nav.you': 'You',
 
   // ── Home ────────────────────────────────────────────────────────────
   'home.greetingMorning': 'Good morning,',

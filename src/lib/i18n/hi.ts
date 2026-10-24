@@ -33,6 +33,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'nav.train': 'ट्रेनिंग',
   'nav.progress': 'प्रगति',
   'nav.fuel': 'पोषण',
+  'nav.you': 'आप',
 
   // ── Home ────────────────────────────────────────────────────────────
   'home.greetingMorning': 'सुप्रभात,',
