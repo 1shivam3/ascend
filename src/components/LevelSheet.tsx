@@ -120,7 +120,7 @@ export default function LevelSheet({
               style={{ width: animated ? `${progress.pct}%` : '0%' }}
             />
           </div>
-          <p className="text-3xs text-text-muted tabular-nums mt-1.5">
+          <p className="text-2xs text-text-muted tabular-nums mt-1.5">
             {t('level.inLevel', { current: progress.current.toLocaleString(), needed: progress.needed.toLocaleString() })}
           </p>
         </div>
@@ -141,13 +141,13 @@ export default function LevelSheet({
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-bold text-text-primary">{t(row.labelKey)}</p>
-                  <p className="text-3xs text-text-muted">{t(row.detailKey)}</p>
+                  <p className="text-2xs text-text-muted">{t(row.detailKey)}</p>
                 </div>
                 <span className="text-xs font-bold text-accent tabular-nums shrink-0">+{row.xp} XP</span>
               </div>
             ))}
           </div>
-          <p className="text-3xs text-text-muted leading-relaxed">
+          <p className="text-2xs text-text-muted leading-relaxed">
             {t('level.neverExpires')}
           </p>
         </div>
@@ -198,8 +198,8 @@ export default function LevelSheet({
                   }`}
                 >
                   <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-3xs font-bold ${
-                      reached || isCurrent ? 'bg-accent text-white' : 'bg-bg-card text-text-muted border border-border/60'
+                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-2xs font-bold ${
+                      reached || isCurrent ? 'bg-accent text-accent-on' : 'bg-bg-card text-text-muted border border-border/60'
                     }`}
                   >
                     {reached ? <Check className="w-3.5 h-3.5" /> : lvl}
@@ -210,7 +210,7 @@ export default function LevelSheet({
                       {isCurrent && <span className="text-accent font-semibold"> {t('level.youAreHere')}</span>}
                     </p>
                   </div>
-                  <span className="text-3xs text-text-muted tabular-nums shrink-0">
+                  <span className="text-2xs text-text-muted tabular-nums shrink-0">
                     {xpForLevel(lvl).toLocaleString()} XP
                   </span>
                 </div>

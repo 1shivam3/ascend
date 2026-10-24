@@ -415,7 +415,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                     {t('vault.csvTitle')}
                   </span>
                 </div>
-                <span className="text-3xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
+                <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
                   Strong / Hevy / FitNotes
                 </span>
               </div>

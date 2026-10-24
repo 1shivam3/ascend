@@ -29,8 +29,9 @@ describe('QA4-015 touch targets ≥40px in workout flows', () => {
     const src = read('src/components/VoiceWorkoutLoggerModal.tsx');
     expect(src).not.toContain('w-6 h-6 rounded bg-bg-secondary');
     expect(src).toContain('w-10 h-10 min-w-[40px] min-h-[40px]');
-    // RPE pills reach 40px tall too
-    expect(src).toContain('py-2 min-h-[40px] rounded text-3xs font-mono font-bold');
+    // RPE pills reach 40px tall too (label floor: text-3xs retired by
+    // the UX redesign, now text-2xs at 11px)
+    expect(src).toContain('py-2 min-h-[40px] rounded text-2xs font-mono font-bold');
   });
 
   it('SuggestedWorkoutModal steppers carry the tap-40 hit area (were 28px)', () => {
@@ -43,9 +44,10 @@ describe('QA4-015 touch targets ≥40px in workout flows', () => {
     const src = read('src/components/ActiveWorkoutScreen.tsx');
     expect(src).not.toContain('className="w-8 h-8 rounded-lg bg-bg-secondary hover:bg-bg-tertiary');
     expect(src).toContain('w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary');
-    // Skip-set chip in the RPE row: 36 -> 40
-    expect(src).not.toContain('py-2 min-h-[36px] rounded-lg text-3xs');
-    expect(src).toContain('py-2 min-h-[40px] rounded-lg text-3xs');
+    // Skip-set chip in the RPE row: 36 -> 40 (label floor: text-3xs
+    // retired by the UX redesign, now text-2xs at 11px)
+    expect(src).not.toContain('py-2 min-h-[36px] rounded-lg text-2xs');
+    expect(src).toContain('py-2 min-h-[40px] rounded-lg text-2xs');
     // Discard button: 36 -> 40
     expect(src).not.toContain('min-h-[36px] min-w-[36px]');
   });

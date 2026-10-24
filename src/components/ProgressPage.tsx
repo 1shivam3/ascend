@@ -936,7 +936,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 )}
               </svg>
               {/* Date-based axis labels (from actual data, not the range) */}
-              <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
+              <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
                 {getDataDateLabels(heroLiftAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                   <span key={i}>{m}</span>
                 ))}
@@ -949,7 +949,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-text-primary">{t('progress.personalRecords')}</h2>
-                <p className="text-3xs text-text-muted mt-0.5">
+                <p className="text-2xs text-text-muted mt-0.5">
                   {t('progress.prExplainer')}
                 </p>
               </div>
@@ -1048,7 +1048,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         onClick={() => setStrengthTimeRange(r)}
                         className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                           strengthTimeRange === r
-                            ? 'bg-accent text-white shadow-xs'
+                            ? 'bg-accent text-accent-on shadow-xs'
                             : 'text-text-muted hover:text-text-primary'
                         }`}
                       >
@@ -1115,7 +1115,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </text>
                     )}
                   </svg>
-                  <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
                     {getDataDateLabels(selectedExerciseAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
@@ -1139,7 +1139,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="font-bold text-text-primary font-mono block">
                             {userUnit === 'lbs' ? `${s.bestWeight} lbs` : `${s.bestWeight} kg`} × {s.bestReps} reps
                           </span>
-                          <span className="text-3xs text-text-muted font-mono">
+                          <span className="text-2xs text-text-muted font-mono">
                             Est. 1RM: {userUnit === 'lbs' ? `${s.bestE1RM} lbs` : `${s.bestE1RM} kg`}
                           </span>
                         </div>
@@ -1147,7 +1147,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="text-2xs font-mono font-medium text-text-secondary block">
                             {formatShortDate(s.date)}
                           </span>
-                          <span className="text-3xs font-mono text-[#858076] font-bold">
+                          <span className="text-2xs font-mono text-[#858076] font-bold">
                             {s.deltaStr}
                           </span>
                         </div>
@@ -1222,7 +1222,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         onClick={() => setBodyTimeRange(r)}
                         className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                           bodyTimeRange === r
-                            ? 'bg-accent text-white shadow-xs'
+                            ? 'bg-accent text-accent-on shadow-xs'
                             : 'text-text-muted hover:text-text-primary'
                         }`}
                       >
@@ -1275,7 +1275,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </text>
                     )}
                   </svg>
-                  <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
                     {getDataDateLabels(bodyweightAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
@@ -1384,7 +1384,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             role="radio"
                             aria-checked={photoPose === pose}
                             onClick={() => setPhotoPose(pose)}
-                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-white' : 'text-text-muted hover:text-text-primary'}`}
+                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-accent-on' : 'text-text-muted hover:text-text-primary'}`}
                           >
                             {pose}
                           </button>
@@ -1486,7 +1486,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       >
                         {bar.isCompleted ? <Check className="w-4 h-4 stroke-[2.5]" /> : null}
                       </div>
-                      <span className="text-3xs font-mono text-text-muted">{bar.label}</span>
+                      <span className="text-2xs font-mono text-text-muted">{bar.label}</span>
                     </div>
                   ))}
                 </div>
@@ -1629,7 +1629,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       if (profile) setProfile({ ...profile, unit: 'lbs' });
                     }}
                     className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'lbs' ? 'bg-accent text-white shadow-xs' : 'text-text-muted hover:text-text-primary'
+                      userUnit === 'lbs' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
                     LBS
@@ -1640,7 +1640,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       if (profile) setProfile({ ...profile, unit: 'kg' });
                     }}
                     className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'kg' ? 'bg-accent text-white shadow-xs' : 'text-text-muted hover:text-text-primary'
+                      userUnit === 'kg' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
                     KG

@@ -117,6 +117,12 @@ describe('i18n wiring coverage (pinned)', () => {
     'src/components/ui/Button.tsx',
     'src/components/ui/Card.tsx',
     'src/components/ui/CircularProgress.tsx',
+    // UX redesign Stage 1: purely presentational — all copy arrives
+    // as props, no user-visible strings of their own.
+    'src/components/ui/EmptyState.tsx',
+    'src/components/ui/FilterBar.tsx',
+    'src/components/ui/Section.tsx',
+    'src/components/ui/SegmentedControl.tsx',
     // TabGuardBanner wired in Round 5 (tabGuard.* keys).
     // App shells: error/loading delegate to the wired state components;
     // layout + legal pages carry metadata / formal legal text only.

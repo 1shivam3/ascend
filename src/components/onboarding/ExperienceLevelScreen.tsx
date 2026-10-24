@@ -121,7 +121,7 @@ export default function ExperienceLevelScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>

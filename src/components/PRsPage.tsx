@@ -592,7 +592,7 @@ function LiftCard({
               <span className="text-2xs text-text-muted font-mono">{item.levelInfo.ratio}× BW</span>
             </div>
             {isMain && (
-              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
+              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
                 {t('prs.coreLift')}
               </span>
             )}
@@ -1160,14 +1160,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
                     {Math.round(dotsScore)} DOTS
                   </span>
-                  <span className="text-3xs text-text-muted block">{t('prs.normalizedScore')}</span>
+                  <span className="text-2xs text-text-muted block">{t('prs.normalizedScore')}</span>
                 </>
               ) : (
                 <>
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
                     {t('prs.liftsCount', { count: exerciseStats.length })}
                   </span>
-                  <span className="text-3xs text-text-muted block">{t('prs.calibratedPrs')}</span>
+                  <span className="text-2xs text-text-muted block">{t('prs.calibratedPrs')}</span>
                 </>
               )}
             </div>
@@ -1180,7 +1180,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.squatMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.squatMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1191,7 +1191,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.benchMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.benchMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1202,7 +1202,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.deadliftMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.deadliftMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1277,7 +1277,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   >
                     {Icon && <Icon className="w-3 h-3 text-accent shrink-0" />}
                     <span>{chip.label}</span>
-                    <span className="text-3xs opacity-75 font-mono">({chip.count})</span>
+                    <span className="text-2xs opacity-75 font-mono">({chip.count})</span>
                   </button>
                 );
               })}

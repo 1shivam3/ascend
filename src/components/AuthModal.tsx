@@ -63,7 +63,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <h2 className="text-sm font-bold text-text-primary tracking-tight font-sans">
                 {isPermanentUser ? t('auth.cloudAccount') : t('auth.linkGoogle')}
               </h2>
-              <p className="text-3xs text-text-muted font-mono">
+              <p className="text-2xs text-text-muted font-mono">
                 {isPermanentUser ? t('auth.backupActive') : t('auth.neverLose')}
               </p>
             </div>
@@ -89,7 +89,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <p className="text-2xs text-text-primary font-mono truncate">
                 {user.email}
               </p>
-              <p className="text-3xs text-text-muted leading-relaxed">
+              <p className="text-2xs text-text-muted leading-relaxed">
                 {t('auth.syncedBody')}
               </p>
             </div>
@@ -161,7 +161,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <span>{t('auth.continueGoogle')}</span>
             </button>
 
-            <div className="flex items-center justify-center gap-1.5 text-3xs text-text-muted pt-1">
+            <div className="flex items-center justify-center gap-1.5 text-2xs text-text-muted pt-1">
               <Shield className="w-3 h-3 text-emerald-500 shrink-0" />
               <span>{t('auth.rls')}</span>
             </div>

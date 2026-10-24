@@ -192,7 +192,7 @@ export default function ConstraintAdapterModal({
                       onClick={() => setSelectedMinutes(m)}
                       className={`px-3 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                         selectedMinutes === m
-                          ? 'bg-accent text-white shadow-xs'
+                          ? 'bg-accent text-accent-on shadow-xs'
                           : 'bg-bg-secondary text-text-muted border border-border/70 hover:text-text-primary'
                       }`}
                     >

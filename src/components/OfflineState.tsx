@@ -55,7 +55,7 @@ export default function OfflineState({
 
       {/* ── Status Badge ────────────────────────────────────────────────── */}
       <div className="flex justify-center -mt-2">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-3xs font-mono font-bold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-2xs font-mono font-bold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
           <span className="w-2 h-2 rounded-full bg-sage animate-pulse" />
           {t('offline.badge')}
         </span>
@@ -75,21 +75,21 @@ export default function OfflineState({
       <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 text-left space-y-2">
         <div className="flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
-          <p className="text-3xs text-text-secondary leading-snug">
+          <p className="text-2xs text-text-secondary leading-snug">
             <strong className="text-text-primary font-semibold block">{t('offline.localTitle')}</strong>
             {t('offline.localDesc')}
           </p>
         </div>
         <div className="flex items-start gap-2.5">
           <CheckCircle2 className="w-4 h-4 text-sage shrink-0 mt-0.5" />
-          <p className="text-3xs text-text-secondary leading-snug">
+          <p className="text-2xs text-text-secondary leading-snug">
             <strong className="text-text-primary font-semibold block">{t('offline.engineTitle')}</strong>
             {t('offline.engineDesc')}
           </p>
         </div>
         <div className="flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-sage shrink-0 mt-0.5" />
-          <p className="text-3xs text-text-secondary leading-snug">
+          <p className="text-2xs text-text-secondary leading-snug">
             <strong className="text-text-primary font-semibold block">{t('offline.syncTitle')}</strong>
             {t('offline.syncDesc')}
           </p>
@@ -102,7 +102,7 @@ export default function OfflineState({
           type="button"
           onClick={handleCheckConnection}
           disabled={isChecking}
-          className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-white flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
+          className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-accent-on flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
         >
           <RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />
           <span>{isChecking ? t('offline.checking') : t('offline.check')}</span>

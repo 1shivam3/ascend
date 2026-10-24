@@ -92,7 +92,7 @@ export default function ExerciseSelectorModal({
             </div>
             <div>
               <h3 className="font-bold text-sm text-text-primary">{title ?? t('exsel.addExercise')}</h3>
-              <p className="text-3xs text-text-muted">{t('exsel.subtitle')}</p>
+              <p className="text-2xs text-text-muted">{t('exsel.subtitle')}</p>
             </div>
           </div>
           <button
@@ -136,7 +136,7 @@ export default function ExerciseSelectorModal({
               onClick={() => setSelectedMuscle('All')}
               className={`px-3 py-1 rounded-full font-semibold transition-all shrink-0 cursor-pointer ${
                 selectedMuscle === 'All'
-                  ? 'bg-accent text-white shadow-xs'
+                  ? 'bg-accent text-accent-on shadow-xs'
                   : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border/60'
               }`}
             >
@@ -149,7 +149,7 @@ export default function ExerciseSelectorModal({
                 onClick={() => setSelectedMuscle(m)}
                 className={`px-3 py-1 rounded-full font-semibold transition-all shrink-0 cursor-pointer ${
                   selectedMuscle === m
-                    ? 'bg-accent text-white shadow-xs'
+                    ? 'bg-accent text-accent-on shadow-xs'
                     : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-border/60'
                 }`}
               >
@@ -173,7 +173,7 @@ export default function ExerciseSelectorModal({
                     onClick={() => setCustomMuscle(m)}
                     className={`px-2.5 py-1 rounded-full font-semibold transition-all shrink-0 cursor-pointer ${
                       active
-                        ? 'bg-accent/85 text-white'
+                        ? 'bg-accent/85 text-accent-on'
                         : 'bg-bg-secondary/60 text-text-muted hover:text-text-primary border border-border/50'
                     }`}
                   >
@@ -215,7 +215,7 @@ export default function ExerciseSelectorModal({
                   <span className="text-xs font-semibold text-text-primary group-hover:text-accent transition-colors block">
                     {ex.name}
                   </span>
-                  <div className="flex items-center gap-1.5 text-3xs font-mono text-text-muted">
+                  <div className="flex items-center gap-1.5 text-2xs font-mono text-text-muted">
                     <span className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border">
                       {ex.muscle}
                     </span>
@@ -230,7 +230,7 @@ export default function ExerciseSelectorModal({
                   </div>
                 </div>
 
-                <div className="w-6 h-6 rounded-full bg-accent/10 text-accent group-hover:bg-accent group-hover:text-white flex items-center justify-center transition-all shrink-0">
+                <div className="w-6 h-6 rounded-full bg-accent/10 text-accent group-hover:bg-accent group-hover:text-accent-on flex items-center justify-center transition-all shrink-0">
                   <Plus className="w-3.5 h-3.5" />
                 </div>
               </button>

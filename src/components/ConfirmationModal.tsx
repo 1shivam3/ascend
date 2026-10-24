@@ -127,7 +127,7 @@ export default function ConfirmationModal({
             disabled={isConfirmDisabled}
             className={`flex-1 min-h-[44px] py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
               variant === 'danger'
-                ? 'bg-accent hover:bg-accent-dim text-white shadow-sm shadow-accent/20'
+                ? 'bg-accent hover:bg-accent-dim text-accent-on shadow-sm shadow-accent/20'
                 : 'bg-text-primary text-bg-primary hover:opacity-90'
             }`}
           >

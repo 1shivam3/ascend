@@ -234,7 +234,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('all')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 ${
             activeFilter === 'all'
-              ? 'bg-accent text-white shadow-xs'
+              ? 'bg-accent text-accent-on shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >

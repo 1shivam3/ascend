@@ -35,14 +35,18 @@
   --text-2: #5E615A;
   --text-3: #6E6A5E;
   --accent-hex: #E44427;
-  --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
+  --accent-on: #000000;           /* UX redesign contrast audit: white on
+    Vermilion #E44427 is 4.07:1 (fails AA for labels); near-black #171916
+    is 4.34:1 (also fails); pure black is 5.15:1. The audit corrects the
+    `on` value, never the accent — see src/lib/accent-themes.ts. */
   --accent-subtle: #FDF1EE;
   --accent-text: #C7351B;          /* accent as TEXT needs the dimmer vermilion: 4.66:1 vs 3.57:1 */
   --sage: 133 128 118;
   --sage-hex: #858076;
   --sage-subtle: rgba(133, 128, 118, 0.15);
-  --success: #858076;
-  --success-bg: rgba(133, 128, 118, 0.15);
+  --success: 21 115 71;            /* D2 fix: success is NO LONGER sage.
+    Light #157347 on #E6F4EA; always with check icon + label. */
+  --success-bg: #E6F4EA;
   --warning: #8A5A00;
   --warning-bg: #FBF0D3;
   --danger: #B42318;
@@ -86,14 +90,17 @@
   --text-2: #A5A9A1;
   --text-3: #8B8F87;
   --accent-hex: #E44427;
-  --accent-on: #FFFFFF;           /* Crisp white on Vermilion #E44427 */
+  --accent-on: #171916;           /* UX redesign contrast audit: white on
+    dark Vermilion #EB4E30 is 3.72:1 (fails AA for labels); near-black
+    #171916 is 4.77:1. See src/lib/accent-themes.ts. */
   --accent-subtle: rgba(228, 68, 39, 0.15);
   --accent-text: #FF7D66;
   --sage: 133 128 118;
   --sage-hex: #858076;
   --sage-subtle: rgba(133, 128, 118, 0.20);
-  --success: #858076;
-  --success-bg: rgba(133, 128, 118, 0.20);
+  --success: 74 222 128;            /* D2 fix (dark): #4ADE80 on
+    rgba(74,222,128,0.15); always with check icon + label. */
+  --success-bg: rgba(74, 222, 128, 0.15);
   --warning: #FBBF24;
   --warning-bg: #2B2210;
   --danger: #F87171;
@@ -166,9 +173,11 @@
     @apply bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 active:scale-95 shadow-sm;
   }
 
-  /* Solid Vermilion (#E44427) primary CTA with crisp white text */
+  /* Solid accent primary CTA. Text uses the accent-on token (UX
+     redesign contrast audit): black on light Vermilion, near-black on
+     dark Vermilion — both ≥4.5:1, where white was 4.07:1 / 3.72:1. */
   .btn-primary {
-    @apply bg-accent text-white font-bold px-4 py-2.5 rounded-xl text-sm;
+    @apply bg-accent text-accent-on font-bold px-4 py-2.5 rounded-xl text-sm;
     @apply active:scale-[0.98] transition-all duration-150 shadow-sm shadow-accent/20;
     @apply hover:brightness-105 flex items-center justify-center gap-2 cursor-pointer;
     min-height: 48px;
@@ -228,18 +237,19 @@
     min-height: 40px;
   }
 
-  /* Reference Display Heading (clean, modern grotesque sans-serif, sentence-case) */
+  /* Reference Display Heading — Barlow Condensed, display roles only
+     (≥28px + wordmark). 32/36 mobile, 40/44 desktop. */
   .display-title {
-    @apply font-sans tracking-tight text-2xl sm:text-3xl font-bold text-text-primary;
+    @apply font-display tracking-tight text-[32px] leading-[36px] lg:text-[40px] lg:leading-[44px] font-semibold text-text-primary;
   }
 
   /* Typographic Hierarchy Classes */
   .page-title {
-    @apply font-sans text-2xl sm:text-3xl font-bold tracking-tight text-text-primary;
+    @apply font-sans text-[22px] leading-[28px] font-semibold tracking-tight text-text-primary;
   }
 
   .section-heading {
-    @apply font-sans text-sm sm:text-base font-semibold tracking-normal text-text-primary;
+    @apply font-sans text-[17px] leading-[22px] font-semibold tracking-normal text-text-primary;
   }
 
   /* Section Title: disciplined 12-13px meta header */

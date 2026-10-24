@@ -131,14 +131,14 @@ function PackedSwapBanner({
         <button
           type="button"
           onClick={onSwap}
-          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent text-white text-3xs font-bold active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent text-accent-on text-2xs font-bold active:scale-95 transition-all cursor-pointer"
         >
           {swapLabel}
         </button>
         <button
           type="button"
           onClick={onKeep}
-          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary border border-border text-3xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary border border-border text-2xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
         >
           {keepLabel}
         </button>
@@ -1898,7 +1898,7 @@ export default function ActiveWorkoutScreen({
             <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[200px] sm:max-w-md font-sans">
               {workoutName}
             </h1>
-            <div className="flex items-center gap-1.5 text-3xs font-mono text-text-muted">
+            <div className="flex items-center gap-1.5 text-2xs font-mono text-text-muted">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               <span>{formatTime(elapsedSeconds)}</span>
             </div>
@@ -2241,7 +2241,7 @@ export default function ActiveWorkoutScreen({
                   {/* Dropdown Menu for Exercise Suggestions */}
                   <div className="absolute left-0 right-0 top-full mt-1.5 bg-bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 animate-scale-in">
                     {/* Suggestions Header */}
-                    <div className="px-3 py-2 bg-bg-secondary/80 border-b border-border/50 flex items-center justify-between text-3xs font-semibold text-text-muted uppercase tracking-wider">
+                    <div className="px-3 py-2 bg-bg-secondary/80 border-b border-border/50 flex items-center justify-between text-2xs font-semibold text-text-muted uppercase tracking-wider">
                       <span className="truncate">
                         {localExerciseName.trim()
                           ? t('workout.matchesFor', { query: localExerciseName.trim() })
@@ -2280,7 +2280,7 @@ export default function ActiveWorkoutScreen({
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5 text-3xs text-text-muted">
+                              <div className="flex items-center gap-1.5 mt-0.5 text-2xs text-text-muted">
                                 <span className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border/40 font-medium">
                                   {item.muscle}
                                 </span>
@@ -2322,7 +2322,7 @@ export default function ActiveWorkoutScreen({
                                 {t('workout.useCustomName', { name: localExerciseName.trim() })}
                               </span>
                             </div>
-                            <span className="text-3xs font-mono uppercase text-accent/80 shrink-0">{t('workout.custom')}</span>
+                            <span className="text-2xs font-mono uppercase text-accent/80 shrink-0">{t('workout.custom')}</span>
                           </button>
                         )}
                     </div>
@@ -2526,7 +2526,7 @@ export default function ActiveWorkoutScreen({
                       @7
                     </span>
                     <span className="text-xs font-bold text-text-primary block">{t('workout.easy')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.easyDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.easyDesc')}</span>
                   </button>
                   <button
                     type="button"
@@ -2541,7 +2541,7 @@ export default function ActiveWorkoutScreen({
                       @8
                     </span>
                     <span className="text-xs font-bold text-accent block">{t('workout.target')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.targetDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.targetDesc')}</span>
                   </button>
                   <button
                     type="button"
@@ -2556,7 +2556,7 @@ export default function ActiveWorkoutScreen({
                       @9.5
                     </span>
                     <span className="text-xs font-bold text-text-primary block">{t('workout.hard')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.hardDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.hardDesc')}</span>
                   </button>
                 </div>
 
@@ -2636,7 +2636,7 @@ export default function ActiveWorkoutScreen({
                           </span>
                         </div>
                         {isCurrentBodyweight && (
-                          <span className="text-3xs text-accent font-semibold mt-0.5">
+                          <span className="text-2xs text-accent font-semibold mt-0.5">
                             {currentExercise.sets[activeSetIdx]?.weight === undefined || currentExercise.sets[activeSetIdx]?.weight === 0 ? t('workout.bodyweight') : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
                           </span>
                         )}
@@ -2864,10 +2864,10 @@ export default function ActiveWorkoutScreen({
                           }}
                           className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
-                        <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
+                        <span className="text-2xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
                       </div>
                       {isCurrentDumbbell && (
-                        <span className="text-3xs font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
+                        <span className="text-2xs font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
                           / db
                         </span>
                       )}
@@ -2876,7 +2876,7 @@ export default function ActiveWorkoutScreen({
                           const w = typeof set.weight === 'number' && !isNaN(set.weight) ? set.weight : 0;
                           const plates = w > 0 ? getPlateSummary(w, userUnit) : null;
                           return plates ? (
-                            <span className="text-3xs font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
+                            <span className="text-2xs font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
                               {plates}
                             </span>
                           ) : null;
@@ -2907,7 +2907,7 @@ export default function ActiveWorkoutScreen({
                         }}
                         className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                       />
-                      <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
+                      <span className="text-2xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
                         <span className="sm:hidden">r</span>
                         <span className="hidden sm:inline">{t('workout.reps').toLowerCase()}</span>
                       </span>
@@ -2929,7 +2929,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleSkipSet(sIdx)}
-                      className={`px-2.5 sm:px-3 py-2 min-h-[40px] rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
+                      className={`px-2.5 sm:px-3 py-2 min-h-[40px] rounded-lg text-2xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
                         set.status === 'skipped'
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                           : 'text-text-muted hover:text-text-primary border-transparent hover:border-border/60'
@@ -2988,7 +2988,7 @@ export default function ActiveWorkoutScreen({
                     <p className="text-xs font-black text-text-primary">
                       {t('workout.exerciseComplete', { name: currentExercise.name })}
                     </p>
-                    <p className="text-3xs text-text-muted">
+                    <p className="text-2xs text-text-muted">
                       {t('workout.allSetsLogged', { count: currentExercise.sets.length })}
                     </p>
                   </div>
@@ -2997,7 +2997,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
-                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-accent-on text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
                   >
                     <span>{t('workout.nextWithName', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -3131,7 +3131,7 @@ export default function ActiveWorkoutScreen({
           >
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <div>
-                <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
                   {t('workout.quickNavigation')}
                 </span>
                 <h3 className="text-base font-black text-text-primary font-sans mt-0.5">
@@ -3190,7 +3190,7 @@ export default function ActiveWorkoutScreen({
                         <div className="font-bold text-xs truncate font-sans">
                           {ex.name}
                         </div>
-                        <div className="text-3xs font-mono text-text-muted">
+                        <div className="text-2xs font-mono text-text-muted">
                           {t('workout.setsCompleted', { done: completedCount, total: totalCount })}
                         </div>
                       </div>
@@ -3198,7 +3198,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
+                        <span className="text-2xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
                           {t('workout.active')}
                         </span>
                       )}
@@ -3250,7 +3250,7 @@ export default function ActiveWorkoutScreen({
               <div className="p-3 rounded-xl bg-bg-secondary border border-border/80 space-y-2 font-mono text-2xs">
                 <div className="flex items-center justify-between text-accent font-bold">
                   <span>{t('workout.plannedWarmup')}</span>
-                  <span className="text-text-muted font-normal text-3xs">
+                  <span className="text-text-muted font-normal text-2xs">
                     {t('workout.targetLabel', { weight: generatedWarmupPreview.workingWeight, unit: userUnit })}
                   </span>
                 </div>
@@ -3258,14 +3258,14 @@ export default function ActiveWorkoutScreen({
                   {generatedWarmupPreview.warmups.map((w, idx) => (
                     <div key={idx} className="pt-1.5 first:pt-0 flex items-center justify-between text-text-secondary">
                       <div className="flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold text-3xs border border-amber-500/20">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold text-2xs border border-amber-500/20">
                           W{idx + 1}
                         </span>
                         <span className="font-semibold text-text-primary">
                           {w.weight} {w.unit} × {t('prs.repsWord', { reps: w.reps })}
                         </span>
                       </div>
-                      <span className="text-3xs text-text-muted truncate max-w-[130px]">{w.label}</span>
+                      <span className="text-2xs text-text-muted truncate max-w-[130px]">{w.label}</span>
                     </div>
                   ))}
                 </div>
@@ -3324,7 +3324,7 @@ export default function ActiveWorkoutScreen({
               )}
               {formCues.map((cue, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
-                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
                     {idx + 1}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>
@@ -3400,7 +3400,7 @@ export default function ActiveWorkoutScreen({
 
             <div className="p-4 space-y-4">
               <div className="text-center p-3 rounded-xl bg-bg-secondary border border-border space-y-2">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.targetBarbellWeight')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.targetBarbellWeight')}</span>
                 <div className="flex items-center justify-center gap-2">
                   <button
                     type="button"
@@ -3449,7 +3449,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Barbell Type Selection */}
               <div className="space-y-1.5">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.barbellType')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.barbellType')}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {BARBELL_PRESETS.map((preset) => {
                     const presetWeight = userUnit === 'kg' ? preset.weightKg : preset.weightLbs;
@@ -3475,7 +3475,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Plate List Breakdown */}
               <div className="space-y-1.5">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.platesPerSide')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.platesPerSide')}</span>
                 {plateResult.plates.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-2">{t('workout.emptyBarbell', { weight: plateResult.barWeight, unit: userUnit })}</p>
                 ) : (
@@ -3494,7 +3494,7 @@ export default function ActiveWorkoutScreen({
                           <span className="text-xs font-black font-mono text-text-primary block">
                             {p.count}× {p.weight} {userUnit}
                           </span>
-                          <span className="text-3xs text-text-muted font-mono">{t('workout.totalSuffix', { total: p.count * p.weight, unit: userUnit })}</span>
+                          <span className="text-2xs text-text-muted font-mono">{t('workout.totalSuffix', { total: p.count * p.weight, unit: userUnit })}</span>
                         </div>
                       </div>
                     ))}
@@ -3523,7 +3523,7 @@ export default function ActiveWorkoutScreen({
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-bold text-text-primary text-sm">{t('workout.swapTitle', { name: currentExercise.name })}</h3>
-                <p className="text-3xs text-text-muted mt-0.5">{t('workout.swapSubtitle')}</p>
+                <p className="text-2xs text-text-muted mt-0.5">{t('workout.swapSubtitle')}</p>
               </div>
               <button
                 type="button"
@@ -3548,7 +3548,7 @@ export default function ActiveWorkoutScreen({
                     key={r.id}
                     type="button"
                     onClick={() => setSwapReason(r.id)}
-                    className={`px-2.5 py-1.5 rounded-full text-2xs font-bold cursor-pointer transition-all ${swapReason === r.id ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
+                    className={`px-2.5 py-1.5 rounded-full text-2xs font-bold cursor-pointer transition-all ${swapReason === r.id ? 'bg-accent text-accent-on' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
                   >
                     {t(r.labelKey)}
                   </button>
@@ -3758,19 +3758,19 @@ export default function ActiveWorkoutScreen({
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
                   <span className="text-lg font-black font-mono text-accent block mt-0.5">
                     {sessionStats.totalVolumeKg}kg
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.sets')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.sets')}</span>
                   <span className="text-lg font-black font-mono text-emerald-400 block mt-0.5">
                     {sessionStats.completedSetsCount}/{sessionStats.totalSetsCount}
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.time')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.time')}</span>
                   <span className="text-lg font-black font-mono text-text-primary block mt-0.5">
                     {sessionStats.durationFormatted}
                   </span>
@@ -3864,7 +3864,7 @@ export default function ActiveWorkoutScreen({
                 <h3 className="font-bold text-text-primary text-sm font-sans">
                   {t('workout.howHardSet')}
                 </h3>
-                <p className="text-3xs text-text-muted">
+                <p className="text-2xs text-text-muted">
                   {t('workout.rpeExplainer', { n: activeRpePickerSetIdx + 1 })}
                 </p>
               </div>

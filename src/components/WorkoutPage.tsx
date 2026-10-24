@@ -328,12 +328,12 @@ function PlanModal({
                 />
               </button>
             </div>
-            <p className="text-3xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
+            <p className="text-2xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
             {intensityMode === 'percent' &&
               !planExercises.some(
                 (ex) => isMainCompound(ex.name) && estimateE1rmKg(ex.name, prs, workouts) !== null
               ) && (
-                <p className="text-3xs text-amber-400 leading-relaxed">{t('plan.intensityNoData')}</p>
+                <p className="text-2xs text-amber-400 leading-relaxed">{t('plan.intensityNoData')}</p>
               )}
           </div>
 
@@ -380,14 +380,14 @@ function PlanModal({
 
                   {/* Name */}
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-3xs text-text-muted font-mono">NAME</span>
+                    <span className="text-2xs text-text-muted font-mono">NAME</span>
                     <button
                       type="button"
                       onClick={() => {
                         setTargetExerciseIndex(i);
                         setIsSelectorOpen(true);
                       }}
-                      className="text-3xs text-accent hover:underline font-mono"
+                      className="text-2xs text-accent hover:underline font-mono"
                     >
                       Pick from library
                     </button>
@@ -458,7 +458,7 @@ function PlanModal({
                     const weights = percentSetWeights(e1rmKg, ex.targetSets || 1, unit);
                     const e1rmDisplay = unit === 'lbs' ? Math.round(e1rmKg * 2.20462) : Math.round(e1rmKg);
                     return (
-                      <p className="mt-2 text-3xs font-mono text-accent">
+                      <p className="mt-2 text-2xs font-mono text-accent">
                         {t('plan.suggestedFrom1rm', {
                           weight: weights[0],
                           unit,
@@ -602,9 +602,9 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             })}
             title={t('plan.usePercent')}
             aria-pressed={plan.intensityMode === 'percent'}
-            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-3xs font-mono font-bold transition-colors cursor-pointer ${
+            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-2xs font-mono font-bold transition-colors cursor-pointer ${
               plan.intensityMode === 'percent'
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-accent-on'
                 : 'text-text-muted hover:text-accent hover:bg-accent/10'
             }`}
           >
@@ -680,7 +680,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           plan can be adopted by the coach without changing it. */}
       {(isBlockPlan || isAdopted) && (
         <div className="flex items-center gap-1.5">
-          <span className="text-3xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+          <span className="text-2xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
             {isBlockPlan ? t('coachBlock.badgeBlock') : t('coachBlock.badgeManaged')}
           </span>
           {isAdopted && !isBlockPlan && (
@@ -2452,7 +2452,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               {runProgress.nextSession && (
                 <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-bg-secondary border border-border/60">
                   <div className="min-w-0">
-                    <p className="text-3xs font-bold text-text-muted uppercase tracking-wide">{t('run.nextRun')}</p>
+                    <p className="text-2xs font-bold text-text-muted uppercase tracking-wide">{t('run.nextRun')}</p>
                     <p className="text-xs font-semibold text-text-primary mt-0.5">
                       {t('run.sessionLabel', { week: runProgress.nextSession.week, day: runProgress.nextSession.day })}
                       {' · '}
@@ -2500,7 +2500,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 onClick={() => startTimer(s)}
                 className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
                   restTotalSeconds === s && restSecondsLeft > 0
-                    ? 'bg-accent text-white border-accent'
+                    ? 'bg-accent text-accent-on border-accent'
                     : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -2510,7 +2510,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={togglePauseTimer}
-              className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
+              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
               title={isRestRunning ? 'Pause' : 'Start'}
             >
               {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
@@ -2599,7 +2599,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </h2>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-3xs text-text-muted font-mono hidden sm:inline">
+              <span className="text-2xs text-text-muted font-mono hidden sm:inline">
                 {isDecisionExpanded ? 'Collapse' : 'Inspect Insights'}
               </span>
               {isDecisionExpanded ? (
@@ -2742,7 +2742,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             <div className="flex items-center justify-between flex-wrap gap-1">
                               <p className="font-medium text-accent text-sm">{ex.name}</p>
                               {effortSummary && effortSummary.averageRpe > 0 && (
-                                <div className="flex items-center gap-1.5 text-3xs font-mono">
+                                <div className="flex items-center gap-1.5 text-2xs font-mono">
                                   <span className="text-text-muted">Effort:</span>
                                   <span className="px-1.5 py-0.5 rounded bg-bg-primary border border-border text-accent font-bold">
                                     Avg @{effortSummary.averageRpe} RPE
@@ -3141,7 +3141,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <span className="text-xs font-bold text-text-primary block group-hover:text-accent transition-colors">
                       Log Finished / Past Workout
                     </span>
-                    <span className="text-3xs text-text-muted">
+                    <span className="text-2xs text-text-muted">
                       Already completed your session? Record weights and reps now
                     </span>
                   </div>
@@ -3205,13 +3205,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                 {plan.name}
                               </span>
                               {scheduledDays.length > 0 && (
-                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-3xs font-mono font-bold text-text-muted">
+                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-2xs font-mono font-bold text-text-muted">
                                   {scheduledDays.join(', ')}
                                 </span>
                               )}
                             </div>
                             {bodyParts.length > 0 ? (
-                              <span className="text-3xs text-accent font-medium block mt-0.5">
+                              <span className="text-2xs text-accent font-medium block mt-0.5">
                                 {bodyParts.join(' • ')}
                               </span>
                             ) : null}

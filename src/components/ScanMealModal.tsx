@@ -799,7 +799,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <div className="w-8 h-8 border-t-2 border-r-2 border-accent absolute top-0 right-0 rounded-tr" />
                     <div className="w-8 h-8 border-b-2 border-l-2 border-accent absolute bottom-0 left-0 rounded-bl" />
                     <div className="w-8 h-8 border-b-2 border-r-2 border-accent absolute bottom-0 right-0 rounded-br" />
-                    <span className="text-3xs font-mono font-bold uppercase tracking-wider text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 shadow-xs">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 shadow-xs">
                       {t('scan.framePlate')}
                     </span>
                   </div>
@@ -1237,11 +1237,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                           </span>
                         </div>
                         {isCreatineLoggedToday ? (
-                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> {t('scan.loggedToday')}
                           </span>
                         ) : (
-                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
                             {t('scan.dailyHabit')}
                           </span>
                         )}
@@ -1358,7 +1358,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                       confidence but never showed it — a
                                       low-confidence guess used to look as
                                       certain as a clean read. */}
-                                  <span className={`text-3xs font-mono font-semibold uppercase tracking-wide ${
+                                  <span className={`text-2xs font-mono font-semibold uppercase tracking-wide ${
                                     item.confidence === 'high'
                                       ? 'text-emerald-500'
                                       : item.confidence === 'medium'
@@ -1387,7 +1387,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                   <span className="font-bold text-xs text-accent block">
                                     ~{adjItem.calories} kcal
                                   </span>
-                                  <span className="text-3xs text-text-muted block">
+                                  <span className="text-2xs text-text-muted block">
                                     P: {item.proteinG}g • C: {item.carbsG}g • F: {adjItem.fatG}g
                                   </span>
                                 </div>
@@ -1417,7 +1417,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 absorbed fat; one tap corrects it. */}
                             {oilDefault && oilLevel && (
                               <div className="flex items-center justify-between gap-2 pt-1">
-                                <span className="text-3xs text-text-muted font-mono shrink-0">
+                                <span className="text-2xs text-text-muted font-mono shrink-0">
                                   {t('scan.gheeOil')}
                                 </span>
                                 <div className="flex gap-1">
@@ -1428,9 +1428,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                       onClick={() =>
                                         setOilLevels((prev) => ({ ...prev, [idx]: level.id }))
                                       }
-                                      className={`px-2 py-0.5 rounded-md text-3xs font-semibold transition-all cursor-pointer ${
+                                      className={`px-2 py-0.5 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
                                         oilLevel === level.id
-                                          ? 'bg-accent text-white'
+                                          ? 'bg-accent text-accent-on'
                                           : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                                       }`}
                                     >

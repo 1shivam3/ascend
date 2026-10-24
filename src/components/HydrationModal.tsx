@@ -159,7 +159,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             }`}
           >
             <span>{t('common.today')}</span>
-            <span className="text-3xs opacity-80 font-mono">({todayStr})</span>
+            <span className="text-2xs opacity-80 font-mono">({todayStr})</span>
           </button>
           <button
             type="button"
@@ -171,7 +171,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             }`}
           >
             <span>{t('meals.yesterday')}</span>
-            <span className="text-3xs opacity-80 font-mono">({yesterdayStr})</span>
+            <span className="text-2xs opacity-80 font-mono">({yesterdayStr})</span>
           </button>
         </div>
 

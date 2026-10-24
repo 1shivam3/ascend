@@ -630,7 +630,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               handleStartWorkoutFromHome();
             }
           }}
-          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-accent-on font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
         >
           {activeWorkoutDraft
             ? t('home.resumeWorkout')
@@ -734,7 +734,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {readiness.score} <span className="text-sm font-semibold text-text-muted">{t(READINESS_LABEL_KEY[readiness.band] ?? 'home.readinessReady')}</span>
             </span>
-            <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
+            <span className="flex items-center gap-0.5 text-2xs font-semibold text-text-muted mt-1">
               {t('home.details')}
               <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
@@ -787,7 +787,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Camera className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
         </button>
         <button
           type="button"
@@ -797,7 +797,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Barcode className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.scan')}</span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.scan')}</span>
         </button>
         <button
           type="button"
@@ -807,7 +807,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
             <Scale className="w-4 h-4" />
           </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.weight')}</span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.weight')}</span>
         </button>
       </div>
 
@@ -820,7 +820,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </span>
             <div>
               <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
-              <p className="text-3xs text-text-muted tabular-nums">
+              <p className="text-2xs text-text-muted tabular-nums">
                 {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
               </p>
             </div>
@@ -892,7 +892,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                         for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
                         handleStartWorkoutFromHome(plan);
                       }}
-                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-accent-on text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
                     >
                       {t('home.doItToday', { name: plan.name })}
                     </button>
@@ -951,7 +951,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     recordCalorieAdjustment(record);
                     toast.success(t('toast.targetUpdated', { kcal: nutritionSuggestion.newCalories.toLocaleString() }), t('toast.titleCaloriesAdjusted'));
                   }}
-                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
                   {t('home.applyKcal', { kcal: nutritionSuggestion.newCalories.toLocaleString() })}
                 </button>
@@ -1016,7 +1016,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xs font-bold text-text-primary block">
               {t('health.stepsToday')}
             </span>
-            <span className="text-3xs text-text-muted block">Health Connect</span>
+            <span className="text-2xs text-text-muted block">Health Connect</span>
           </div>
           <span className="ml-auto text-sm font-black font-mono text-text-primary tabular-nums">
             {healthSummary.stepsToday.toLocaleString()}
@@ -1029,7 +1029,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
-          <span className="text-3xs font-mono text-text-muted">{t('home.monSun')}</span>
+          <span className="text-2xs font-mono text-text-muted">{t('home.monSun')}</span>
         </div>
         {uiPreferences.gamificationEnabled && (
           <div className="flex items-center gap-2 mb-3">
@@ -1040,7 +1040,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 : t('home.streakStart')}
             </p>
             {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
-              <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+              <span className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted ml-auto shrink-0">
                 <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
                 {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
               </span>
@@ -1048,7 +1048,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         )}
         {uiPreferences.gamificationEnabled && streakInfo.freezeConsumed && (
-          <p className="text-3xs text-text-muted -mt-1 mb-3">
+          <p className="text-2xs text-text-muted -mt-1 mb-3">
             {t('home.freezeCovered')}
           </p>
         )}
@@ -1089,7 +1089,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             : t('home.streakStart')}
         </p>
         {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
-          <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+          <span className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted ml-auto shrink-0">
             <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
             {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
           </span>
@@ -1119,7 +1119,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-bold text-text-primary">{homeChallenge.def.titleKey ? t(homeChallenge.def.titleKey) : homeChallenge.def.title}</p>
-                <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.descriptionKey ? t(homeChallenge.def.descriptionKey) : homeChallenge.def.description}</p>
+                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.descriptionKey ? t(homeChallenge.def.descriptionKey) : homeChallenge.def.description}</p>
               </div>
             </div>
             {!homeChallenge.optedIn && (
@@ -1144,7 +1144,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   style={{ width: `${homeChallenge.evaluation.pct}%` }}
                 />
               </div>
-              <p className="text-3xs text-text-muted tabular-nums mt-1.5">
+              <p className="text-2xs text-text-muted tabular-nums mt-1.5">
                 {homeChallenge.evaluation.progress} of {homeChallenge.evaluation.target} · {homeChallenge.evaluation.pct}%
                 {homeChallenge.evaluation.completed ? ` · ${t('chal.complete', { xp: XP_CHALLENGE_COMPLETE })}` : ''}
               </p>
@@ -1157,7 +1157,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 optInChallenge(homeChallenge.key);
                 toast.success(t('toast.challengeJoined'), t('toast.titleChallengeAccepted'));
               }}
-              className="mt-3 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="mt-3 py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               {t('home.joinChallenge')}
             </button>
@@ -1286,13 +1286,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                                   {plan.name}
                                 </span>
                                 {isSelected && (
-                                  <span className="px-1.5 py-0.5 rounded bg-accent text-white text-3xs font-mono font-bold">
+                                  <span className="px-1.5 py-0.5 rounded bg-accent text-accent-on text-2xs font-mono font-bold">
                                     {t('home.todaysPlan')}
                                   </span>
                                 )}
                               </div>
                               {bodyParts.length > 0 && (
-                                <span className="text-3xs text-accent font-medium block mt-0.5">
+                                <span className="text-2xs text-accent font-medium block mt-0.5">
                                   {bodyParts.map((b) => (BODY_PART_KEY[b] ? t(BODY_PART_KEY[b]) : b)).join(' • ')}
                                 </span>
                               )}
@@ -1452,7 +1452,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── DAILY QUOTE — always the last element on the page ──────────────── */}
       <div className="text-center pt-1 pb-2">
         <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
-        <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
+        <p className="text-2xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
       </div>
     </div>
   );

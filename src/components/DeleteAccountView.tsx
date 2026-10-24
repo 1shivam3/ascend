@@ -460,7 +460,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                   {t('del.resumeCleanup')}
                 </button>
               </div>
-              <p className="text-3xs text-text-muted">
+              <p className="text-2xs text-text-muted">
                 {t('del.partialContactA')}{' '}
                 <a href={`mailto:${SUPPORT_EMAIL}`} rel="noreferrer" className="underline font-mono">
                   {SUPPORT_EMAIL}
@@ -492,7 +492,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                     <KeyRound className="size-3.5" />
                     <span>{t('del.step1Title')}</span>
                   </div>
-                  <p className="text-3xs text-text-secondary leading-relaxed">
+                  <p className="text-2xs text-text-secondary leading-relaxed">
                     {t('del.step1Body')}
                   </p>
                   <form onSubmit={handleRequestToken} className="space-y-2.5">
@@ -639,7 +639,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
             </>
           )}
 
-          <p className="text-3xs text-text-muted">
+          <p className="text-2xs text-text-muted">
             {t('del.manualHelpA')}{' '}
             <a href={`mailto:${SUPPORT_EMAIL}`} className="text-accent underline font-mono">
               {SUPPORT_EMAIL}

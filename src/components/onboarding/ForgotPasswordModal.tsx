@@ -74,7 +74,7 @@ export default function ForgotPasswordModal({
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 w-full py-2.5 px-4 rounded-xl bg-accent text-white font-semibold text-xs hover:bg-accent-dim transition cursor-pointer"
+              className="mt-3 w-full py-2.5 px-4 rounded-xl bg-accent text-accent-on font-semibold text-xs hover:bg-accent-dim transition cursor-pointer"
             >
               {t('common.done')}
             </button>
@@ -121,7 +121,7 @@ export default function ForgotPasswordModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-1/2 py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-xs font-semibold text-white transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="w-1/2 py-2.5 rounded-xl bg-accent hover:bg-accent-dim text-xs font-semibold text-accent-on transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t('auth.sendLink')}
               </button>

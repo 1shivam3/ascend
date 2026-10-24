@@ -211,12 +211,12 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 {user?.email || athleteEmail}
               </p>
               <div className="pt-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
                   {athleteTier.title} · {t('profile.level', { level: athleteTier.level })}
                 </span>
                 {athleteTier.estimatedCount > 0 && (
-                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                  <p className="text-2xs text-amber-500 mt-1 leading-relaxed">
                     {t('profile.estimatedLifts', {
                       estimated: athleteTier.estimatedCount,
                       total: athleteTier.totalLifts,
@@ -227,11 +227,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                     "excluded" copy above while actually being INCLUDED.
                     Say so plainly, plus the tables' real basis. */}
                 {athleteTier.isEstimate && (
-                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                  <p className="text-2xs text-amber-500 mt-1 leading-relaxed">
                     {t('profile.allEstimated')}
                   </p>
                 )}
-                <p className="text-3xs text-text-muted mt-1 leading-relaxed">
+                <p className="text-2xs text-text-muted mt-1 leading-relaxed">
                   {t('profile.levelTablesNote')}
                 </p>
               </div>
@@ -252,7 +252,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         {/* ── 3-Column Quick Metrics Card ──────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-border/60">
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('profile.height')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -261,7 +261,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           </div>
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('home.weight')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -270,7 +270,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           </div>
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('profile.age')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -282,7 +282,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
       {/* ── SECTION 1: ACCOUNT & TRAINING MENU ──────────────────────────────── */}
       <div className="space-y-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('profile.sectionAccount')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
@@ -298,7 +298,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.personalDetails')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.personalDetailsHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.personalDetailsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -316,7 +316,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.fitnessGoals')}</p>
-                <p className="text-3xs text-text-muted">
+                <p className="text-2xs text-text-muted">
                   {goals.length > 0
                     ? goals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(', ')
                     : t('profile.defaultGoal')}
@@ -338,7 +338,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.reminders')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.remindersHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.remindersHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -356,7 +356,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.dataStorage')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.dataStorageHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.dataStorageHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -374,7 +374,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.appSettings')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.appSettingsHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.appSettingsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -384,7 +384,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
       {/* ── SECTION 2: SHARING & COMMUNITY ──────────────────────────────────── */}
       <div className="space-y-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('profile.sectionSharing')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
@@ -400,7 +400,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.shareSplit')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.shareSplitHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.shareSplitHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -418,7 +418,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.weeklyCard')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.weeklyCardHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.weeklyCardHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -436,7 +436,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.feedback')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.feedbackHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.feedbackHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />

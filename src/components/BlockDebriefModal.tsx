@@ -87,7 +87,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
 
         {debrief.liftChanges.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.debriefLiftsTitle')}
             </p>
             <div className="space-y-1">
@@ -102,7 +102,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
 
         {debrief.learned.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.debriefLearnedTitle')}
             </p>
             <div className="space-y-1">

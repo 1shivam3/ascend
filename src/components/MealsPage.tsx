@@ -1675,9 +1675,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       key={opt.labelKey}
                       type="button"
                       onClick={() => setMealDayKind(todayDate, opt.kind ?? null)}
-                      className={`px-2 py-1 rounded-full text-3xs font-semibold transition-all cursor-pointer ${
+                      className={`px-2 py-1 rounded-full text-2xs font-semibold transition-all cursor-pointer ${
                         active
-                          ? 'bg-accent text-white'
+                          ? 'bg-accent text-accent-on'
                           : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                       }`}
                     >
@@ -1687,7 +1687,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 })}
               </div>
               {dayTargets && (
-                <p className="text-3xs text-text-muted text-center leading-relaxed px-2">
+                <p className="text-2xs text-text-muted text-center leading-relaxed px-2">
                   {dayTargets.note}
                 </p>
               )}
@@ -1698,7 +1698,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {((!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
               <CollapsibleDetails label={t('meals.why')} className="w-full">
                 {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
-                  <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
+                  <span className="text-2xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
                     {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
                     {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
                     {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
@@ -1713,7 +1713,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   </span>
                 )}
                 {typeof todayMacros.sugarG === 'number' && (
-                  <p className="w-full text-center text-3xs text-text-muted pt-1">
+                  <p className="w-full text-center text-2xs text-text-muted pt-1">
                     {t('meals.sugarNote')}{' '}
                     <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
                     {t('meals.sugarNoteSuffix')}
@@ -1726,33 +1726,33 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
               {/* Protein */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-accent tracking-wider block">{t('meals.protein')}</span>
+                <span className="text-2xs uppercase font-bold text-accent tracking-wider block">{t('meals.protein')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.proteinG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {displayGoals?.proteinG || proteinTargetG}g
                 </span>
               </div>
 
               {/* Carbs */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-text-secondary tracking-wider block">{t('meals.carbs')}</span>
+                <span className="text-2xs uppercase font-bold text-text-secondary tracking-wider block">{t('meals.carbs')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.carbsG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {macroGoals?.carbsG || 220}g
                 </span>
               </div>
 
               {/* Fat */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-text-muted tracking-wider block">{t('meals.fat')}</span>
+                <span className="text-2xs uppercase font-bold text-text-muted tracking-wider block">{t('meals.fat')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.fatG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {macroGoals?.fatG || 70}g
                 </span>
               </div>
@@ -1868,7 +1868,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('meals.scanFood')}</span>
-                <span className="text-3xs text-text-muted">{t('meals.takePhoto')}</span>
+                <span className="text-2xs text-text-muted">{t('meals.takePhoto')}</span>
               </div>
             </button>
 
@@ -1882,7 +1882,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('meals.scanBarcode')}</span>
-                <span className="text-3xs text-text-muted">{t('meals.packagedProducts')}</span>
+                <span className="text-2xs text-text-muted">{t('meals.packagedProducts')}</span>
               </div>
             </button>
           </div>
@@ -2047,7 +2047,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">{t('meals.water')}</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
-                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-3xs">/ {formatWaterMl(waterTargetMl)}</span>
+                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-2xs">/ {formatWaterMl(waterTargetMl)}</span>
                 </span>
               </div>
             </button>
@@ -2159,10 +2159,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <h3 className="font-bold text-xs sm:text-sm text-text-primary truncate">
                           {displayMealName(meal.name)}
                         </h3>
-                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
                           ~{Math.round(mMacros.calories)} kcal
                         </span>
-                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
                           ~{Math.round(mMacros.proteinG)}g P
                         </span>
                       </div>
@@ -2199,15 +2199,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
-                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                                <span className="text-text-secondary text-2xs shrink-0">({hiName})</span>
                               ) : null;
                             })()}
-                            <span className="text-text-muted text-3xs">
+                            <span className="text-text-muted text-2xs">
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <div className="text-3xs font-mono text-text-muted shrink-0">
+                            <div className="text-2xs font-mono text-text-muted shrink-0">
                               <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
                               <span className="mx-1">•</span>
                               <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
@@ -2259,7 +2259,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <button
             type="button"
             onClick={() => setIsScanModalOpen(true)}
-            className="py-1.5 px-3 rounded-xl bg-accent text-white text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="py-1.5 px-3 rounded-xl bg-accent text-accent-on text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>{t('meals.scanMeal')}</span>
@@ -2317,7 +2317,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <h3 className="text-xs font-bold text-text-primary">
                         {isToday ? t('common.today') : isYesterday ? t('meals.yesterday') : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </h3>
-                      <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
+                      <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
                         {t(dayMeals.length === 1 ? 'meals.mealCountOne' : 'meals.mealCountMany', { count: dayMeals.length })}
                       </span>
                     </div>
@@ -2326,7 +2326,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <span className="text-xs font-black text-text-primary tabular-nums block font-mono">
                       ~{Math.round(dayMacros.calories)} cal
                     </span>
-                    <span className="text-3xs text-accent font-semibold block font-mono">
+                    <span className="text-2xs text-accent font-semibold block font-mono">
                       {Math.round(dayMacros.proteinG)}g P • {Math.round(dayMacros.carbsG)}g C • {Math.round(dayMacros.fatG)}g F
                     </span>
                   </div>
@@ -2348,10 +2348,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <h4 className="font-bold text-xs text-text-primary truncate">
                                 {displayMealName(meal.name)}
                               </h4>
-                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
                                 ~{Math.round(mMacros.calories)} cal
                               </span>
-                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
                                 ~{Math.round(mMacros.proteinG)}g P
                               </span>
                             </div>
@@ -2387,15 +2387,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
-                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                                <span className="text-text-secondary text-2xs shrink-0">({hiName})</span>
                               ) : null;
                             })()}
-                                  <span className="text-text-muted text-3xs">
+                                  <span className="text-text-muted text-2xs">
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <div className="text-3xs font-mono text-text-muted shrink-0">
+                                  <div className="text-2xs font-mono text-text-muted shrink-0">
                                     <span className="text-accent font-semibold">~{Math.round(food.calories)} cal</span>
                                     <span className="mx-1">•</span>
                                     <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
@@ -2448,36 +2448,36 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         {/* Big numbers row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
+            <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.calories || 2400}
             </span>
-            <span className="text-3xs text-text-muted">cal</span>
+            <span className="text-2xs text-text-muted">cal</span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-accent block">{t('meals.protein')}</span>
+            <span className="text-2xs uppercase font-bold text-accent block">{t('meals.protein')}</span>
             <span className="text-lg font-black text-accent tabular-nums block font-mono">
               {macroGoals?.proteinG || proteinTargetG}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
+            <span className="text-2xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.carbsG || 220}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
+            <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.fatG || 70}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
@@ -2485,7 +2485,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         {/* Visual Macro Ratio Bar */}
         <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between text-3xs text-text-muted font-mono">
+          <div className="flex justify-between text-2xs text-text-muted font-mono">
             <span>{t('meals.macroSplit')}</span>
             <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}% • C {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}% • F {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%</span>
           </div>
@@ -2793,11 +2793,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         {language === 'hi' && (() => {
                                           const hiName = getFoodHindiName(sugg.name);
                                           return hiName ? (
-                                            <span className="text-3xs text-text-secondary">({hiName})</span>
+                                            <span className="text-2xs text-text-secondary">({hiName})</span>
                                           ) : null;
                                         })()}
                                         {sugg.kind === 'custom' && (
-                                          <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                                          <span className="text-2xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
                                             {t('meals.myVersionBadge')}
                                           </span>
                                         )}
@@ -2853,7 +2853,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           {/* Recipe assumption — what the DB values already
                               count for this dish (muted, honest). */}
                           {indianMeta && hasName && (
-                            <p className="text-3xs text-text-muted leading-relaxed">
+                            <p className="text-2xs text-text-muted leading-relaxed">
                               {indianMeta.meta.assumption}
                             </p>
                           )}
@@ -2972,7 +2972,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         onClick={() => handleOilChange(i, level.id)}
                                         className={`px-2 py-1 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
                                           (food.oilLevel || 'none') === level.id
-                                            ? 'bg-accent text-white'
+                                            ? 'bg-accent text-accent-on'
                                             : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
                                         }`}
                                       >
@@ -3161,7 +3161,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <button
                         type="button"
                         onClick={handleReconcileCarbs}
-                        className="px-2 py-0.5 rounded bg-accent/15 text-accent text-3xs font-bold hover:bg-accent/25 transition-colors"
+                        className="px-2 py-0.5 rounded bg-accent/15 text-accent text-2xs font-bold hover:bg-accent/25 transition-colors"
                       >
                         {t('meals.autoBalanceCarbs')}
                       </button>
@@ -3673,7 +3673,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       </p>
                     </div>
                   </div>
-                  <span className="text-3xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
+                  <span className="text-2xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
                     {t('meals.oneTap')}
                   </span>
                 </button>

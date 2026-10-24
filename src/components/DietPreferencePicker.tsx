@@ -25,7 +25,7 @@ export default function DietPreferencePicker() {
     <div className="space-y-2">
       <div>
         <span className="text-xs font-bold text-text-primary block">{t('settings.dietPreference')}</span>
-        <span className="text-3xs text-text-muted block mt-0.5">
+        <span className="text-2xs text-text-muted block mt-0.5">
           {t('settings.dietHint')}
         </span>
       </div>

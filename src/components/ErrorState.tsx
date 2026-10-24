@@ -106,7 +106,7 @@ export default function ErrorState({
           <button
             type="button"
             onClick={() => reset()}
-            className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-white flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer"
+            className="w-full min-h-[46px] py-3 px-4 rounded-xl text-xs sm:text-sm font-bold bg-accent hover:bg-accent-dim text-accent-on flex items-center justify-center gap-2 shadow-sm shadow-accent/20 transition-all cursor-pointer"
           >
             <RotateCcw className="w-4 h-4" />
             <span>{t('state.retry')}</span>
@@ -125,7 +125,7 @@ export default function ErrorState({
         <button
           type="button"
           onClick={handleEmergencyReset}
-          className="text-3xs font-mono text-text-muted hover:text-accent hover:underline transition-colors pt-1 block mx-auto cursor-pointer"
+          className="text-2xs font-mono text-text-muted hover:text-accent hover:underline transition-colors pt-1 block mx-auto cursor-pointer"
         >
           {t('state.emergencyReset')}
         </button>

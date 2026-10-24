@@ -406,7 +406,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
         <div className={`space-y-4 ${sectionDim}`}>
           {/* ── TRAINING ─────────────────────────────────────────── */}
           <div className="space-y-2">
-            <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
               {t('rem.training')}
             </span>
 
@@ -455,7 +455,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     />
                   </div>
                   <div>
-                    <span className="block text-3xs font-mono uppercase text-text-muted mb-1.5">
+                    <span className="block text-2xs font-mono uppercase text-text-muted mb-1.5">
                       {t('rem.trainingDays')}
                     </span>
                     <div className="flex gap-1">
@@ -549,7 +549,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
           {/* ── NUTRITION ────────────────────────────────────────── */}
           <div className="space-y-2">
-            <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
               {t('rem.nutrition')}
             </span>
 
@@ -596,7 +596,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                     ] as const
                   ).map(({ key, label }) => (
                     <div key={key}>
-                      <label className="block text-3xs font-mono uppercase text-text-muted mb-1">
+                      <label className="block text-2xs font-mono uppercase text-text-muted mb-1">
                         {label}
                       </label>
                       <input
@@ -619,7 +619,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
           {/* ── HABITS ───────────────────────────────────────────── */}
           <div className="space-y-2">
-            <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
               {t('rem.habits')}
             </span>
 
@@ -683,7 +683,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
 
           {/* ── QUIET HOURS & PRIVACY ────────────────────────────── */}
           <div className="space-y-2">
-            <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+            <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
               {t('rem.dndPrivacy')}
             </span>
 
@@ -779,7 +779,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
           <Send className="w-4 h-4 text-accent" />
           <span>{isSendingTest ? t('rem.sending') : t('rem.sendTest')}</span>
         </button>
-        <p className="text-3xs text-text-muted text-center font-mono">
+        <p className="text-2xs text-text-muted text-center font-mono">
           {t('rem.footer')}
         </p>
       </div>

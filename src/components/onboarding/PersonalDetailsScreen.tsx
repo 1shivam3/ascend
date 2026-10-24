@@ -260,7 +260,7 @@ export default function PersonalDetailsScreen({
                 <label htmlFor="details-weight" className="block text-xs font-semibold text-text-primary">
                   Weight
                 </label>
-                <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-3xs font-semibold">
+                <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-2xs font-semibold">
                   <button
                     type="button"
                     onClick={() => handleUnitToggle('kg')}
@@ -301,7 +301,7 @@ export default function PersonalDetailsScreen({
               <label htmlFor="details-height-cm" className="block text-xs font-semibold text-text-primary">
                 Height
               </label>
-              <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-3xs font-semibold">
+              <div className="flex items-center gap-0.5 rounded-lg bg-bg-primary p-0.5 border border-border text-2xs font-semibold">
                 <button
                   type="button"
                   onClick={() => setHeightUnit('cm')}
@@ -366,7 +366,7 @@ export default function PersonalDetailsScreen({
             <span className="block text-xs font-semibold text-text-primary">
               {t('onboarding.dietPreference')}
             </span>
-            <span className="block text-3xs text-text-muted">
+            <span className="block text-2xs text-text-muted">
               {t('onboarding.dietHint')}
             </span>
             <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('onboarding.dietPreference')}>
@@ -407,7 +407,7 @@ export default function PersonalDetailsScreen({
           type="submit"
           form="personal-details-form"
           disabled={loading}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
         >
           {loading ? (
             <>

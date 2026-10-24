@@ -83,7 +83,7 @@ function Chip({
       aria-pressed={active}
       className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
         active
-          ? 'bg-accent text-white border-accent'
+          ? 'bg-accent text-accent-on border-accent'
           : 'bg-bg-secondary text-text-secondary border-border hover:border-accent/50'
       }`}
     >
@@ -94,7 +94,7 @@ function Chip({
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="text-3xs font-mono font-bold uppercase tracking-wide text-text-muted block mb-1.5">
+    <span className="text-2xs font-mono font-bold uppercase tracking-wide text-text-muted block mb-1.5">
       {children}
     </span>
   );
@@ -441,7 +441,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                 {proposal.weeks.map((w) => (
                   <span
                     key={w.index}
-                    className={`text-3xs font-mono font-bold px-2 py-0.5 rounded-md ${
+                    className={`text-2xs font-mono font-bold px-2 py-0.5 rounded-md ${
                       w.type === 'deload'
                         ? 'bg-warning/15 text-warning'
                         : w.type === 'test'

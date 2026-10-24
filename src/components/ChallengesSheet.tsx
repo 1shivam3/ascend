@@ -142,13 +142,13 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-text-primary">{def.titleKey ? t(def.titleKey) : def.title}</p>
-                  <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{def.descriptionKey ? t(def.descriptionKey) : def.description}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{def.descriptionKey ? t(def.descriptionKey) : def.description}</p>
                 </div>
-                <span className="text-3xs font-bold text-amber-500 tabular-nums shrink-0 pt-0.5">
+                <span className="text-2xs font-bold text-amber-500 tabular-nums shrink-0 pt-0.5">
                   +{XP_CHALLENGE_COMPLETE} XP
                 </span>
               </div>
-              <p className="text-3xs font-semibold text-text-secondary">{t(GOAL_KEY[def.metric], { target: def.target })}</p>
+              <p className="text-2xs font-semibold text-text-secondary">{t(GOAL_KEY[def.metric], { target: def.target })}</p>
 
               {optedIn && evaluation.completed ? (
                 <p className="text-xs font-bold text-emerald-500">
@@ -164,7 +164,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                     />
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-3xs text-text-muted tabular-nums">
+                    <p className="text-2xs text-text-muted tabular-nums">
                       {t(daysLeftInMonth === 1 ? 'chal.progressOne' : 'chal.progress', { progress: evaluation.progress, target: evaluation.target, pct: evaluation.pct, days: daysLeftInMonth })}
                     </p>
                     <button
@@ -173,7 +173,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                         optOutChallenge(key);
                         toast.info(t('chal.leftMsg'), t('chal.leftTitle'));
                       }}
-                      className="text-3xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0"
+                      className="text-2xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0"
                     >
                       {t('chal.leave')}
                     </button>
@@ -186,7 +186,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
                     optInChallenge(key);
                     toast.success(t('chal.joinedMsg'), t('chal.joinedTitle'));
                   }}
-                  className="py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                  className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
                   {t('chal.join')}
                 </button>
@@ -195,7 +195,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
           ))}
         </div>
 
-        <p className="text-3xs text-text-muted leading-relaxed">
+        <p className="text-2xs text-text-muted leading-relaxed">
           {t('chal.footer')}
         </p>
 

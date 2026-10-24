@@ -26,6 +26,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'common.search': 'खोजें',
   'common.loading': 'लोड हो रहा है…',
   'common.today': 'आज',
+  'common.estimatedShort': 'अनु.',
 
   // ── Bottom navigation ───────────────────────────────────────────────
   'nav.today': 'आज',

@@ -221,7 +221,7 @@ export default function PostWorkoutTakeModal({
           {/* Quick Numbers Bar: 4 Core Athletic Metrics */}
         <div className="grid grid-cols-4 gap-1.5 py-2.5 border-y border-border text-center bg-bg-secondary/30 rounded-xl px-2">
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.duration')}</span>
+            <span className="text-2xs uppercase tracking-wider text-text-muted block">{t('take.duration')}</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.durationSeconds !== undefined
                 ? formatDuration(completedWorkout.durationSeconds)
@@ -231,19 +231,19 @@ export default function PostWorkoutTakeModal({
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.volume')}</span>
+            <span className="text-2xs uppercase tracking-wider text-text-muted block">{t('take.volume')}</span>
             <span className="font-bold text-xs sm:text-sm text-accent font-mono truncate block" title={totalVolume}>
               {totalVolume}
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.lifts')}</span>
+            <span className="text-2xs uppercase tracking-wider text-text-muted block">{t('take.lifts')}</span>
             <span className="font-bold text-xs sm:text-sm text-text-primary font-mono">
               {completedWorkout.exercises.length}
             </span>
           </div>
           <div>
-            <span className="text-3xs uppercase tracking-wider text-text-muted block">{t('take.sets')}</span>
+            <span className="text-2xs uppercase tracking-wider text-text-muted block">{t('take.sets')}</span>
             <span className="font-bold text-xs sm:text-sm text-emerald-500 font-mono">
               {totalSets}
             </span>
@@ -276,7 +276,7 @@ export default function PostWorkoutTakeModal({
                       </div>
                       <div>
                         <span className="font-bold text-text-primary block">{pr.exercise}</span>
-                        <span className="text-3xs text-text-muted font-mono">
+                        <span className="text-2xs text-text-muted font-mono">
                           {isRepPR ? (pr.notes || t('take.repMilestone')) : `1RM: ${userUnit === 'lbs' ? Math.round(pr.oneRepMax * 2.20462) : pr.oneRepMax} ${userUnit}`}
                         </span>
                       </div>
@@ -312,11 +312,11 @@ export default function PostWorkoutTakeModal({
               </span>
               <div className="flex items-center gap-1.5">
                 {take.source === 'gemini' ? (
-                  <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
+                  <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500">
                     {t('take.autoregulated')}
                   </span>
                 ) : (
-                  <span className="text-3xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
+                  <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
                     {t('take.localCoach')}
                   </span>
                 )}

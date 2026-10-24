@@ -1,6 +1,6 @@
 /**
  * Text-size setting (persona-sim round 5, SIM-P1-08). The app renders
- * almost all type in rem-based classes (text-3xs = 0.625rem, etc.), so
+ * almost all type in rem-based classes (text-2xs = 0.625rem, etc.), so
  * scaling the root font-size scales the whole UI — including the 10px
  * labels — without touching 858 call sites. 'normal' clears any override
  * (browser default 16px); large/xlarge step to 112.5%/125%.

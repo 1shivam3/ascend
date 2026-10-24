@@ -124,7 +124,7 @@ export default function FitnessGoalsScreen({
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border transition-all ${
                     isSelected
-                      ? 'bg-accent border-accent text-white shadow-xs'
+                      ? 'bg-accent border-accent text-accent-on shadow-xs'
                       : 'border-border bg-transparent'
                   }`}
                   aria-hidden="true"
@@ -142,7 +142,7 @@ export default function FitnessGoalsScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>

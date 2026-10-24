@@ -367,7 +367,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
       {/* ── SECTION 1: ACCOUNT & CLOUD SYNC ─────────────────────────────────── */}
       <div ref={accountSectionRef} className="space-y-2 scroll-mt-20">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.accountSecurity')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
@@ -413,7 +413,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <button
                 type="button"
                 onClick={() => setIsAuthModalOpen(true)}
-                className="py-1.5 px-3 rounded-xl bg-accent hover:bg-accent-dim text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                className="py-1.5 px-3 rounded-xl bg-accent hover:bg-accent-dim text-accent-on text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
                 {t('settings.signIn')}
               </button>
@@ -438,7 +438,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
       {/* ── SECTION 2: APP PREFERENCES ───────────────────────────────────────── */}
       <div ref={preferencesSectionRef} className="space-y-2 scroll-mt-20">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.appPreferences')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
@@ -532,7 +532,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="space-y-2 pt-1">
             <div>
               <span className="text-xs font-bold text-text-primary block">{t('settings.language')}</span>
-              <span className="text-3xs text-text-muted block mt-0.5">
+              <span className="text-2xs text-text-muted block mt-0.5">
                 {t('settings.languageHint')}
               </span>
             </div>
@@ -586,7 +586,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </div>
                 <div>
                   <p className="text-xs font-bold text-text-primary">{t('home.notificationSettings')}</p>
-                  <p className="text-3xs text-text-muted">{t('home.notifications')}</p>
+                  <p className="text-2xs text-text-muted">{t('home.notifications')}</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -597,7 +597,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
       {/* ── SECTION 2b: CUSTOMIZATION ──────────────────────────────────────── */}
       <div ref={customizationSectionRef} className="space-y-2 scroll-mt-20">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.customization')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
@@ -613,7 +613,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   : t('settings.targetDays', { days: uiPreferences.weeklyTargetDays })}
               </span>
             </div>
-            <p className="text-3xs text-text-muted leading-relaxed">
+            <p className="text-2xs text-text-muted leading-relaxed">
               {t('settings.weeklyTargetHint')}
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -632,7 +632,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   onClick={() => setUiPreferences({ weeklyTargetDays: opt.value })}
                   className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
                     uiPreferences.weeklyTargetDays === opt.value
-                      ? 'bg-accent text-white border-accent'
+                      ? 'bg-accent text-accent-on border-accent'
                       : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
                   }`}
                 >
@@ -655,7 +655,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </div>
                 <div>
                   <p className="text-xs font-bold text-text-primary">{t('settings.weeklySchedule')}</p>
-                  <p className="text-3xs text-text-muted">{t('settings.weeklyScheduleHint')}</p>
+                  <p className="text-2xs text-text-muted">{t('settings.weeklyScheduleHint')}</p>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -675,7 +675,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   : t('settings.textNormal')}
               </span>
             </div>
-            <p className="text-3xs text-text-muted leading-relaxed">
+            <p className="text-2xs text-text-muted leading-relaxed">
               {t('settings.textSizeHint')}
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -690,7 +690,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   onClick={() => setUiPreferences({ textScale: opt.value })}
                   className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                     uiPreferences.textScale === opt.value
-                      ? 'bg-accent text-white border-accent'
+                      ? 'bg-accent text-accent-on border-accent'
                       : 'bg-bg-secondary text-text-secondary border-border hover:text-text-primary'
                   }`}
                 >
@@ -704,7 +704,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('settings.gamification')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.gamificationHint')}</p>
+              <p className="text-2xs text-text-muted leading-relaxed">{t('settings.gamificationHint')}</p>
             </div>
             <SettingsToggle
               label={t('settings.toggleGamification')}
@@ -717,7 +717,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('settings.coach')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.coachHint')}</p>
+              <p className="text-2xs text-text-muted leading-relaxed">{t('settings.coachHint')}</p>
             </div>
             <SettingsToggle
               label={t('settings.toggleCoach')}
@@ -730,7 +730,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('settings.habitMatrix')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.habitMatrixHint')}</p>
+              <p className="text-2xs text-text-muted leading-relaxed">{t('settings.habitMatrixHint')}</p>
             </div>
             <SettingsToggle
               label={t('settings.toggleHabitMatrix')}
@@ -743,7 +743,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>
               <p className="text-xs font-bold text-text-primary">{t('progress.muscleVolume')}</p>
-              <p className="text-3xs text-text-muted leading-relaxed">{t('settings.muscleVolumeHint')}</p>
+              <p className="text-2xs text-text-muted leading-relaxed">{t('settings.muscleVolumeHint')}</p>
             </div>
             <SettingsToggle
               label={t('settings.toggleMuscleVolume')}
@@ -758,7 +758,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-text-primary">{t('health.title')}</p>
-                  <p className="text-3xs text-text-muted leading-relaxed">{t('health.hint')}</p>
+                  <p className="text-2xs text-text-muted leading-relaxed">{t('health.hint')}</p>
                 </div>
                 <SettingsToggle
                   label={t('settings.toggleHealth')}
@@ -767,7 +767,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 />
               </div>
               {uiPreferences.healthConnectEnabled === true && (
-                <p className="text-3xs text-text-muted">
+                <p className="text-2xs text-text-muted">
                   {healthConnectLastSyncedAt
                     ? t('health.lastSynced', {
                         time: new Date(healthConnectLastSyncedAt).toLocaleString(),
@@ -776,10 +776,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </p>
               )}
               {healthStatus === 'connecting' && (
-                <p className="text-3xs text-text-muted">{t('settings.healthOpening')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.healthOpening')}</p>
               )}
               {healthStatus === 'unavailable' && (
-                <p className="text-3xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
+                <p className="text-2xs text-amber-300 leading-relaxed">{t('health.unavailable')}</p>
               )}
               {healthStatus === 'denied' && (
                 <PermissionHelp
@@ -809,7 +809,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
       {/* ── SECTION 3: DATA & PRIVACY ────────────────────────────────────────── */}
       <div ref={dataSectionRef} className="space-y-2 scroll-mt-20">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.dataPrivacyLegal')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
@@ -825,7 +825,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.exportJson')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.exportJsonHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.exportJsonHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -843,7 +843,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.exportCsv')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.exportCsvHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.exportCsvHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -862,7 +862,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.importBackup')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.importBackupHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.importBackupHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -890,7 +890,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.privacyPolicy')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.privacyPolicyHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.privacyPolicyHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -909,7 +909,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.terms')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.termsHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.termsHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -928,7 +928,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.disclaimer')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.disclaimerHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.disclaimerHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -947,7 +947,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('settings.deleteDataWeb')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.deleteDataWebHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.deleteDataWebHint')}</p>
               </div>
             </div>
             <ExternalLink className="w-4 h-4 text-text-muted" />
@@ -960,7 +960,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           <div className="w-full p-3 flex items-center justify-between">
             <div className="space-y-0.5 pr-2">
               <p className="text-xs font-bold text-text-primary">{t('settings.diagnostics')}</p>
-              <p className="text-3xs text-text-muted">{t('settings.diagnosticsHint')}</p>
+              <p className="text-2xs text-text-muted">{t('settings.diagnosticsHint')}</p>
             </div>
             <button
               type="button"
@@ -998,7 +998,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
               <div>
                 <p className="text-xs font-bold text-accent">{t('settings.deleteAccount')}</p>
-                <p className="text-3xs text-text-muted">{t('settings.deleteAccountHint')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.deleteAccountHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-accent" />

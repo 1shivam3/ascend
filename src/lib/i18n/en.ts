@@ -29,6 +29,7 @@ export const en = {
   'common.search': 'Search',
   'common.loading': 'Loading…',
   'common.today': 'Today',
+  'common.estimatedShort': 'est.',
 
   // ── Bottom navigation ───────────────────────────────────────────────
   'nav.today': 'Today',

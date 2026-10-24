@@ -321,7 +321,7 @@ export default function VoiceWorkoutLoggerModal({
               <h3 className="font-bold text-sm text-text-primary leading-tight">
                 {t('voice.title')}
               </h3>
-              <p className="text-3xs text-text-muted font-mono truncate max-w-[140px]">
+              <p className="text-2xs text-text-muted font-mono truncate max-w-[140px]">
                 {currentExerciseName || t('voice.activeWorkout')}
               </p>
             </div>
@@ -335,7 +335,7 @@ export default function VoiceWorkoutLoggerModal({
                 const nextLang = speechLang === 'en-IN' ? 'hi-IN' : 'en-IN';
                 setSpeechLang(nextLang);
               }}
-              className="py-1 px-2 rounded-lg bg-bg-secondary border border-border/80 text-3xs font-mono font-bold text-text-secondary hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
+              className="py-1 px-2 rounded-lg bg-bg-secondary border border-border/80 text-2xs font-mono font-bold text-text-secondary hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
               title={t('voice.toggleLang')}
             >
               <Globe className="w-2.5 h-2.5 text-accent" />
@@ -359,7 +359,7 @@ export default function VoiceWorkoutLoggerModal({
             <p className="text-xs font-mono font-semibold text-text-primary">
               {t('voice.notAvailable')}
             </p>
-            <p className="text-3xs font-mono text-text-secondary">
+            <p className="text-2xs font-mono text-text-secondary">
               {t('voice.unsupported')}
             </p>
           </div>
@@ -377,7 +377,7 @@ export default function VoiceWorkoutLoggerModal({
             <p className="text-xs font-mono font-semibold text-text-primary">
               {t('voice.notOnDevice')}
             </p>
-            <p className="text-3xs font-mono text-text-secondary leading-relaxed">
+            <p className="text-2xs font-mono text-text-secondary leading-relaxed">
               {t('voice.noService')}
             </p>
           </div>
@@ -410,7 +410,7 @@ export default function VoiceWorkoutLoggerModal({
                   <Mic className="w-7 h-7" />
                 )}
               </button>
-              <span className="text-3xs font-mono font-bold mt-2 text-text-secondary uppercase tracking-wider">
+              <span className="text-2xs font-mono font-bold mt-2 text-text-secondary uppercase tracking-wider">
                 {isListening ? t('voice.listening') : t('voice.tapMic')}
               </span>
             </div>
@@ -442,7 +442,7 @@ export default function VoiceWorkoutLoggerModal({
 
             {/* Parse Error Notification */}
             {parseError && !parsedResult && !isAiParsing && (
-              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-3xs font-mono text-left">
+              <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-2xs font-mono text-left">
                 {parseError}
               </div>
             )}
@@ -451,7 +451,7 @@ export default function VoiceWorkoutLoggerModal({
             {parsedResult && (
               <div className="p-3 rounded-xl bg-emerald-500/10 border-2 border-emerald-500/40 space-y-2.5 text-left animate-fade-in">
                 <div className="flex items-center justify-between">
-                  <span className="text-3xs font-mono font-black uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded tracking-wide">
+                  <span className="text-2xs font-mono font-black uppercase text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded tracking-wide">
                     {t('voice.recognized')}
                   </span>
                   <button
@@ -465,11 +465,11 @@ export default function VoiceWorkoutLoggerModal({
                     <Flag className="w-3.5 h-3.5" />
                   </button>
                   {autoApplyCountdown !== null && autoApplyCountdown > 0 ? (
-                    <span className="text-3xs font-mono text-text-muted animate-pulse">
+                    <span className="text-2xs font-mono text-text-muted animate-pulse">
                       {t('voice.autoLogging', { seconds: autoApplyCountdown })}
                     </span>
                   ) : (
-                    <span className="text-3xs font-mono text-text-muted">
+                    <span className="text-2xs font-mono text-text-muted">
                       {t('voice.readyApply')}
                     </span>
                   )}
@@ -487,7 +487,7 @@ export default function VoiceWorkoutLoggerModal({
                   {/* Weight Stepper */}
                   <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
                     <div>
-                      <span className="text-3xs text-text-muted block uppercase">{t('voice.weight')}</span>
+                      <span className="text-2xs text-text-muted block uppercase">{t('voice.weight')}</span>
                       <span className="text-sm font-black text-text-primary">
                         {parsedResult.weight} {defaultUnit}
                       </span>
@@ -515,7 +515,7 @@ export default function VoiceWorkoutLoggerModal({
                   {/* Reps Stepper */}
                   <div className="p-2 rounded-lg bg-bg-card border border-border flex items-center justify-between">
                     <div>
-                      <span className="text-3xs text-text-muted block uppercase">{t('voice.reps')}</span>
+                      <span className="text-2xs text-text-muted block uppercase">{t('voice.reps')}</span>
                       <span className="text-sm font-black text-text-primary">
                         {parsedResult.reps}
                       </span>
@@ -543,7 +543,7 @@ export default function VoiceWorkoutLoggerModal({
 
                 {/* Quick RPE Pills */}
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-3xs font-mono text-text-muted">
+                  <div className="flex items-center justify-between text-2xs font-mono text-text-muted">
                     <span className="flex items-center gap-1">
                       <SlidersHorizontal className="w-2.5 h-2.5" />
                       <span>{t('voice.rpeLabel')}</span>
@@ -558,9 +558,9 @@ export default function VoiceWorkoutLoggerModal({
                         key={val}
                         type="button"
                         onClick={() => setRpe(val)}
-                        className={`flex-1 py-2 min-h-[40px] rounded text-3xs font-mono font-bold transition-all ${
+                        className={`flex-1 py-2 min-h-[40px] rounded text-2xs font-mono font-bold transition-all ${
                           parsedResult.rpe === val
-                            ? 'bg-accent text-white shadow-xs'
+                            ? 'bg-accent text-accent-on shadow-xs'
                             : 'bg-bg-card hover:bg-bg-secondary border border-border/70 text-text-secondary'
                         }`}
                       >
@@ -594,7 +594,7 @@ export default function VoiceWorkoutLoggerModal({
 
             {/* Quick Example Chips */}
             <div className="pt-1 text-left">
-              <span className="text-3xs uppercase font-mono text-text-muted block mb-1">
+              <span className="text-2xs uppercase font-mono text-text-muted block mb-1">
                 {t('voice.examples')}
               </span>
               <div className="flex flex-wrap gap-1">
@@ -613,7 +613,7 @@ export default function VoiceWorkoutLoggerModal({
                       setTranscript(eg);
                       handleProcessTranscript(eg);
                     }}
-                    className="text-3xs font-mono px-2 py-0.5 rounded bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 transition-colors"
+                    className="text-2xs font-mono px-2 py-0.5 rounded bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 transition-colors"
                   >
                     &quot;{eg}&quot;
                   </button>

@@ -781,7 +781,7 @@ export default function SuggestedWorkoutModal({
                         onClick={() => setSelectedSplitDayIdx(idx)}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                           isDaySelected
-                            ? 'bg-accent text-white border-accent shadow-xs'
+                            ? 'bg-accent text-accent-on border-accent shadow-xs'
                             : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
                         }`}
                       >
@@ -799,7 +799,7 @@ export default function SuggestedWorkoutModal({
                     <span className="text-xs font-bold text-text-primary block">
                       {t('sg.genWeekly')}
                     </span>
-                    <span className="text-3xs text-text-secondary block mt-0.5">
+                    <span className="text-2xs text-text-secondary block mt-0.5">
                       {t('sg.genWeeklySub', { name: currentSplit.name })}
                     </span>
                   </div>

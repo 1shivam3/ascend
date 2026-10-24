@@ -380,7 +380,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
               <h3 className="font-bold text-sm text-text-primary leading-tight">
                 {t('recap.modalTitle')}
               </h3>
-              <p className="text-3xs text-text-muted font-mono">{t('recap.modalSubtitle')}</p>
+              <p className="text-2xs text-text-muted font-mono">{t('recap.modalSubtitle')}</p>
             </div>
           </div>
           <button

@@ -208,7 +208,7 @@ export default function WeeklyScheduleModal({
 
         {/* Schedule Presets bar */}
         <div className="px-4 py-2.5 bg-bg-secondary/60 border-b border-border/60 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-          <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted shrink-0">
+          <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted shrink-0">
             {t('sched.presets')}
           </span>
           {[
@@ -223,7 +223,7 @@ export default function WeeklyScheduleModal({
               onClick={() => applyPreset(p.days)}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border transition-all ${
                 activeTrainingDays === p.days
-                  ? 'bg-accent text-white border-accent shadow-xs'
+                  ? 'bg-accent text-accent-on border-accent shadow-xs'
                   : 'bg-bg-card text-text-secondary border-border/80 hover:border-accent/40'
               }`}
             >
@@ -276,7 +276,7 @@ export default function WeeklyScheduleModal({
                       {info.label}
                     </span>
                     {isToday && (
-                      <span className="px-1.5 py-0.5 rounded-md bg-accent text-white text-3xs font-bold font-mono">
+                      <span className="px-1.5 py-0.5 rounded-md bg-accent text-accent-on text-2xs font-bold font-mono">
                         {t('sched.today')}
                       </span>
                     )}
@@ -292,7 +292,7 @@ export default function WeeklyScheduleModal({
                       }}
                       className={`px-2 py-0.5 rounded text-2xs font-bold transition-all flex items-center gap-1 ${
                         !isRest
-                          ? 'bg-accent text-white shadow-xs'
+                          ? 'bg-accent text-accent-on shadow-xs'
                           : 'text-text-muted hover:text-text-primary'
                       }`}
                     >
@@ -319,7 +319,7 @@ export default function WeeklyScheduleModal({
                   <div className="space-y-2.5 pt-1 border-t border-border/40">
                     {/* Workout plan dropdown */}
                     <div className="flex items-center gap-2">
-                      <span className="text-3xs font-mono font-bold uppercase text-text-muted shrink-0">
+                      <span className="text-2xs font-mono font-bold uppercase text-text-muted shrink-0">
                         {t('sched.routine')}
                       </span>
                       <div className="relative flex-1">
@@ -343,7 +343,7 @@ export default function WeeklyScheduleModal({
 
                     {/* Body Parts selector chips */}
                     <div className="space-y-1">
-                      <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
+                      <span className="text-2xs font-mono font-bold uppercase text-text-muted block">
                         {t('sched.bodyParts')}
                       </span>
                       <div className="flex flex-wrap gap-1.5">
@@ -354,7 +354,7 @@ export default function WeeklyScheduleModal({
                               key={part}
                               type="button"
                               onClick={() => handleToggleBodyPart(day, part)}
-                              className={`px-2 py-0.5 rounded-full text-3xs font-semibold border transition-all ${
+                              className={`px-2 py-0.5 rounded-full text-2xs font-semibold border transition-all ${
                                 isSelected
                                   ? 'bg-accent/15 border-accent text-accent'
                                   : 'bg-bg-card border-border/70 text-text-muted hover:border-border'

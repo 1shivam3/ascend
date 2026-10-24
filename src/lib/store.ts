@@ -47,6 +47,8 @@ import {
   ApplyPolicyDecisionResult,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
+import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
+import { normalizeHex } from './accent-themes';
 import { purgeLocalAppData, isRecognizedBackupData } from './storage';
 import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
@@ -191,6 +193,32 @@ export interface UiPreferences {
    * old saves lack the field, so consumers check `!== false`.
    */
   showMuscleVolume: boolean;
+  /**
+   * UX redesign — accent theme (personalization-spec §5.1). 'custom'
+   * uses customAccentHex. Local-only: never synced (the sync payload
+   * carries no uiPreferences field at all — see the Stage 1 sync
+   * audit in docs/ux-redesign/implementation-summary.md). UI copy
+   * must never promise cross-device sync for this key.
+   */
+  accentTheme: 'vermilion' | 'cobalt' | 'forest' | 'plum' | 'teal' | 'rose' | 'custom';
+  /** Custom accent hex (normalized #RRGGBB) or null. Local-only. */
+  customAccentHex: string | null;
+  /**
+   * UX redesign — information density. 'simple' | 'detailed',
+   * presentation only (same data, logic, features). New accounts
+   * default 'simple'; pre-redesign blobs migrate to 'detailed'
+   * (persist version bump + migrate()). Local-only.
+   */
+  density: 'simple' | 'detailed';
+  /** UX redesign — Today section visibility/order. Local-only. */
+  todayLayout: { visible: Record<string, boolean | 'unset'>; order: string[] };
+  /**
+   * UX redesign — explicit workout-mode override. null = follow
+   * density (Beginner in Simple, Advanced in Detailed). Local-only.
+   */
+  workoutModeOverride: 'beginner' | 'advanced' | null;
+  /** UX redesign — pinned Progress spotlight chart id, or null. Local-only. */
+  pinnedProgressChart: string | null;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -202,6 +230,13 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   textScale: 'normal',
   healthConnectEnabled: false,
   showMuscleVolume: true,
+  // UX redesign defaults (fresh stores = new accounts = Simple).
+  accentTheme: 'vermilion',
+  customAccentHex: null,
+  density: 'simple',
+  todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] },
+  workoutModeOverride: null,
+  pinnedProgressChart: null,
 };
 
 export interface AppState {
@@ -733,17 +768,85 @@ export function syncWorkoutReminderDays(
  * Flat slices and collections are user data with no defaults to merge
  * and pass through untouched.
  */
-export const PERSIST_VERSION = 1;
+export const PERSIST_VERSION = 2;
+
+const ACCENT_THEME_IDS = ['vermilion', 'cobalt', 'forest', 'plum', 'teal', 'rose', 'custom'];
+
+/**
+ * UX redesign — value validation for uiPreferences
+ * (personalization-spec §5.4). Silent by design: invalid values fall
+ * back to defaults, never a crash or blank screen; corrected values
+ * are written back on the next persist so the blob heals itself.
+ * Non-object uiPreferences is returned as a fresh default set here —
+ * the merge path uses this; migratePersistedState deliberately leaves
+ * non-object uiPreferences untouched (QA4-012 pins that behavior).
+ */
+export function sanitizeUiPreferences(
+  prefs: unknown,
+  hasUserData: boolean,
+): Record<string, unknown> {
+  if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)) {
+    return { ...DEFAULT_UI_PREFERENCES };
+  }
+  const out: Record<string, unknown> = {
+    ...DEFAULT_UI_PREFERENCES,
+    ...(prefs as Record<string, unknown>),
+  };
+  if (!ACCENT_THEME_IDS.includes(out.accentTheme as string)) {
+    out.accentTheme = 'vermilion';
+  }
+  const hex =
+    typeof out.customAccentHex === 'string' ? normalizeHex(out.customAccentHex) : null;
+  out.customAccentHex = hex;
+  if (out.accentTheme === 'custom' && !hex) out.accentTheme = 'vermilion';
+  // Invalid/missing density → the §5.2 account default (existing users
+  // keep Detailed; fresh accounts get Simple). A stored valid value is
+  // always honored.
+  if (out.density !== 'simple' && out.density !== 'detailed') {
+    out.density = hasUserData ? 'detailed' : 'simple';
+  }
+  out.todayLayout = sanitizeTodayLayout(out.todayLayout);
+  if (
+    out.workoutModeOverride !== 'beginner' &&
+    out.workoutModeOverride !== 'advanced' &&
+    out.workoutModeOverride !== null
+  ) {
+    out.workoutModeOverride = null;
+  }
+  if (typeof out.pinnedProgressChart !== 'string') out.pinnedProgressChart = null;
+  return out;
+}
+
+function blobHasUserData(state: Record<string, any>): boolean {
+  return Boolean(
+    state.profile ||
+      (Array.isArray(state.workouts) && state.workouts.length > 0) ||
+      (Array.isArray(state.meals) && state.meals.length > 0),
+  );
+}
 
 export function migratePersistedState(
   persisted: unknown,
-  _version: number,
+  version: number,
 ): Record<string, unknown> {
   const state = (persisted ?? {}) as Record<string, any>;
   const next: Record<string, any> = { ...state };
 
   if (state.uiPreferences && typeof state.uiPreferences === 'object') {
-    next.uiPreferences = { ...DEFAULT_UI_PREFERENCES, ...state.uiPreferences };
+    const merged: Record<string, unknown> = {
+      ...DEFAULT_UI_PREFERENCES,
+      ...(state.uiPreferences as Record<string, unknown>),
+    };
+    // UX redesign migration (persist v1 → v2): pre-redesign blobs never
+    // carried a density key. Existing accounts keep the experience they
+    // already have (Detailed). A stored valid density is always honored
+    // — the check reads the STORED value, not the merged one, because
+    // merging defaults first would mask the key's absence.
+    const storedDensity = (state.uiPreferences as Record<string, unknown>).density;
+    if (version < 2 && storedDensity !== 'simple' && storedDensity !== 'detailed') {
+      merged.density = 'detailed';
+    }
+    next.uiPreferences = sanitizeUiPreferences(merged, blobHasUserData(state));
   }
 
   if (state.notificationPreferences && typeof state.notificationPreferences === 'object') {
@@ -3853,9 +3956,26 @@ export const useAppStore = create<AppState>()(
       // QA4-012: versioned migrations — legacy blobs (version 0) are
       // deep-merged over current defaults so newer default-ON fields
       // are never lost on rehydration. See migratePersistedState.
+      // UX redesign: v2 adds the six personalization keys; v1 blobs
+      // migrate existing accounts to density 'detailed' (see above).
       version: PERSIST_VERSION,
       migrate: (persistedState: unknown, version: number) =>
         migratePersistedState(persistedState, version) as unknown as AppState,
+      // UX redesign §5.4: validate preference VALUES on read (the
+      // default merge only fills missing keys). Otherwise identical
+      // to zustand's default shallow merge.
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Record<string, any>;
+        const merged = { ...(currentState as unknown as Record<string, unknown>), ...persisted } as Record<
+          string,
+          unknown
+        >;
+        merged.uiPreferences = sanitizeUiPreferences(
+          persisted.uiPreferences ?? (currentState as AppState).uiPreferences,
+          blobHasUserData(persisted),
+        );
+        return merged as unknown as AppState;
+      },
     }
   )
 );
