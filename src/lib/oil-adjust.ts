@@ -1,4 +1,5 @@
 import type { OilLevelId } from './types';
+import type { StringKey } from './i18n/en';
 import { resolveIndianMeta, getHouseholdUnitGrams } from './indian-foods';
 
 /**
@@ -23,6 +24,13 @@ export interface OilLevel {
   label: string;
   tsp: number;
 }
+
+export const OIL_LEVEL_LABEL_KEYS: Record<OilLevelId, StringKey> = {
+  none: 'oil.levelNone',
+  tsp: 'oil.levelTsp',
+  tbsp: 'oil.levelTbsp',
+  tbsp2: 'oil.levelTbsp2',
+};
 
 export const OIL_LEVELS: OilLevel[] = [
   { id: 'none', label: 'None', tsp: 0 },

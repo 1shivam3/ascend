@@ -175,6 +175,12 @@ export interface UiPreferences {
    */
   language: Language;
   /**
+   * Text size (SIM-P1-08). 'normal' = browser default; 'large'/'xlarge'
+   * scale the root font-size, which scales all rem-based text. Old
+   * saves lack the field and resolve to 'normal' in the applier.
+   */
+  textScale: 'normal' | 'large' | 'xlarge';
+  /**
    * Health Connect sync consent (Android). DEFAULT OFF — nothing is
    * read until the user connects in Settings. Old saves lack the
    * field; consumers must check `=== true`.
@@ -193,6 +199,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   showHabitMatrix: true,
   weeklyTargetDays: null,
   language: 'en',
+  textScale: 'normal',
   healthConnectEnabled: false,
   showMuscleVolume: true,
 };
@@ -375,6 +382,12 @@ export interface AppState {
   
   addWorkout: (workout: WorkoutEntry) => void;
   deleteWorkout: (id: string) => void;
+  /** Persona-sim round 5 (SIM-P1-09) Undo: re-insert a deleted workout
+   *  at its original index (no-op if present) and clear its tombstone,
+   *  mirroring the QA4-014 meal/plan undo. PRs minted by the workout
+   *  are NOT restored here — they survive deletion today (delete does
+   *  not remove PRs), so undo only restores the session itself. */
+  insertWorkoutAt: (workout: WorkoutEntry, index: number) => void;
   
   addMeal: (meal: MealEntry) => void;
   deleteMeal: (id: string) => void;
@@ -1806,6 +1819,18 @@ export const useAppStore = create<AppState>()(
           deletedWorkoutIds: (state.deletedWorkoutIds || []).includes(id)
             ? state.deletedWorkoutIds
             : [...(state.deletedWorkoutIds || []), id],
+        };
+      }),
+      insertWorkoutAt: (workout, index) => set((state) => {
+        if (state.workouts.some((w) => w.id === workout.id)) return state;
+        const nextWorkouts = [...state.workouts];
+        nextWorkouts.splice(Math.max(0, Math.min(index, nextWorkouts.length)), 0, workout);
+        return {
+          workouts: nextWorkouts,
+          lifterProfile: generateLifterTwinProfile(nextWorkouts, state.profile?.unit || 'kg'),
+          // Undoing a deletion must also clear its tombstone (QA4-001),
+          // or the next sync would delete the restored workout again.
+          deletedWorkoutIds: (state.deletedWorkoutIds || []).filter((d) => d !== workout.id),
         };
       }),
       

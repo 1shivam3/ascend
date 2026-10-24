@@ -220,10 +220,7 @@ export default function BarcodeScannerModal({
   // of a wasted database lookup that ends in a bare "not found".
   const handleManualBarcodeSubmit = () => {
     if (!isValidManualBarcode(manualBarcode)) {
-      toast.error(
-        'That barcode looks invalid — check the digits under the bars and try again.',
-        'Invalid Barcode'
-      );
+      toast.error(t('toast.barcodeInvalid'), t('toast.titleInvalidBarcode'));
       return;
     }
     handleBarcodeFound(manualBarcode);
@@ -459,7 +456,7 @@ export default function BarcodeScannerModal({
         fatG: fatPer100,
       });
       if (macroError) {
-        toast.error(macroError, 'Check Nutrition Values');
+        toast.error(macroError, t('toast.titleNutritionCheck'));
         return;
       }
     }

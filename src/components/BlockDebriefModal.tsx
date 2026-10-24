@@ -13,6 +13,7 @@ import React, { useMemo, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { buildBlockDebrief, type BlockDebrief } from '@/lib/weekly-review';
 import type { ActiveCoachBlock } from '@/lib/block-engine';
 import { Flag, X } from 'lucide-react';
@@ -27,7 +28,7 @@ interface BlockDebriefModalProps {
 export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextBlock }: BlockDebriefModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const workouts = useStore((s) => s.workouts);
   const plannedWorkouts = useStore((s) => s.plannedWorkouts);
   const weeklySchedule = useStore((s) => s.weeklySchedule);
@@ -82,7 +83,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
           </button>
         </div>
 
-        <p className="text-sm text-text-primary font-semibold">{debrief.completionLine}</p>
+        <p className="text-sm text-text-primary font-semibold">{renderLocalizedSentence(t, language, debrief.completionI18n, debrief.completionLine)}</p>
 
         {debrief.liftChanges.length > 0 && (
           <div>

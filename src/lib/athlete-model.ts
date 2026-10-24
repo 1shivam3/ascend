@@ -34,6 +34,7 @@ import {
 } from './workout-engine';
 import { resolveExerciseMuscle, type MuscleGroup } from './exercise-library';
 import { parseLocalDate } from './formatters';
+import type { LocalizedSentence } from './coach-i18n';
 
 /**
  * Muscle for recovery purposes — the library resolver WITHOUT its
@@ -117,6 +118,12 @@ export interface AthleteModelFact {
   kind: 'pain' | 'progress' | 'adherence' | 'recovery' | 'baseline' | 'learning';
   text: string;
   tier: AthleteModelTier;
+  /** LIVE-P1-03: full-sentence localizable twin of `text` (pain + learning facts). */
+  textI18n?: LocalizedSentence;
+  /** LIVE-P1-03: for the adherence fact, `text` minus its English suffix. */
+  baseText?: string;
+  /** LIVE-P1-03: localized twin of the adherence suffix alone. */
+  suffixI18n?: LocalizedSentence;
 }
 
 export interface AthleteModel {
@@ -136,6 +143,14 @@ export interface AthleteModel {
     episodesLast28dByFamily: Partial<Record<MovementFamily, number>>;
     /** Families with ≥2 attributed episodes in 28 days — excluded from new plans, progression held. */
     flaggedFamilies: MovementFamily[];
+    /**
+     * Canonical keys of exercises with a pain episode in the last 28
+     * days (SIM-P1-03). flaggedFamilies needs a pattern (≥2 days), but a
+     * single deliberate "Hurts" report must still keep that exact lift
+     * out of the next coach block — the block engine swaps-or-drops
+     * these keys even when their family is not flagged.
+     */
+    recentPainExerciseKeys: string[];
   };
   /** Share of scored days in the last 28 that were caution/rest. */
   lowReadinessShare: ModelEstimate<number>;
@@ -784,6 +799,13 @@ function buildPain(input: AthleteModelInput, todayStr: string): AthleteModel['pa
     .filter(([fam, count]) => fam !== 'other' && count >= 2)
     .map(([fam]) => fam);
 
+  // Single-report keys (SIM-P1-03): every exercise with an episode in
+  // the last 28 days, whether or not its family reached the ≥2-day
+  // pattern bar. Session-level reports (exerciseKey '') carry no lift.
+  const recentPainExerciseKeys = [...new Set(
+    episodes.filter((e) => e.date >= recentStart && e.exerciseKey).map((e) => e.exerciseKey)
+  )];
+
   // Collapse exact duplicates (same day, same lift) — re-imports and sync
   // echoes must not double the record.
   const seenEp = new Set<string>();
@@ -798,6 +820,7 @@ function buildPain(input: AthleteModelInput, todayStr: string): AthleteModel['pa
     episodes: deduped.slice(0, 60),
     episodesLast28dByFamily: byFamily,
     flaggedFamilies,
+    recentPainExerciseKeys,
   };
 }
 
@@ -822,6 +845,13 @@ function buildTopFacts(
       kind: 'pain',
       tier: days >= 3 ? 'established' : 'emerging',
       text: `Pain has come up on ${days} separate days in the last month around ${fam.replace(/_/g, ' ')} movements${example ? ` (e.g. ${example.exerciseName})` : ''} — your coach will steer clear of that pattern, and it's worth getting checked if it persists.`,
+      // LIVE-P1-03: family id + exercise name localize via coach-i18n.
+      textI18n: example
+        ? {
+            key: 'coachModel.factPainExample',
+            params: { days, family: fam, exercise: example.exerciseName },
+          }
+        : { key: 'coachModel.factPain', params: { days, family: fam } },
     });
   }
   if (flaggedSorted.length > 4) {
@@ -829,6 +859,7 @@ function buildTopFacts(
       kind: 'pain',
       tier: 'emerging',
       text: `${flaggedSorted.length - 4} more pain patterns are being tracked — if pain keeps recurring, get it checked.`,
+      textI18n: { key: 'coachModel.factPainMore', params: { count: flaggedSorted.length - 4 } },
     });
   }
   const facts: AthleteModelFact[] = [...painFacts];
@@ -848,6 +879,10 @@ function buildTopFacts(
       text:
         model.adherence.adherenceRate.evidence +
         (skip ? ` ${skip[0].toUpperCase() + skip.slice(1)}s are the day most often missed.` : ''),
+      // LIVE-P1-03: the evidence stays English (still-open); only the
+      // suffix localizes, rendered as baseText + localized suffix.
+      baseText: model.adherence.adherenceRate.evidence,
+      suffixI18n: skip ? { key: 'coachModel.factAdherenceSuffix', params: { day: skip } } : undefined,
     });
   }
 
@@ -870,6 +905,7 @@ function buildTopFacts(
       kind: 'learning',
       tier: 'prior',
       text: 'Still learning you — trends need ~4 sessions on the same lift and baselines a handful of morning check-ins. Until then your coach uses standard defaults and says so.',
+      textI18n: { key: 'coachModel.factLearning' },
     });
   }
   return facts.slice(0, 5);

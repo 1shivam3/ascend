@@ -77,8 +77,8 @@ module.exports = {
         info: '#3b82f6',
       },
       fontFamily: {
-        sans: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['var(--font-sans)', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['var(--font-sans)', 'Inter', 'var(--font-devanagari)', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['var(--font-sans)', 'Inter', 'var(--font-devanagari)', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {

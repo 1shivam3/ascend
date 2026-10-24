@@ -31,8 +31,12 @@ describe('vegetarian protein coach', () => {
     expect(s!.message).toContain('80 g to go');
   });
 
-  it('never fires for non-vegetarian users', () => {
-    expect(getProteinGapSuggestion({ ...base, diet: 'non_vegetarian' })).toBeNull();
+  // SIM-P2-04 (round 5): the old behavior — silent null for
+  // non-vegetarians — WAS the bug. They now get a meat/fish/egg anchor.
+  it('fires for non-vegetarian users with a meat/fish/egg anchor', () => {
+    const s = getProteinGapSuggestion({ ...base, diet: 'non_vegetarian' });
+    expect(s).not.toBeNull();
+    expect(s!.anchor.proteinG).toBeGreaterThan(0);
   });
 
   it('fires for eggitarian and vegan users too', () => {

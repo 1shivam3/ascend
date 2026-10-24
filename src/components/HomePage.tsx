@@ -29,7 +29,10 @@ import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
 import { useTranslation } from '@/lib/i18n';
 
-import { getLevel, getLevelName, progressToNext, summarizeXpInRange } from '@/lib/xp-system';
+import { getLevel, getLevelName, getLevelNameKey, progressToNext, summarizeXpInRange, XP_CHALLENGE_COMPLETE } from '@/lib/xp-system';
+import { getExerciseHindiName } from '@/lib/exercise-library';
+import { renderLocalizedSentence, formatCheckInList } from '@/lib/coach-i18n';
+import type { StringKey } from '@/lib/i18n/en';
 import { buildActiveDays, calculateStreak } from '@/lib/streak-freeze';
 import { calculateReadiness } from '@/lib/coach-engine';
 import { buildHealthSignals } from '@/lib/health-connect';
@@ -51,11 +54,23 @@ import LevelSheet from '@/components/LevelSheet';
 import ChallengesSheet from '@/components/ChallengesSheet';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
 
-const READINESS_LABEL: Record<string, string> = {
-  primed: 'Primed',
-  ready: 'Ready',
-  caution: 'Easy day',
-  rest: 'Rest',
+const READINESS_LABEL_KEY: Record<string, StringKey> = {
+  primed: 'home.readinessPrimed',
+  ready: 'home.readinessReady',
+  caution: 'home.readinessEasy',
+  rest: 'home.readinessRest',
+};
+
+// LIVE-P1-03: getWorkoutBodyParts values → i18n keys (unknown values fall back to themselves).
+const BODY_PART_KEY: Record<string, StringKey> = {
+  Chest: 'home.bodyPartChest',
+  Back: 'home.bodyPartBack',
+  Legs: 'home.bodyPartLegs',
+  Shoulders: 'home.bodyPartShoulders',
+  Arms: 'home.bodyPartArms',
+  Core: 'home.bodyPartCore',
+  'Full Body': 'home.bodyPartFullBody',
+  Conditioning: 'home.bodyPartConditioning',
 };
 
 const SuggestedWorkoutModal = dynamic(() => import('@/components/SuggestedWorkoutModal'), { ssr: false });
@@ -207,7 +222,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const levelInfo = useMemo(() => {
     const total = xp?.totalXp || 0;
     const level = getLevel(total);
-    return { total, level, name: getLevelName(level), progress: progressToNext(total) };
+    return { total, level, name: getLevelName(level), nameKey: getLevelNameKey(level), progress: progressToNext(total) };
   }, [xp]);
 
   // XP attributable to this week's (Mon–Sun) logged activity — shown in the
@@ -267,7 +282,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       if (rewardDue) {
         awardXpEvents([{ id: challengeXpEventId(def), type: 'challenge' }]);
         grantChallengeReward(challengeInstanceKey(def));
-        toast.success(`${def.title} complete — 200 XP earned.`, 'Challenge Complete');
+        toast.success(t('toast.challengeComplete', { title: def.title }), t('toast.titleChallengeComplete'));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,7 +306,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       foods: [scannedItem],
     };
     addMeal(newMeal);
-    toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal)!`, 'Scanned Food Logged');
+    toast.success(t('toast.scannedLoggedShort', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedLogged'));
   };
 
   // Modal triggers
@@ -381,7 +396,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       bodyParts: getWorkoutBodyParts(plan.exercises),
     });
     setIsChangeWorkoutOpen(false);
-    toast.success(`Set "${plan.name}" as today's workout!`, 'Routine Updated');
+    toast.success(t('toast.todayWorkoutSet', { name: plan.name }), t('toast.titleRoutineUpdated'));
   };
 
   // Launch or resume workout session
@@ -414,7 +429,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       });
 
       saveWorkoutDraft(draft);
-      toast.success(`Loaded "${planToStart.name}". Let's lift!`, 'Session Started');
+      toast.success(t('toast.sessionStarted', { name: planToStart.name }), t('toast.titleSessionStarted'));
     }
     onNavigate('workout');
   };
@@ -550,8 +565,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             type="button"
             onClick={() => onNavigate('profile')}
             className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
-            title="Athlete Profile"
-            aria-label="Athlete Profile"
+            title={t('home.athleteProfile')}
+            aria-label={t('home.athleteProfile')}
           >
             {profile?.avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -571,9 +586,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             type="button"
             onClick={() => setIsChangeWorkoutOpen(true)}
             className="text-2xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
-            title="Change Today's Workout"
+            title={t('home.changeWorkoutTitle')}
           >
-            <span>Adaptive Split</span>
+            <span>{t('home.adaptiveSplit')}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -584,8 +599,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
         <p className="text-xs sm:text-sm text-text-muted mt-1 font-normal">
           {/^rest day/i.test(routineDisplayName)
-            ? 'Recovery is training too — sleep well, eat well, come back stronger tomorrow.'
-            : `${durationMinutes} min • ${exerciseCount} exercises`}
+            ? t('home.restDayLine')
+            : t('home.durationExercises', { min: durationMinutes, count: exerciseCount })}
         </p>
 
         <button
@@ -620,7 +635,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             onClick={() => setIsLogPastModalOpen(true)}
             className="text-xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
           >
-            Already trained? Quick log a past session
+            {t('home.quickLogPast')}
           </button>
         </div>
       </div>
@@ -633,7 +648,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors pressable"
           role="button"
           tabIndex={0}
-          aria-label="View Nutrition Details"
+          aria-label={t('home.viewNutritionDetails')}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -658,7 +673,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-accent/40 transition-colors pressable"
           role="button"
           tabIndex={0}
-          aria-label="View Protein Details"
+          aria-label={t('home.viewProteinDetails')}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -686,7 +701,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         >
           <Leaf className="w-3.5 h-3.5 text-accent shrink-0" aria-hidden="true" />
           <span className="text-xs text-text-secondary leading-relaxed">
-            {homeProteinHint.message}
+            {renderLocalizedSentence(t, language, homeProteinHint.messageI18n, homeProteinHint.message)}
           </span>
         </button>
       )}
@@ -701,16 +716,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <button
           type="button"
           onClick={() => setIsReadinessSheetOpen(true)}
-          aria-label="View readiness details"
+          aria-label={t('home.viewReadinessDetails')}
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
-              {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
+              {readiness.score} <span className="text-sm font-semibold text-text-muted">{t(READINESS_LABEL_KEY[readiness.band] ?? 'home.readinessReady')}</span>
             </span>
             <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
-              Details
+              {t('home.details')}
               <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </span>
@@ -723,10 +738,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <button
           type="button"
           onClick={() => setIsLevelSheetOpen(true)}
-          aria-label="View level details"
+          aria-label={t('home.viewLevelDetails')}
           className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
         >
-          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {levelInfo.name}</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {t(levelInfo.nameKey)}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {levelInfo.total.toLocaleString()} XP
@@ -738,7 +753,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               />
             </span>
             <span className="text-xs text-text-muted tabular-nums block mt-1">
-              {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} to Level {levelInfo.level + 1}
+              {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} {t('home.toLevel', { level: levelInfo.level + 1 })}
             </span>
           </span>
         </button>
@@ -796,7 +811,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <div>
               <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
               <p className="text-3xs text-text-muted tabular-nums">
-                {(todayWaterMl / 1000).toFixed(1)} / {(hydrationTargetMl / 1000).toFixed(1)} L today
+                {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
               </p>
             </div>
           </div>
@@ -805,9 +820,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 logWater(250);
-                toast.success('+250 ml logged', 'Hydration Updated');
+                toast.success(t('toast.water250'), t('toast.titleHydration'));
               }}
-              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
               +250
             </button>
@@ -815,9 +830,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 logWater(500);
-                toast.success('+500 ml logged', 'Hydration Updated');
+                toast.success(t('toast.water500'), t('toast.titleHydration'));
               }}
-              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
               +500
             </button>
@@ -842,11 +857,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-text-primary leading-relaxed">
                   {checkIn.sessions.length === 1
-                    ? `${checkIn.sessions[0].name} didn't get logged this week`
-                    : `${checkIn.sessions.length} planned sessions didn't get logged this week`}
+                    ? t('home.missedOne', { name: checkIn.sessions[0].name })
+                    : t('home.missedMany', { count: checkIn.sessions.length })}
                 </p>
-                <CollapsibleDetails label="Details">
-                  <p className="whitespace-pre-line">{checkIn.message}</p>
+                <CollapsibleDetails label={t('home.details')}>
+                  <p className="whitespace-pre-line">{checkIn.details ? t(checkIn.details.key, { list: formatCheckInList(checkIn.details.sessions, language) }) : checkIn.message}</p>
                 </CollapsibleDetails>
                 {(() => {
                   // "Do it today": actually start the most recent missed
@@ -868,7 +883,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       }}
                       className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
                     >
-                      Do it today — start {plan.name}
+                      {t('home.doItToday', { name: plan.name })}
                     </button>
                   );
                 })()}
@@ -878,10 +893,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
-                toast.info("Check-in snoozed — it won't repeat this week.", 'Snoozed');
+                toast.info(t('toast.checkinSnoozed'), t('toast.titleSnoozed'));
               }}
               className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
-              aria-label="Dismiss check-in"
+              aria-label={t('home.dismissCheckin')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -899,11 +914,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-text-primary leading-relaxed">
-                  Coach suggests {nutritionSuggestion.deltaKcal > 0 ? '+' : ''}{nutritionSuggestion.deltaKcal} kcal → {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                  {t('home.coachSuggestsKcal', {
+                    delta: `${nutritionSuggestion.deltaKcal > 0 ? '+' : ''}${nutritionSuggestion.deltaKcal}`,
+                    new: nutritionSuggestion.newCalories.toLocaleString(),
+                  })}
                 </p>
-                <CollapsibleDetails label="Why?">
-                  <p>{nutritionSuggestion.reason}</p>
-                  <p className="mt-1">General training guidance, not medical advice. If you have a medical condition (e.g. diabetes), check with your doctor before changing calorie targets.</p>
+                <CollapsibleDetails label={t('home.why')}>
+                  <p>{renderLocalizedSentence(t, language, nutritionSuggestion.reasonI18n, nutritionSuggestion.reason)}</p>
+                  <p className="mt-1">{t('home.medicalDisclaimer')}</p>
                 </CollapsibleDetails>
                 <button
                   type="button"
@@ -922,11 +940,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
                     }
                     recordCalorieAdjustment(record);
-                    toast.success(`Target updated to ${nutritionSuggestion.newCalories.toLocaleString()} kcal/day.`, 'Calories Adjusted');
+                    toast.success(t('toast.targetUpdated', { kcal: nutritionSuggestion.newCalories.toLocaleString() }), t('toast.titleCaloriesAdjusted'));
                   }}
                   className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
-                  Apply {nutritionSuggestion.newCalories.toLocaleString()} kcal/day
+                  {t('home.applyKcal', { kcal: nutritionSuggestion.newCalories.toLocaleString() })}
                 </button>
               </div>
             </div>
@@ -941,10 +959,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
                   dismissed: true,
                 });
-                toast.info("Suggestion dismissed — I'll reassess in two weeks.", 'Dismissed');
+                toast.info(t('toast.suggestionDismissed'), t('toast.titleDismissed'));
               }}
               className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
-              aria-label="Dismiss calorie suggestion"
+              aria-label={t('home.dismissSuggestion')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -955,20 +973,20 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {/* ── 7c. NEXT-SESSION ADJUSTMENTS (auto-regulation) ───────────────── */}
       {uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs">
-          <span className="text-xs font-medium text-text-muted">Next session — coach&apos;s calls</span>
+          <span className="text-xs font-medium text-text-muted">{t('home.nextSessionCalls')}</span>
           <div className="mt-2 space-y-2">
             {coachDigest.nextAdjustments.map((adj) => (
               <div key={adj.exercise}>
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-xs font-bold text-text-primary truncate">{adj.exercise}</p>
+                  <p className="text-xs font-bold text-text-primary truncate">{language === 'hi' ? (getExerciseHindiName(adj.exercise) ?? adj.exercise) : adj.exercise}</p>
                   <span className="text-xs font-bold text-text-primary tabular-nums shrink-0">
                     {adj.oldTarget.weight} → {adj.newTarget.weight}
                     {adj.newTarget.unit}
                   </span>
                 </div>
                 {/* The reasoning is one tap away, never auto-shown. */}
-                <CollapsibleDetails label="Why?">
-                  <p>{adj.reason}</p>
+                <CollapsibleDetails label={t('home.why')}>
+                  <p>{renderLocalizedSentence(t, language, adj.reasonI18n, adj.reason)}</p>
                 </CollapsibleDetails>
               </div>
             ))}
@@ -985,19 +1003,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </span>
           <p className="text-xs font-bold text-text-primary">
             {streakInfo.currentStreak > 0
-              ? `${streakInfo.currentStreak} day${streakInfo.currentStreak === 1 ? '' : 's'} streak — keep it burning`
-              : 'Start your streak with today\'s workout'}
+              ? t(streakInfo.currentStreak === 1 ? 'home.streakOne' : 'home.streakMany', { count: streakInfo.currentStreak })
+              : t('home.streakStart')}
           </p>
           {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
             <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
               <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
-              {streak.freezesAvailable} freeze{streak.freezesAvailable === 1 ? '' : 's'} ready
+              {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
             </span>
           )}
         </div>
         {streakInfo.freezeConsumed && (
           <p className="text-3xs text-text-muted mt-1.5">
-            A streak freeze covered a missed day this run — no harm done.
+            {t('home.freezeCovered')}
           </p>
         )}
       </div>
@@ -1026,7 +1044,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
-          <span className="text-3xs font-mono text-text-muted">MON — SUN</span>
+          <span className="text-3xs font-mono text-text-muted">{t('home.monSun')}</span>
         </div>
         <WeeklyHabitMatrix
           compact
@@ -1061,7 +1079,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           onClick={() => setIsChallengesSheetOpen(true)}
           role="button"
           tabIndex={0}
-          aria-label="View all challenges"
+          aria-label={t('home.viewChallenges')}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -1075,8 +1093,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 <Trophy className="w-4 h-4" />
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-bold text-text-primary">{homeChallenge.def.title}</p>
-                <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.description}</p>
+                <p className="text-xs font-bold text-text-primary">{homeChallenge.def.titleKey ? t(homeChallenge.def.titleKey) : homeChallenge.def.title}</p>
+                <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.descriptionKey ? t(homeChallenge.def.descriptionKey) : homeChallenge.def.description}</p>
               </div>
             </div>
             {!homeChallenge.optedIn && (
@@ -1087,7 +1105,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   dismissChallenge(homeChallenge.key);
                 }}
                 className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
-                aria-label="Dismiss challenge"
+                aria-label={t('home.dismissChallenge')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1103,7 +1121,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </div>
               <p className="text-3xs text-text-muted tabular-nums mt-1.5">
                 {homeChallenge.evaluation.progress} of {homeChallenge.evaluation.target} · {homeChallenge.evaluation.pct}%
-                {homeChallenge.evaluation.completed ? ' · Complete — 200 XP earned' : ''}
+                {homeChallenge.evaluation.completed ? ` · ${t('chal.complete', { xp: XP_CHALLENGE_COMPLETE })}` : ''}
               </p>
             </div>
           ) : (
@@ -1112,11 +1130,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               onClick={(e) => {
                 e.stopPropagation();
                 optInChallenge(homeChallenge.key);
-                toast.success('Challenge joined. Good luck!', 'Challenge Accepted');
+                toast.success(t('toast.challengeJoined'), t('toast.titleChallengeAccepted'));
               }}
               className="mt-3 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
-              Join challenge
+              {t('home.joinChallenge')}
             </button>
           )}
         </div>
@@ -1145,9 +1163,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
             <div className="space-y-3 text-xs">
               <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
-                <p className="font-semibold text-text-primary">Today&apos;s Training</p>
+                <p className="font-semibold text-text-primary">{t('home.todaysTraining')}</p>
                 <p className="text-text-muted mt-0.5">
-                  {routineDisplayName} is scheduled for today ({durationMinutes} min).
+                  {t('home.scheduledToday', { name: routineDisplayName, min: durationMinutes })}
                 </p>
               </div>
 
@@ -1155,8 +1173,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 <p className="font-semibold text-text-primary">{t('home.weeklyTarget')}</p>
                 <p className="text-text-muted mt-0.5">
                   {uiPreferences.weeklyTargetDays === 0
-                    ? `${weeklyStats.completedCount} workouts completed this week.`
-                    : `${weeklyStats.completedCount} of ${uiPreferences.weeklyTargetDays ?? weeklyStats.targetDays} workouts completed this week.`}
+                    ? t('home.workoutsWeek', { count: weeklyStats.completedCount })
+                    : t('home.workoutsWeekOf', { count: weeklyStats.completedCount, target: uiPreferences.weeklyTargetDays ?? weeklyStats.targetDays })}
                 </p>
               </div>
             </div>
@@ -1188,8 +1206,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             {/* Header */}
             <div className="p-4 border-b border-border flex items-center justify-between shrink-0 bg-bg-card">
               <div>
-                <h2 className="text-base font-bold text-text-primary">Change Today&apos;s Workout</h2>
-                <p className="text-2xs text-text-muted">Choose which plan to display and train today</p>
+                <h2 className="text-base font-bold text-text-primary">{t('home.changeWorkoutTitle')}</h2>
+                <p className="text-2xs text-text-muted">{t('home.changeWorkoutHint')}</p>
               </div>
               <button
                 type="button"
@@ -1206,7 +1224,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
-                    AVAILABLE ROUTINES
+                    {t('home.availableRoutines')}
                   </span>
                   <button
                     type="button"
@@ -1216,7 +1234,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     }}
                     className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
                   >
-                    <span>Manage Plans</span>
+                    <span>{t('home.managePlans')}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -1244,17 +1262,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                                 </span>
                                 {isSelected && (
                                   <span className="px-1.5 py-0.5 rounded bg-accent text-white text-3xs font-mono font-bold">
-                                    TODAY&apos;S PLAN
+                                    {t('home.todaysPlan')}
                                   </span>
                                 )}
                               </div>
                               {bodyParts.length > 0 && (
                                 <span className="text-3xs text-accent font-medium block mt-0.5">
-                                  {bodyParts.join(' • ')}
+                                  {bodyParts.map((b) => (BODY_PART_KEY[b] ? t(BODY_PART_KEY[b]) : b)).join(' • ')}
                                 </span>
                               )}
                               <span className="text-xs text-text-muted line-clamp-1 mt-0.5">
-                                {plan.exercises.map((e) => e.name).join(', ')}
+                                {plan.exercises.map((e) => (language === 'hi' ? (getExerciseHindiName(e.name) ?? e.name) : e.name)).join(', ')}
                               </span>
                             </div>
                           </div>
@@ -1269,7 +1287,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                                   : 'bg-bg-elevated hover:bg-bg-secondary text-text-primary border border-border'
                               }`}
                             >
-                              {isSelected ? 'Selected for Today' : "Set as Today's Workout"}
+                              {isSelected ? t('home.selectedForToday') : t('home.setAsToday')}
                             </button>
                             <button
                               type="button"
@@ -1288,7 +1306,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     })}
                   </div>
                 ) : (
-                  <p className="text-xs text-text-muted italic py-1">No workout plans available.</p>
+                  <p className="text-xs text-text-muted italic py-1">{t('home.noPlans')}</p>
                 )}
               </div>
 
@@ -1302,11 +1320,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     bodyParts: [],
                   });
                   setIsChangeWorkoutOpen(false);
-                  toast.info("Set today as Rest & Recovery.", "Rest Day Set");
+                  toast.info(t('toast.restDaySet'), t('toast.titleRestDay'));
                 }}
                 className="w-full p-3 rounded-xl bg-bg-secondary/60 border border-border/80 hover:border-accent/40 flex items-center justify-between text-left text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
               >
-                <span>Set today as Rest Day (Recovery)</span>
+                <span>{t('home.setRestDay')}</span>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
               </button>
             </div>
@@ -1334,7 +1352,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             exercises: plan.exercises,
           };
           addPlannedWorkout(newPlan);
-          toast.success(`Plan "${plan.name}" saved!`, 'Plan Saved');
+          toast.success(t('toast.planSaved', { name: plan.name }), t('toast.titlePlanSaved'));
         }}
       />
 
@@ -1395,7 +1413,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onClose={() => setIsLevelSheetOpen(false)}
         total={levelInfo.total}
         level={levelInfo.level}
-        name={levelInfo.name}
+        name={t(levelInfo.nameKey)}
         progress={levelInfo.progress}
         weekXp={weekXp}
       />

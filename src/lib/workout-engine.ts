@@ -23,6 +23,7 @@ import {
   findLibraryExercise,
   getExerciseMuscle,
   getLibrarySubstitutes,
+  type JointArea,
   type MovementFamily,
 } from './exercise-library';
 
@@ -39,7 +40,30 @@ export {
 export type { SetExecutionStatus } from './types';
 
 /**
- * Finalizes a single set for persistence in a completed or interrupted workout record.
+ * Sanity ceilings for logged training numbers (persona-sim round 5,
+ * SIM-P1-06). Floors existed everywhere (Math.max(0, …)); ceilings
+ * almost nowhere — so a typo like 9,999 kg minted a world-record PR
+ * and poisoned %1RM, levels, and DOTS downstream. 500 kg matches the
+ * manual-PR cap (MAX_PR_WEIGHT_KG); 100 reps covers any real set
+ * (including high-rep bodyweight work) while stopping absurdity.
+ */
+export const MAX_WORKOUT_WEIGHT_KG = 500;
+export const MAX_SET_REPS = 100;
+
+export function clampWorkoutWeight(weight: number, unit: 'kg' | 'lbs' = 'kg'): number {
+  if (!Number.isFinite(weight)) return 0;
+  const kg = unit === 'lbs' ? weight / 2.20462 : weight;
+  const cappedKg = Math.min(Math.max(0, kg), MAX_WORKOUT_WEIGHT_KG);
+  const out = unit === 'lbs' ? cappedKg * 2.20462 : cappedKg;
+  return Math.round(out * 10) / 10;
+}
+
+export function clampWorkoutReps(reps: number): number {
+  if (!Number.isFinite(reps)) return 0;
+  return Math.min(Math.max(0, Math.floor(reps)), MAX_SET_REPS);
+}
+/**
+ * Normalizes a set at save time: floors, ceilings, and status derivation.
  *
  * Rules:
  * - If set is active-completed and reps > 0: status is 'completed', completed is true.
@@ -61,7 +85,13 @@ export function finalizeWorkoutSet(set: WorkoutSet): WorkoutSet {
   // QA4-026 finalize guard: a typed negative must never persist — it
   // would subtract from session volume. Clamp to 0 (the stepper floor).
   if (w !== undefined && w < 0) w = 0;
-  const r = Math.max(0, parseInt(String(set.reps), 10) || 0);
+  // SIM-P1-06: apply the same ceiling as the input handlers, so a
+  // typo can never persist even if it bypasses the UI (imports, past
+  // logs, older clients). Unit-aware: the cap is 500 kg.
+  if (w !== undefined) {
+    w = clampWorkoutWeight(w, (set.unit as 'kg' | 'lbs') || 'kg');
+  }
+  const r = clampWorkoutReps(parseInt(String(set.reps), 10) || 0);
   const isCompleted = isActiveSetCompleted(set) && r > 0;
 
   let finalStatus: SetExecutionStatus;
@@ -1464,6 +1494,70 @@ export function getInjuryBannedFamilies(limitations: string[] = []): Set<Movemen
   return banned;
 }
 
+/**
+ * Joint-aware limitation bans (persona-sim round 5, SIM-P1-01).
+ * Family bans alone miss most joint loading: a shoulder limitation bans
+ * only vertical_push, but bench/fly variants, pull-ups, raises, and
+ * planks all load the shoulder too. EXERCISE_META.jointCautions is the
+ * per-exercise data that closes that gap — it previously had zero
+ * consumers outside exercise-library.ts. Same regex vocabulary as
+ * INJURY_FAMILY_BANS, so a declared limitation string bans both its
+ * families AND every exercise flagging that joint. Caution data only —
+ * never a diagnosis; a banned exercise is swapped or dropped, never
+ * relabelled as "safe".
+ */
+const LIMITATION_JOINT_MAP: [RegExp, JointArea[]][] = [
+  [/shoulder|rotator|impingement/i, ['shoulder']],
+  [/elbow/i, ['elbow']],
+  [/wrist/i, ['wrist']],
+  [/knee|meniscus|acl|patella/i, ['knee']],
+  [/back|spine|disc|lumbar|sciatica/i, ['lower_back']],
+  [/hip|groin/i, ['hip']],
+  [/ankle|achilles/i, ['ankle']],
+  [/neck/i, ['neck']],
+];
+
+export function getInjuryBannedJoints(limitations: string[] = []): Set<JointArea> {
+  const banned = new Set<JointArea>();
+  for (const lim of limitations || []) {
+    for (const [pattern, joints] of LIMITATION_JOINT_MAP) {
+      if (pattern.test(lim)) joints.forEach((j) => banned.add(j));
+    }
+  }
+  return banned;
+}
+
+/** Joint cautions of a library exercise (empty when unknown — never assumed safe). */
+export function getExerciseJointCautions(name: string): JointArea[] {
+  const item = findLibraryExercise(name);
+  return item?.jointCautions ?? [];
+}
+
+/** True when the exercise flags any joint the user has limited. */
+export function isExerciseJointBanned(name: string, bannedJoints: Set<JointArea>): boolean {
+  if (bannedJoints.size === 0) return false;
+  return getExerciseJointCautions(name).some((j) => bannedJoints.has(j));
+}
+
+/**
+ * Joint bans for PLAN adaptation (templates + coach blocks), as opposed
+ * to per-exercise pain swaps. Identical to getInjuryBannedJoints EXCEPT
+ * 'lower_back' is excluded — deliberately, not an oversight. Lower-back
+ * cautions in EXERCISE_META are near-universal across compounds (squat,
+ * leg press, every row, overhead press, core work), so a hard ban would
+ * gut a program for any back limitation; spinal loading is graded by
+ * movement pattern instead, and the family ban already removes the
+ * highest-risk pattern (hinge) — that is the ARJUN-1 decision
+ * (r2-plan-pipeline: a bad back keeps Squat, drops hinges). Peripheral
+ * joints (shoulder/elbow/wrist/knee/hip/ankle/neck) have narrow,
+ * specific cautions where a hard ban stays proportionate.
+ */
+export function getPlanBannedJoints(limitations: string[] = []): Set<JointArea> {
+  const banned = getInjuryBannedJoints(limitations);
+  banned.delete('lower_back');
+  return banned;
+}
+
 /** Last-resort swaps by muscle group when no table/pattern match exists. */
 const MUSCLE_HOME_FALLBACKS: Record<string, { dumbbell: string; bodyweight: string }> = {
   Chest: { dumbbell: 'Dumbbell Bench Press', bodyweight: 'Push-ups' },
@@ -1521,7 +1615,10 @@ export function adaptExerciseForEquipment(
   // default in getEquipmentType, so keying this on eq==='cardio' would
   // never fire — the NAME is the reliable signal.)
   if (access !== 'full_gym' && MACHINE_CARDIO_PATTERN.test(ex.name)) {
-    const replacement = /interval|hiit|sprint/i.test(ex.name) ? 'Burpees' : 'Jumping Jacks';
+    // Low-impact default (SIM-P2-16): Burpees were the automatic HIIT
+    // fallback for home users — high-impact and high-skill. Jumping
+    // Jacks serve the same conditioning slot without the impact.
+    const replacement = 'Jumping Jacks';
     return {
       ...ex,
       name: replacement,
@@ -1584,6 +1681,14 @@ export interface SubstituteFilterOptions {
   exclusions?: string[];
   /** Pain swaps: drop substitutes from this exercise's movement family. */
   avoidSameFamilyAs?: string;
+  /**
+   * Pain swaps: drop substitutes that load any joint the named exercise
+   * loads. This is what makes 'other'-family pain swaps safe — lateral
+   * raises, front raises and similar isolation work share no family, but
+   * they share the shoulder, so family filtering alone offered another
+   * raise (SIM-P2-08).
+   */
+  avoidJointsOf?: string;
 }
 
 export function getFilteredSubstitutes(
@@ -1607,6 +1712,12 @@ export function getFilteredSubstitutes(
     const fam = getMovementFamily(opts.avoidSameFamilyAs);
     if (fam !== 'other') {
       list = list.filter((s) => getMovementFamily(s.name) !== fam);
+    }
+  }
+  if (opts.avoidJointsOf) {
+    const joints = new Set(getExerciseJointCautions(opts.avoidJointsOf));
+    if (joints.size > 0) {
+      list = list.filter((s) => !getExerciseJointCautions(s.name).some((j) => joints.has(j)));
     }
   }
   const selfKey = normalizeExerciseKey(exerciseName);
@@ -1638,7 +1749,8 @@ function findFamilySafeAlternative(
   access: EquipmentAccess,
   banned: Set<MovementFamily>,
   exclusions: string[],
-  isLbs: boolean
+  isLbs: boolean,
+  bannedJoints: Set<JointArea> = new Set()
 ): PlannedExercise | null {
   const allowed = ALLOWED_EQUIPMENT[access];
   const subs = getQuickSubstitutes(ex.name).filter(
@@ -1646,6 +1758,7 @@ function findFamilySafeAlternative(
       allowed.has(s.equipment.toLowerCase()) &&
       !isPlaceholderSubstitute(s.name) &&
       !banned.has(getMovementFamily(s.name)) &&
+      !isExerciseJointBanned(s.name, bannedJoints) &&
       !exerciseMatchesExclusion(s.name, exclusions)
   );
   const pick = (name: string): PlannedExercise => ({
@@ -1658,7 +1771,11 @@ function findFamilySafeAlternative(
   const mf = MUSCLE_HOME_FALLBACKS[getExerciseMuscle(ex.name)];
   if (mf) {
     const candidate = access === 'home_dumbbells' ? mf.dumbbell : mf.bodyweight;
-    if (!banned.has(getMovementFamily(candidate)) && !exerciseMatchesExclusion(candidate, exclusions)) {
+    if (
+      !banned.has(getMovementFamily(candidate)) &&
+      !isExerciseJointBanned(candidate, bannedJoints) &&
+      !exerciseMatchesExclusion(candidate, exclusions)
+    ) {
       return pick(candidate);
     }
   }
@@ -1675,6 +1792,10 @@ export function adaptSplitForEquipment(
 ): PlannedWorkout[] {
   const isLbs = unit === 'lbs';
   const bannedFamilies = getInjuryBannedFamilies(options.limitations || []);
+  // Joint-aware bans (SIM-P1-01): family bans alone miss most joint
+  // loading (bench loads the shoulder without being vertical_push).
+  // Plan-scoped: lower_back excluded per ARJUN-1 (see getPlanBannedJoints).
+  const bannedJoints = getPlanBannedJoints(options.limitations || []);
   // Pull-ups regress for beginners, for minors, and for anyone without a
   // bar (home/bodyweight) — the substitution table used to CREATE pull-up
   // prescriptions for intermediate home users (round-1 bug, reintroduced
@@ -1689,8 +1810,17 @@ export function adaptSplitForEquipment(
       if (!next) continue; // excluded, no safe replacement — dropped honestly
 
       if (bannedFamilies.size > 0 && bannedFamilies.has(getMovementFamily(next.name))) {
-        const alt = findFamilySafeAlternative(next, access, bannedFamilies, exclusions, isLbs);
+        const alt = findFamilySafeAlternative(next, access, bannedFamilies, exclusions, isLbs, bannedJoints);
         if (!alt) continue; // nothing safe for this limitation — drop
+        next = alt;
+      }
+
+      // Joint ban (SIM-P1-01): an exercise can pass the family ban while
+      // still loading a limited joint (e.g. bench press on a bad
+      // shoulder). Swap it joint-safe or drop it — never prescribe it.
+      if (bannedJoints.size > 0 && isExerciseJointBanned(next.name, bannedJoints)) {
+        const alt = findFamilySafeAlternative(next, access, bannedFamilies, exclusions, isLbs, bannedJoints);
+        if (!alt) continue; // nothing joint-safe for this limitation — drop
         next = alt;
       }
 
@@ -2133,15 +2263,42 @@ function scaleTemplateWeightForAthlete(
 ): number | undefined {
   if (templateWeight === undefined || templateWeight <= 0) return templateWeight;
   const bw = ctx.bodyweightKg;
-  if (!bw || bw <= 0) return templateWeight;
   const experience = effectiveTemplateExperience(ctx);
+  const increment = isLbs ? 5 : 2.5;
+  // SIM-P3-06: without a bodyweight the old code returned the template
+  // weight unchanged even for beginners — the first-exposure scaling
+  // silently vanished. Keep the beginner factor (0.6×, capped at the
+  // template) and only skip the bodyweight ratio.
+  if (!bw || bw <= 0) {
+    if (experience === 'beginner') {
+      return Math.max(increment, Math.round((templateWeight * BEGINNER_FIRST_EXPOSURE_FACTOR) / increment) * increment);
+    }
+    return templateWeight;
+  }
   const experienceFactor = experience === 'beginner' ? BEGINNER_FIRST_EXPOSURE_FACTOR : 1;
   const scaled = templateWeight * (bw / TEMPLATE_REFERENCE_BW_KG) * experienceFactor;
-  const increment = isLbs ? 5 : 2.5;
   const rounded = Math.max(increment, Math.round(scaled / increment) * increment);
   // Beginners never get more than the template default on first exposure.
   if (experience === 'beginner') return Math.min(rounded, templateWeight);
   return rounded;
+}
+
+/**
+ * Rough session-length estimate for a plan (persona-sim round 5,
+ * SIM-P2-17): plans used to start with no idea how long they take.
+ * Assumes ~40s work + ~90s rest per set (the goal default rest) and
+ * ~2 min setup per exercise, returned as a ±25% range and ALWAYS
+ * labelled an estimate — it is a planning aid, not a promise.
+ */
+export function estimatePlanDurationMin(plan: {
+  exercises: { targetSets?: number }[];
+}): { min: number; max: number } {
+  const totalSets = plan.exercises.reduce((s, e) => s + (e.targetSets || 3), 0);
+  const minutes = totalSets * 2.2 + plan.exercises.length * 2;
+  return {
+    min: Math.max(5, Math.round(minutes * 0.75)),
+    max: Math.max(5, Math.round(minutes * 1.25)),
+  };
 }
 
 /**

@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
@@ -60,6 +61,11 @@ import {
   getExecutedExercises,
   createWorkoutExercisesFromPlan,
   getExercisePrescription,
+  getInjuryBannedFamilies,
+  getInjuryBannedJoints,
+  getMovementFamily,
+  isExerciseJointBanned,
+  estimatePlanDurationMin,
 } from '@/lib/workout-engine';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import {
@@ -155,6 +161,7 @@ function PlanModal({
   const { t } = useTranslation();
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
+  const trainingProfile = useStore((state) => state.trainingProfile);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'percent'>('rpe');
@@ -216,32 +223,30 @@ function PlanModal({
   const handleSave = () => {
     const trimmedName = planName.trim().slice(0, MAX_PLAN_NAME_LENGTH);
     if (!trimmedName) {
-      toast.error('Please give the plan a name.', 'Missing Name');
+      toast.error(t('toast.planNameRequired'), t('toast.titlePlanNameRequired'));
       return;
     }
     const validExercises = planExercises.filter(e => e.name.trim());
     if (validExercises.length === 0) {
-      toast.error('Add at least one exercise to the plan.', 'No Exercises');
+      toast.error(t('toast.planNeedExercise'), t('toast.titleNoExercises'));
       return;
     }
-    for (const ex of validExercises) {
-      const sets = Number(ex.targetSets);
-      if (!Number.isFinite(sets) || sets < 1) {
-        toast.error(`"${ex.name.trim()}": sets must be at least 1.`, 'Invalid Sets');
-        return;
+    // LIVE-P1-01: validation lives in lib/plan-validation (unit-tested).
+    // A blank TARGET WEIGHT is valid — it means bodyweight / no
+    // prescribed load — and must not fail as "weight cannot be negative".
+    const validation = validatePlanExercises(planExercises);
+    if (!validation.ok) {
+      const { name, kind } = validation.error;
+      if (kind === 'sets') {
+        toast.error(t('toast.planSetsMin', { name }), t('toast.titleInvalidSets'));
+      } else if (kind === 'reps') {
+        toast.error(t('toast.planRepsMin', { name }), t('toast.titleInvalidReps'));
+      } else {
+        toast.error(t('toast.planWeightNeg', { name }), t('toast.titleInvalidWeight'));
       }
-      const reps = Number(ex.targetReps);
-      if (!Number.isFinite(reps) || reps < 1) {
-        toast.error(`"${ex.name.trim()}": reps must be at least 1.`, 'Invalid Reps');
-        return;
-      }
-      const weight = Number(ex.targetWeight);
-      if (!Number.isFinite(weight) || weight < 0) {
-        toast.error(`"${ex.name.trim()}": weight cannot be negative.`, 'Invalid Weight');
-        return;
-      }
+      return;
     }
-    onSave({ name: trimmedName, exercises: validExercises, intensityMode });
+    onSave({ name: trimmedName, exercises: validation.exercises, intensityMode });
     onClose();
   };
 
@@ -269,6 +274,26 @@ function PlanModal({
 
         {/* Body */}
         <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-5">
+          {/* SIM-P1-02: hand-built plans used to bypass ALL limitation /
+              pain machinery silently. Warn (don't block — the user may
+              have recovered) when a listed exercise loads a joint or
+              movement family their declared limitations ban. */}
+          {(() => {
+            const limitations = trainingProfile?.injuriesOrLimitations || [];
+            if (limitations.length === 0) return null;
+            const bannedFamilies = getInjuryBannedFamilies(limitations);
+            const bannedJoints = getInjuryBannedJoints(limitations);
+            const conflicts = planExercises
+              .map((e) => e.name.trim())
+              .filter((n) => n && (bannedFamilies.has(getMovementFamily(n)) || isExerciseJointBanned(n, bannedJoints)));
+            if (conflicts.length === 0) return null;
+            return (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200">
+                <span className="font-bold">Heads up — limitation clash: </span>
+                {conflicts.join(', ')} {conflicts.length === 1 ? 'loads' : 'load'} an area in your declared limitations ({limitations.join(', ')}). Generated plans swap or drop these automatically; hand-built plans only warn. Swap it out if it still hurts.
+              </div>
+            );
+          })()}
           {/* Plan Name */}
           <div>
             <label className="section-title mb-2 block">Plan Name</label>
@@ -527,6 +552,7 @@ interface PlanCardProps {
 function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
   const { t } = useTranslation();
   const coachBlocks = useStore((state) => state.coachBlocks);
+  const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
   const adoptPlanForCoaching = useStore((state) => state.adoptPlanForCoaching);
   const unadoptPlanForCoaching = useStore((state) => state.unadoptPlanForCoaching);
   const isBlockPlan =
@@ -559,10 +585,31 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
+            {/* SIM-P2-17: a duration estimate before starting. */}
+            {' · '}{(() => { const d = estimatePlanDurationMin(plan); return t('plan.estDuration', { min: d.min, max: d.max }); })()}
           </p>
         </div>
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* SIM-P3-04: %1RM mode used to be silently inert on generated
+              plans — it lived only inside the plan editor. A card-level
+              toggle makes it discoverable and switchable anywhere. */}
+          <button
+            type="button"
+            onClick={() => updatePlannedWorkout(plan.id, {
+              ...plan,
+              intensityMode: plan.intensityMode === 'percent' ? 'rpe' : 'percent',
+            })}
+            title={t('plan.usePercent')}
+            aria-pressed={plan.intensityMode === 'percent'}
+            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-3xs font-mono font-bold transition-colors cursor-pointer ${
+              plan.intensityMode === 'percent'
+                ? 'bg-accent text-white'
+                : 'text-text-muted hover:text-accent hover:bg-accent/10'
+            }`}
+          >
+            %1RM
+          </button>
           <button
             type="button"
             onClick={onDuplicate}
@@ -673,7 +720,9 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPageProps = {}) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  // SIM-P2-19: dates render in the active language, not hardcoded en-US.
+  const dateLocale = language === 'hi' ? 'hi-IN' : 'en-US';
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -1047,7 +1096,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setStartedFromPlanId(activeWorkoutDraft.startedFromPlanId || activeWorkoutDraft.planId || null);
     setSessionStartTime(activeWorkoutDraft.sessionStartTime || Date.now());
     setIsModalOpen(true);
-    toast.success('Resumed active workout session!', 'Workout Restored');
+    toast.success(t('toast.workoutResumed'), t('toast.titleWorkoutRestored'));
   };
 
   // "Start Workout" on Home saves a fresh draft and navigates here — a draft
@@ -1073,7 +1122,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     clearWorkoutDraft();
     setStartedFromPlan(null);
     setStartedFromPlanId(null);
-    toast.info('Workout draft discarded.', 'Draft Cleared');
+    toast.info(t('toast.draftDiscarded'), t('toast.titleDraftCleared'));
   };
 
   const handleRepeatLastWorkout = () => {
@@ -1099,7 +1148,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setDate(getLocalTodayStr());
     setStartedFromPlan(`Repeated (${last.date})`);
     setIsModalOpen(true);
-    toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
+    toast.success(clonedExercises.length === 1 ? t('toast.lastSessionLoadedOne') : t('toast.lastSessionLoadedMany', { count: clonedExercises.length }), t('toast.titleWorkoutLoaded'));
   };
 
   // Voice logging goes through the shared recognizer in lib/voice-logger:
@@ -1120,12 +1169,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
         },
       ]);
-      toast.success(
-        `Logged "${parsed.exerciseName}" (${parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')})`,
-        'Voice Input Added'
-      );
+      toast.success(t('toast.voiceLogged', { exercise: parsed.exerciseName, sets: parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ') }), t('toast.titleVoiceAdded'));
     } else {
-      toast.error(`Could not parse: "${transcript}"`, 'Voice Error');
+      toast.error(t('toast.voiceParseFailed', { transcript }), t('toast.titleVoiceError'));
     }
   };
 
@@ -1142,7 +1188,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
 
     if (!isSpeechRecognitionSupported()) {
-      toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+      toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
       return;
     }
 
@@ -1161,14 +1207,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onError: (err: string) => {
           setIsListening(false);
           if (err === 'not-allowed' || err === 'service-not-allowed') {
-            toast.error(
-              isNativePlatform()
-                ? 'Microphone permission is off — enable it in Settings → Apps → ASCEND → Permissions.'
-                : 'Microphone access denied — allow it in your browser site settings.',
-              'Voice Logging'
-            );
+            toast.error(isNativePlatform() ? t('toast.voiceMicNative') : t('toast.voiceMicBrowser'), t('toast.titleVoiceLogging'));
           } else if (err === 'unavailable') {
-            toast.error('Voice recognition is not available on this device.', 'Voice Logging');
+            toast.error(t('toast.voiceUnavailableDevice'), t('toast.titleVoiceLogging'));
           }
         },
         onEnd: () => {
@@ -1182,14 +1223,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
 
       if (!recognizer) {
-        toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+        toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
         return;
       }
 
       pageVoiceRecognizerRef.current = recognizer;
       recognizer.start();
       setIsListening(true);
-      toast.info('Listening... Say e.g. "Bench 70 for 8 8 7"', 'Voice Logging');
+      toast.info(t('toast.voiceListening'), t('toast.titleVoiceLogging'));
     } catch {
       setIsListening(false);
     }
@@ -1255,7 +1296,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     } else {
       handleAddExercise(exerciseName);
     }
-    toast.success(`Added "${exerciseName}" to session`, 'Exercise Added');
+    toast.success(t('toast.exerciseAdded', { name: exerciseName }), t('toast.titleExerciseAdded'));
   };
 
   const handleExerciseNotesChange = (index: number, notes: string) => {
@@ -1368,6 +1409,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       plan.intensityMode === 'percent'
         ? buildPercentSuggestions(plan, userPrs, useStore.getState().workouts, userUnit)
         : {};
+    // SIM-P3-04: never start silently without the loads the mode
+    // promises — say why when no suggestion could be built.
+    if (plan.intensityMode === 'percent' && Object.keys(percentSuggestions).length === 0) {
+      toast.info(t('plan.intensityNoData'), t('plan.intensityPercent'));
+    }
     const percentWeightsByIndex: Record<number, number[]> = {};
     for (const [idx, s] of Object.entries(percentSuggestions)) {
       percentWeightsByIndex[Number(idx)] = s.weights;
@@ -1448,7 +1494,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         setRestSecondsLeft((prev) => {
           if (prev <= 1) {
             playBeep();
-            toast.info('⏰ Rest time is up! Ready for your next set.', 'SET READY');
+            toast.info(t('toast.restReady'), t('toast.titleSetReady'));
             setIsRestRunning(false);
             setIsTimerFinished(true);
             return 0;
@@ -1509,7 +1555,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
     if (!hasMeaningfulData) {
-      toast.error('No exercises or planned sets recorded to save.', 'Empty Workout');
+      toast.error(t('toast.emptyWorkout'), t('toast.titleEmptyWorkout'));
       return;
     }
 
@@ -1612,20 +1658,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
 
     if (newPRCount > 0) {
-      toast.success(
-        `${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
-        'New PR Milestone'
-      );
+      toast.success(newPRCount === 1 ? t('toast.newPRsOne') : t('toast.newPRsMany', { count: newPRCount }), t('toast.titleNewPR'));
     } else if (hasCompletedSets) {
-      toast.success(
-        `Logged workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''}!`,
-        'Workout Saved'
-      );
+      toast.success(exercisesToSave.length === 1 ? t('toast.workoutLoggedOne') : t('toast.workoutLoggedMany', { count: exercisesToSave.length }), t('toast.titleWorkoutSaved'));
     } else {
-      toast.info(
-        `Saved interrupted workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''} (0 completed sets).`,
-        'Interrupted Session Saved'
-      );
+      toast.info(exercisesToSave.length === 1 ? t('toast.interruptedSavedOne') : t('toast.interruptedSavedMany', { count: exercisesToSave.length }), t('toast.titleInterruptedSaved'));
     }
 
     setPostWorkoutSummary({
@@ -1651,7 +1688,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         (p) => p.id !== editingPlan.id && p.name.toLowerCase() === planData.name.toLowerCase()
       );
       if (clash) {
-        toast.error(`A different plan is already named "${planData.name}". Please choose another name.`, 'Duplicate Name');
+        toast.error(t('toast.duplicatePlanName', { name: planData.name }), t('toast.titleDuplicateName'));
         return;
       }
       updatePlannedWorkout(editingPlan.id, {
@@ -1660,7 +1697,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         exercises: planData.exercises,
         intensityMode: planData.intensityMode,
       });
-      toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
+      toast.success(t('toast.planUpdated', { name: planData.name }), t('toast.titlePlanSaved'));
       // If the edited plan is open in the detail view, refresh it so the
       // view reflects the saved changes instead of the stale snapshot.
       if (selectedDetailsPlan && selectedDetailsPlan.id === editingPlan.id) {
@@ -1680,12 +1717,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         (p) => p.name.toLowerCase() === planData.name.toLowerCase()
       );
       addPlannedWorkout(newPlan);
-      toast.success(
-        nameTaken
-          ? `A plan named "${planData.name}" already exists — saved as "${planData.name} (Copy)".`
-          : `Plan "${planData.name}" created!`,
-        'Plan Created'
-      );
+      toast.success(nameTaken ? t('toast.planCreatedCopy', { name: planData.name }) : t('toast.planCreated', { name: planData.name }), t('toast.titlePlanCreated'));
     }
     setEditingPlan(null);
   };
@@ -1747,7 +1779,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       exercises: plan.exercises.map(e => ({ ...e })),
     };
     addPlannedWorkout(duplicatedPlan);
-    toast.success(`Duplicated "${plan.name}"`, 'Plan Duplicated');
+    toast.success(t('toast.planDuplicated', { name: plan.name }), t('toast.titlePlanDuplicated'));
   };
 
   const openCreatePlan = () => {
@@ -1822,12 +1854,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
-    const startMonth = startOfWeek.toLocaleDateString('en-US', { month: 'short' });
-    const endMonth = endOfWeek.toLocaleDateString('en-US', { month: 'short' });
+    const startMonth = startOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
+    const endMonth = endOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
     return startMonth === endMonth
       ? `${startMonth} ${startOfWeek.getDate()}–${endOfWeek.getDate()}`
       : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}`;
-  }, []);
+  }, [dateLocale]);
 
   const weeklyScheduleStats = useMemo(() => {
     const now = new Date();
@@ -1836,7 +1868,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const weekWorkouts = workouts.filter((w) => new Date(w.date) >= startOfWeek);
+    const weekWorkouts = workouts.filter((w) => parseLocalDate(w.date) >= startOfWeek);
     const trainedDates = new Set(weekWorkouts.map((w) => w.date.split('T')[0]));
 
     const scheduledDaysCount = weeklySchedule
@@ -1912,13 +1944,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const past = new Date(dateStr);
+      // SIM-P2-19: date-only strings parsed as UTC midnight used to
+      // shift the day for IST evenings; parseLocalDate pins local noon.
+      const past = parseLocalDate(dateStr);
       past.setHours(0, 0, 0, 0);
       const diffDays = Math.round((today.getTime() - past.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`;
-      return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (diffDays === 0) return t('workout.todayRel');
+      if (diffDays === 1) return t('workout.yesterdayRel');
+      if (diffDays > 1 && diffDays < 7) return t('workout.daysAgoRel', { days: diffDays });
+      return past.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -2164,6 +2198,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     {t('coachBlock.activeHint', {
                       type: t(`coachBlock.week_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.week_build'),
                     })}
+                  </p>
+                  {/* SIM-P2-09/10: a week-type label alone explains nothing.
+                      State what the week means for today's loads — and,
+                      for deload, that the 10% cut is review-gated by
+                      design, not silently applied or silently absent. */}
+                  <p className="text-2xs text-text-muted leading-relaxed">
+                    {t(`coachBlock.weekExplain_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.weekExplain_build')}
                   </p>
                 </>
               ) : (
@@ -2652,11 +2693,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     className="w-full flex justify-between items-center text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40 rounded-lg p-0.5"
                     onClick={() => toggleExpand(workout.id)}
                     aria-expanded={isExpanded}
-                    aria-label={`Workout on ${new Date(workout.date).toLocaleDateString()}`}
+                    aria-label={`Workout on ${parseLocalDate(workout.date).toLocaleDateString(dateLocale)}`}
                   >
                     <div>
                       <h3 className="font-semibold text-text-primary">
-                        {new Date(workout.date).toLocaleDateString('en-US', {
+                        {parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
                           weekday: 'short',
                           month: 'short',
                           day: 'numeric',
@@ -2796,18 +2837,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             <button
                               type="button"
                               onClick={() => {
+                                // SIM-P1-09: snapshot index + session BEFORE
+                                // the delete, so the toast's Undo restores
+                                // it exactly (mirrors the plan/meal undo).
+                                const st = useStore.getState();
+                                const workoutIndex = st.workouts.findIndex((w) => w.id === workout.id);
+                                const snapshot = workout;
                                 deleteWorkout(workout.id);
                                 setConfirmDeleteId(null);
-                                toast.info(`Deleted workout session from ${workout.date}.`, 'Workout Removed');
+                                toast.showToast('info', `Deleted workout session from ${workout.date}.`, 'Workout Removed', undefined, {
+                                  label: 'Undo',
+                                  onAction: () => useStore.getState().insertWorkoutAt(snapshot, workoutIndex),
+                                });
                               }}
-                              className="px-2.5 py-1 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 transition-colors"
+                              className="min-h-[44px] px-3 py-2 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 transition-colors"
                             >
                               Yes, Delete
                             </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="px-2.5 py-1 bg-bg-secondary text-text-muted rounded text-xs font-semibold hover:text-text-primary transition-colors"
+                              className="min-h-[44px] px-3 py-2 bg-bg-secondary text-text-muted rounded text-xs font-semibold hover:text-text-primary transition-colors"
                             >
                               Cancel
                             </button>
@@ -2892,15 +2942,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             setStartedFromPlan(null);
             setStartedFromPlanId(null);
             if (newPRsCount > 0) {
-              toast.success(
-                `${newPRsCount} New PR${newPRsCount > 1 ? 's' : ''} detected & synced to your PRs!`,
-                'New PR Milestone'
-              );
+              toast.success(newPRsCount === 1 ? t('toast.newPRsOne') : t('toast.newPRsMany', { count: newPRsCount }), t('toast.titleNewPR'));
             } else {
-              toast.success(
-                `Logged workout with ${workoutEntry.exercises.length} exercise${workoutEntry.exercises.length > 1 ? 's' : ''}!`,
-                'Workout Saved'
-              );
+              toast.success(workoutEntry.exercises.length === 1 ? t('toast.workoutLoggedOne') : t('toast.workoutLoggedMany', { count: workoutEntry.exercises.length }), t('toast.titleWorkoutSaved'));
             }
           }}
           onPause={() => {

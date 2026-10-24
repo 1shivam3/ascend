@@ -117,9 +117,7 @@ describe('i18n wiring coverage (pinned)', () => {
     'src/components/ui/Button.tsx',
     'src/components/ui/Card.tsx',
     'src/components/ui/CircularProgress.tsx',
-    // Second-tab warning banner (PR #30): copy not yet localized —
-    // known remainder, pinned here deliberately.
-    'src/components/ui/TabGuardBanner.tsx',
+    // TabGuardBanner wired in Round 5 (tabGuard.* keys).
     // App shells: error/loading delegate to the wired state components;
     // layout + legal pages carry metadata / formal legal text only.
     'src/app/delete-account/page.tsx',

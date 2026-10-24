@@ -160,10 +160,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
       if (evaluation && friendRewardDue(rec, evaluation)) {
         awardXpEvents([{ id: friendChallengeXpEventId(rec.def.id), type: 'challenge' }]);
         grantFriendChallengeReward(rec.def.id);
-        toast.success(
-          `${rec.def.title} complete — ${XP_CHALLENGE_COMPLETE} XP earned.`,
-          'Challenge Complete',
-        );
+        toast.success(t('toast.challengeCompleteXP', { title: rec.def.title, xp: XP_CHALLENGE_COMPLETE }), t('toast.titleChallengeComplete'));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

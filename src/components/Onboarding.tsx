@@ -116,7 +116,7 @@ export default function Onboarding() {
 
     if (oauthError) {
       const cleanMsg = decodeURIComponent(oauthError.replace(/\+/g, ' '));
-      toast.error(cleanMsg, 'Sign-In Failed');
+      toast.error(cleanMsg, t('toast.titleSignInFailed'));
       window.history.replaceState(null, '', window.location.pathname);
       setIsRestoringAccount(false);
       setCurrentScreen('welcome');
@@ -181,7 +181,7 @@ export default function Onboarding() {
           } else if (status === 'error') {
             setIsRestoringAccount(false);
             if (error) {
-              toast.error(error, 'Sync Error');
+              toast.error(error, t('toast.titleSyncError'));
             }
             if (!useStore.getState().profile) {
               setCurrentScreen('welcome');
@@ -229,7 +229,7 @@ export default function Onboarding() {
     setSelectedGoals((prev) => {
       if (prev.includes(goal)) {
         if (prev.length <= 1) {
-          toast.info('Keep at least one goal selected — ASCEND calibrates your plan around it.', 'Goal Required');
+          toast.info(t('toast.keepOneGoal'), t('toast.titleGoalRequired'));
           return prev;
         }
         return prev.filter((g) => g !== goal);
@@ -249,7 +249,7 @@ export default function Onboarding() {
   }) => {
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
-      toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+      toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
       return;
     }
 
@@ -414,10 +414,7 @@ export default function Onboarding() {
   };
 
   const completeOnboarding = () => {
-    toast.success(
-      `Welcome to ASCEND, ${savedFirstName}!`,
-      pendingPlans ? 'Training Program Ready' : 'You\'re All Set'
-    );
+    toast.success(t('toast.welcome', { name: savedFirstName }), pendingPlans ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
     try {
       navigate('home', { clearHistory: true });
     } catch {}
@@ -470,13 +467,13 @@ export default function Onboarding() {
         const { importFullBackupJSON } = await import('@/lib/storage');
         const success = importFullBackupJSON(text);
         if (success) {
-          toast.success('Successfully restored your profile and data!', 'Backup Restored');
+          toast.success(t('toast.backupRestored'), t('toast.titleBackupRestored'));
           window.location.reload();
         } else {
-          toast.error('The file does not appear to be a valid ASCEND backup.', 'Restore Error');
+          toast.error(t('toast.invalidBackup'), t('toast.titleRestoreError'));
         }
       } catch {
-        toast.error('Could not parse the backup file.', 'File Error');
+        toast.error(t('toast.backupParseFailed'), t('toast.titleFileError'));
       }
     };
     reader.readAsText(file);
@@ -546,7 +543,7 @@ export default function Onboarding() {
             if (backupSnapshot) {
               const ok = importAllData(backupSnapshot);
               if (ok) {
-                toast.success('Restored profile and data!', 'Restored');
+                toast.success(t('toast.profileRestored'), t('toast.titleRestored'));
               }
             } else {
               fileInputRef.current?.click();
@@ -597,14 +594,14 @@ export default function Onboarding() {
         onToggleGoal={handleToggleGoal}
         onContinue={() => {
           if (!canContinueFromGoalStep(selectedGoals)) {
-            toast.error('Please choose at least one training goal to continue — ASCEND calibrates your plan around it.', 'Goal Required');
+            toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
             return;
           }
           setCurrentScreen('experience');
         }}
         onSkip={() => {
           setSelectedGoals(['general_fitness']);
-          toast.info('No goal selected — starting with General Fitness. You can change it anytime in Profile.', 'Goal Set');
+          toast.info(t('toast.defaultGoalSet'), t('toast.titleGoalSet'));
           setCurrentScreen('experience');
         }}
         onBack={() => {

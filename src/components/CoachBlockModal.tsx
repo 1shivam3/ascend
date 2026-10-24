@@ -25,6 +25,7 @@ import {
 import type { BlockProposal } from '@/lib/block-engine';
 import { ATHLETE_GOAL_CONFIGS, type AthleteGoal } from '@/lib/types';
 import type { EquipmentAccess } from '@/lib/workout-engine';
+import { estimateSessionMinutes, MAX_WORKOUT_WEIGHT_KG } from '@/lib/workout-engine';
 import { canonicalizeExerciseName } from '@/lib/workout-outcome-evidence';
 import { CalendarRange, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
 
@@ -198,6 +199,19 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
       days: proposal.days.map((d, di) => (di === dayIdx ? { ...d, exercises } : d)),
       schemes: proposal.schemes.filter((s) => remainingKeys.has(s.exerciseKey)),
     });
+  };
+
+  // SIM-P3-07: review used to be remove-only — a wrong load meant
+  // rejecting the whole day or approving a bad number. Sets and load
+  // are now editable in place; the day's time estimate recomputes.
+  const editExercise = (dayIdx: number, exIdx: number, patch: { targetSets?: number; targetWeight?: number }) => {
+    if (!proposal) return;
+    const days = proposal.days.map((d, di) => {
+      if (di !== dayIdx) return d;
+      const exercises = d.exercises.map((e, ei) => (ei === exIdx ? { ...e, ...patch } : e));
+      return { ...d, exercises, estimatedMinutes: estimateSessionMinutes({ exercises }) };
+    });
+    setEdited({ ...proposal, days });
   };
 
   const handleApprove = () => {
@@ -483,6 +497,63 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                             <p className="text-2xs text-text-muted">
                               {day.whyByExercise[canonicalizeExerciseName(ex.name)] ?? ''}
                             </p>
+                            {/* SIM-P3-07: in-place sets/load editing. */}
+                            <div className="flex items-center gap-3 pt-1">
+                              <span className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => editExercise(di, ei, { targetSets: Math.max(1, (ex.targetSets || 3) - 1) })}
+                                  disabled={(ex.targetSets || 3) <= 1}
+                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                  aria-label={`Fewer sets for ${ex.name}`}
+                                >
+                                  −
+                                </button>
+                                <span className="text-2xs font-mono text-text-secondary min-w-[52px] text-center">
+                                  {ex.targetSets || 3} sets
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => editExercise(di, ei, { targetSets: Math.min(10, (ex.targetSets || 3) + 1) })}
+                                  disabled={(ex.targetSets || 3) >= 10}
+                                  className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                  aria-label={`More sets for ${ex.name}`}
+                                >
+                                  +
+                                </button>
+                              </span>
+                              {typeof ex.targetWeight === 'number' && (() => {
+                                const unit = ex.targetUnit || profile?.unit || 'kg';
+                                const step = unit === 'lbs' ? 5 : 2.5;
+                                const w = ex.targetWeight as number;
+                                const cap = unit === 'lbs' ? Math.round(MAX_WORKOUT_WEIGHT_KG * 2.20462) : MAX_WORKOUT_WEIGHT_KG;
+                                return (
+                                  <span className="flex items-center gap-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => editExercise(di, ei, { targetWeight: Math.max(0, Math.round((w - step) * 10) / 10) })}
+                                      disabled={w <= 0}
+                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                      aria-label={`Lighter load for ${ex.name}`}
+                                    >
+                                      −
+                                    </button>
+                                    <span className="text-2xs font-mono text-text-secondary min-w-[64px] text-center">
+                                      {w}{unit}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => editExercise(di, ei, { targetWeight: Math.min(cap, Math.round((w + step) * 10) / 10) })}
+                                      disabled={w >= cap}
+                                      className="px-2 py-1 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary border border-border text-text-primary font-bold disabled:opacity-30 cursor-pointer"
+                                      aria-label={`Heavier load for ${ex.name}`}
+                                    >
+                                      +
+                                    </button>
+                                  </span>
+                                );
+                              })()}
+                            </div>
                           </div>
                           <button
                             type="button"

@@ -98,12 +98,24 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const homePagePath = path.join(rootDir, 'src', 'components', 'HomePage.tsx');
       const homeContent = fs.readFileSync(homePagePath, 'utf8');
       expect(homeContent).not.toContain('AI Routine');
-      expect(homeContent).toContain('Adaptive Split');
+      // LIVE-P1-03: 'Adaptive Split' moved into the i18n dictionary and
+      // HomePage renders it via t('home.adaptiveSplit') — same precedent
+      // as QA4-004's 'Macro Lens' below. The rendered English is unchanged.
+      expect(homeContent).toContain('home.adaptiveSplit');
+      expect(
+        fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
+      ).toContain("'home.adaptiveSplit': 'Adaptive Split'");
 
       const mealsPagePath = path.join(rootDir, 'src', 'components', 'MealsPage.tsx');
       const mealsContent = fs.readFileSync(mealsPagePath, 'utf8');
       expect(mealsContent).not.toContain('AI Vision');
-      expect(mealsContent).toContain('Macro Lens');
+      // LIVE-P1-RESIDUAL-02: the Fuel input-methods badge moved into the
+      // i18n dictionary and MealsPage renders it via t('meals.inputMethods')
+      // — same precedent as QA4-004 / LIVE-P1-03. Rendered English unchanged.
+      expect(mealsContent).toContain("t('meals.inputMethods')");
+      expect(
+        fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
+      ).toContain("'meals.inputMethods': 'Macro Lens • Voice / Text • Indian IFCT'");
 
       const scanMealModalPath = path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx');
       const scanContent = fs.readFileSync(scanMealModalPath, 'utf8');

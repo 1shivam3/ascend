@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
+import { applyTextScale } from '@/lib/text-scale';
 import OnboardingScreen from '@/components/Onboarding';
 import SplashScreen from '@/components/onboarding/SplashScreen';
 
@@ -70,7 +71,7 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences } = useStore();
 
   // True zustand-persist hydration (distinct from the _hasHydrated splash
   // fallback, which can fire before the persisted state is merged). Theme
@@ -167,6 +168,22 @@ export default function AppPage() {
       document.documentElement.setAttribute('data-theme', 'light');
     }
   }, [theme, _hasHydrated, persistHydrated]);
+
+  // SIM-P1-08: apply the saved text size on load and whenever it
+  // changes in Settings. Root font-size scaling covers all rem text.
+  useEffect(() => {
+    if (!_hasHydrated || !persistHydrated) return;
+    applyTextScale(uiPreferences?.textScale);
+  }, [uiPreferences?.textScale, _hasHydrated, persistHydrated]);
+
+  // SIM-P2-02: keep <html lang> in sync with the active language so
+  // screen readers pronounce Hindi UI as Hindi, not English. (The
+  // static layout hardcodes lang="en"; this runtime effect corrects it
+  // once the persisted preference hydrates.)
+  useEffect(() => {
+    if (!_hasHydrated || !persistHydrated) return;
+    document.documentElement.lang = uiPreferences?.language === 'hi' ? 'hi' : 'en';
+  }, [uiPreferences?.language, _hasHydrated, persistHydrated]);
 
   // Dismiss root modals when Back is pressed
   useEffect(() => {

@@ -915,11 +915,13 @@ const PIECE_WEIGHTS: Record<string, number> = {
   'roasted papad': 15,
 };
 
-function findBestMatch(normalizedName: string): string {
-  if (normalizedName.length < 2) return '';
+type MatchTier = 'exact' | 'substring' | 'overlap' | 'none';
+
+function findBestMatch(normalizedName: string): { key: string; tier: MatchTier } {
+  if (normalizedName.length < 2) return { key: '', tier: 'none' };
 
   // 1) Exact match
-  if (FOOD_DB[normalizedName]) return normalizedName;
+  if (FOOD_DB[normalizedName]) return { key: normalizedName, tier: 'exact' };
 
   // 2) Check if user input contains a known DB key
   let bestKey = '';
@@ -938,7 +940,7 @@ function findBestMatch(normalizedName: string): string {
     }
   }
 
-  if (bestKey && bestScore >= 0.25) return bestKey;
+  if (bestKey && bestScore >= 0.25) return { key: bestKey, tier: 'substring' };
 
   // 3) Word overlap fallback
   const inputWords = normalizedName.split(/\s+/).filter(w => w.length >= 3);
@@ -951,7 +953,7 @@ function findBestMatch(normalizedName: string): string {
     }
   }
 
-  return bestScore >= 0.25 ? bestKey : '';
+  return bestScore >= 0.25 ? { key: bestKey, tier: 'overlap' } : { key: '', tier: 'none' };
 }
 
 export function estimateMacros(foodName: string, quantity?: number, unit: string = 'g'): FoodItem {
@@ -1000,8 +1002,14 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     }
   }
 
-  const matchedKey = findBestMatch(cleanFoodName);
+  const { key: matchedKey, tier: matchTier } = findBestMatch(cleanFoodName);
   const isUnmatched = !matchedKey || !FOOD_DB[matchedKey];
+  // Word-overlap matches resolve to a real entry, but a DIFFERENT food
+  // than the typed name (e.g. "Zqxwv fruit" → "dragon fruit" via the
+  // shared generic word "fruit"). Those values must be labeled as
+  // estimates in the dialog, never presented as a match.
+  const isApproximateMatch = !isUnmatched && matchTier === 'overlap';
+  const matchedEntry = isApproximateMatch ? matchedKey : undefined;
   const baseMacros = !isUnmatched ? FOOD_DB[matchedKey] : EMPTY_MACROS;
 
   // If still no quantity provided, return raw per-100g data without scaling
@@ -1015,6 +1023,8 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
       quantity: undefined,
       unit: effectiveUnit,
       isUnmatched,
+      isApproximateMatch,
+      matchedEntry,
     };
   }
 
@@ -1076,12 +1086,82 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
     quantity: safeQty,
     unit: effectiveUnit,
     isUnmatched,
+    isApproximateMatch,
+    matchedEntry,
   };
 }
 
 /**
- * Computes exact Atwater calories from macronutrients: (4 * P) + (4 * C) + (9 * F)
+ * Pure state transition for the manual-meal dialog's quantity field.
+ * Kept here (not inline in the component) so the dialog's state handling
+ * is unit-testable without rendering React: scale the previous row's
+ * values when it already carries macros, keep user-entered macros for
+ * unmatched rows, otherwise re-estimate from the name.
  */
+export function nextFoodItemOnQuantityChange(prevItem: FoodItem, rawQty: number | undefined): FoodItem {
+  const prevQty =
+    typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
+  if (rawQty && prevQty && prevItem.name.trim().length > 1 && !prevItem.customFoodId) {
+    // CLEAN-ROW RECOMPUTE (dialog bug fix, live repro i09i2i0cm): when the
+    // row's current values are exactly what the estimator produces for its
+    // previous quantity/unit — i.e. the row is untouched since it was
+    // estimated (selected suggestion or fresh estimate) — recompute from
+    // the canonical profile instead of scaling the rounded display values.
+    // Scaling compounds rounding error across keystrokes: the quantity
+    // input fires one change per keystroke, so typing "150" over "100"
+    // runs 100 -> 1 -> 15 -> 150 and turns 165/31/3.6 into 300/45/0.
+    // Recomputing makes every keystroke land on the exact value. Rows
+    // with user edits, scanned values, or saved custom foods are NOT
+    // clean (their values differ from the estimator output), so they
+    // fall through to proportional scaling below and keep their values.
+    const prevEst = estimateMacros(prevItem.name, prevQty, prevItem.unit);
+    const round1 = (v: number) => Math.round(v * 10) / 10;
+    const clean =
+      prevItem.calories === prevEst.calories &&
+      round1(prevItem.proteinG || 0) === round1(prevEst.proteinG || 0) &&
+      round1(prevItem.carbsG || 0) === round1(prevEst.carbsG || 0) &&
+      round1(prevItem.fatG || 0) === round1(prevEst.fatG || 0) &&
+      (prevItem.isUnmatched === true) === (prevEst.isUnmatched === true) &&
+      (prevItem.isApproximateMatch === true) === (prevEst.isApproximateMatch === true);
+    if (clean) {
+      const est = estimateMacros(prevItem.name, rawQty, prevItem.unit);
+      return {
+        ...prevItem,
+        quantity: rawQty,
+        calories: est.calories,
+        proteinG: est.proteinG,
+        carbsG: est.carbsG,
+        fatG: est.fatG,
+        isUnmatched: est.isUnmatched,
+        isApproximateMatch: est.isApproximateMatch,
+        matchedEntry: est.matchedEntry,
+      };
+    }
+  }
+  if (prevQty && prevItem.calories > 0 && rawQty) {
+    // Proportional scaling preserves scanned or custom barcode macros!
+    return scaleFoodByQuantity(prevItem, rawQty);
+  } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
+    // User entered custom macros for an unmatched food; do not wipe them out!
+    return {
+      ...prevItem,
+      quantity: rawQty,
+    };
+  } else {
+    const est = estimateMacros(prevItem.name, rawQty, prevItem.unit);
+    return {
+      ...prevItem,
+      quantity: rawQty,
+      calories: est.calories,
+      proteinG: est.proteinG,
+      carbsG: est.carbsG,
+      fatG: est.fatG,
+      isUnmatched: est.isUnmatched,
+      isApproximateMatch: est.isApproximateMatch,
+      matchedEntry: est.matchedEntry,
+    };
+  }
+}
 export function calculateCaloriesFromMacros(proteinG: number, carbsG: number, fatG: number): number {
   const p = Math.max(0, Number(proteinG) || 0);
   const c = Math.max(0, Number(carbsG) || 0);
@@ -1275,22 +1355,34 @@ export function isJunkMealParse(foods: FoodItem[]): boolean {
  * warning, or null when the quantity looks sane. Callers should refuse to
  * log and ask the user to re-enter, rather than silently recording junk.
  */
-export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): string | null {
+/**
+ * Structured absurd-quantity warning (Round 4 toast i18n): the message is
+ * rendered by the caller via t(warning.key, warning.params), so the same
+ * guard speaks Hindi in Hindi mode. The English templates live in
+ * src/lib/i18n/en.ts as toast.absurd* keys; the key is just a string here
+ * (no i18n import into macros.ts, avoiding a store import cycle).
+ */
+export interface AbsurdQuantityWarning {
+  key: 'toast.absurdCalories' | 'toast.absurdGrams' | 'toast.absurdBulk' | 'toast.absurdPieces';
+  params: Record<string, string | number>;
+}
+
+export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): AbsurdQuantityWarning | null {
   const qty = typeof food.quantity === 'number' && isFinite(food.quantity) ? food.quantity : 0;
   const cal = typeof food.calories === 'number' && isFinite(food.calories) ? food.calories : 0;
   const unit = (food.unit || 'g').toLowerCase().trim();
   const label = (food.name || 'This item').trim() || 'This item';
   if (cal > 6000) {
-    return `${label}: ~${Math.round(cal).toLocaleString()} kcal in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdCalories', params: { label, kcal: Math.round(cal).toLocaleString() } };
   }
   if ((unit === 'g' || unit === 'ml') && qty > 2500) {
-    return `${label}: ${qty.toLocaleString()} ${unit} in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdGrams', params: { label, qty: qty.toLocaleString(), unit } };
   }
   if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
-    return `${label}: ${qty} ${unit} in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdBulk', params: { label, qty, unit } };
   }
   if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful', 'katori', 'glass'].includes(unit) && qty > 25) {
-    return `${label}: ${qty} ${unit}s in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdPieces', params: { label, qty, unit } };
   }
   return null;
 }
@@ -1337,6 +1429,27 @@ export function getSafeMinCalories(gender: Gender = 'male'): number {
 }
 
 /**
+ * Atwater rounding band for calorie deltas.
+ *
+ * LIVE-P1-02: reconciling a target to 4P+4C+9F with integer grams moves
+ * the total by at most ~9 kcal (protein ±2, fat ±4.5, carbs ±2). A delta
+ * inside that band is rounding noise, NOT a prescribed deficit or
+ * surplus. Before this fix, a General Fitness guest (maintenance 2,301
+ * kcal, reconciled target 2,300 kcal) got delta −1, which the UI
+ * rendered as a fake "−1 deficit • ≈0.00 kg/week" and onboarding
+ * narrated as "to lose fat steadily" — a fat-loss promise for a
+ * maintenance goal. Normalizing |delta| ≤ 10 to 0 makes every
+ * explanation line say maintenance instead of inventing a 1 kcal diet.
+ * Real deficits/surpluses (100+ kcal) are untouched.
+ */
+export const CALORIE_DELTA_ROUNDING_BAND_KCAL = 10;
+
+export function normalizeCalorieDelta(delta: number): number {
+  if (!Number.isFinite(delta)) return 0;
+  return Math.abs(delta) <= CALORIE_DELTA_ROUNDING_BAND_KCAL ? 0 : delta;
+}
+
+/**
  * Mifflin-St Jeor maintenance estimate.
  * Single source of truth for maintenance — used by both the auto
  * calibration and manual Edit Targets, so the deficit/surplus explanation
@@ -1380,11 +1493,15 @@ export function calculateRecommendedMacroGoals(
 
   switch (goal) {
     case 'build_muscle':
-      targetCalories = maintenance + 250; // Lean caloric surplus
+      // SIM-P2-05: surplus scales with maintenance (which already
+      // reflects bodyweight) instead of a flat +250 for a 55 kg and a
+      // 100 kg lifter alike: ~10% of maintenance, bounded 150–400 kcal.
+      targetCalories = maintenance + Math.min(400, Math.max(150, Math.round(maintenance * 0.1)));
       proteinPerKg = 1.8;
       break;
     case 'get_stronger':
-      targetCalories = maintenance + 150; // Performance slight surplus
+      // Same scaling, smaller: ~6% of maintenance, bounded 100–250 kcal.
+      targetCalories = maintenance + Math.min(250, Math.max(100, Math.round(maintenance * 0.06)));
       proteinPerKg = 1.8;
       break;
     case 'lose_fat': {
@@ -1440,7 +1557,7 @@ export function calculateRecommendedMacroGoals(
     fatG,
     carbsG,
     maintenanceCalories: maintenance,
-    calorieDelta: exactCalories - maintenance,
+    calorieDelta: normalizeCalorieDelta(exactCalories - maintenance),
   };
 }
 
@@ -1475,7 +1592,7 @@ export function scaleMacroGoalsToCalories(current: MacroGoals, newCalories: numb
       fatG,
       carbsG,
       maintenanceCalories: maintenance,
-      calorieDelta: exact - maintenance,
+      calorieDelta: normalizeCalorieDelta(exact - maintenance),
     };
   }
 
@@ -1493,7 +1610,7 @@ export function scaleMacroGoalsToCalories(current: MacroGoals, newCalories: numb
     fatG,
     carbsG,
     maintenanceCalories: maintenance,
-    calorieDelta: exact - maintenance,
+    calorieDelta: normalizeCalorieDelta(exact - maintenance),
   };
 }
 
@@ -1503,7 +1620,7 @@ export interface MealFoodsValidation {
   /** Names of items that couldn't be matched (logged at 0 kcal). */
   unmatchedNames: string[];
   /** First implausible-quantity warning, if any (e.g. "100 rotis"). */
-  absurdWarning: string | null;
+  absurdWarning: AbsurdQuantityWarning | null;
 }
 
 /**

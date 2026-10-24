@@ -69,7 +69,9 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
     const deadliftPR = prs.find((p) => p.exercise.toLowerCase().includes('deadlift'))?.weightKg || 0;
     const totalBig3 = squatPR + benchPR + deadliftPR;
 
-    const dotsScore = profile?.bodyweightKg
+    // SIM-P1-07: DOTS is defined only for a full S/B/D total — a
+    // partial total must not produce a DOTS number.
+    const dotsScore = profile?.bodyweightKg && squatPR > 0 && benchPR > 0 && deadliftPR > 0
       ? calculateDOTS(profile.bodyweightKg, totalBig3, profile.gender || 'male')
       : 0;
 

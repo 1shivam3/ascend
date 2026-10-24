@@ -1,5 +1,6 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 import { getAllExerciseNames, EXERCISE_LIBRARY, getExerciseMuscle } from './exercise-library';
+import type { StringKey } from './i18n/en';
 
 /**
  * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
@@ -37,7 +38,16 @@ export function suggestLoad(
   const safeReps = Math.max(1, reps);
   const safeRpe = Math.min(10, Math.max(5, rpe));
   const base1RM = unit === 'lbs' ? e1rmKg * 2.20462 : e1rmKg;
-  const load = base1RM / (1 + (safeReps + (10 - safeRpe)) / 30);
+  // SIM-P3-05: invert the SAME dampened Epley calculateOneRepMax uses.
+  // The old code inverted the undampened formula, so for 12–15 rep
+  // sets (exactly where beginners live) the suggestion disagreed with
+  // the e1RM the app itself reports. Effective reps = target reps +
+  // reps in reserve from RPE.
+  const effective = safeReps + (10 - safeRpe);
+  const divisor = effective <= 10
+    ? 1 + effective / 30
+    : 1 + 10 / 30 + (effective - 10) / 45;
+  const load = base1RM / divisor;
   const step = unit === 'lbs' ? 5 : 2.5;
   return Math.round(load / step) * step;
 }
@@ -365,6 +375,17 @@ export function getExercisesByCategory(): { category: string; exercises: string[
   ];
 }
 
+/** i18n keys for the getExercisesByCategory headings (Round 4, SIM-P1-05):
+ * render sites translate via this map; unknown categories fall back to the
+ * English string at the call site (never a raw key). */
+export const EXERCISE_CATEGORY_KEYS: Record<string, StringKey> = {
+  'Barbell Compounds': 'cat.barbellCompounds',
+  Dumbbell: 'cat.dumbbell',
+  Bodyweight: 'cat.bodyweight',
+  Cable: 'cat.cable',
+  Machine: 'cat.machine',
+};
+
 /**
  * Overall Character Titles based on composite average level
  */
@@ -554,13 +575,16 @@ export function getLiftLevel(
 
 export function getOverallLevel(liftLevels: LiftLevel[]): OverallLevel {
   if (!liftLevels || liftLevels.length === 0) {
-    return { level: 1, title: 'INITIATE', averageRatio: 0, isMainLiftsOnly: false, mainLiftsCount: 0 };
+    return { level: 1, title: 'INITIATE', averageRatio: 0, isMainLiftsOnly: false, mainLiftsCount: 0, isEstimate: false };
   }
 
   // Exercises ranked against a proxy standard are estimates — they must not
   // inflate the athlete's overall level.
   const ranked = liftLevels.filter((l) => !l.isStandardUnavailable);
   const pool = ranked.length > 0 ? ranked : liftLevels;
+  // SIM-P2-18: when the pool fell back to proxies entirely, the headline
+  // level IS an estimate — flag it so renderers disclose it.
+  const isEstimate = ranked.length === 0;
 
   // Count main compound lifts first to reflect true athletic & strength capacity
   const mainLifts = pool.filter((l) => isMainCompoundLift(l.exercise));
@@ -578,6 +602,7 @@ export function getOverallLevel(liftLevels: LiftLevel[]): OverallLevel {
     averageRatio: Number(avgRatio.toFixed(2)),
     isMainLiftsOnly: mainLifts.length > 0,
     mainLiftsCount: mainLifts.length,
+    isEstimate,
   };
 }
 

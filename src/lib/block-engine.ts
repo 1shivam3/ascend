@@ -36,7 +36,9 @@ import {
   getFilteredSubstitutes,
   getGoalAdaptiveSplitTemplates,
   getInjuryBannedFamilies,
+  getPlanBannedJoints,
   getMovementFamily,
+  isExerciseJointBanned,
   isPlaceholderSubstitute,
   normalizeExerciseKey,
   type EquipmentAccess,
@@ -616,10 +618,15 @@ function pickExercisesForMuscle(
 ): PlannedExercise[] {
   const banned = getInjuryBannedFamilies(ctx.limitations);
   ctx.bannedFamilies.forEach((f) => banned.add(f));
+  // Joint-aware filter (SIM-P1-01): a limitation bans every exercise
+  // flagging that joint, not just its movement family. Plan-scoped:
+  // lower_back excluded per ARJUN-1 (see getPlanBannedJoints).
+  const bannedJoints = getPlanBannedJoints(ctx.limitations);
   const candidates = EXERCISE_LIBRARY.filter((item) => {
     if (item.muscle !== muscle && !item.secondaryMuscles.includes(muscle)) return false;
     if (ctx.usedKeys.has(normalizeExerciseKey(item.name))) return false;
     if (banned.has(item.movementPattern)) return false;
+    if (isExerciseJointBanned(item.name, bannedJoints)) return false;
     if (ctx.experience === 'beginner' && item.difficulty === 'advanced') return false;
     return true;
   }).sort((a, b) => {
@@ -693,33 +700,46 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   });
   skeletons = skeletons.map((s, i) => ({ label: s.label, exercises: adapted[i]?.exercises ?? [] }));
 
-  // 3) Pain-flagged families (D6): nothing in a flagged family is
-  //    programmed, even when no limitation string bans it.
+  // 3) Pain-flagged families (D6) + single recent reports (SIM-P1-03):
+  //    nothing in a flagged family is programmed, even when no
+  //    limitation string bans it — and a single deliberate "Hurts"
+  //    report in the last 28 days keeps that exact lift out of the
+  //    block too. Previously only a ≥2-day pattern did, so one bad
+  //    session was re-programmed at held load. 'other'-family pain
+  //    (e.g. lateral raises) is handled by the exact-key path, since
+  //    flaggedFamilies excludes 'other' by construction.
   const flaggedFamilies = new Set<MovementFamily>(athleteModel?.pain.flaggedFamilies ?? []);
+  const recentPainKeys = new Set<string>(athleteModel?.pain.recentPainExerciseKeys ?? []);
   const injuryBanned = getInjuryBannedFamilies(intake.limitations);
-  if (flaggedFamilies.size > 0) {
+  if (flaggedFamilies.size > 0 || recentPainKeys.size > 0) {
     const bannedUnion = new Set<MovementFamily>([...injuryBanned, ...flaggedFamilies]);
     skeletons = skeletons.map((day) => {
       const kept: PlannedExercise[] = [];
       for (const ex of day.exercises) {
         const family = getMovementFamily(ex.name);
-        if (!flaggedFamilies.has(family) || injuryBanned.has(family)) {
+        const isFlagged = flaggedFamilies.has(family) && !injuryBanned.has(family);
+        const isRecentPain = recentPainKeys.has(canonicalizeExerciseName(ex.name));
+        if (!isFlagged && !isRecentPain) {
           kept.push(ex);
           continue;
         }
         const sub = getFilteredSubstitutes(ex.name, {
           equipment: intake.equipment,
           exclusions: disliked,
+          avoidSameFamilyAs: ex.name,
+          avoidJointsOf: ex.name,
         }).find((s) => !bannedUnion.has(getMovementFamily(s.name)) && !isPlaceholderSubstitute(s.name));
         if (sub) {
           kept.push({
             ...ex,
             name: sub.name,
-            notes: `${ex.notes ? ex.notes + ' · ' : ''}Swapped from ${ex.name} — you have reported pain on this movement pattern recently`,
+            notes: `${ex.notes ? ex.notes + ' · ' : ''}Swapped from ${ex.name} — you have reported pain on this movement recently`,
           });
         } else {
           warnings.push(
-            `${ex.name} was left out — you have reported pain on ${family.replace('_', ' ')} movements recently and no safe alternative fits your equipment. Worth getting it checked if it keeps happening.`
+            isFlagged
+              ? `${ex.name} was left out — you have reported pain on ${family.replace('_', ' ')} movements recently and no safe alternative fits your equipment. Worth getting it checked if it keeps happening.`
+              : `${ex.name} was left out — you reported pain on it recently and no safe alternative fits your equipment. Worth getting it checked if it keeps happening.`
           );
         }
       }

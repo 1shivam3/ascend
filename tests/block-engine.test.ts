@@ -74,7 +74,7 @@ function athleteModel(partial: Partial<AthleteModel> = {}): AthleteModel {
       mostSkippedDay: null,
       mostTrainedDay: null,
     },
-    pain: { episodes: [], episodesLast28dByFamily: {}, flaggedFamilies: [] },
+    pain: { episodes: [], episodesLast28dByFamily: {}, flaggedFamilies: [], recentPainExerciseKeys: [] },
     lowReadinessShare: estimate(0),
     topFacts: [],
     ...partial,
@@ -219,7 +219,7 @@ describe('generateBlockProposal — athlete fitting', () => {
   });
 
   it('a pain-flagged family (athlete model) is swapped or dropped even with no declared limitation', () => {
-    const model = athleteModel({ pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'] } });
+    const model = athleteModel({ pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'], recentPainExerciseKeys: [] } });
     const p = generateBlockProposal(input({ athleteModel: model }));
     for (const day of p.days) {
       for (const ex of day.exercises) {
@@ -568,7 +568,7 @@ describe('plateau proposals', () => {
 
 describe('buildIntakePrefill', () => {
   it('pre-ticks limitation chips for pain-flagged families and says why', () => {
-    const model = athleteModel({ pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'] } });
+    const model = athleteModel({ pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'], recentPainExerciseKeys: [] } });
     const { intake, flaggedChips } = buildIntakePrefill({
       profile: null,
       trainingProfile: null,

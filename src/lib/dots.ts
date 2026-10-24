@@ -80,16 +80,16 @@ export function getDOTSClassification(dots: number, gender?: Gender | null): DOT
     return {
       tier: 'WORLD CLASS',
       badge: 'S-TIER',
-      description: 'International competitor standard. Top 0.1% strength elite.',
-      percentile: 'Top 0.1%',
+      description: 'International competitor standard (ASCEND tier, not a population statistic).',
+      percentile: 'S-tier band',
     };
   }
   if (dots >= 500) {
     return {
       tier: 'ELITE',
       badge: 'A-TIER',
-      description: 'National podium caliber. Exceptionally rare pound-for-pound power.',
-      percentile: 'Top 1%',
+      description: 'National podium caliber pound-for-pound strength (ASCEND tier).',
+      percentile: 'A-tier band',
     };
   }
   if (dots >= 440) {
@@ -97,7 +97,7 @@ export function getDOTSClassification(dots: number, gender?: Gender | null): DOT
       tier: 'NATIONAL CLASS',
       badge: 'B-TIER',
       description: 'Competitive powerlifting meet qualifier. Advanced strength mastery.',
-      percentile: 'Top 5%',
+      percentile: 'B-tier band',
     };
   }
   if (dots >= 375) {
@@ -105,7 +105,7 @@ export function getDOTSClassification(dots: number, gender?: Gender | null): DOT
       tier: 'REGIONAL CLASS',
       badge: 'C-TIER',
       description: 'High-level gym strength. Formidable across all 3 compound lifts.',
-      percentile: 'Top 15%',
+      percentile: 'C-tier band',
     };
   }
   if (dots >= 300) {
@@ -113,7 +113,7 @@ export function getDOTSClassification(dots: number, gender?: Gender | null): DOT
       tier: 'INTERMEDIATE',
       badge: 'D-TIER',
       description: 'Solid foundational power. Consistent disciplined strength work.',
-      percentile: 'Top 35%',
+      percentile: 'D-tier band',
     };
   }
   return {

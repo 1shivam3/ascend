@@ -19,6 +19,7 @@
 import {
   AthleteGoal,
   BodyMetricEntry,
+  DayOfWeek,
   Gender,
   MacroGoals,
   Unit,
@@ -36,6 +37,7 @@ import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
 import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
 import { EXERCISE_LIBRARY } from './exercise-library';
+import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared helpers
@@ -338,6 +340,8 @@ export interface TargetAdjustment {
   action: 'back_off' | 'push' | 'hold';
   /** Plain-English reason, coach voice. */
   reason: string;
+  /** LIVE-P1-03: same reason as a localizable key + params (rendered via coach-i18n). */
+  reasonI18n?: LocalizedSentence;
 }
 
 const MAX_SINGLE_ADJUST_PCT = 7.5;
@@ -392,11 +396,15 @@ export function adjustNextTargets(
     let pct = 0;
     let action: TargetAdjustment['action'] = 'hold';
     let reason: string;
+    // LIVE-P1-03: every branch sets reasonI18n next to reason, so the
+    // UI can render the same call in Hindi (exercise names via EXERCISE_NAME_HI).
+    let reasonI18n: LocalizedSentence | undefined;
 
     if (inPain) {
       reason =
         `Holding ${target.exercise} where it is — you flagged pain in the last session. ` +
         `Train around it, not through it; if it lingers past a week, get it checked rather than pushing the load.`;
+      reasonI18n = { key: 'coachDigest.adjPain', params: { exercise: target.exercise } };
     } else if (avgRpe !== undefined && avgRpe >= 9 && missedReps) {
       pct = -5;
       action = 'back_off';
@@ -404,30 +412,38 @@ export function adjustNextTargets(
         `Last session was a grinder (RPE ${fmtRpe(avgRpe)}) and reps were missed, so I'm pulling ` +
         `${target.exercise} back 5% next session. This isn't lost progress — it's how you bank the strength ` +
         `you just built instead of burying yourself under it.`;
+      reasonI18n = { key: 'coachDigest.adjBackOff5', params: { exercise: target.exercise, rpe: fmtRpe(avgRpe) } };
     } else if (avgRpe !== undefined && avgRpe >= 9) {
       pct = -2.5;
       action = 'back_off';
       reason =
         `You hit every rep but rated it RPE ${fmtRpe(avgRpe)} — that's maximal effort with no margin. ` +
         `Easing ${target.exercise} back 2.5% next session keeps the stimulus while letting fatigue clear.`;
+      reasonI18n = { key: 'coachDigest.adjBackOff25', params: { exercise: target.exercise, rpe: fmtRpe(avgRpe) } };
     } else if (avgRpe !== undefined && avgRpe <= 6 && !missedReps) {
       pct = 5;
       action = 'push';
       reason =
         `${target.exercise} moved easy at RPE ${fmtRpe(avgRpe)} with every rep crisp. ` +
         `You've got room, so we're adding 5% — aggressive enough to matter, small enough to keep your form honest.`;
+      reasonI18n = { key: 'coachDigest.adjPush5', params: { exercise: target.exercise, rpe: fmtRpe(avgRpe) } };
     } else if (avgRpe !== undefined && avgRpe <= 7 && !missedReps) {
       pct = 2.5;
       action = 'push';
       reason =
         `${target.exercise} felt controlled at RPE ${fmtRpe(avgRpe)} and no reps were missed. ` +
         `A 2.5% bump keeps the progression ticking without outrunning your recovery.`;
+      reasonI18n = { key: 'coachDigest.adjPush25', params: { exercise: target.exercise, rpe: fmtRpe(avgRpe) } };
     } else {
       const rpeNote = avgRpe !== undefined ? ` (RPE ${fmtRpe(avgRpe)})` : '';
       const missedNote = missedReps ? ' Some reps were missed,' : '';
       reason =
         `Holding ${target.exercise} steady${rpeNote}.${missedNote} The load is in the right zone — ` +
         `right now the win is repeating it cleanly, not chasing a bigger number.`;
+      reasonI18n = {
+        key: missedReps ? 'coachDigest.adjHoldMissed' : 'coachDigest.adjHold',
+        params: { exercise: target.exercise, rpeNote },
+      };
     }
 
     // Never an absurd jump; never cross sanity bounds.
@@ -447,6 +463,10 @@ export function adjustNextTargets(
       reason =
         `The math says ${target.exercise} should move ${clampedPct > 0 ? 'up' : 'down'} slightly, ` +
         `but it's smaller than the smallest plate jump, so we're holding this week and letting the reps do the talking.`;
+      reasonI18n = {
+        key: clampedPct > 0 ? 'coachDigest.adjRoundingHoldUp' : 'coachDigest.adjRoundingHoldDown',
+        params: { exercise: target.exercise },
+      };
     }
 
     adjustments.push({
@@ -455,6 +475,7 @@ export function adjustNextTargets(
       newTarget: { weight: action === 'hold' ? oldRounded : newWeight, reps: target.reps, unit: target.unit },
       action,
       reason,
+      reasonI18n,
     });
 
     // `prescribedKnown` is informational only — target.reps already covers
@@ -487,6 +508,13 @@ export interface ReadinessResult {
   band: 'primed' | 'ready' | 'caution' | 'rest';
   /** Plain-English factors behind the score. */
   factors: string[];
+  /** LIVE-P1-RESIDUAL: i18n structs parallel to `factors` (index-aligned).
+   *  A null entry means no localized form exists yet and the renderer
+   *  falls back to the English factor. Currently only the no-history
+   *  factor is localized; the other engine factors (sleep, load spikes,
+   *  RPE trends, …) remain English in Hindi mode — a known residual,
+   *  same class as the unlocalized athlete-model evidence sentences. */
+  factorsI18n?: (LocalizedSentence | null)[];
 }
 
 /**
@@ -638,7 +666,15 @@ export function calculateReadiness(
     }
     score = applyHealthSignals(score);
     score = Math.max(1, Math.min(79, Math.round(score)));
-    return { score, band: bandFor(score), factors: factors.slice(0, 5) };
+    const shownFactors = factors.slice(0, 5);
+    return {
+      score,
+      band: bandFor(score),
+      factors: shownFactors,
+      // The no-history sentence is always factors[0] in this branch: it is
+      // pushed first, before any check-in or device factor below.
+      factorsI18n: shownFactors.map((_, i) => (i === 0 ? { key: 'ready.factorNoHistory' } : null)),
+    };
   }
 
   const latest = [...(bodyMetrics || [])].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();
@@ -1211,6 +1247,33 @@ export function generateCheckIn(missed: MissedSession[]): string {
   );
 }
 
+/**
+ * LIVE-P1-03 — structured twin of generateCheckIn. The English `message`
+ * is byte-identical to generateCheckIn's output; `key` + `sessions` let
+ * the UI render the same sentence in Hindi (weekday names localized,
+ * plan names untouched — they are user content).
+ */
+export interface CheckInDetails {
+  message: string;
+  key: 'coachDigest.checkinNone' | 'coachDigest.checkinOne' | 'coachDigest.checkinMany';
+  sessions: { name: string; day: DayOfWeek }[];
+}
+
+export function generateCheckInDetails(missed: MissedSession[]): CheckInDetails {
+  const message = generateCheckIn(missed);
+  const sessions = (missed || []).map((m) => ({
+    name: m.name,
+    day: DAY_ORDER[(parseLocalDate(m.date).getDay() + 6) % 7],
+  }));
+  const key =
+    !missed || missed.length === 0
+      ? 'coachDigest.checkinNone'
+      : missed.length === 1
+        ? 'coachDigest.checkinOne'
+        : 'coachDigest.checkinMany';
+  return { message, key, sessions };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 6. DYNAMIC NUTRITION
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1291,6 +1354,8 @@ export interface CalorieSuggestion {
   /** True when already at (or below) the safe floor — no cut applied. */
   atSafeMinimum: boolean;
   reason: string;
+  /** LIVE-P1-03: same reason as a localizable key + params (rendered via coach-i18n). */
+  reasonI18n?: LocalizedSentence;
 }
 
 // SAFE_MIN_CALORIES is imported from macros.ts — the single source of
@@ -1312,15 +1377,16 @@ export function suggestCalorieAdjustment(
   const current = Math.max(0, Math.round(currentTargets?.calories ?? 0));
   const rate = Math.abs(trend.slopeKgPerWeek);
 
-  const hold = (reason: string): CalorieSuggestion => ({
+  const hold = (reason: string, reasonI18n?: LocalizedSentence): CalorieSuggestion => ({
     action: 'hold',
     deltaKcal: 0,
     newCalories: current,
     atSafeMinimum: false,
     reason,
+    reasonI18n,
   });
 
-  const apply = (delta: number, reason: string): CalorieSuggestion => {
+  const apply = (delta: number, reason: string, reasonI18n?: LocalizedSentence): CalorieSuggestion => {
     const target = current + delta;
     if (delta < 0 && target < safeMin) {
       return {
@@ -1332,6 +1398,16 @@ export function suggestCalorieAdjustment(
           `I'd normally trim about ${Math.abs(delta)} kcal, but you're already at ${current.toLocaleString()} kcal — ` +
           `below the safe floor of ${safeMin.toLocaleString()}. Cutting further risks muscle, hormones and sanity. ` +
           `Instead: tighten tracking accuracy for two weeks, or add a couple of brisk walks. If the scale still won't budge, that's a conversation, not a bigger deficit.`,
+        // LIVE-P1-03: the floor branch builds its own struct — callers
+        // can't know in advance that the floor will trigger.
+        reasonI18n: {
+          key: 'coachDigest.calFloorHold',
+          params: {
+            delta: String(Math.abs(delta)),
+            current: current.toLocaleString(),
+            floor: safeMin.toLocaleString(),
+          },
+        },
       };
     }
     return {
@@ -1340,6 +1416,7 @@ export function suggestCalorieAdjustment(
       newCalories: Math.max(safeMin, target),
       atSafeMinimum: false,
       reason,
+      reasonI18n,
     };
   };
 
@@ -1352,7 +1429,8 @@ export function suggestCalorieAdjustment(
   ) {
     return hold(
       `Not enough weigh-ins yet to read a trend — log your weight a few mornings a week for two weeks, ` +
-      `same conditions, and I'll tell you exactly what the scale is saying.`
+      `same conditions, and I'll tell you exactly what the scale is saying.`,
+      { key: 'coachDigest.calHoldNoData' }
     );
   }
 
@@ -1363,21 +1441,26 @@ export function suggestCalorieAdjustment(
       if (trend.direction === 'losing' && rate <= 1) {
         return hold(
           `You're losing at ${rateStr} — that's right in the sweet spot (up to about 1 kg/week keeps muscle and sanity intact). ` +
-          `Change nothing; the plan is working.`
+          `Change nothing; the plan is working.`,
+          { key: 'coachDigest.calLoseSweetSpot', params: { rate: rateStr } }
         );
       }
       if (trend.direction === 'losing' && rate > 1) {
         return apply(
           100,
           `You're losing at ${rateStr}, which is faster than the sustainable zone. Aggressive cuts stall sooner and cost more muscle. ` +
-          `Adding back 100 kcal slows the loss to a pace you can actually hold.`
+          `Adding back 100 kcal slows the loss to a pace you can actually hold.`,
+          { key: 'coachDigest.calLoseTooFast', params: { rate: rateStr } }
         );
       }
       return apply(
         -125,
         `Two weeks in and the scale is ${trend.direction === 'flat' ? 'flat' : `climbing (+${rateStr})`} ` +
         `while the goal is fat loss. Smallest effective change: trim 125 kcal — roughly one snack — and reassess in two weeks. ` +
-        `Big cuts backfire; this one won't.`
+        `Big cuts backfire; this one won't.`,
+        trend.direction === 'flat'
+          ? { key: 'coachDigest.calLoseFlatFlat' }
+          : { key: 'coachDigest.calLoseFlatClimbing', params: { rate: rateStr } }
       );
     }
     case 'build_muscle':
@@ -1385,35 +1468,50 @@ export function suggestCalorieAdjustment(
       if (trend.direction === 'gaining') {
         if (rate >= 0.1 && rate <= 0.35) {
           return hold(
-            `Gaining at ${rateStr} — textbook lean-gain pace. Most of that is muscle and the water that comes with it. Hold course.`
+            `Gaining at ${rateStr} — textbook lean-gain pace. Most of that is muscle and the water that comes with it. Hold course.`,
+            { key: 'coachDigest.calGainSweetSpot', params: { rate: rateStr } }
           );
         }
         if (rate > 0.5) {
           return apply(
             -100,
             `You're gaining at ${rateStr}, which is faster than muscle can realistically be built — the excess is mostly fat. ` +
-            `Trimming 100 kcal keeps you growing while keeping the gain lean.`
+            `Trimming 100 kcal keeps you growing while keeping the gain lean.`,
+            { key: 'coachDigest.calGainTooFast', params: { rate: rateStr } }
           );
         }
-        return hold(`Weight is drifting up gently — right where a lean bulk should be. Hold steady.`);
+        return hold(`Weight is drifting up gently — right where a lean bulk should be. Hold steady.`, {
+          key: 'coachDigest.calGainDrift',
+        });
       }
       // Flat or drifting down while trying to grow: not enough fuel.
       return apply(
         100,
         `The scale is ${trend.direction} but the goal is growth — you can't build a bigger house without more bricks. ` +
-        `Adding 100 kcal gives training something to build with. Reassess in two weeks.`
+        `Adding 100 kcal gives training something to build with. Reassess in two weeks.`,
+        trend.direction === 'losing'
+          ? { key: 'coachDigest.calGrowFuelLosing' }
+          : { key: 'coachDigest.calGrowFuelFlat' }
       );
     }
     case 'stamina':
     case 'general_fitness':
     default: {
       if (trend.direction === 'flat') {
-        return hold(`Weight is stable and the goal is maintenance — the nutrition side is doing its job. Nothing to change.`);
+        return hold(`Weight is stable and the goal is maintenance — the nutrition side is doing its job. Nothing to change.`, {
+          key: 'coachDigest.calMaintFlat',
+        });
       }
       if (trend.direction === 'gaining') {
-        return apply(-100, `Weight is creeping up (${rateStr}) while the goal is maintenance. A gentle 100 kcal trim steadies it without any real sacrifice.`);
+        return apply(-100, `Weight is creeping up (${rateStr}) while the goal is maintenance. A gentle 100 kcal trim steadies it without any real sacrifice.`, {
+          key: 'coachDigest.calMaintGain',
+          params: { rate: rateStr },
+        });
       }
-      return apply(100, `Weight is drifting down (${rateStr}) while the goal is maintenance. Adding 100 kcal holds you level.`);
+      return apply(100, `Weight is drifting down (${rateStr}) while the goal is maintenance. Adding 100 kcal holds you level.`, {
+        key: 'coachDigest.calMaintLose',
+        params: { rate: rateStr },
+      });
     }
   }
 }

@@ -8,6 +8,7 @@ import {
   getOverallLevel,
   getExerciseList,
   getExercisesByCategory,
+  EXERCISE_CATEGORY_KEYS,
   calculateOneRepMax,
   getNextMilestone,
   getNextLevelInfo,
@@ -198,7 +199,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                       {pillCfg?.label || group.category.slice(0, 2).toUpperCase()}
                     </span>
                     <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">
-                      {group.category}
+                      {EXERCISE_CATEGORY_KEYS[group.category] ? t(EXERCISE_CATEGORY_KEYS[group.category]) : group.category}
                     </span>
                   </div>
                   {group.exercises.map((ex) => (
@@ -688,9 +689,11 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
 
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
   const dotsScore = useMemo(() => {
-    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0) return 0;
+    // SIM-P1-07: DOTS is defined only for a full S/B/D total. A
+    // partial total must not render a DOTS number next to it.
+    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0 || !bigThreeStats.isComplete) return 0;
     return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
-  }, [profile, bigThreeStats.totalKg]);
+  }, [profile, bigThreeStats]);
 
   const displayWeight = (kg: number) => {
     if (userUnit === 'lbs') {
@@ -1142,6 +1145,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   {profile?.goals?.includes('get_stronger') ? t('prs.big3Total') : t('prs.combinedTotal')}
                 </span>
               </div>
+              {/* SIM-P2-11: totals are estimates, and a partial total
+                  must say so instead of posing as a Big 3 total. */}
+              {!bigThreeStats.isComplete && (
+                <p className="text-2xs text-amber-400 mt-1">
+                  {t('prs.partialTotal', { missing: bigThreeStats.missingLifts.join(', ') })}
+                </p>
+              )}
+              <p className="text-2xs text-text-muted mt-1">{t('prs.totalEstimatedNote')}</p>
             </div>
             <div className="text-right">
               {profile?.goals?.includes('get_stronger') && dotsScore > 0 ? (
