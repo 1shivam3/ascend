@@ -30,16 +30,22 @@
  *  - All angle ranges are coaching heuristics, labelled as such in
  *    the UI — never medical-grade claims.
  *
- * Upload path (v1): next to the camera option, the user can pick a
- * recorded video file instead of starting the camera. The file is
- * loaded into the SAME video element via an object URL and run
- * through the SAME rAF loop, pose engine, counter, gate, cues, and
- * debug readout as live camera — the loop only ever reads the video
- * element, so the source (stream vs file) is invisible to it. The
- * file is decoded locally in the browser; no upload request is ever
- * made, so the video never leaves the device. The camera path is
- * untouched when upload is not used, and switching back revokes the
- * object URL. No camera permission is requested on the upload path.
+ * Upload path (v1, seek-based since the slow-phone fix): next to the
+ * camera option, the user can pick a recorded video file instead of
+ * starting the camera. The file is loaded into the SAME video element
+ * via an object URL and run through the SAME pose engine, counter,
+ * gate, cues, and debug readout as live camera — but NOT through the
+ * real-time loop: a file is not a live stream, so the video is PAUSED
+ * and stepped through frame by frame (seek → detect → repeat), which
+ * decouples analysis from playback speed. On a slow phone real-time
+ * playback sampled ~1.5 fps and the counter's taint rule + 2-frame
+ * confirms turned that into 0 reps; stepping sees every sampled
+ * frame, so reps count at the cost of a longer (but progress-shown)
+ * analysis. The file is decoded locally in the browser; no upload
+ * request is ever made, so the video never leaves the device. The
+ * camera path is untouched when upload is not used, and switching
+ * back revokes the object URL. No camera permission is requested on
+ * the upload path.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -62,6 +68,7 @@ import {
   type IssueCode,
   type JointGroup,
   type LiftId,
+  type PoseLandmark,
   type SetSummary,
   type UnclearDetail,
   type UnclearReason,
@@ -75,6 +82,12 @@ import {
   toPoseLandmarks,
   type PoseLandmarkerLike,
 } from '@/lib/pose-engine';
+import {
+  computeUploadStepTimes,
+  nextAnalysisTimestamp,
+  seekVideoTo,
+  waitForMetadata,
+} from '@/lib/upload-analysis';
 
 type UiPhase = 'idle' | 'loading' | 'active' | 'summary' | 'error';
 type CameraFacing = 'user' | 'environment';
@@ -216,6 +229,18 @@ export default function FormCheckSection() {
   // gating, or counting (buildVisibilityDiagnostic is pure).
   const [showDebug, setShowDebug] = useState(false);
   const [diag, setDiag] = useState<VisibilityDiagnostic | null>(null);
+  // Upload analysis progress (null = not analyzing). Shown honestly
+  // during seek-based analysis so a slow phone's minutes-long run
+  // reads as work in progress, not a hang.
+  const [analysisProgress, setAnalysisProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
+  // Detection instrumentation for the debug readout + summary.
+  const [detectStats, setDetectStats] = useState<{
+    frames: number;
+    avgMs: number;
+  } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -228,6 +253,13 @@ export default function FormCheckSection() {
   const lastLiveRef = useRef<string>('');
   const detectMsRef = useRef<number[]>([]);
   const detectErrorStreakRef = useRef(0);
+  const detectStatsRef = useRef({ frames: 0, totalMs: 0 });
+  // Generation counter for the upload analysis loop: starting a new
+  // run, cancelling, ending, or unmounting invalidates any in-flight
+  // loop, which checks this token every step and exits cleanly
+  // without touching state or firing a stale summary.
+  const analysisTokenRef = useRef(0);
+  const lastAnalysisTsRef = useRef(0);
   const phaseRef = useRef<UiPhase>('idle');
   phaseRef.current = phase;
   const showDebugRef = useRef(false);
@@ -274,6 +306,75 @@ export default function FormCheckSection() {
     await video.play();
   }, []);
 
+  // Book one detection's time: the 30-frame window behind the slow
+  // note (live loop) AND the run totals behind the instrumentation
+  // (debug readout + summary). The loop already tracked detectMs —
+  // this wires the same timer through, it does not invent a second
+  // one. detectMs here is frame-processing time (detect + counter),
+  // measured the same way in both loops.
+  const noteDetect = useCallback((dt: number) => {
+    detectMsRef.current.push(dt);
+    if (detectMsRef.current.length > 30) detectMsRef.current.shift();
+    if (detectMsRef.current.length === 30) {
+      const avg =
+        detectMsRef.current.reduce((s, v) => s + v, 0) / detectMsRef.current.length;
+      setSlowNote((prev) => (avg > 120 ? true : prev));
+    }
+    detectStatsRef.current.frames += 1;
+    detectStatsRef.current.totalMs += dt;
+  }, []);
+
+  // Feed one detected frame through the counter and into the live
+  // UI. Shared by the live rAF loop and the upload stepping loop —
+  // there is exactly one counting path, so a stepped frame and a live
+  // frame are judged identically. Display-only extras (live state,
+  // throttled debug snapshot) live here too, never inside the counter.
+  const handleCounterFrame = useCallback(
+    (marks: PoseLandmark[], detected: PoseLandmark[] | null, timestampMs: number) => {
+      const counter = counterRef.current;
+      if (!counter) return;
+      const frameResult = counter.processFrame({ landmarks: marks, timestampMs });
+      const primary = counter.config.primaryAngle;
+      const angleDeg =
+        frameResult.angles && frameResult.angles[primary] !== null
+          ? Math.round(frameResult.angles[primary] as number)
+          : null;
+      const next: LiveState = {
+        reps: frameResult.repCount,
+        cueCode: frameResult.liveCueCode,
+        unclear: frameResult.status === 'unclear',
+        unclearReason: frameResult.unclearReason,
+        unclearDetail: frameResult.unclearDetail,
+        noPerson: detected === null,
+        phase: frameResult.phase,
+        angleDeg,
+      };
+      const key = JSON.stringify(next);
+      if (key !== lastLiveRef.current) {
+        lastLiveRef.current = key;
+        setLive(next);
+      }
+      // Diagnostic snapshot only: throttled to ~4/s so the readout
+      // can never jank detection, and skipped entirely when the
+      // toggle is off (zero extra work, zero behavior change).
+      // Display-only — the counter already ran above.
+      const now = performance.now();
+      if (showDebugRef.current && now - lastDiagAtRef.current >= 250) {
+        lastDiagAtRef.current = now;
+        setDiag(
+          buildVisibilityDiagnostic(counter.liftId, marks, frameResult, detected === null)
+        );
+        const st = detectStatsRef.current;
+        setDetectStats(
+          st.frames > 0
+            ? { frames: st.frames, avgMs: Math.round(st.totalMs / st.frames) }
+            : null
+        );
+      }
+    },
+    []
+  );
+
   const loop = useCallback(() => {
     if (!runningRef.current) return;
     const video = videoRef.current;
@@ -285,46 +386,9 @@ export default function FormCheckSection() {
         const result = landmarker.detectForVideo(video, t0);
         const detected = toPoseLandmarks(result);
         const marks = detected ?? emptyLandmarks();
-        const frameResult = counter.processFrame({ landmarks: marks, timestampMs: t0 });
+        handleCounterFrame(marks, detected, t0);
         detectErrorStreakRef.current = 0;
-        const dt = performance.now() - t0;
-        detectMsRef.current.push(dt);
-        if (detectMsRef.current.length > 30) detectMsRef.current.shift();
-        if (detectMsRef.current.length === 30) {
-          const avg =
-            detectMsRef.current.reduce((s, v) => s + v, 0) / detectMsRef.current.length;
-          setSlowNote((prev) => (avg > 120 ? true : prev));
-        }
-        const primary = counter.config.primaryAngle;
-        const angleDeg =
-          frameResult.angles && frameResult.angles[primary] !== null
-            ? Math.round(frameResult.angles[primary] as number)
-            : null;
-        const next: LiveState = {
-          reps: frameResult.repCount,
-          cueCode: frameResult.liveCueCode,
-          unclear: frameResult.status === 'unclear',
-          unclearReason: frameResult.unclearReason,
-          unclearDetail: frameResult.unclearDetail,
-          noPerson: detected === null,
-          phase: frameResult.phase,
-          angleDeg,
-        };
-        const key = JSON.stringify(next);
-        if (key !== lastLiveRef.current) {
-          lastLiveRef.current = key;
-          setLive(next);
-        }
-        // Diagnostic snapshot only: throttled to ~4/s so the readout
-        // can never jank the detection loop, and skipped entirely
-        // when the toggle is off (zero extra work, zero behavior
-        // change). Display-only — the counter already ran above.
-        if (showDebugRef.current && t0 - lastDiagAtRef.current >= 250) {
-          lastDiagAtRef.current = t0;
-          setDiag(
-            buildVisibilityDiagnostic(counter.liftId, marks, frameResult, detected === null)
-          );
-        }
+        noteDetect(performance.now() - t0);
       } catch {
         // A failed detection frame is skipped, never fabricated. If
         // detection keeps failing, surface a non-crash error state.
@@ -343,7 +407,7 @@ export default function FormCheckSection() {
       }
     }
     rafRef.current = requestAnimationFrame(loop);
-  }, [stopLoop, stopTracks]);
+  }, [handleCounterFrame, noteDetect, stopLoop, stopTracks]);
 
   const start = useCallback(async () => {
     setError(null);
@@ -353,10 +417,14 @@ export default function FormCheckSection() {
     setSummary(null);
     setSlowNote(false);
     setDiag(null);
+    setDetectStats(null);
+    setAnalysisProgress(null);
+    analysisTokenRef.current += 1;
     lastDiagAtRef.current = 0;
     setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, noPerson: false, phase: 'top', angleDeg: null });
     lastLiveRef.current = '';
     detectMsRef.current = [];
+    detectStatsRef.current = { frames: 0, totalMs: 0 };
     detectErrorStreakRef.current = 0;
     setPhase('loading');
     try {
@@ -380,13 +448,140 @@ export default function FormCheckSection() {
     }
   }, [attachStream, facing, lift, loop, revokeUpload, stopLoop, stopTracks]);
 
-  // Upload path: run the SAME loop/counter over a recorded file.
+  const endSet = useCallback(
+    (pain: boolean) => {
+      const counter = counterRef.current;
+      stopLoop();
+      stopTracks();
+      revokeUpload();
+      setDiag(null);
+      // Invalidate any in-flight upload analysis: it must not fire a
+      // stale summary after the set already ended.
+      analysisTokenRef.current += 1;
+      const result = counter
+        ? pain
+          ? counter.requestPainStop(performance.now())
+          : counter.endSet('completed', performance.now())
+        : null;
+      // Attach this run's detection instrumentation (never the
+      // counter's business) so the summary reports it without
+      // needing the debug toggle.
+      const st = detectStatsRef.current;
+      setSummary(
+        result
+          ? {
+              ...result,
+              framesProcessed: st.frames,
+              avgDetectMs: st.frames > 0 ? Math.round(st.totalMs / st.frames) : null,
+            }
+          : null
+      );
+      setAnalysisProgress(null);
+      setPhase('summary');
+    },
+    [revokeUpload, stopLoop, stopTracks]
+  );
+
+  // Seek-based offline analysis for uploads (upload path only; the
+  // live camera path never calls this). Steps through the paused
+  // video — seek to a time, await the seeked event, detect that exact
+  // frame through the SAME counter as live — then shows the same
+  // post-set summary when stepping completes. Analysis time is
+  // decoupled from playback speed: a slow phone takes longer, but
+  // still sees every stepped frame, so reps count. Progress is shown
+  // honestly (frames done of total) because the run can take minutes
+  // on a slow phone. A per-seek timeout surfaces a clear error
+  // instead of hanging; cancelling invalidates the token, and this
+  // loop then exits without touching state or firing a stale summary.
+  const analyzeUpload = useCallback(async () => {
+    const token = analysisTokenRef.current;
+    const video = videoRef.current;
+    const landmarker = landmarkerRef.current;
+    const counter = counterRef.current;
+    if (!video || !landmarker || !counter) return;
+    const times = computeUploadStepTimes(video.duration);
+    if (times.length === 0) return;
+    setAnalysisProgress({ done: 0, total: times.length });
+    const baseTs = performance.now();
+    lastAnalysisTsRef.current = 0;
+    try {
+      for (let i = 0; i < times.length; i++) {
+        if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
+        const t = times[i];
+        // A stuck seek must surface, never hang: seekVideoTo rejects
+        // on timeout (caught below as a seek error).
+        await seekVideoTo(video, t);
+        if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
+        const t0 = performance.now();
+        try {
+          // Monotonic timestamps: the landmarker is cached across
+          // runs, so raw video time would go backwards on a second
+          // run — nextAnalysisTimestamp keeps it strictly increasing
+          // (counter durations use differences, so the offset cancels).
+          const ts = nextAnalysisTimestamp(baseTs, t * 1000, lastAnalysisTsRef.current);
+          lastAnalysisTsRef.current = ts;
+          const result = landmarker.detectForVideo(video, ts);
+          const detected = toPoseLandmarks(result);
+          const marks = detected ?? emptyLandmarks();
+          handleCounterFrame(marks, detected, ts);
+          detectErrorStreakRef.current = 0;
+          noteDetect(performance.now() - t0);
+        } catch {
+          // A single failed frame is skipped, never fabricated —
+          // same rule as the live loop. The counter is NOT fed.
+          detectErrorStreakRef.current += 1;
+          if (detectErrorStreakRef.current > 30) {
+            revokeUpload();
+            setError({
+              titleKey: 'formcheck.errTrackingTitle',
+              messageKey: 'formcheck.errTrackingMessage',
+              tryThisKey: 'formcheck.errTrackingTry',
+            });
+            setPhase('error');
+            return;
+          }
+        }
+        setAnalysisProgress({ done: i + 1, total: times.length });
+        const st = detectStatsRef.current;
+        if (st.frames > 0) {
+          setDetectStats({ frames: st.frames, avgMs: Math.round(st.totalMs / st.frames) });
+        }
+      }
+    } catch {
+      // Seek failure (timeout or video error). A cancelled run exits
+      // above before reaching here, so this is a genuine failure.
+      if (token !== analysisTokenRef.current) return;
+      revokeUpload();
+      setError({
+        titleKey: 'formcheck.errSeekTitle',
+        messageKey: 'formcheck.errSeekMessage',
+        tryThisKey: 'formcheck.errSeekTry',
+      });
+      setUploadError(true);
+      setPhase('error');
+      return;
+    }
+    if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
+    // Final instrumentation snapshot, then the same post-set summary
+    // as live (endSet attaches the run's frame/detect stats).
+    const st = detectStatsRef.current;
+    if (st.frames > 0) {
+      setDetectStats({ frames: st.frames, avgMs: Math.round(st.totalMs / st.frames) });
+    }
+    setAnalysisProgress(null);
+    endSet(false);
+  }, [endSet, handleCounterFrame, noteDetect, revokeUpload]);
+
+  // Upload path: run the SAME counter over a recorded file — but NOT
+  // through the real-time loop. A file is not a live stream: playing
+  // it at normal speed on a slow phone samples ~1.5 fps, and the
+  // counter's taint rule + 2-frame confirms turn that into 0 reps
+  // even when the model reads every frame perfectly. So the video is
+  // PAUSED and stepped through offline (see analyzeUpload below).
   // Never calls getUserMedia, so no camera permission is requested.
   // The video element mounts on the 'loading' render; the macrotask
   // wait below guarantees it exists before videoRef is touched
-  // (same reason the camera path awaits getUserMedia first). The
-  // file plays at normal speed from the start only after the engine
-  // is loaded, so no frame is analysed before the loop is running.
+  // (same reason the camera path awaits getUserMedia first).
   const startUpload = useCallback(async (file: File) => {
     setError(null);
     setUploadError(false);
@@ -395,10 +590,14 @@ export default function FormCheckSection() {
     setSummary(null);
     setSlowNote(false);
     setDiag(null);
+    setDetectStats(null);
+    setAnalysisProgress(null);
+    analysisTokenRef.current += 1;
     lastDiagAtRef.current = 0;
     setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, noPerson: false, phase: 'top', angleDeg: null });
     lastLiveRef.current = '';
     detectMsRef.current = [];
+    detectStatsRef.current = { frames: 0, totalMs: 0 };
     detectErrorStreakRef.current = 0;
     const url = URL.createObjectURL(file);
     uploadUrlRef.current = url;
@@ -411,23 +610,34 @@ export default function FormCheckSection() {
       video.src = url;
       video.muted = true;
       video.playsInline = true;
+      // Metadata first: stepping needs a duration, and a file that
+      // never reports one cannot be analyzed. Then PAUSE — the
+      // autoPlay attribute may have started playback, and the
+      // analysis below drives currentTime itself, so playback must
+      // not race it. No play() call exists on this path.
+      await waitForMetadata(video);
+      video.pause();
+      if (!Number.isFinite(video.duration) || video.duration <= 0) {
+        throw new Error('video has no duration');
+      }
       if (!landmarkerRef.current) {
         landmarkerRef.current = await loadPoseLandmarker();
       }
-      await video.play();
       counterRef.current = new RepCounter(lift);
-      runningRef.current = true;
       setPhase('active');
-      rafRef.current = requestAnimationFrame(loop);
+      // NOTE: no rAF loop and no play() here — analyzeUpload owns
+      // the run. runningRef stays false so the live loop never runs
+      // over a stepped file.
+      void analyzeUpload();
     } catch (err) {
       stopLoop();
       revokeUpload();
       // Engine failures keep their own box; anything else on this
-      // path (corrupt/unsupported file, play rejection) is an upload
-      // failure — never a camera-permission prompt. Either way the
-      // error came from the upload path, so the error screen's
-      // primary action returns to idle (re-pick a file or start the
-      // camera) instead of retrying the camera directly.
+      // path (corrupt/unsupported file, metadata failure) is an
+      // upload failure — never a camera-permission prompt. Either
+      // way the error came from the upload path, so the error
+      // screen's primary action returns to idle (re-pick a file or
+      // start the camera) instead of retrying the camera directly.
       setError(
         err instanceof PoseEngineError
           ? mapError(err)
@@ -440,7 +650,24 @@ export default function FormCheckSection() {
       setUploadError(true);
       setPhase('error');
     }
-  }, [lift, loop, revokeUpload, stopLoop]);
+  }, [analyzeUpload, lift, revokeUpload, stopLoop]);
+
+
+  // Cancel an in-flight upload analysis: invalidate the loop, drop
+  // the file, return to idle. Partial results are DISCARDED — a
+  // half-analyzed video's rep count is not a valid set result, so
+  // cancelling shows no summary (unlike End set on a live set).
+  const cancelAnalysis = useCallback(() => {
+    analysisTokenRef.current += 1;
+    stopLoop();
+    stopTracks();
+    revokeUpload();
+    setDiag(null);
+    setDetectStats(null);
+    setAnalysisProgress(null);
+    setSummary(null);
+    setPhase('idle');
+  }, [revokeUpload, stopLoop, stopTracks]);
 
   const switchCamera = useCallback(async () => {
     const next: CameraFacing = facing === 'user' ? 'environment' : 'user';
@@ -464,29 +691,13 @@ export default function FormCheckSection() {
     }
   }, [attachStream, facing, stopLoop, stopTracks]);
 
-  const endSet = useCallback(
-    (pain: boolean) => {
-      const counter = counterRef.current;
-      stopLoop();
-      stopTracks();
-      revokeUpload();
-      setDiag(null);
-      const result = counter
-        ? pain
-          ? counter.requestPainStop(performance.now())
-          : counter.endSet('completed', performance.now())
-        : null;
-      setSummary(result);
-      setPhase('summary');
-    },
-    [revokeUpload, stopLoop, stopTracks]
-  );
 
   // Unmount: never leave the camera or the model running, and never
   // leak an uploaded file's object URL.
   useEffect(
     () => () => {
       runningRef.current = false;
+      analysisTokenRef.current += 1;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (streamRef.current) {
         for (const track of streamRef.current.getTracks()) track.stop();
@@ -640,6 +851,36 @@ export default function FormCheckSection() {
 
         {phase === 'active' && (
           <div className="space-y-2">
+            {/* Upload analysis progress: honest frames-done-of-total
+                (plus a bar) so a slow phone's minutes-long run reads
+                as work in progress, not a hang. Live sets never show
+                this — analysisProgress is null for the camera path. */}
+            {analysisProgress && (
+              <div className="space-y-1">
+                <p className="text-xs text-text-secondary">
+                  {t('formcheck.analyzingVideo', {
+                    done: analysisProgress.done,
+                    total: analysisProgress.total,
+                    pct: Math.round(
+                      (analysisProgress.done / analysisProgress.total) * 100
+                    ),
+                  })}
+                </p>
+                <div
+                  className="h-2 rounded-full bg-white/10 overflow-hidden"
+                  aria-hidden="true"
+                >
+                  <div
+                    className="h-full bg-accent rounded-full"
+                    style={{
+                      width: `${Math.round(
+                        (analysisProgress.done / analysisProgress.total) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex items-end justify-between gap-3">
               <div>
                 <p className="text-2xs text-text-muted uppercase">{t('formcheck.reps')}</p>
@@ -754,6 +995,16 @@ export default function FormCheckSection() {
                   {diag.primaryAngleDeg !== null ? `${diag.primaryAngleDeg}°` : '—'} ·
                   gate ≥ 0.50
                 </p>
+                {/* TEMPORARY instrumentation: run totals from the same
+                    detect timer (not a second timer). Shown here
+                    during the run and, via the summary, after it —
+                    so the next test reports them without the toggle. */}
+                {detectStats && (
+                  <p className="text-text-muted">
+                    {t('formcheck.debugFrames', { n: detectStats.frames })} ·{' '}
+                    {t('formcheck.debugAvgDetect', { ms: detectStats.avgMs })}
+                  </p>
+                )}
               </div>
             )}
 
@@ -780,21 +1031,37 @@ export default function FormCheckSection() {
                   <SwitchCamera className="w-4 h-4" /> {t('formcheck.switchCamera')}
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => endSet(false)}
-                className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
-              >
-                <Square className="w-4 h-4" /> {t('formcheck.endSet')}
-              </button>
-              <button
-                type="button"
-                onClick={() => endSet(true)}
-                className="py-2 px-4 text-xs font-bold cursor-pointer flex items-center gap-2 rounded-xl bg-red-600 text-white"
-                aria-label={t('formcheck.painStopAria')}
-              >
-                <AlertTriangle className="w-4 h-4" /> {t('formcheck.painStop')}
-              </button>
+              {analysisProgress ? (
+                // During upload analysis there is no live set to end:
+                // cancelling discards the partial run and returns to
+                // idle (a half-analyzed video's count is not a valid
+                // set result). Pain stop is meaningless for a file.
+                <button
+                  type="button"
+                  onClick={() => cancelAnalysis()}
+                  className="py-1.5 px-3 text-xs font-bold cursor-pointer card border border-border"
+                >
+                  {t('formcheck.cancelAnalysis')}
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => endSet(false)}
+                    className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
+                  >
+                    <Square className="w-4 h-4" /> {t('formcheck.endSet')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => endSet(true)}
+                    className="py-2 px-4 text-xs font-bold cursor-pointer flex items-center gap-2 rounded-xl bg-red-600 text-white"
+                    aria-label={t('formcheck.painStopAria')}
+                  >
+                    <AlertTriangle className="w-4 h-4" /> {t('formcheck.painStop')}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -875,6 +1142,18 @@ export default function FormCheckSection() {
                 <p className="text-2xs text-text-muted">{t('formcheck.medianRepTime')}</p>
               </div>
             </div>
+            {/* TEMPORARY instrumentation: this run's detection totals,
+                attached by endSet — reported here without needing the
+                debug toggle. Remove with the debug readout before any
+                merge. */}
+            {summary.framesProcessed !== undefined && summary.framesProcessed > 0 && (
+              <p className="text-2xs text-text-muted">
+                {t('formcheck.summaryAnalysis', {
+                  frames: summary.framesProcessed,
+                  ms: summary.avgDetectMs ?? 0,
+                })}
+              </p>
+            )}
             {summary.issues.length > 0 ? (
               <ul className="space-y-2">
                 {summary.issues.map((issue) => (

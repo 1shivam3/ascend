@@ -2790,6 +2790,8 @@ export const en = {
     'Or check a video you already recorded — filmed from the side, full body in frame.',
   'formcheck.uploadLoading':
     'Loading your video and the pose model… First load can take a few seconds — several MB to download.',
+  'formcheck.analyzingVideo': 'Analyzing video… {done} of {total} frames ({pct}%)',
+  'formcheck.cancelAnalysis': 'Cancel analysis',
   'formcheck.heuristicsNote':
     'Angles shown are coaching heuristics from a phone camera, not medical measurements. Film from the side with your full body in frame.',
   'formcheck.loading': 'Starting camera and loading the pose model… First load can take a few seconds — several MB to download.',
@@ -2825,6 +2827,8 @@ export const en = {
   'formcheck.debugModel': 'Model: {model}',
   'formcheck.debugVerdictClear': 'Gate: clear',
   'formcheck.debugVerdictUnclear': 'Gate: unclear',
+  'formcheck.debugFrames': 'Frames: {n}',
+  'formcheck.debugAvgDetect': 'Avg detect: {ms} ms',
   'formcheck.endSet': 'End set',
   'formcheck.painStop': 'I feel pain — stop',
   'formcheck.painStopAria': 'I feel pain — stop the set',
@@ -2838,6 +2842,7 @@ export const en = {
   'formcheck.setCompleteOther': 'Set complete — {count} reps counted',
   'formcheck.fullDepth': 'Full depth',
   'formcheck.medianRepTime': 'Median rep time',
+  'formcheck.summaryAnalysis': 'Analysis: {frames} frames · avg detect {ms} ms',
   'formcheck.noFlags': 'No form flags on this set — depth and positions stayed in range.',
   'formcheck.noRepsCounted':
     'No reps counted: only full reps with a clear view count. Partial reps and reps interrupted by an unclear view are never counted.',
@@ -2881,6 +2886,9 @@ export const en = {
     'This file could not be played as a video. It may be corrupt or in an unsupported format.',
   'formcheck.errUploadTry':
     'Pick another video file, or record a new one with your phone camera.',
+  'formcheck.errSeekTitle': 'Video analysis stalled',
+  'formcheck.errSeekMessage': 'This video could not be stepped through for analysis.',
+  'formcheck.errSeekTry': 'Try another video, or record a shorter clip.',
   'formcheck.errTrackingTitle': 'Pose tracking stopped',
   'formcheck.errTrackingMessage': 'Pose detection kept failing on this device.',
   'formcheck.errTrackingTry': 'Retry, or close other apps and try again.',

@@ -2787,6 +2787,8 @@ export const hi: Partial<Record<StringKey, string>> = {
     'या पहले से रिकॉर्ड किया गया वीडियो चेक करें — साइड से फिल्माया गया, पूरा शरीर फ्रेम में।',
   'formcheck.uploadLoading':
     'आपका वीडियो और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
+  'formcheck.analyzingVideo': 'वीडियो विश्लेषण हो रहा है… {done} / {total} फ़्रेम ({pct}%)',
+  'formcheck.cancelAnalysis': 'विश्लेषण रद्द करें',
   'formcheck.heuristicsNote':
     'दिखाए गए कोण फोन कैमरे से मिले कोचिंग अनुमान हैं, मेडिकल माप नहीं। साइड से फिल्म करें, पूरा शरीर फ्रेम में रहे।',
   'formcheck.loading': 'कैमरा शुरू हो रहा है और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
@@ -2820,6 +2822,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.debugModel': 'मॉडल: {model}',
   'formcheck.debugVerdictClear': 'गेट: स्पष्ट',
   'formcheck.debugVerdictUnclear': 'गेट: अस्पष्ट',
+  'formcheck.debugFrames': 'फ़्रेम: {n}',
+  'formcheck.debugAvgDetect': 'औसत पहचान: {ms} मि.से.',
   'formcheck.endSet': 'सेट खत्म करें',
   'formcheck.painStop': 'दर्द हो रहा है — रुकें',
   'formcheck.painStopAria': 'दर्द हो रहा है — सेट रोकें',
@@ -2833,6 +2837,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.setCompleteOther': 'सेट पूरा — {count} रेप गिने गए',
   'formcheck.fullDepth': 'पूरी गहराई',
   'formcheck.medianRepTime': 'मध्य रेप समय',
+  'formcheck.summaryAnalysis': 'विश्लेषण: {frames} फ़्रेम · औसत पहचान {ms} मि.से.',
   'formcheck.noFlags': 'इस सेट में कोई फॉर्म चेतावनी नहीं — गहराई और पोज़िशन सही रेंज में रहे।',
   'formcheck.noRepsCounted':
     'कोई रेप नहीं गिना गया: सिर्फ़ साफ़ नज़र वाले पूरे रेप गिने जाते हैं। अधूरे रेप और साफ़ नज़र के बिना टूटे रेप कभी नहीं गिने जाते।',
@@ -2870,6 +2875,9 @@ export const hi: Partial<Record<StringKey, string>> = {
     'यह फ़ाइल वीडियो के रूप में चलाई नहीं जा सकी। यह खराब हो सकती है या असमर्थित फ़ॉर्मैट में हो सकती है।',
   'formcheck.errUploadTry':
     'दूसरी वीडियो फ़ाइल चुनें, या अपने फ़ोन कैमरे से नया वीडियो रिकॉर्ड करें।',
+  'formcheck.errSeekTitle': 'वीडियो विश्लेषण रुक गया',
+  'formcheck.errSeekMessage': 'इस वीडियो को विश्लेषण के लिए आगे नहीं बढ़ाया जा सका।',
+  'formcheck.errSeekTry': 'दूसरा वीडियो चुनें, या छोटा क्लिप रिकॉर्ड करें।',
   'formcheck.errTrackingTitle': 'पोज़ ट्रैकिंग रुक गई',
   'formcheck.errTrackingMessage': 'इस डिवाइस पर पोज़ पहचान बार-बार फेल हो रही थी।',
   'formcheck.errTrackingTry': 'फिर से कोशिश करें, या दूसरे ऐप बंद करके दोबारा कोशिश करें।',

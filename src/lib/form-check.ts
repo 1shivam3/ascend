@@ -207,6 +207,17 @@ export interface SetSummary {
   issues: IssueSummary[];
   /** Set duration in seconds, null when the set never started. */
   setDurationSec: number | null;
+  /**
+   * Detection instrumentation, attached by the UI (never the
+   * counter): frames fed through detection in this run + mean detect
+   * time in ms. Optional because the counter itself never sees
+   * detection — the section fills these in at endSet so the summary
+   * reports them without needing the debug toggle. Absent on
+   * summaries built before this field existed.
+   */
+  framesProcessed?: number;
+  /** Mean detect time in ms; null when no frame was processed. */
+  avgDetectMs?: number | null;
 }
 
 export interface FrameResult {

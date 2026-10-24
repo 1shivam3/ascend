@@ -9,17 +9,21 @@ import { translate } from '@/lib/i18n';
 /**
  * Video-upload form check (v1): instead of only the live camera, the
  * user can pick a recorded video file, which runs through the SAME
- * <video> element, rAF loop, pose engine, counter, gate, cues, and
- * debug readout as live camera. This also diagnoses the persistent
- * unclear-box problem: if an uploaded video of the same squat counts
- * reps while live camera does not, the fault is live-camera-path
- * specific; if both fail identically, it is input/model-wide.
+ * video element, pose engine, counter, gate, cues, and debug readout
+ * as live camera — but stepped offline (seek → detect → repeat),
+ * NOT through the real-time rAF loop: real-time playback on a slow
+ * phone samples ~1.5 fps and the counter's taint rule + 2-frame
+ * confirms turn that into 0 reps, even when the model reads every
+ * frame perfectly. This also diagnoses the persistent unclear-box
+ * problem: if an uploaded video of the same squat counts reps while
+ * live camera does not, the fault is live-camera-path specific; if
+ * both fail identically, it is input/model-wide.
  *
- * The section needs video + rAF + landmarker, so — like the framing
- * and diagnostic tests — section wiring is pinned with a static
- * harness over FormCheckSection.tsx, and the shared engine is pinned
- * with pure counter tests (the upload path feeds this same counter;
- * there is no second counting implementation).
+ * The section needs video + landmarker, so — like the framing and
+ * diagnostic tests — section wiring is pinned with a static harness
+ * over FormCheckSection.tsx, and the shared engine is pinned with
+ * pure counter tests (the upload path feeds this same counter; there
+ * is no second counting implementation).
  *
  * Conventions mirror tests/form-check.test.ts: left side exact, right
  * side = left x + 0.02 (a side view), visibility 1 unless overridden.
@@ -136,15 +140,30 @@ describe('upload section contract (static-rendering harness)', () => {
     expect(SECTION).toContain("e.target.value = ''");
   });
 
-  it('upload runs the SAME loop and counter, and never asks for the camera', () => {
+  it('upload runs the SAME counter via seek-based analysis, never the live loop or the camera', () => {
     const upload = region(SECTION, 'const startUpload', 'const switchCamera');
     expect(upload).toContain('URL.createObjectURL');
     expect(upload).toContain('new RepCounter(lift)');
-    expect(upload).toContain('requestAnimationFrame(loop)');
+    expect(upload).toContain('void analyzeUpload()');
+    expect(upload).toContain('waitForMetadata');
+    expect(upload).toContain('video.pause()');
+    // No real-time playback on this path: no rAF loop, no play().
+    expect(upload).not.toContain('requestAnimationFrame(loop)');
+    expect(upload).not.toContain('video.play()');
     expect(upload).not.toContain('getUserMedia');
-    // The camera path still asks for the camera (unchanged).
+    // The stepping loop itself: seeks + detects each stepped frame
+    // through the same counter, with a token-guarded exit.
+    const analysis = region(SECTION, 'const analyzeUpload', 'const startUpload');
+    expect(analysis).toContain('computeUploadStepTimes');
+    expect(analysis).toContain('seekVideoTo');
+    expect(analysis).toContain('nextAnalysisTimestamp');
+    expect(analysis).toContain('handleCounterFrame');
+    expect(analysis).toContain('analysisTokenRef');
+    expect(analysis).toContain('endSet(false)');
+    // The camera path still asks for the camera and runs the live loop (unchanged).
     const camera = region(SECTION, 'const start = ', 'const startUpload');
     expect(camera).toContain('getUserMedia');
+    expect(camera).toContain('requestAnimationFrame(loop)');
   });
 
   it('upload failures show the upload error box, never a camera prompt', () => {
