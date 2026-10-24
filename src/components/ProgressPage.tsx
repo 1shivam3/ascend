@@ -403,12 +403,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     } catch {}
   }, [activeTab, strengthSubView]);
 
-  // Persist chart ranges (local only) whenever a pill changes.
-  useEffect(() => {
-    try {
-      localStorage.setItem('ascend-progress-ranges', JSON.stringify({ strength: strengthTimeRange, body: bodyTimeRange }));
-    } catch {}
-  }, [strengthTimeRange, bodyTimeRange]);
+  // (Chart-range persistence lives below, after the big-three lift state
+  // it also persists — a deps array may not reference a later const.)
 
   // ── 1. REAL STRENGTH ANALYTICS & PRs DATA ─────────────────────────────────
   // Core compound lifts computed strictly from real records
@@ -806,7 +802,17 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   // ── UX redesign Stage 5 — goal-aware spotlight ─────────────────────
   const primaryGoal = resolvePrimaryGoal(profile?.goals);
   const spotlightChart = resolveSpotlightChart(primaryGoal, uiPreferences.pinnedProgressChart);
-  const [big3Lift, setBig3Lift] = useState<'Squat' | 'Bench Press' | 'Deadlift'>('Squat');
+  const [big3Lift, setBig3Lift] = useState<'Squat' | 'Bench Press' | 'Deadlift'>(() => {
+    // Stage 10: the big-three lift filter persists like the chart ranges
+    // (local only); an invalid stored value falls back to Squat.
+    if (typeof window === 'undefined') return 'Squat';
+    try {
+      const parsed = JSON.parse(localStorage.getItem('ascend-progress-ranges') || '{}');
+      return parsed.big3 === 'Bench Press' || parsed.big3 === 'Deadlift' ? parsed.big3 : 'Squat';
+    } catch {
+      return 'Squat';
+    }
+  });
   // Big-three trend mirrors the hero computation (sessions + PRs).
   const big3Analytics = useMemo(() => {
     const sessions = getExerciseHistorySessions(big3Lift, workouts, userUnit);
@@ -837,6 +843,16 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     () => computeChartGeometry(big3Analytics.dataPoints, 320, 110, 10, 20),
     [big3Analytics.dataPoints],
   );
+
+  // Persist chart ranges + big-three lift filter (local only) whenever one
+  // changes. Placed here (not with the other effects above) because the
+  // deps array evaluates during render and big3Lift is declared above.
+  useEffect(() => {
+    try {
+      localStorage.setItem('ascend-progress-ranges', JSON.stringify({ strength: strengthTimeRange, body: bodyTimeRange, big3: big3Lift }));
+    } catch {}
+  }, [strengthTimeRange, bodyTimeRange, big3Lift]);
+
   // Goal change clears a pinned chart (with a toast) — the spotlight
   // follows the new goal until the user pins again. Mount does not
   // clear: prevGoalRef starts at the current goal.
