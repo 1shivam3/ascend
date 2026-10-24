@@ -2360,7 +2360,7 @@ export default function ActiveWorkoutScreen({
                   aria-label={t('workout.changeAria', { name: currentExercise.name || t('workout.untitled') })}
                   title={t('workout.changeTitle')}
                 >
-                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#E44427] transition-colors truncate">
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors truncate">
                     {(currentExercise.name || t('workout.untitled')).toUpperCase()}.
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
@@ -2448,7 +2448,7 @@ export default function ActiveWorkoutScreen({
                     }}
                     className={`w-10 h-10 min-w-[40px] min-h-[40px] rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
-                        ? 'bg-[#E44427] text-white font-black shadow-xs'
+                        ? 'bg-accent text-white font-black shadow-xs'
                         : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : s.status === 'skipped'
@@ -2754,7 +2754,7 @@ export default function ActiveWorkoutScreen({
                     className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
                       isActiveSetCompleted(currentExercise.sets[activeSetIdx])
                         ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                        : 'bg-[#E44427] hover:bg-[#c9361e] text-white shadow-[#E44427]/25'
+                        : 'bg-accent hover:brightness-105 text-white shadow-accent/25'
                     }`}
                   >
                     <Check className="w-5 h-5 stroke-[3]" />
@@ -3076,7 +3076,7 @@ export default function ActiveWorkoutScreen({
                 skipTimer();
                 setIsRestPopoverOpen(false);
               }}
-              className="px-2.5 py-2 min-h-[40px] rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2.5 py-2 min-h-[40px] rounded-lg bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               {t('workout.skip')}
             </button>
@@ -3095,7 +3095,7 @@ export default function ActiveWorkoutScreen({
               setIsRestPopoverOpen((prev) => !prev);
             }
           }}
-          className={`flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+          className={`flex items-center gap-2 px-4 py-2.5 min-h-[48px] rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
             isRestFinished
               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
               : isRestRunning
@@ -3169,7 +3169,7 @@ export default function ActiveWorkoutScreen({
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                           isCurrent
-                            ? 'bg-[#E44427] text-white'
+                            ? 'bg-accent text-white'
                             : isDone
                             ? 'bg-emerald-500 text-white'
                             : 'bg-bg-secondary text-text-muted border border-border'
@@ -3189,7 +3189,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
+                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent text-white">
                           {t('workout.active')}
                         </span>
                       )}
@@ -3712,7 +3712,7 @@ export default function ActiveWorkoutScreen({
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#E44427]" />
+                <Trophy className="w-5 h-5 text-accent" />
                 {/* Honest title: a 2-of-17 bail is "SESSION SAVED.", not a trophy ceremony. */}
                 <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{isPartial ? t('workout.sessionSaved') : t('workout.workoutComplete')}</h3>
               </div>
@@ -3916,115 +3916,133 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Screen 13: Set Complete! Transition View (Reference: Flow Board Screen 13) ── */}
       {completedSetSummary && (
-        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in max-w-md mx-auto">
-          {/* Top Bar with subtle workout info */}
-          <div className="flex items-center justify-between pt-2">
-            <span className="text-xs font-mono font-bold tracking-wider uppercase text-[#858076]">
-              {workoutName}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCompletedSetSummary(null)}
-              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
-              aria-label="Dismiss set complete screen"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Center Celebratory State */}
-          <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 space-y-4">
-            {/* Sage Checkmark Circle */}
-            <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#858076]/20 border-2 border-[#858076] text-[#858076] flex items-center justify-center shadow-lg shadow-[#858076]/10 animate-scale-in">
-              <Check className="w-10 h-10 sm:w-12 sm:h-12 stroke-[3] text-[#858076]" />
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-2xl sm:text-3xl font-black text-[#F3F0E7] tracking-tight font-sans">
-                {t('workout.setComplete')}
-              </h2>
-              <p className="text-sm font-semibold text-[#858076]">
-                {t('workout.setCompleteLine', {
-                  exercise: completedSetSummary.exerciseName,
-                  current: completedSetSummary.setIndex + 1,
-                  total: completedSetSummary.totalSets,
-                })}
-              </p>
-            </div>
-
-            {/* Performance Summary Pill */}
-            <div className="px-4 py-2 rounded-xl bg-[#212420] border border-[#2C302B] inline-flex items-center gap-2 shadow-xs">
-              <span className="text-base sm:text-lg font-bold font-mono text-[#F3F0E7]">
-                {completedSetSummary.weight > 0 ? `${completedSetSummary.weight} ${completedSetSummary.unit} × ` : ''}
-                {t('prs.repsWord', { reps: completedSetSummary.reps })}
+        <div
+          className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex flex-col justify-end sm:justify-center p-3 sm:p-6 animate-fade-in"
+          onClick={() => setCompletedSetSummary(null)}
+        >
+          <div
+            className="bg-bg-card border border-border text-text-primary rounded-3xl p-5 sm:p-6 shadow-2xl max-w-md w-full mx-auto space-y-4 animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar with subtle workout info */}
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <span className="text-xs font-mono font-bold tracking-wider uppercase text-text-muted">
+                {workoutName}
               </span>
-              {completedSetSummary.isPR && (
-                <span className="px-2 py-0.5 rounded-full bg-[#E44427] text-white text-xs font-black uppercase tracking-wider">
-                  {t('workout.newPr')}
+              <button
+                type="button"
+                onClick={() => setCompletedSetSummary(null)}
+                className="w-10 h-10 min-w-[44px] min-h-[44px] rounded-full bg-bg-secondary border border-border flex items-center justify-center text-text-muted hover:text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
+                aria-label="Dismiss set complete screen"
+                title="Dismiss and view workout sheet"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Center Celebratory State */}
+            <div className="flex flex-col items-center justify-center text-center py-2 space-y-3">
+              {/* Checkmark Circle with Accent Glow */}
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-accent/15 border-2 border-accent text-accent flex items-center justify-center shadow-lg shadow-accent/20 animate-scale-in">
+                <Check className="w-8 h-8 sm:w-10 sm:h-10 stroke-[3] text-accent" />
+              </div>
+
+              <div className="space-y-0.5">
+                <h2 className="text-xl sm:text-2xl font-black text-text-primary tracking-tight font-sans">
+                  {t('workout.setComplete')}
+                </h2>
+                <p className="text-xs sm:text-sm font-semibold text-text-muted">
+                  {t('workout.setCompleteLine', {
+                    exercise: completedSetSummary.exerciseName,
+                    current: completedSetSummary.setIndex + 1,
+                    total: completedSetSummary.totalSets,
+                  })}
+                </p>
+              </div>
+
+              {/* Performance Summary Pill */}
+              <div className="px-4 py-2 rounded-xl bg-bg-secondary border border-border inline-flex items-center gap-2 shadow-xs">
+                <span className="text-base sm:text-lg font-bold font-mono text-text-primary">
+                  {completedSetSummary.weight > 0 ? `${completedSetSummary.weight} ${completedSetSummary.unit} × ` : ''}
+                  {t('prs.repsWord', { reps: completedSetSummary.reps })}
                 </span>
-              )}
-            </div>
-
-            {/* Live Rest Timer Countdown */}
-            <div className="pt-6 pb-2 space-y-2 w-full max-w-xs">
-              <span className="text-2xs font-bold uppercase tracking-wider text-[#858076] font-mono block">
-                {t('workout.restTimer')}
-              </span>
-              <div className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
-                {isRestFinished
-                  ? t('workout.ready')
-                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+                {completedSetSummary.isPR && (
+                  <span className="px-2 py-0.5 rounded-full bg-accent text-accent-on text-xs font-black uppercase tracking-wider shadow-xs">
+                    {t('workout.newPr')}
+                  </span>
+                )}
               </div>
 
-              {/* Timer Controls */}
-              <div className="flex items-center justify-center gap-2 pt-2">
+              {/* Live Rest Timer Countdown */}
+              <div className="pt-3 pb-1 space-y-2 w-full max-w-xs">
+                <span className="text-2xs font-bold uppercase tracking-wider text-text-muted font-mono block">
+                  {t('workout.restTimer')}
+                </span>
+                <div className="text-4xl sm:text-5xl font-black font-mono text-text-primary tabular-nums tracking-tight">
+                  {isRestFinished
+                    ? t('workout.ready')
+                    : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+                </div>
+
+                {/* Timer Controls with >=48px Touch Targets */}
+                <div className="flex items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => adjustTimer(-30)}
+                    className="px-3.5 py-2.5 min-h-[48px] min-w-[48px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-muted hover:text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                  >
+                    -30s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={togglePauseTimer}
+                    className="px-5 py-2.5 min-h-[48px] rounded-xl bg-bg-secondary border border-border text-xs font-bold text-text-primary flex items-center gap-1.5 hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                  >
+                    {isRestRunning ? <Pause className="w-4 h-4 text-accent" /> : <Play className="w-4 h-4 text-accent" />}
+                    <span>{isRestRunning ? t('workout.pause') : t('workout.resume')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTimer(30)}
+                    className="px-3.5 py-2.5 min-h-[48px] min-w-[48px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-muted hover:text-text-primary hover:border-accent/40 active:scale-95 transition-all cursor-pointer"
+                  >
+                    +30s
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Actions: Next Set & End Workout */}
+            <div className="w-full max-w-xs mx-auto space-y-2 pt-1">
+              <button
+                type="button"
+                onClick={handleProceedNextSet}
+                className="w-full py-3.5 min-h-[48px] rounded-xl bg-accent text-accent-on font-bold text-base flex items-center justify-center gap-2 shadow-md shadow-accent/25 hover:brightness-105 active:scale-[0.98] transition-all cursor-pointer"
+              >
+                <span>{t('workout.nextSet')}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center justify-between text-xs pt-1 px-1">
                 <button
                   type="button"
-                  onClick={() => adjustTimer(-30)}
-                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                  onClick={() => setCompletedSetSummary(null)}
+                  className="py-2 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
                 >
-                  -30s
+                  Keep resting & view sheet
                 </button>
                 <button
                   type="button"
-                  onClick={togglePauseTimer}
-                  className="px-4 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setCompletedSetSummary(null);
+                    setIsFinishModalOpen(true);
+                  }}
+                  className="py-2 text-text-muted hover:text-red-400 transition-colors cursor-pointer font-medium"
                 >
-                  {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{isRestRunning ? t('workout.pause') : t('workout.resume')}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => adjustTimer(30)}
-                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
-                >
-                  +30s
+                  {t('workout.endWorkout')}
                 </button>
               </div>
             </div>
-          </div>
-
-          {/* Bottom Actions: Next Set & End Workout */}
-          <div className="w-full max-w-xs mx-auto space-y-2.5 pb-2">
-            <button
-              type="button"
-              onClick={handleProceedNextSet}
-              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#E44427]/25 cursor-pointer active:scale-[0.98]"
-            >
-              <span>{t('workout.nextSet')}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setCompletedSetSummary(null);
-                setIsFinishModalOpen(true);
-              }}
-              className="w-full py-2 text-xs font-semibold text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer text-center block"
-            >
-              {t('workout.endWorkout')}
-            </button>
           </div>
         </div>
       )}

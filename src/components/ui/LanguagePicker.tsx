@@ -27,15 +27,15 @@ export default function LanguagePicker({
 
   const container =
     variant === 'light'
-      ? 'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white border border-[#E2DFD6]'
+      ? 'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-white border border-stone-200'
       : 'grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border';
   const activeCls =
     variant === 'light'
-      ? 'bg-[#171916] text-white shadow-xs'
+      ? 'bg-stone-900 text-white shadow-xs'
       : 'bg-bg-card text-text-primary shadow-xs border border-border';
   const idleCls =
     variant === 'light'
-      ? 'text-[#858076] hover:text-[#171916]'
+      ? 'text-stone-500 hover:text-stone-900'
       : 'text-text-muted hover:text-text-primary';
 
   return (

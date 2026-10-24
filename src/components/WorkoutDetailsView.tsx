@@ -86,19 +86,19 @@ export default function WorkoutDetailsView({
     'Build strength and muscle with compound movements and focused accessory work.';
 
   return (
-    <div className="fixed inset-0 z-[60] bg-[#171916] text-[#F3F0E7] flex flex-col justify-between max-w-md mx-auto overflow-y-auto animate-fade-in pb-28">
+    <div className="fixed inset-0 z-[60] bg-bg-primary text-text-primary flex flex-col justify-between max-w-md mx-auto overflow-y-auto animate-fade-in pb-28">
       {/* ── Top Navigation Bar ────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-[#171916]/90 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-[#2C302B]/60">
+      <div className="sticky top-0 z-20 bg-bg-primary/95 backdrop-blur-md px-4 py-3 flex items-center justify-between border-b border-border/60">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to workouts"
-          className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+          className="w-10 h-10 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-secondary active:scale-95 transition-all cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <span className="text-xs font-semibold tracking-wider uppercase text-[#858076]">
+        <span className="text-xs font-semibold tracking-wider uppercase text-text-muted">
           Workout Details
         </span>
 
@@ -108,9 +108,9 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onShare(plan)}
               aria-label="Share workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-secondary active:scale-95 transition-all cursor-pointer"
             >
-              <Share2 className="w-4 h-4 text-[#858076]" />
+              <Share2 className="w-4 h-4 text-text-muted" />
             </button>
           )}
           {onEdit && (
@@ -118,9 +118,9 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onEdit(plan)}
               aria-label="Edit workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-secondary active:scale-95 transition-all cursor-pointer"
             >
-              <Edit2 className="w-4 h-4 text-[#858076]" />
+              <Edit2 className="w-4 h-4 text-text-muted" />
             </button>
           )}
           {onDelete && (
@@ -128,9 +128,9 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onDelete(plan)}
               aria-label="Delete workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-10 h-10 rounded-full bg-bg-card border border-border flex items-center justify-center text-text-primary hover:bg-bg-secondary active:scale-95 transition-all cursor-pointer"
             >
-              <Trash2 className="w-4 h-4 text-[#858076]" />
+              <Trash2 className="w-4 h-4 text-text-muted" />
             </button>
           )}
         </div>
@@ -138,21 +138,21 @@ export default function WorkoutDetailsView({
 
       <div className="px-4 py-4 space-y-5 flex-1">
         {/* ── Hero Photograph (Reference Screen 11) ───────────────────────── */}
-        <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-[#212420] border border-[#2C302B] shadow-md">
+        <div className="relative w-full h-44 rounded-2xl overflow-hidden bg-bg-card border border-border shadow-md">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/splash-athlete.jpg"
             alt="Workout hero photograph"
             className="w-full h-full object-cover object-center filter brightness-90"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#171916] via-transparent to-transparent opacity-90" />
+          <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-transparent to-transparent opacity-90" />
           <div className="absolute bottom-3 left-3 flex items-center gap-2">
-            <span className="px-2.5 py-1 rounded-full bg-[#171916]/80 backdrop-blur-sm border border-[#2C302B] text-2xs font-semibold text-[#F3F0E7] flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#E44427]" />
+            <span className="px-2.5 py-1 rounded-full bg-bg-card/90 backdrop-blur-sm border border-border text-2xs font-semibold text-text-primary flex items-center gap-1">
+              <Clock className="w-3 h-3 text-accent" />
               {estimatedDuration} min
             </span>
-            <span className="px-2.5 py-1 rounded-full bg-[#171916]/80 backdrop-blur-sm border border-[#2C302B] text-2xs font-semibold text-[#F3F0E7] flex items-center gap-1">
-              <Flame className="w-3 h-3 text-[#E44427]" />
+            <span className="px-2.5 py-1 rounded-full bg-bg-card/90 backdrop-blur-sm border border-border text-2xs font-semibold text-text-primary flex items-center gap-1">
+              <Flame className="w-3 h-3 text-accent" />
               {exerciseCount} exercises
             </span>
           </div>
@@ -160,7 +160,7 @@ export default function WorkoutDetailsView({
 
         {/* ── Title, Metadata & Description ───────────────────────────────── */}
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-[#F3F0E7] tracking-tight leading-snug">
+          <h1 className="text-2xl font-bold text-text-primary tracking-tight leading-snug">
             {plan.name.replace(/^Builtin\s+/i, '')}
           </h1>
 
@@ -168,17 +168,17 @@ export default function WorkoutDetailsView({
             {bodyParts.map((tag, i) => (
               <span
                 key={i}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#212420] text-[#858076] border border-[#2C302B]"
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-bg-card text-text-muted border border-border"
               >
                 {tag}
               </span>
             ))}
-            <span className="text-xs text-[#858076]">
+            <span className="text-xs text-text-muted">
               {estimatedDuration} min · {exerciseCount} exercises
             </span>
           </div>
 
-          <p className="text-sm text-[#858076] leading-relaxed pt-1">
+          <p className="text-sm text-text-muted leading-relaxed pt-1">
             {defaultDescription}
           </p>
         </div>
@@ -186,19 +186,19 @@ export default function WorkoutDetailsView({
         {/* ── Exercises Section ────────────────────────────────────────────── */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-[#F3F0E7] tracking-tight">
+            <h2 className="text-base font-bold text-text-primary tracking-tight">
               {t('train.exercises')}
             </h2>
-            <span className="text-xs text-[#858076]">
+            <span className="text-xs text-text-muted">
               {exerciseCount} total
             </span>
           </div>
 
           {/* Crowded-gym pre-swap toggle */}
-          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[#212420] border border-[#2C302B]">
+          <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-bg-card border border-border">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#F3F0E7]">{t('packed.toggle')}</p>
-              <p className="text-xs text-[#858076] mt-0.5 leading-relaxed">
+              <p className="text-sm font-semibold text-text-primary">{t('packed.toggle')}</p>
+              <p className="text-xs text-text-muted mt-0.5 leading-relaxed">
                 {gymPacked && packedResult
                   ? t('packed.swappedCount', { count: packedResult.swappedCount })
                   : t('packed.previewHint')}
@@ -211,11 +211,11 @@ export default function WorkoutDetailsView({
               aria-label={t('packed.toggle')}
               onClick={() => setGymPacked((v) => !v)}
               className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-                gymPacked ? 'bg-[#E44427]' : 'bg-[#2A2E29] border border-[#2C302B]'
+                gymPacked ? 'bg-accent' : 'bg-bg-secondary border border-border'
               }`}
             >
               <span
-                className={`absolute top-0.5 h-5 w-5 rounded-full bg-[#F3F0E7] shadow transition-all ${
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white dark:bg-zinc-100 shadow transition-all ${
                   gymPacked ? 'left-[22px]' : 'left-0.5'
                 }`}
               />
@@ -232,23 +232,23 @@ export default function WorkoutDetailsView({
               return (
                 <div
                   key={idx}
-                  className="p-3.5 rounded-xl bg-[#212420] border border-[#2C302B] flex items-center justify-between gap-3 shadow-xs hover:border-[#858076]/40 transition-colors"
+                  className="p-3.5 rounded-xl bg-bg-card border border-border flex items-center justify-between gap-3 shadow-xs hover:border-accent/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-[#2A2E29] border border-[#2C302B] flex items-center justify-center shrink-0 text-[#858076]">
-                      <Dumbbell className="w-4 h-4 text-[#E44427]" />
+                    <div className="w-10 h-10 rounded-lg bg-bg-secondary border border-border flex items-center justify-center shrink-0 text-text-muted">
+                      <Dumbbell className="w-4 h-4 text-accent" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-sm text-[#F3F0E7] truncate">
+                      <h3 className="font-semibold text-sm text-text-primary truncate">
                         {ex.name}
                       </h3>
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-[#858076] mt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-text-muted mt-0.5">
                         <span>
                           {targetSets} sets · {targetReps} reps
                           {targetW ? ` @ ${targetW} ${ex.targetUnit || userUnit}` : ''}
                         </span>
                         {!targetW && percentSuggestions[idx] && (
-                          <span className="text-2xs text-[#E44427] font-mono">
+                          <span className="text-2xs text-accent font-mono">
                             {t('plan.suggestedFrom1rm', {
                               weight: percentSuggestions[idx].weights[0],
                               unit: percentSuggestions[idx].unit,
@@ -261,18 +261,18 @@ export default function WorkoutDetailsView({
                           </span>
                         )}
                         {lastPerf && lastPerf.bestWeight > 0 && (
-                          <span className="text-2xs text-[#858076]/80 font-mono">
+                          <span className="text-2xs text-text-muted/80 font-mono">
                             • Prev: {lastPerf.bestWeight} {userUnit} × {lastPerf.bestReps}
                           </span>
                         )}
                       </div>
                       {gymPacked && ex.notes && (
-                        <p className="text-2xs text-[#E44427] mt-0.5">{ex.notes}</p>
+                        <p className="text-2xs text-accent mt-0.5">{ex.notes}</p>
                       )}
                     </div>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-[#858076] shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
                 </div>
               );
             })}
@@ -281,11 +281,11 @@ export default function WorkoutDetailsView({
       </div>
 
       {/* ── Fixed Bottom CTA ──────────────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gradient-to-t from-[#171916] via-[#171916]/95 to-transparent z-[70]">
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-gradient-to-t from-bg-primary via-bg-primary/95 to-transparent z-[70]">
         <button
           type="button"
           onClick={() => onStart(displayPlan)}
-          className="w-full py-4 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-bold text-base shadow-lg shadow-[#E44427]/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+          className="w-full py-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-accent-on font-bold text-base shadow-lg shadow-accent/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <Play className="w-4 h-4 fill-white" />
           <span>{t('train.startWorkout')}</span>

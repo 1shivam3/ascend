@@ -9,7 +9,7 @@ import path from 'node:path';
  * silently shrink a target or reintroduce jargon.
  */
 const read = (rel: string) =>
-  readFileSync(path.resolve(__dirname, '..', rel), 'utf8');
+  readFileSync(path.resolve(__dirname, '..', rel), 'utf8').replace(/\r\n/g, '\n');
 
 describe('QA4-015 touch targets ≥40px in workout flows', () => {
   it('shared Button sm is 40px tall (was 36px)', () => {

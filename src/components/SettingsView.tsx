@@ -34,6 +34,7 @@ import ConfirmationModal from '@/components/ConfirmationModal';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import LanguagePicker from '@/components/ui/LanguagePicker';
+import ThemeSelector from '@/components/ui/ThemeSelector';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation, type StringKey } from '@/lib/i18n';
 import {
@@ -452,6 +453,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Laptop className="w-3.5 h-3.5" />
                 <span>{t('settings.themeSystem')}</span>
               </button>
+            </div>
+            {/* Curated Accent Theme & Information Density Selector */}
+            <div className="pt-3 border-t border-border/60">
+              <ThemeSelector />
             </div>
           </div>
 

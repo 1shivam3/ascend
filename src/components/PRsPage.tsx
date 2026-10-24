@@ -1097,7 +1097,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#E44427] uppercase">{t('prs.personalBests')}</div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-accent uppercase">{t('prs.personalBests')}</div>
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">
               {t('prs.title')}
             </h1>

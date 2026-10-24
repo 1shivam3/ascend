@@ -882,8 +882,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
                 <defs>
                   <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                    <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                    <stop offset="0%" stopColor="var(--accent-hex, #E44427)" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="var(--accent-hex, #E44427)" stopOpacity="0.0" />
                   </linearGradient>
                 </defs>
                 <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
@@ -895,7 +895,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <path
                           d={heroChartGeometry.pathD}
                           fill="none"
-                          stroke="#E44427"
+                          stroke="var(--accent-hex, #E44427)"
                           strokeWidth="2.5"
                           strokeLinecap="round"
                         />
@@ -907,7 +907,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         cx={pt.x}
                         cy={pt.y}
                         r={i === heroChartGeometry.points.length - 1 ? 4 : 3}
-                        fill="#E44427"
+                        fill="var(--accent-hex, #E44427)"
                         stroke={i === heroChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
                         strokeWidth={i === heroChartGeometry.points.length - 1 ? 2 : 0}
                       />
@@ -1060,8 +1060,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <svg viewBox="0 0 320 130" className="w-full h-32 overflow-visible" preserveAspectRatio="none">
                     <defs>
                       <linearGradient id="analyticsGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#E44427" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                        <stop offset="0%" stopColor="var(--accent-hex, #E44427)" stopOpacity="0.25" />
+                        <stop offset="100%" stopColor="var(--accent-hex, #E44427)" stopOpacity="0.0" />
                       </linearGradient>
                     </defs>
                     <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
@@ -1075,7 +1075,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             <path
                               d={strengthChartGeometry.pathD}
                               fill="none"
-                              stroke="#E44427"
+                              stroke="var(--accent-hex, #E44427)"
                               strokeWidth="2.5"
                               strokeLinecap="round"
                             />
@@ -1087,7 +1087,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             cx={pt.x}
                             cy={pt.y}
                             r={i === strengthChartGeometry.points.length - 1 ? 4.5 : 3.5}
-                            fill="#E44427"
+                            fill="var(--accent-hex, #E44427)"
                             stroke={i === strengthChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
                             strokeWidth={i === strengthChartGeometry.points.length - 1 ? 2 : 0}
                           />
@@ -1493,7 +1493,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <div
                           style={{ height: `${bar.heightPct}%` }}
                           className={`w-full rounded-lg transition-all ${
-                            bar.isCompleted ? 'bg-[#E44427]' : 'bg-border/60'
+                            bar.isCompleted ? 'bg-accent' : 'bg-border/60'
                           }`}
                         />
                       </div>

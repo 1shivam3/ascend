@@ -149,6 +149,7 @@ describe('i18n wiring coverage (pinned)', () => {
         const src = readFileSync(f, 'utf8');
         return !src.includes('useTranslation') && !src.includes('translate(');
       })
+      .map((f) => f.replace(/\\/g, '/'))
       .sort();
     expect(unwired).toEqual(EXPECTED_UNWIRED);
   });

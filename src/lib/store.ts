@@ -156,7 +156,27 @@ export interface ActiveWorkoutDraft {
   savedAt: string;
 }
 
+export type AccentPreset = 'vermilion' | 'amber' | 'cobalt' | 'emerald' | 'silver' | 'crimson' | 'custom';
+export type InformationDensityMode = 'simple' | 'detailed';
+
+export interface DashboardCardPreferences {
+  showHero: boolean;
+  showHabits: boolean;
+  showNutrition: boolean;
+  showAthleteModel: boolean;
+  showPRs: boolean;
+  showWeeklyReview: boolean;
+}
+
 export interface UiPreferences {
+  /** Selected accent theme preset. Default 'vermilion'. */
+  accentPreset: AccentPreset;
+  /** Optional custom hex string when accentPreset === 'custom'. */
+  customAccentHex?: string;
+  /** Density mode for Home and logging: 'simple' (calm default) or 'detailed'. */
+  densityMode: InformationDensityMode;
+  /** Visibility controls for individual Home dashboard cards. */
+  dashboardCards: DashboardCardPreferences;
   /** XP level card, streak card, monthly challenge card on Home. */
   gamificationEnabled: boolean;
   /** Coach check-in cards, calorie suggestions, readiness score on Home. */
@@ -188,6 +208,17 @@ export interface UiPreferences {
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
+  accentPreset: 'vermilion',
+  customAccentHex: undefined,
+  densityMode: 'simple',
+  dashboardCards: {
+    showHero: true,
+    showHabits: true,
+    showNutrition: true,
+    showAthleteModel: true,
+    showPRs: true,
+    showWeeklyReview: true,
+  },
   gamificationEnabled: true,
   coachEnabled: true,
   showHabitMatrix: true,

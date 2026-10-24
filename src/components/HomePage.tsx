@@ -115,6 +115,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     grantChallengeReward,
     awardXpEvents,
     uiPreferences,
+    setUiPreferences,
   } = useStore();
 
   const toast = useToast();
@@ -137,6 +138,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }
     return getTimeGreeting(today);
   }, [today, language, t]);
+
+  const isDetailed = uiPreferences?.densityMode === 'detailed';
+  const showHero = uiPreferences?.dashboardCards?.showHero ?? true;
+  const showNutrition = uiPreferences?.dashboardCards?.showNutrition ?? true;
+  const showHabits = uiPreferences?.dashboardCards?.showHabits ?? true;
+  const showAthleteModel = uiPreferences?.dashboardCards?.showAthleteModel ?? true;
+  const showWeeklyReview = uiPreferences?.dashboardCards?.showWeeklyReview ?? true;
 
   const athleteDisplayName = useMemo(() => {
     if (!profile?.name || !profile.name.trim()) return 'Alex';
@@ -563,6 +571,39 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </header>
 
+      {/* ── MODE SELECTOR (Simple vs Detailed) ── */}
+      <div className="flex items-center justify-between pt-0.5">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted">
+          {isDetailed ? 'Athlete View (Detailed)' : 'Focus View (Simple)'}
+        </span>
+        <div className="inline-flex items-center p-0.5 rounded-full bg-bg-secondary border border-border/80 text-2xs font-semibold select-none shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setUiPreferences({ densityMode: 'simple' })}
+            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+              !isDetailed
+                ? 'bg-accent text-accent-on font-bold shadow-xs'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+            aria-pressed={!isDetailed}
+          >
+            Simple
+          </button>
+          <button
+            type="button"
+            onClick={() => setUiPreferences({ densityMode: 'detailed' })}
+            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+              isDetailed
+                ? 'bg-accent text-accent-on font-bold shadow-xs'
+                : 'text-text-muted hover:text-text-primary'
+            }`}
+            aria-pressed={isDetailed}
+          >
+            Detailed
+          </button>
+        </div>
+      </div>
+
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
       <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs transition-all">
         <div className="flex items-center justify-between text-xs text-text-muted mb-2">
@@ -605,7 +646,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               handleStartWorkoutFromHome();
             }
           }}
-          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-accent-on font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
         >
           {activeWorkoutDraft
             ? t('home.resumeWorkout')
@@ -691,66 +732,118 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </button>
       )}
 
-      {/* ── 4. READINESS + LEVEL (each hideable in Settings) ────────────── */}
-      {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
-        {/* Readiness Card (coach engine) — compact; the whole card opens
-            the Readiness sheet (factors + optional feel check-in live there).
-            Readiness is computed internally; the card shows the score only. */}
-        {uiPreferences.coachEnabled && (
-        <button
-          type="button"
-          onClick={() => setIsReadinessSheetOpen(true)}
-          aria-label="View readiness details"
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
-        >
-          <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
-          <span className="mt-1.5 block">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
-              {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
-            </span>
-            <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
-              Details
-              <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-            </span>
-          </span>
-        </button>
-        )}
+      {/* ── 4. ATHLETE READINESS & MODELS (Unfolded in Detailed, Expandable in Simple) ── */}
+      {isDetailed ? (
+        <div className="space-y-4 animate-fade-in">
+          {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
+              {uiPreferences.coachEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setIsReadinessSheetOpen(true)}
+                  aria-label="View readiness details"
+                  className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
+                >
+                  <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
+                  <span className="mt-1.5 block">
+                    <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
+                      {readiness.score} <span className="text-sm font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
+                    </span>
+                    <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
+                      Details
+                      <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </span>
+                  </span>
+                </button>
+              )}
 
-        {/* Level Card (XP system) — compact; the whole card opens the Level
-            sheet (how XP is earned, this week, the level ladder). */}
-        {uiPreferences.gamificationEnabled && (
-        <button
-          type="button"
-          onClick={() => setIsLevelSheetOpen(true)}
-          aria-label="View level details"
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
-        >
-          <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {levelInfo.name}</span>
-          <span className="mt-1.5 block">
-            <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
-              {levelInfo.total.toLocaleString()} XP
-            </span>
-            <span className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2 block">
-              <span
-                className="h-full rounded-full bg-accent transition-all duration-500 block"
-                style={{ width: `${levelInfo.progress.pct}%` }}
-              />
-            </span>
-            <span className="text-xs text-text-muted tabular-nums block mt-1">
-              {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} to Level {levelInfo.level + 1}
-            </span>
-          </span>
-        </button>
-        )}
-      </div>
+              {uiPreferences.gamificationEnabled && (
+                <button
+                  type="button"
+                  onClick={() => setIsLevelSheetOpen(true)}
+                  aria-label="View level details"
+                  className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
+                >
+                  <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {levelInfo.name}</span>
+                  <span className="mt-1.5 block">
+                    <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
+                      {levelInfo.total.toLocaleString()} XP
+                    </span>
+                    <span className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-2 block">
+                      <span
+                        className="h-full rounded-full bg-accent transition-all duration-500 block"
+                        style={{ width: `${levelInfo.progress.pct}%` }}
+                      />
+                    </span>
+                    <span className="text-xs text-text-muted tabular-nums block mt-1">
+                      {(levelInfo.progress.needed - levelInfo.progress.current).toLocaleString()} to Level {levelInfo.level + 1}
+                    </span>
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {uiPreferences.coachEnabled && showAthleteModel && <AthleteModelCard />}
+          {uiPreferences.coachEnabled && showWeeklyReview && <CoachWeeklyReviewCard />}
+        </div>
+      ) : (
+        <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-accent" />
+              <span className="text-xs font-bold text-text-primary">Athlete Insights</span>
+            </div>
+            {uiPreferences.coachEnabled && (
+              <span className="text-2xs font-mono font-semibold text-text-muted px-2 py-0.5 rounded-md bg-bg-secondary border border-border">
+                {readiness.score} {READINESS_LABEL[readiness.band] || 'Ready'}
+              </span>
+            )}
+          </div>
+          <CollapsibleDetails label="Show readiness, athlete model & weekly review">
+            <div className="space-y-4 pt-3">
+              {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
+                <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
+                  {uiPreferences.coachEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setIsReadinessSheetOpen(true)}
+                      aria-label="View readiness details"
+                      className={`bg-bg-secondary/70 border border-border/80 rounded-2xl p-3 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
+                    >
+                      <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
+                      <span className="mt-1 block">
+                        <span className="text-lg font-bold text-text-primary tabular-nums leading-tight">
+                          {readiness.score} <span className="text-xs font-semibold text-text-muted">{READINESS_LABEL[readiness.band] || 'Ready'}</span>
+                        </span>
+                      </span>
+                    </button>
+                  )}
+
+                  {uiPreferences.gamificationEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => setIsLevelSheetOpen(true)}
+                      aria-label="View level details"
+                      className={`bg-bg-secondary/70 border border-border/80 rounded-2xl p-3 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
+                    >
+                      <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level}</span>
+                      <span className="mt-1 block">
+                        <span className="text-lg font-bold text-text-primary tabular-nums leading-tight">
+                          {levelInfo.total.toLocaleString()} XP
+                        </span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {uiPreferences.coachEnabled && showAthleteModel && <AthleteModelCard />}
+              {uiPreferences.coachEnabled && showWeeklyReview && <CoachWeeklyReviewCard />}
+            </div>
+          </CollapsibleDetails>
+        </div>
       )}
-
-      {/* ── 4b. ATHLETE MODEL — what the coach has learned about you ──── */}
-      {uiPreferences.coachEnabled && <AthleteModelCard />}
-
-      {/* ── 4c. WEEKLY REVIEW (PR-C) ─────────────────────────────────────── */}
-      {uiPreferences.coachEnabled && <CoachWeeklyReviewCard />}
 
       {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-2.5">

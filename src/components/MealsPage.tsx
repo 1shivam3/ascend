@@ -1545,7 +1545,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">{t('meals.eyebrow')}</div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-accent uppercase">{t('meals.eyebrow')}</div>
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">{t('meals.title')}</h1>
           </div>
         </div>
@@ -1878,7 +1878,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label={t('meals.logMealAria')}
-                className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3.5 py-2 min-h-[44px] rounded-xl bg-accent hover:brightness-105 text-accent-on font-bold text-xs flex items-center gap-1.5 disabled:opacity-40 active:scale-95 transition-all shadow-xs shadow-accent/20 cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="animate-pulse text-2xs">...</span>
@@ -2559,7 +2559,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       onClick={() => setMealName(template)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border transition-colors ${
                         mealName === template
-                          ? 'bg-[#FF6B1F] text-stone-950 font-bold border-[#FF6B1F]'
+                          ? 'bg-accent text-accent-on font-bold border-accent shadow-xs'
                           : 'bg-bg-elevated border-border text-text-secondary hover:border-accent/60 hover:text-accent'
                       }`}
                     >

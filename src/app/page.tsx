@@ -45,6 +45,7 @@ const ImportProgramModal = dynamic(() => import('@/components/ImportProgramModal
   ssr: false,
 });
 import { decodeProgramFromHash, DecodedProgram } from '@/lib/program-sharing';
+import { applyAccentTheme } from '@/lib/theme';
 import { PlannedWorkout } from '@/lib/types';
 import { useAppNavigation, TabId } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
@@ -70,7 +71,7 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences } = useStore();
 
   // True zustand-persist hydration (distinct from the _hasHydrated splash
   // fallback, which can fire before the persisted state is merged). Theme
@@ -166,7 +167,8 @@ export default function AppPage() {
       document.documentElement.classList.add('light');
       document.documentElement.setAttribute('data-theme', 'light');
     }
-  }, [theme, _hasHydrated, persistHydrated]);
+    applyAccentTheme(uiPreferences?.accentPreset, uiPreferences?.customAccentHex, activeTheme === 'dark');
+  }, [theme, _hasHydrated, persistHydrated, uiPreferences?.accentPreset, uiPreferences?.customAccentHex]);
 
   // Dismiss root modals when Back is pressed
   useEffect(() => {
