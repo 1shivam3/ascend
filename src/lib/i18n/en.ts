@@ -2810,6 +2810,9 @@ export const en = {
     "Your {joints} aren't reading clearly — move into better light and keep every joint in frame.",
   'formcheck.unclearTurnSideways':
     'Turn sideways to the camera — a front view cannot be analyzed for this lift. Prop the phone and stand side-on, with your full body in frame.',
+  'formcheck.noPerson': "I can't find a person in frame.",
+  'formcheck.noPersonHint':
+    'Step back so your full body is visible, and make sure nothing blocks the camera.',
   'formcheck.slowNote':
     'This device is struggling to keep up — close other apps and try again for steadier tracking.',
   'formcheck.endSet': 'End set',

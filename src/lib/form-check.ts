@@ -27,6 +27,10 @@
  *    control calls requestPainStop(); the summary then carries
  *    stoppedForPain + PAIN_REFER_OUT_MESSAGE and nothing else is
  *    inferred from it.
+ *  - SIDE-VIEW TRUST: in a side view the far side is occluded by the
+ *    body, so the gate trusts whichever side is complete and angles
+ *    come from trusted sides only. The far side is don't-care, never
+ *    a reason to refuse a good side view.
  *
  * MediaPipe 33-point landmark indices used here (Google AI Edge docs):
  *   11 left shoulder, 12 right shoulder, 13 left elbow, 14 right elbow,
@@ -63,11 +67,14 @@ export type JointGroup = 'shoulders' | 'elbows' | 'wrists' | 'hips' | 'knees' | 
  * frame); lowVisibility = present but below the trust floor (dim,
  * blurred, or occluded). For camera-angle both lists are empty — every
  * joint reads fine, the problem is the viewing angle, not the joints.
+ * side = which side the lists describe (the better side, see
+ * betterSide); null for camera-angle.
  */
 export interface UnclearDetail {
   reason: UnclearReason;
   outOfFrame: JointGroup[];
   lowVisibility: JointGroup[];
+  side: 'left' | 'right' | null;
 }
 
 const JOINT_GROUP_OF: Record<number, JointGroup> = {
@@ -84,6 +91,67 @@ const JOINT_GROUP_OF: Record<number, JointGroup> = {
   27: 'ankles',
   28: 'ankles',
 };
+
+/** Landmark index per side for each joint group. */
+const SIDE_LANDMARKS: Record<JointGroup, { left: number; right: number }> = {
+  shoulders: { left: 11, right: 12 },
+  elbows: { left: 13, right: 14 },
+  wrists: { left: 15, right: 16 },
+  hips: { left: 23, right: 24 },
+  knees: { left: 25, right: 26 },
+  ankles: { left: 27, right: 28 },
+};
+
+type BodySide = 'left' | 'right';
+
+/**
+ * Required joint groups for a lift, in required-landmark order,
+ * deduplicated. Every lift's required set is symmetric: both sides of
+ * each group.
+ */
+function requiredGroups(liftId: LiftId): JointGroup[] {
+  const groups: JointGroup[] = [];
+  for (const idx of LIFT_CONFIGS[liftId].requiredLandmarks) {
+    const group = JOINT_GROUP_OF[idx];
+    if (group && !groups.includes(group)) groups.push(group);
+  }
+  return groups;
+}
+
+/** True when this side's landmark for the group is finite and trusted. */
+function sideLandmarkTrusted(landmarks: PoseLandmark[], idx: number): boolean {
+  const lm = landmarks[idx];
+  return (
+    isFiniteLandmark(lm) && lm.visibility !== undefined && lm.visibility >= VISIBILITY_MIN
+  );
+}
+
+/** How many of the lift's required groups this side has trusted. */
+function sideTrustedCount(
+  liftId: LiftId,
+  landmarks: PoseLandmark[],
+  side: BodySide
+): number {
+  let count = 0;
+  for (const group of requiredGroups(liftId)) {
+    if (sideLandmarkTrusted(landmarks, SIDE_LANDMARKS[group][side])) count += 1;
+  }
+  return count;
+}
+
+/**
+ * The better side: more trusted required groups; left wins ties.
+ * On unclear frames the detail lists describe this side only, so a
+ * far-side-only failure can never again masquerade as "nothing is
+ * visible" — if the better side is complete the frame is clear, and
+ * if it is not, its own failures are what the user must fix.
+ */
+function betterSide(liftId: LiftId, landmarks: PoseLandmark[]): BodySide {
+  return sideTrustedCount(liftId, landmarks, 'left') >=
+    sideTrustedCount(liftId, landmarks, 'right')
+    ? 'left'
+    : 'right';
+}
 
 /** Why a frame could not be read. UI copy for all three is the same
  *  "can't see you clearly — adjust the camera" state; the reason only
@@ -354,7 +422,14 @@ function isFiniteLandmark(lm: PoseLandmark | undefined): lm is PoseLandmark {
   return !!lm && Number.isFinite(lm.x) && Number.isFinite(lm.y);
 }
 
-/** Mean of the left/right 3-point angles; null when neither side is computable. */
+/**
+ * Mean of the left/right 3-point angles; null when neither side is
+ * computable. A side counts only when all three of its landmarks are
+ * finite AND trusted (visibility defined and >= the floor): without
+ * this, a near-side-gated frame would still average in the occluded
+ * far side's estimates. Undefined visibility counts as untrusted,
+ * matching the gate — real MediaPipe output always sets it.
+ */
 function sideMeanAngle(
   landmarks: PoseLandmark[],
   aL: number,
@@ -368,13 +443,33 @@ function sideMeanAngle(
   const lA = landmarks[aL];
   const lB = landmarks[bL];
   const lC = landmarks[cL];
-  if (isFiniteLandmark(lA) && isFiniteLandmark(lB) && isFiniteLandmark(lC)) {
+  if (
+    isFiniteLandmark(lA) &&
+    isFiniteLandmark(lB) &&
+    isFiniteLandmark(lC) &&
+    lA.visibility !== undefined &&
+    lA.visibility >= VISIBILITY_MIN &&
+    lB.visibility !== undefined &&
+    lB.visibility >= VISIBILITY_MIN &&
+    lC.visibility !== undefined &&
+    lC.visibility >= VISIBILITY_MIN
+  ) {
     angles.push(angleAt(lA, lB, lC));
   }
   const rA = landmarks[aR];
   const rB = landmarks[bR];
   const rC = landmarks[cR];
-  if (isFiniteLandmark(rA) && isFiniteLandmark(rB) && isFiniteLandmark(rC)) {
+  if (
+    isFiniteLandmark(rA) &&
+    isFiniteLandmark(rB) &&
+    isFiniteLandmark(rC) &&
+    rA.visibility !== undefined &&
+    rA.visibility >= VISIBILITY_MIN &&
+    rB.visibility !== undefined &&
+    rB.visibility >= VISIBILITY_MIN &&
+    rC.visibility !== undefined &&
+    rC.visibility >= VISIBILITY_MIN
+  ) {
     angles.push(angleAt(rA, rB, rC));
   }
   if (angles.length === 0) return null;
@@ -398,7 +493,14 @@ export function computeAngles(landmarks: PoseLandmark[]): ComputedAngles {
   ] as const) {
     const sh = landmarks[s];
     const hp = landmarks[h];
-    if (isFiniteLandmark(sh) && isFiniteLandmark(hp)) {
+    if (
+      isFiniteLandmark(sh) &&
+      isFiniteLandmark(hp) &&
+      sh.visibility !== undefined &&
+      sh.visibility >= VISIBILITY_MIN &&
+      hp.visibility !== undefined &&
+      hp.visibility >= VISIBILITY_MIN
+    ) {
       // Vector hip→shoulder vs straight up (0,-1); y grows downward.
       const vx = sh.x - hp.x;
       const vy = sh.y - hp.y;
@@ -415,24 +517,54 @@ export function computeAngles(landmarks: PoseLandmark[]): ComputedAngles {
 
 /**
  * Gate a frame. Returns null when clear, else the reason it is unclear.
- * Order matters: missing/occluded landmarks first, then visibility,
- * then camera angle (which needs shoulders + hips to evaluate).
- * A frame is NEVER partially trusted: one bad required landmark fails it.
+ *
+ * SIDE-VIEW TRUST, CORRECTED: in a true side view the far side is
+ * occluded by the body, and MediaPipe reports occluded joints below
+ * the visibility floor — so requiring BOTH sides made correct side
+ * views fail every frame (the user's exact symptom: full body, side
+ * view, all four groups "unclear"). The gate now trusts whichever
+ * side is complete: a frame is clear when at least one side has every
+ * required joint trusted. Angles come from trusted sides only (see
+ * sideMeanAngle), so this is not a weakening — the measured angle
+ * comes from the visible side, and the far side is don't-care.
+ *
+ * Order: neither side complete → the better side's failure
+ * (occlusion when a better-side landmark is not finite, else
+ * low-visibility); some side complete → the side-view ratio gate
+ * (skipped when it cannot be evaluated — a front view presents both
+ * shoulders, so a missing far shoulder already implies a side view).
+ * A frame is NEVER partially trusted: no complete side fails it.
  */
 export function gateFrame(liftId: LiftId, landmarks: PoseLandmark[]): UnclearReason | null {
-  const cfg = LIFT_CONFIGS[liftId];
-  for (const idx of cfg.requiredLandmarks) {
-    const lm = landmarks[idx];
-    if (!isFiniteLandmark(lm)) return 'occlusion';
-    if (lm.visibility === undefined || lm.visibility < VISIBILITY_MIN) return 'low-visibility';
+  const groups = requiredGroups(liftId);
+  const leftComplete = groups.every((g) =>
+    sideLandmarkTrusted(landmarks, SIDE_LANDMARKS[g].left)
+  );
+  const rightComplete = groups.every((g) =>
+    sideLandmarkTrusted(landmarks, SIDE_LANDMARKS[g].right)
+  );
+  if (!leftComplete && !rightComplete) {
+    const side = betterSide(liftId, landmarks);
+    for (const group of groups) {
+      if (!isFiniteLandmark(landmarks[SIDE_LANDMARKS[group][side]])) return 'occlusion';
+    }
+    return 'low-visibility';
   }
   // Side-view gate: shoulders far apart relative to torso length means
   // the camera sees the front, where depth/hinge angles are meaningless.
-  const sL = landmarks[LM.shoulderL]!;
-  const sR = landmarks[LM.shoulderR]!;
+  // It needs both shoulders and both hips finite to evaluate; when it
+  // cannot run, the frame stays clear — a front view presents both
+  // shoulders, so a missing far shoulder already implies a side view.
+  const sL = landmarks[LM.shoulderL];
+  const sR = landmarks[LM.shoulderR];
   const hL = landmarks[LM.hipL];
   const hR = landmarks[LM.hipR];
-  if (isFiniteLandmark(hL) && isFiniteLandmark(hR)) {
+  if (
+    isFiniteLandmark(sL) &&
+    isFiniteLandmark(sR) &&
+    isFiniteLandmark(hL) &&
+    isFiniteLandmark(hR)
+  ) {
     const shoulderWidth = distance(sL, sR);
     const torsoLen = (distance(sL, hL) + distance(sR, hR)) / 2;
     if (torsoLen > 0 && shoulderWidth > SIDE_VIEW_MAX_RATIO * torsoLen) return 'camera-angle';
@@ -442,28 +574,33 @@ export function gateFrame(liftId: LiftId, landmarks: PoseLandmark[]): UnclearRea
 
 /**
  * Name the failing body parts behind an unclear frame. Returns null
- * when the frame is clear. Groups follow the lift's required-landmark
- * order, deduplicated (left + right collapse to one group). Pure:
- * no thresholds change here — this only DESCRIBES the gate result so
- * the UI can say what is missing instead of a generic "can't see you".
+ * when the frame is clear. The lists describe the BETTER side only:
+ * blending both sides used to report all four groups whenever the
+ * occluded far side failed, even with a perfect near side — so the
+ * user could never tell what was actually wrong. Groups follow the
+ * lift's required-landmark order. Pure: no thresholds change here —
+ * this only DESCRIBES the gate result so the UI can say what is
+ * missing instead of a generic "can't see you".
  */
 export function unclearDetail(liftId: LiftId, landmarks: PoseLandmark[]): UnclearDetail | null {
   const reason = gateFrame(liftId, landmarks);
   if (reason === null) return null;
+  if (reason === 'camera-angle') {
+    return { reason, outOfFrame: [], lowVisibility: [], side: null };
+  }
+  const side = betterSide(liftId, landmarks);
   const outOfFrame: JointGroup[] = [];
   const lowVisibility: JointGroup[] = [];
   const push = (list: JointGroup[], group: JointGroup): void => {
     if (!list.includes(group)) list.push(group);
   };
-  for (const idx of LIFT_CONFIGS[liftId].requiredLandmarks) {
-    const group = JOINT_GROUP_OF[idx];
-    if (!group) continue;
-    const lm = landmarks[idx];
+  for (const group of requiredGroups(liftId)) {
+    const lm = landmarks[SIDE_LANDMARKS[group][side]];
     if (!isFiniteLandmark(lm)) push(outOfFrame, group);
     else if (lm.visibility === undefined || lm.visibility < VISIBILITY_MIN)
       push(lowVisibility, group);
   }
-  return { reason, outOfFrame, lowVisibility };
+  return { reason, outOfFrame, lowVisibility, side };
 }
 
 function primaryValue(angles: ComputedAngles, primary: PrimaryAngle): number | null {
@@ -584,7 +721,7 @@ export class RepCounter {
       return {
         status: 'unclear',
         unclearReason: 'low-visibility',
-        unclearDetail: { reason: 'low-visibility', outOfFrame: [], lowVisibility: [] },
+        unclearDetail: { reason: 'low-visibility', outOfFrame: [], lowVisibility: [], side: null },
         liveCue: UNCLEAR_COPY,
         liveCueCode: 'unclear',
         repCount: this.repCount,

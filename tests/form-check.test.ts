@@ -219,8 +219,12 @@ describe('uncertainty gating', () => {
   });
 
   it('a missing required landmark reads as occlusion', () => {
+    // Both knees missing: neither side is complete, so the frame is
+    // unclear. (One-sided loss alone is now trusted via the other
+    // side — see the side-gating tests.)
     const f = frame(SQUAT_TOP, 0);
     f.landmarks[25] = { x: Number.NaN, y: Number.NaN, visibility: 1 };
+    f.landmarks[26] = { x: Number.NaN, y: Number.NaN, visibility: 1 };
     const r = new RepCounter('squat').processFrame(f);
     expect(r.status).toBe('unclear');
     expect(r.unclearReason).toBe('occlusion');

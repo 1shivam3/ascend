@@ -134,12 +134,18 @@ describe('gate behavior: realistic framings', () => {
     expect(gateFrame('squat', marks)).toBe('occlusion');
   });
 
-  it('far-side visibility 0.4 fails as low-visibility even when the near side is perfect', () => {
-    // Probe for the second suspect: a true side view where MediaPipe
-    // reports the occluded far side below the 0.5 floor. Current
-    // behavior is unclear — documented here, not changed on speculation.
+  it('far-side visibility 0.4 is CLEAR when the near side is perfect (side-view trust)', () => {
+    // Formerly the probe for the second suspect: a true side view
+    // where MediaPipe reports the occluded far side below the 0.5
+    // floor. The old both-sides gate failed this every frame — the
+    // user's exact symptom. The gate now trusts the complete near
+    // side; the far side is don't-care for the angle.
     const marks = sideLandmarks(STANDING_SIDE, { farVis: 0.4 });
-    expect(gateFrame('squat', marks)).toBe('low-visibility');
+    expect(gateFrame('squat', marks)).toBeNull();
+    expect(unclearDetail('squat', marks)).toBeNull();
+    const result = new RepCounter('squat').processFrame(frame(marks));
+    expect(result.status).toBe('clear');
+    expect(result.angles).not.toBeNull();
   });
 
   it('bench side view is clear; a missing wrist fails as low-visibility', () => {
@@ -177,6 +183,7 @@ describe('unclear detail: the box names what is missing', () => {
       reason: 'low-visibility',
       outOfFrame: [],
       lowVisibility: ['knees', 'ankles'],
+      side: 'left',
     });
     const result = new RepCounter('squat').processFrame(frame(marks));
     expect(result.unclearDetail?.lowVisibility).toEqual(['knees', 'ankles']);
@@ -189,6 +196,7 @@ describe('unclear detail: the box names what is missing', () => {
       reason: 'occlusion',
       outOfFrame: ['knees', 'ankles'],
       lowVisibility: [],
+      side: 'left',
     });
   });
 
@@ -207,13 +215,19 @@ describe('unclear detail: the box names what is missing', () => {
       reason: 'camera-angle',
       outOfFrame: [],
       lowVisibility: [],
+      side: null,
     });
   });
 
-  it('one-sided failure collapses to a single joint group (left knee only → knees)', () => {
+  it('one-sided failure is trusted via the other side (left knee dim → clear)', () => {
+    // Changed with side-view trust: a single bad side no longer
+    // blocks the frame — the complete right side carries the angle.
+    // Better-side naming for a genuinely unclear frame is covered by
+    // the side-gating tests (split failure names only the bad side).
     const marks = sideLandmarks(STANDING_SIDE);
     marks[25] = { ...marks[25], visibility: 0.2 };
-    expect(unclearDetail('squat', marks)?.lowVisibility).toEqual(['knees']);
+    expect(gateFrame('squat', marks)).toBeNull();
+    expect(unclearDetail('squat', marks)).toBeNull();
   });
 
   it('bench wrist failure → wrists only', () => {
@@ -264,6 +278,8 @@ describe('form-check section: video sizing, overlay, guidance wiring', () => {
       'formcheck.missingJoints',
       'formcheck.lowVisibilityJoints',
       'formcheck.unclearTurnSideways',
+      'formcheck.noPerson',
+      'formcheck.noPersonHint',
     ] as const;
     for (const key of keys) {
       expect((en as Record<string, string>)[key]?.length).toBeGreaterThan(0);

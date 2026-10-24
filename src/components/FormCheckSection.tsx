@@ -18,7 +18,10 @@
  * Honesty wiring:
  *  - Frames are fed to the counter ONLY from real detections. When
  *    MediaPipe finds nobody, an all-visibility-0 frame is fed, which
- *    the gate fails as unclear — never a guessed pose.
+ *    the gate fails as unclear — never a guessed pose — AND the UI
+ *    renders the distinct "no person detected" box instead of the
+ *    joint-unclear box, so a detection failure is never mistaken
+ *    for a visibility failure.
  *  - No frames are fed while the camera is switching or the video is
  *    not ready, so a camera gap can neither count nor taint a rep.
  *  - The "I feel pain — stop" button ends the set immediately and
@@ -67,6 +70,7 @@ interface LiveState {
   unclear: boolean;
   unclearReason: UnclearReason | null;
   unclearDetail: UnclearDetail | null;
+  noPerson: boolean;
   phase: string;
   angleDeg: number | null;
 }
@@ -182,6 +186,7 @@ export default function FormCheckSection() {
     unclear: false,
     unclearReason: null,
     unclearDetail: null,
+    noPerson: false,
     phase: 'top',
     angleDeg: null,
   });
@@ -236,7 +241,8 @@ export default function FormCheckSection() {
       const t0 = performance.now();
       try {
         const result = landmarker.detectForVideo(video, t0);
-        const marks = toPoseLandmarks(result) ?? emptyLandmarks();
+        const detected = toPoseLandmarks(result);
+        const marks = detected ?? emptyLandmarks();
         const frameResult = counter.processFrame({ landmarks: marks, timestampMs: t0 });
         detectErrorStreakRef.current = 0;
         const dt = performance.now() - t0;
@@ -258,6 +264,7 @@ export default function FormCheckSection() {
           unclear: frameResult.status === 'unclear',
           unclearReason: frameResult.unclearReason,
           unclearDetail: frameResult.unclearDetail,
+          noPerson: detected === null,
           phase: frameResult.phase,
           angleDeg,
         };
@@ -290,7 +297,7 @@ export default function FormCheckSection() {
     setError(null);
     setSummary(null);
     setSlowNote(false);
-    setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, phase: 'top', angleDeg: null });
+    setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, noPerson: false, phase: 'top', angleDeg: null });
     lastLiveRef.current = '';
     detectMsRef.current = [];
     detectErrorStreakRef.current = 0;
@@ -471,7 +478,17 @@ export default function FormCheckSection() {
               </div>
             </div>
 
-            {live.unclear ? (
+            {live.noPerson ? (
+              <div className="rounded-xl border border-warning/40 p-3">
+                <p className="text-xs font-bold text-text-primary">{t('formcheck.noPerson')}</p>
+                <p className="text-2xs text-text-secondary mt-1">
+                  {t('formcheck.noPersonHint')}
+                </p>
+                <p className="text-2xs text-text-muted mt-1">
+                  {t('formcheck.noRepWhileUnclear')}
+                </p>
+              </div>
+            ) : live.unclear ? (
               <div className="rounded-xl border border-warning/40 p-3">
                 <p className="text-xs font-bold text-text-primary">{t('formcheck.unclear')}</p>
                 {live.unclearReason === 'camera-angle' ? (
