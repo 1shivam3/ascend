@@ -36,7 +36,7 @@ import {
 import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
 import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
-import { EXERCISE_LIBRARY } from './exercise-library';
+import { EXERCISE_LIBRARY, type MuscleGroup } from './exercise-library';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -501,6 +501,14 @@ export interface ManualCheckin {
   soreness: number;
   /** 1 (drained) – 5 (buzzing). Optional. */
   energy?: number;
+  /**
+   * Optional per-muscle freshness on the same 1 (still sore) – 5 (fresh)
+   * scale as `soreness`. Never required: when a muscle has no entry here,
+   * the global `soreness` above is the prior for that muscle, so every
+   * existing check-in keeps working unchanged. Read by
+   * per-muscle-readiness; the global readiness score never reads it.
+   */
+  sorenessByMuscle?: Partial<Record<MuscleGroup, number>>;
 }
 
 export interface ReadinessResult {

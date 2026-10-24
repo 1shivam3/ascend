@@ -141,6 +141,7 @@ import {
   type HealthDaySummary,
   type HealthFetchResult,
 } from './health-connect';
+import { computePerMuscleReadiness } from './per-muscle-readiness';
 
 export * from './types';
 
@@ -2510,6 +2511,12 @@ export const useAppStore = create<AppState>()(
       proposeCoachBlock: (intake) => {
         const state = get();
         const todayStr = getLocalTodayStr();
+        // Per-muscle readiness for today: today's check-in (including
+        // any per-muscle soreness) layered on the global readiness
+        // score, so the block's weekday fit and weak-point picks see
+        // the same table. Falls back to the global score alone when
+        // there is no check-in — never blocks the proposal.
+        const todayCheckin = state.dailyCheckins?.[todayStr];
         const proposal = generateBlockProposal({
           intake,
           athleteModel: state.athleteModel,
@@ -2522,6 +2529,17 @@ export const useAppStore = create<AppState>()(
           bodyweightKg: state.profile?.bodyweightKg,
           ageYears: state.profile?.age,
           dislikedExercises: state.trainingProfile?.dislikedExercises ?? [],
+          perMuscleReadiness: computePerMuscleReadiness({
+            workouts: state.workouts,
+            recovery: state.athleteModel?.recovery ?? [],
+            checkin: todayCheckin,
+            globalReadiness: calculateReadiness(
+              state.workouts,
+              state.bodyMetrics ?? [],
+              todayCheckin
+            ),
+            todayStr,
+          }),
         });
         set({ coachBlocks: { ...state.coachBlocks, pendingProposal: proposal } });
         return proposal;

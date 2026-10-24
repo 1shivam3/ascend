@@ -2761,6 +2761,116 @@ export const en = {
   'coachModel.factAdherenceSuffix': '{day}s are the day most often missed.',
   'bodyMetrics.noChanges': 'No changes to save — these measurements already match your last saved values.',
   'bodyMetrics.prefillHint': 'Weight and height are filled from your profile. Grey example numbers are not saved values — leave a field blank if you didn\'t measure it; blank means "not measured", not zero.',
+  // ── Live form check (Train tab, Coach area) ─────────────────────────
+  'formcheck.title': 'LIVE FORM CHECK',
+  'formcheck.sectionAria': 'Live form check',
+  'formcheck.intro':
+    'Point your camera at your set and get live rep counts and form cues. Video is processed on-device and never leaves your phone — nothing is recorded or uploaded.',
+  'formcheck.liftSquat': 'Squat',
+  'formcheck.liftBench': 'Bench Press',
+  'formcheck.liftDeadlift': 'Deadlift',
+  'formcheck.liftOverheadPress': 'Overhead Press',
+  'formcheck.liftBarbellRow': 'Barbell Row',
+  'formcheck.hintSquat': 'Film from the side, full body in frame, feet to head.',
+  'formcheck.hintBench': 'Film from the side of the bench, arms and chest in frame.',
+  'formcheck.hintDeadlift': 'Film from the side, full body in frame, bar path visible.',
+  'formcheck.hintOverheadPress': 'Film from the side, head to hips in frame.',
+  'formcheck.hintBarbellRow': 'Film from the side, hinged torso and arms in frame.',
+  'formcheck.chooseLift': 'Choose a lift',
+  'formcheck.angleKnee': 'Knee angle',
+  'formcheck.angleHip': 'Hip angle',
+  'formcheck.angleElbow': 'Elbow angle',
+  'formcheck.startCamera': 'Start camera check',
+  'formcheck.frontCamera': 'Front camera',
+  'formcheck.backCamera': 'Back camera',
+  'formcheck.tapToSwitch': '— tap to switch',
+  'formcheck.switchCamera': 'Switch camera',
+  'formcheck.heuristicsNote':
+    'Angles shown are coaching heuristics from a phone camera, not medical measurements. Film from the side with your full body in frame.',
+  'formcheck.loading': 'Starting camera and loading the pose model…',
+  'formcheck.reps': 'Reps',
+  'formcheck.atTop': 'At the top — start your next rep.',
+  'formcheck.repInProgress': 'Rep in progress…',
+  'formcheck.unclear':
+    "Can't see you clearly — adjust the camera so your full body stays in frame.",
+  'formcheck.unclearLowVisibility': 'Move into better light and keep every joint in frame.',
+  'formcheck.unclearOcclusion': 'Something is blocking the view — move it out of frame.',
+  'formcheck.unclearCameraAngle':
+    'Film from the side, not the front — depth only reads from the side.',
+  'formcheck.noRepWhileUnclear': 'No rep is counted while the view is unclear.',
+  'formcheck.slowNote':
+    'This device is struggling to keep up — close other apps and try again for steadier tracking.',
+  'formcheck.endSet': 'End set',
+  'formcheck.painStop': 'I feel pain — stop',
+  'formcheck.painStopAria': 'I feel pain — stop the set',
+  'formcheck.retry': 'Retry',
+  'formcheck.back': 'Back',
+  'formcheck.setStopped': 'Set stopped',
+  'formcheck.painMessage':
+    'Set stopped. Rest, and if the pain persists or worries you, talk to a physiotherapist or coach in person — this app cannot diagnose pain or tell you whether it is safe to continue.',
+  'formcheck.setCompleteOne': 'Set complete — 1 rep counted',
+  'formcheck.setCompleteOther': 'Set complete — {count} reps counted',
+  'formcheck.fullDepth': 'Full depth',
+  'formcheck.medianRepTime': 'Median rep time',
+  'formcheck.noFlags': 'No form flags on this set — depth and positions stayed in range.',
+  'formcheck.noRepsCounted':
+    'No reps counted: only full reps with a clear view count. Partial reps and reps interrupted by an unclear view are never counted.',
+  'formcheck.checkAnother': 'Check another set',
+  'formcheck.cueTorsoLean': 'Chest up — your torso is tipping forward.',
+  'formcheck.cueLeanBack': 'Ribs down — you are leaning back.',
+  'formcheck.cueHingeLost': 'Hold the hinge — stay bent over through the pull.',
+  'formcheck.cueHipsFirst': 'Push the floor away — hips and chest rising together.',
+  'formcheck.cueWristDrift': 'Stack your wrists over your elbows.',
+  'formcheck.issueShallow':
+    'Some reps stopped short of full depth — try a slightly longer lowering phase next set.',
+  'formcheck.issueTorsoLean':
+    'Your torso tipped forward on some reps — brace and keep your chest up as you drive.',
+  'formcheck.issueHipsFirst':
+    'Hips rose before the legs drove on some reps — push the floor away and keep hips and chest rising together.',
+  'formcheck.issueWristDrift':
+    'Wrists drifted off the elbow line on some reps — stack wrists over elbows before you press.',
+  'formcheck.issueHingeLost':
+    'You stood up out of the hinge on some pulls — hold the bent-over position through the whole pull.',
+  'formcheck.issueLeanBack':
+    'You leaned back at lockout on some reps — ribs down, glutes tight, press straight up.',
+  'formcheck.issueStraightLegStart':
+    'Legs were nearly straight at the set-up on some reps — bend the knees to set up before you pull.',
+  'formcheck.errEngineTitle': 'Pose engine unavailable',
+  'formcheck.errEngineMessage': 'The on-device pose engine could not be loaded.',
+  'formcheck.errEngineTry': 'Check your connection and retry, or try again on a newer browser.',
+  'formcheck.errModelTitle': 'Pose model download failed',
+  'formcheck.errModelMessage': 'The on-device pose model could not be downloaded.',
+  'formcheck.errModelTry': 'Check your connection and retry. Nothing was recorded.',
+  'formcheck.errDeniedTitle': 'Camera permission denied',
+  'formcheck.errDeniedMessage': 'ASCEND needs camera permission to watch your form.',
+  'formcheck.errDeniedTry': 'Allow camera access in your browser settings, then retry.',
+  'formcheck.errNoCameraTitle': 'No camera found',
+  'formcheck.errNoCameraMessage': 'This device reported no usable camera.',
+  'formcheck.errNoCameraTry': 'Try another device, or log the set by hand as usual.',
+  'formcheck.errStartTitle': 'Camera could not start',
+  'formcheck.errStartMessage': 'Something went wrong starting the camera.',
+  'formcheck.errStartTry': 'Close other apps using the camera and retry.',
+  'formcheck.errTrackingTitle': 'Pose tracking stopped',
+  'formcheck.errTrackingMessage': 'Pose detection kept failing on this device.',
+  'formcheck.errTrackingTry': 'Retry, or close other apps and try again.',
+
+  // ── Conversational coach (Train tab, Coach area; text chat only) ─────
+  'coachChat.title': 'COACH CHAT',
+  'coachChat.sectionAria': 'Coach chat',
+  'coachChat.subtitle':
+    'Ask your coach — every answer is based on your own logged training, not generic advice.',
+  'coachChat.placeholder': 'Ask about your training…',
+  'coachChat.send': 'Send',
+  'coachChat.sending': 'Thinking…',
+  'coachChat.basedOn': 'Based on your data:',
+  'coachChat.coldStart':
+    'Your coach has no training history for you yet — log your first workout, and answers will be based on your own data.',
+  'coachChat.errorGeneric': 'Could not reach your coach. Try again.',
+  'coachChat.errorCap': "You have reached today's chat limit. Come back tomorrow.",
+  'coachChat.errorRateLimit': 'Too many messages too fast. Wait a moment and try again.',
+  'coachChat.you': 'You',
+  'coachChat.coach': 'Coach',
+  'coachChat.dailyLeft': '{n} messages left today',
 } as const;
 
 export type StringKey = keyof typeof en;

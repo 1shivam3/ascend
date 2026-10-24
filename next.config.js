@@ -35,11 +35,14 @@ const nextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
+            // Live Form Check (MediaPipe Pose): jsdelivr serves the pose
+            // engine ESM at runtime; 'wasm-unsafe-eval' allows WASM compile.
+            "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://*.openfoodfacts.org https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms",
             "font-src 'self' data:",
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://world.openfoodfacts.org https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.clarity.ms https://*.ingest.us.sentry.io https://*.ingest.sentry.io",
+            // Live Form Check: WASM binary (jsdelivr) + pose model (Google Cloud Storage).
+            "connect-src 'self' https://cdn.jsdelivr.net https://storage.googleapis.com https://*.supabase.co wss://*.supabase.co https://world.openfoodfacts.org https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://*.clarity.ms https://*.ingest.us.sentry.io https://*.ingest.sentry.io",
             "media-src 'self' blob:",
             "worker-src 'self' blob:",
             "frame-ancestors 'none'",
