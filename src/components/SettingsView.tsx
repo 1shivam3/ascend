@@ -23,19 +23,21 @@ import {
   FileText,
   ExternalLink,
   Calendar,
+  Bell,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
-import type { DietPreference } from '@/lib/types';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
+import ReminderCenterModal from '@/components/ReminderCenterModal';
+import DietPreferencePicker from '@/components/DietPreferencePicker';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
-import { useTranslation, type StringKey } from '@/lib/i18n';
+import { useTranslation } from '@/lib/i18n';
 import {
   isHealthConnectAvailable,
   isHealthConnectSupported,
@@ -112,6 +114,18 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
+
+  // UX discoverability: Settings is one long scrolling page. These
+  // section chips jump straight to each section so the user never has
+  // to scroll-hunt for a setting they already know they want.
+  const accountSectionRef = useRef<HTMLDivElement>(null);
+  const preferencesSectionRef = useRef<HTMLDivElement>(null);
+  const customizationSectionRef = useRef<HTMLDivElement>(null);
+  const dataSectionRef = useRef<HTMLDivElement>(null);
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   // Health Connect (Android only — the whole block renders only where
   // the capability exists; web/PWA never sees dead UI).
@@ -330,8 +344,29 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </header>
 
+      {/* ── Section chips: jump links for the long page (sticky) ──────── */}
+      <div className="sticky top-0 z-30 bg-bg-primary/95 backdrop-blur py-2 -mx-1 px-1 flex gap-1.5 overflow-x-auto">
+        {(
+          [
+            { labelKey: 'settings.accountSecurity', ref: accountSectionRef },
+            { labelKey: 'settings.appPreferences', ref: preferencesSectionRef },
+            { labelKey: 'settings.customization', ref: customizationSectionRef },
+            { labelKey: 'settings.dataPrivacyLegal', ref: dataSectionRef },
+          ] as const
+        ).map((chip) => (
+          <button
+            key={chip.labelKey}
+            type="button"
+            onClick={() => scrollToSection(chip.ref)}
+            className="shrink-0 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent hover:border-accent/40 transition-colors cursor-pointer"
+          >
+            {t(chip.labelKey)}
+          </button>
+        ))}
+      </div>
+
       {/* ── SECTION 1: ACCOUNT & CLOUD SYNC ─────────────────────────────────── */}
-      <div className="space-y-2">
+      <div ref={accountSectionRef} className="space-y-2 scroll-mt-20">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.accountSecurity')}
         </span>
@@ -402,7 +437,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       </div>
 
       {/* ── SECTION 2: APP PREFERENCES ───────────────────────────────────────── */}
-      <div className="space-y-2">
+      <div ref={preferencesSectionRef} className="space-y-2 scroll-mt-20">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.appPreferences')}
         </span>
@@ -504,44 +539,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <LanguagePicker />
           </div>
 
-          {/* Diet Preference */}
-          <div className="space-y-2 pt-1">
-            <div>
-              <span className="text-xs font-bold text-text-primary block">{t('settings.dietPreference')}</span>
-              <span className="text-3xs text-text-muted block mt-0.5">
-                {t('settings.dietHint')}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { id: 'vegetarian', labelKey: 'settings.dietVegetarian' },
-                  { id: 'eggitarian', labelKey: 'settings.dietEggetarian' },
-                  { id: 'non_vegetarian', labelKey: 'settings.dietNonVegetarian' },
-                  { id: 'vegan', labelKey: 'settings.dietVegan' },
-                ] as { id: DietPreference; labelKey: StringKey }[]
-              ).map((opt) => {
-                const active = (profile?.dietPreference || 'non_vegetarian') === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => {
-                      if (!profile) return;
-                      setProfile({ ...profile, dietPreference: opt.id });
-                      toast.success(t('settings.dietSetMsg', { label: t(opt.labelKey) }), t('settings.preferencesTitle'));
-                    }}
-                    className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
-                      active
-                        ? 'border-accent bg-accent/10 text-accent'
-                        : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
-                    }`}
-                  >
-                    {t(opt.labelKey)}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Diet Preference — shared picker, also surfaced on Fuel */}
+          <div className="pt-1">
+            <DietPreferencePicker />
           </div>
 
           {/* Experience Mode */}
@@ -570,11 +570,33 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               ))}
             </div>
           </div>
+
+          {/* Notifications — the single home for reminder settings.
+              The Today bell stays as a shortcut; this row is where a
+              user hunting "notification settings" actually looks. */}
+          <div className="pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => setIsReminderCenterOpen(true)}
+              className="w-full flex items-center justify-between cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                  <Bell className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary">{t('home.notificationSettings')}</p>
+                  <p className="text-3xs text-text-muted">{t('home.notifications')}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* ── SECTION 2b: CUSTOMIZATION ──────────────────────────────────────── */}
-      <div className="space-y-2">
+      <div ref={customizationSectionRef} className="space-y-2 scroll-mt-20">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.customization')}
         </span>
@@ -780,8 +802,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         />
       )}
 
+      <ReminderCenterModal
+        isOpen={isReminderCenterOpen}
+        onClose={() => setIsReminderCenterOpen(false)}
+      />
+
       {/* ── SECTION 3: DATA & PRIVACY ────────────────────────────────────────── */}
-      <div className="space-y-2">
+      <div ref={dataSectionRef} className="space-y-2 scroll-mt-20">
         <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.dataPrivacyLegal')}
         </span>
@@ -926,9 +953,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <ExternalLink className="w-4 h-4 text-text-muted" />
           </a>
 
-          <p className="px-3 pt-1 text-3xs text-text-muted leading-relaxed">
-            {t('settings.medicalNote')}
-          </p>
+          {/* The full medical note lives on the Disclaimer page linked
+              above — the wall of text here is gone, the meaning stays. */}
 
           {/* Anonymous Telemetry */}
           <div className="w-full p-3 flex items-center justify-between">

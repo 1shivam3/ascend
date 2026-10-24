@@ -294,13 +294,24 @@ describe('Authentication & Login Recovery Flow', () => {
       expect(state.workouts.length).toBe(1);
     });
 
-    it('returns an actionable error message when Supabase is not configured', async () => {
+    it('returns a neutral error code (never raw provider/config text) when Supabase is not configured', async () => {
       delete process.env.NEXT_PUBLIC_SUPABASE_URL;
       delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       mockStorage.clear();
 
       const result = await syncEngine.signInWithGoogle();
-      expect(result.error).toContain('Cloud authentication is not configured');
+      expect(result.error).toBe('google_signin_incomplete');
+    });
+
+    it('maps provider OAuth errors to the same neutral code, never the raw message', async () => {
+      mockSupabase.auth.signInWithOAuth.mockResolvedValue({
+        error: { message: 'Provider "google" is not enabled for this project (see https://supabase.com/docs)' },
+      });
+
+      const result = await syncEngine.signInWithGoogle();
+      expect(result.error).toBe('google_signin_incomplete');
+      expect(result.error).not.toContain('supabase.com');
+      expect(result.error).not.toContain('Provider');
     });
   });
 });
