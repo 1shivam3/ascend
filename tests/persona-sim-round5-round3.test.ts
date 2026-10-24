@@ -39,7 +39,7 @@ describe('Toast i18n coverage, core journeys (SIM-P2-01 Round 3)', () => {
   const toastKeys = (Object.keys(en) as string[]).filter((k) => k.startsWith('toast.'));
   const paramsOf = (s: string) => [...s.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 
-  it('converts the core-journey toast set (33 calls) and keeps en/hi in parity', () => {
+  it('converts the core-journey toast set (39 calls) and keeps en/hi in parity', () => {
     expect(toastKeys.length).toBeGreaterThanOrEqual(60);
     const missingInHi = toastKeys.filter((k) => !(k in hi));
     expect(missingInHi).toEqual([]);

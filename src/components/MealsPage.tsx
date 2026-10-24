@@ -661,7 +661,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (isModalOpen) {
       // Append to currently editing meal
       setFoods((prev) => [...prev, scannedItem]);
-      toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
+      toast.success(t('toast.scannedAddedToMeal', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedAdded'));
     } else {
       // User confirmed in barcode modal: save directly to today's meals.
       // SIM-P2-20: the builder refuses absurd quantities at save, but
@@ -708,7 +708,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       setMealName('Quick Meal');
       setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${fav.name}. Tap Save when done!`, 'Meal Created');
+      toast.info(t('toast.mealStarted', { name: fav.name }), t('toast.titleMealCreated'));
     }
   };
 
@@ -719,9 +719,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (!food.name.trim()) return;
     const added = toggleFavoriteFood(food);
     if (added) {
-      toast.success(`Pinned ${food.name} to Frequent Favorites!`, 'Favorite Saved');
+      toast.success(t('toast.foodPinned', { name: food.name }), t('toast.titleFavoriteSaved'));
     } else {
-      toast.info(`Unpinned ${food.name} from Favorites.`, 'Favorite Removed');
+      toast.info(t('toast.foodUnpinned', { name: food.name }), t('toast.titleFavoriteRemoved'));
     }
   };
 
@@ -832,12 +832,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       : food;
     if (isModalOpen) {
       setFoods((prev) => [...prev, item]);
-      toast.success(`Added ${item.name} to current meal!`);
+      toast.success(t('toast.addedToMeal', { name: item.name }));
     } else {
       setMealName('Quick Meal');
       setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${item.name}. Tap Save when done!`);
+      toast.info(t('toast.mealStarted', { name: item.name }));
     }
   };
 
