@@ -202,10 +202,16 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
 
       expect(html).toContain('Settings');
       expect(html).toContain('Account &amp; Security');
-      expect(html).toContain('App Preferences');
+      // UX redesign Stage 6 — IA regroup: App Preferences / Customization
+      // became Appearance & personalization + Training preferences.
+      expect(html).toContain('Appearance &amp; personalization');
+      expect(html).toContain('Training preferences');
       expect(html).toContain('Appearance');
       expect(html).toContain('Chalk');
       expect(html).toContain('Graphite');
+      expect(html).toContain('Accent theme');
+      expect(html).toContain('Information density');
+      expect(html).toContain('Customize Today');
       expect(html).toContain('Units of Measure');
       expect(html).toContain('Athlete Experience');
       expect(html).toContain('Data, Privacy &amp; Legal');

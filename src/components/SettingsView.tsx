@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
@@ -13,7 +13,6 @@ import {
   Download,
   Upload,
   RefreshCw,
-  LogOut,
   Trash2,
   Lock,
   Moon,
@@ -36,6 +35,11 @@ import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
 import DietPreferencePicker from '@/components/DietPreferencePicker';
+import ThemePicker from '@/components/ThemePicker';
+import CustomizeSheet from '@/components/CustomizeSheet';
+import SegmentedControl from '@/components/ui/SegmentedControl';
+import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex } from '@/lib/accent-themes';
+import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation } from '@/lib/i18n';
@@ -78,7 +82,6 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const setTheme = useStore((state) => state.setTheme);
   const resetThemeToSystem = useStore((state) => state.resetThemeToSystem);
   const hasCustomTheme = useStore((state) => state.hasCustomTheme);
-  const logout = useStore((state) => state.logout);
   const importAllData = useStore((state) => state.importAllData);
   const uiPreferences = useStore((state) => state.uiPreferences);
   const setUiPreferences = useStore((state) => state.setUiPreferences);
@@ -106,13 +109,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     lastSyncedAt,
     syncNow,
     user,
-    signOut,
     deleteAccount,
   } = useSupabaseSync();
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -122,12 +123,105 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   // section chips jump straight to each section so the user never has
   // to scroll-hunt for a setting they already know they want.
   const accountSectionRef = useRef<HTMLDivElement>(null);
-  const preferencesSectionRef = useRef<HTMLDivElement>(null);
-  const customizationSectionRef = useRef<HTMLDivElement>(null);
+  const appearanceSectionRef = useRef<HTMLDivElement>(null);
+  const trainingSectionRef = useRef<HTMLDivElement>(null);
   const dataSectionRef = useRef<HTMLDivElement>(null);
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  // ── UX redesign Stage 6 — accent + dashboard personalization ──────────
+  // Accent selection is NOT a theme-mode pick: it never touches
+  // hasCustomTheme. The page.tsx effect restyles the app from these keys.
+  const isDarkMode = theme === 'dark';
+  const accentSwatches = ACCENT_PRESETS.map((p) => ({
+    id: p.id,
+    name: t(
+      p.id === 'vermilion'
+        ? 'settings.accentVermilion'
+        : p.id === 'cobalt'
+          ? 'settings.accentCobalt'
+          : p.id === 'forest'
+            ? 'settings.accentForest'
+            : p.id === 'plum'
+              ? 'settings.accentPlum'
+              : p.id === 'teal'
+                ? 'settings.accentTeal'
+                : 'settings.accentRose',
+    ),
+    swatch: isDarkMode ? p.dark.accent : p.light.accent,
+  }));
+  const [draftHex, setDraftHex] = useState(() =>
+    uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '',
+  );
+  const normalizedDraft = normalizeHex(draftHex);
+  const customError =
+    draftHex.trim() !== '' && !normalizedDraft ? t('settings.customAccentInvalid') : null;
+  const customDerived =
+    normalizedDraft !== null
+      ? deriveCustomAccent(normalizedDraft, isDarkMode ? 'dark' : 'light')
+      : null;
+  const customPreview = customDerived?.variant ?? null;
+  const customPreviewNote = customDerived?.correctedNote
+    ? t('settings.customAccentAdjusted', { shade: customDerived.variant.text, entered: normalizedDraft ?? '' })
+    : null;
+  const handleSelectPreset = (id: string) => {
+    setUiPreferences({
+      accentTheme: id as 'vermilion' | 'cobalt' | 'forest' | 'plum' | 'teal' | 'rose',
+    });
+  };
+  const handleApplyCustom = () => {
+    if (!normalizedDraft) return;
+    setUiPreferences({ accentTheme: 'custom', customAccentHex: normalizedDraft });
+  };
+  const handleCancelCustom = () => {
+    setDraftHex(uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '');
+  };
+  const handleResetTheme = () => {
+    setUiPreferences({ accentTheme: 'vermilion', customAccentHex: null });
+    toast.info(t('settings.themeResetMsg'));
+  };
+
+  // ── UX redesign Stage 6 — the same Customize Today sheet as Today ──────
+  // Sheet labels must match the visible Today section titles exactly.
+  const sheetSectionTitles: Record<string, string> = {
+    'nutrition-strip': t('home.nutrition'),
+    coach: t('home.coachSection'),
+    'habit-matrix': t('home.habitsThisWeek'),
+    'quick-actions': t('home.quickActions'),
+    hydration: t('home.hydration'),
+    readiness: t('home.readiness'),
+    level: t('home.level'),
+    steps: t('health.stepsToday'),
+    challenge: t('home.monthlyChallenge'),
+    'weekly-review-detail': t('weeklyReview.cardTitle'),
+  };
+  const resolvedTodayForSheet = useMemo(
+    () => resolveTodayLayout(uiPreferences.todayLayout, uiPreferences.density),
+    [uiPreferences.todayLayout, uiPreferences.density],
+  );
+  const rawTodayLayoutForSheet = useMemo(
+    () => sanitizeTodayLayout(uiPreferences.todayLayout),
+    [uiPreferences.todayLayout],
+  );
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const handleToggleSection = (id: string, next: boolean) => {
+    setUiPreferences({
+      todayLayout: { ...rawTodayLayoutForSheet, visible: { ...rawTodayLayoutForSheet.visible, [id]: next } },
+    });
+  };
+  const handleMoveSection = (id: string, dir: -1 | 1) => {
+    const order = [...rawTodayLayoutForSheet.order];
+    const idx = order.indexOf(id);
+    const next = idx + dir;
+    if (idx < 0 || next < 0 || next >= order.length) return;
+    [order[idx], order[next]] = [order[next], order[idx]];
+    setUiPreferences({ todayLayout: { ...rawTodayLayoutForSheet, order } });
+  };
+  const handleRestoreLayout = () => {
+    setUiPreferences({ todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] } });
+    toast.success(t('customize.layoutRestored'));
+  };
+
 
   // Health Connect (Android only — the whole block renders only where
   // the capability exists; web/PWA never sees dead UI).
@@ -294,19 +388,6 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     reader.readAsText(file);
   };
 
-  // Sign out confirmation
-  const handleExecuteSignOut = async () => {
-    setShowLogoutConfirm(false);
-    try {
-      await signOut();
-    } catch (err) {
-      console.warn('Sign out warning:', err);
-    }
-    logout({ clearLocalData: false });
-    toast.info(t('settings.signedOutMsg'), t('settings.signedOutTitle'));
-    if (onNavigate) onNavigate('home');
-  };
-
   // Delete account confirmation
   const handleExecuteDeleteAccount = async () => {
     setIsDeleting(true);
@@ -329,6 +410,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
 
   return (
     <div className="page animate-fade-in space-y-5 pb-24 max-w-md mx-auto px-5 pt-3">
+
       {/* ── Top Header ────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
@@ -346,13 +428,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </header>
 
-      {/* ── Section chips: jump links for the long page (sticky) ──────── */}
-      <div className="sticky top-0 z-30 bg-bg-primary/95 backdrop-blur py-2 -mx-1 px-1 flex gap-1.5 overflow-x-auto">
+      {/* ── Section chips: jump links for the long page (sticky, below the You bar) ── */}
+      <div className="sticky top-14 z-20 bg-bg-primary/95 backdrop-blur py-2 -mx-1 px-1 flex gap-1.5 overflow-x-auto">
         {(
           [
             { labelKey: 'settings.accountSecurity', ref: accountSectionRef },
-            { labelKey: 'settings.appPreferences', ref: preferencesSectionRef },
-            { labelKey: 'settings.customization', ref: customizationSectionRef },
+            { labelKey: 'settings.appearancePersonalization', ref: appearanceSectionRef },
+            { labelKey: 'settings.trainingPreferences', ref: trainingSectionRef },
             { labelKey: 'settings.dataPrivacyLegal', ref: dataSectionRef },
           ] as const
         ).map((chip) => (
@@ -367,8 +449,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         ))}
       </div>
 
-      {/* ── SECTION 1: ACCOUNT & CLOUD SYNC ─────────────────────────────────── */}
-      <div ref={accountSectionRef} className="space-y-2 scroll-mt-20">
+      {/* ── SECTION 1: ACCOUNT & SECURITY ─────────────────────────────────────── */}
+      <div ref={accountSectionRef} className="space-y-2 scroll-mt-28">
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.accountSecurity')}
         </span>
@@ -421,27 +503,41 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </button>
             )}
           </div>
-
-          {user && (
-            <div className="pt-2 border-t border-border/60 flex items-center justify-between">
-              <span className="text-xs text-text-muted">{t('settings.cloudAccount')}</span>
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>{t('settings.signOut')}</span>
-              </button>
-            </div>
+        </div>
+        <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-3">
+          <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.accountMethods')}</span>
+          {user ? (
+            <p className="text-xs text-text-primary">
+              {t('settings.signedInWith', {
+                method: user.isAnonymous
+                  ? t('settings.methodGuest')
+                  : user.provider === 'apple'
+                    ? t('settings.methodApple')
+                    : user.provider === 'google'
+                      ? t('settings.methodGoogle')
+                      : t('settings.methodEmailPassword'),
+              })}
+            </p>
+          ) : (
+            <p className="text-xs text-text-primary">{t('settings.guestMethodNote')}</p>
+          )}
+          <p className="text-2xs text-text-muted leading-relaxed">{t('settings.supportedMethods')}</p>
+          {!user && (
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="py-1.5 px-3 rounded-xl bg-accent hover:bg-accent-dim text-accent-on text-xs font-bold transition-all shadow-xs cursor-pointer"
+            >
+              {t('settings.signIn')}
+            </button>
           )}
         </div>
       </div>
 
-      {/* ── SECTION 2: APP PREFERENCES ───────────────────────────────────────── */}
-      <div ref={preferencesSectionRef} className="space-y-2 scroll-mt-20">
+      {/* ── SECTION 2: APPEARANCE & PERSONALIZATION ───────────────────────────── */}
+      <div ref={appearanceSectionRef} className="space-y-2 scroll-mt-28">
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          {t('settings.appPreferences')}
+          {t('settings.appearancePersonalization')}
         </span>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           {/* Appearance / Theme */}
@@ -490,6 +586,162 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <span>{t('settings.themeSystem')}</span>
               </button>
             </div>
+          </div>
+
+          {/* Text size (SIM-P1-08): 10px labels are unreadable for
+              older eyes; root scaling covers all rem-based text. */}
+          <div className="space-y-2 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.textSize')}</span>
+              <span className="text-2xs font-mono text-text-muted">
+                {uiPreferences.textScale === 'large'
+                  ? t('settings.textLarge')
+                  : uiPreferences.textScale === 'xlarge'
+                  ? t('settings.textXLarge')
+                  : t('settings.textNormal')}
+              </span>
+            </div>
+            <p className="text-2xs text-text-muted leading-relaxed">
+              {t('settings.textSizeHint')}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: t('settings.textNormal'), value: 'normal' as const },
+                { label: t('settings.textLarge'), value: 'large' as const },
+                { label: t('settings.textXLarge'), value: 'xlarge' as const },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setUiPreferences({ textScale: opt.value })}
+                  className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    uiPreferences.textScale === opt.value
+                      ? 'bg-accent text-accent-on border-accent'
+                      : 'bg-bg-secondary text-text-secondary border-border hover:text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
+          {/* Accent theme — six presets + custom hex (personalization-spec §1) */}
+          <div className="space-y-2">
+            <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.accentTheme')}</span>
+            <ThemePicker
+              swatches={accentSwatches}
+              selectedId={uiPreferences.accentTheme}
+              customHex={draftHex}
+              customError={customError}
+              preview={customPreview}
+              previewNote={customPreviewNote}
+              onSelectPreset={handleSelectPreset}
+              onCustomHexChange={setDraftHex}
+              onApplyCustom={handleApplyCustom}
+              onCancelCustom={handleCancelCustom}
+              onReset={handleResetTheme}
+            />
+          </div>
+
+          {/* Information density — one key for the whole app */}
+          <div className="space-y-2 pt-3 border-t border-border/60">
+            <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.density')}</span>
+            <p className="text-2xs text-text-muted leading-relaxed">{t('settings.densityHint')}</p>
+            <SegmentedControl
+              ariaLabel={t('settings.density')}
+              value={uiPreferences.density}
+              options={[
+                { value: 'simple', label: t('settings.densitySimple') },
+                { value: 'detailed', label: t('settings.densityDetailed') },
+              ]}
+              onChange={(v) => setUiPreferences({ density: v })}
+            />
+          </div>
+
+          {/* Dashboard cards — the same Customize Today sheet as Today */}
+          <div className="pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => setIsCustomizeOpen(true)}
+              className="w-full flex items-center justify-between cursor-pointer text-left"
+            >
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('customize.today')}</p>
+                <p className="text-2xs text-text-muted">{t('settings.customizeTodayHint')}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── SECTION 3: TRAINING PREFERENCES ───────────────────────────────────── */}
+      <div ref={trainingSectionRef} className="space-y-2 scroll-mt-28">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+          {t('settings.trainingPreferences')}
+        </span>
+        <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
+          {/* Weekly workout target */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.weeklyWorkoutTarget')}</span>
+              <span className="text-2xs font-mono text-text-muted">
+                {uiPreferences.weeklyTargetDays === null
+                  ? t('settings.targetAuto')
+                  : uiPreferences.weeklyTargetDays === 0
+                  ? t('settings.targetOff')
+                  : t('settings.targetDays', { days: uiPreferences.weeklyTargetDays })}
+              </span>
+            </div>
+            <p className="text-2xs text-text-muted leading-relaxed">
+              {t('settings.weeklyTargetHint')}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: t('settings.auto'), value: null as number | null },
+                { label: t('settings.off'), value: 0 as number | null },
+                { label: '2', value: 2 as number | null },
+                { label: '3', value: 3 as number | null },
+                { label: '4', value: 4 as number | null },
+                { label: '5', value: 5 as number | null },
+                { label: '6', value: 6 as number | null },
+              ].map((opt) => (
+                <button
+                  key={opt.label}
+                  type="button"
+                  onClick={() => setUiPreferences({ weeklyTargetDays: opt.value })}
+                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+                    uiPreferences.weeklyTargetDays === opt.value
+                      ? 'bg-accent text-accent-on border-accent'
+                      : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Weekly schedule editor */}
+          <div className="pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="w-full flex items-center justify-between cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary">{t('settings.weeklySchedule')}</p>
+                  <p className="text-2xs text-text-muted">{t('settings.weeklyScheduleHint')}</p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
           </div>
 
           {/* Unit Preference */}
@@ -594,113 +846,6 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <ChevronRight className="w-4 h-4 text-text-muted" />
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* ── SECTION 2b: CUSTOMIZATION ──────────────────────────────────────── */}
-      <div ref={customizationSectionRef} className="space-y-2 scroll-mt-20">
-        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
-          {t('settings.customization')}
-        </span>
-        <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
-          {/* Weekly workout target */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.weeklyWorkoutTarget')}</span>
-              <span className="text-2xs font-mono text-text-muted">
-                {uiPreferences.weeklyTargetDays === null
-                  ? t('settings.targetAuto')
-                  : uiPreferences.weeklyTargetDays === 0
-                  ? t('settings.targetOff')
-                  : t('settings.targetDays', { days: uiPreferences.weeklyTargetDays })}
-              </span>
-            </div>
-            <p className="text-2xs text-text-muted leading-relaxed">
-              {t('settings.weeklyTargetHint')}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: t('settings.auto'), value: null as number | null },
-                { label: t('settings.off'), value: 0 as number | null },
-                { label: '2', value: 2 as number | null },
-                { label: '3', value: 3 as number | null },
-                { label: '4', value: 4 as number | null },
-                { label: '5', value: 5 as number | null },
-                { label: '6', value: 6 as number | null },
-              ].map((opt) => (
-                <button
-                  key={opt.label}
-                  type="button"
-                  onClick={() => setUiPreferences({ weeklyTargetDays: opt.value })}
-                  className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                    uiPreferences.weeklyTargetDays === opt.value
-                      ? 'bg-accent text-accent-on border-accent'
-                      : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Weekly schedule editor */}
-          <div className="pt-3 border-t border-border/60">
-            <button
-              type="button"
-              onClick={() => setIsScheduleModalOpen(true)}
-              className="w-full flex items-center justify-between cursor-pointer text-left"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
-                  <Calendar className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-xs font-bold text-text-primary">{t('settings.weeklySchedule')}</p>
-                  <p className="text-2xs text-text-muted">{t('settings.weeklyScheduleHint')}</p>
-                </div>
-              </div>
-              <ChevronRight className="w-4 h-4 text-text-muted" />
-            </button>
-          </div>
-
-          {/* Text size (SIM-P1-08): 10px labels are unreadable for
-              older eyes; root scaling covers all rem-based text. */}
-          <div className="space-y-2 pt-3 border-t border-border/60">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.textSize')}</span>
-              <span className="text-2xs font-mono text-text-muted">
-                {uiPreferences.textScale === 'large'
-                  ? t('settings.textLarge')
-                  : uiPreferences.textScale === 'xlarge'
-                  ? t('settings.textXLarge')
-                  : t('settings.textNormal')}
-              </span>
-            </div>
-            <p className="text-2xs text-text-muted leading-relaxed">
-              {t('settings.textSizeHint')}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: t('settings.textNormal'), value: 'normal' as const },
-                { label: t('settings.textLarge'), value: 'large' as const },
-                { label: t('settings.textXLarge'), value: 'xlarge' as const },
-              ].map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setUiPreferences({ textScale: opt.value })}
-                  className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    uiPreferences.textScale === opt.value
-                      ? 'bg-accent text-accent-on border-accent'
-                      : 'bg-bg-secondary text-text-secondary border-border hover:text-text-primary'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Gamification toggle */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
@@ -796,20 +941,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </div>
 
-      {isScheduleModalOpen && (
-        <WeeklyScheduleModal
-          isOpen={isScheduleModalOpen}
-          onClose={() => setIsScheduleModalOpen(false)}
-          plannedWorkouts={plannedWorkouts}
-        />
-      )}
-
-      <ReminderCenterModal
-        isOpen={isReminderCenterOpen}
-        onClose={() => setIsReminderCenterOpen(false)}
-      />
-
-      {/* ── SECTION 3: DATA & PRIVACY ────────────────────────────────────────── */}
+      {/* ── SECTION 4: DATA & PRIVACY ────────────────────────────────────────── */}
       <div ref={dataSectionRef} className="space-y-2 scroll-mt-20">
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.dataPrivacyLegal')}
@@ -1008,20 +1140,21 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </div>
 
-      {/* ── Screen 24: Confirmation Modals ──────────────────────────────────── */}
-      {/* Sign Out Modal */}
-      <ConfirmationModal
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={handleExecuteSignOut}
-        title={t('settings.signOutTitle')}
-        message={user ? t('settings.signOutMsgUser') : t('settings.signOutMsgGuest')}
-        confirmText={t('settings.signOut')}
-        cancelText={t('common.cancel')}
-        variant="default"
-        icon="logout"
+
+      {isScheduleModalOpen && (
+        <WeeklyScheduleModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          plannedWorkouts={plannedWorkouts}
+        />
+      )}
+
+      <ReminderCenterModal
+        isOpen={isReminderCenterOpen}
+        onClose={() => setIsReminderCenterOpen(false)}
       />
 
+      {/* ── Screen 24: Confirmation Modals ──────────────────────────────────── */}
       {/* Delete Account Modal */}
       <ConfirmationModal
         isOpen={showDeleteConfirm}
@@ -1042,6 +1175,20 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
       />
+
+      <CustomizeSheet
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+        sections={[
+          { id: 'workout-card', title: t('home.todaysWorkout'), locked: true },
+          ...resolvedTodayForSheet.map((s) => ({ id: s.id, title: sheetSectionTitles[s.id] ?? s.id })),
+        ]}
+        shown={{ 'workout-card': true, ...Object.fromEntries(resolvedTodayForSheet.map((s) => [s.id, s.shown])) }}
+        onToggle={handleToggleSection}
+        onMove={handleMoveSection}
+        onRestore={handleRestoreLayout}
+      />
+
     </div>
   );
 }

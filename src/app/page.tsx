@@ -6,6 +6,7 @@ import { Home, Dumbbell, TrendingUp, UtensilsCrossed, User } from 'lucide-react'
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
+import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
 import SplashScreen from '@/components/onboarding/SplashScreen';
 import SegmentedControl from '@/components/ui/SegmentedControl';
@@ -174,6 +175,20 @@ export default function AppPage() {
       document.documentElement.setAttribute('data-theme', 'light');
     }
   }, [theme, _hasHydrated, persistHydrated]);
+
+  // UX redesign Stage 6 — apply the selected accent theme (preset or custom)
+  // as CSS vars on <html>. This is NOT a theme-mode pick: it never touches
+  // hasCustomTheme or the light/dark class above. Re-applied when the accent
+  // selection or the mode changes (every preset has light + dark variants).
+  useEffect(() => {
+    if (typeof document === 'undefined' || !_hasHydrated || !persistHydrated) return;
+    const variant = resolveAccentVariant(
+      uiPreferences?.accentTheme ?? 'vermilion',
+      uiPreferences?.customAccentHex ?? null,
+      theme === 'dark' ? 'dark' : 'light',
+    );
+    applyAccentVars(accentVariantToCssVars(variant));
+  }, [uiPreferences?.accentTheme, uiPreferences?.customAccentHex, theme, _hasHydrated, persistHydrated]);
 
   // SIM-P1-08: apply the saved text size on load and whenever it
   // changes in Settings. Root font-size scaling covers all rem text.
