@@ -2798,6 +2798,18 @@ export const en = {
   'formcheck.unclearCameraAngle':
     'Film from the side, not the front — depth only reads from the side.',
   'formcheck.noRepWhileUnclear': 'No rep is counted while the view is unclear.',
+  'formcheck.jointShoulders': 'shoulders',
+  'formcheck.jointElbows': 'elbows',
+  'formcheck.jointWrists': 'wrists',
+  'formcheck.jointHips': 'hips',
+  'formcheck.jointKnees': 'knees',
+  'formcheck.jointAnkles': 'ankles',
+  'formcheck.missingJoints':
+    "We can't see your {joints} — step back until your full body, feet to head, is in frame.",
+  'formcheck.lowVisibilityJoints':
+    "Your {joints} aren't reading clearly — move into better light and keep every joint in frame.",
+  'formcheck.unclearTurnSideways':
+    'Turn sideways to the camera — a front view cannot be analyzed for this lift. Prop the phone and stand side-on, with your full body in frame.',
   'formcheck.slowNote':
     'This device is struggling to keep up — close other apps and try again for steadier tracking.',
   'formcheck.endSet': 'End set',

@@ -44,8 +44,10 @@ import {
   LIFT_ORDER,
   RepCounter,
   type IssueCode,
+  type JointGroup,
   type LiftId,
   type SetSummary,
+  type UnclearDetail,
   type UnclearReason,
 } from '@/lib/form-check';
 import {
@@ -64,6 +66,7 @@ interface LiveState {
   cueCode: IssueCode | 'unclear' | null;
   unclear: boolean;
   unclearReason: UnclearReason | null;
+  unclearDetail: UnclearDetail | null;
   phase: string;
   angleDeg: number | null;
 }
@@ -78,6 +81,15 @@ const UNCLEAR_HINT_KEYS: Record<UnclearReason, StringKey> = {
   'low-visibility': 'formcheck.unclearLowVisibility',
   occlusion: 'formcheck.unclearOcclusion',
   'camera-angle': 'formcheck.unclearCameraAngle',
+};
+
+const JOINT_LABEL_KEYS: Record<JointGroup, StringKey> = {
+  shoulders: 'formcheck.jointShoulders',
+  elbows: 'formcheck.jointElbows',
+  wrists: 'formcheck.jointWrists',
+  hips: 'formcheck.jointHips',
+  knees: 'formcheck.jointKnees',
+  ankles: 'formcheck.jointAnkles',
 };
 
 const PRIMARY_LABEL_KEYS: Record<string, StringKey> = {
@@ -169,6 +181,7 @@ export default function FormCheckSection() {
     cueCode: null,
     unclear: false,
     unclearReason: null,
+    unclearDetail: null,
     phase: 'top',
     angleDeg: null,
   });
@@ -244,6 +257,7 @@ export default function FormCheckSection() {
           cueCode: frameResult.liveCueCode,
           unclear: frameResult.status === 'unclear',
           unclearReason: frameResult.unclearReason,
+          unclearDetail: frameResult.unclearDetail,
           phase: frameResult.phase,
           angleDeg,
         };
@@ -276,7 +290,7 @@ export default function FormCheckSection() {
     setError(null);
     setSummary(null);
     setSlowNote(false);
-    setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, phase: 'top', angleDeg: null });
+    setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, phase: 'top', angleDeg: null });
     lastLiveRef.current = '';
     detectMsRef.current = [];
     detectErrorStreakRef.current = 0;
@@ -421,14 +435,25 @@ export default function FormCheckSection() {
         )}
 
         {(phase === 'active' || phase === 'loading') && (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full rounded-xl bg-black aspect-video object-cover"
-            style={mirrored ? { transform: 'scaleX(-1)' } : undefined}
-          />
+          <div className="relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full rounded-xl bg-black object-cover aspect-[9/16] max-h-[62vh]"
+              style={mirrored ? { transform: 'scaleX(-1)' } : undefined}
+            />
+            {/* Framing guide: corner brackets marking the full-body
+                target (feet to head). Display-only CSS overlay — it
+                never touches pose detection, which reads raw frames. */}
+            <div aria-hidden="true" className="framing-guide pointer-events-none absolute inset-0">
+              <span className="absolute left-3 top-3 h-6 w-6 border-l-2 border-t-2 border-white/60 rounded-tl-sm" />
+              <span className="absolute right-3 top-3 h-6 w-6 border-r-2 border-t-2 border-white/60 rounded-tr-sm" />
+              <span className="absolute bottom-3 left-3 h-6 w-6 border-b-2 border-l-2 border-white/60 rounded-bl-sm" />
+              <span className="absolute bottom-3 right-3 h-6 w-6 border-b-2 border-r-2 border-white/60 rounded-br-sm" />
+            </div>
+          </div>
         )}
 
         {phase === 'active' && (
@@ -449,10 +474,39 @@ export default function FormCheckSection() {
             {live.unclear ? (
               <div className="rounded-xl border border-warning/40 p-3">
                 <p className="text-xs font-bold text-text-primary">{t('formcheck.unclear')}</p>
-                {live.unclearReason && (
+                {live.unclearReason === 'camera-angle' ? (
                   <p className="text-2xs text-text-secondary mt-1">
-                    {t(UNCLEAR_HINT_KEYS[live.unclearReason])}
+                    {t('formcheck.unclearTurnSideways')}
                   </p>
+                ) : (
+                  <>
+                    {live.unclearDetail && live.unclearDetail.outOfFrame.length > 0 && (
+                      <p className="text-2xs text-text-secondary mt-1">
+                        {t('formcheck.missingJoints', {
+                          joints: live.unclearDetail.outOfFrame
+                            .map((g) => t(JOINT_LABEL_KEYS[g]))
+                            .join(', '),
+                        })}
+                      </p>
+                    )}
+                    {live.unclearDetail && live.unclearDetail.lowVisibility.length > 0 && (
+                      <p className="text-2xs text-text-secondary mt-1">
+                        {t('formcheck.lowVisibilityJoints', {
+                          joints: live.unclearDetail.lowVisibility
+                            .map((g) => t(JOINT_LABEL_KEYS[g]))
+                            .join(', '),
+                        })}
+                      </p>
+                    )}
+                    {(!live.unclearDetail ||
+                      (live.unclearDetail.outOfFrame.length === 0 &&
+                        live.unclearDetail.lowVisibility.length === 0)) &&
+                      live.unclearReason && (
+                        <p className="text-2xs text-text-secondary mt-1">
+                          {t(UNCLEAR_HINT_KEYS[live.unclearReason])}
+                        </p>
+                      )}
+                  </>
                 )}
                 <p className="text-2xs text-text-muted mt-1">
                   {t('formcheck.noRepWhileUnclear')}

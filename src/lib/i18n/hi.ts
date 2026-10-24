@@ -2793,6 +2793,18 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.unclearOcclusion': 'कुछ नज़र रोक रहा है — उसे फ्रेम से हटाएँ।',
   'formcheck.unclearCameraAngle': 'सामने से नहीं, साइड से फिल्म करें — गहराई सिर्फ़ साइड से पढ़ी जाती है।',
   'formcheck.noRepWhileUnclear': 'नज़र साफ़ न होने पर कोई रेप नहीं गिना जाता।',
+  'formcheck.jointShoulders': 'कंधे',
+  'formcheck.jointElbows': 'कोहनियाँ',
+  'formcheck.jointWrists': 'कलाई',
+  'formcheck.jointHips': 'कूल्हे',
+  'formcheck.jointKnees': 'घुटने',
+  'formcheck.jointAnkles': 'टखने',
+  'formcheck.missingJoints':
+    'आपके {joints} नहीं दिख रहे हैं — पीछे हटें ताकि आपका पूरा शरीर, पैरों से सिर तक, फ्रेम में आ जाए।',
+  'formcheck.lowVisibilityJoints':
+    'आपके {joints} साफ़ नहीं पढ़े जा रहे हैं — बेहतर रोशनी में आएँ और हर जोड़ फ्रेम में रखें।',
+  'formcheck.unclearTurnSideways':
+    'कैमरे की तरफ़ साइड से खड़े हों — सामने का नज़रिया इस लिफ्ट के लिए विश्लेषित नहीं किया जा सकता। फ़ोन को टिकाएँ और साइड प्रोफ़ाइल में खड़े हों, पूरा शरीर फ्रेम में रहे।',
   'formcheck.slowNote':
     'यह डिवाइस साथ नहीं दे पा रहा है — दूसरे ऐप बंद करें और स्थिर ट्रैकिंग के लिए फिर से कोशिश करें।',
   'formcheck.endSet': 'सेट खत्म करें',

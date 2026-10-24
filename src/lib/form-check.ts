@@ -54,6 +54,37 @@ export type LiftId = 'squat' | 'bench' | 'deadlift' | 'overhead-press' | 'barbel
 
 export type UnclearReason = 'low-visibility' | 'occlusion' | 'camera-angle';
 
+/** Body-part group a missing/low-visibility landmark belongs to. */
+export type JointGroup = 'shoulders' | 'elbows' | 'wrists' | 'hips' | 'knees' | 'ankles';
+
+/**
+ * Exactly why a frame is unclear, with the failing body parts named.
+ * outOfFrame = required landmarks not finite at all (joint outside the
+ * frame); lowVisibility = present but below the trust floor (dim,
+ * blurred, or occluded). For camera-angle both lists are empty — every
+ * joint reads fine, the problem is the viewing angle, not the joints.
+ */
+export interface UnclearDetail {
+  reason: UnclearReason;
+  outOfFrame: JointGroup[];
+  lowVisibility: JointGroup[];
+}
+
+const JOINT_GROUP_OF: Record<number, JointGroup> = {
+  11: 'shoulders',
+  12: 'shoulders',
+  13: 'elbows',
+  14: 'elbows',
+  15: 'wrists',
+  16: 'wrists',
+  23: 'hips',
+  24: 'hips',
+  25: 'knees',
+  26: 'knees',
+  27: 'ankles',
+  28: 'ankles',
+};
+
 /** Why a frame could not be read. UI copy for all three is the same
  *  "can't see you clearly — adjust the camera" state; the reason only
  *  picks the extra hint (move into frame / unblock the view / film
@@ -113,6 +144,8 @@ export interface SetSummary {
 export interface FrameResult {
   status: FrameStatus;
   unclearReason: UnclearReason | null;
+  /** Named unclear detail (null on clear frames). */
+  unclearDetail: UnclearDetail | null;
   /** Live cue for clear frames; the unclear copy for unclear frames;
    *  null when there is nothing to say (e.g. resting at the top). */
   liveCue: string | null;
@@ -407,6 +440,32 @@ export function gateFrame(liftId: LiftId, landmarks: PoseLandmark[]): UnclearRea
   return null;
 }
 
+/**
+ * Name the failing body parts behind an unclear frame. Returns null
+ * when the frame is clear. Groups follow the lift's required-landmark
+ * order, deduplicated (left + right collapse to one group). Pure:
+ * no thresholds change here — this only DESCRIBES the gate result so
+ * the UI can say what is missing instead of a generic "can't see you".
+ */
+export function unclearDetail(liftId: LiftId, landmarks: PoseLandmark[]): UnclearDetail | null {
+  const reason = gateFrame(liftId, landmarks);
+  if (reason === null) return null;
+  const outOfFrame: JointGroup[] = [];
+  const lowVisibility: JointGroup[] = [];
+  const push = (list: JointGroup[], group: JointGroup): void => {
+    if (!list.includes(group)) list.push(group);
+  };
+  for (const idx of LIFT_CONFIGS[liftId].requiredLandmarks) {
+    const group = JOINT_GROUP_OF[idx];
+    if (!group) continue;
+    const lm = landmarks[idx];
+    if (!isFiniteLandmark(lm)) push(outOfFrame, group);
+    else if (lm.visibility === undefined || lm.visibility < VISIBILITY_MIN)
+      push(lowVisibility, group);
+  }
+  return { reason, outOfFrame, lowVisibility };
+}
+
 function primaryValue(angles: ComputedAngles, primary: PrimaryAngle): number | null {
   return angles[primary];
 }
@@ -480,6 +539,7 @@ export class RepCounter {
       return {
         status: 'clear',
         unclearReason: null,
+        unclearDetail: null,
         liveCue: null,
         liveCueCode: null,
         repCount: this.repCount,
@@ -505,6 +565,7 @@ export class RepCounter {
       return {
         status: 'unclear',
         unclearReason,
+        unclearDetail: unclearDetail(this.liftId, frame.landmarks),
         liveCue: UNCLEAR_COPY,
         liveCueCode: 'unclear',
         repCount: this.repCount,
@@ -523,6 +584,7 @@ export class RepCounter {
       return {
         status: 'unclear',
         unclearReason: 'low-visibility',
+        unclearDetail: { reason: 'low-visibility', outOfFrame: [], lowVisibility: [] },
         liveCue: UNCLEAR_COPY,
         liveCueCode: 'unclear',
         repCount: this.repCount,
@@ -602,6 +664,7 @@ export class RepCounter {
     return {
       status: 'clear',
       unclearReason: null,
+      unclearDetail: null,
       liveCue,
       liveCueCode: cue.code,
       repCount: this.repCount,
