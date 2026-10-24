@@ -56,6 +56,10 @@ import { getMondayOfWeek, parseLocalDate } from './formatters';
 import { getWorkoutBodyParts } from './workout-schedule';
 import type { AthleteModel } from './athlete-model';
 import type { StallFlag } from './coach-engine';
+import {
+  computePerMuscleReadiness,
+  type PerMuscleReadiness,
+} from './per-muscle-readiness';
 import type { BlockIntake } from './block-intake';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,6 +182,16 @@ export interface BlockEngineInput {
   bodyweightKg?: number;
   ageYears?: number;
   dislikedExercises?: string[];
+  /**
+   * Per-muscle readiness for today, when the caller already computed it
+   * (the store passes computePerMuscleReadiness from today's check-in +
+   * global readiness). When absent, generateBlockProposal derives it from
+   * workouts + the athlete model's recovery curves alone (no check-in,
+   * standard 70 baseline) — never from nothing, never blocking.
+   * Global readiness / spacing rules stay the fallback when a muscle
+   * has no per-muscle data.
+   */
+  perMuscleReadiness?: PerMuscleReadiness[] | null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -412,23 +426,37 @@ const WEEKDAY_CANDIDATES: Record<number, DayOfWeek[][]> = {
  * primary muscle should sit at least that muscle's recoveryDays apart
  * (wrapping around the week). The athlete's most-skipped day is avoided
  * when adherence data actually knows it. Deterministic: first best.
+ *
+ * Per-muscle readiness (Phase 1) adds one more pressure: a day whose
+ * primary muscle is caution/rest today is pushed LATER in the week —
+ * later weekdays give that muscle more days before its first block
+ * session. A low-readiness muscle can never be removed by weekday
+ * choice alone (every skeleton day is scheduled somewhere); when the
+ * chosen pattern still puts one early, or when readiness did not
+ * change the pick, the proposal says so in its reason / per-exercise
+ * notes instead of silently scheduling through it. Low readiness is
+ * a fatigue signal here, never an injury claim, and pain-flagged
+ * exclusions (step 3 of the generator) are untouched by this.
  */
 function chooseWeekdays(
   dayMuscles: Set<MuscleGroup>[],
-  athleteModel: AthleteModel | null
-): { weekdays: DayOfWeek[]; reason: string } {
+  athleteModel: AthleteModel | null,
+  perMuscleReadiness?: PerMuscleReadiness[] | null
+): { weekdays: DayOfWeek[]; reason: string; readinessNote: string | null } {
   const candidates = WEEKDAY_CANDIDATES[dayMuscles.length] ?? WEEKDAY_CANDIDATES[4];
   const recoveryByMuscle = new Map<MuscleGroup, number>();
   for (const row of athleteModel?.recovery ?? []) {
     recoveryByMuscle.set(row.muscle, row.recoveryDays.value);
   }
+  const readinessByMuscle = new Map<MuscleGroup, PerMuscleReadiness>();
+  for (const row of perMuscleReadiness ?? []) {
+    if (row) readinessByMuscle.set(row.muscle, row);
+  }
   const skipped = athleteModel?.adherence.mostSkippedDay ?? null;
   const skippedPenaltyApplies =
     !!athleteModel && athleteModel.adherence.plannedSessions >= 8 && !!skipped;
 
-  let best = candidates[0];
-  let bestScore = Number.POSITIVE_INFINITY;
-  for (const cand of candidates) {
+  const scoreCandidate = (cand: DayOfWeek[], withReadiness: boolean): number => {
     let score = 0;
     const idx = cand.map((d) => WEEKDAYS.indexOf(d));
     for (let i = 0; i < cand.length; i++) {
@@ -441,13 +469,38 @@ function chooseWeekdays(
           if (gap < need) score += (need - gap) * 2;
         }
       }
+      // Readiness pressure: a caution/rest primary muscle scheduled on
+      // an early weekday costs more than the same muscle later — the
+      // penalty falls as the weekday index rises, so the ranking prefers
+      // patterns that give low-readiness muscles more days first.
+      if (withReadiness) {
+        for (const m of dayMuscles[i]) {
+          const r = readinessByMuscle.get(m);
+          if (!r || (r.band !== 'caution' && r.band !== 'rest')) continue;
+          const w = idx[i];
+          score += r.band === 'rest' ? 24 - 2 * w : 12 - w;
+        }
+      }
     }
     if (skippedPenaltyApplies && skipped && cand.includes(skipped)) score += 3;
-    if (score < bestScore) {
-      bestScore = score;
-      best = cand;
+    return score;
+  };
+
+  const pick = (withReadiness: boolean): DayOfWeek[] => {
+    let best = candidates[0];
+    let bestScore = Number.POSITIVE_INFINITY;
+    for (const cand of candidates) {
+      const score = scoreCandidate(cand, withReadiness);
+      if (score < bestScore) {
+        bestScore = score;
+        best = cand;
+      }
     }
-  }
+    return best;
+  };
+
+  const best = pick(true);
+  const bestWithoutReadiness = pick(false);
 
   const measured = [...recoveryByMuscle.entries()].find(
     ([, v]) => v !== 2
@@ -455,7 +508,29 @@ function chooseWeekdays(
   const reason = measured
     ? `Days are spaced around your measured recovery — your ${measured[0].toLowerCase()} work historically needs about ${measured[1]} days before you are back at your best.`
     : 'Days are spread across the week so the same muscles are not trained on back-to-back days.';
-  return { weekdays: best, reason };
+
+  // Did readiness actually change the decision? Say so, with numbers —
+  // and name the muscle that moved, not just "readiness".
+  let readinessNote: string | null = null;
+  const differs = best.some((d, i) => d !== bestWithoutReadiness[i]);
+  if (differs) {
+    const moved: string[] = [];
+    best.forEach((d, i) => {
+      if (d === bestWithoutReadiness[i]) return;
+      for (const m of dayMuscles[i]) {
+        const r = readinessByMuscle.get(m);
+        if (r && (r.band === 'caution' || r.band === 'rest')) {
+          moved.push(
+            `${m.toLowerCase()} work moved to ${d[0].toUpperCase() + d.slice(1)} — its readiness is ${r.band} (${r.score}) right now`
+          );
+        }
+      }
+    });
+    if (moved.length > 0) {
+      readinessNote = `Per-muscle readiness changed the days: ${moved.join('; ')}.`;
+    }
+  }
+  return { weekdays: best, reason, readinessNote };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -729,7 +804,41 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
 
   // 4) Weak-point work. The 5-day split gets a dedicated day; other
   //    splits get one accessory on the weakest muscle's day when it fits.
+  //
+  // Per-muscle readiness (Phase 1) is resolved once, here, so both the
+  // weak-point picks below and the weekday fit in step 6 see the same
+  // table. A caution/rest muscle gets NO extra weak-point work: adding
+  // volume to a muscle that is already low-readiness would be the
+  // opposite of what readiness is for. The hold is said out loud in
+  // warnings (with the score), not silently dropped — and the muscle's
+  // regular skeleton work stays, flagged in its per-exercise note.
+  const perMuscleReadiness =
+    input.perMuscleReadiness ??
+    computePerMuscleReadiness({
+      workouts: input.workouts,
+      recovery: athleteModel?.recovery ?? [],
+      todayStr,
+    });
+  const readinessByMuscle = new Map<MuscleGroup, PerMuscleReadiness>();
+  for (const row of perMuscleReadiness) {
+    if (row) readinessByMuscle.set(row.muscle, row);
+  }
+  const isLowReadiness = (m: MuscleGroup): boolean => {
+    const r = readinessByMuscle.get(m);
+    return !!r && (r.band === 'caution' || r.band === 'rest');
+  };
   const weak = rankWeakMuscles(skeletons, athleteModel);
+  const weakAvailable = weak.filter((w) => !isLowReadiness(w.muscle));
+  // Only muscles that would actually have received extra work are named:
+  // the top 2 on a 5-day split, the single weakest otherwise.
+  const weakPickCount = intake.daysPerWeek === 5 ? 2 : 1;
+  for (const w of weak.slice(0, weakPickCount)) {
+    if (!isLowReadiness(w.muscle)) continue;
+    const r = readinessByMuscle.get(w.muscle) as PerMuscleReadiness;
+    warnings.push(
+      `Extra ${w.muscle.toLowerCase()} work is held back in this block — its readiness is ${r.band} (${r.score}) right now, so no extra volume is added for it until it recovers. Its regular sessions stay in the plan.`
+    );
+  }
   const weakWhy = new Map<string, string>(); // canonical key -> why
   const usedKeys = new Set<string>();
   for (const d of skeletons) for (const e of d.exercises) usedKeys.add(normalizeExerciseKey(e.name));
@@ -744,7 +853,7 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   };
   if (intake.daysPerWeek === 5) {
     const day = skeletons[4];
-    for (const w of weak.slice(0, 2)) {
+    for (const w of weakAvailable.slice(0, 2)) {
       const picks = pickExercisesForMuscle(w.muscle, 2, pickCtx);
       for (const p of picks) {
         day.exercises.push(p);
@@ -755,8 +864,8 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         );
       }
     }
-  } else if (weak.length > 0 && weak[0].weeklySets < 6) {
-    const w = weak[0];
+  } else if (weakAvailable.length > 0 && weakAvailable[0].weeklySets < 6) {
+    const w = weakAvailable[0];
     const targetDay = skeletons.find((d) =>
       d.exercises.some((e) => getExerciseMuscle(e.name) === w.muscle)
     );
@@ -798,11 +907,15 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
     return { label: day.label, exercises };
   });
 
-  // 6) Weekdays fitted to recovery + adherence.
+  // 6) Weekdays fitted to recovery + adherence + per-muscle readiness.
   const dayMuscles = skeletons.map(
     (d) => new Set(d.exercises.map((e) => getExerciseMuscle(e.name)))
   );
-  const { weekdays, reason: weekdayReason } = chooseWeekdays(dayMuscles, athleteModel);
+  const {
+    weekdays,
+    reason: weekdayReason,
+    readinessNote,
+  } = chooseWeekdays(dayMuscles, athleteModel, perMuscleReadiness);
 
   // 7) Prescriptions + schemes + per-exercise rationale.
   // Entered top lifts (intake) outrank history estimates: they are the
@@ -868,6 +981,23 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
       } else {
         whyByExercise[key] = `${getExerciseMuscle(ex.name)} work to balance the day — ${targetSets} sets in the ${range.min}–${range.max} rep range.`;
       }
+      // Per-muscle readiness, surfaced where it could not move the
+      // exercise: a caution/rest primary muscle keeps its session (the
+      // block still trains it), but the note says plainly that its
+      // readiness is low today, so the athlete knows to keep the day
+      // moderate rather than chase a max. Fatigue signal only — this
+      // never frames low readiness as pain or injury, and it never
+      // overrides a pain-flagged exclusion (those already removed the
+      // exercise above).
+      const primaryMuscle = getExerciseMuscle(ex.name);
+      const primaryReadiness = readinessByMuscle.get(primaryMuscle);
+      if (
+        primaryReadiness &&
+        (primaryReadiness.band === 'caution' || primaryReadiness.band === 'rest')
+      ) {
+        whyByExercise[key] +=
+          ` Note: your ${primaryMuscle.toLowerCase()} readiness is ${primaryReadiness.band} (${primaryReadiness.score}) right now — keep this session moderate and leave a rep in reserve rather than pushing for a max.`;
+      }
       return next;
     });
     return {
@@ -884,8 +1014,15 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   // 8) Names (collision-safe) + ids.
   const blockName = `${FOCUS_LABEL[focus]} Block`;
   const existingNames = new Set(input.existingPlans.map((p) => p.name.trim().toLowerCase()));
+  // The id hashes the inputs that shape the proposal. Caller-supplied
+  // per-muscle readiness is part of the hash when present; when absent
+  // the old hash is preserved exactly so existing ids do not churn.
   const proposalId = `block_${fnv1a(
-    JSON.stringify({ intake, todayStr, focus })
+    JSON.stringify(
+      input.perMuscleReadiness
+        ? { intake, todayStr, focus, perMuscleReadiness: input.perMuscleReadiness }
+        : { intake, todayStr, focus }
+    )
   )}`;
   for (const day of days) {
     let planName = `${blockName} · ${day.label}`;
@@ -903,8 +1040,9 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
   const summary =
     `${weekWord}-week ${FOCUS_LABEL[focus].toLowerCase()} block, ${intake.daysPerWeek} days a week. ` +
     `${focusReason} ${weekdayReason} ` +
+    (readinessNote ? `${readinessNote} ` : '') +
     `Weeks 1–${weekTypes.indexOf('deload')} build, week ${weekTypes.indexOf('deload') + 1} is a deload, and the final week tests your main lifts. ` +
-    (weak.length > 0 ? `Extra attention goes to your ${weak[0].muscle.toLowerCase()} — ${weak[0].why}.` : '');
+    (weakAvailable.length > 0 ? `Extra attention goes to your ${weakAvailable[0].muscle.toLowerCase()} — ${weakAvailable[0].why}.` : '');
 
   return {
     id: proposalId,
