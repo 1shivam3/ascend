@@ -807,7 +807,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 logWater(250);
                 toast.success('+250 ml logged', 'Hydration Updated');
               }}
-              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
               +250
             </button>
@@ -817,7 +817,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 logWater(500);
                 toast.success('+500 ml logged', 'Hydration Updated');
               }}
-              className="px-3 py-1.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
               +500
             </button>

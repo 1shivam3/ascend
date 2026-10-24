@@ -1208,6 +1208,16 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       <span>•</span>
                       <span className="text-text-primary">{t('scan.fatSuffix', { amount: analysis.totalFat })}</span>
                     </div>
+                    <p className="text-2xs text-text-muted pt-0.5">
+                      {t('scan.overallConfidence', {
+                        level:
+                          analysis.confidence === 'high'
+                            ? t('scan.confHigh')
+                            : analysis.confidence === 'medium'
+                            ? t('scan.confMedium')
+                            : t('scan.confLow'),
+                      })}
+                    </p>
 
                     <p className="text-2xs text-text-muted border-t border-border/60 pt-2 mt-1">
                       {t('scan.reviewHint')}
@@ -1343,6 +1353,23 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-bold text-xs sm:text-sm text-text-primary">
                                     {item.name}
+                                  </span>
+                                  {/* SIM-P3-02: the scan computes per-item
+                                      confidence but never showed it — a
+                                      low-confidence guess used to look as
+                                      certain as a clean read. */}
+                                  <span className={`text-3xs font-mono font-semibold uppercase tracking-wide ${
+                                    item.confidence === 'high'
+                                      ? 'text-emerald-500'
+                                      : item.confidence === 'medium'
+                                      ? 'text-amber-500'
+                                      : 'text-danger'
+                                  }`}>
+                                    {item.confidence === 'high'
+                                      ? t('scan.confHigh')
+                                      : item.confidence === 'medium'
+                                      ? t('scan.confMedium')
+                                      : t('scan.confLow')}
                                   </span>
                                 </div>
                                 <span className="text-2xs text-text-secondary mt-0.5 block">

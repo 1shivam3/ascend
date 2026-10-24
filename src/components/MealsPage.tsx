@@ -663,7 +663,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       setFoods((prev) => [...prev, scannedItem]);
       toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
     } else {
-      // User confirmed in barcode modal: save directly to today's meals
+      // User confirmed in barcode modal: save directly to today's meals.
+      // SIM-P2-20: the builder refuses absurd quantities at save, but
+      // this direct path had no guard — a mis-scan could log junk.
+      const absurd = getAbsurdQuantityWarning(scannedItem);
+      if (absurd) {
+        toast.error(absurd, 'Unlikely Quantity');
+        return;
+      }
       const newMeal: MealEntry = {
         id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
         date: todayDate,
@@ -1151,6 +1158,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         if (rejectAbsurd(data.foods)) {
           return;
         }
+        // SIM-P1-04: the builder refuses all-zero items at save, but
+        // quick-log saved first and only warned after — an unmatched
+        // "pizza" logged at 0 kcal and flattered the deficit badge.
+        // Apply the same guard BEFORE addMeal.
+        const zeroDataOnline = data.foods.filter(
+          (f: FoodItem) => f.calories === 0 && f.proteinG === 0 && f.carbsG === 0 && f.fatG === 0
+        );
+        if (zeroDataOnline.length > 0) {
+          toast.error(
+            `${zeroDataOnline.map((f: FoodItem) => `"${f.name}"`).join(', ')} has no nutrition values yet — it was not logged. Add it manually for accurate numbers.`,
+            'Missing Nutrition Data'
+          );
+          setIsNaturalParsing(false);
+          return;
+        }
         const newMeal: MealEntry = {
           id: safeRandomId('meal'),
           date: today,
@@ -1193,6 +1215,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             return;
           }
           if (rejectAbsurd(offlineFoods)) {
+            return;
+          }
+          // SIM-P1-04: same pre-save zero-data guard as the online path.
+          const zeroDataOffline = offlineFoods.filter(
+            (f) => f.calories === 0 && f.proteinG === 0 && f.carbsG === 0 && f.fatG === 0
+          );
+          if (zeroDataOffline.length > 0) {
+            toast.error(
+              `${zeroDataOffline.map((f) => `"${f.name}"`).join(', ')} has no nutrition values yet — it was not logged. Add it manually for accurate numbers.`,
+              'Missing Nutrition Data'
+            );
+            setIsNaturalParsing(false);
             return;
           }
           const totals = calculateMealMacros(offlineFoods);

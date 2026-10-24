@@ -223,6 +223,17 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                     })}
                   </p>
                 )}
+                {/* SIM-P2-18: the all-proxy case used to render under the
+                    "excluded" copy above while actually being INCLUDED.
+                    Say so plainly, plus the tables' real basis. */}
+                {athleteTier.isEstimate && (
+                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                    {t('profile.allEstimated')}
+                  </p>
+                )}
+                <p className="text-3xs text-text-muted mt-1 leading-relaxed">
+                  {t('profile.levelTablesNote')}
+                </p>
               </div>
             </div>
           </div>

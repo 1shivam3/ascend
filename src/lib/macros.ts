@@ -1380,11 +1380,15 @@ export function calculateRecommendedMacroGoals(
 
   switch (goal) {
     case 'build_muscle':
-      targetCalories = maintenance + 250; // Lean caloric surplus
+      // SIM-P2-05: surplus scales with maintenance (which already
+      // reflects bodyweight) instead of a flat +250 for a 55 kg and a
+      // 100 kg lifter alike: ~10% of maintenance, bounded 150–400 kcal.
+      targetCalories = maintenance + Math.min(400, Math.max(150, Math.round(maintenance * 0.1)));
       proteinPerKg = 1.8;
       break;
     case 'get_stronger':
-      targetCalories = maintenance + 150; // Performance slight surplus
+      // Same scaling, smaller: ~6% of maintenance, bounded 100–250 kcal.
+      targetCalories = maintenance + Math.min(250, Math.max(100, Math.round(maintenance * 0.06)));
       proteinPerKg = 1.8;
       break;
     case 'lose_fat': {

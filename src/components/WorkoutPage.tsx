@@ -60,6 +60,11 @@ import {
   getExecutedExercises,
   createWorkoutExercisesFromPlan,
   getExercisePrescription,
+  getInjuryBannedFamilies,
+  getInjuryBannedJoints,
+  getMovementFamily,
+  isExerciseJointBanned,
+  estimatePlanDurationMin,
 } from '@/lib/workout-engine';
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import {
@@ -155,6 +160,7 @@ function PlanModal({
   const { t } = useTranslation();
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
+  const trainingProfile = useStore((state) => state.trainingProfile);
   const [planName, setPlanName] = useState('');
   const [planExercises, setPlanExercises] = useState<PlannedExercise[]>([emptyPlanExercise(userUnit, defaultTargetReps)]);
   const [intensityMode, setIntensityMode] = useState<'rpe' | 'percent'>('rpe');
@@ -269,6 +275,26 @@ function PlanModal({
 
         {/* Body */}
         <div className="p-4 overflow-y-auto flex-1 flex flex-col gap-5">
+          {/* SIM-P1-02: hand-built plans used to bypass ALL limitation /
+              pain machinery silently. Warn (don't block — the user may
+              have recovered) when a listed exercise loads a joint or
+              movement family their declared limitations ban. */}
+          {(() => {
+            const limitations = trainingProfile?.injuriesOrLimitations || [];
+            if (limitations.length === 0) return null;
+            const bannedFamilies = getInjuryBannedFamilies(limitations);
+            const bannedJoints = getInjuryBannedJoints(limitations);
+            const conflicts = planExercises
+              .map((e) => e.name.trim())
+              .filter((n) => n && (bannedFamilies.has(getMovementFamily(n)) || isExerciseJointBanned(n, bannedJoints)));
+            if (conflicts.length === 0) return null;
+            return (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-200">
+                <span className="font-bold">Heads up — limitation clash: </span>
+                {conflicts.join(', ')} {conflicts.length === 1 ? 'loads' : 'load'} an area in your declared limitations ({limitations.join(', ')}). Generated plans swap or drop these automatically; hand-built plans only warn. Swap it out if it still hurts.
+              </div>
+            );
+          })()}
           {/* Plan Name */}
           <div>
             <label className="section-title mb-2 block">Plan Name</label>
@@ -527,6 +553,7 @@ interface PlanCardProps {
 function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpen }: PlanCardProps) {
   const { t } = useTranslation();
   const coachBlocks = useStore((state) => state.coachBlocks);
+  const updatePlannedWorkout = useStore((state) => state.updatePlannedWorkout);
   const adoptPlanForCoaching = useStore((state) => state.adoptPlanForCoaching);
   const unadoptPlanForCoaching = useStore((state) => state.unadoptPlanForCoaching);
   const isBlockPlan =
@@ -559,10 +586,31 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
           <p className="text-2xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
+            {/* SIM-P2-17: a duration estimate before starting. */}
+            {' · '}{(() => { const d = estimatePlanDurationMin(plan); return t('plan.estDuration', { min: d.min, max: d.max }); })()}
           </p>
         </div>
         {/* Action buttons */}
         <div className="flex items-center gap-1 shrink-0">
+          {/* SIM-P3-04: %1RM mode used to be silently inert on generated
+              plans — it lived only inside the plan editor. A card-level
+              toggle makes it discoverable and switchable anywhere. */}
+          <button
+            type="button"
+            onClick={() => updatePlannedWorkout(plan.id, {
+              ...plan,
+              intensityMode: plan.intensityMode === 'percent' ? 'rpe' : 'percent',
+            })}
+            title={t('plan.usePercent')}
+            aria-pressed={plan.intensityMode === 'percent'}
+            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-3xs font-mono font-bold transition-colors cursor-pointer ${
+              plan.intensityMode === 'percent'
+                ? 'bg-accent text-white'
+                : 'text-text-muted hover:text-accent hover:bg-accent/10'
+            }`}
+          >
+            %1RM
+          </button>
           <button
             type="button"
             onClick={onDuplicate}
@@ -673,7 +721,9 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPageProps = {}) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
+  // SIM-P2-19: dates render in the active language, not hardcoded en-US.
+  const dateLocale = language === 'hi' ? 'hi-IN' : 'en-US';
   const profile = useStore((state) => state.profile);
   const prs = useStore((state) => state.prs);
   const workouts = useStore((state) => state.workouts);
@@ -1368,6 +1418,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       plan.intensityMode === 'percent'
         ? buildPercentSuggestions(plan, userPrs, useStore.getState().workouts, userUnit)
         : {};
+    // SIM-P3-04: never start silently without the loads the mode
+    // promises — say why when no suggestion could be built.
+    if (plan.intensityMode === 'percent' && Object.keys(percentSuggestions).length === 0) {
+      toast.info(t('plan.intensityNoData'), t('plan.intensityPercent'));
+    }
     const percentWeightsByIndex: Record<number, number[]> = {};
     for (const [idx, s] of Object.entries(percentSuggestions)) {
       percentWeightsByIndex[Number(idx)] = s.weights;
@@ -1822,12 +1877,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6);
-    const startMonth = startOfWeek.toLocaleDateString('en-US', { month: 'short' });
-    const endMonth = endOfWeek.toLocaleDateString('en-US', { month: 'short' });
+    const startMonth = startOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
+    const endMonth = endOfWeek.toLocaleDateString(dateLocale, { month: 'short' });
     return startMonth === endMonth
       ? `${startMonth} ${startOfWeek.getDate()}–${endOfWeek.getDate()}`
       : `${startMonth} ${startOfWeek.getDate()} – ${endMonth} ${endOfWeek.getDate()}`;
-  }, []);
+  }, [dateLocale]);
 
   const weeklyScheduleStats = useMemo(() => {
     const now = new Date();
@@ -1836,7 +1891,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     startOfWeek.setDate(now.getDate() - dayOfWeek);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    const weekWorkouts = workouts.filter((w) => new Date(w.date) >= startOfWeek);
+    const weekWorkouts = workouts.filter((w) => parseLocalDate(w.date) >= startOfWeek);
     const trainedDates = new Set(weekWorkouts.map((w) => w.date.split('T')[0]));
 
     const scheduledDaysCount = weeklySchedule
@@ -1912,13 +1967,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const past = new Date(dateStr);
+      // SIM-P2-19: date-only strings parsed as UTC midnight used to
+      // shift the day for IST evenings; parseLocalDate pins local noon.
+      const past = parseLocalDate(dateStr);
       past.setHours(0, 0, 0, 0);
       const diffDays = Math.round((today.getTime() - past.getTime()) / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return 'Today';
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays > 1 && diffDays < 7) return `${diffDays} days ago`;
-      return past.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      if (diffDays === 0) return t('workout.todayRel');
+      if (diffDays === 1) return t('workout.yesterdayRel');
+      if (diffDays > 1 && diffDays < 7) return t('workout.daysAgoRel', { days: diffDays });
+      return past.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
     } catch {
       return dateStr;
     }
@@ -2164,6 +2221,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     {t('coachBlock.activeHint', {
                       type: t(`coachBlock.week_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.week_build'),
                     })}
+                  </p>
+                  {/* SIM-P2-09/10: a week-type label alone explains nothing.
+                      State what the week means for today's loads — and,
+                      for deload, that the 10% cut is review-gated by
+                      design, not silently applied or silently absent. */}
+                  <p className="text-2xs text-text-muted leading-relaxed">
+                    {t(`coachBlock.weekExplain_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.weekExplain_build')}
                   </p>
                 </>
               ) : (
@@ -2652,11 +2716,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     className="w-full flex justify-between items-center text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-accent/40 rounded-lg p-0.5"
                     onClick={() => toggleExpand(workout.id)}
                     aria-expanded={isExpanded}
-                    aria-label={`Workout on ${new Date(workout.date).toLocaleDateString()}`}
+                    aria-label={`Workout on ${parseLocalDate(workout.date).toLocaleDateString(dateLocale)}`}
                   >
                     <div>
                       <h3 className="font-semibold text-text-primary">
-                        {new Date(workout.date).toLocaleDateString('en-US', {
+                        {parseLocalDate(workout.date).toLocaleDateString(dateLocale, {
                           weekday: 'short',
                           month: 'short',
                           day: 'numeric',
@@ -2796,18 +2860,27 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             <button
                               type="button"
                               onClick={() => {
+                                // SIM-P1-09: snapshot index + session BEFORE
+                                // the delete, so the toast's Undo restores
+                                // it exactly (mirrors the plan/meal undo).
+                                const st = useStore.getState();
+                                const workoutIndex = st.workouts.findIndex((w) => w.id === workout.id);
+                                const snapshot = workout;
                                 deleteWorkout(workout.id);
                                 setConfirmDeleteId(null);
-                                toast.info(`Deleted workout session from ${workout.date}.`, 'Workout Removed');
+                                toast.showToast('info', `Deleted workout session from ${workout.date}.`, 'Workout Removed', undefined, {
+                                  label: 'Undo',
+                                  onAction: () => useStore.getState().insertWorkoutAt(snapshot, workoutIndex),
+                                });
                               }}
-                              className="px-2.5 py-1 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 transition-colors"
+                              className="min-h-[44px] px-3 py-2 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 transition-colors"
                             >
                               Yes, Delete
                             </button>
                             <button
                               type="button"
                               onClick={() => setConfirmDeleteId(null)}
-                              className="px-2.5 py-1 bg-bg-secondary text-text-muted rounded text-xs font-semibold hover:text-text-primary transition-colors"
+                              className="min-h-[44px] px-3 py-2 bg-bg-secondary text-text-muted rounded text-xs font-semibold hover:text-text-primary transition-colors"
                             >
                               Cancel
                             </button>

@@ -136,6 +136,14 @@ export interface AthleteModel {
     episodesLast28dByFamily: Partial<Record<MovementFamily, number>>;
     /** Families with ≥2 attributed episodes in 28 days — excluded from new plans, progression held. */
     flaggedFamilies: MovementFamily[];
+    /**
+     * Canonical keys of exercises with a pain episode in the last 28
+     * days (SIM-P1-03). flaggedFamilies needs a pattern (≥2 days), but a
+     * single deliberate "Hurts" report must still keep that exact lift
+     * out of the next coach block — the block engine swaps-or-drops
+     * these keys even when their family is not flagged.
+     */
+    recentPainExerciseKeys: string[];
   };
   /** Share of scored days in the last 28 that were caution/rest. */
   lowReadinessShare: ModelEstimate<number>;
@@ -784,6 +792,13 @@ function buildPain(input: AthleteModelInput, todayStr: string): AthleteModel['pa
     .filter(([fam, count]) => fam !== 'other' && count >= 2)
     .map(([fam]) => fam);
 
+  // Single-report keys (SIM-P1-03): every exercise with an episode in
+  // the last 28 days, whether or not its family reached the ≥2-day
+  // pattern bar. Session-level reports (exerciseKey '') carry no lift.
+  const recentPainExerciseKeys = [...new Set(
+    episodes.filter((e) => e.date >= recentStart && e.exerciseKey).map((e) => e.exerciseKey)
+  )];
+
   // Collapse exact duplicates (same day, same lift) — re-imports and sync
   // echoes must not double the record.
   const seenEp = new Set<string>();
@@ -798,6 +813,7 @@ function buildPain(input: AthleteModelInput, todayStr: string): AthleteModel['pa
     episodes: deduped.slice(0, 60),
     episodesLast28dByFamily: byFamily,
     flaggedFamilies,
+    recentPainExerciseKeys,
   };
 }
 

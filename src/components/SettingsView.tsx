@@ -640,6 +640,44 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </button>
           </div>
 
+          {/* Text size (SIM-P1-08): 10px labels are unreadable for
+              older eyes; root scaling covers all rem-based text. */}
+          <div className="space-y-2 pt-3 border-t border-border/60">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.textSize')}</span>
+              <span className="text-2xs font-mono text-text-muted">
+                {uiPreferences.textScale === 'large'
+                  ? t('settings.textLarge')
+                  : uiPreferences.textScale === 'xlarge'
+                  ? t('settings.textXLarge')
+                  : t('settings.textNormal')}
+              </span>
+            </div>
+            <p className="text-3xs text-text-muted leading-relaxed">
+              {t('settings.textSizeHint')}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { label: t('settings.textNormal'), value: 'normal' as const },
+                { label: t('settings.textLarge'), value: 'large' as const },
+                { label: t('settings.textXLarge'), value: 'xlarge' as const },
+              ].map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setUiPreferences({ textScale: opt.value })}
+                  className={`px-3 py-2 min-h-[44px] rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                    uiPreferences.textScale === opt.value
+                      ? 'bg-accent text-white border-accent'
+                      : 'bg-bg-secondary text-text-secondary border-border hover:text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Gamification toggle */}
           <div className="flex items-center justify-between gap-3 pt-3 border-t border-border/60">
             <div>

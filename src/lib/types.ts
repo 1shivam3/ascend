@@ -470,6 +470,10 @@ export interface OverallLevel {
   averageRatio: number;
   isMainLiftsOnly?: boolean;
   mainLiftsCount?: number;
+  /** True when every lift in the pool is a proxy-standard estimate
+   *  (SIM-P2-18): the headline number is then an estimate, and renderers
+   *  must say so instead of showing a bare level. */
+  isEstimate?: boolean;
 }
 
 export interface MacroGoals {

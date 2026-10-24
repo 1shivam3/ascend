@@ -25,6 +25,7 @@ import {
   calculateOneRepMax,
   getEffectiveExerciseLoad,
 } from '@/lib/strength-standards';
+import { MAX_WORKOUT_WEIGHT_KG } from '@/lib/workout-engine';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
@@ -427,12 +428,14 @@ export default function LogPastWorkoutModal({
         const wKg = userUnit === 'lbs' ? w * 0.453592 : w;
         const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
         const current1RM = calculateOneRepMax(effectiveLoadKg, r);
+        // SIM-P1-06: above-cap loads never mint PRs (typo guard, same
+        // 500 kg ceiling as the live workout flow).
 
         const existingBest = prs
           .filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase())
           .reduce((max, p) => Math.max(max, p.oneRepMax), 0);
 
-        if (current1RM > existingBest && current1RM > 0) {
+        if (current1RM > existingBest && current1RM > 0 && wKg <= MAX_WORKOUT_WEIGHT_KG) {
           const wLbs = userUnit === 'kg' ? w * 2.20462 : w;
           const prRecord: PersonalRecord = {
             id: safeRandomId('pr'),
@@ -698,6 +701,17 @@ export default function LogPastWorkoutModal({
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         )}
+                        {/* SIM-P2-07: pain on past workouts — previously only
+                            the live "Hurts" swap created pain episodes, so
+                            backfilled history undercounted pain. */}
+                        <button
+                          type="button"
+                          onClick={() => setExercises((prev) => prev.map((e, i) => i === exIdx ? { ...e, reportsPain: !e.reportsPain } : e))}
+                          title={t('lp.painToggleHint')}
+                          className={`text-xs font-semibold px-2 py-1 rounded-lg transition-colors cursor-pointer ${ex.reportsPain ? 'text-red-400 bg-red-500/10' : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'}`}
+                        >
+                          {ex.reportsPain ? '✓ ' : ''}{t('lp.painToggle')}
+                        </button>
                       </div>
                     </div>
 
