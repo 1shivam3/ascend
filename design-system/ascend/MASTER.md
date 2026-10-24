@@ -1,5 +1,14 @@
 # Design System Master File
 
+> **⚠️ SUPERSEDED — DO NOT FOLLOW.** This file (generated 2026-10-06) is stale:
+> its palette (`#F97316` / green accent) and fonts match nothing in the shipped
+> code, and it references `design-system/pages/*.md` files that do not exist.
+> The live design system is `tailwind.config.js` + `src/app/globals.css` (+
+> `src/components/ui/`), specified in `docs/ux-redesign/design-system.md`. This
+> file is kept for history only; if any doc contradicts the live system, the
+> live system wins. (Header note added by the UX redesign program, docs only;
+> the rest of this file is unchanged.)
+
 > **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file.
 > If not, strictly follow the rules below.
