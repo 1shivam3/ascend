@@ -2788,6 +2788,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.uploadLoading':
     'आपका वीडियो और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
   'formcheck.analyzingVideo': 'वीडियो विश्लेषण हो रहा है… {done} / {total} फ़्रेम ({pct}%)',
+  'formcheck.analyzingFrame': 'फ़्रेम {current} / {total} पर काम चल रहा है…',
   'formcheck.cancelAnalysis': 'विश्लेषण रद्द करें',
   'formcheck.heuristicsNote':
     'दिखाए गए कोण फोन कैमरे से मिले कोचिंग अनुमान हैं, मेडिकल माप नहीं। साइड से फिल्म करें, पूरा शरीर फ्रेम में रहे।',

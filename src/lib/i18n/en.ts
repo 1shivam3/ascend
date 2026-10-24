@@ -2791,6 +2791,7 @@ export const en = {
   'formcheck.uploadLoading':
     'Loading your video and the pose model… First load can take a few seconds — several MB to download.',
   'formcheck.analyzingVideo': 'Analyzing video… {done} of {total} frames ({pct}%)',
+  'formcheck.analyzingFrame': 'Working on frame {current} of {total}…',
   'formcheck.cancelAnalysis': 'Cancel analysis',
   'formcheck.heuristicsNote':
     'Angles shown are coaching heuristics from a phone camera, not medical measurements. Film from the side with your full body in frame.',

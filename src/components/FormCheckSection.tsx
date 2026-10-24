@@ -229,12 +229,18 @@ export default function FormCheckSection() {
   // gating, or counting (buildVisibilityDiagnostic is pure).
   const [showDebug, setShowDebug] = useState(false);
   const [diag, setDiag] = useState<VisibilityDiagnostic | null>(null);
-  // Upload analysis progress (null = not analyzing). Shown honestly
-  // during seek-based analysis so a slow phone's minutes-long run
-  // reads as work in progress, not a hang.
+  // Upload analysis progress (null = not analyzing). `done` counts
+  // finished frames; `current` is the 1-based frame being worked on
+  // RIGHT NOW (seeking to it or detecting it). That distinction is
+  // the first-frame fix: a slow first detection used to leave the
+  // screen frozen at "0 of N (0%)" with no sign of life, which looks
+  // identical to a hang. With `current`, the UI always names the
+  // frame in flight, and the pulse dot below animates on the
+  // compositor thread even while JS is blocked inside a detection.
   const [analysisProgress, setAnalysisProgress] = useState<{
     done: number;
     total: number;
+    current: number;
   } | null>(null);
   // Detection instrumentation for the debug readout + summary.
   const [detectStats, setDetectStats] = useState<{
@@ -493,6 +499,13 @@ export default function FormCheckSection() {
   // on a slow phone. A per-seek timeout surfaces a clear error
   // instead of hanging; cancelling invalidates the token, and this
   // loop then exits without touching state or firing a stale summary.
+  // No per-detection timeout exists, deliberately: the tasks-vision
+  // detectForVideo API is synchronous, so no timer can fire while it
+  // blocks — a Promise.race "timeout" would never trip and would only
+  // pretend to protect the run. The first-frame stall class is handled
+  // instead by the loading-phase warm-up in startUpload (the
+  // first-inference cost is paid before analysis starts), the
+  // in-flight frame line above, and the compositor pulse.
   const analyzeUpload = useCallback(async () => {
     const token = analysisTokenRef.current;
     const video = videoRef.current;
@@ -501,17 +514,40 @@ export default function FormCheckSection() {
     if (!video || !landmarker || !counter) return;
     const times = computeUploadStepTimes(video.duration);
     if (times.length === 0) return;
-    setAnalysisProgress({ done: 0, total: times.length });
+    setAnalysisProgress({ done: 0, total: times.length, current: 1 });
     const baseTs = performance.now();
     lastAnalysisTsRef.current = 0;
     try {
       for (let i = 0; i < times.length; i++) {
         if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
         const t = times[i];
+        // Name the frame in flight BEFORE seeking to it, so the UI
+        // never sits on a bare "0 of N" while a step is in progress.
+        setAnalysisProgress({ done: i, total: times.length, current: i + 1 });
         // A stuck seek must surface, never hang: seekVideoTo rejects
         // on timeout (caught below as a seek error).
         await seekVideoTo(video, t);
         if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
+        // First frame only: yield to paint BEFORE the first
+        // detection. The first detectForVideo on a landmarker pays
+        // the delegate/shader-init cost and blocks the main thread,
+        // so without this the "Working on frame 1" line above may
+        // never paint before the block — leaving the screen frozen
+        // at "0 of N (0%)", indistinguishable from a hang. rAF +
+        // timer is the standard yield-to-paint; the 500 ms fallback
+        // covers a backgrounded tab where rAF never fires.
+        if (i === 0) {
+          await new Promise<void>((resolve) => {
+            const fallback = setTimeout(resolve, 500);
+            requestAnimationFrame(() =>
+              setTimeout(() => {
+                clearTimeout(fallback);
+                resolve();
+              }, 0)
+            );
+          });
+          if (token !== analysisTokenRef.current || phaseRef.current !== 'active') return;
+        }
         const t0 = performance.now();
         try {
           // Monotonic timestamps: the landmarker is cached across
@@ -541,7 +577,7 @@ export default function FormCheckSection() {
             return;
           }
         }
-        setAnalysisProgress({ done: i + 1, total: times.length });
+        setAnalysisProgress({ done: i + 1, total: times.length, current: i + 1 });
         const st = detectStatsRef.current;
         if (st.frames > 0) {
           setDetectStats({ frames: st.frames, avgMs: Math.round(st.totalMs / st.frames) });
@@ -622,6 +658,25 @@ export default function FormCheckSection() {
       }
       if (!landmarkerRef.current) {
         landmarkerRef.current = await loadPoseLandmarker();
+      }
+      // Best-effort warm-up: the FIRST detectForVideo on a landmarker
+      // pays the delegate/shader-init cost and can block the main
+      // thread for seconds on a slow phone. Doing it here, during
+      // the loading phase (where "Loading your video and the pose
+      // model…" already sets the expectation of waiting), keeps that
+      // stall OUT of the analysis phase, where a frozen "0 of N"
+      // looks identical to a hang. Discarded: never fed to the
+      // counter, never touches progress or stats. Any failure is
+      // ignored — the analysis loop surfaces real errors itself.
+      // Timestamp note: this runs before analyzeUpload captures its
+      // base timestamp, so analysis timestamps stay increasing.
+      try {
+        const lm = landmarkerRef.current;
+        if (lm && video.readyState >= 2 && video.videoWidth > 0) {
+          lm.detectForVideo(video, performance.now());
+        }
+      } catch {
+        // Warm-up is best-effort only.
       }
       counterRef.current = new RepCounter(lift);
       setPhase('active');
@@ -864,6 +919,24 @@ export default function FormCheckSection() {
                     pct: Math.round(
                       (analysisProgress.done / analysisProgress.total) * 100
                     ),
+                  })}
+                </p>
+                {/* In-flight frame + compositor pulse: while a frame
+                    is being detected the main thread may be blocked
+                    inside the synchronous detectForVideo call, so no
+                    React update can land — but this pulse is a CSS
+                    animation, which the compositor keeps animating
+                    during a JS block, proving the page is alive.
+                    Together with the frame number, a screenshot can
+                    no longer read as "dead at 0%". */}
+                <p className="text-xs text-text-secondary flex items-center gap-2">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block w-2 h-2 rounded-full bg-accent animate-pulse"
+                  />
+                  {t('formcheck.analyzingFrame', {
+                    current: analysisProgress.current,
+                    total: analysisProgress.total,
                   })}
                 </p>
                 <div
