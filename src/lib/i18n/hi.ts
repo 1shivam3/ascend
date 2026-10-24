@@ -55,6 +55,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.resumeWorkout': 'वर्कआउट जारी रखें',
   'home.viewCompletedWorkout': 'पूरा हुआ वर्कआउट देखें',
   'home.notificationSettings': 'नोटिफ़िकेशन सेटिंग्स',
+  'home.coachNotes': 'कोच नोट्स',
+  'home.coachNotesMissed': 'छूटे हुए सत्र',
+  'home.coachNotesCalories': 'कैलोरी सुझाव',
+  'home.coachNotesNextSession': 'अगला सत्र',
   'home.level': 'लेवल',
 
   // ── Train / Plans ───────────────────────────────────────────────────
@@ -1662,6 +1666,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'auth.emailAddress': 'ईमेल पता',
   'auth.sendLink': 'लिंक भेजें',
   'auth.googleFailed': 'Google साइन-इन विफल',
+  'auth.googleSignInIncomplete': 'Google साइन-इन पूरा नहीं हुआ — फिर से कोशिश करें',
   'auth.googleConnectFail': 'Google से कनेक्ट नहीं हो सका',
   'auth.signInError': 'साइन-इन त्रुटि',
   'auth.orContinue': 'या इसके साथ जारी रखें',
@@ -1687,6 +1692,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'auth.googleInitFail': 'Google साइन-इन शुरू नहीं हो सका।',
   'auth.rls': 'PostgreSQL Row-Level Security द्वारा सुरक्षित',
   'ui.details': 'विवरण',
+  'ui.seeAll': 'सभी देखें',
   'ui.rankFoundation': 'फ़ाउंडेशन',
   'ui.rankTrained': 'प्रशिक्षित',
   'ui.rankSkilled': 'कुशल',

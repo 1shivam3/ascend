@@ -50,6 +50,7 @@ import {
 import ReadinessSheet from '@/components/ReadinessSheet';
 import AthleteModelCard from '@/components/AthleteModelCard';
 import CoachWeeklyReviewCard from '@/components/CoachWeeklyReviewCard';
+import CoachNotesSection from '@/components/CoachNotesSection';
 import LevelSheet from '@/components/LevelSheet';
 import ChallengesSheet from '@/components/ChallengesSheet';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
@@ -563,6 +564,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
           <button
             type="button"
+            onClick={() => onNavigate('settings')}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            title={t('settings.title')}
+            aria-label={t('settings.title')}
+          >
+            <Settings className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
             onClick={() => onNavigate('profile')}
             className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
             title={t('home.athleteProfile')}
@@ -846,8 +856,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
-      {/* ── 7a. COACH CHECK-IN (missed sessions) — hideable in Settings ──── */}
-      {uiPreferences.coachEnabled && checkIn && (
+      {/* ── 7. COACH NOTES — one section: first card expanded, rest behind taps ── */}
+      <CoachNotesSection
+        checkIn={uiPreferences.coachEnabled && checkIn && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5 min-w-0">
@@ -903,9 +914,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       )}
-
-      {/* ── 7b. COACH NUTRITION SUGGESTION (weight trend → calorie target) ──── */}
-      {uiPreferences.coachEnabled && nutritionSuggestion && nutritionSuggestion.action !== 'hold' && (
+        nutrition={uiPreferences.coachEnabled && nutritionSuggestion && nutritionSuggestion.action !== 'hold' && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-2.5 min-w-0">
@@ -969,9 +978,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       )}
-
-      {/* ── 7c. NEXT-SESSION ADJUSTMENTS (auto-regulation) ───────────────── */}
-      {uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
+        adjustments={uiPreferences.coachEnabled && coachDigest.nextAdjustments.length > 0 && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs">
           <span className="text-xs font-medium text-text-muted">{t('home.nextSessionCalls')}</span>
           <div className="mt-2 space-y-2">
@@ -993,33 +1000,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </div>
       )}
+      />
 
-      {/* ── 8. STREAK (hidden when gamification is off; the quote now lives at the page bottom) ─ */}
-      {uiPreferences.gamificationEnabled && (
-      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Flame className="w-4 h-4" />
-          </span>
-          <p className="text-xs font-bold text-text-primary">
-            {streakInfo.currentStreak > 0
-              ? t(streakInfo.currentStreak === 1 ? 'home.streakOne' : 'home.streakMany', { count: streakInfo.currentStreak })
-              : t('home.streakStart')}
-          </p>
-          {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
-            <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
-              <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
-              {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
-            </span>
-          )}
-        </div>
-        {streakInfo.freezeConsumed && (
-          <p className="text-3xs text-text-muted mt-1.5">
-            {t('home.freezeCovered')}
-          </p>
-        )}
-      </div>
-      )}
+      {/* Streak now lives in the habit-matrix header below (or the slim
+          fallback after it when the matrix is hidden) — no standalone
+          streak section anymore. */}
 
       {/* ── 8a2. STEPS (Health Connect, only when synced data exists) ──── */}
       {healthSummary && healthSummary.date === todayStr && healthSummary.stepsToday > 0 && (
@@ -1046,6 +1031,27 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
           <span className="text-3xs font-mono text-text-muted">{t('home.monSun')}</span>
         </div>
+        {uiPreferences.gamificationEnabled && (
+          <div className="flex items-center gap-2 mb-3">
+            <Flame className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
+            <p className="text-xs font-bold text-text-primary">
+              {streakInfo.currentStreak > 0
+                ? t(streakInfo.currentStreak === 1 ? 'home.streakOne' : 'home.streakMany', { count: streakInfo.currentStreak })
+                : t('home.streakStart')}
+            </p>
+            {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
+              <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+                <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
+                {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
+              </span>
+            )}
+          </div>
+        )}
+        {uiPreferences.gamificationEnabled && streakInfo.freezeConsumed && (
+          <p className="text-3xs text-text-muted -mt-1 mb-3">
+            {t('home.freezeCovered')}
+          </p>
+        )}
         <WeeklyHabitMatrix
           compact
           workouts={workouts}
@@ -1069,6 +1075,25 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             return d;
           })()}
         />
+      </div>
+      )}
+
+      {/* Streak fallback: when the habit matrix is hidden, the streak
+          still gets its slim one-line row instead of vanishing. */}
+      {!uiPreferences.showHabitMatrix && uiPreferences.gamificationEnabled && (
+      <div className="bg-bg-card border border-border/80 rounded-2xl px-4 py-3 shadow-xs flex items-center gap-2.5">
+        <Flame className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
+        <p className="text-xs font-bold text-text-primary">
+          {streakInfo.currentStreak > 0
+            ? t(streakInfo.currentStreak === 1 ? 'home.streakOne' : 'home.streakMany', { count: streakInfo.currentStreak })
+            : t('home.streakStart')}
+        </p>
+        {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
+          <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+            <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
+            {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
+          </span>
+        )}
       </div>
       )}
 

@@ -64,6 +64,7 @@ import {
   dismissHint,
 } from '@/lib/nutrition-coach';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import DietPreferencePicker from '@/components/DietPreferencePicker';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -209,6 +210,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
+  const [isDietPickerOpen,     setIsDietPickerOpen]     = useState(false);
   const mealModalRef = useRef<HTMLDivElement>(null); const { dialogProps: mealDialogProps } = useModalA11y(mealModalRef, isModalOpen, () => setIsModalOpen(false));
   const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
@@ -1690,20 +1692,34 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </p>
               )}
             </div>
-            {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
-              <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2">
-                {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
-                {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
-                {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
-                {macroGoals.calorieDelta < 0 && (
-                  <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
+            {/* Target math stays one tap away: the ring and macro numbers
+                above are the glanceable part; the formula, deficit/surplus
+                note, and sugar line live behind this detail tap. */}
+            {((!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
+              <CollapsibleDetails label={t('meals.why')} className="w-full">
+                {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
+                  <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
+                    {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
+                    {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
+                    {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
+                    {macroGoals.calorieDelta < 0 && (
+                      <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
+                    )}
+                    <span className="block text-4xs opacity-80">
+                      {macroGoals.calorieDelta < 0
+                        ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
+                        : t('meals.surplusNote')}
+                    </span>
+                  </span>
                 )}
-                <span className="block text-4xs opacity-80">
-                  {macroGoals.calorieDelta < 0
-                    ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
-                    : t('meals.surplusNote')}
-                </span>
-              </span>
+                {typeof todayMacros.sugarG === 'number' && (
+                  <p className="w-full text-center text-3xs text-text-muted pt-1">
+                    {t('meals.sugarNote')}{' '}
+                    <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
+                    {t('meals.sugarNoteSuffix')}
+                  </p>
+                )}
+              </CollapsibleDetails>
             )}
 
             {/* 3 Macro Cards in 3 Columns */}
@@ -1742,15 +1758,45 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
             </div>
 
-            {/* Sugar — shown only when at least one logged food carried
-                label sugar data (barcode/packaged foods). Never shown as
-                0: unknown is not zero, especially for diabetics. */}
-            {typeof todayMacros.sugarG === 'number' && (
-              <p className="w-full text-center text-3xs text-text-muted pt-1">
-                {t('meals.sugarNote')}{' '}
-                <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
-                {t('meals.sugarNoteSuffix')}
-              </p>
+            {/* Sugar line moved into the target detail tap above (it only
+                renders when at least one logged food carried label sugar
+                data — unknown is never shown as 0). */}
+          </section>
+
+          {/* Diet preference — surfaced where the user thinks about food.
+              Same picker as Settings; writes the same profile field, so
+              the two surfaces can never disagree. */}
+          <section className="card p-4 bg-bg-card border border-border/80">
+            <button
+              type="button"
+              onClick={() => setIsDietPickerOpen((o) => !o)}
+              aria-expanded={isDietPickerOpen}
+              className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                  <Leaf className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-2xs font-bold uppercase tracking-wider text-text-muted block">
+                    {t('settings.dietPreference')}
+                  </span>
+                  <span className="text-xs font-bold text-text-primary block truncate">
+                    {t(({
+                      vegetarian: 'settings.dietVegetarian',
+                      eggitarian: 'settings.dietEggetarian',
+                      non_vegetarian: 'settings.dietNonVegetarian',
+                      vegan: 'settings.dietVegan',
+                    } as Record<string, StringKey>)[profile?.dietPreference || 'non_vegetarian'])}
+                  </span>
+                </div>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${isDietPickerOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {isDietPickerOpen && (
+              <div className="mt-3 pt-3 border-t border-border/60">
+                <DietPreferencePicker />
+              </div>
             )}
           </section>
 

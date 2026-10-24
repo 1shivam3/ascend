@@ -43,7 +43,7 @@ export default function SocialAuthButtons({ onSuccess: _onSuccess }: SocialAuthB
     try {
       const res = await syncEngine.signInWithGoogle();
       if (res.error) {
-        toast.error(res.error, t('auth.googleFailed'));
+        toast.error(t('auth.googleSignInIncomplete'), t('auth.googleFailed'));
         setLoadingProvider(null);
       }
     } catch {
