@@ -414,6 +414,137 @@ export function getExerciseById(id: string): LibraryExercise | undefined {
 }
 
 /**
+ * Devanagari (transliterated) display names for the library, keyed by
+ * exercise id (persona-sim round 5, SIM-P1-05 Round 3). Indian gym
+ * culture uses the English terms, so these are transliterations, not
+ * reinventions — "Bench Press" stays recognisably "बेंच प्रेस" for a
+ * user who reads Devanagari but not Latin script. Display-only: every
+ * key, match, and log still uses the English name, so nothing in
+ * matching, PRs, or history can break. Coverage is asserted by tests
+ * (104/104 ids).
+ */
+export const EXERCISE_NAME_HI: Record<string, string> = {
+  // Chest
+  bench_press: 'बारबेल बेंच प्रेस',
+  incline_bench: 'इन्क्लाइन बारबेल बेंच प्रेस',
+  decline_bench: 'डिक्लाइन बारबेल बेंच प्रेस',
+  close_grip_bench: 'क्लोज़-ग्रिप बेंच प्रेस',
+  db_press: 'डंबल बेंच प्रेस',
+  incline_db_press: 'इन्क्लाइन डंबल प्रेस',
+  decline_db_press: 'डिक्लाइन डंबल प्रेस',
+  db_fly: 'डंबल चेस्ट फ़्लाई',
+  incline_db_fly: 'इन्क्लाइन डंबल फ़्लाई',
+  chest_press_machine: 'मशीन चेस्ट प्रेस',
+  incline_chest_machine: 'इन्क्लाइन मशीन चेस्ट प्रेस',
+  pec_deck: 'पेक डेक / चेस्ट फ़्लाई मशीन',
+  cable_crossover_high: 'केबल क्रॉसओवर (ऊपर से नीचे)',
+  cable_crossover_low: 'केबल क्रॉसओवर (नीचे से ऊपर)',
+  cable_chest_press: 'स्टैंडिंग केबल चेस्ट प्रेस',
+  push_ups: 'पुश-अप्स',
+  chest_dips: 'चेस्ट डिप्स',
+  smith_bench: 'स्मिथ मशीन बेंच प्रेस',
+  smith_incline_bench: 'स्मिथ मशीन इन्क्लाइन प्रेस',
+  // Back
+  deadlift: 'कन्वेंशनल डेडलिफ्ट',
+  sumo_deadlift: 'सूमो डेडलिफ्ट',
+  barbell_row: 'बारबेल बेंट-ओवर रो',
+  pendlay_row: 'पेंडले रो',
+  t_bar_row: 'टी-बार रो',
+  romanian_deadlift: 'रोमानियन डेडलिफ्ट (RDL)',
+  pull_ups: 'पुल-अप्स',
+  chin_ups: 'चिन-अप्स',
+  inverted_row: 'इन्वर्टेड बॉडीवेट रो',
+  lat_pulldown: 'लैट पुलडाउन',
+  close_grip_pulldown: 'क्लोज़-ग्रिप लैट पुलडाउन',
+  seated_cable_row: 'सीटेड केबल रो',
+  single_arm_cable_row: 'सिंगल-आर्म केबल रो',
+  straight_arm_pulldown: 'स्ट्रेट-आर्म पुलडाउन (लैट प्रेयर)',
+  db_row: 'सिंगल-आर्म डंबल रो',
+  db_chest_supported_row: 'चेस्ट-सपोर्टेड डंबल रो',
+  db_rdl: 'डंबल रोमानियन डेडलिफ्ट',
+  chest_supported_machine_row: 'चेस्ट-सपोर्टेड मशीन रो',
+  hyperextension: 'बैक हाइपरएक्सटेंशन',
+  barbell_shrug: 'बारबेल श्रग',
+  db_shrug: 'डंबल श्रग',
+  // Legs
+  squat: 'बारबेल बैक स्क्वाट',
+  front_squat: 'बारबेल फ्रंट स्क्वाट',
+  leg_press: 'लेग प्रेस',
+  hack_squat_machine: 'हैक स्क्वाट मशीन',
+  leg_extension: 'लेग एक्सटेंशन',
+  lying_leg_curl: 'लाइंग लेग कर्ल',
+  seated_leg_curl: 'सीटेड लेग कर्ल',
+  barbell_hip_thrust: 'बारबेल हिप थ्रस्ट',
+  bulgarian_split_squat: 'बल्गेरियन स्प्लिट स्क्वाट',
+  goblet_squat: 'गॉबलेट स्क्वाट',
+  db_walking_lunge: 'डंबल वॉकिंग लंज',
+  standing_calf_raise: 'स्टैंडिंग काफ़ रेज़',
+  seated_calf_raise: 'सीटेड काफ़ रेज़',
+  abductor_machine: 'हिप एब्डक्टर मशीन',
+  adductor_machine: 'हिप एडक्टर मशीन',
+  bodyweight_squats: 'बॉडीवेट स्क्वाट्स',
+  smith_squat: 'स्मिथ मशीन स्क्वाट',
+  // Shoulders
+  overhead_press: 'ओवरहेड प्रेस (बारबेल OHP)',
+  push_press: 'बारबेल पुश प्रेस',
+  db_shoulder_press: 'सीटेड डंबल शोल्डर प्रेस',
+  arnold_press: 'आर्नोल्ड प्रेस',
+  db_lateral_raise: 'डंबल लेटरल रेज़',
+  cable_lateral_raise: 'केबल लेटरल रेज़',
+  machine_lateral_raise: 'मशीन लेटरल रेज़',
+  face_pull: 'केबल फ़ेस पुल',
+  rear_delt_fly: 'डंबल रियर डेल्ट फ़्लाई',
+  rear_delt_machine: 'रियर डेल्ट पेक डेक मशीन',
+  front_raise: 'डंबल फ्रंट रेज़',
+  upright_row: 'बारबेल / केबल अपराइट रो',
+  smith_ohp: 'स्मिथ मशीन शोल्डर प्रेस',
+  // Arms
+  barbell_curl: 'बारबेल बाइसेप कर्ल',
+  ez_bar_curl: 'EZ-बार बाइसेप कर्ल',
+  db_curl: 'डंबल बाइसेप कर्ल',
+  incline_db_curl: 'इन्क्लाइन डंबल कर्ल',
+  hammer_curl: 'डंबल हैमर कर्ल',
+  preacher_curl: 'प्रीचर कर्ल (EZ बार)',
+  cable_bicep_curl: 'केबल बाइसेप कर्ल',
+  concentration_curl: 'कंसंट्रेशन कर्ल',
+  tricep_pushdown_rope: 'ट्राइसेप रोप पुशडाउन',
+  tricep_pushdown_bar: 'स्ट्रेट-बार केबल पुशडाउन',
+  skull_crushers: 'स्कल क्रशर्स (लाइंग EZ-बार एक्सटेंशन)',
+  overhead_db_tricep: 'ओवरहेड डंबल ट्राइसेप एक्सटेंशन',
+  overhead_cable_tricep: 'ओवरहेड केबल ट्राइसेप एक्सटेंशन',
+  tricep_dips: 'ट्राइसेप डिप्स (बेंच / पैरेलल बार्स)',
+  diamond_pushups: 'डायमंड पुश-अप्स',
+  wrist_curl: 'बारबेल रिस्ट कर्ल',
+  // Core
+  hanging_leg_raise: 'हैंगिंग लेग रेज़',
+  hanging_knee_raise: 'हैंगिंग नी रेज़',
+  cable_crunch: 'नीलिंग केबल क्रंच',
+  cable_woodchopper: 'केबल वुडचॉपर',
+  ab_wheel_rollout: 'एब व्हील रोलआउट',
+  plank: 'फ्रंट प्लैंक (सेकंड्स)',
+  side_plank: 'साइड प्लैंक (सेकंड्स)',
+  russian_twist: 'रशियन ट्विस्ट (प्रति साइड रेप्स)',
+  decline_crunch: 'डिक्लाइन बेंच क्रंच',
+  machine_crunch: 'एब्डोमिनल क्रंच मशीन',
+  // Cardio / conditioning
+  captain_chair_raise: 'कैप्टन चेयर नी/लेग रेज़',
+  zone2_cycling: 'ज़ोन 2 स्टेशनरी साइकलिंग',
+  incline_treadmill_walk: 'इन्क्लाइन ट्रेडमिल वॉक',
+  rowing_intervals: 'रोइंग मशीन इंटरवल्स',
+  jump_rope: 'जंप रोप इंटरवल्स',
+  stair_climber: 'स्टेयर क्लाइंबर (स्टेपमिल)',
+  kettlebell_swings: 'केटलबेल स्विंग्स',
+  farmers_walk: 'फ़ार्मर्स वॉक',
+};
+
+/** Devanagari display name for an exercise, or undefined when unknown. */
+export function getExerciseHindiName(name: string): string | undefined {
+  const item = findLibraryExercise(name);
+  if (!item) return undefined;
+  return EXERCISE_NAME_HI[item.id];
+}
+
+/**
  * Canonical loose names -> library id. Split templates, generated plans,
  * and user logs all emit shorthand ("Barbell Row", "Tricep Pushdown")
  * that substring rules cannot express — "Barbell Bent-Over Row" does not

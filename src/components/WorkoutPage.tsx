@@ -222,28 +222,28 @@ function PlanModal({
   const handleSave = () => {
     const trimmedName = planName.trim().slice(0, MAX_PLAN_NAME_LENGTH);
     if (!trimmedName) {
-      toast.error('Please give the plan a name.', 'Missing Name');
+      toast.error(t('toast.planNameRequired'), t('toast.titlePlanNameRequired'));
       return;
     }
     const validExercises = planExercises.filter(e => e.name.trim());
     if (validExercises.length === 0) {
-      toast.error('Add at least one exercise to the plan.', 'No Exercises');
+      toast.error(t('toast.planNeedExercise'), t('toast.titleNoExercises'));
       return;
     }
     for (const ex of validExercises) {
       const sets = Number(ex.targetSets);
       if (!Number.isFinite(sets) || sets < 1) {
-        toast.error(`"${ex.name.trim()}": sets must be at least 1.`, 'Invalid Sets');
+        toast.error(t('toast.planSetsMin', { name: ex.name.trim() }), t('toast.titleInvalidSets'));
         return;
       }
       const reps = Number(ex.targetReps);
       if (!Number.isFinite(reps) || reps < 1) {
-        toast.error(`"${ex.name.trim()}": reps must be at least 1.`, 'Invalid Reps');
+        toast.error(t('toast.planRepsMin', { name: ex.name.trim() }), t('toast.titleInvalidReps'));
         return;
       }
       const weight = Number(ex.targetWeight);
       if (!Number.isFinite(weight) || weight < 0) {
-        toast.error(`"${ex.name.trim()}": weight cannot be negative.`, 'Invalid Weight');
+        toast.error(t('toast.planWeightNeg', { name: ex.name.trim() }), t('toast.titleInvalidWeight'));
         return;
       }
     }
@@ -1097,7 +1097,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setStartedFromPlanId(activeWorkoutDraft.startedFromPlanId || activeWorkoutDraft.planId || null);
     setSessionStartTime(activeWorkoutDraft.sessionStartTime || Date.now());
     setIsModalOpen(true);
-    toast.success('Resumed active workout session!', 'Workout Restored');
+    toast.success(t('toast.workoutResumed'), t('toast.titleWorkoutRestored'));
   };
 
   // "Start Workout" on Home saves a fresh draft and navigates here — a draft
@@ -1123,7 +1123,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     clearWorkoutDraft();
     setStartedFromPlan(null);
     setStartedFromPlanId(null);
-    toast.info('Workout draft discarded.', 'Draft Cleared');
+    toast.info(t('toast.draftDiscarded'), t('toast.titleDraftCleared'));
   };
 
   const handleRepeatLastWorkout = () => {
@@ -1305,7 +1305,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     } else {
       handleAddExercise(exerciseName);
     }
-    toast.success(`Added "${exerciseName}" to session`, 'Exercise Added');
+    toast.success(t('toast.exerciseAdded', { name: exerciseName }), t('toast.titleExerciseAdded'));
   };
 
   const handleExerciseNotesChange = (index: number, notes: string) => {
@@ -1564,7 +1564,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
     if (!hasMeaningfulData) {
-      toast.error('No exercises or planned sets recorded to save.', 'Empty Workout');
+      toast.error(t('toast.emptyWorkout'), t('toast.titleEmptyWorkout'));
       return;
     }
 
@@ -1706,7 +1706,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         (p) => p.id !== editingPlan.id && p.name.toLowerCase() === planData.name.toLowerCase()
       );
       if (clash) {
-        toast.error(`A different plan is already named "${planData.name}". Please choose another name.`, 'Duplicate Name');
+        toast.error(t('toast.duplicatePlanName', { name: planData.name }), t('toast.titleDuplicateName'));
         return;
       }
       updatePlannedWorkout(editingPlan.id, {
@@ -1715,7 +1715,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         exercises: planData.exercises,
         intensityMode: planData.intensityMode,
       });
-      toast.success(`Plan "${planData.name}" updated.`, 'Plan Saved');
+      toast.success(t('toast.planUpdated', { name: planData.name }), t('toast.titlePlanSaved'));
       // If the edited plan is open in the detail view, refresh it so the
       // view reflects the saved changes instead of the stale snapshot.
       if (selectedDetailsPlan && selectedDetailsPlan.id === editingPlan.id) {
@@ -1802,7 +1802,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       exercises: plan.exercises.map(e => ({ ...e })),
     };
     addPlannedWorkout(duplicatedPlan);
-    toast.success(`Duplicated "${plan.name}"`, 'Plan Duplicated');
+    toast.success(t('toast.planDuplicated', { name: plan.name }), t('toast.titlePlanDuplicated'));
   };
 
   const openCreatePlan = () => {

@@ -77,7 +77,7 @@ import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural, formatWaterMl } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWaterMl } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -678,7 +678,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         foods: [scannedItem],
       };
       addMeal(newMeal);
-      toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal) to today's meals!`, 'Scanned Food Logged');
+      toast.success(t('toast.scannedLogged', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedLogged'));
     }
   };
 
@@ -703,7 +703,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     if (isModalOpen) {
       setFoods((prev) => [...prev, item]);
-      toast.success(`Added ${fav.name} to meal!`, 'Favorite Added');
+      toast.success(t('toast.favAdded', { name: fav.name }), t('toast.titleFavoriteAdded'));
     } else {
       setMealName('Quick Meal');
       setFoods([item]);
@@ -819,7 +819,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     clearAllFavoriteFoods();
     setConfirmClearAll(false);
     setIsManagePinnedOpen(false);
-    toast.info('All pinned foods have been removed.', 'Pinned Foods Cleared');
+    toast.info(t('toast.pinnedCleared'), t('toast.titlePinnedCleared'));
   };
 
   const handleAddFoodFromHistory = (food: FoodItem) => {
@@ -872,7 +872,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
     addMeal(newMeal);
     const mMacros = calculateMealMacros(scaledFoods);
-    toast.success(`Logged ${newMeal.name} (~${Math.round(mMacros.calories)} kcal, ~${Math.round(mMacros.proteinG)}g P)!`, 'Meal Added');
+    toast.success(t('toast.mealLoggedFav', { name: newMeal.name, kcal: Math.round(mMacros.calories), protein: Math.round(mMacros.proteinG) }), t('toast.titleMealAdded'));
   };
 
   const handlePinMealFoods = (meal: MealEntry) => {
@@ -893,7 +893,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const handleSaveMeal = () => {
     const validFoods = foods.filter((f) => f.name.trim());
     if (validFoods.length === 0) {
-      toast.error('Please add at least one food item with a name.', 'No Food Items');
+      toast.error(t('toast.noFoodItems'), t('toast.titleNoFoodItems'));
       return;
     }
 
@@ -901,7 +901,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // produced piles of indistinguishable duplicates.
     const finalMealName = mealName.trim();
     if (!finalMealName) {
-      toast.error('Please give this meal a name (e.g. "Post-Workout Shake").', 'Meal Name Required');
+      toast.error(t('toast.mealNameRequired'), t('toast.titleMealNameRequired'));
       return;
     }
 
@@ -945,8 +945,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     );
     if (zeroDataItems.length > 0) {
       toast.error(
-        `${zeroDataItems.map((f) => `"${f.name}"`).join(', ')} has no nutrition values yet. Enter its calories/macros (tap the item) or remove it before saving.`,
-        'Missing Nutrition Data'
+        t('toast.zeroDataBuilder', { names: zeroDataItems.map((f) => `"${f.name}"`).join(', ') }),
+        t('toast.titleMissingNutrition')
       );
       return;
     }
@@ -955,8 +955,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     addMeal(newMeal);
     toast.success(
-      `Added ${finalMealName} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
-      'Meal Logged'
+      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG) }),
+      t('toast.titleMealLogged')
     );
     resetBuilderForm();
     setIsModalOpen(false);
@@ -1090,7 +1090,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const handleClearGoals = () => {
     setMacroGoals(null);
-    toast.info('Daily macro targets cleared.', 'Targets Reset');
+    toast.info(t('toast.targetsCleared'), t('toast.titleTargetsReset'));
     setIsGoalsModalOpen(false);
   };
 
@@ -1167,8 +1167,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         );
         if (zeroDataOnline.length > 0) {
           toast.error(
-            `${zeroDataOnline.map((f: FoodItem) => `"${f.name}"`).join(', ')} has no nutrition values yet — it was not logged. Add it manually for accurate numbers.`,
-            'Missing Nutrition Data'
+            t('toast.zeroDataQuick', { names: zeroDataOnline.map((f: FoodItem) => `"${f.name}"`).join(', ') }),
+            t('toast.titleMissingNutrition')
           );
           setIsNaturalParsing(false);
           return;
@@ -1199,8 +1199,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         }
         warnUnmatched(data.foods);
         toast.success(
-          `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
-          'Meal Logged'
+          data.foods.length === 1
+            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 })
+            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 }),
+          t('toast.titleMealLogged')
         );
         return;
       }
@@ -1223,8 +1225,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           );
           if (zeroDataOffline.length > 0) {
             toast.error(
-              `${zeroDataOffline.map((f) => `"${f.name}"`).join(', ')} has no nutrition values yet — it was not logged. Add it manually for accurate numbers.`,
-              'Missing Nutrition Data'
+              t('toast.zeroDataQuick', { names: zeroDataOffline.map((f) => `"${f.name}"`).join(', ') }),
+              t('toast.titleMissingNutrition')
             );
             setIsNaturalParsing(false);
             return;
@@ -1240,8 +1242,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           setNaturalQuery('');
           warnUnmatched(offlineFoods);
           toast.success(
-            `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
-            'Meal Logged (Offline)'
+            offlineFoods.length === 1
+              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG })
+              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG }),
+            t('toast.titleMealLoggedOffline')
           );
           return;
         }

@@ -267,7 +267,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       if (rewardDue) {
         awardXpEvents([{ id: challengeXpEventId(def), type: 'challenge' }]);
         grantChallengeReward(challengeInstanceKey(def));
-        toast.success(`${def.title} complete — 200 XP earned.`, 'Challenge Complete');
+        toast.success(t('toast.challengeComplete', { title: def.title }), t('toast.titleChallengeComplete'));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -291,7 +291,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       foods: [scannedItem],
     };
     addMeal(newMeal);
-    toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal)!`, 'Scanned Food Logged');
+    toast.success(t('toast.scannedLoggedShort', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedLogged'));
   };
 
   // Modal triggers
@@ -414,7 +414,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       });
 
       saveWorkoutDraft(draft);
-      toast.success(`Loaded "${planToStart.name}". Let's lift!`, 'Session Started');
+      toast.success(t('toast.sessionStarted', { name: planToStart.name }), t('toast.titleSessionStarted'));
     }
     onNavigate('workout');
   };
@@ -805,7 +805,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 logWater(250);
-                toast.success('+250 ml logged', 'Hydration Updated');
+                toast.success(t('toast.water250'), t('toast.titleHydration'));
               }}
               className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
@@ -815,7 +815,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 logWater(500);
-                toast.success('+500 ml logged', 'Hydration Updated');
+                toast.success(t('toast.water500'), t('toast.titleHydration'));
               }}
               className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
             >
@@ -1112,7 +1112,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               onClick={(e) => {
                 e.stopPropagation();
                 optInChallenge(homeChallenge.key);
-                toast.success('Challenge joined. Good luck!', 'Challenge Accepted');
+                toast.success(t('toast.challengeJoined'), t('toast.titleChallengeAccepted'));
               }}
               className="mt-3 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
@@ -1302,7 +1302,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     bodyParts: [],
                   });
                   setIsChangeWorkoutOpen(false);
-                  toast.info("Set today as Rest & Recovery.", "Rest Day Set");
+                  toast.info(t('toast.restDaySet'), t('toast.titleRestDay'));
                 }}
                 className="w-full p-3 rounded-xl bg-bg-secondary/60 border border-border/80 hover:border-accent/40 flex items-center justify-between text-left text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
               >
@@ -1334,7 +1334,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             exercises: plan.exercises,
           };
           addPlannedWorkout(newPlan);
-          toast.success(`Plan "${plan.name}" saved!`, 'Plan Saved');
+          toast.success(t('toast.planSaved', { name: plan.name }), t('toast.titlePlanSaved'));
         }}
       />
 

@@ -16,7 +16,7 @@ import {
 import { WorkoutEntry, PersonalRecord } from '@/lib/types';
 import { getExercisesByCategory, calculateOneRepMax } from '@/lib/strength-standards';
 import { getLastExercisePerformance } from '@/lib/workout-engine';
-import { getExerciseFormCues } from '@/lib/exercise-library';
+import { getExerciseFormCues, getExerciseHindiName } from '@/lib/exercise-library';
 import { getDemoForExercise } from '@/lib/exercise-media';
 import ExerciseDemo from '@/components/ExerciseDemo';
 import { useTranslation } from '@/lib/i18n';
@@ -98,7 +98,7 @@ export default function ExerciseLibraryModal({
 }: ExerciseLibraryModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
   const [selectedMuscle, setSelectedMuscle] = useState<string>('all');
@@ -294,6 +294,17 @@ export default function ExerciseLibraryModal({
                       <span className="text-xs font-bold text-text-primary truncate font-sans">
                         {ex.name}
                       </span>
+                      {/* SIM-P1-05 Round 3: Devanagari name under the
+                          English one in Hindi mode — display-only, the
+                          English name stays the key everywhere. */}
+                      {language === 'hi' && (() => {
+                        const hi = getExerciseHindiName(ex.name);
+                        return hi ? (
+                          <span className="text-2xs text-text-secondary font-sans shrink-0">
+                            {hi}
+                          </span>
+                        ) : null;
+                      })()}
                       <span className="text-3xs uppercase font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted">
                         {ex.equipment}
                       </span>

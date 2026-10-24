@@ -39,6 +39,7 @@ import {
   searchExercises,
   getExerciseMuscle,
   getExerciseFormCues,
+  getExerciseHindiName,
 } from '@/lib/exercise-library';
 import {
   getLastExercisePerformance,
@@ -342,7 +343,7 @@ export default function ActiveWorkoutScreen({
   // accepted swaps are real session changes and stay when it's OFF.
   const [gymPacked, setGymPacked] = useState(false);
   const [packedDismissed, setPackedDismissed] = useState<Set<string>>(new Set());
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
   const renameContainerRef = useRef<HTMLDivElement>(null);
@@ -3301,6 +3302,11 @@ export default function ActiveWorkoutScreen({
                 <div>
                   <h3 className="font-bold text-text-primary">{t('workout.formCuesHeading')}</h3>
                   <p className="text-2xs text-text-muted">{currentExercise?.name}</p>
+                  {/* SIM-P1-05 Round 3: Devanagari name in Hindi mode. */}
+                  {language === 'hi' && currentExercise?.name && (() => {
+                    const hi = getExerciseHindiName(currentExercise.name);
+                    return hi ? <p className="text-2xs text-text-secondary">{hi}</p> : null;
+                  })()}
                 </div>
               </div>
               <button
