@@ -24,11 +24,18 @@
  * binary + model download). Without those, loading fails and the UI
  * shows the engine-unavailable state instead of crashing.
  *
- * Model choice: pose_landmarker_lite (float16) — the smallest model,
- * chosen for low-end phones over the full/heavy variants. A v1
- * trade-off, documented, not hidden: lite is less precise at extreme
- * angles, which is exactly why the uncertainty gate in form-check.ts
- * refuses to count reps from low-confidence frames.
+ * Model choice: pose_landmarker_full (float16) — switched from lite
+ * 2026-10-24 after a phone audit proved lite scores the near side
+ * below the 0.5 gate on real side-view squats (deep squat, loose
+ * clothing, indoor evening light): lite's visibility values were the
+ * bottleneck, not the gate. Full is the same API and the same pinned
+ * CDN/WASM sources, only a larger, more precise model (~9.4 MB vs
+ * lite's ~5.8 MB). The 0.5 visibility gate is UNTOUCHED — full is
+ * honesty-neutral; it earns higher visibility values instead of
+ * lowering the bar. Cost, stated plainly: a bigger first download
+ * and slower per-frame inference + more heat on low-end phones (the
+ * section already surfaces a slow note when the 30-frame average
+ * detect time exceeds 120 ms).
  */
 
 import type { PoseLandmark } from './form-check';
@@ -60,7 +67,7 @@ const TASKS_VISION_CDN =
   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.10';
 const WASM_URL = `${TASKS_VISION_CDN}/wasm`;
 const MODEL_URL =
-  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
+  'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task';
 
 /** Shape of the runtime-loaded tasks-vision module (CDN import). */
 interface VisionModule {
@@ -81,8 +88,17 @@ interface VisionModule {
  * with no error and no retry. Racing the whole load against this
  * timeout turns that silence into the visible engine-unavailable
  * error state (with retry) instead.
+ *
+ * Value 45s (raised from 30s with the full-model switch): the model
+ * download grew 5.8 MB → 9.4 MB (+62%) while the WASM/ESM portions
+ * are unchanged, so the increase is sized to the model delta. On a
+ * ~2 Mbps connection 9.4 MB alone takes ~38s — over the old 30s, a
+ * false engine-unavailable on a load that would have succeeded.
+ * 45s covers ~2 Mbps and up while still bounding a genuine hang to
+ * under a minute, far better than the previous never-settling
+ * silence.
  */
-const LOAD_TIMEOUT_MS = 30000;
+const LOAD_TIMEOUT_MS = 45000;
 
 export interface PoseEngineLoadOptions {
   /** Test seam: override the CDN import (production uses the real import). */

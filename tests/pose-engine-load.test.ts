@@ -43,7 +43,7 @@ describe('loadPoseLandmarker timeout', () => {
     }).catch((e) => {
       caught = e;
     });
-    await vi.advanceTimersByTimeAsync(30000);
+    await vi.advanceTimersByTimeAsync(45000);
     await done;
     expect(caught).toBeInstanceOf(PoseEngineError);
     expect((caught as PoseEngineError).kind).toBe('engine-unavailable');
@@ -56,7 +56,7 @@ describe('loadPoseLandmarker timeout', () => {
     const done = loadPoseLandmarker({
       importVision: () =>
         new Promise((resolve) => {
-          // Resolves only after the 30s timeout — too late by design.
+          // Resolves only after the 45s timeout — too late by design.
           // (Resolves with a valid module so the orphaned inner load
           // fulfills rather than rejecting unobserved.)
           setTimeout(() => resolve(mod), 60000);
@@ -64,10 +64,50 @@ describe('loadPoseLandmarker timeout', () => {
     }).catch((e) => {
       caught = e;
     });
-    await vi.advanceTimersByTimeAsync(30000);
+    await vi.advanceTimersByTimeAsync(45000);
     await done;
     expect(caught).toBeInstanceOf(PoseEngineError);
     expect((caught as PoseEngineError).kind).toBe('engine-unavailable');
+  });
+});
+
+describe('loadPoseLandmarker model asset', () => {
+  it('requests the full model, never lite, on the same pinned hosts', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const mod = fakeModuleWith(async (_vision, options) => {
+      seen.push(options.baseOptions as Record<string, unknown>);
+      return fakeLandmarker;
+    });
+    await loadPoseLandmarker({ importVision: async () => mod });
+    expect(seen).toHaveLength(1);
+    const asset = seen[0].modelAssetPath as string;
+    expect(asset).toContain('pose_landmarker_full');
+    expect(asset).not.toContain('lite');
+    expect(asset).toBe(
+      'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task'
+    );
+  });
+
+  it('applies the GPU→CPU delegate fallback to the full model too', async () => {
+    const assets: string[] = [];
+    const delegates: string[] = [];
+    const mod = fakeModuleWith(async (_vision, options) => {
+      const base = options.baseOptions as {
+        delegate?: string;
+        modelAssetPath?: string;
+      };
+      delegates.push(base.delegate ?? '');
+      assets.push(base.modelAssetPath ?? '');
+      if (base.delegate === 'GPU') throw new Error('GPU delegate unavailable');
+      return fakeLandmarker;
+    });
+    const result = await loadPoseLandmarker({ importVision: async () => mod });
+    expect(result).toBe(fakeLandmarker);
+    expect(delegates).toEqual(['GPU', 'CPU']);
+    expect(assets).toEqual([
+      'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+      'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task',
+    ]);
   });
 });
 
