@@ -2785,6 +2785,11 @@ export const en = {
   'formcheck.backCamera': 'Back camera',
   'formcheck.tapToSwitch': '— tap to switch',
   'formcheck.switchCamera': 'Switch camera',
+  'formcheck.uploadVideo': 'Upload a video',
+  'formcheck.uploadHint':
+    'Or check a video you already recorded — filmed from the side, full body in frame.',
+  'formcheck.uploadLoading':
+    'Loading your video and the pose model… First load can take a few seconds — several MB to download.',
   'formcheck.heuristicsNote':
     'Angles shown are coaching heuristics from a phone camera, not medical measurements. Film from the side with your full body in frame.',
   'formcheck.loading': 'Starting camera and loading the pose model… First load can take a few seconds — several MB to download.',
@@ -2825,6 +2830,7 @@ export const en = {
   'formcheck.painStopAria': 'I feel pain — stop the set',
   'formcheck.retry': 'Retry',
   'formcheck.back': 'Back',
+  'formcheck.chooseAnotherVideo': 'Choose another video',
   'formcheck.setStopped': 'Set stopped',
   'formcheck.painMessage':
     'Set stopped. Rest, and if the pain persists or worries you, talk to a physiotherapist or coach in person — this app cannot diagnose pain or tell you whether it is safe to continue.',
@@ -2870,6 +2876,11 @@ export const en = {
   'formcheck.errStartTitle': 'Camera could not start',
   'formcheck.errStartMessage': 'Something went wrong starting the camera.',
   'formcheck.errStartTry': 'Close other apps using the camera and retry.',
+  'formcheck.errUploadTitle': 'Video could not be played',
+  'formcheck.errUploadMessage':
+    'This file could not be played as a video. It may be corrupt or in an unsupported format.',
+  'formcheck.errUploadTry':
+    'Pick another video file, or record a new one with your phone camera.',
   'formcheck.errTrackingTitle': 'Pose tracking stopped',
   'formcheck.errTrackingMessage': 'Pose detection kept failing on this device.',
   'formcheck.errTrackingTry': 'Retry, or close other apps and try again.',

@@ -29,6 +29,17 @@
  *    explained away, and never used to suggest continuing.
  *  - All angle ranges are coaching heuristics, labelled as such in
  *    the UI — never medical-grade claims.
+ *
+ * Upload path (v1): next to the camera option, the user can pick a
+ * recorded video file instead of starting the camera. The file is
+ * loaded into the SAME video element via an object URL and run
+ * through the SAME rAF loop, pose engine, counter, gate, cues, and
+ * debug readout as live camera — the loop only ever reads the video
+ * element, so the source (stream vs file) is invisible to it. The
+ * file is decoded locally in the browser; no upload request is ever
+ * made, so the video never leaves the device. The camera path is
+ * untouched when upload is not used, and switching back revokes the
+ * object URL. No camera permission is requested on the upload path.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +51,7 @@ import {
   RefreshCw,
   Square,
   SwitchCamera,
+  Upload,
   Video,
 } from 'lucide-react';
 import {
@@ -66,6 +78,7 @@ import {
 
 type UiPhase = 'idle' | 'loading' | 'active' | 'summary' | 'error';
 type CameraFacing = 'user' | 'environment';
+type VideoSource = 'camera' | 'upload';
 
 interface LiveState {
   reps: number;
@@ -195,6 +208,8 @@ export default function FormCheckSection() {
   });
   const [summary, setSummary] = useState<SetSummary | null>(null);
   const [error, setError] = useState<UiError | null>(null);
+  const [uploadError, setUploadError] = useState(false);
+  const [source, setSource] = useState<VideoSource>('camera');
   const [slowNote, setSlowNote] = useState(false);
   // Diagnostic readout: OFF by default. When on, the loop below only
   // ADDS a throttled display snapshot — it never touches detection,
@@ -203,6 +218,8 @@ export default function FormCheckSection() {
   const [diag, setDiag] = useState<VisibilityDiagnostic | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadUrlRef = useRef<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const landmarkerRef = useRef<PoseLandmarkerLike | null>(null);
   const counterRef = useRef<RepCounter | null>(null);
@@ -215,6 +232,8 @@ export default function FormCheckSection() {
   phaseRef.current = phase;
   const showDebugRef = useRef(false);
   showDebugRef.current = showDebug;
+  const sourceRef = useRef<VideoSource>('camera');
+  sourceRef.current = source;
   const lastDiagAtRef = useRef(0);
 
   const stopTracks = useCallback(() => {
@@ -223,6 +242,18 @@ export default function FormCheckSection() {
       streamRef.current = null;
     }
     if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  // Drop the uploaded file's object URL and detach it from the video
+  // element. Idempotent: safe to call when no upload is active (it
+  // then does nothing). Never touches srcObject, so the camera path
+  // is unaffected when this runs while leaving the upload path.
+  const revokeUpload = useCallback(() => {
+    if (uploadUrlRef.current) {
+      URL.revokeObjectURL(uploadUrlRef.current);
+      uploadUrlRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.removeAttribute('src');
   }, []);
 
   const stopLoop = useCallback(() => {
@@ -316,6 +347,9 @@ export default function FormCheckSection() {
 
   const start = useCallback(async () => {
     setError(null);
+    setUploadError(false);
+    revokeUpload();
+    setSource('camera');
     setSummary(null);
     setSlowNote(false);
     setDiag(null);
@@ -344,7 +378,69 @@ export default function FormCheckSection() {
       setError(mapError(err));
       setPhase('error');
     }
-  }, [attachStream, facing, lift, loop, stopLoop, stopTracks]);
+  }, [attachStream, facing, lift, loop, revokeUpload, stopLoop, stopTracks]);
+
+  // Upload path: run the SAME loop/counter over a recorded file.
+  // Never calls getUserMedia, so no camera permission is requested.
+  // The video element mounts on the 'loading' render; the macrotask
+  // wait below guarantees it exists before videoRef is touched
+  // (same reason the camera path awaits getUserMedia first). The
+  // file plays at normal speed from the start only after the engine
+  // is loaded, so no frame is analysed before the loop is running.
+  const startUpload = useCallback(async (file: File) => {
+    setError(null);
+    setUploadError(false);
+    revokeUpload();
+    setSource('upload');
+    setSummary(null);
+    setSlowNote(false);
+    setDiag(null);
+    lastDiagAtRef.current = 0;
+    setLive({ reps: 0, cueCode: null, unclear: false, unclearReason: null, unclearDetail: null, noPerson: false, phase: 'top', angleDeg: null });
+    lastLiveRef.current = '';
+    detectMsRef.current = [];
+    detectErrorStreakRef.current = 0;
+    const url = URL.createObjectURL(file);
+    uploadUrlRef.current = url;
+    setPhase('loading');
+    try {
+      await new Promise((r) => setTimeout(r, 0));
+      const video = videoRef.current;
+      if (!video) throw new Error('video element missing');
+      video.srcObject = null;
+      video.src = url;
+      video.muted = true;
+      video.playsInline = true;
+      if (!landmarkerRef.current) {
+        landmarkerRef.current = await loadPoseLandmarker();
+      }
+      await video.play();
+      counterRef.current = new RepCounter(lift);
+      runningRef.current = true;
+      setPhase('active');
+      rafRef.current = requestAnimationFrame(loop);
+    } catch (err) {
+      stopLoop();
+      revokeUpload();
+      // Engine failures keep their own box; anything else on this
+      // path (corrupt/unsupported file, play rejection) is an upload
+      // failure — never a camera-permission prompt. Either way the
+      // error came from the upload path, so the error screen's
+      // primary action returns to idle (re-pick a file or start the
+      // camera) instead of retrying the camera directly.
+      setError(
+        err instanceof PoseEngineError
+          ? mapError(err)
+          : {
+              titleKey: 'formcheck.errUploadTitle',
+              messageKey: 'formcheck.errUploadMessage',
+              tryThisKey: 'formcheck.errUploadTry',
+            }
+      );
+      setUploadError(true);
+      setPhase('error');
+    }
+  }, [lift, loop, revokeUpload, stopLoop]);
 
   const switchCamera = useCallback(async () => {
     const next: CameraFacing = facing === 'user' ? 'environment' : 'user';
@@ -373,6 +469,7 @@ export default function FormCheckSection() {
       const counter = counterRef.current;
       stopLoop();
       stopTracks();
+      revokeUpload();
       setDiag(null);
       const result = counter
         ? pain
@@ -382,16 +479,21 @@ export default function FormCheckSection() {
       setSummary(result);
       setPhase('summary');
     },
-    [stopLoop, stopTracks]
+    [revokeUpload, stopLoop, stopTracks]
   );
 
-  // Unmount: never leave the camera or the model running.
+  // Unmount: never leave the camera or the model running, and never
+  // leak an uploaded file's object URL.
   useEffect(
     () => () => {
       runningRef.current = false;
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       if (streamRef.current) {
         for (const track of streamRef.current.getTracks()) track.stop();
+      }
+      if (uploadUrlRef.current) {
+        URL.revokeObjectURL(uploadUrlRef.current);
+        uploadUrlRef.current = null;
       }
       try {
         landmarkerRef.current?.close();
@@ -403,7 +505,7 @@ export default function FormCheckSection() {
   );
 
   const cfg = LIFT_CONFIGS[lift];
-  const mirrored = facing === 'user';
+  const mirrored = source === 'camera' && facing === 'user';
 
   return (
     <section className="space-y-2.5" aria-label={t('formcheck.sectionAria')}>
@@ -451,6 +553,28 @@ export default function FormCheckSection() {
             </button>
             <button
               type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="py-2 px-4 text-xs font-bold cursor-pointer flex items-center gap-2 card border border-border"
+            >
+              <Upload className="w-4 h-4" /> {t('formcheck.uploadVideo')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/*"
+              className="hidden"
+              aria-label={t('formcheck.uploadVideo')}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                // Reset so the same file can be picked again after an
+                // error (a file input otherwise ignores a repeat pick).
+                e.target.value = '';
+                if (f) void startUpload(f);
+              }}
+            />
+            <p className="text-2xs text-text-muted">{t('formcheck.uploadHint')}</p>
+            <button
+              type="button"
               onClick={() => void switchCamera()}
               className="py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
             >
@@ -462,7 +586,9 @@ export default function FormCheckSection() {
         )}
 
         {phase === 'loading' && (
-          <p className="text-xs text-text-secondary">{t('formcheck.loading')}</p>
+          <p className="text-xs text-text-secondary">
+            {source === 'upload' ? t('formcheck.uploadLoading') : t('formcheck.loading')}
+          </p>
         )}
 
         {(phase === 'active' || phase === 'loading') && (
@@ -474,6 +600,31 @@ export default function FormCheckSection() {
               muted
               className="w-full rounded-xl bg-black object-cover aspect-[9/16] max-h-[62vh]"
               style={mirrored ? { transform: 'scaleX(-1)' } : undefined}
+              // Upload source only: a file the element cannot decode
+              // (corrupt/unsupported) surfaces here — never a camera
+              // prompt. The guard keeps camera-path errors out, and
+              // the phase guard makes re-entry after the error render
+              // a no-op (same box, not a loop).
+              onError={() => {
+                if (sourceRef.current !== 'upload') return;
+                if (phaseRef.current !== 'active' && phaseRef.current !== 'loading') return;
+                stopLoop();
+                revokeUpload();
+                setError({
+                  titleKey: 'formcheck.errUploadTitle',
+                  messageKey: 'formcheck.errUploadMessage',
+                  tryThisKey: 'formcheck.errUploadTry',
+                });
+                setUploadError(true);
+                setPhase('error');
+              }}
+              // Upload source only: reaching the end of a recorded
+              // file finishes the set exactly like End set on live.
+              onEnded={() => {
+                if (sourceRef.current === 'upload' && phaseRef.current === 'active') {
+                  endSet(false);
+                }
+              }}
             />
             {/* Framing guide: corner brackets marking the full-body
                 target (feet to head). Display-only CSS overlay — it
@@ -620,13 +771,15 @@ export default function FormCheckSection() {
               >
                 {t('formcheck.debugToggle')}
               </button>
-              <button
-                type="button"
-                onClick={() => void switchCamera()}
-                className="py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
-              >
-                <SwitchCamera className="w-4 h-4" /> {t('formcheck.switchCamera')}
-              </button>
+              {source === 'camera' && (
+                <button
+                  type="button"
+                  onClick={() => void switchCamera()}
+                  className="py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
+                >
+                  <SwitchCamera className="w-4 h-4" /> {t('formcheck.switchCamera')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => endSet(false)}
@@ -654,17 +807,32 @@ export default function FormCheckSection() {
               <p className="text-2xs text-text-muted mt-1">{t(error.tryThisKey)}</p>
             </div>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void start()}
-                className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" /> {t('formcheck.retry')}
-              </button>
+              {uploadError ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setUploadError(false);
+                    setPhase('idle');
+                  }}
+                  className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" /> {t('formcheck.chooseAnotherVideo')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void start()}
+                  className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer flex items-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" /> {t('formcheck.retry')}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
                   setError(null);
+                  setUploadError(false);
                   setPhase('idle');
                 }}
                 className="py-1.5 px-3 text-xs font-bold cursor-pointer"

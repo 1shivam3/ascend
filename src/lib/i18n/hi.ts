@@ -2782,6 +2782,11 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.backCamera': 'बैक कैमरा',
   'formcheck.tapToSwitch': '— बदलने के लिए टैप करें',
   'formcheck.switchCamera': 'कैमरा बदलें',
+  'formcheck.uploadVideo': 'वीडियो अपलोड करें',
+  'formcheck.uploadHint':
+    'या पहले से रिकॉर्ड किया गया वीडियो चेक करें — साइड से फिल्माया गया, पूरा शरीर फ्रेम में।',
+  'formcheck.uploadLoading':
+    'आपका वीडियो और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
   'formcheck.heuristicsNote':
     'दिखाए गए कोण फोन कैमरे से मिले कोचिंग अनुमान हैं, मेडिकल माप नहीं। साइड से फिल्म करें, पूरा शरीर फ्रेम में रहे।',
   'formcheck.loading': 'कैमरा शुरू हो रहा है और पोज़ मॉडल लोड हो रहा है… पहली बार लोड होने में कुछ सेकंड लग सकते हैं — कई MB डाउनलोड होने हैं।',
@@ -2820,6 +2825,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.painStopAria': 'दर्द हो रहा है — सेट रोकें',
   'formcheck.retry': 'फिर से कोशिश करें',
   'formcheck.back': 'वापस',
+  'formcheck.chooseAnotherVideo': 'दूसरा वीडियो चुनें',
   'formcheck.setStopped': 'सेट रोक दिया गया',
   'formcheck.painMessage':
     'सेट रोक दिया गया है। आराम करें, और अगर दर्द बना रहे या चिंता हो तो किसी फिज़ियोथेरेपिस्ट या कोच से आमने-सामने बात करें — यह ऐप दर्द का कारण नहीं बता सकता और न ही यह बता सकता है कि जारी रखना सुरक्षित है या नहीं।',
@@ -2859,6 +2865,11 @@ export const hi: Partial<Record<StringKey, string>> = {
   'formcheck.errStartTitle': 'कैमरा शुरू नहीं हो सका',
   'formcheck.errStartMessage': 'कैमरा शुरू करते समय कुछ गलत हो गया।',
   'formcheck.errStartTry': 'कैमरा इस्तेमाल कर रहे दूसरे ऐप बंद करें और फिर से कोशिश करें।',
+  'formcheck.errUploadTitle': 'वीडियो चलाया नहीं जा सका',
+  'formcheck.errUploadMessage':
+    'यह फ़ाइल वीडियो के रूप में चलाई नहीं जा सकी। यह खराब हो सकती है या असमर्थित फ़ॉर्मैट में हो सकती है।',
+  'formcheck.errUploadTry':
+    'दूसरी वीडियो फ़ाइल चुनें, या अपने फ़ोन कैमरे से नया वीडियो रिकॉर्ड करें।',
   'formcheck.errTrackingTitle': 'पोज़ ट्रैकिंग रुक गई',
   'formcheck.errTrackingMessage': 'इस डिवाइस पर पोज़ पहचान बार-बार फेल हो रही थी।',
   'formcheck.errTrackingTry': 'फिर से कोशिश करें, या दूसरे ऐप बंद करके दोबारा कोशिश करें।',
