@@ -23,7 +23,7 @@ interface ScheduleScreenProps {
   onBack: () => void;
 }
 
-const LIMITATION_OPTIONS = ['Lower back', 'Knees', 'Shoulders', 'Wrists'];
+const INJURY_AREA_OPTIONS = ['Lower back', 'Knees', 'Shoulders', 'Wrists'];
 
 const DAY_OPTIONS = [2, 3, 4, 5, 6];
 
@@ -47,10 +47,11 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
   const [activity, setActivity] = useState<ActivityLevel>(initialActivity);
   const [limitations, setLimitations] = useState<string[]>(initialLimitations || []);
 
-  const toggleLimitation = (opt: string) =>
-    setLimitations((prev) =>
-      prev.includes(opt) ? prev.filter((l) => l !== opt) : [...prev, opt]
-    );
+  const addLimitation = (opt: string) =>
+    setLimitations((prev) => (opt && !prev.includes(opt) ? [...prev, opt] : prev));
+
+  const removeLimitation = (opt: string) =>
+    setLimitations((prev) => prev.filter((l) => l !== opt));
 
   return (
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
@@ -131,30 +132,44 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-bold">Any injuries or sore joints we should plan around?</p>
-          <p className="text-xs text-text-muted -mt-1.5">
-            Pick any that apply — your plan will avoid movements that load them. Leave empty if none.
-          </p>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Injuries or limitations">
-            {LIMITATION_OPTIONS.map((opt) => {
-              const active = limitations.includes(opt);
-              return (
+          <label htmlFor="injury-select" className="text-sm font-bold block">
+            {t('onboarding.injuriesTitle')}
+          </label>
+          <p className="text-xs text-text-muted -mt-1.5">{t('onboarding.injuriesHint')}</p>
+          <select
+            id="injury-select"
+            aria-label={t('onboarding.injuriesTitle')}
+            value=""
+            onChange={(e) => addLimitation(e.target.value)}
+            className="w-full p-4 rounded-2xl bg-bg-card border border-border text-sm font-bold cursor-pointer"
+          >
+            <option value="">
+              {limitations.length === 0
+                ? t('onboarding.injuriesNone')
+                : t('onboarding.injuriesAdd')}
+            </option>
+            {INJURY_AREA_OPTIONS.filter((opt) => !limitations.includes(opt)).map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+          {limitations.length > 0 && (
+            <div className="flex flex-wrap gap-2" role="group" aria-label={t('onboarding.injuriesTitle')}>
+              {limitations.map((opt) => (
                 <button
                   key={opt}
                   type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleLimitation(opt)}
-                  className={`px-4 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer border ${
-                    active
-                      ? 'bg-accent border-accent text-white'
-                      : 'bg-bg-card border-border text-text-primary hover:border-border-hover/40'
-                  }`}
+                  onClick={() => removeLimitation(opt)}
+                  aria-label={t('onboarding.injuriesRemove', { area: opt })}
+                  title={t('onboarding.injuriesRemove', { area: opt })}
+                  className="px-4 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer border bg-accent border-accent text-white"
                 >
-                  {opt}
+                  {opt} ×
                 </button>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
