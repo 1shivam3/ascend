@@ -195,7 +195,7 @@ export default function FeedbackModal({
         {/* Success Screen */}
         {submittedRefId ? (
           <div className="p-6 text-center space-y-4">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center animate-bounce-subtle">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
               <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
             </div>
             <div className="space-y-1">

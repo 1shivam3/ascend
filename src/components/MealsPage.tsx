@@ -1933,7 +1933,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
-                  <span className="animate-pulse text-2xs">...</span>
+                  <span className="text-2xs">...</span>
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />

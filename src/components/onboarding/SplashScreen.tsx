@@ -25,7 +25,7 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
   return (
     <div
       onClick={!isHydrating && onContinue ? onContinue : undefined}
-      className={`relative min-h-screen w-full bg-brand-graphite text-brand-chalk flex flex-col items-center justify-between p-8 select-none overflow-hidden transition-opacity duration-500 ${
+      className={`relative min-h-screen w-full bg-brand-graphite text-brand-chalk flex flex-col items-center justify-between p-8 select-none overflow-hidden transition-opacity duration-300 ${
         !isHydrating && onContinue ? 'cursor-pointer' : ''
       }`}
       role="banner"
@@ -64,8 +64,8 @@ export default function SplashScreen({ onContinue, isHydrating = false }: Splash
       {/* Bottom Indicator */}
       <div className="relative z-10 pb-8 flex flex-col items-center text-center">
         {isHydrating ? (
-          <div className="flex items-center gap-2 text-xs text-brand-chalk/70 font-mono animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-accent animate-ping mr-1" />
+          <div className="flex items-center gap-2 text-xs text-brand-chalk/70 font-mono">
+            <span className="w-2 h-2 rounded-full bg-accent mr-1" />
             <span>{t('auth.initializing')}</span>
           </div>
         ) : (

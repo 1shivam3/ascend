@@ -466,7 +466,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     syncStatus === 'synced'
                       ? 'bg-sage'
                       : syncStatus === 'syncing'
-                      ? 'bg-amber-400 animate-pulse'
+                      ? 'bg-amber-400'
                       : 'bg-text-muted'
                   }`}
                 />

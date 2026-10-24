@@ -658,7 +658,7 @@ export default function BarcodeScannerModal({
                 {isScanning && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className="relative w-56 h-28 border-2 border-accent rounded-xl overflow-hidden shadow-[0_0_24px_rgba(249,115,22,0.35)]">
-                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse" />
+                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent" />
                       <span className="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-accent" />
                       <span className="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-accent" />
                       <span className="absolute bottom-1 left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-accent" />
@@ -745,7 +745,7 @@ export default function BarcodeScannerModal({
                 {/* Confirmation Prompt Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isNotFoundInDB ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`} />
+                    <span className={`w-2 h-2 rounded-full ${isNotFoundInDB ? 'bg-amber-400' : 'bg-emerald-500'}`} />
                     <span className={`text-2xs font-mono font-bold uppercase tracking-wider ${
                       isNotFoundInDB ? 'text-amber-400' : 'text-emerald-500'
                     }`}>

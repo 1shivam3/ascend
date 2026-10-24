@@ -2597,7 +2597,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             aria-label="Toggle progression policy recommendation"
           >
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-accent" />
               <h2 className="section-title text-[11px] mb-0 font-mono">
                 {activePolicyDecision
                   ? 'TRAINING DECISION POLICY RECOMMENDATION'

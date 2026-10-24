@@ -3150,7 +3150,7 @@ export default function ActiveWorkoutScreen({
             isRestFinished
               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
               : isRestRunning
-              ? 'bg-bg-card/95 border-accent text-accent shadow-accent/20 animate-pulse'
+              ? 'bg-bg-card/95 border-accent text-accent shadow-accent/20'
               : 'bg-bg-card/90 border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
           }`}
           title={isRestRunning ? t('workout.timerControls') : t('workout.restTimer')}

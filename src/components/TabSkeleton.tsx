@@ -12,7 +12,7 @@ export interface TabSkeletonProps {
  */
 export default function TabSkeleton({ tab = 'home' }: TabSkeletonProps) {
   return (
-    <div className="w-full max-w-md mx-auto px-5 pt-4 pb-24 space-y-5 animate-pulse select-none">
+    <div className="w-full max-w-md mx-auto px-5 pt-4 pb-24 space-y-5 select-none">
       {/* Top Header Skeleton */}
       <div className="flex items-center justify-between pt-1">
         <div className="space-y-2">

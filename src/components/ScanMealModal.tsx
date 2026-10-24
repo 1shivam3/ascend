@@ -987,8 +987,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         {step === 'analyzing' && (
           <div className="p-8 sm:p-12 text-center space-y-4">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent relative">
-              <Sparkles className="w-8 h-8 animate-pulse" />
-              <div className="absolute inset-0 rounded-2xl border-2 border-accent animate-ping opacity-25" />
+              <Sparkles className="w-8 h-8" />
             </div>
 
             <div className="space-y-1.5">

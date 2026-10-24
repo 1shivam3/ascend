@@ -399,7 +399,7 @@ export default function VoiceWorkoutLoggerModal({
                 }}
                 className={`w-16 h-16 rounded-full flex items-center justify-center transition-all ${
                   isListening
-                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 animate-pulse scale-105'
+                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/40 scale-105'
                     : 'bg-accent/20 text-accent hover:bg-accent/30 border-2 border-accent'
                 }`}
                 title={isListening ? t('voice.finishTitle') : t('voice.startTitle')}
@@ -422,7 +422,7 @@ export default function VoiceWorkoutLoggerModal({
                   &quot;{transcript}&quot;
                 </p>
               ) : isListening ? (
-                <p className="text-2xs font-mono text-text-muted animate-pulse">
+                <p className="text-2xs font-mono text-text-muted">
                   {t('voice.sayExample')}
                 </p>
               ) : (
@@ -465,7 +465,7 @@ export default function VoiceWorkoutLoggerModal({
                     <Flag className="w-3.5 h-3.5" />
                   </button>
                   {autoApplyCountdown !== null && autoApplyCountdown > 0 ? (
-                    <span className="text-2xs font-mono text-text-muted animate-pulse">
+                    <span className="text-2xs font-mono text-text-muted">
                       {t('voice.autoLogging', { seconds: autoApplyCountdown })}
                     </span>
                   ) : (

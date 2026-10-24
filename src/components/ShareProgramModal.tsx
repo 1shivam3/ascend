@@ -225,7 +225,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
                 />
               </div>
             ) : (
-              <div className="w-56 h-56 rounded-2xl bg-bg-secondary animate-pulse flex items-center justify-center text-text-muted text-xs font-mono">
+              <div className="w-56 h-56 rounded-2xl bg-bg-secondary flex items-center justify-center text-text-muted text-xs font-mono">
                 {t('share.generatingQr')}
               </div>
             )}

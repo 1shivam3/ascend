@@ -401,7 +401,7 @@ function LevelProgressionModal({
                   >
                     <div className="flex items-center gap-2">
                       {isCurrent && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                       )}
                       {!isCurrent && passed && (
                         <span className="w-1.5 h-1.5 rounded-full bg-text-muted/40 shrink-0" />

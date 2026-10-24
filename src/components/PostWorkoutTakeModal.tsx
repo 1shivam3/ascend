@@ -298,7 +298,7 @@ export default function PostWorkoutTakeModal({
 
         {/* Coach's Take Card */}
         {loading ? (
-          <div className="py-6 text-center space-y-2 animate-pulse">
+          <div className="py-6 text-center space-y-2">
             <Sparkles className="w-5 h-5 text-accent animate-spin mx-auto" />
             <p className="text-xs text-text-muted font-medium">
               {t('take.generating')}
