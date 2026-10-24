@@ -58,6 +58,10 @@ export const en = {
   'home.resumeWorkout': 'Resume Workout',
   'home.viewCompletedWorkout': 'View Completed Workout',
   'home.notificationSettings': 'Notification Settings',
+  'home.coachNotes': 'Coach notes',
+  'home.coachNotesMissed': 'Missed sessions',
+  'home.coachNotesCalories': 'Calorie suggestion',
+  'home.coachNotesNextSession': 'Next session',
   'home.level': 'Level',
 
   // ── Train / Plans ───────────────────────────────────────────────────
@@ -1445,6 +1449,7 @@ export const en = {
   'auth.emailAddress': 'Email Address',
   'auth.sendLink': 'Send Link',
   'auth.googleFailed': 'Google Sign-In Failed',
+  'auth.googleSignInIncomplete': 'Google sign-in didn\'t complete — try again',
   'auth.googleConnectFail': 'Could not connect to Google',
   'auth.signInError': 'Sign-In Error',
   'auth.orContinue': 'Or continue with',
@@ -1470,6 +1475,7 @@ export const en = {
   'auth.googleInitFail': 'Could not initiate Google sign in.',
   'auth.rls': 'Protected by PostgreSQL Row-Level Security',
   'ui.details': 'Details',
+  'ui.seeAll': 'See all',
   'ui.rankFoundation': 'FOUNDATION',
   'ui.rankTrained': 'TRAINED',
   'ui.rankSkilled': 'SKILLED',

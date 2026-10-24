@@ -38,7 +38,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        toast.error(error, t('auth.googleFailed'));
+        toast.error(t('auth.googleSignInIncomplete'), t('auth.googleFailed'));
         setLoading(false);
       }
       // On success, browser will redirect to Google's official OAuth consent

@@ -115,8 +115,10 @@ export default function Onboarding() {
       hashParams.get('error');
 
     if (oauthError) {
-      const cleanMsg = decodeURIComponent(oauthError.replace(/\+/g, ' '));
-      toast.error(cleanMsg, 'Sign-In Failed');
+      // Provider redirect errors used to render verbatim (provider
+      // wordings, URLs) — show neutral copy instead. The raw value is
+      // still cleared from the URL below.
+      toast.error(t('auth.googleSignInIncomplete'), t('auth.signInError'));
       window.history.replaceState(null, '', window.location.pathname);
       setIsRestoringAccount(false);
       setCurrentScreen('welcome');

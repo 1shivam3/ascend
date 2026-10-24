@@ -309,6 +309,15 @@ class SupabaseSyncEngine {
     }, 800);
   }
 
+  /**
+   * Google sign-in — neutral errors only (UX discoverability).
+   *
+   * Raw provider errors used to surface verbatim in toasts: provider
+   * wordings, config hints, even env var names. The engine now returns
+   * only the stable code 'google_signin_incomplete'; UI callers map it
+   * to neutral localized copy (auth.googleSignInIncomplete). The raw
+   * detail is logged to the console for diagnostics, never shown.
+   */
   public async signInWithGoogle(): Promise<{ error?: string }> {
     if (typeof window !== 'undefined') {
       try {
@@ -317,9 +326,8 @@ class SupabaseSyncEngine {
     }
     const supabase = getSupabase();
     if (!supabase) {
-      return {
-        error: 'Cloud authentication is not configured. Please verify NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment.',
-      };
+      console.warn('[ascend] Google sign-in: Supabase client is not configured.');
+      return { error: 'google_signin_incomplete' };
     }
 
     try {
@@ -329,10 +337,14 @@ class SupabaseSyncEngine {
           redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
         },
       });
-      if (error) return { error: error.message };
+      if (error) {
+        console.warn('[ascend] Google sign-in failed:', error.message);
+        return { error: 'google_signin_incomplete' };
+      }
       return {};
     } catch (err: any) {
-      return { error: err?.message || 'Google sign-in failed' };
+      console.warn('[ascend] Google sign-in threw:', err?.message || err);
+      return { error: 'google_signin_incomplete' };
     }
   }
 

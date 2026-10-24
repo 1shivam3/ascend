@@ -4,6 +4,7 @@ import { Brain } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { Badge } from './ui/Badge';
+import { CollapsibleDetails } from './ui/CollapsibleDetails';
 import type { AthleteModelTier } from '@/lib/athlete-model';
 
 const TIER_BADGE: Record<AthleteModelTier, { variant: 'neutral' | 'warning' | 'success'; key: 'coachModel.tierDefault' | 'coachModel.tierLearning' | 'coachModel.tierPersonal' }> = {
@@ -20,6 +21,9 @@ const TIER_BADGE: Record<AthleteModelTier, { variant: 'neutral' | 'warning' | 's
  * confidence tier: Default (population stand-in) / Learning / Personal.
  * Nothing here is decorative — if the model has nothing yet, the card
  * stays hidden until the first computation lands.
+ *
+ * UX discoverability: the full fact list used to stretch Today. Only
+ * the top 2 facts show now; the rest sit behind a "See all" tap.
  */
 export default function AthleteModelCard() {
   const { t } = useTranslation();
@@ -30,6 +34,18 @@ export default function AthleteModelCard() {
   if (!athleteModel || !Array.isArray(athleteModel.topFacts) || athleteModel.topFacts.length === 0) return null;
   const facts = athleteModel.topFacts.filter((f) => f && typeof f.text === 'string' && f.text.length > 0);
   if (facts.length === 0) return null;
+
+  const renderFact = (fact: (typeof facts)[number], i: number) => {
+    const badge = TIER_BADGE[fact.tier] ?? TIER_BADGE.prior;
+    return (
+      <li key={`${fact.kind}-${i}`} className="flex items-start gap-2">
+        <p className="flex-1 text-xs leading-relaxed text-text-secondary">{fact.text}</p>
+        <Badge variant={fact.kind === 'pain' ? 'danger' : badge.variant} size="xs" className="shrink-0 mt-0.5">
+          {fact.kind === 'pain' ? t('coachModel.tierPain') : t(badge.key)}
+        </Badge>
+      </li>
+    );
+  };
 
   return (
     <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
@@ -43,18 +59,15 @@ export default function AthleteModelCard() {
         </div>
       </div>
       <ul className="mt-3 space-y-2.5">
-        {facts.map((fact, i) => {
-          const badge = TIER_BADGE[fact.tier] ?? TIER_BADGE.prior;
-          return (
-            <li key={`${fact.kind}-${i}`} className="flex items-start gap-2">
-              <p className="flex-1 text-xs leading-relaxed text-text-secondary">{fact.text}</p>
-              <Badge variant={fact.kind === 'pain' ? 'danger' : badge.variant} size="xs" className="shrink-0 mt-0.5">
-                {fact.kind === 'pain' ? t('coachModel.tierPain') : t(badge.key)}
-              </Badge>
-            </li>
-          );
-        })}
+        {facts.slice(0, 2).map(renderFact)}
       </ul>
+      {facts.length > 2 && (
+        <CollapsibleDetails label={t('ui.seeAll')}>
+          <ul className="space-y-2.5">
+            {facts.slice(2).map((fact, i) => renderFact(fact, i + 2))}
+          </ul>
+        </CollapsibleDetails>
+      )}
     </div>
   );
 }

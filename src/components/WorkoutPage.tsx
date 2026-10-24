@@ -714,6 +714,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     [workouts, runProgram],
   );
   const [activeRunSession, setActiveRunSession] = useState<RunSession | null>(null);
+  const [isRunIntroOpen, setIsRunIntroOpen] = useState(false);
   const toast = useToast();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
@@ -2327,18 +2328,32 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <div className="card p-4 sm:p-5 space-y-3">
           {!runProgram ? (
             <>
-              <div>
-                <p className="text-sm font-bold text-text-primary">{t('run.programName')}</p>
-                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{t('run.programDesc')}</p>
-              </div>
+              {/* Non-enrolled: one row until tapped — the full intro and
+                  enroll button live behind it, so nothing is lost. */}
               <button
                 type="button"
-                onClick={() => enrollRunProgram(getLocalTodayStr())}
-                className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                onClick={() => setIsRunIntroOpen((o) => !o)}
+                aria-expanded={isRunIntroOpen}
+                className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
               >
-                <Play className="w-3.5 h-3.5 fill-white" />
-                <span>{t('run.startProgram')}</span>
+                <span className="text-sm font-bold text-text-primary">{t('run.programName')}</span>
+                <ChevronDown className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${isRunIntroOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
               </button>
+              {isRunIntroOpen && (
+                <>
+                  <div>
+                    <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{t('run.programDesc')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => enrollRunProgram(getLocalTodayStr())}
+                    className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-white" />
+                    <span>{t('run.startProgram')}</span>
+                  </button>
+                </>
+              )}
             </>
           ) : runProgress.complete ? (
             <>
