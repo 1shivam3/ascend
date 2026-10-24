@@ -9,12 +9,22 @@ export function useSupabaseSync() {
     lastSyncedAt: string | null;
     error: string | null;
     user: AuthUser | null;
+    /** Phase 2: true when coach_blocks/weekly_reviews do not exist yet
+     *  (migration not run) — surfaced to the UI as "coach sync pending
+     *  setup", never as a whole-sync error. */
+    coachSyncPendingSetup: boolean;
   }>(syncEngine.getStatus());
 
   useEffect(() => {
     syncEngine.init();
     const unsubscribe = syncEngine.subscribe((status, lastSyncedAt, error, user) => {
-      setState({ status, lastSyncedAt, error, user });
+      setState({
+        status,
+        lastSyncedAt,
+        error,
+        user,
+        coachSyncPendingSetup: syncEngine.getStatus().coachSyncPendingSetup,
+      });
     });
     return () => unsubscribe();
   }, []);

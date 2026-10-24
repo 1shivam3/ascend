@@ -11,6 +11,16 @@ import {
   buildPlanExtras,
   planFieldsFromExtras,
 } from './reconcile';
+import {
+  pullCoachState,
+  pushCoachState,
+  recordCoachLocalChanges,
+  loadCoachSyncMeta,
+  setCoachSyncStamps,
+  isCoachSyncPendingSetup,
+  coachSyncSignature,
+  EMPTY_COACH_BLOCKS,
+} from './coach-sync';
 
 /** Map a `planned_workouts` row to a local plan, restoring the
  *  column-less fields (description / goalTag / intensityMode) from the
@@ -141,6 +151,10 @@ export interface SyncedStateSlice {
   meals: readonly unknown[];
   bodyMetrics: readonly unknown[];
   plannedWorkouts: readonly unknown[];
+  /** Phase 2 coach slices — optional so older callers/tests that build
+   *  a slice without them keep typechecking; undefined = no coach state. */
+  coachBlocks?: unknown;
+  weeklyReviews?: readonly unknown[];
 }
 
 export function syncedStateSignature(state: SyncedStateSlice): string {
@@ -151,6 +165,7 @@ export function syncedStateSignature(state: SyncedStateSlice): string {
     collectionSignature(state.meals),
     collectionSignature(state.bodyMetrics),
     collectionSignature(state.plannedWorkouts),
+    coachSyncSignature(state.coachBlocks, state.weeklyReviews),
   ].join('|');
 }
 
@@ -169,7 +184,9 @@ export function hasSyncedContentChanged(
     prev.workouts === next.workouts &&
     prev.meals === next.meals &&
     prev.bodyMetrics === next.bodyMetrics &&
-    prev.plannedWorkouts === next.plannedWorkouts
+    prev.plannedWorkouts === next.plannedWorkouts &&
+    prev.coachBlocks === next.coachBlocks &&
+    prev.weeklyReviews === next.weeklyReviews
   ) {
     return false;
   }
@@ -181,6 +198,11 @@ class SupabaseSyncEngine {
   private lastSyncedAt: string | null = null;
   private errorMessage: string | null = null;
   private currentUser: AuthUser | null = null;
+  /** Phase 2: true when coach_blocks/weekly_reviews do not exist yet
+   *  (migration not run) — surfaced to the UI as "coach sync pending
+   *  setup", never as a whole-sync error. Mirrors the module flag in
+   *  coach-sync.ts after every coach pull/push. */
+  private coachSyncPendingSetup = false;
   private listeners: Set<SyncListener> = new Set();
   private debounceTimer: any = null;
   private isSyncing = false;
@@ -209,7 +231,12 @@ class SupabaseSyncEngine {
       lastSyncedAt: this.lastSyncedAt,
       error: this.errorMessage,
       user: this.currentUser,
+      coachSyncPendingSetup: this.coachSyncPendingSetup,
     };
+  }
+
+  private refreshCoachSyncPendingSetup() {
+    this.coachSyncPendingSetup = isCoachSyncPendingSetup();
   }
 
   public getCurrentUser() {
@@ -297,6 +324,26 @@ class SupabaseSyncEngine {
       // not the source of truth and pushing it would clobber the
       // leader's data server-side too.
       if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
+
+      // Phase 2: stamp local coach edits (per-item, in coach-sync.ts) so
+      // the pull's last-write-wins comparison has a local timestamp.
+      // Recorded even on the follower-tab path? No — suppressed above,
+      // exactly like the push, so a follower never claims local edits.
+      if (
+        prevState.coachBlocks !== (state as any).coachBlocks ||
+        prevState.weeklyReviews !== (state as any).weeklyReviews
+      ) {
+        try {
+          recordCoachLocalChanges(
+            (prevState as any).coachBlocks,
+            (prevState as any).weeklyReviews,
+            (state as any).coachBlocks,
+            (state as any).weeklyReviews,
+          );
+        } catch {
+          /* stamps are best-effort; never block the push */
+        }
+      }
 
       if (hasSyncedContentChanged(prevState, state)) {
         this.scheduleDebouncedPush();
@@ -734,6 +781,20 @@ class SupabaseSyncEngine {
 
       const localState = useStore.getState();
 
+      // Phase 2 coach pull — run after the other pulls, against the
+      // fresh local snapshot, so a concurrent local coach edit is not
+      // clobbered by a stale snapshot. pullCoachState never throws and
+      // never deletes: a missing table yields pendingSetup (local state
+      // kept, whole sync NOT failed), and a missing server row is an
+      // upsert candidate on push, not a local deletion.
+      const coachPull = await pullCoachState(
+        supabase as any,
+        user.id,
+        { coachBlocks: localState.coachBlocks, weeklyReviews: localState.weeklyReviews },
+        loadCoachSyncMeta(),
+      );
+      this.refreshCoachSyncPendingSetup();
+
       // Detect if the existing local profile belongs to a DIFFERENT authenticated account
       const isCrossAccountSwitch = Boolean(
         localState.profile?.id &&
@@ -856,6 +917,15 @@ class SupabaseSyncEngine {
           notes: r.notes || undefined,
         }));
         updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
+        // Phase 2 coach: cross-account replaces outright (different
+        // account's decisions, not an older copy of this one's). No
+        // server row -> the initial/empty state, not a stale leftover.
+        updates.coachBlocks = coachPull.remoteCoachBlocks ?? EMPTY_COACH_BLOCKS;
+        updates.weeklyReviews = coachPull.remoteWeeklyReviews;
+        if (coachPull.remoteCoachBlocksUpdatedAt) {
+          setCoachSyncStamps({ coachBlocksUpdatedAt: coachPull.remoteCoachBlocksUpdatedAt });
+        }
+        setCoachSyncStamps({ weeklyReviewsUpdatedAt: coachPull.remoteWeeklyReviewUpdatedAt });
         needsLocalUpdate = true;
       } else {
         // Same account / guest migration: Merge remote cloud records into local store
@@ -956,6 +1026,23 @@ class SupabaseSyncEngine {
             updates.plannedWorkouts = merged;
             needsLocalUpdate = true;
           }
+        }
+
+        // Phase 2 coach merge (last-write-wins, coach-sync.ts). A
+        // missing server row adds nothing and deletes nothing; a
+        // pending-setup pull (tables not yet created) leaves local
+        // state untouched by construction — coachPull.changed is false
+        // and its merged state equals the local state.
+        if (coachPull.changed) {
+          updates.coachBlocks = coachPull.coachBlocks;
+          updates.weeklyReviews = coachPull.weeklyReviews;
+          needsLocalUpdate = true;
+        }
+        if (coachPull.adoptedCoachBlocksUpdatedAt || Object.keys(coachPull.adoptedWeeklyReviewUpdatedAt).length > 0) {
+          setCoachSyncStamps({
+            coachBlocksUpdatedAt: coachPull.adoptedCoachBlocksUpdatedAt,
+            weeklyReviewsUpdatedAt: coachPull.adoptedWeeklyReviewUpdatedAt,
+          });
         }
       }
 
@@ -1112,7 +1199,33 @@ class SupabaseSyncEngine {
       }
     }
 
-    // 7. Deletion propagation: the push path historically only upserted,
+    // 7. Phase 2 coach push — upsert only, debounced via scheduleDebouncedPush
+    // like the other collections (this method is the push path for both
+    // triggerSyncNow and syncPush). Soft-fails on missing tables
+    // (pending setup) or an unconfigured client: local state is kept,
+    // the whole push is NOT failed, and no DELETE is ever issued here
+    // (see coach-sync.ts: no tombstones for coach state, by design).
+    // The initial coach state is never pushed, so a local reset cannot
+    // wipe the cloud copy.
+    try {
+      const coachPush = await pushCoachState(
+        supabase as any,
+        userId,
+        state.coachBlocks,
+        state.weeklyReviews,
+      );
+      this.refreshCoachSyncPendingSetup();
+      if (coachPush.pushedCoachBlocks || coachPush.pushedReviewCount > 0) {
+        setCoachSyncStamps({
+          coachBlocksUpdatedAt: coachPush.pushedUpdatedAt,
+          weeklyReviewsUpdatedAt: coachPush.pushedWeeklyReviewUpdatedAt,
+        });
+      }
+    } catch {
+      /* coach push must never fail the rest of the push */
+    }
+
+    // 8. Deletion propagation: the push path historically only upserted,
     // so a locally deleted record stayed on the server forever and the
     // union pull-merge resurrected it on the next sync. Delete exactly the
     // tombstoned records (explicit user deletions) — a full local reset
