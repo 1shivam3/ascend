@@ -1275,22 +1275,34 @@ export function isJunkMealParse(foods: FoodItem[]): boolean {
  * warning, or null when the quantity looks sane. Callers should refuse to
  * log and ask the user to re-enter, rather than silently recording junk.
  */
-export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): string | null {
+/**
+ * Structured absurd-quantity warning (Round 4 toast i18n): the message is
+ * rendered by the caller via t(warning.key, warning.params), so the same
+ * guard speaks Hindi in Hindi mode. The English templates live in
+ * src/lib/i18n/en.ts as toast.absurd* keys; the key is just a string here
+ * (no i18n import into macros.ts, avoiding a store import cycle).
+ */
+export interface AbsurdQuantityWarning {
+  key: 'toast.absurdCalories' | 'toast.absurdGrams' | 'toast.absurdBulk' | 'toast.absurdPieces';
+  params: Record<string, string | number>;
+}
+
+export function getAbsurdQuantityWarning(food: { name?: string; calories?: number; quantity?: number; unit?: string }): AbsurdQuantityWarning | null {
   const qty = typeof food.quantity === 'number' && isFinite(food.quantity) ? food.quantity : 0;
   const cal = typeof food.calories === 'number' && isFinite(food.calories) ? food.calories : 0;
   const unit = (food.unit || 'g').toLowerCase().trim();
   const label = (food.name || 'This item').trim() || 'This item';
   if (cal > 6000) {
-    return `${label}: ~${Math.round(cal).toLocaleString()} kcal in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdCalories', params: { label, kcal: Math.round(cal).toLocaleString() } };
   }
   if ((unit === 'g' || unit === 'ml') && qty > 2500) {
-    return `${label}: ${qty.toLocaleString()} ${unit} in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdGrams', params: { label, qty: qty.toLocaleString(), unit } };
   }
   if ((unit === 'kg' || unit === 'l') && qty > 2.5) {
-    return `${label}: ${qty} ${unit} in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdBulk', params: { label, qty, unit } };
   }
   if (['piece', 'cup', 'bowl', 'plate', 'slice', 'scoop', 'handful', 'katori', 'glass'].includes(unit) && qty > 25) {
-    return `${label}: ${qty} ${unit}s in a single item looks wrong. Please check the quantity.`;
+    return { key: 'toast.absurdPieces', params: { label, qty, unit } };
   }
   return null;
 }
@@ -1507,7 +1519,7 @@ export interface MealFoodsValidation {
   /** Names of items that couldn't be matched (logged at 0 kcal). */
   unmatchedNames: string[];
   /** First implausible-quantity warning, if any (e.g. "100 rotis"). */
-  absurdWarning: string | null;
+  absurdWarning: AbsurdQuantityWarning | null;
 }
 
 /**

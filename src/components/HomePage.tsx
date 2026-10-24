@@ -381,7 +381,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       bodyParts: getWorkoutBodyParts(plan.exercises),
     });
     setIsChangeWorkoutOpen(false);
-    toast.success(`Set "${plan.name}" as today's workout!`, 'Routine Updated');
+    toast.success(t('toast.todayWorkoutSet', { name: plan.name }), t('toast.titleRoutineUpdated'));
   };
 
   // Launch or resume workout session
@@ -878,7 +878,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               type="button"
               onClick={() => {
                 for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
-                toast.info("Check-in snoozed — it won't repeat this week.", 'Snoozed');
+                toast.info(t('toast.checkinSnoozed'), t('toast.titleSnoozed'));
               }}
               className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
               aria-label="Dismiss check-in"
@@ -922,7 +922,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       setMacroGoals(scaleMacroGoalsToCalories(current, nutritionSuggestion.newCalories));
                     }
                     recordCalorieAdjustment(record);
-                    toast.success(`Target updated to ${nutritionSuggestion.newCalories.toLocaleString()} kcal/day.`, 'Calories Adjusted');
+                    toast.success(t('toast.targetUpdated', { kcal: nutritionSuggestion.newCalories.toLocaleString() }), t('toast.titleCaloriesAdjusted'));
                   }}
                   className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
@@ -941,7 +941,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   basedOnLatestWeightDate: coachDigest.nutrition.latestWeightDate,
                   dismissed: true,
                 });
-                toast.info("Suggestion dismissed — I'll reassess in two weeks.", 'Dismissed');
+                toast.info(t('toast.suggestionDismissed'), t('toast.titleDismissed'));
               }}
               className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
               aria-label="Dismiss calorie suggestion"

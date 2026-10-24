@@ -51,8 +51,9 @@ import {
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, MealDayKind, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { resolveIndianMeta } from '@/lib/indian-foods';
-import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
+import { OIL_LEVELS, OIL_LEVEL_LABEL_KEYS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
+import { getFoodHindiName } from '@/lib/food-hindi';
 import {
   getProteinGapSuggestion,
   getWholeDayAdaptation,
@@ -140,7 +141,7 @@ interface MealsPageProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const displayMealName = (name: string) => {
     const key = MEAL_NAME_KEYS[name];
     return key ? t(key) : name;
@@ -473,7 +474,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'quantity') {
         // Reject zero/negative quantities explicitly instead of silently blanking.
         if (typeof value === 'number' && !isNaN(value) && value <= 0) {
-          toast.error('Quantity must be greater than 0.', 'Invalid Quantity');
+          toast.error(t('toast.qtyPositive'), t('toast.titleInvalidQty'));
           return prev;
         }
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
@@ -634,13 +635,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
     if (food.customFoodId) {
       updateCustomFood(food.customFoodId, snapshot);
-      toast.success(`Updated your version of ${snapshot.name}.`, 'My Version');
+      toast.success(t('toast.myVersionUpdated', { name: snapshot.name }), t('toast.titleMyVersion'));
     } else {
       const created = addCustomFood(snapshot);
       setFoods((prev) =>
         prev.map((f, i) => (i === index ? { ...f, customFoodId: created.id } : f))
       );
-      toast.success(`Saved "${snapshot.name}" as your version — it will top search results.`, 'My Version');
+      toast.success(t('toast.myVersionSaved', { name: snapshot.name }), t('toast.titleMyVersion'));
     }
   };
 
@@ -651,7 +652,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       ...s,
       [index]: (s[index] || []).filter((r) => r.customFood?.id !== result.customFood!.id),
     }));
-    toast.info(`Deleted your version of ${result.name}.`, 'My Version');
+    toast.info(t('toast.myVersionDeleted', { name: result.name }), t('toast.titleMyVersion'));
   };
 
   /**
@@ -668,7 +669,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       // this direct path had no guard — a mis-scan could log junk.
       const absurd = getAbsurdQuantityWarning(scannedItem);
       if (absurd) {
-        toast.error(absurd, 'Unlikely Quantity');
+        toast.error(t(absurd.key, absurd.params), t('toast.titleUnlikelyQty'));
         return;
       }
       const newMeal: MealEntry = {
@@ -760,7 +761,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const handleAutoEstimatePinned = () => {
     if (!pinnedName.trim()) {
-      toast.error('Please enter a food name first.', 'Missing Name');
+      toast.error(t('toast.foodNameFirst'), t('toast.titleMissingName'));
       return;
     }
     const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
@@ -769,13 +770,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setPinnedProtein(String(est.proteinG));
     setPinnedCarbs(String(est.carbsG));
     setPinnedFat(String(est.fatG));
-    toast.info(`Calculated: ~${est.calories} kcal, ~${est.proteinG}g protein.`, 'Macros Calculated');
+    toast.info(t('toast.macrosCalculated', { kcal: est.calories, protein: est.proteinG }), t('toast.titleMacrosCalculated'));
   };
 
   const handleSavePinnedFood = () => {
     const name = pinnedName.trim();
     if (!name) {
-      toast.error('Please enter a food name.', 'Missing Name');
+      toast.error(t('toast.foodNameRequired'), t('toast.titleMissingName'));
       return;
     }
     const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
@@ -794,7 +795,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG: carb,
         fatG: fat,
       });
-      toast.success(`Updated "${name}" in pinned foods!`, 'Food Updated');
+      toast.success(t('toast.pinnedUpdated', { name }), t('toast.titleFoodUpdated'));
     } else {
       toggleFavoriteFood({
         name,
@@ -805,14 +806,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG: carb,
         fatG: fat,
       });
-      toast.success(`Pinned "${name}" to favorites!`, 'Food Pinned');
+      toast.success(t('toast.pinnedAdded', { name }), t('toast.titleFoodPinned'));
     }
     setIsEditPinnedOpen(false);
   };
 
   const handleDeletePinned = (id: string, name: string) => {
     deleteFavoriteFood(id);
-    toast.info(`Removed "${name}" from pinned foods.`, 'Food Unpinned');
+    toast.info(t('toast.pinnedRemoved', { name }), t('toast.titleFoodUnpinned'));
   };
 
   const handleClearAllPinned = () => {
@@ -848,7 +849,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       toggleFavoriteFood(food);
       count++;
     });
-    toast.success(`Pinned ${count} frequent foods to your favorites!`, 'Foods Pinned');
+    toast.success(count === 1 ? t('toast.frequentPinnedOne') : t('toast.frequentPinnedMany', { count }), t('toast.titleFoodsPinned'));
   };
 
   const handleLogFrequentMeal = (meal: MealEntry, multiplier: number = 1) => {
@@ -884,9 +885,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       }
     });
     if (count > 0) {
-      toast.success(`Pinned ${count} food${count > 1 ? 's' : ''} from ${meal.name}!`, 'Foods Pinned');
+      toast.success(count === 1 ? t('toast.mealPinnedOne', { meal: meal.name }) : t('toast.mealPinnedMany', { count, meal: meal.name }), t('toast.titleFoodsPinned'));
     } else {
-      toast.info('All foods in this meal are already pinned.');
+      toast.info(t('toast.mealAlreadyPinned'));
     }
   };
 
@@ -933,7 +934,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     const absurdWarning = cleanedFoods.map(getAbsurdQuantityWarning).find((w) => w !== null);
     if (absurdWarning) {
-      toast.error(absurdWarning, 'Unlikely Quantity');
+      toast.error(t(absurdWarning.key, absurdWarning.params), t('toast.titleUnlikelyQty'));
       return;
     }
 
@@ -998,10 +999,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setGoalCarbs(String(rec.carbsG || 0));
     setGoalFat(String(rec.fatG || 0));
 
-    toast.success(
-      `Targets calibrated for ${bw}kg (${goalConfig.label}): ${rec.calories} kcal (${rec.proteinG}P / ${rec.carbsG}C / ${rec.fatG}F)`,
-      'Goals Calibrated'
-    );
+    toast.success(t('toast.targetsCalibrated', { bw, goal: goalConfig.label, kcal: rec.calories || 0, protein: rec.proteinG || 0, carbs: rec.carbsG || 0, fat: rec.fatG || 0 }), t('toast.titleGoalsCalibrated'));
   };
 
   const handleReconcileCarbs = () => {
@@ -1009,12 +1007,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const prot = parseFloat(goalProtein) || 0;
     const fat = parseFloat(goalFat) || 0;
     if (cal <= 0) {
-      toast.error('Please enter a daily calorie target first.', 'Calorie Target Required');
+      toast.error(t('toast.targetCaloriesFirst'), t('toast.titleCalorieTargetRequired'));
       return;
     }
     const carbsG = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
     setGoalCarbs(String(carbsG));
-    toast.success(`Carbs balanced to ${carbsG}g so macros total exactly ${cal} kcal.`, 'Carbs Reconciled');
+    toast.success(t('toast.carbsReconciled', { carbs: carbsG, kcal: cal }), t('toast.titleCarbsReconciled'));
   };
 
   const handleSaveGoals = () => {
@@ -1024,7 +1022,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const fat  = parseFloat(goalFat);
 
     if (isNaN(cal) || cal <= 0 || isNaN(prot) || prot <= 0) {
-      toast.error('Please enter valid target calories and protein.', 'Invalid Targets');
+      toast.error(t('toast.targetsInvalid'), t('toast.titleInvalidTargets'));
       return;
     }
     // Honest range validation — never silently ignore or rebalance absurd input.
@@ -1034,22 +1032,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // days were then praised as "Deficit Preserved".
     const safeFloor = getSafeMinCalories(profile?.gender || 'male');
     if (cal < safeFloor || cal > 10000) {
-      toast.error(
-        `Daily calories must be between ${safeFloor.toLocaleString()} and 10,000 kcal (you entered ${goalCalories}). Below ${safeFloor.toLocaleString()} kcal/day risks muscle, hormones and health — ASCEND won't set a target there.`,
-        'Unsafe Target'
-      );
+      toast.error(t('toast.caloriesRange', { floor: safeFloor.toLocaleString(), entered: goalCalories }), t('toast.titleUnsafeTarget'));
       return;
     }
     if (prot < 10 || prot > 400) {
-      toast.error(`Protein target must be between 10 and 400 g (you entered ${goalProtein} g). Very high intakes offer no benefit past ~2.2 g/kg.`, 'Unlikely Target');
+      toast.error(t('toast.proteinRange', { entered: goalProtein }), t('toast.titleUnlikelyTarget'));
       return;
     }
     if (!isNaN(fat) && (fat < 0 || fat > 300)) {
-      toast.error('Fat target must be between 0 and 300 g.', 'Unlikely Target');
+      toast.error(t('toast.fatRange'), t('toast.titleUnlikelyTarget'));
       return;
     }
     if (!isNaN(carb) && (carb < 0 || carb > 800)) {
-      toast.error('Carb target must be between 0 and 800 g.', 'Unlikely Target');
+      toast.error(t('toast.carbRange'), t('toast.titleUnlikelyTarget'));
       return;
     }
 
@@ -1080,11 +1075,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     newGoals.calorieDelta = newGoals.calories - (newGoals.maintenanceCalories as number);
 
     setMacroGoals(newGoals);
-    toast.success(
-      `Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).` +
-      (carbsAdjusted ? ` Carbs adjusted to fit your calorie target.` : ''),
-      'Goals Saved'
-    );
+    toast.success(carbsAdjusted ? t('toast.goalsSavedCarbs', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }) : t('toast.goalsSaved', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }), t('toast.titleGoalsSaved'));
     setIsGoalsModalOpen(false);
   };
 
@@ -1102,10 +1093,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // Reject unrecognizable input: never silently log a phantom 0-calorie meal.
     const isJunkParse = (foods: FoodItem[]) => isJunkMealParse(foods);
     const rejectJunk = () => {
-      toast.error(
-        `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal", or use Add Manually.`,
-        'Not Recognized'
-      );
+      toast.error(t('toast.notRecognized', { query: q.length > 40 ? q.slice(0, 40) + '…' : q }), t('toast.titleNotRecognized'));
       setIsNaturalParsing(false);
     };
     // Warn when SOME items couldn't be matched: a mixed parse like
@@ -1115,17 +1103,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       const unmatched = (foods || []).filter((f) => f.isUnmatched);
       if (unmatched.length > 0) {
         const names = unmatched.map((f) => `"${f.name}"`).join(', ');
-        toast.info(
-          `Couldn't identify ${names} — logged at 0 kcal, so totals may be understated. Add it manually for accurate numbers.`,
-          'Some Foods Unmatched'
-        );
+        toast.info(t('toast.someUnmatched', { names }), t('toast.titleSomeUnmatched'));
       }
     };
     // Refuse implausible quantities (e.g. "100 rotis") instead of logging junk.
     const rejectAbsurd = (foods: FoodItem[]) => {
       const warning = foods.map(getAbsurdQuantityWarning).find((w) => w !== null);
       if (warning) {
-        toast.error(warning, 'Unlikely Quantity');
+        toast.error(t(warning.key, warning.params), t('toast.titleUnlikelyQty'));
         setIsNaturalParsing(false);
         return true;
       }
@@ -1252,7 +1237,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       } catch (offlineErr) {
         console.error('Offline parse error in MealsPage:', offlineErr);
       }
-      toast.error('Could not parse meal. Please check food text or connection.', 'Error');
+      toast.error(t('toast.parseMealFailed'), t('toast.titleError'));
     } finally {
       setIsNaturalParsing(false);
     }
@@ -1408,18 +1393,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const handleCopyYesterday = () => {
     if (yesterdayMeals.length === 0) return;
     const copiedCount = copyMealsFromDate(yesterdayDate, todayDate);
-    toast.success(
-      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from yesterday (~${Math.round(yesterdayMacros.calories)} kcal)!`,
-      'Yesterday Meals Copied'
-    );
+    toast.success(copiedCount === 1 ? t('toast.yesterdayCopiedOne', { kcal: Math.round(yesterdayMacros.calories) }) : t('toast.yesterdayCopiedMany', { count: copiedCount, kcal: Math.round(yesterdayMacros.calories) }), t('toast.titleYesterdayCopied'));
   };
 
   const handleCopySpecificDay = (sourceDate: string) => {
     const copiedCount = copyMealsFromDate(sourceDate, todayDate);
-    toast.success(
-      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from ${sourceDate} to Today!`,
-      'Meals Copied'
-    );
+    toast.success(copiedCount === 1 ? t('toast.mealsCopiedOne', { date: sourceDate }) : t('toast.mealsCopiedMany', { count: copiedCount, date: sourceDate }), t('toast.titleMealsCopied'));
   };
 
   const groupedMeals = useMemo(() => {
@@ -2182,6 +2161,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="text-text-primary font-medium truncate">{food.name}</span>
+                            {language === 'hi' && (() => {
+                              const hiName = getFoodHindiName(food.name);
+                              return hiName ? (
+                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                              ) : null;
+                            })()}
                             <span className="text-text-muted text-3xs">
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
@@ -2364,6 +2349,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
                                 <div className="flex items-center gap-1.5 truncate">
                                   <span className="text-text-primary font-medium truncate">{food.name}</span>
+                            {language === 'hi' && (() => {
+                              const hiName = getFoodHindiName(food.name);
+                              return hiName ? (
+                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                              ) : null;
+                            })()}
                                   <span className="text-text-muted text-3xs">
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
@@ -2631,6 +2622,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       >
                         <Star className="w-3 h-3 text-accent fill-accent" />
                         <span>{fav.name}</span>
+                        {language === 'hi' && (() => {
+                          const hiName = getFoodHindiName(fav.name);
+                          return hiName ? <span className="text-text-secondary">({hiName})</span> : null;
+                        })()}
                       </button>
                     ))}
                   </div>
@@ -2760,6 +2755,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     >
                                       <span className="flex items-center gap-2">
                                         {sugg.name}
+                                        {language === 'hi' && (() => {
+                                          const hiName = getFoodHindiName(sugg.name);
+                                          return hiName ? (
+                                            <span className="text-3xs text-text-secondary">({hiName})</span>
+                                          ) : null;
+                                        })()}
                                         {sugg.kind === 'custom' && (
                                           <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
                                             {t('meals.myVersionBadge')}
@@ -2938,7 +2939,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                             : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
                                         }`}
                                       >
-                                        {level.label}
+                                        {t(OIL_LEVEL_LABEL_KEYS[level.id])}
                                       </button>
                                     ))}
                                   </div>

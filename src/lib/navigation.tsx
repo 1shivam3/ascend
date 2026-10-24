@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from '@/components/ui/Toast';
+import { useTranslation } from '@/lib/i18n';
 import { useStore } from '@/lib/store';
 
 export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings';
@@ -159,6 +160,7 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<TabId>(() => getInitialNavigationState().tab);
   const [progressInitialTab, setProgressInitialTab] = useState<ProgressTabId>(() => getInitialNavigationState().progressTab);
   const [historyStack, setHistoryStack] = useState<TabId[]>(() => {
@@ -343,7 +345,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       }
     } else {
       lastBackPressRef.current = now;
-      toast.info('Press back again to exit', 'ASCEND');
+      toast.info(t('toast.pressBackAgain'), t('toast.titleApp'));
     }
   }, [runBackHandlers, navigate, toast]);
 
@@ -426,7 +428,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         } else {
           // First press: Intercept and prompt user
           lastBackPressRef.current = now;
-          toast.info('Press back again to exit', 'ASCEND');
+          toast.info(t('toast.pressBackAgain'), t('toast.titleApp'));
           try {
             window.history.pushState({ tab: 'home', root: true, stackDepth: 1 }, '', buildTabUrl('home'));
           } catch {}

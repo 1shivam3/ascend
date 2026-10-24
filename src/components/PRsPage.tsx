@@ -8,6 +8,7 @@ import {
   getOverallLevel,
   getExerciseList,
   getExercisesByCategory,
+  EXERCISE_CATEGORY_KEYS,
   calculateOneRepMax,
   getNextMilestone,
   getNextLevelInfo,
@@ -198,7 +199,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                       {pillCfg?.label || group.category.slice(0, 2).toUpperCase()}
                     </span>
                     <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">
-                      {group.category}
+                      {EXERCISE_CATEGORY_KEYS[group.category] ? t(EXERCISE_CATEGORY_KEYS[group.category]) : group.category}
                     </span>
                   </div>
                   {group.exercises.map((ex) => (

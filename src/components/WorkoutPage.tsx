@@ -1149,7 +1149,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setDate(getLocalTodayStr());
     setStartedFromPlan(`Repeated (${last.date})`);
     setIsModalOpen(true);
-    toast.success(`Loaded ${clonedExercises.length} exercises from last session!`, 'Workout Loaded');
+    toast.success(clonedExercises.length === 1 ? t('toast.lastSessionLoadedOne') : t('toast.lastSessionLoadedMany', { count: clonedExercises.length }), t('toast.titleWorkoutLoaded'));
   };
 
   // Voice logging goes through the shared recognizer in lib/voice-logger:
@@ -1170,12 +1170,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           sets: parsed.sets.map((s) => ({ ...s, unit: userUnit })),
         },
       ]);
-      toast.success(
-        `Logged "${parsed.exerciseName}" (${parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ')})`,
-        'Voice Input Added'
-      );
+      toast.success(t('toast.voiceLogged', { exercise: parsed.exerciseName, sets: parsed.sets.map((s) => `${s.weight}×${s.reps}`).join(', ') }), t('toast.titleVoiceAdded'));
     } else {
-      toast.error(`Could not parse: "${transcript}"`, 'Voice Error');
+      toast.error(t('toast.voiceParseFailed', { transcript }), t('toast.titleVoiceError'));
     }
   };
 
@@ -1192,7 +1189,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
 
     if (!isSpeechRecognitionSupported()) {
-      toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+      toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
       return;
     }
 
@@ -1211,14 +1208,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         onError: (err: string) => {
           setIsListening(false);
           if (err === 'not-allowed' || err === 'service-not-allowed') {
-            toast.error(
-              isNativePlatform()
-                ? 'Microphone permission is off — enable it in Settings → Apps → ASCEND → Permissions.'
-                : 'Microphone access denied — allow it in your browser site settings.',
-              'Voice Logging'
-            );
+            toast.error(isNativePlatform() ? t('toast.voiceMicNative') : t('toast.voiceMicBrowser'), t('toast.titleVoiceLogging'));
           } else if (err === 'unavailable') {
-            toast.error('Voice recognition is not available on this device.', 'Voice Logging');
+            toast.error(t('toast.voiceUnavailableDevice'), t('toast.titleVoiceLogging'));
           }
         },
         onEnd: () => {
@@ -1232,14 +1224,14 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       });
 
       if (!recognizer) {
-        toast.error('Voice recognition is not supported on this browser.', 'Voice Logging');
+        toast.error(t('toast.voiceUnsupportedBrowser'), t('toast.titleVoiceLogging'));
         return;
       }
 
       pageVoiceRecognizerRef.current = recognizer;
       recognizer.start();
       setIsListening(true);
-      toast.info('Listening... Say e.g. "Bench 70 for 8 8 7"', 'Voice Logging');
+      toast.info(t('toast.voiceListening'), t('toast.titleVoiceLogging'));
     } catch {
       setIsListening(false);
     }
@@ -1503,7 +1495,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         setRestSecondsLeft((prev) => {
           if (prev <= 1) {
             playBeep();
-            toast.info('⏰ Rest time is up! Ready for your next set.', 'SET READY');
+            toast.info(t('toast.restReady'), t('toast.titleSetReady'));
             setIsRestRunning(false);
             setIsTimerFinished(true);
             return 0;
@@ -1667,20 +1659,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     }
 
     if (newPRCount > 0) {
-      toast.success(
-        `${newPRCount} New Personal Record${newPRCount > 1 ? 's' : ''} detected & synced to your PRs!`,
-        'New PR Milestone'
-      );
+      toast.success(newPRCount === 1 ? t('toast.newPRsOne') : t('toast.newPRsMany', { count: newPRCount }), t('toast.titleNewPR'));
     } else if (hasCompletedSets) {
-      toast.success(
-        `Logged workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''}!`,
-        'Workout Saved'
-      );
+      toast.success(exercisesToSave.length === 1 ? t('toast.workoutLoggedOne') : t('toast.workoutLoggedMany', { count: exercisesToSave.length }), t('toast.titleWorkoutSaved'));
     } else {
-      toast.info(
-        `Saved interrupted workout with ${exercisesToSave.length} exercise${exercisesToSave.length > 1 ? 's' : ''} (0 completed sets).`,
-        'Interrupted Session Saved'
-      );
+      toast.info(exercisesToSave.length === 1 ? t('toast.interruptedSavedOne') : t('toast.interruptedSavedMany', { count: exercisesToSave.length }), t('toast.titleInterruptedSaved'));
     }
 
     setPostWorkoutSummary({
@@ -1735,12 +1718,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         (p) => p.name.toLowerCase() === planData.name.toLowerCase()
       );
       addPlannedWorkout(newPlan);
-      toast.success(
-        nameTaken
-          ? `A plan named "${planData.name}" already exists — saved as "${planData.name} (Copy)".`
-          : `Plan "${planData.name}" created!`,
-        'Plan Created'
-      );
+      toast.success(nameTaken ? t('toast.planCreatedCopy', { name: planData.name }) : t('toast.planCreated', { name: planData.name }), t('toast.titlePlanCreated'));
     }
     setEditingPlan(null);
   };
@@ -2965,15 +2943,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             setStartedFromPlan(null);
             setStartedFromPlanId(null);
             if (newPRsCount > 0) {
-              toast.success(
-                `${newPRsCount} New PR${newPRsCount > 1 ? 's' : ''} detected & synced to your PRs!`,
-                'New PR Milestone'
-              );
+              toast.success(newPRsCount === 1 ? t('toast.newPRsOne') : t('toast.newPRsMany', { count: newPRsCount }), t('toast.titleNewPR'));
             } else {
-              toast.success(
-                `Logged workout with ${workoutEntry.exercises.length} exercise${workoutEntry.exercises.length > 1 ? 's' : ''}!`,
-                'Workout Saved'
-              );
+              toast.success(workoutEntry.exercises.length === 1 ? t('toast.workoutLoggedOne') : t('toast.workoutLoggedMany', { count: workoutEntry.exercises.length }), t('toast.titleWorkoutSaved'));
             }
           }}
           onPause={() => {

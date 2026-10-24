@@ -1,5 +1,6 @@
 import { LiftLevel, OverallLevel, Gender, ExerciseRank, OverallTitle, EquipmentType } from './types';
 import { getAllExerciseNames, EXERCISE_LIBRARY, getExerciseMuscle } from './exercise-library';
+import type { StringKey } from './i18n/en';
 
 /**
  * Sanity cap for manually logged PR weights. 500 kg exceeds every raw
@@ -373,6 +374,17 @@ export function getExercisesByCategory(): { category: string; exercises: string[
     },
   ];
 }
+
+/** i18n keys for the getExercisesByCategory headings (Round 4, SIM-P1-05):
+ * render sites translate via this map; unknown categories fall back to the
+ * English string at the call site (never a raw key). */
+export const EXERCISE_CATEGORY_KEYS: Record<string, StringKey> = {
+  'Barbell Compounds': 'cat.barbellCompounds',
+  Dumbbell: 'cat.dumbbell',
+  Bodyweight: 'cat.bodyweight',
+  Cable: 'cat.cable',
+  Machine: 'cat.machine',
+};
 
 /**
  * Overall Character Titles based on composite average level
