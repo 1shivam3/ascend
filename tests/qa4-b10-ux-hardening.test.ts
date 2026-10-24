@@ -192,7 +192,18 @@ describe('QA4-035(b) CSP hardening', () => {
   it("script-src no longer allows 'unsafe-eval' (production build verified eval-free)", () => {
     const cfg = read('next.config.js');
     const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
-    expect(scriptSrc).not.toContain('unsafe-eval');
+    // Token match, not substring: 'wasm-unsafe-eval' CONTAINS the
+    // substring 'unsafe-eval' but is a strictly narrower allowance —
+    // it permits WebAssembly compilation only, never JavaScript eval.
+    // It is deliberately allowed: MediaPipe's on-device WASM pose
+    // engine (live form check) cannot compile without it, and no
+    // other WASM/eval path exists in the app.
+    const tokens = scriptSrc
+      .split(/\s+/)
+      .map((tok) => tok.replace(/'/g, ''))
+      .filter(Boolean);
+    expect(tokens).not.toContain('unsafe-eval');
+    expect(tokens).toContain('wasm-unsafe-eval');
     // 'unsafe-inline' is explicitly out of scope for this batch and stays.
     expect(scriptSrc).toContain('unsafe-inline');
   });
