@@ -5,6 +5,7 @@ import {
   getExerciseJointCautions,
   getFilteredSubstitutes,
   getInjuryBannedJoints,
+  getPlanBannedJoints,
   isExerciseJointBanned,
 } from '@/lib/workout-engine';
 import { generateBlockProposal, type BlockEngineInput } from '@/lib/block-engine';
@@ -76,6 +77,13 @@ describe('joint-aware limitation bans (SIM-P1-01)', () => {
     expect(isExerciseJointBanned('Dumbbell Lateral Raise', new Set(['shoulder']))).toBe(true);
     expect(isExerciseJointBanned('Barbell Back Squat', new Set(['shoulder']))).toBe(false);
     expect(getExerciseJointCautions('Barbell Bench Press')).toContain('shoulder');
+  });
+
+  it('plan joint bans exclude lower_back per ARJUN-1 (hinge banned at family level, squat kept)', () => {
+    const banned = getPlanBannedJoints(['Lower back']);
+    expect(banned.has('lower_back')).toBe(false);
+    const shoulderBanned = getPlanBannedJoints(['shoulder']);
+    expect(shoulderBanned.has('shoulder')).toBe(true);
   });
 
   it('adaptSplitForEquipment removes or swaps shoulder-loading lifts for a shoulder limitation', () => {

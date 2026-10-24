@@ -1539,6 +1539,25 @@ export function isExerciseJointBanned(name: string, bannedJoints: Set<JointArea>
   return getExerciseJointCautions(name).some((j) => bannedJoints.has(j));
 }
 
+/**
+ * Joint bans for PLAN adaptation (templates + coach blocks), as opposed
+ * to per-exercise pain swaps. Identical to getInjuryBannedJoints EXCEPT
+ * 'lower_back' is excluded — deliberately, not an oversight. Lower-back
+ * cautions in EXERCISE_META are near-universal across compounds (squat,
+ * leg press, every row, overhead press, core work), so a hard ban would
+ * gut a program for any back limitation; spinal loading is graded by
+ * movement pattern instead, and the family ban already removes the
+ * highest-risk pattern (hinge) — that is the ARJUN-1 decision
+ * (r2-plan-pipeline: a bad back keeps Squat, drops hinges). Peripheral
+ * joints (shoulder/elbow/wrist/knee/hip/ankle/neck) have narrow,
+ * specific cautions where a hard ban stays proportionate.
+ */
+export function getPlanBannedJoints(limitations: string[] = []): Set<JointArea> {
+  const banned = getInjuryBannedJoints(limitations);
+  banned.delete('lower_back');
+  return banned;
+}
+
 /** Last-resort swaps by muscle group when no table/pattern match exists. */
 const MUSCLE_HOME_FALLBACKS: Record<string, { dumbbell: string; bodyweight: string }> = {
   Chest: { dumbbell: 'Dumbbell Bench Press', bodyweight: 'Push-ups' },
@@ -1775,7 +1794,8 @@ export function adaptSplitForEquipment(
   const bannedFamilies = getInjuryBannedFamilies(options.limitations || []);
   // Joint-aware bans (SIM-P1-01): family bans alone miss most joint
   // loading (bench loads the shoulder without being vertical_push).
-  const bannedJoints = getInjuryBannedJoints(options.limitations || []);
+  // Plan-scoped: lower_back excluded per ARJUN-1 (see getPlanBannedJoints).
+  const bannedJoints = getPlanBannedJoints(options.limitations || []);
   // Pull-ups regress for beginners, for minors, and for anyone without a
   // bar (home/bodyweight) — the substitution table used to CREATE pull-up
   // prescriptions for intermediate home users (round-1 bug, reintroduced

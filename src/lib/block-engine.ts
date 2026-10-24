@@ -36,7 +36,7 @@ import {
   getFilteredSubstitutes,
   getGoalAdaptiveSplitTemplates,
   getInjuryBannedFamilies,
-  getInjuryBannedJoints,
+  getPlanBannedJoints,
   getMovementFamily,
   isExerciseJointBanned,
   isPlaceholderSubstitute,
@@ -619,8 +619,9 @@ function pickExercisesForMuscle(
   const banned = getInjuryBannedFamilies(ctx.limitations);
   ctx.bannedFamilies.forEach((f) => banned.add(f));
   // Joint-aware filter (SIM-P1-01): a limitation bans every exercise
-  // flagging that joint, not just its movement family.
-  const bannedJoints = getInjuryBannedJoints(ctx.limitations);
+  // flagging that joint, not just its movement family. Plan-scoped:
+  // lower_back excluded per ARJUN-1 (see getPlanBannedJoints).
+  const bannedJoints = getPlanBannedJoints(ctx.limitations);
   const candidates = EXERCISE_LIBRARY.filter((item) => {
     if (item.muscle !== muscle && !item.secondaryMuscles.includes(muscle)) return false;
     if (ctx.usedKeys.has(normalizeExerciseKey(item.name))) return false;
