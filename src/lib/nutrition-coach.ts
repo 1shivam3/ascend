@@ -1,5 +1,6 @@
 import { FOOD_DB } from './macros';
 import type { DietPreference, MacroGoals, MealDayKind } from './types';
+import type { LocalizedSentence } from './coach-i18n';
 
 /**
  * Nutrition coach — vegetarian protein guidance, whole-day adaptation,
@@ -63,6 +64,7 @@ interface AnchorDef {
 const VEG: DietPreference[] = ['vegetarian', 'eggitarian', 'vegan'];
 const VEG_EGG: DietPreference[] = ['vegetarian', 'eggitarian'];
 const EGG_ONLY: DietPreference[] = ['eggitarian'];
+const NON_VEG: DietPreference[] = ['non_vegetarian'];
 
 // Portions a person would actually eat, with protein taken from the
 // food DB at that portion (never dry-chart numbers for cooked food).
@@ -71,7 +73,9 @@ const ANCHORS: AnchorDef[] = [
   { foodKey: 'soya chunks', grams: 30, detail: '30 g soya chunks (dry) tossed into a sabzi or curry', diets: VEG },
   { foodKey: 'greek yogurt', grams: 150, detail: '150 g Greek yogurt or hung curd', diets: VEG_EGG },
   { foodKey: 'milk', grams: 500, detail: '500 ml milk across the evening', diets: VEG_EGG },
-  { foodKey: 'eggs', grams: 120, detail: '2 eggs', diets: EGG_ONLY },
+  { foodKey: 'eggs', grams: 120, detail: '2 eggs', diets: [...EGG_ONLY, ...NON_VEG] },
+  { foodKey: 'chicken breast', grams: 150, detail: '150 g chicken breast', diets: NON_VEG },
+  { foodKey: 'fish curry', grams: 150, detail: '1 katori fish curry', diets: NON_VEG },
   { foodKey: 'sattu', grams: 50, detail: 'a 50 g sattu drink', diets: VEG },
   { foodKey: 'boiled chana', grams: 150, detail: '1 katori (150 g) boiled chana', diets: VEG },
   { foodKey: 'whey protein', grams: 30, detail: '1 scoop whey', diets: VEG_EGG },
@@ -89,12 +93,18 @@ export interface ProteinGapSuggestion {
   gapG: number;
   anchor: ProteinAnchor;
   message: string;
+  /** LIVE-P1-03: same message as a localizable key + params. */
+  messageI18n?: LocalizedSentence;
 }
 
 /**
- * One concrete protein anchor when a veg/eggitarian/vegan user's logged
- * protein is tracking below target into the afternoon/evening.
- * Returns null when there's nothing useful to say.
+ * One concrete protein anchor when a user's logged protein is tracking
+ * below target into the afternoon/evening. Previously veg-only by code
+ * (SIM-P2-04): non-vegetarians got a silent null — the exact users who
+ * most need "eat more, specifically this." Anchors are diet-scoped via
+ * their diets arrays, so every diet now gets a useful answer or an
+ * honest null when nothing fits. Returns null when there's nothing
+ * useful to say.
  */
 export function getProteinGapSuggestion(input: {
   diet: DietPreference;
@@ -103,7 +113,6 @@ export function getProteinGapSuggestion(input: {
   hour: number;
 }): ProteinGapSuggestion | null {
   const { diet, proteinLoggedG, proteinTargetG, hour } = input;
-  if (!VEG.includes(diet)) return null;
   if (!(proteinTargetG > 0)) return null;
   if (hour < 14) return null; // too early in the day to call it
 
@@ -134,10 +143,29 @@ export function getProteinGapSuggestion(input: {
       : anchor.proteinG >= gapG / 2
         ? 'would close most of the gap'
         : `is a strong start — about ${remainingAfter} g would still be left, so pair it with another protein food at your next meal`;
+  // LIVE-P1-03: same sentence as a localizable struct. `detail` is a
+  // food portion description and passes through untranslated by design
+  // (food names are never machine-translated).
+  const messageI18n: LocalizedSentence =
+    remainingAfter <= 2
+      ? {
+          key: 'nutritionCoach.proteinGapFull',
+          params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG },
+        }
+      : anchor.proteinG >= gapG / 2
+        ? {
+            key: 'nutritionCoach.proteinGapMost',
+            params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG },
+          }
+        : {
+            key: 'nutritionCoach.proteinGapPartial',
+            params: { gap: gapG, detail: anchor.detail, protein: anchor.proteinG, remaining: remainingAfter },
+          };
   return {
     gapG,
     anchor,
     message: `Protein is tracking low today — about ${gapG} g to go. Adding ${anchor.detail} (~${anchor.proteinG} g protein) ${closing}.`,
+    messageI18n,
   };
 }
 

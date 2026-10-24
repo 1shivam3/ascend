@@ -63,7 +63,7 @@ function athleteModel(partial: Partial<AthleteModel> = {}): AthleteModel {
       mostSkippedDay: null,
       mostTrainedDay: null,
     },
-    pain: { episodes: [], episodesLast28dByFamily: {}, flaggedFamilies: [] },
+    pain: { episodes: [], episodesLast28dByFamily: {}, flaggedFamilies: [], recentPainExerciseKeys: [] },
     lowReadinessShare: estimate(0),
     topFacts: [],
     ...partial,
@@ -163,7 +163,7 @@ describe('buildWeeklyReview — focus priority', () => {
       input({
         workouts: missedWeek,
         athleteModel: athleteModel({
-          pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'] },
+          pain: { episodes: [], episodesLast28dByFamily: { squat: 2 }, flaggedFamilies: ['squat'], recentPainExerciseKeys: [] },
         }),
       })
     );

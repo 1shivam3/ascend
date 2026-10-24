@@ -133,8 +133,11 @@ describe('QA4-026 finalize clamps negative/NaN-adjacent set values', () => {
 
   it('the typed-input handlers clamp at the source', () => {
     const aws = readSrc('src/components/ActiveWorkoutScreen.tsx');
-    expect(aws).toContain('Math.max(0, numericWeight)');
-    expect(aws).toContain('Math.max(0, Math.floor(parsed))');
+    // SIM-P1-06 (round 5): the inline Math.max(0, …) clamps were replaced
+    // by the shared ceiling-aware helpers — the floor is still applied
+    // at the source, now with the 500 kg / 100 rep ceilings as well.
+    expect(aws).toContain('clampWorkoutWeight(numericWeight, userUnit)');
+    expect(aws).toContain('clampWorkoutReps(parsed)');
   });
 });
 

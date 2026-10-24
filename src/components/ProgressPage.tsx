@@ -614,10 +614,25 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
     let deltaText = 'No logs yet';
     if (dataPoints.length >= 2) {
-      const latest = dataPoints[dataPoints.length - 1].value;
-      const first = dataPoints[0].value;
-      const delta = latest - first;
-      const pct = first > 0 ? (delta / first) * 100 : 0;
+      // SIM-P2-03: the headline delta was endpoint-based (latest minus
+      // first), so one bad weigh-in swung the number the user sees —
+      // while the coach trend uses regression. Use fitted endpoints
+      // from a least-squares line over the window instead: same format,
+      // resistant to single-point noise.
+      const firstTime = new Date(dataPoints[0].date).getTime();
+      const xs = dataPoints.map((d) => (new Date(d.date).getTime() - firstTime) / 86400000);
+      const ys = dataPoints.map((d) => d.value);
+      const n = xs.length;
+      const meanX = xs.reduce((a, b) => a + b, 0) / n;
+      const meanY = ys.reduce((a, b) => a + b, 0) / n;
+      const num = xs.reduce((s, x, i) => s + (x - meanX) * (ys[i] - meanY), 0);
+      const den = xs.reduce((s, x) => s + (x - meanX) * (x - meanX), 0);
+      const slope = den === 0 ? 0 : num / den;
+      const intercept = meanY - slope * meanX;
+      const fittedFirst = intercept;
+      const fittedLast = intercept + slope * xs[n - 1];
+      const delta = fittedLast - fittedFirst;
+      const pct = fittedFirst > 0 ? (delta / fittedFirst) * 100 : 0;
       deltaText = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
     } else if (dataPoints.length === 1) {
       deltaText = 'Baseline';
@@ -727,9 +742,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   // DOTS calculation for powerlifting modal
   const bigThreeStats = useMemo(() => getBigThreeStats(prs), [prs]);
   const dotsScore = useMemo(() => {
-    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0) return 0;
+    // SIM-P1-07: DOTS is defined only for a full S/B/D total.
+    if (!profile || !profile.bodyweightKg || bigThreeStats.totalKg === 0 || !bigThreeStats.isComplete) return 0;
     return calculateDOTS(profile.bodyweightKg, bigThreeStats.totalKg, profile.gender);
-  }, [profile, bigThreeStats.totalKg]);
+  }, [profile, bigThreeStats]);
   const dotsClassification = useMemo(() => getDOTSClassification(dotsScore), [dotsScore]);
 
   // Screen 14 Hero Chart Geometry

@@ -14,6 +14,7 @@
  */
 import { isSetCompleted } from './types';
 import type { WorkoutEntry, MealEntry } from './types';
+import type { StringKey } from './i18n/en';
 
 export type ChallengeMetric =
   | 'workouts'
@@ -27,6 +28,9 @@ export interface ChallengeDef {
   id: string;
   title: string;
   description: string;
+  /** LIVE-P1-03: localized title/description — renderers prefer these via t(). */
+  titleKey?: StringKey;
+  descriptionKey?: StringKey;
   /** How many of the metric to reach. */
   target: number;
   metric: ChallengeMetric;
@@ -282,6 +286,8 @@ export function monthlyChallenges(month: string): ChallengeDef[] {
       id: 'workouts-12',
       title: '12 Workouts This Month',
       description: 'Log 12 real workouts before the month ends. No rush — pace yourself.',
+      titleKey: 'chal.monthly12WorkoutsTitle',
+      descriptionKey: 'chal.monthly12WorkoutsDesc',
       target: 12,
       metric: 'workouts',
       month,
@@ -290,6 +296,8 @@ export function monthlyChallenges(month: string): ChallengeDef[] {
       id: 'breakfasts-20',
       title: '20 Breakfasts',
       description: 'Log breakfast 20 days this month. Small habit, big mornings.',
+      titleKey: 'chal.monthly20BreakfastsTitle',
+      descriptionKey: 'chal.monthly20BreakfastsDesc',
       target: 20,
       metric: 'breakfasts',
       month,
@@ -298,6 +306,8 @@ export function monthlyChallenges(month: string): ChallengeDef[] {
       id: 'streak-7',
       title: '7-Day Streak',
       description: 'Stay active 7 days in a row. Miss a day? Your freeze has you covered.',
+      titleKey: 'chal.monthly7StreakTitle',
+      descriptionKey: 'chal.monthly7StreakDesc',
       target: 7,
       metric: 'streak_days',
       month,
@@ -306,6 +316,8 @@ export function monthlyChallenges(month: string): ChallengeDef[] {
       id: 'prs-5',
       title: '5 Personal Records',
       description: 'Set 5 new PRs this month. Any lift, any rep range — progress is progress.',
+      titleKey: 'chal.monthly5PrsTitle',
+      descriptionKey: 'chal.monthly5PrsDesc',
       target: 5,
       metric: 'prs',
       month,

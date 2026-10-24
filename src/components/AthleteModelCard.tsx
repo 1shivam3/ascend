@@ -3,6 +3,7 @@
 import { Brain } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { Badge } from './ui/Badge';
 import type { AthleteModelTier } from '@/lib/athlete-model';
 
@@ -22,7 +23,7 @@ const TIER_BADGE: Record<AthleteModelTier, { variant: 'neutral' | 'warning' | 's
  * stays hidden until the first computation lands.
  */
 export default function AthleteModelCard() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const athleteModel = useStore((state) => state.athleteModel);
 
   // A persisted slice from an older build could be malformed — never let
@@ -45,9 +46,17 @@ export default function AthleteModelCard() {
       <ul className="mt-3 space-y-2.5">
         {facts.map((fact, i) => {
           const badge = TIER_BADGE[fact.tier] ?? TIER_BADGE.prior;
+          // LIVE-P1-03: full-sentence facts render localized; the
+          // adherence fact renders its (English) evidence plus the
+          // localized suffix; everything else renders as stored.
+          const factText = fact.textI18n
+            ? renderLocalizedSentence(t, language, fact.textI18n, fact.text)
+            : fact.suffixI18n && fact.baseText
+              ? `${fact.baseText} ${renderLocalizedSentence(t, language, fact.suffixI18n, '')}`
+              : fact.text;
           return (
             <li key={`${fact.kind}-${i}`} className="flex items-start gap-2">
-              <p className="flex-1 text-xs leading-relaxed text-text-secondary">{fact.text}</p>
+              <p className="flex-1 text-xs leading-relaxed text-text-secondary">{factText}</p>
               <Badge variant={fact.kind === 'pain' ? 'danger' : badge.variant} size="xs" className="shrink-0 mt-0.5">
                 {fact.kind === 'pain' ? t('coachModel.tierPain') : t(badge.key)}
               </Badge>

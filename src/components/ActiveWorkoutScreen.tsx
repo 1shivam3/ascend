@@ -39,6 +39,7 @@ import {
   searchExercises,
   getExerciseMuscle,
   getExerciseFormCues,
+  getExerciseHindiName,
 } from '@/lib/exercise-library';
 import {
   getLastExercisePerformance,
@@ -50,6 +51,9 @@ import {
   getExecutedExercises,
   getNextSessionTarget,
   applyExerciseEffortRating,
+  clampWorkoutWeight,
+  clampWorkoutReps,
+  MAX_WORKOUT_WEIGHT_KG,
 } from '@/lib/workout-engine';
 import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calculator';
 import { compareSetAdherence } from '@/lib/workout-adherence';
@@ -127,14 +131,14 @@ function PackedSwapBanner({
         <button
           type="button"
           onClick={onSwap}
-          className="px-2.5 py-1.5 rounded-lg bg-accent text-white text-3xs font-bold active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent text-white text-3xs font-bold active:scale-95 transition-all cursor-pointer"
         >
           {swapLabel}
         </button>
         <button
           type="button"
           onClick={onKeep}
-          className="px-2.5 py-1.5 rounded-lg bg-bg-secondary border border-border text-3xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary border border-border text-3xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
         >
           {keepLabel}
         </button>
@@ -339,7 +343,7 @@ export default function ActiveWorkoutScreen({
   // accepted swaps are real session changes and stay when it's OFF.
   const [gymPacked, setGymPacked] = useState(false);
   const [packedDismissed, setPackedDismissed] = useState<Set<string>>(new Set());
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [isEditingName, setIsEditingName] = useState(false);
   const [localExerciseName, setLocalExerciseName] = useState('');
   const renameContainerRef = useRef<HTMLDivElement>(null);
@@ -1011,8 +1015,8 @@ export default function ActiveWorkoutScreen({
 
   const formCues = useMemo(() => {
     if (!currentExercise?.name) return [];
-    return getExerciseFormCues(currentExercise.name);
-  }, [currentExercise?.name]);
+    return getExerciseFormCues(currentExercise.name, language);
+  }, [currentExercise?.name, language]);
 
   // Animated demo (original SVG artwork — see lib/exercise-media). Most
   // exercises have none; the Form affordance then stays exactly as it was,
@@ -1117,8 +1121,10 @@ export default function ActiveWorkoutScreen({
     }
     // QA4-026: typed input bypasses the stepper's Math.max(0, …) clamp —
     // apply the same floor here so a negative weight can never be stored.
+    // SIM-P1-06: and the same 500 kg ceiling as the manual-PR cap, so a
+    // typo (9,999 kg) can never mint a bogus PR downstream.
     if (numericWeight !== undefined && Number.isFinite(numericWeight)) {
-      numericWeight = Math.max(0, numericWeight);
+      numericWeight = clampWorkoutWeight(numericWeight, userUnit);
     }
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -1147,7 +1153,7 @@ export default function ActiveWorkoutScreen({
         const baseW = typeof editedSet?.weight === 'number' && !isNaN(editedSet.weight)
           ? editedSet.weight
           : (typeof editedSet?.prescribedWeight === 'number' && !isNaN(editedSet.prescribedWeight) ? editedSet.prescribedWeight : 0);
-        const newW = Math.max(0, Math.round((baseW + step) * 10) / 10);
+        const newW = clampWorkoutWeight(Math.round((baseW + step) * 10) / 10, userUnit);
         const oldWeight = editedSet?.weight;
         return {
           ...ex,
@@ -1167,13 +1173,13 @@ export default function ActiveWorkoutScreen({
     // QA4-026: typed reps were stored raw (`as any`), bypassing the
     // stepper's floor — a negative or fractional value persisted into
     // volume math. Normalize: keep '' while typing, otherwise a
-    // non-negative integer.
+    // non-negative integer. SIM-P1-06: capped at 100 reps.
     let cleanReps: string | number = val;
     if (typeof val === 'number') {
-      cleanReps = Number.isFinite(val) ? Math.max(0, Math.floor(val)) : 0;
+      cleanReps = Number.isFinite(val) ? clampWorkoutReps(val) : 0;
     } else if (typeof val === 'string' && val.trim() !== '') {
       const parsed = parseInt(val, 10);
-      if (!isNaN(parsed)) cleanReps = Math.max(0, Math.floor(parsed));
+      if (!isNaN(parsed)) cleanReps = clampWorkoutReps(parsed);
     }
     setExercises((prev) =>
       prev.map((ex, i) => {
@@ -1759,6 +1765,9 @@ export default function ActiveWorkoutScreen({
           const sReps = parseInt(String(s.reps), 10) || 0;
           if (sReps > 0 && (sWeight > 0 || isBW)) {
             const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+            // SIM-P1-06: never let an above-cap load feed PR detection,
+            // even if it arrived via import or an older client.
+            if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
             const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
             const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
             if (e1rm > topSet.e1RMKg) {
@@ -3293,6 +3302,11 @@ export default function ActiveWorkoutScreen({
                 <div>
                   <h3 className="font-bold text-text-primary">{t('workout.formCuesHeading')}</h3>
                   <p className="text-2xs text-text-muted">{currentExercise?.name}</p>
+                  {/* SIM-P1-05 Round 3: Devanagari name in Hindi mode. */}
+                  {language === 'hi' && currentExercise?.name && (() => {
+                    const hi = getExerciseHindiName(currentExercise.name);
+                    return hi ? <p className="text-2xs text-text-secondary">{hi}</p> : null;
+                  })()}
                 </div>
               </div>
               <button
@@ -3554,6 +3568,11 @@ export default function ActiveWorkoutScreen({
                 // "Hurts" swaps must leave the painful movement family
                 // entirely — the raw table offered hinge-for-hinge swaps.
                 avoidSameFamilyAs: swapReason === 'hurts' ? currentExercise.name : undefined,
+                // ...and must not load the same joints either (SIM-P2-08):
+                // 'other'-family isolation work shares no family, but a
+                // lateral raise for shoulder pain must not offer another
+                // raise. Empty list degrades to the "need another" note.
+                avoidJointsOf: swapReason === 'hurts' ? currentExercise.name : undefined,
               }).map((sub) => (
                   <button
                     key={sub.name}
@@ -3687,6 +3706,16 @@ export default function ActiveWorkoutScreen({
                   className="btn-secondary flex-1 py-2 text-xs font-semibold"
                 >
                   {t('workout.keepTraining')}
+                </button>
+                {/* SIM-P3-08: back-exit used to be binary — keep or lose
+                    the session. A pause-and-save option keeps typed sets
+                    via the existing draft instead of forcing a discard. */}
+                <button
+                  type="button"
+                  onClick={() => { setIsDiscardConfirmOpen(false); handlePauseWorkout(); }}
+                  className="btn-secondary flex-1 py-2 text-xs font-semibold"
+                >
+                  {t('workout.pauseSaveDraft')}
                 </button>
                 <button
                   type="button"

@@ -10,11 +10,12 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import { CalendarRange, ChevronRight } from 'lucide-react';
 
 export default function CoachWeeklyReviewCard() {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const weeklyReviews = useStore((s) => s.weeklyReviews);
   const refreshWeeklyReview = useStore((s) => s.refreshWeeklyReview);
   const [isOpen, setIsOpen] = useState(false);
@@ -45,7 +46,7 @@ export default function CoachWeeklyReviewCard() {
                 <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" aria-label="New" />
               )}
             </p>
-            <p className="text-2xs text-text-muted truncate">{review.focus.headline}</p>
+            <p className="text-2xs text-text-muted truncate">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
           </div>
         </div>
         <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />

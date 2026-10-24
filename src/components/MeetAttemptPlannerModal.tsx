@@ -114,6 +114,11 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
               • <strong>{t('meet.tip2')}</strong>: {t('meet.tip2Body')}<br />
               • <strong>{t('meet.tip3', { pct: thirdAttemptPercent })}</strong>: {t('meet.tip3Body')}
             </p>
+            {/* SIM-P2-12: fixed-percentage planning must not pose as
+                attempt selection — say what it is and what it ignores. */}
+            <p className="text-2xs text-amber-400 leading-relaxed pt-1">
+              {t('meet.warnEstimated')}
+            </p>
           </div>
 
           {/* Third Attempt Aggression Selector */}

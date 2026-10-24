@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Barlow_Condensed } from 'next/font/google';
+import { Inter, Barlow_Condensed, Noto_Sans_Devanagari } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { NavigationProvider } from '@/lib/navigation';
@@ -7,6 +7,12 @@ import TelemetryProvider from '@/components/TelemetryProvider';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'optional' });
+// Devanagari fallback (Round 4, SIM-P2-02): Inter is Latin-only, so Hindi
+// text previously fell back to whatever system font was present. Noto Sans
+// Devanagari is subset to Devanagari glyphs and sits behind Inter in the
+// font stack, so Latin text is untouched and only Devanagari glyphs use it.
+// preload: false — English-mode users never download it.
+const notoDevanagari = Noto_Sans_Devanagari({ subsets: ['devanagari'], variable: '--font-devanagari', display: 'swap', preload: false });
 const barlowCondensed = Barlow_Condensed({
   subsets: ['latin'],
   weight: ['600', '700'],
@@ -134,7 +140,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={`${inter.variable} ${barlowCondensed.variable} ${inter.className} font-sans`}>
+      <body className={`${inter.variable} ${barlowCondensed.variable} ${notoDevanagari.variable} ${inter.className} font-sans`}>
         {/* Skip to main content for accessibility */}
         <a
           href="#main-content"

@@ -11,10 +11,14 @@ import {
   Trophy,
   Filter,
   Check,
+  Info,
 } from 'lucide-react';
 import { WorkoutEntry, PersonalRecord } from '@/lib/types';
 import { getExercisesByCategory, calculateOneRepMax } from '@/lib/strength-standards';
 import { getLastExercisePerformance } from '@/lib/workout-engine';
+import { getExerciseFormCues, getExerciseHindiName } from '@/lib/exercise-library';
+import { getDemoForExercise } from '@/lib/exercise-media';
+import ExerciseDemo from '@/components/ExerciseDemo';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
@@ -94,10 +98,13 @@ export default function ExerciseLibraryModal({
 }: ExerciseLibraryModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string>('all');
   const [selectedMuscle, setSelectedMuscle] = useState<string>('all');
+  // SIM-P2-13: rows expand to show the written how-to (and the animated
+  // demo when one exists) instead of the guide living only in workouts.
+  const [expandedName, setExpandedName] = useState<string | null>(null);
 
   const exerciseCategories = useMemo(() => getExercisesByCategory(), []);
 
@@ -274,17 +281,30 @@ export default function ExerciseLibraryModal({
               const matchingPR = prs.find(
                 (p) => p.exercise.toLowerCase() === ex.name.toLowerCase()
               );
+              const isExpanded = expandedName === ex.name;
 
               return (
                 <div
                   key={ex.name}
-                  className="py-3 px-2 flex items-center justify-between hover:bg-bg-secondary/40 rounded-xl transition-colors group"
+                  className="hover:bg-bg-secondary/40 rounded-xl transition-colors group"
                 >
+                  <div className="py-3 px-2 flex items-center justify-between">
                   <div className="space-y-1 min-w-0 pr-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-bold text-text-primary truncate font-sans">
                         {ex.name}
                       </span>
+                      {/* SIM-P1-05 Round 3: Devanagari name under the
+                          English one in Hindi mode — display-only, the
+                          English name stays the key everywhere. */}
+                      {language === 'hi' && (() => {
+                        const hi = getExerciseHindiName(ex.name);
+                        return hi ? (
+                          <span className="text-2xs text-text-secondary font-sans shrink-0">
+                            {hi}
+                          </span>
+                        ) : null;
+                      })()}
                       <span className="text-3xs uppercase font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted">
                         {ex.equipment}
                       </span>
@@ -313,6 +333,16 @@ export default function ExerciseLibraryModal({
                     </div>
                   </div>
 
+                  <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedName(isExpanded ? null : ex.name)}
+                    aria-expanded={isExpanded}
+                    className="btn-secondary py-1.5 px-3 text-xs font-semibold shrink-0 flex items-center gap-1 transition-colors"
+                  >
+                    <Info className="w-3.5 h-3.5" />
+                    <span>{t('lib.howTo')}</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
@@ -324,6 +354,34 @@ export default function ExerciseLibraryModal({
                     <Plus className="w-3.5 h-3.5" />
                     <span>{t('lib.select')}</span>
                   </button>
+                  </div>
+                  </div>
+                  {/* SIM-P2-13: the written guide, in the library itself —
+                      demo when one exists, steps when written, and an
+                      honest fallback when neither exists. */}
+                  {isExpanded && (() => {
+                    const cues = getExerciseFormCues(ex.name, language);
+                    const demo = getDemoForExercise(ex.name);
+                    return (
+                      <div className="px-2 pb-3 space-y-2.5">
+                        {demo && <ExerciseDemo name={ex.name} />}
+                        {cues.length > 0 ? (
+                          cues.map((cue, idx) => (
+                            <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
+                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                                {idx + 1}
+                              </span>
+                              <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-xs text-text-muted leading-relaxed px-1">
+                            {t('lib.noGuide')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })

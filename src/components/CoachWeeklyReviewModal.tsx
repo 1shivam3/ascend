@@ -12,6 +12,7 @@ import React, { useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import type { WeeklyReview } from '@/lib/weekly-review';
 import { CalendarRange, Check, TrendingUp, X } from 'lucide-react';
 
@@ -24,7 +25,7 @@ interface CoachWeeklyReviewModalProps {
 export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: CoachWeeklyReviewModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const markWeeklyReviewSeen = useStore((s) => s.markWeeklyReviewSeen);
   const applyScheduleRevision = useStore((s) => s.applyScheduleRevision);
 
@@ -73,13 +74,13 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
           <p className="text-3xs font-mono font-bold uppercase text-accent">
             {t('weeklyReview.focusLabel')}
           </p>
-          <p className="text-sm font-bold text-text-primary mt-0.5">{review.focus.headline}</p>
-          <p className="text-xs text-text-secondary mt-1">{review.focus.detail}</p>
+          <p className="text-sm font-bold text-text-primary mt-0.5">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
+          <p className="text-xs text-text-secondary mt-1">{renderLocalizedSentence(t, language, review.focus.detailI18n, review.focus.detail)}</p>
         </div>
 
         {review.painEscalation && review.focus.kind !== 'safety' && (
           <div className="p-3 rounded-xl bg-warning/10 border border-warning/30">
-            <p className="text-xs text-text-secondary">{review.painEscalation}</p>
+            <p className="text-xs text-text-secondary">{renderLocalizedSentence(t, language, review.painEscalationI18n, review.painEscalation)}</p>
           </div>
         )}
 

@@ -5,6 +5,7 @@ import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import {
   estimateMacros,
   calculateMealMacros,
@@ -14,8 +15,9 @@ import {
   parseNaturalMealOffline,
   getAbsurdQuantityWarning,
   isJunkMealParse,
-  scaleFoodByQuantity,
+  nextFoodItemOnQuantityChange,
   getSafeMinCalories,
+  normalizeCalorieDelta,
 } from '@/lib/macros';
 import {
   Plus,
@@ -51,8 +53,9 @@ import {
 } from 'lucide-react';
 import { MealEntry, FoodItem, MacroGoals, FavoriteFood, AthleteGoal, ATHLETE_GOAL_CONFIGS, DietPreference, OilLevelId, MealDayKind, DEFAULT_GOALS, resolvePrimaryGoal } from '@/lib/types';
 import { resolveIndianMeta } from '@/lib/indian-foods';
-import { OIL_LEVELS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
+import { OIL_LEVELS, OIL_LEVEL_LABEL_KEYS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
+import { getFoodHindiName } from '@/lib/food-hindi';
 import {
   getProteinGapSuggestion,
   getWholeDayAdaptation,
@@ -77,7 +80,7 @@ import { calculateHydrationTarget } from '@/lib/habits';
 import { useToast } from '@/components/ui/Toast';
 
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, plural, formatWaterMl } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, formatLocalDate, round1, formatWaterMl } from '@/lib/formatters';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -140,7 +143,7 @@ interface MealsPageProps {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const displayMealName = (name: string) => {
     const key = MEAL_NAME_KEYS[name];
     return key ? t(key) : name;
@@ -463,6 +466,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            isApproximateMatch: est.isApproximateMatch,
+            matchedEntry: est.matchedEntry,
             customFoodId: undefined,
             oilAssumedTsp: oil?.assumedTsp,
             oilLevel: oil?.level,
@@ -473,38 +478,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       if (field === 'quantity') {
         // Reject zero/negative quantities explicitly instead of silently blanking.
         if (typeof value === 'number' && !isNaN(value) && value <= 0) {
-          toast.error('Quantity must be greater than 0.', 'Invalid Quantity');
+          toast.error(t('toast.qtyPositive'), t('toast.titleInvalidQty'));
           return prev;
         }
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
-          // prevItem must come from `prev` (pre-update): next[index] already
-          // carries the NEW quantity, which made ratio = rawQty/prevQty = 1
-          // and silently skipped scaling.
-          const prevItem = prev[index];
-          const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
-          if (prevQty && prevItem.calories > 0 && rawQty) {
-            // Proportional scaling preserves scanned or custom barcode macros!
-            // scaleFoodByQuantity keeps the ratio math in one tested place.
-            next[index] = scaleFoodByQuantity(prevItem, rawQty);
-          } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
-            // User entered custom macros for an unmatched food; do not wipe them out!
-            next[index] = {
-              ...prevItem,
-              quantity: rawQty,
-            };
-          } else {
-            const est = estimateMacros(next[index].name, rawQty, next[index].unit);
-            next[index] = {
-              ...next[index],
-              quantity: rawQty,
-              calories: est.calories,
-              proteinG: est.proteinG,
-              carbsG:   est.carbsG,
-              fatG:     est.fatG,
-              isUnmatched: est.isUnmatched,
-            };
-          }
+          // The quantity decision lives in one tested place (macros.ts).
+          next[index] = nextFoodItemOnQuantityChange(prev[index], rawQty);
         }
       }
 
@@ -519,6 +499,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             carbsG:   est.carbsG,
             fatG:     est.fatG,
             isUnmatched: est.isUnmatched,
+            isApproximateMatch: est.isApproximateMatch,
+            matchedEntry: est.matchedEntry,
           };
         }
       }
@@ -533,6 +515,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           [field]: val,
           calories: Math.round(4 * p + 4 * c + 9 * f),
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
         };
       }
 
@@ -541,6 +525,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           ...next[index],
           calories: Math.max(0, Math.round(Number(value) || 0)),
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
         };
       }
 
@@ -566,6 +552,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           carbsG: cf.carbsG,
           fatG: cf.fatG,
           isUnmatched: false,
+          isApproximateMatch: false,
+          matchedEntry: undefined,
           customFoodId: cf.id,
           oilAssumedTsp: oil?.assumedTsp,
           oilLevel: cf.oilLevel ?? oil?.level,
@@ -605,6 +593,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG:   est.carbsG,
         fatG:     est.fatG,
         isUnmatched: est.isUnmatched,
+        isApproximateMatch: est.isApproximateMatch,
+        matchedEntry: est.matchedEntry,
         customFoodId: undefined,
         oilAssumedTsp: oil?.assumedTsp,
         oilLevel: oil?.level,
@@ -634,13 +624,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
     if (food.customFoodId) {
       updateCustomFood(food.customFoodId, snapshot);
-      toast.success(`Updated your version of ${snapshot.name}.`, 'My Version');
+      toast.success(t('toast.myVersionUpdated', { name: snapshot.name }), t('toast.titleMyVersion'));
     } else {
       const created = addCustomFood(snapshot);
       setFoods((prev) =>
         prev.map((f, i) => (i === index ? { ...f, customFoodId: created.id } : f))
       );
-      toast.success(`Saved "${snapshot.name}" as your version — it will top search results.`, 'My Version');
+      toast.success(t('toast.myVersionSaved', { name: snapshot.name }), t('toast.titleMyVersion'));
     }
   };
 
@@ -651,7 +641,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       ...s,
       [index]: (s[index] || []).filter((r) => r.customFood?.id !== result.customFood!.id),
     }));
-    toast.info(`Deleted your version of ${result.name}.`, 'My Version');
+    toast.info(t('toast.myVersionDeleted', { name: result.name }), t('toast.titleMyVersion'));
   };
 
   /**
@@ -661,9 +651,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (isModalOpen) {
       // Append to currently editing meal
       setFoods((prev) => [...prev, scannedItem]);
-      toast.success(`Added ${scannedItem.name} (${scannedItem.calories} kcal) to meal!`, 'Scanned Food Added');
+      toast.success(t('toast.scannedAddedToMeal', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedAdded'));
     } else {
-      // User confirmed in barcode modal: save directly to today's meals
+      // User confirmed in barcode modal: save directly to today's meals.
+      // SIM-P2-20: the builder refuses absurd quantities at save, but
+      // this direct path had no guard — a mis-scan could log junk.
+      const absurd = getAbsurdQuantityWarning(scannedItem);
+      if (absurd) {
+        toast.error(t(absurd.key, absurd.params), t('toast.titleUnlikelyQty'));
+        return;
+      }
       const newMeal: MealEntry = {
         id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `meal_${Date.now()}`,
         date: todayDate,
@@ -671,7 +668,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         foods: [scannedItem],
       };
       addMeal(newMeal);
-      toast.success(`Logged ${scannedItem.name} (${scannedItem.calories} kcal) to today's meals!`, 'Scanned Food Logged');
+      toast.success(t('toast.scannedLogged', { name: scannedItem.name, kcal: scannedItem.calories }), t('toast.titleScannedLogged'));
     }
   };
 
@@ -696,12 +693,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     if (isModalOpen) {
       setFoods((prev) => [...prev, item]);
-      toast.success(`Added ${fav.name} to meal!`, 'Favorite Added');
+      toast.success(t('toast.favAdded', { name: fav.name }), t('toast.titleFavoriteAdded'));
     } else {
       setMealName('Quick Meal');
       setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${fav.name}. Tap Save when done!`, 'Meal Created');
+      toast.info(t('toast.mealStarted', { name: fav.name }), t('toast.titleMealCreated'));
     }
   };
 
@@ -712,9 +709,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (!food.name.trim()) return;
     const added = toggleFavoriteFood(food);
     if (added) {
-      toast.success(`Pinned ${food.name} to Frequent Favorites!`, 'Favorite Saved');
+      toast.success(t('toast.foodPinned', { name: food.name }), t('toast.titleFavoriteSaved'));
     } else {
-      toast.info(`Unpinned ${food.name} from Favorites.`, 'Favorite Removed');
+      toast.info(t('toast.foodUnpinned', { name: food.name }), t('toast.titleFavoriteRemoved'));
     }
   };
 
@@ -753,7 +750,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   const handleAutoEstimatePinned = () => {
     if (!pinnedName.trim()) {
-      toast.error('Please enter a food name first.', 'Missing Name');
+      toast.error(t('toast.foodNameFirst'), t('toast.titleMissingName'));
       return;
     }
     const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
@@ -762,13 +759,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setPinnedProtein(String(est.proteinG));
     setPinnedCarbs(String(est.carbsG));
     setPinnedFat(String(est.fatG));
-    toast.info(`Calculated: ~${est.calories} kcal, ~${est.proteinG}g protein.`, 'Macros Calculated');
+    toast.info(t('toast.macrosCalculated', { kcal: est.calories, protein: est.proteinG }), t('toast.titleMacrosCalculated'));
   };
 
   const handleSavePinnedFood = () => {
     const name = pinnedName.trim();
     if (!name) {
-      toast.error('Please enter a food name.', 'Missing Name');
+      toast.error(t('toast.foodNameRequired'), t('toast.titleMissingName'));
       return;
     }
     const qty = pinnedQuantity ? parseFloat(pinnedQuantity) : undefined;
@@ -787,7 +784,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG: carb,
         fatG: fat,
       });
-      toast.success(`Updated "${name}" in pinned foods!`, 'Food Updated');
+      toast.success(t('toast.pinnedUpdated', { name }), t('toast.titleFoodUpdated'));
     } else {
       toggleFavoriteFood({
         name,
@@ -798,21 +795,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         carbsG: carb,
         fatG: fat,
       });
-      toast.success(`Pinned "${name}" to favorites!`, 'Food Pinned');
+      toast.success(t('toast.pinnedAdded', { name }), t('toast.titleFoodPinned'));
     }
     setIsEditPinnedOpen(false);
   };
 
   const handleDeletePinned = (id: string, name: string) => {
     deleteFavoriteFood(id);
-    toast.info(`Removed "${name}" from pinned foods.`, 'Food Unpinned');
+    toast.info(t('toast.pinnedRemoved', { name }), t('toast.titleFoodUnpinned'));
   };
 
   const handleClearAllPinned = () => {
     clearAllFavoriteFoods();
     setConfirmClearAll(false);
     setIsManagePinnedOpen(false);
-    toast.info('All pinned foods have been removed.', 'Pinned Foods Cleared');
+    toast.info(t('toast.pinnedCleared'), t('toast.titlePinnedCleared'));
   };
 
   const handleAddFoodFromHistory = (food: FoodItem) => {
@@ -825,12 +822,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       : food;
     if (isModalOpen) {
       setFoods((prev) => [...prev, item]);
-      toast.success(`Added ${item.name} to current meal!`);
+      toast.success(t('toast.addedToMeal', { name: item.name }));
     } else {
       setMealName('Quick Meal');
       setFoods([item]);
       setIsModalOpen(true);
-      toast.info(`Started meal with ${item.name}. Tap Save when done!`);
+      toast.info(t('toast.mealStarted', { name: item.name }));
     }
   };
 
@@ -841,7 +838,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       toggleFavoriteFood(food);
       count++;
     });
-    toast.success(`Pinned ${count} frequent foods to your favorites!`, 'Foods Pinned');
+    toast.success(count === 1 ? t('toast.frequentPinnedOne') : t('toast.frequentPinnedMany', { count }), t('toast.titleFoodsPinned'));
   };
 
   const handleLogFrequentMeal = (meal: MealEntry, multiplier: number = 1) => {
@@ -865,7 +862,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     };
     addMeal(newMeal);
     const mMacros = calculateMealMacros(scaledFoods);
-    toast.success(`Logged ${newMeal.name} (~${Math.round(mMacros.calories)} kcal, ~${Math.round(mMacros.proteinG)}g P)!`, 'Meal Added');
+    toast.success(t('toast.mealLoggedFav', { name: newMeal.name, kcal: Math.round(mMacros.calories), protein: Math.round(mMacros.proteinG) }), t('toast.titleMealAdded'));
   };
 
   const handlePinMealFoods = (meal: MealEntry) => {
@@ -877,16 +874,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       }
     });
     if (count > 0) {
-      toast.success(`Pinned ${count} food${count > 1 ? 's' : ''} from ${meal.name}!`, 'Foods Pinned');
+      toast.success(count === 1 ? t('toast.mealPinnedOne', { meal: meal.name }) : t('toast.mealPinnedMany', { count, meal: meal.name }), t('toast.titleFoodsPinned'));
     } else {
-      toast.info('All foods in this meal are already pinned.');
+      toast.info(t('toast.mealAlreadyPinned'));
     }
   };
 
   const handleSaveMeal = () => {
     const validFoods = foods.filter((f) => f.name.trim());
     if (validFoods.length === 0) {
-      toast.error('Please add at least one food item with a name.', 'No Food Items');
+      toast.error(t('toast.noFoodItems'), t('toast.titleNoFoodItems'));
       return;
     }
 
@@ -894,7 +891,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // produced piles of indistinguishable duplicates.
     const finalMealName = mealName.trim();
     if (!finalMealName) {
-      toast.error('Please give this meal a name (e.g. "Post-Workout Shake").', 'Meal Name Required');
+      toast.error(t('toast.mealNameRequired'), t('toast.titleMealNameRequired'));
       return;
     }
 
@@ -926,7 +923,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     const absurdWarning = cleanedFoods.map(getAbsurdQuantityWarning).find((w) => w !== null);
     if (absurdWarning) {
-      toast.error(absurdWarning, 'Unlikely Quantity');
+      toast.error(t(absurdWarning.key, absurdWarning.params), t('toast.titleUnlikelyQty'));
       return;
     }
 
@@ -938,8 +935,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     );
     if (zeroDataItems.length > 0) {
       toast.error(
-        `${zeroDataItems.map((f) => `"${f.name}"`).join(', ')} has no nutrition values yet. Enter its calories/macros (tap the item) or remove it before saving.`,
-        'Missing Nutrition Data'
+        t('toast.zeroDataBuilder', { names: zeroDataItems.map((f) => `"${f.name}"`).join(', ') }),
+        t('toast.titleMissingNutrition')
       );
       return;
     }
@@ -948,8 +945,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     addMeal(newMeal);
     toast.success(
-      `Added ${finalMealName} (~${Math.round(mealMacros.calories)} kcal, ~${Math.round(mealMacros.proteinG)}g protein)!`,
-      'Meal Logged'
+      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG) }),
+      t('toast.titleMealLogged')
     );
     resetBuilderForm();
     setIsModalOpen(false);
@@ -991,10 +988,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setGoalCarbs(String(rec.carbsG || 0));
     setGoalFat(String(rec.fatG || 0));
 
-    toast.success(
-      `Targets calibrated for ${bw}kg (${goalConfig.label}): ${rec.calories} kcal (${rec.proteinG}P / ${rec.carbsG}C / ${rec.fatG}F)`,
-      'Goals Calibrated'
-    );
+    toast.success(t('toast.targetsCalibrated', { bw, goal: goalConfig.label, kcal: rec.calories || 0, protein: rec.proteinG || 0, carbs: rec.carbsG || 0, fat: rec.fatG || 0 }), t('toast.titleGoalsCalibrated'));
   };
 
   const handleReconcileCarbs = () => {
@@ -1002,12 +996,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const prot = parseFloat(goalProtein) || 0;
     const fat = parseFloat(goalFat) || 0;
     if (cal <= 0) {
-      toast.error('Please enter a daily calorie target first.', 'Calorie Target Required');
+      toast.error(t('toast.targetCaloriesFirst'), t('toast.titleCalorieTargetRequired'));
       return;
     }
     const carbsG = Math.max(0, Math.round((cal - prot * 4 - fat * 9) / 4));
     setGoalCarbs(String(carbsG));
-    toast.success(`Carbs balanced to ${carbsG}g so macros total exactly ${cal} kcal.`, 'Carbs Reconciled');
+    toast.success(t('toast.carbsReconciled', { carbs: carbsG, kcal: cal }), t('toast.titleCarbsReconciled'));
   };
 
   const handleSaveGoals = () => {
@@ -1017,7 +1011,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     const fat  = parseFloat(goalFat);
 
     if (isNaN(cal) || cal <= 0 || isNaN(prot) || prot <= 0) {
-      toast.error('Please enter valid target calories and protein.', 'Invalid Targets');
+      toast.error(t('toast.targetsInvalid'), t('toast.titleInvalidTargets'));
       return;
     }
     // Honest range validation — never silently ignore or rebalance absurd input.
@@ -1027,22 +1021,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // days were then praised as "Deficit Preserved".
     const safeFloor = getSafeMinCalories(profile?.gender || 'male');
     if (cal < safeFloor || cal > 10000) {
-      toast.error(
-        `Daily calories must be between ${safeFloor.toLocaleString()} and 10,000 kcal (you entered ${goalCalories}). Below ${safeFloor.toLocaleString()} kcal/day risks muscle, hormones and health — ASCEND won't set a target there.`,
-        'Unsafe Target'
-      );
+      toast.error(t('toast.caloriesRange', { floor: safeFloor.toLocaleString(), entered: goalCalories }), t('toast.titleUnsafeTarget'));
       return;
     }
     if (prot < 10 || prot > 400) {
-      toast.error(`Protein target must be between 10 and 400 g (you entered ${goalProtein} g). Very high intakes offer no benefit past ~2.2 g/kg.`, 'Unlikely Target');
+      toast.error(t('toast.proteinRange', { entered: goalProtein }), t('toast.titleUnlikelyTarget'));
       return;
     }
     if (!isNaN(fat) && (fat < 0 || fat > 300)) {
-      toast.error('Fat target must be between 0 and 300 g.', 'Unlikely Target');
+      toast.error(t('toast.fatRange'), t('toast.titleUnlikelyTarget'));
       return;
     }
     if (!isNaN(carb) && (carb < 0 || carb > 800)) {
-      toast.error('Carb target must be between 0 and 800 g.', 'Unlikely Target');
+      toast.error(t('toast.carbRange'), t('toast.titleUnlikelyTarget'));
       return;
     }
 
@@ -1070,20 +1061,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       ),
       calorieDelta: 0, // set below
     };
-    newGoals.calorieDelta = newGoals.calories - (newGoals.maintenanceCalories as number);
+    newGoals.calorieDelta = normalizeCalorieDelta(newGoals.calories - (newGoals.maintenanceCalories as number));
 
     setMacroGoals(newGoals);
-    toast.success(
-      `Daily goals set: ${newGoals.calories} kcal (${newGoals.proteinG}P / ${newGoals.carbsG}C / ${newGoals.fatG}F).` +
-      (carbsAdjusted ? ` Carbs adjusted to fit your calorie target.` : ''),
-      'Goals Saved'
-    );
+    toast.success(carbsAdjusted ? t('toast.goalsSavedCarbs', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }) : t('toast.goalsSaved', { kcal: newGoals.calories || 0, protein: newGoals.proteinG || 0, carbs: newGoals.carbsG || 0, fat: newGoals.fatG || 0 }), t('toast.titleGoalsSaved'));
     setIsGoalsModalOpen(false);
   };
 
   const handleClearGoals = () => {
     setMacroGoals(null);
-    toast.info('Daily macro targets cleared.', 'Targets Reset');
+    toast.info(t('toast.targetsCleared'), t('toast.titleTargetsReset'));
     setIsGoalsModalOpen(false);
   };
 
@@ -1095,10 +1082,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     // Reject unrecognizable input: never silently log a phantom 0-calorie meal.
     const isJunkParse = (foods: FoodItem[]) => isJunkMealParse(foods);
     const rejectJunk = () => {
-      toast.error(
-        `Couldn't recognize "${q.length > 40 ? q.slice(0, 40) + '…' : q}" as food. Try a food name like "2 rotis and dal", or use Add Manually.`,
-        'Not Recognized'
-      );
+      toast.error(t('toast.notRecognized', { query: q.length > 40 ? q.slice(0, 40) + '…' : q }), t('toast.titleNotRecognized'));
       setIsNaturalParsing(false);
     };
     // Warn when SOME items couldn't be matched: a mixed parse like
@@ -1108,17 +1092,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
       const unmatched = (foods || []).filter((f) => f.isUnmatched);
       if (unmatched.length > 0) {
         const names = unmatched.map((f) => `"${f.name}"`).join(', ');
-        toast.info(
-          `Couldn't identify ${names} — logged at 0 kcal, so totals may be understated. Add it manually for accurate numbers.`,
-          'Some Foods Unmatched'
-        );
+        toast.info(t('toast.someUnmatched', { names }), t('toast.titleSomeUnmatched'));
       }
     };
     // Refuse implausible quantities (e.g. "100 rotis") instead of logging junk.
     const rejectAbsurd = (foods: FoodItem[]) => {
       const warning = foods.map(getAbsurdQuantityWarning).find((w) => w !== null);
       if (warning) {
-        toast.error(warning, 'Unlikely Quantity');
+        toast.error(t(warning.key, warning.params), t('toast.titleUnlikelyQty'));
         setIsNaturalParsing(false);
         return true;
       }
@@ -1151,6 +1132,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         if (rejectAbsurd(data.foods)) {
           return;
         }
+        // SIM-P1-04: the builder refuses all-zero items at save, but
+        // quick-log saved first and only warned after — an unmatched
+        // "pizza" logged at 0 kcal and flattered the deficit badge.
+        // Apply the same guard BEFORE addMeal.
+        const zeroDataOnline = data.foods.filter(
+          (f: FoodItem) => f.calories === 0 && f.proteinG === 0 && f.carbsG === 0 && f.fatG === 0
+        );
+        if (zeroDataOnline.length > 0) {
+          toast.error(
+            t('toast.zeroDataQuick', { names: zeroDataOnline.map((f: FoodItem) => `"${f.name}"`).join(', ') }),
+            t('toast.titleMissingNutrition')
+          );
+          setIsNaturalParsing(false);
+          return;
+        }
         const newMeal: MealEntry = {
           id: safeRandomId('meal'),
           date: today,
@@ -1177,8 +1173,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         }
         warnUnmatched(data.foods);
         toast.success(
-          `Logged ${data.foods.length} ${plural(data.foods.length, 'item')} (${sourceBadge}): ~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g P!`,
-          'Meal Logged'
+          data.foods.length === 1
+            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 })
+            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 }),
+          t('toast.titleMealLogged')
         );
         return;
       }
@@ -1195,6 +1193,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           if (rejectAbsurd(offlineFoods)) {
             return;
           }
+          // SIM-P1-04: same pre-save zero-data guard as the online path.
+          const zeroDataOffline = offlineFoods.filter(
+            (f) => f.calories === 0 && f.proteinG === 0 && f.carbsG === 0 && f.fatG === 0
+          );
+          if (zeroDataOffline.length > 0) {
+            toast.error(
+              t('toast.zeroDataQuick', { names: zeroDataOffline.map((f) => `"${f.name}"`).join(', ') }),
+              t('toast.titleMissingNutrition')
+            );
+            setIsNaturalParsing(false);
+            return;
+          }
           const totals = calculateMealMacros(offlineFoods);
           const newMeal: MealEntry = {
             id: safeRandomId('meal'),
@@ -1206,15 +1216,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           setNaturalQuery('');
           warnUnmatched(offlineFoods);
           toast.success(
-            `Logged ${offlineFoods.length} ${plural(offlineFoods.length, 'item')} (Offline IFCT): ~${totals.calories} kcal, ${totals.proteinG}g P!`,
-            'Meal Logged (Offline)'
+            offlineFoods.length === 1
+              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG })
+              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG }),
+            t('toast.titleMealLoggedOffline')
           );
           return;
         }
       } catch (offlineErr) {
         console.error('Offline parse error in MealsPage:', offlineErr);
       }
-      toast.error('Could not parse meal. Please check food text or connection.', 'Error');
+      toast.error(t('toast.parseMealFailed'), t('toast.titleError'));
     } finally {
       setIsNaturalParsing(false);
     }
@@ -1370,18 +1382,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const handleCopyYesterday = () => {
     if (yesterdayMeals.length === 0) return;
     const copiedCount = copyMealsFromDate(yesterdayDate, todayDate);
-    toast.success(
-      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from yesterday (~${Math.round(yesterdayMacros.calories)} kcal)!`,
-      'Yesterday Meals Copied'
-    );
+    toast.success(copiedCount === 1 ? t('toast.yesterdayCopiedOne', { kcal: Math.round(yesterdayMacros.calories) }) : t('toast.yesterdayCopiedMany', { count: copiedCount, kcal: Math.round(yesterdayMacros.calories) }), t('toast.titleYesterdayCopied'));
   };
 
   const handleCopySpecificDay = (sourceDate: string) => {
     const copiedCount = copyMealsFromDate(sourceDate, todayDate);
-    toast.success(
-      `Copied ${copiedCount} meal${copiedCount > 1 ? 's' : ''} from ${sourceDate} to Today!`,
-      'Meals Copied'
-    );
+    toast.success(copiedCount === 1 ? t('toast.mealsCopiedOne', { date: sourceDate }) : t('toast.mealsCopiedMany', { count: copiedCount, date: sourceDate }), t('toast.titleMealsCopied'));
   };
 
   const groupedMeals = useMemo(() => {
@@ -1760,7 +1766,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     {t('meals.proteinCoach')}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
-                    {proteinSuggestion.message}
+                    {renderLocalizedSentence(t, language, proteinSuggestion.messageI18n, proteinSuggestion.message)}
                   </p>
                 </div>
                 <button
@@ -1913,7 +1919,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           {/* Secondary Tools Dropdown ("More") */}
           <div className="flex items-center justify-between text-xs text-text-secondary px-1 pt-0.5">
-            <span className="font-mono text-xs text-text-muted">Macro Lens • Voice / Text • Indian IFCT</span>
+            <span className="font-mono text-xs text-text-muted">{t('meals.inputMethods')}</span>
             <div className="relative">
               <button
                 type="button"
@@ -2144,6 +2150,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="text-text-primary font-medium truncate">{food.name}</span>
+                            {language === 'hi' && (() => {
+                              const hiName = getFoodHindiName(food.name);
+                              return hiName ? (
+                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                              ) : null;
+                            })()}
                             <span className="text-text-muted text-3xs">
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
@@ -2326,6 +2338,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <div key={idx} className="flex justify-between items-center text-2xs py-1 px-2 rounded-lg bg-bg-card border border-border/40">
                                 <div className="flex items-center gap-1.5 truncate">
                                   <span className="text-text-primary font-medium truncate">{food.name}</span>
+                            {language === 'hi' && (() => {
+                              const hiName = getFoodHindiName(food.name);
+                              return hiName ? (
+                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                              ) : null;
+                            })()}
                                   <span className="text-text-muted text-3xs">
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
@@ -2593,6 +2611,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       >
                         <Star className="w-3 h-3 text-accent fill-accent" />
                         <span>{fav.name}</span>
+                        {language === 'hi' && (() => {
+                          const hiName = getFoodHindiName(fav.name);
+                          return hiName ? <span className="text-text-secondary">({hiName})</span> : null;
+                        })()}
                       </button>
                     ))}
                   </div>
@@ -2722,6 +2744,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     >
                                       <span className="flex items-center gap-2">
                                         {sugg.name}
+                                        {language === 'hi' && (() => {
+                                          const hiName = getFoodHindiName(sugg.name);
+                                          return hiName ? (
+                                            <span className="text-3xs text-text-secondary">({hiName})</span>
+                                          ) : null;
+                                        })()}
                                         {sugg.kind === 'custom' && (
                                           <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
                                             {t('meals.myVersionBadge')}
@@ -2794,10 +2822,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 </p>
                               ) : (
                                 <div className="space-y-1.5">
-                                  {food.isUnmatched && (
+                                  {(food.isUnmatched || food.isApproximateMatch) && (
                                     <div className="flex items-center gap-1.5 text-2xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
                                       <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
-                                      <span>{t('meals.notInDb')}</span>
+                                      {/* Approximate rows carry another entry's values: name the
+                                          entry so the estimate is never mistaken for a match. */}
+                                      <span>{food.isUnmatched ? t('meals.notInDb') : t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}</span>
                                     </div>
                                   )}
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
@@ -2900,7 +2930,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                             : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
                                         }`}
                                       >
-                                        {level.label}
+                                        {t(OIL_LEVEL_LABEL_KEYS[level.id])}
                                       </button>
                                     ))}
                                   </div>
@@ -2923,11 +2953,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="font-bold text-accent">~{Math.round(currentMealMacros.calories)} kcal</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
-                <span>~{Math.round(currentMealMacros.proteinG)}g P</span>
+                <span>~{round1(currentMealMacros.proteinG)}g P</span>
                 <span>•</span>
-                <span>~{Math.round(currentMealMacros.carbsG)}g C</span>
+                <span>~{round1(currentMealMacros.carbsG)}g C</span>
                 <span>•</span>
-                <span>~{Math.round(currentMealMacros.fatG)}g F</span>
+                <span>~{round1(currentMealMacros.fatG)}g F</span>
               </div>
               <div className="flex gap-3">
                 <button
