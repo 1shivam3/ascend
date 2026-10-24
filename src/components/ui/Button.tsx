@@ -46,10 +46,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     };
 
     const sizes = {
-      sm: 'text-xs px-3 py-1.5 min-h-[40px] gap-1.5',
+      sm: 'text-xs px-3 py-1.5 min-h-[44px] gap-1.5',
       md: 'text-sm px-4 py-2.5 min-h-[44px] gap-2',
       lg: 'text-base px-5 py-3.5 min-h-[52px] gap-2.5 rounded-2xl',
-      icon: 'w-10 h-10 p-0 shrink-0 min-h-[40px]',
+      icon: 'w-11 h-11 p-0 shrink-0 min-h-[44px]',
     };
 
     return (

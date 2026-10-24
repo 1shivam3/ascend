@@ -270,12 +270,49 @@ export function deriveCustomAccent(
         : accent;
   const glow = rgb ? `rgba(${rgb.r},${rgb.g},${rgb.b},${mode === 'light' ? 0.16 : 0.28})` : accent;
 
-  const variant: AccentVariant = { accent, dim, text, on, subtle, glow };
+  // Chip use (Stage 9 audit): accent-text also sits on the accent-subtle
+  // wash, whose effective background is the wash blended over the page
+  // background. Stepping text further in the same direction only improves
+  // the page-background ratio, so step until it passes against the blend
+  // too — otherwise the blend shift alone can drop a passing pair below
+  // 4.5:1 (vermilion: 4.66 on chalk, 4.49 on its own wash).
+  let chipText = text;
+  if (rgb) {
+    const bgRgb = hexToRgb(bg);
+    const alpha = mode === 'light' ? 0.08 : 0.15;
+    if (bgRgb) {
+      const channels = [rgb.r, rgb.g, rgb.b];
+      const bgChannels = [bgRgb.r, bgRgb.g, bgRgb.b];
+      const blendedHex = `#${channels
+        .map((fg, i) => Math.round(alpha * fg + (1 - alpha) * bgChannels[i]))
+        .map((v) => v.toString(16).padStart(2, '0'))
+        .join('')}`.toUpperCase();
+      const chipRatio = contrastRatio(text, blendedHex);
+      if (chipRatio !== null && chipRatio < 4.5) {
+        chipText = stepToRatio(text, blendedHex, 4.5, direction);
+      }
+    }
+  }
+
+  const variant: AccentVariant = { accent, dim, text: chipText, on, subtle, glow };
   const correctedNote =
-    text.toUpperCase() !== hex.toUpperCase()
-      ? `Adjusted for readability — text uses ${text}, not ${hex}.`
+    chipText.toUpperCase() !== hex.toUpperCase()
+      ? `Adjusted for readability — text uses ${chipText}, not ${hex}.`
       : null;
   return { variant, correctedNote };
+}
+
+/** Input gate for custom accents (Stage 9 audit): a custom hex ships a
+    light variant identical to the hex, so it must stand out from the
+    light page background (≥3:1, UI use) or the accent/focus ring would be
+    invisible in light mode. The dark variant is brightened until ≥3:1 by
+    derivation, so only the light pairing needs this gate. A failing hex
+    shows an inline error and blocks Apply — it never reaches the store. */
+export function isCustomAccentUsable(hex: string): boolean {
+  const normalized = normalizeHex(hex);
+  if (!normalized) return false;
+  const ratio = contrastRatio(normalized, PAGE_BACKGROUND.light);
+  return ratio !== null && ratio >= 3;
 }
 
 /** Resolve the full variant for a stored theme selection + mode. */

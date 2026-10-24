@@ -38,7 +38,7 @@ import DietPreferencePicker from '@/components/DietPreferencePicker';
 import ThemePicker from '@/components/ThemePicker';
 import CustomizeSheet from '@/components/CustomizeSheet';
 import SegmentedControl from '@/components/ui/SegmentedControl';
-import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex } from '@/lib/accent-themes';
+import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable } from '@/lib/accent-themes';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
@@ -154,13 +154,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '',
   );
   const normalizedDraft = normalizeHex(draftHex);
+  // A custom accent must stand out from the page background in BOTH modes
+  // (the same hex ships a light variant when the user switches mode). The
+  // dark variant is brightened until ≥3:1 by derivation, so only the light
+  // pairing needs this gate; a failing hex shows an error and blocks Apply
+  // (preview null) instead of shipping an invisible accent/focus ring.
+  const tooCloseToBackground =
+    normalizedDraft !== null && !isCustomAccentUsable(normalizedDraft);
   const customError =
-    draftHex.trim() !== '' && !normalizedDraft ? t('settings.customAccentInvalid') : null;
+    draftHex.trim() !== '' && !normalizedDraft
+      ? t('settings.customAccentInvalid')
+      : tooCloseToBackground
+        ? t('settings.customAccentTooClose')
+        : null;
   const customDerived =
     normalizedDraft !== null
       ? deriveCustomAccent(normalizedDraft, isDarkMode ? 'dark' : 'light')
       : null;
-  const customPreview = customDerived?.variant ?? null;
+  const customPreview = customError ? null : (customDerived?.variant ?? null);
   const customPreviewNote = customDerived?.correctedNote
     ? t('settings.customAccentAdjusted', { shade: customDerived.variant.text, entered: normalizedDraft ?? '' })
     : null;

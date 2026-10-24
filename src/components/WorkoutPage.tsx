@@ -269,7 +269,7 @@ function PlanModal({
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2058,7 +2058,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={goBack}
-                className="w-10 h-10 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
                 aria-label="Go back"
               >
                 <ChevronLeft className="w-5 h-5 text-accent" />
@@ -2074,7 +2074,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsPlateModalOpen(true)}
-                className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+                className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
                 title="Plate Calculator"
                 aria-label="Plate Calculator"
               >
@@ -2084,7 +2084,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={() => setIsToolsMenuOpen(true)}
-              className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+              className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
               title="Training Tools & Actions"
               aria-label="Training Tools"
             >
@@ -3122,7 +3122,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3284,7 +3284,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

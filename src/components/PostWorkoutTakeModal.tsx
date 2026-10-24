@@ -209,7 +209,7 @@ export default function PostWorkoutTakeModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary min-h-[40px] min-w-[40px] flex items-center justify-center cursor-pointer transition-colors"
+            className="p-2 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer transition-colors"
             aria-label={t('take.closeAria')}
           >
             <X className="w-5 h-5" />

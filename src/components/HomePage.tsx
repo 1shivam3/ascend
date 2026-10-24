@@ -643,7 +643,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => setIsNotificationsOpen(true)}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
             title={t('home.notifications')}
             aria-label={t('home.notifications')}
           >
@@ -652,7 +652,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('settings')}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
             title={t('settings.title')}
             aria-label={t('settings.title')}
           >
@@ -661,7 +661,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('profile')}
-            className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
+            className="w-11 h-11 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
             title={t('home.athleteProfile')}
             aria-label={t('home.athleteProfile')}
           >
@@ -1340,7 +1340,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1397,7 +1397,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

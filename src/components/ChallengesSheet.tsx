@@ -129,7 +129,7 @@ export default function ChallengesSheet({ isOpen, onClose }: ChallengesSheetProp
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label={t('chal.closeAria')}
           >
             <X className="w-5 h-5" />

@@ -183,7 +183,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
             aria-label="Close run"
           >
             <X className="w-5 h-5" />

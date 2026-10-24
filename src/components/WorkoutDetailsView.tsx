@@ -93,7 +93,7 @@ export default function WorkoutDetailsView({
           type="button"
           onClick={onBack}
           aria-label="Back to workouts"
-          className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+          className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -108,7 +108,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onShare(plan)}
               aria-label="Share workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Share2 className="w-4 h-4 text-[#858076]" />
             </button>
@@ -118,7 +118,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onEdit(plan)}
               aria-label="Edit workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Edit2 className="w-4 h-4 text-[#858076]" />
             </button>
@@ -128,7 +128,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onDelete(plan)}
               aria-label="Delete workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Trash2 className="w-4 h-4 text-[#858076]" />
             </button>

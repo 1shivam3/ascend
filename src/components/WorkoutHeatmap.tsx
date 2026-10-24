@@ -331,6 +331,7 @@ export default function WorkoutHeatmap({
                 <button
                   key={dateStr}
                   type="button"
+                  aria-label={t('heat.cellSummary', { date: dateStr, done: totalHabitsDone })}
                   onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   className={`aspect-square rounded-xl flex flex-col items-center justify-between p-1 text-xs font-mono transition-all duration-150 relative select-none border ${
                     activeFilter !== 'all'

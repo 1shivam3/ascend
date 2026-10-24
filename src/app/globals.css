@@ -143,6 +143,17 @@
     font-size: 16px !important; /* Critical: < 16px triggers iOS/Android auto-zoom on focus */
   }
 
+  /* Visible keyboard focus for interactive elements without their own
+     focus ring (inputs/selects/textarea already carry focus:border-accent
+     + focus:ring-1 above, so they are excluded here to avoid doubling). */
+  button:focus-visible,
+  a:focus-visible,
+  [role='button']:focus-visible,
+  [role='switch']:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
   @screen sm {
     input, textarea, select {
       font-size: 0.875rem !important; /* 14px on desktop/tablets */

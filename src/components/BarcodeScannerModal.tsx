@@ -610,7 +610,7 @@ export default function BarcodeScannerModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
