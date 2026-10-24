@@ -1080,8 +1080,71 @@ export function estimateMacros(foodName: string, quantity?: number, unit: string
 }
 
 /**
- * Computes exact Atwater calories from macronutrients: (4 * P) + (4 * C) + (9 * F)
+ * Pure state transition for the manual-meal dialog's quantity field.
+ * Kept here (not inline in the component) so the dialog's state handling
+ * is unit-testable without rendering React: scale the previous row's
+ * values when it already carries macros, keep user-entered macros for
+ * unmatched rows, otherwise re-estimate from the name.
  */
+export function nextFoodItemOnQuantityChange(prevItem: FoodItem, rawQty: number | undefined): FoodItem {
+  const prevQty =
+    typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
+  if (rawQty && prevQty && prevItem.name.trim().length > 1 && !prevItem.customFoodId) {
+    // CLEAN-ROW RECOMPUTE (dialog bug fix, live repro i09i2i0cm): when the
+    // row's current values are exactly what the estimator produces for its
+    // previous quantity/unit — i.e. the row is untouched since it was
+    // estimated (selected suggestion or fresh estimate) — recompute from
+    // the canonical profile instead of scaling the rounded display values.
+    // Scaling compounds rounding error across keystrokes: the quantity
+    // input fires one change per keystroke, so typing "150" over "100"
+    // runs 100 -> 1 -> 15 -> 150 and turns 165/31/3.6 into 300/45/0.
+    // Recomputing makes every keystroke land on the exact value. Rows
+    // with user edits, scanned values, or saved custom foods are NOT
+    // clean (their values differ from the estimator output), so they
+    // fall through to proportional scaling below and keep their values.
+    const prevEst = estimateMacros(prevItem.name, prevQty, prevItem.unit);
+    const round1 = (v: number) => Math.round(v * 10) / 10;
+    const clean =
+      prevItem.calories === prevEst.calories &&
+      round1(prevItem.proteinG || 0) === round1(prevEst.proteinG || 0) &&
+      round1(prevItem.carbsG || 0) === round1(prevEst.carbsG || 0) &&
+      round1(prevItem.fatG || 0) === round1(prevEst.fatG || 0) &&
+      (prevItem.isUnmatched === true) === (prevEst.isUnmatched === true);
+    if (clean) {
+      const est = estimateMacros(prevItem.name, rawQty, prevItem.unit);
+      return {
+        ...prevItem,
+        quantity: rawQty,
+        calories: est.calories,
+        proteinG: est.proteinG,
+        carbsG: est.carbsG,
+        fatG: est.fatG,
+        isUnmatched: est.isUnmatched,
+      };
+    }
+  }
+  if (prevQty && prevItem.calories > 0 && rawQty) {
+    // Proportional scaling preserves scanned or custom barcode macros!
+    return scaleFoodByQuantity(prevItem, rawQty);
+  } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
+    // User entered custom macros for an unmatched food; do not wipe them out!
+    return {
+      ...prevItem,
+      quantity: rawQty,
+    };
+  } else {
+    const est = estimateMacros(prevItem.name, rawQty, prevItem.unit);
+    return {
+      ...prevItem,
+      quantity: rawQty,
+      calories: est.calories,
+      proteinG: est.proteinG,
+      carbsG: est.carbsG,
+      fatG: est.fatG,
+      isUnmatched: est.isUnmatched,
+    };
+  }
+}
 export function calculateCaloriesFromMacros(proteinG: number, carbsG: number, fatG: number): number {
   const p = Math.max(0, Number(proteinG) || 0);
   const c = Math.max(0, Number(carbsG) || 0);

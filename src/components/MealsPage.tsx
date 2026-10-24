@@ -15,7 +15,7 @@ import {
   parseNaturalMealOffline,
   getAbsurdQuantityWarning,
   isJunkMealParse,
-  scaleFoodByQuantity,
+  nextFoodItemOnQuantityChange,
   getSafeMinCalories,
   normalizeCalorieDelta,
 } from '@/lib/macros';
@@ -481,33 +481,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         }
         const rawQty = typeof value === 'number' && !isNaN(value) && value > 0 ? value : undefined;
         if (next[index].name.trim().length > 1) {
-          // prevItem must come from `prev` (pre-update): next[index] already
-          // carries the NEW quantity, which made ratio = rawQty/prevQty = 1
-          // and silently skipped scaling.
-          const prevItem = prev[index];
-          const prevQty = typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
-          if (prevQty && prevItem.calories > 0 && rawQty) {
-            // Proportional scaling preserves scanned or custom barcode macros!
-            // scaleFoodByQuantity keeps the ratio math in one tested place.
-            next[index] = scaleFoodByQuantity(prevItem, rawQty);
-          } else if (prevItem.isUnmatched && (prevItem.calories > 0 || (prevItem.proteinG || 0) > 0)) {
-            // User entered custom macros for an unmatched food; do not wipe them out!
-            next[index] = {
-              ...prevItem,
-              quantity: rawQty,
-            };
-          } else {
-            const est = estimateMacros(next[index].name, rawQty, next[index].unit);
-            next[index] = {
-              ...next[index],
-              quantity: rawQty,
-              calories: est.calories,
-              proteinG: est.proteinG,
-              carbsG:   est.carbsG,
-              fatG:     est.fatG,
-              isUnmatched: est.isUnmatched,
-            };
-          }
+          // The quantity decision lives in one tested place (macros.ts).
+          next[index] = nextFoodItemOnQuantityChange(prev[index], rawQty);
         }
       }
 
