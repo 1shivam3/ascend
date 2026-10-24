@@ -508,6 +508,13 @@ export interface ReadinessResult {
   band: 'primed' | 'ready' | 'caution' | 'rest';
   /** Plain-English factors behind the score. */
   factors: string[];
+  /** LIVE-P1-RESIDUAL: i18n structs parallel to `factors` (index-aligned).
+   *  A null entry means no localized form exists yet and the renderer
+   *  falls back to the English factor. Currently only the no-history
+   *  factor is localized; the other engine factors (sleep, load spikes,
+   *  RPE trends, …) remain English in Hindi mode — a known residual,
+   *  same class as the unlocalized athlete-model evidence sentences. */
+  factorsI18n?: (LocalizedSentence | null)[];
 }
 
 /**
@@ -659,7 +666,15 @@ export function calculateReadiness(
     }
     score = applyHealthSignals(score);
     score = Math.max(1, Math.min(79, Math.round(score)));
-    return { score, band: bandFor(score), factors: factors.slice(0, 5) };
+    const shownFactors = factors.slice(0, 5);
+    return {
+      score,
+      band: bandFor(score),
+      factors: shownFactors,
+      // The no-history sentence is always factors[0] in this branch: it is
+      // pushed first, before any check-in or device factor below.
+      factorsI18n: shownFactors.map((_, i) => (i === 0 ? { key: 'ready.factorNoHistory' } : null)),
+    };
   }
 
   const latest = [...(bodyMetrics || [])].sort((a, b) => (a.date < b.date ? -1 : 1)).pop();

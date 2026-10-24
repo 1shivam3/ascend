@@ -1932,7 +1932,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
           {/* Secondary Tools Dropdown ("More") */}
           <div className="flex items-center justify-between text-xs text-text-secondary px-1 pt-0.5">
-            <span className="font-mono text-xs text-text-muted">Macro Lens • Voice / Text • Indian IFCT</span>
+            <span className="font-mono text-xs text-text-muted">{t('meals.inputMethods')}</span>
             <div className="relative">
               <button
                 type="button"
@@ -2964,11 +2964,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="font-bold text-accent">~{Math.round(currentMealMacros.calories)} kcal</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
-                <span>~{Math.round(currentMealMacros.proteinG)}g P</span>
+                <span>~{round1(currentMealMacros.proteinG)}g P</span>
                 <span>•</span>
-                <span>~{Math.round(currentMealMacros.carbsG)}g C</span>
+                <span>~{round1(currentMealMacros.carbsG)}g C</span>
                 <span>•</span>
-                <span>~{Math.round(currentMealMacros.fatG)}g F</span>
+                <span>~{round1(currentMealMacros.fatG)}g F</span>
               </div>
               <div className="flex gap-3">
                 <button

@@ -109,7 +109,13 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const mealsPagePath = path.join(rootDir, 'src', 'components', 'MealsPage.tsx');
       const mealsContent = fs.readFileSync(mealsPagePath, 'utf8');
       expect(mealsContent).not.toContain('AI Vision');
-      expect(mealsContent).toContain('Macro Lens');
+      // LIVE-P1-RESIDUAL-02: the Fuel input-methods badge moved into the
+      // i18n dictionary and MealsPage renders it via t('meals.inputMethods')
+      // — same precedent as QA4-004 / LIVE-P1-03. Rendered English unchanged.
+      expect(mealsContent).toContain("t('meals.inputMethods')");
+      expect(
+        fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
+      ).toContain("'meals.inputMethods': 'Macro Lens • Voice / Text • Indian IFCT'");
 
       const scanMealModalPath = path.join(rootDir, 'src', 'components', 'ScanMealModal.tsx');
       const scanContent = fs.readFileSync(scanMealModalPath, 'utf8');

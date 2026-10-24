@@ -4,6 +4,7 @@ import React, { useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { X, Activity } from 'lucide-react';
 import type { ReadinessResult, ManualCheckin } from '@/lib/coach-engine';
+import { renderLocalizedSentence } from '@/lib/coach-i18n';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
@@ -49,7 +50,7 @@ export default function ReadinessSheet({
 }: ReadinessSheetProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -104,7 +105,7 @@ export default function ReadinessSheet({
                   key={i}
                   className="text-xs text-text-secondary leading-relaxed p-2.5 rounded-xl bg-bg-secondary border border-border/60"
                 >
-                  {factor}
+                  {renderLocalizedSentence(t, language, readiness.factorsI18n?.[i], factor)}
                 </li>
               ))}
             </ul>
