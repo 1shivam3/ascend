@@ -21,6 +21,8 @@ interface WeeklyHabitMatrixProps {
   onSelectDate?: (dateStr: string) => void;
   /** Compact: no navigation, tighter cells (Home card). */
   compact?: boolean;
+  /** Simple density (Home card): show only today's column. */
+  todayOnly?: boolean;
   /** Hide the creatine row (minors, or creatine tracking disabled) —
    *  an always-empty CREAT row reads as a daily failure. */
   showCreatine?: boolean;
@@ -46,18 +48,24 @@ export default function WeeklyHabitMatrix({
   onWeekChange,
   onSelectDate,
   compact = false,
+  todayOnly = false,
   showCreatine = true,
 }: WeeklyHabitMatrixProps) {
   const { t, language } = useTranslation();
   const todayStr = useToday();
 
   const days = useMemo(() => {
-    return Array.from({ length: 7 }).map((_, i) => {
+    const all = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(weekStart);
       d.setDate(d.getDate() + i);
       return { date: d, dateStr: toLocalDateString(d), letter: weekdayNames(language, 'short')[i] };
     });
-  }, [weekStart, language]);
+    // Simple density renders only today's column; the week strip and
+    // rows filter to the same single day so header and cells align.
+    // (Falls back to the full week if today is outside this week.)
+    const filtered = todayOnly ? all.filter((d) => d.dateStr === todayStr) : all;
+    return filtered.length ? filtered : all;
+  }, [weekStart, language, todayOnly, todayStr]);
 
   const workoutDays = useMemo(() => {
     const set = new Set<string>();
@@ -87,7 +95,7 @@ export default function WeeklyHabitMatrix({
     { label: t('habit.protein'), color: '#22C55E', done: (d) => (proteinMap.get(d) || 0) >= proteinTargetG * 0.85 },
   ];
 
-  const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[6].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;
+  const rangeLabel = `${days[0].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })} – ${days[days.length - 1].date.toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { month: 'short', day: 'numeric' })}`;
 
   return (
     <div className="space-y-1.5 text-xs font-mono">
