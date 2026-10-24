@@ -146,8 +146,12 @@ describe('upload section contract (static-rendering harness)', () => {
     expect(upload).toContain('new RepCounter(lift)');
     expect(upload).toContain('void analyzeUpload()');
     expect(upload).toContain('waitForMetadata');
-    expect(upload).toContain('video.pause()');
-    // No real-time playback on this path: no rAF loop, no play().
+    // Priming, not continuous playback: play() briefly inside the
+    // helper (which pauses right after play resolves — pinned
+    // behaviorally in form-check-upload-prime.test.ts), then
+    // stepping owns currentTime. No rAF loop, no direct play()
+    // call, no camera on this path.
+    expect(upload).toContain('primeVideoForAnalysis(video)');
     expect(upload).not.toContain('requestAnimationFrame(loop)');
     expect(upload).not.toContain('video.play()');
     expect(upload).not.toContain('getUserMedia');

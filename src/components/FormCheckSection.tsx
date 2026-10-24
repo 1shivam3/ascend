@@ -85,6 +85,7 @@ import {
 import {
   computeUploadStepTimes,
   nextAnalysisTimestamp,
+  primeVideoForAnalysis,
   seekVideoTo,
   waitForMetadata,
 } from '@/lib/upload-analysis';
@@ -503,9 +504,11 @@ export default function FormCheckSection() {
   // detectForVideo API is synchronous, so no timer can fire while it
   // blocks — a Promise.race "timeout" would never trip and would only
   // pretend to protect the run. The first-frame stall class is handled
-  // instead by the loading-phase warm-up in startUpload (the
-  // first-inference cost is paid before analysis starts), the
-  // in-flight frame line above, and the compositor pulse.
+  // instead by priming in startUpload (the element is played once so
+  // frames are decoded and readyState advanced before any stepped
+  // detect) plus the loading-phase warm-up (the first-inference cost
+  // is paid before analysis starts), the in-flight frame line above,
+  // and the compositor pulse.
   const analyzeUpload = useCallback(async () => {
     const token = analysisTokenRef.current;
     const video = videoRef.current;
@@ -647,12 +650,25 @@ export default function FormCheckSection() {
       video.muted = true;
       video.playsInline = true;
       // Metadata first: stepping needs a duration, and a file that
-      // never reports one cannot be analyzed. Then PAUSE — the
-      // autoPlay attribute may have started playback, and the
-      // analysis below drives currentTime itself, so playback must
-      // not race it. No play() call exists on this path.
+      // never reports one cannot be analyzed. Then PRIME — play
+      // briefly and pause. A paused, never-played blob video may
+      // sit at readyState 1 (metadata only) on mobile — the browser
+      // defers frame decode for non-playing media — and the first
+      // stepped seek (t = 0) is a no-op that forces no decode, so
+      // the first stepped detect ran on an unprimed element. Live
+      // camera and the old real-time upload path never had this
+      // state: their elements were playing with frames flowing. On
+      // the user's phone that first detect blocked the synchronous
+      // detectForVideo call for minutes with no error, on a build
+      // whose "Working on frame 1" line proved the new code was
+      // running. Playing briefly (the old path proved play() works
+      // on this phone) forces a real decode and advances readyState;
+      // the pause right after leaves a primed element for stepping,
+      // and makes the first step a real seek whenever currentTime
+      // advanced past epsilon. A priming failure rejects into the
+      // upload error box below — never a silent hang.
       await waitForMetadata(video);
-      video.pause();
+      await primeVideoForAnalysis(video);
       if (!Number.isFinite(video.duration) || video.duration <= 0) {
         throw new Error('video has no duration');
       }
@@ -665,7 +681,12 @@ export default function FormCheckSection() {
       // the loading phase (where "Loading your video and the pose
       // model…" already sets the expectation of waiting), keeps that
       // stall OUT of the analysis phase, where a frozen "0 of N"
-      // looks identical to a hang. Discarded: never fed to the
+      // looks identical to a hang. Priming above is what makes this
+      // guard realistic: on a primed element readyState is >= 2, so
+      // the warm-up now actually runs instead of being silently
+      // skipped on a never-played video (the previous failure mode:
+      // frame 1 stayed the true first inference on an unprimed
+      // element and blocked for minutes). Discarded: never fed to the
       // counter, never touches progress or stats. Any failure is
       // ignored — the analysis loop surfaces real errors itself.
       // Timestamp note: this runs before analyzeUpload captures its

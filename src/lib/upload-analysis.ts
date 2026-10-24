@@ -60,6 +60,68 @@ export const UPLOAD_SEEK_TIMEOUT_MS = 5000;
  *  unusable for stepping and surfaces the upload error box. */
 export const UPLOAD_METADATA_TIMEOUT_MS = 10000;
 
+/** Priming-play timeout: starting playback on a local file should
+ *  resolve in milliseconds; 10 s bounds a pathological stall so it
+ *  surfaces an error instead of hanging the upload. */
+export const UPLOAD_PRIME_TIMEOUT_MS = 10000;
+
+/** Minimal video surface priming needs. */
+export interface PlayableVideo {
+  play(): Promise<void>;
+  pause(): void;
+}
+
+/**
+ * Prime a just-loaded file video into the state detection is proven
+ * to work on: played at least once, frames decoded, readyState
+ * advanced. A paused, never-played blob video may sit at readyState 1
+ * (metadata only) on mobile — the browser defers frame decode for
+ * non-playing media — and the first stepped seek (t = 0) is a no-op
+ * that forces no decode, so the first stepped detect ran on an
+ * unprimed element. Live camera and the old real-time upload path
+ * never had this state: their elements were playing with frames
+ * flowing. On the user's phone that first detect blocked the
+ * synchronous detectForVideo call for minutes with no error, on a
+ * build whose "Working on frame 1" line proved the new code was
+ * running. Playing briefly (the old path proved play() works on this
+ * phone) forces a real decode; pausing immediately after leaves a
+ * primed element for stepping, and makes the first step a real seek
+ * whenever currentTime advanced past epsilon. A rejection or timeout
+ * rejects so the caller surfaces an error — never a silent hang.
+ * The pause happens only after play() resolves, so no AbortError
+ * from pausing a pending play() is possible; if the timeout wins
+ * first, the caller's error path drops the video source, which stops
+ * any late-starting playback.
+ */
+export function primeVideoForAnalysis(
+  video: PlayableVideo,
+  timeoutMs: number = UPLOAD_PRIME_TIMEOUT_MS
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error('video playback did not start'));
+    }, timeoutMs);
+    video.play().then(
+      () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        video.pause();
+        resolve();
+      },
+      (err) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(err instanceof Error ? err : new Error('video playback failed'));
+      }
+    );
+  });
+}
+
 /**
  * The times (seconds) to step through for a video of this duration.
  * Starts at 0, advances by the step, and — unless the step grid already
