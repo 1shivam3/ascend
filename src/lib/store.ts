@@ -452,7 +452,8 @@ export interface AppState {
     bodyFatPct?: number,
     chestIn?: number,
     waistIn?: number,
-    hipsIn?: number
+    hipsIn?: number,
+    entryDate?: string
   ) => void;
 
   addPlannedWorkout: (plan: PlannedWorkout) => void;
@@ -2097,11 +2098,16 @@ export const useAppStore = create<AppState>()(
         persistProgressPhotos(next);
         return { progressPhotos: next };
       }),
-      updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn) => set((state) => {
-        const todayDate = getLocalTodayStr();
+      updateBodyMetrics: (weightKg, heightCm, bodyFatPct, chestIn, waistIn, hipsIn, entryDate) => set((state) => {
+        // P0-1/D1: the entry date is caller-supplied (the modal's date
+        // field); it defaults to today for callers that don't pass one
+        // (e.g. EditProfileModal). Previously this hardcoded today, so a
+        // picked date was silently ignored and the entry overwrote
+        // today's real entry.
+        const entryDateStr = entryDate || getLocalTodayStr();
         const entry: BodyMetricEntry = {
           id: safeRandomId('bm'),
-          date: todayDate,
+          date: entryDateStr,
           weightKg: Math.round(weightKg * 10) / 10,
           heightCm: heightCm ? Math.round(heightCm) : undefined,
           bodyFatPct: typeof bodyFatPct === 'number' && !isNaN(bodyFatPct) ? Math.round(bodyFatPct * 10) / 10 : undefined,
@@ -2109,11 +2115,22 @@ export const useAppStore = create<AppState>()(
           waistIn: typeof waistIn === 'number' && !isNaN(waistIn) ? Math.round(waistIn * 10) / 10 : undefined,
           hipsIn: typeof hipsIn === 'number' && !isNaN(hipsIn) ? Math.round(hipsIn * 10) / 10 : undefined,
         };
+        const nextMetrics = [entry, ...state.bodyMetrics.filter(m => m.date !== entryDateStr)];
+        // P0-1/D1: profile weight/height follow the NEWEST entry by date
+        // (ignoring any future-dated rows), so a backdated entry never
+        // moves current weight. Logging today behaves exactly as before
+        // (today's entry is the newest), and a past date newer than all
+        // existing entries still becomes the current weight.
+        const todayStr = getLocalTodayStr();
+        const dated = nextMetrics.filter(m => m.date <= todayStr);
+        const newest = [...(dated.length > 0 ? dated : nextMetrics)].sort(
+          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+        )[0];
         const updatedProfile = state.profile ? {
           ...state.profile,
-          bodyweightKg: Math.round(weightKg * 10) / 10,
-          bodyweightLbs: Math.round(weightKg * 2.20462 * 10) / 10,
-          ...(heightCm ? { heightCm: Math.round(heightCm) } : {}),
+          bodyweightKg: Math.round(newest.weightKg * 10) / 10,
+          bodyweightLbs: Math.round(newest.weightKg * 2.20462 * 10) / 10,
+          ...(newest.heightCm ? { heightCm: Math.round(newest.heightCm) } : {}),
           // Profile changed — stamp it so sync's last-write-wins keeps
           // this edit over an older server row (QA4A-001).
           updatedAt: new Date().toISOString(),
@@ -2121,11 +2138,11 @@ export const useAppStore = create<AppState>()(
         // The new entry replaces any same-date entry; tombstone the
         // replaced row or the next sync pull resurrects it (QA4-001).
         const replacedIds = state.bodyMetrics
-          .filter(m => m.date === todayDate)
+          .filter(m => m.date === entryDateStr)
           .map(m => m.id);
         return {
           profile: updatedProfile,
-          bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== todayDate)],
+          bodyMetrics: nextMetrics,
           deletedBodyMetricIds: [
             ...new Set([...(state.deletedBodyMetricIds || []), ...replacedIds]),
           ],

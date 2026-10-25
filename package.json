@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prebuild": "node scripts/generate-sw.js"
   },
   "dependencies": {
     "@capacitor-community/speech-recognition": "^7.0.1",
