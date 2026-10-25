@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Dumbbell, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import { useTranslation } from '@/lib/i18n';
 
@@ -25,14 +25,9 @@ export default function WelcomeScreen({
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between p-6 sm:p-8 animate-fade-in">
       {/* Top spacer / subtle branding */}
       <div className="w-full max-w-md mx-auto pt-6 flex flex-col items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-bg-card border border-border flex items-center justify-center shadow-2xs">
-            <Dumbbell className="w-5 h-5 text-accent" strokeWidth={2.4} />
-          </div>
-          <span className="text-sm font-bold tracking-widest text-text-primary uppercase font-sans">
-            ASCEND
-          </span>
-        </div>
+        <span className="text-sm font-bold tracking-widest text-text-primary uppercase font-sans">
+          ASCEND
+        </span>
         {/* Language choice — first screen, optional, English by default */}
         <div className="w-52">
           <span className="block text-center text-2xs font-semibold text-text-muted mb-1.5">
