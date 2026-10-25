@@ -21,9 +21,10 @@ export interface BodyMetricsFormInput {
   waist: string;
   hips: string;
   unit: 'kg' | 'lbs';
+  date?: string;
 }
 
-export type BodyMetricsField = 'weight' | 'height' | 'bodyFat' | 'chest' | 'waist' | 'hips';
+export type BodyMetricsField = 'weight' | 'height' | 'bodyFat' | 'chest' | 'waist' | 'hips' | 'date';
 
 export interface BodyMetricsFormResult {
   errors: Partial<Record<BodyMetricsField, string>>;
@@ -99,6 +100,26 @@ export function validateBodyMetricsForm(input: BodyMetricsFormInput): BodyMetric
   const chestIn = circumference(input.chest, 'chest', 'Chest');
   const waistIn = circumference(input.waist, 'waist', 'Waist');
   const hipsIn = circumference(input.hips, 'hips', 'Hips');
+
+  // P0-1/D1: the entry date must be a real calendar date, today or
+  // earlier. A future or malformed date is a visible field error and
+  // nothing is saved — never a silent fallback to today (that silent
+  // fallback is the original date lie). Callers that omit `date`
+  // entirely keep the old behavior (store defaults to today).
+  if (input.date !== undefined) {
+    const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    let dateOk = DATE_RE.test(input.date);
+    if (dateOk) {
+      const [y, m, d] = input.date.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dateOk =
+        dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d &&
+        input.date <= getLocalTodayStr();
+    }
+    if (!dateOk) {
+      errors.date = 'Please pick a valid date — today or earlier.';
+    }
+  }
 
   if (Object.keys(errors).length > 0) return { errors };
   return {
@@ -255,6 +276,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       waist: waistInput,
       hips: hipsInput,
       unit,
+      date: dateInput,
     });
     setErrors(formErrors);
     if (!values) return;
@@ -265,30 +287,33 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
     // confirm with a real toast that survives the modal closing —
     // the old in-modal message vanished with the modal after 700 ms,
     // which is why a save looked like it did nothing.
-    const latestForCompare =
-      bodyMetrics && bodyMetrics.length > 0
-        ? [...bodyMetrics].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-        : null;
-    const submitted: BodyMetricSnapshot = {
-      weightKg: values.weightKg,
-      heightCm: values.heightCm ?? profile?.heightCm,
-      bodyFatPct: values.bodyFatPct,
-      chestIn: values.chestIn,
-      waistIn: values.waistIn,
-      hipsIn: values.hipsIn,
-    };
-    const current: BodyMetricSnapshot = {
-      weightKg: profile?.bodyweightKg,
-      heightCm: profile?.heightCm,
-      bodyFatPct: latestForCompare?.bodyFatPct,
-      chestIn: latestForCompare?.chestIn,
-      waistIn: latestForCompare?.waistIn,
-      hipsIn: latestForCompare?.hipsIn,
-    };
-    if (!hasBodyMetricChanges(current, submitted)) {
-      toast.info(t('bodyMetrics.noChanges'));
-      onClose();
-      return;
+    // P0-1/D1: the comparison is against the entry for the CHOSEN
+    // date, not the latest entry. If no entry exists for that date,
+    // always save — a new day's measurement is new data even when the
+    // values match the latest entry.
+    const entryForDate = bodyMetrics.find((m) => m.date === dateInput) ?? null;
+    if (entryForDate) {
+      const current: BodyMetricSnapshot = {
+        weightKg: entryForDate.weightKg,
+        heightCm: entryForDate.heightCm,
+        bodyFatPct: entryForDate.bodyFatPct,
+        chestIn: entryForDate.chestIn,
+        waistIn: entryForDate.waistIn,
+        hipsIn: entryForDate.hipsIn,
+      };
+      const submitted: BodyMetricSnapshot = {
+        weightKg: values.weightKg,
+        heightCm: values.heightCm ?? profile?.heightCm,
+        bodyFatPct: values.bodyFatPct,
+        chestIn: values.chestIn,
+        waistIn: values.waistIn,
+        hipsIn: values.hipsIn,
+      };
+      if (!hasBodyMetricChanges(current, submitted)) {
+        toast.info(t('bodyMetrics.noChanges'));
+        onClose();
+        return;
+      }
     }
 
     updateBodyMetrics(
@@ -298,7 +323,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
       values.bodyFatPct,
       values.chestIn,
       values.waistIn,
-      values.hipsIn
+      values.hipsIn,
+      dateInput
     );
     toast.success(t('bodyMetrics.savedMsg'));
     onClose();
@@ -515,8 +541,10 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 type="date"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
+                max={getLocalTodayStr()}
                 className="w-full text-sm font-mono py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
               />
+              {errors.date && <p className="text-danger text-xs mt-1 font-medium">{errors.date}</p>}
             </div>
           </div>
 
