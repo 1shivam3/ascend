@@ -364,6 +364,84 @@ phase and is NOT claimed here. Regression pins:
 - **L11 — OUT OF SCOPE, unchanged.** Widths 390/1024/1440 stay pending;
   never claimed.
 
+### Micro-fix round 2 (2026-10-25) — items live re-verification proved STILL broken after fix round 1
+
+**L4 rest timer — live path CORRECTED.** Root cause of the round-1 miss:
+the first round fixed the Set Complete overlay path, but the guest flow's
+live timer after overlay dismiss is the pill + popover in
+ActiveWorkoutScreen (WorkoutPage's separate preset-button timer is NOT the
+live path — confirmed by the live bar's "-30s / +30s / Pause / Skip"
+matching the popover exactly). Round-2 fixes, all in ActiveWorkoutScreen:
+(1) the pill hides while the popover is open (guard now
+`!completedSetSummary && !isRestPopoverOpen`), so pill + bar can never
+count side by side; (2) the popover now carries the countdown readout
+itself (same `restSecondsLeft > 0 ? restSecondsLeft :
+defaultRestDuration` expression as the pill), so hiding the pill loses no
+information; (3) Escape on the popover closes it AND pauses cleanly (new
+`dismissRestPopover`: clears the end-time ref, running false, remaining
+time preserved, resumable via Pause/Resume — same semantics as overlay
+dismiss); (4) opening the overlay closes the popover, so pill + popover +
+overlay can never triple-stack; (5) a collapse-only X button on the
+popover (mobile has no Escape; Skip kills the timer, so without X the
+only mobile close would destroy the timer). Deviation recorded: the bar,
+not a full-viewport overlay, is the real post-dismiss timer design —
+round 1's "overlay lost max-w-md" fix stands for the overlay itself, but
+the live coherent timer is the bar; no full-viewport overlay was forced.
+**"Pill stuck at 2:00" reinterpreted, not reproduced as a countdown bug:**
+the tick mechanism is timestamp-based (500ms, drift-free, re-ticks on
+visibilitychange) and sound; after overlay dismiss the timer is PAUSED at
+~full duration (dismiss happens ~1s after start), so "2:00" is a paused
+timer displaying correctly while workout elapsed time (which always
+runs) advances — the browser judged pausing by the wrong signal. What
+was genuinely broken was (1) and (3) above, plus the popover having no
+readout of its own. Preset unity at 2:00 preserved. Tests: 6 L4 pins in
+`tests/ux-redesign-microfix.test.ts`. **Live visual confirmation still
+owed (parent-run browser phase).**
+
+**L12 focus — rule REPAIRED, visual confirmation still owed.** Root
+cause found in code: the layered rule (`globals.css`, `@layer base`)
+read `outline: 2px solid var(--accent)` — INVALID, because `--accent`
+is an RGB triplet, not a color, so the declaration is dropped at parse
+time. The unlayered `:focus-visible` rule below it is valid and should
+have covered keyboard focus per cascade layers, so the live "no visible
+ring" report is not fully explained by code alone (screenshot scale may
+also have hidden a 2px outline) — but a focus rule that silently parses
+to nothing must not ship. Fix: layered rule now
+`rgb(var(--accent))`; verified the repaired rule survives into compiled
+build CSS (`button:focus-visible{outline:2px solid
+rgb(var(--accent));outline-offset:2px}`). Disclosed side effect: the
+Stage 9 test pinned the OLD invalid string, and the live-fixes pill +
+favorites tests pinned superseded behavior — all three pins were updated
+to the new intended behavior (same coverage, not weakened). **Do NOT
+claim a full keyboard pass — that still needs live eyes after this fix.**
+
+**L9b favorites row — WRAPPED.** The L9 scroll + fade-mask still
+truncated the edge chip in the initial view (scrollable ≠ visible). The
+row is now `flex flex-wrap` (mask, horizontal-scroll, and
+scrollbar-hiding classes removed); every chip is visible without
+scrolling in the narrow dialog. Tests pin wrap + absence of
+scroll/mask classes.
+
+**L2 heading caveat — FIXED (copy).** Simple heading now
+`home.habitsToday` ("Today's habits" / "आज की आदतें" — Hindi composed
+from dictionary words आज + की + आदतें, as in habitsThisWeek); Detailed
+keeps "Habits This Week". **New Hindi key flagged for native review**
+with the ~94 others.
+
+**L3 Auto clarification — FIXED (copy, behavior untouched).** When no
+explicit override is set, the row now shows a hint built from existing
+keys only: "Auto: Detailed → Advanced" (or Simple → Beginner), so a
+density switch that moves the value is legible as designed
+follow-density behavior. Follow-density behavior itself unchanged (null
+override = follow density; no experience key exists). No new keys.
+
+**Still open after round 2 (unchanged):** D1, D6, D5, custom domain,
+in-Settings sign-in forms, widths 390/1024/1440, desktop wide grids, L6
+make-up question (user decision), L10 Hindi strings, ProgressPage SVG
+Vermilion attributes, editor "~CAL" labels, L8 mixed-saved-meal
+rendering (could not be produced via manual entry — entering required
+macros clears the estimate).
+
 ### Not fixed, shipped as known issues (unchanged from Stage 10/11)
 
 D1, D6, D5 (removing `public/ui-mockups.html` from serving), Supabase custom domain
@@ -397,6 +475,23 @@ tsc clean; `npm run build` passes (shared First Load JS 88.2 kB,
 unchanged from Stage 10); lint exit 0 with the same 15 pre-existing
 warnings; `git diff --check` clean. No data/auth/schema/sync change, no
 new dependencies, boundaries intact. Per-defect verdicts in §6.
+
+**Micro-fix round 2 (2026-10-25, branch only, master untouched):**
+L4 live path corrected (pill hides while popover open, popover carries
+its own countdown, Escape closes + pauses, overlay-open closes popover,
+collapse-only X for mobile), L12 invalid focus rule repaired and
+build-verified, L9b favorites row wrapped, L2 Simple heading as today,
+L3 Auto hint from existing keys. Gates on the micro-fix tip: vitest
+1830 passed / 20 failed (baseline 1817/20; +13 new micro-fix pins; 3
+pre-existing pins updated for intentionally changed behavior — Stage 9
+focus string, live-fixes pill guard, live-fixes favorites row; zero NEW
+failures; the 20 ONLY in `tests/security-integration-gate.test.ts`);
+tsc clean; `npm run build` passes (shared First Load JS 88.2 kB,
+unchanged; `/` 490 kB); lint exit 0 with the same 15 pre-existing
+warnings (flagged lines in touched files verified pre-existing, outside
+the new hunks); `git diff --check` clean. No data/auth/schema/sync
+change, no new dependencies, boundaries intact. Per-defect verdicts in
+§6. Live re-verification of round-2 fixes still owed (parent-run).
 
 **Blocked on user decisions (NOT decidable by this program):** P0-1 D1, P0-2 D6,
 D5 ui-mockups removal, Supabase custom domain ($25/mo Pro), in-Settings Apple/OTP/email

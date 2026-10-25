@@ -459,6 +459,20 @@ export default function ActiveWorkoutScreen({
     }
   }, [isRestRunning]);
 
+  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
+  // Set Complete overlay — the first round hid the pill only while the
+  // overlay was open, so pill + popover counted side by side and Escape
+  // did nothing on the popover. Dismissing the popover pauses the rest
+  // timer (remaining time stays resumable from the pill); collapsing the
+  // popover via its X button does NOT pause — Escape is the pause path.
+  const dismissRestPopover = useCallback(() => {
+    setIsRestPopoverOpen(false);
+    if (isRestRunning) {
+      restTargetEndTimeRef.current = null;
+      setIsRestRunning(false);
+    }
+  }, [isRestRunning]);
+
   useEffect(() => {
     if (completedSetSummary) {
       return registerBackHandler(() => {
@@ -478,6 +492,26 @@ export default function ActiveWorkoutScreen({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [completedSetSummary, dismissSetComplete]);
+
+  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
+  // (same dismiss+pause semantics as the overlay). Without this, Escape
+  // did nothing on the popover — the only close paths were Skip (which
+  // kills the timer) and re-tapping the pill (hidden once open).
+  useEffect(() => {
+    if (!isRestPopoverOpen || completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissRestPopover();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
+
+  // Micro-fix L4 (round 2): single timer UI across transitions — when
+  // the Set Complete overlay opens, the popover closes so pill + popover
+  // + overlay can never stack.
+  useEffect(() => {
+    if (completedSetSummary) setIsRestPopoverOpen(false);
+  }, [completedSetSummary]);
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
@@ -3120,6 +3154,13 @@ export default function ActiveWorkoutScreen({
       <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
         {isRestPopoverOpen && (
           <div className="bg-bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-2 flex items-center gap-1.5 animate-scale-in">
+            {/* Micro-fix L4 (round 2): the popover carries the countdown
+                itself, so hiding the pill while it is open loses nothing. */}
+            <span className="px-1 font-mono text-xs font-bold text-text-primary tabular-nums">
+              {isRestFinished
+                ? t('workout.ready')
+                : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
+            </span>
             <button
               type="button"
               onClick={() => adjustTimer(-30)}
@@ -3153,15 +3194,30 @@ export default function ActiveWorkoutScreen({
             >
               {t('workout.skip')}
             </button>
+            {/* Micro-fix L4 (round 2): collapse-only close. The pill hides
+                while the popover is open, so without this the only
+                non-destructive close on mobile would be Escape (which
+                has no mobile equivalent); Skip kills the timer. */}
+            <button
+              type="button"
+              onClick={() => setIsRestPopoverOpen(false)}
+              aria-label={t('common.close')}
+              className="px-2 py-2 min-h-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
-        {/* Live-fix L4: one timer UI at a time — while the Set Complete
-            overlay is open it IS the timer, so the pill hides and the two
-            never count side by side. After Next Set the pill returns,
-            showing the still-running timer (rest deliberately spans into
-            next-set setup; that is one timer, not a second one). */}
-        {!completedSetSummary && (
+        {/* Micro-fix L4 (round 2): one timer UI at a time — while the Set
+            Complete overlay is open it IS the timer, so the pill hides and
+            the two never count side by side. After Next Set the pill
+            returns, showing the still-running timer (rest deliberately
+            spans into next-set setup; that is one timer, not a second
+            one). Same rule for the popover: while it is open IT is the
+            timer (it now carries the countdown readout), so the pill
+            hides until it closes. */}
+        {!completedSetSummary && !isRestPopoverOpen && (
         <button
           type="button"
           onClick={() => {

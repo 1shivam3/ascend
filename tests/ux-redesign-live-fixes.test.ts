@@ -158,8 +158,11 @@ describe('L4 rest timer (static)', () => {
 
   it('the pill hides while the Set Complete overlay is open', () => {
     const aw = src('src/components/ActiveWorkoutScreen.tsx');
-    expect(aw).toContain('Live-fix L4: one timer UI at a time');
-    expect(aw).toContain('{!completedSetSummary && (');
+    // Micro-fix L4 (round 2): the guard gained the popover condition —
+    // the pill is the collapsed timer, so it also hides while the
+    // popover (which now carries the countdown) is open.
+    expect(aw).toContain('Micro-fix L4 (round 2): one timer UI at a time');
+    expect(aw).toContain('{!completedSetSummary && !isRestPopoverOpen && (');
   });
 
   it('Escape and X dismiss the overlay and pause the timer', () => {
@@ -223,10 +226,14 @@ describe('L9 clipping/overlap (static)', () => {
     expect(sv).toContain('max-sm:[mask-image:linear-gradient(to_right,black_88%,transparent)]');
   });
 
-  it('the favorites row carries a scroll-fade mask and end padding', () => {
+  it('the favorites row wraps chips instead of scrolling with a mask', () => {
+    // Micro-fix L9b (round 2): the L9 scroll+mask still truncated the
+    // edge chip in the initial view — scrollable is not visible. Wrap
+    // is the honest fix in this narrow dialog.
     const meals = src('src/components/MealsPage.tsx');
-    expect(meals).toContain('pr-2 scrollbar-none');
-    expect(meals).toContain('[mask-image:linear-gradient(to_right,black_92%,transparent)]');
+    expect(meals).toContain('flex flex-wrap gap-1.5');
+    expect(meals).not.toContain('overflow-x-auto pb-1 pr-2 scrollbar-none');
+    expect(meals).not.toContain('[mask-image:linear-gradient(to_right,black_92%,transparent)]');
   });
 
   it('toasts sit above the bottom nav, never over headings', () => {

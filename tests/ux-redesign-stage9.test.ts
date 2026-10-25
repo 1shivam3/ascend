@@ -128,7 +128,12 @@ describe('Stage 9 — touch targets, focus, layout', () => {
   it('keyboard focus is visible on buttons, links, and switches', () => {
     const css = read('src/app/globals.css');
     expect(css).toContain('button:focus-visible');
-    expect(css).toContain('outline: 2px solid var(--accent)');
+    // Micro-fix L12 (round 2): the Stage 9 pin asserted the bare
+    // `var(--accent)` form — invalid, because --accent is an RGB triplet,
+    // not a color, so the declaration was dropped at parse time. The
+    // valid form is rgb(var(--accent)).
+    expect(css).toContain('outline: 2px solid rgb(var(--accent))');
+    expect(css).not.toContain('outline: 2px solid var(--accent)');
   });
 
   it('modal-stack semantics still route through use-modal-a11y', () => {

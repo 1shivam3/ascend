@@ -53,6 +53,9 @@ export const en = {
   'home.weight': 'Weight',
   'home.hydration': 'Hydration',
   'home.habitsThisWeek': 'Habits This Week',
+  // Micro-fix L2 (round 2): Simple-mode habit heading. Flagged for
+  // native review with the ~94 other new Hindi keys.
+  'home.habitsToday': "Today's habits",
   'home.notifications': 'Notifications',
   'home.weeklyTarget': 'Weekly Target',
   'home.start': 'Start',

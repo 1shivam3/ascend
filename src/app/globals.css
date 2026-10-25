@@ -145,12 +145,17 @@
 
   /* Visible keyboard focus for interactive elements without their own
      focus ring (inputs/selects/textarea already carry focus:border-accent
-     + focus:ring-1 above, so they are excluded here to avoid doubling). */
+     + focus:ring-1 above, so they are excluded here to avoid doubling).
+     Micro-fix L12 (round 2): this rule previously read
+     `2px solid var(--accent)` — invalid, because --accent is an RGB
+     triplet, not a color; the declaration was dropped at parse time.
+     The unlayered :focus-visible rule below still covered it, but a
+     focus rule that silently parses to nothing must not ship. */
   button:focus-visible,
   a:focus-visible,
   [role='button']:focus-visible,
   [role='switch']:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid rgb(var(--accent));
     outline-offset: 2px;
   }
 

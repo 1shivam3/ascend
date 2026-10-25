@@ -1159,7 +1159,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       {uiPreferences.showHabitMatrix && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
+          <span className="text-xs font-bold text-text-primary">{density === 'simple' ? t('home.habitsToday') : t('home.habitsThisWeek')}</span>
           {/* Live-fix L2: Simple shows only today's column (todayOnly),
               so the week-range label would lie — show today's date instead.
               No new i18n string: the date is computed, like the matrix's

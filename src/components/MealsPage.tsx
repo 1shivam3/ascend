@@ -2683,9 +2683,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <label className="text-2xs font-mono text-text-muted uppercase block mb-1">
                     {t('meals.quickAddFavorites')}
                   </label>
-                  {/* Live-fix L9: fade mask + end padding so the scrollable
-                      favorites row never reads as clipped buttons. */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 pr-2 scrollbar-none font-mono [mask-image:linear-gradient(to_right,black_92%,transparent)]">
+                  {/* Micro-fix L9b (round 2): wrap, don't scroll. The
+                      L9 mask+padding still truncated the edge chip in
+                      the initial view (scrollable ≠ visible); in this
+                      narrow dialog every chip must be visible without
+                      scrolling. */}
+                  <div className="flex flex-wrap gap-1.5 pb-1 font-mono">
                     {favoriteFoods.map((fav) => (
                       <button
                         key={fav.id}

@@ -815,7 +815,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
           {/* Workout view mode — density-following, NOT the athlete's
               experience level (live-fix L3: this row used to be labeled
               "Athlete Experience", so a Simple→Detailed switch that moved
-              the view to Advanced read as the user's level flipping). */}
+              the view to Advanced read as the user's level flipping).
+              Micro-fix L3 (round 2): the flip itself is DESIGNED (Auto =
+              follows density), but nothing said so — the hint below
+              states the current Auto mapping from existing keys only,
+              so a density switch that moves the value is legible. */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-text-secondary font-sans">{t('workout.viewMode')}</span>
@@ -843,6 +847,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 </button>
               ))}
             </div>
+            {!uiPreferences.workoutModeOverride && (
+              <p className="text-2xs text-text-muted">
+                {t('workout.viewAuto')}: {uiPreferences.density === 'detailed' ? t('settings.densityDetailed') : t('settings.densitySimple')} → {modeLabel(workoutMode)}
+              </p>
+            )}
           </div>
 
           {/* Notifications — the single home for reminder settings.
