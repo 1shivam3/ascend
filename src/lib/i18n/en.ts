@@ -141,7 +141,10 @@ export const en = {
   'onboarding.summaryInjuries': 'Injuries',
   'onboarding.summaryNoInjuries': 'No injuries',
   'onboarding.summaryContinue': 'Start training',
-  'onboarding.summaryEdit': 'Edit in Settings → Training Preferences',
+  // FND-05: the button used to name a "Training Preferences" screen
+  // that does not exist — it lands on the Settings screen, so it now
+  // says so. (It still scrolls to the Training Preferences section.)
+  'onboarding.summaryEdit': 'Edit in You → Settings',
   'onboarding.guestNote': 'No account needed — your data stays on this device.',
   'onboarding.dietPreference': 'Diet Preference',
   'onboarding.dietHint': 'Used by the protein coach for suggestions that fit how you eat.',
@@ -1091,6 +1094,11 @@ export const en = {
   'settings.muscleVolumeHint': 'Per-muscle weekly sets and the recovery map on Progress',
   'settings.healthOpening': 'Opening Health Connect…',
   'settings.dataPrivacyLegal': 'Data, Privacy & Legal',
+  // FND-05: the single place for destructive actions (Log Out, Delete
+  // Account, Delete WebApp Data & Reset), each with scope copy shown
+  // before its confirmation.
+  'settings.dataAccount': 'Data & Account',
+  'settings.dataAccountHint': 'Log out, delete your account, or reset this device\'s data',
   'settings.exportJson': 'Export JSON Backup',
   'settings.exportJsonHint': 'Download all workouts, PRs, and meals',
   'settings.importBackup': 'Import Backup File',

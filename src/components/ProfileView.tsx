@@ -27,7 +27,6 @@ import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import EditProfileModal from '@/components/EditProfileModal';
-import ConfirmationModal from '@/components/ConfirmationModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
 import DataVaultModal from '@/components/DataVaultModal';
@@ -46,12 +45,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const prs = useStore((state) => state.prs || []);
   const goals = useStore((state) => state.goals || []);
-  const logout = useStore((state) => state.logout);
   const toast = useToast();
   const { t } = useTranslation();
 
   const { goBack, canGoBack } = useAppNavigation();
-  const { user, signOut } = useSupabaseSync();
+  const { user } = useSupabaseSync();
 
   // Modals
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -78,7 +76,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     }
     setIsSharePickerOpen(true);
   };
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleBack = useCallback(() => {
     if (onBack) {
@@ -93,18 +90,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // NOTE: no system-back handler is registered in page mode. Tab-level back is
   // already handled by the navigation stack; registering handleBack here would
   // recurse (handleBack -> goBack -> runBackHandlers -> handleBack ...).
-
-  const handleConfirmLogout = async () => {
-    setShowLogoutConfirm(false);
-    try {
-      await signOut();
-    } catch (err) {
-      console.warn('Sign out warning:', err);
-    }
-    logout({ clearLocalData: false });
-    toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
-    if (onNavigate) onNavigate('home');
-  };
 
   const athleteName = profile?.name ? profile.name.trim() : 'Alex';
   const athleteInitial = athleteName.charAt(0).toUpperCase();
@@ -444,15 +429,24 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         </div>
       </div>
 
-      {/* ── Log Out Button ──────────────────────────────────────────────────── */}
+      {/* ── Data & Account (FND-05) ───────────────────────────────────────────
+          Log Out no longer lives here: all destructive actions sit in
+          one place, Settings → Data & Account. This row navigates there
+          and lands scrolled on that section. */}
       <div className="pt-2">
         <button
           type="button"
-          onClick={() => setShowLogoutConfirm(true)}
+          onClick={() => {
+            try {
+              sessionStorage.setItem('ascend_settings_section', 'data-account');
+            } catch {}
+            onNavigate?.('settings');
+          }}
           className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border text-xs font-bold text-text-secondary hover:text-accent transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
           <LogOut className="w-4 h-4 text-accent" />
-          <span>{t('profile.logOut')}</span>
+          <span>{t('settings.dataAccount')}</span>
+          <ChevronRight className="w-4 h-4 text-text-muted" />
         </button>
       </div>
 
@@ -536,18 +530,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         onClose={() => setSharePlan(null)}
       />
 
-      {/* Screen 24: Log Out Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={handleConfirmLogout}
-        title={t('profile.logoutTitle')}
-        message={user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}
-        confirmText={t('profile.logOut')}
-        cancelText={t('common.cancel')}
-        variant="default"
-        icon="logout"
-      />
     </div>
   );
 }

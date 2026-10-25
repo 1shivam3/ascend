@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Calendar,
   Bell,
+  LogOut,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
@@ -31,6 +32,7 @@ import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import ConfirmationModal from '@/components/ConfirmationModal';
+import DataVaultModal from '@/components/DataVaultModal';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
@@ -109,13 +111,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     lastSyncedAt,
     syncNow,
     user,
+    signOut,
     deleteAccount,
   } = useSupabaseSync();
+  const logout = useStore((state) => state.logout);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  // FND-05: destructive actions consolidated in the Data & Account
+  // section below (moved here from ProfileView and the Data Vault).
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
 
@@ -126,9 +134,30 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const appearanceSectionRef = useRef<HTMLDivElement>(null);
   const trainingSectionRef = useRef<HTMLDivElement>(null);
   const dataSectionRef = useRef<HTMLDivElement>(null);
+  const dataAccountSectionRef = useRef<HTMLDivElement>(null);
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+  // FND-05: deep-link landing — ProfileView's Data & Account row and
+  // the onboarding summary button set this flag, then Settings opens
+  // scrolled to the named section. The flag is consumed once, so a
+  // plain ?tab=settings visit still lands at the top, unchanged.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let target: string | null = null;
+    try {
+      target = sessionStorage.getItem('ascend_settings_section');
+      if (target) sessionStorage.removeItem('ascend_settings_section');
+    } catch {}
+    if (!target) return;
+    const ref =
+      target === 'data-account'
+        ? dataAccountSectionRef
+        : target === 'training'
+          ? trainingSectionRef
+          : null;
+    ref?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   // ── UX redesign Stage 6 — accent + dashboard personalization ──────────
   // Accent selection is NOT a theme-mode pick: it never touches
   // hasCustomTheme. The page.tsx effect restyles the app from these keys.
@@ -399,6 +428,20 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     reader.readAsText(file);
   };
 
+  // FND-05: Log Out, moved here from ProfileView — same behavior
+  // (sign out, keep local data, go home) and same scope copy.
+  const handleConfirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    try {
+      await signOut();
+    } catch (err) {
+      console.warn('Sign out warning:', err);
+    }
+    logout({ clearLocalData: false });
+    toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
+    if (onNavigate) onNavigate('home');
+  };
+
   // Delete account confirmation
   const handleExecuteDeleteAccount = async () => {
     setIsDeleting(true);
@@ -450,6 +493,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             { labelKey: 'settings.appearancePersonalization', ref: appearanceSectionRef },
             { labelKey: 'settings.trainingPreferences', ref: trainingSectionRef },
             { labelKey: 'settings.dataPrivacyLegal', ref: dataSectionRef },
+            { labelKey: 'settings.dataAccount', ref: dataAccountSectionRef },
           ] as const
         ).map((chip) => (
           <button
@@ -1149,7 +1193,39 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </button>
           </div>
 
-          {/* Delete Account (Danger Action) */}
+        </div>
+      </div>
+
+      {/* ── SECTION 5: DATA & ACCOUNT ─────────────────────────────────────────
+          FND-05: the ONE place for destructive actions. Each row states
+          its scope BEFORE any confirmation dialog opens, and each action
+          keeps its original behavior — consolidation is one place, not
+          removal. The Data Vault's own delete button is gone; its
+          delete-confirm flow is reached from the row below. */}
+      <div ref={dataAccountSectionRef} className="space-y-2 scroll-mt-28">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+          {t('settings.dataAccount')}
+        </span>
+        <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
+          {/* Log Out (moved from ProfileView) */}
+          <button
+            type="button"
+            onClick={() => setShowLogoutConfirm(true)}
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <LogOut className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('profile.logOut')}</p>
+                <p className="text-2xs text-text-muted">{user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted" />
+          </button>
+
+          {/* Delete Account (moved from Data, Privacy & Legal) */}
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
@@ -1165,6 +1241,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-accent" />
+          </button>
+
+          {/* Delete WebApp Data & Reset (moved from the Data Vault) */}
+          <button
+            type="button"
+            onClick={() => setIsDataVaultOpen(true)}
+            className="w-full p-3 flex items-center justify-between hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-400">
+                <Trash2 className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-rose-400">{t('vault.deleteReset')}</p>
+                <p className="text-2xs text-text-muted">{t('vault.safeguardBody')}</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-rose-400" />
           </button>
         </div>
       </div>
@@ -1184,6 +1278,28 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       />
 
       {/* ── Screen 24: Confirmation Modals ──────────────────────────────────── */}
+      {/* Log Out Modal (FND-05: scope copy stated on the row AND here) */}
+      <ConfirmationModal
+        isOpen={showLogoutConfirm}
+        onClose={() => setShowLogoutConfirm(false)}
+        onConfirm={handleConfirmLogout}
+        title={t('profile.logoutTitle')}
+        message={user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}
+        confirmText={t('profile.logOut')}
+        cancelText={t('common.cancel')}
+        variant="default"
+        icon="logout"
+      />
+
+      {/* Data Vault, opened straight at its delete-confirm view (FND-05) */}
+      {isDataVaultOpen && (
+        <DataVaultModal
+          isOpen={isDataVaultOpen}
+          onClose={() => setIsDataVaultOpen(false)}
+          startAtDeleteConfirm
+        />
+      )}
+
       {/* Delete Account Modal */}
       <ConfirmationModal
         isOpen={showDeleteConfirm}

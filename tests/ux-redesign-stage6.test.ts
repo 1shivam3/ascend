@@ -31,13 +31,17 @@ describe('Stage 6 — You/Settings IA regroup', () => {
     expect(src).not.toContain('settings.customization');
   });
 
-  it('log out lives in Profile only — Settings has no sign-out row or modal', () => {
+  it('FND-05: log out lives in Settings Data & Account — Profile links there', () => {
     const settings = read('src/components/SettingsView.tsx');
     const profile = read('src/components/ProfileView.tsx');
-    expect(settings).not.toContain('showLogoutConfirm');
-    expect(settings).not.toContain('handleExecuteSignOut');
-    expect(settings).not.toContain("t('settings.signOut')");
-    expect(profile).toContain("t('profile.logOut')");
+    expect(settings).toContain('showLogoutConfirm');
+    expect(settings).toContain('handleConfirmLogout');
+    expect(settings).toContain("t('settings.dataAccount')");
+    expect(settings).toContain("t('profile.logOut')");
+    expect(profile).toContain("t('settings.dataAccount')");
+    expect(profile).toContain('ascend_settings_section');
+    expect(profile).not.toContain('showLogoutConfirm');
+    expect(profile).not.toContain('handleConfirmLogout');
   });
 
   it('Appearance & Personalization holds the three personalization controls', () => {

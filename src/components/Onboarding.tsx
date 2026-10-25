@@ -438,11 +438,15 @@ export default function Onboarding() {
     } catch {}
   };
 
-  // Summary edit link: apply the staged profile, finish onboarding, and
-  // land on You → Settings, where Training Preferences holds the editors.
+  // Summary edit link (FND-05): apply the staged profile, finish
+  // onboarding, and land on You → Settings, scrolled to the Training
+  // Preferences section. The button label names that real destination.
   const handleSummaryEdit = () => {
     applyPendingProfile();
     toast.success(t('toast.welcome', { name: savedFirstName }), t('toast.titleAllSet'));
+    try {
+      sessionStorage.setItem('ascend_settings_section', 'training');
+    } catch {}
     try {
       navigate('settings', { clearHistory: true });
     } catch {}

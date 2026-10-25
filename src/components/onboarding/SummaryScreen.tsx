@@ -8,8 +8,9 @@ import { useTranslation } from '@/lib/i18n';
  * the tabs. Presentational: every row restates a choice the user already
  * made — goal, level, training days, diet, injuries — from the stored
  * profile/training profile, never invented. Edits happen afterward in
- * You → Settings → Training Preferences (the edit button finishes
- * onboarding and lands there); there is no back button by design.
+ * You → Settings (the edit button finishes onboarding and lands there,
+ * scrolled to the Training Preferences section); there is no back
+ * button by design.
  */
 
 export interface SummaryScreenProps {

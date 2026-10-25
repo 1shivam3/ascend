@@ -138,7 +138,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.summaryInjuries': 'चोटें',
   'onboarding.summaryNoInjuries': 'कोई चोट नहीं',
   'onboarding.summaryContinue': 'ट्रेनिंग शुरू करें',
-  'onboarding.summaryEdit': 'Settings → Training Preferences में बदलें',
+  // FND-05: same rename as en — the destination is the Settings screen.
+  'onboarding.summaryEdit': 'You → Settings में बदलें',
   'onboarding.guestNote': 'कोई खाता ज़रूरी नहीं — आपका डेटा इसी डिवाइस पर रहता है।',
   'onboarding.dietPreference': 'आहार पसंद',
   'onboarding.dietHint': 'आपका प्रोटीन कोच इसके आधार पर आपकी खाने की आदतों के अनुसार सुझाव देता है।',
@@ -1088,6 +1089,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'settings.muscleVolumeHint': 'प्रगति पर हर मसल के हफ़्ते के सेट और रिकवरी मैप',
   'settings.healthOpening': 'Health Connect खुल रहा है…',
   'settings.dataPrivacyLegal': 'डेटा, प्राइवेसी और कानूनी',
+  // FND-05: composed from existing hi words ('डेटा', 'खाता') — flag
+  // for native-speaker review.
+  'settings.dataAccount': 'डेटा और खाता',
+  'settings.dataAccountHint': 'लॉग आउट करें, खाता हटाएं या इस डिवाइस का डेटा रीसेट करें',
   'settings.exportJson': 'JSON बैकअप एक्सपोर्ट करें',
   'settings.exportJsonHint': 'सभी वर्कआउट, PR और खाना डाउनलोड करें',
   'settings.importBackup': 'बैकअप फ़ाइल इम्पोर्ट करें',
