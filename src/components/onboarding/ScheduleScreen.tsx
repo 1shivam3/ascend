@@ -58,7 +58,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
       <StepProgressBar currentStep={3} onBack={onBack} />
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <h1 className="page-title">
             Your week, your setup
           </h1>
           <p className="text-sm text-text-muted">
@@ -79,7 +79,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
                 onClick={() => setDays(d)}
                 className={`py-3.5 rounded-xl font-bold text-lg transition-all shadow-2xs cursor-pointer border ${
                   days === d
-                    ? 'bg-accent border-accent text-white'
+                    ? 'bg-accent border-accent text-accent-on'
                     : 'bg-bg-card border-border text-text-primary hover:border-border-hover/40'
                 }`}
               >
@@ -119,7 +119,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border transition-all ${
                     equipment === opt.id
-                      ? 'bg-accent border-accent text-white'
+                      ? 'bg-accent border-accent text-accent-on'
                       : 'border-border bg-transparent'
                   }`}
                   aria-hidden="true"
@@ -163,7 +163,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
                   onClick={() => removeLimitation(opt)}
                   aria-label={t('onboarding.injuriesRemove', { area: opt })}
                   title={t('onboarding.injuriesRemove', { area: opt })}
-                  className="px-4 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer border bg-accent border-accent text-white"
+                  className="px-4 py-2.5 rounded-full text-sm font-bold transition-all cursor-pointer border bg-accent border-accent text-accent-on"
                 >
                   {opt} ×
                 </button>
@@ -202,7 +202,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
         <button
           type="button"
           onClick={() => onContinue(days, equipment, activity, limitations)}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>

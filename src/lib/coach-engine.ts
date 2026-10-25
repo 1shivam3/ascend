@@ -1126,7 +1126,41 @@ export function detectMissedSessions(
     }
     cursor.setDate(cursor.getDate() + 1);
   }
-  return missed;
+
+  // FND-02 follow-up: same-plan make-up coverage. A session logged on an
+  // unscheduled day this week with the same plan as a missed entry covers
+  // that entry (earliest first, one workout covers one entry). This answers
+  // the open L6 question as YES for the coach check-in only — the only
+  // consumer of this function: the scheduled-day denominator
+  // (getScheduledPlanEntries) and adherence are untouched, and a planless
+  // or different-plan session clears nothing. A workout logged on a
+  // scheduled day is already spent covering that day by date, so only
+  // unscheduled-day workouts enter the pool (one workout must never cover
+  // two days). Revert note: deleting this block restores the pure
+  // exact-date contract.
+  const plannedWeekdays = new Set(plannedSchedule.map((p) => p.weekday));
+  const pool: { planId?: string; name: string }[] = [];
+  for (const w of loggedWorkouts || []) {
+    const ds = (w.date || '').split('T')[0];
+    if (!ds || ds < weekRange.start || ds > weekRange.end || ds > todayStr) continue;
+    const weekday = (parseLocalDate(ds).getDay() + 6) % 7; // Monday = 0
+    if (plannedWeekdays.has(weekday)) continue;
+    const name = (w.name || '').trim().toLowerCase();
+    if (!w.planId && !name) continue;
+    pool.push({ planId: w.planId, name });
+  }
+  const used = new Set<number>();
+  const matchesPlan = (m: MissedSession, p: { planId?: string; name: string }): boolean => {
+    if (m.planId && p.planId) return m.planId === p.planId;
+    if (m.planId || p.planId) return false;
+    return m.name.trim().toLowerCase() === p.name && p.name !== '';
+  };
+  return missed.filter((m) => {
+    const idx = pool.findIndex((p, i) => !used.has(i) && matchesPlan(m, p));
+    if (idx === -1) return true;
+    used.add(idx);
+    return false;
+  });
 }
 
 export interface TrainingPattern {

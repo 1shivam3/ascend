@@ -144,7 +144,7 @@ export default function PolicyDecisionLedger({
               onClick={() => setActiveFilter(tab.id)}
               className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 shrink-0 transition-colors border outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 isActive
-                  ? 'bg-accent text-white border-accent shadow-xs'
+                  ? 'bg-accent text-accent-on border-accent shadow-xs'
                   : 'bg-bg-card text-text-muted border-border/80 hover:text-text-primary hover:border-border'
               }`}
             >

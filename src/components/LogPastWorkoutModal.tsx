@@ -490,7 +490,7 @@ export default function LogPastWorkoutModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+              className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -506,7 +506,7 @@ export default function LogPastWorkoutModal({
               <span>•</span>
               <span className="text-accent font-semibold">{t('lp.volume', { volume: sessionStats.totalVolume, unit: userUnit })}</span>
             </div>
-            <span className="text-3xs text-text-muted font-mono uppercase tracking-wider">
+            <span className="text-2xs text-text-muted font-mono uppercase tracking-wider">
               {t('lp.autoPr')}
             </span>
           </div>
@@ -545,7 +545,7 @@ export default function LogPastWorkoutModal({
                         {t('lp.logComplete')}
                       </button>
                     </div>
-                    <p className="text-3xs text-text-muted">
+                    <p className="text-2xs text-text-muted">
                       {t('lp.quickHint')}
                     </p>
                   </div>
@@ -560,7 +560,7 @@ export default function LogPastWorkoutModal({
                       <button
                         type="button"
                         onClick={() => setDate(todayStr)}
-                        className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                        className={`text-2xs font-mono px-1.5 py-0.5 rounded transition-colors ${
                           date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
                         }`}
                       >
@@ -569,7 +569,7 @@ export default function LogPastWorkoutModal({
                       <button
                         type="button"
                         onClick={() => setDate(yesterdayStr)}
-                        className={`text-3xs font-mono px-1.5 py-0.5 rounded transition-colors ${
+                        className={`text-2xs font-mono px-1.5 py-0.5 rounded transition-colors ${
                           date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
                         }`}
                       >
@@ -601,7 +601,7 @@ export default function LogPastWorkoutModal({
                       placeholder="45"
                       className="w-full bg-bg-card border border-border/80 rounded-xl px-3 py-2 text-xs font-mono text-text-primary outline-none focus:border-accent"
                     />
-                    <span className="text-3xs font-mono text-text-muted absolute right-3 top-1/2 -translate-y-1/2">
+                    <span className="text-2xs font-mono text-text-muted absolute right-3 top-1/2 -translate-y-1/2">
                       {t('lp.min')}
                     </span>
                   </div>
@@ -625,7 +625,7 @@ export default function LogPastWorkoutModal({
               {/* Quick Template Selector */}
               {plannedWorkouts.length > 0 && (
                 <div className="pt-1 border-t border-border/40">
-                  <span className="text-3xs font-mono font-semibold uppercase text-text-muted block mb-1.5">
+                  <span className="text-2xs font-mono font-semibold uppercase text-text-muted block mb-1.5">
                     {t('lp.prefill')}
                   </span>
                   <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
@@ -676,7 +676,7 @@ export default function LogPastWorkoutModal({
                         </span>
                         <div>
                           <h4 className="text-sm font-bold text-text-primary leading-tight">{ex.name}</h4>
-                          <span className="text-3xs text-text-muted font-mono">
+                          <span className="text-2xs text-text-muted font-mono">
                             {isBW ? t('lp.bodyweight') : t('lp.loaded', { unit: userUnit })}
                           </span>
                         </div>
@@ -754,7 +754,7 @@ export default function LogPastWorkoutModal({
                               onBlur={() => handleSetBlur(exIdx, sIdx, 'weight')}
                               className="w-full text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-transparent outline-none p-0 tabular-nums"
                             />
-                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">{userUnit}</span>
+                            <span className="text-2xs font-mono text-text-muted ml-1 shrink-0">{userUnit}</span>
                           </div>
 
                           {/* Reps Input Box */}
@@ -774,7 +774,7 @@ export default function LogPastWorkoutModal({
                               onBlur={() => handleSetBlur(exIdx, sIdx, 'reps')}
                               className="w-full text-center font-mono font-bold text-xs sm:text-sm text-text-primary bg-transparent outline-none p-0 tabular-nums"
                             />
-                            <span className="text-3xs font-mono text-text-muted ml-1 shrink-0">{t('lp.repsUnit')}</span>
+                            <span className="text-2xs font-mono text-text-muted ml-1 shrink-0">{t('lp.repsUnit')}</span>
                           </div>
 
                           {/* RPE Selector */}
@@ -820,7 +820,7 @@ export default function LogPastWorkoutModal({
 
                       {/* Quick Weight Adjust Chips for Active Set */}
                       <div className="flex items-center justify-between pt-1 px-1">
-                        <span className="text-3xs font-mono text-text-muted">
+                        <span className="text-2xs font-mono text-text-muted">
                           {t('lp.quickStep', { unit: userUnit })}
                         </span>
                         <div className="flex items-center gap-1">

@@ -183,7 +183,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
           <button
             type="button"
             onClick={onCancel}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary cursor-pointer"
             aria-label="Close run"
           >
             <X className="w-5 h-5" />
@@ -206,7 +206,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
                 style={{ width: `${overallPct}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-3xs text-text-muted font-mono tabular-nums">
+            <div className="flex items-center justify-between text-2xs text-text-muted font-mono tabular-nums">
               <span>{fmtClock(elapsed)}</span>
               <span>{fmtClock(totalSeconds)}</span>
             </div>
@@ -223,7 +223,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
             <button
               type="button"
               onClick={() => setIsRunning((v) => !v)}
-              className="w-16 h-16 rounded-full bg-accent text-white flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/25"
+              className="w-16 h-16 rounded-full bg-accent text-accent-on flex items-center justify-center active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/25"
               aria-label={isRunning ? t('run.pause') : t('run.resume')}
             >
               {isRunning ? <Pause className="w-7 h-7" /> : <Play className="w-7 h-7 fill-white" />}
@@ -248,7 +248,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
               {t('run.endRun')}
             </button>
           </div>
-          <p className="text-3xs text-text-muted">
+          <p className="text-2xs text-text-muted">
             {t('run.intervalsDone', { done: completedBodyRef.current, total: bodyTotal })}
           </p>
         </div>
@@ -288,7 +288,7 @@ export default function RunSessionScreen({ session, onFinish, onCancel }: RunSes
             <button
               type="button"
               onClick={handleSave}
-              className="py-3 px-4 rounded-xl bg-accent text-white text-xs font-bold flex-1 active:scale-95 transition-all cursor-pointer"
+              className="py-3 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold flex-1 active:scale-95 transition-all cursor-pointer"
             >
               {t('run.saveRun')}
             </button>

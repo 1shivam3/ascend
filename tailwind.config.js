@@ -59,6 +59,9 @@ module.exports = {
           dim: 'rgb(var(--accent-dim) / <alpha-value>)',
           glow: 'var(--accent-glow)',
           vermilion: '#E44427',
+          text: 'var(--accent-text)',
+          on: 'var(--accent-on)',
+          subtle: 'var(--accent-subtle)',
         },
         border: {
           DEFAULT: 'rgb(var(--border) / <alpha-value>)',
@@ -70,7 +73,11 @@ module.exports = {
         protein: '#22C55E',
         creatine: '#F5B301',
         weight: '#A78BFA',
-        success: '#858076',
+        // D2 fix (UX redesign): success is NO LONGER sage. Light #157347
+        // on #E6F4EA, dark #4ADE80 on rgba(74,222,128,0.15) — see
+        // globals.css --success / --success-bg. Always paired with a
+        // check icon + label, never color alone.
+        success: 'rgb(var(--success) / <alpha-value>)',
         warning: '#f59e0b',
         danger: '#ef4444',
         error: '#ef4444',
@@ -78,18 +85,26 @@ module.exports = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'Inter', 'var(--font-devanagari)', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['var(--font-sans)', 'Inter', 'var(--font-devanagari)', 'system-ui', '-apple-system', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        // Display: Barlow Condensed, wired ONLY for display headings
+        // ≥28px + wordmark (design-system §4). Devanagari glyphs fall
+        // back per-glyph to Noto; if a live check shows mixed-script
+        // inconsistency, the fallback is Inter-only with tight tracking.
+        display: ['var(--font-display)', 'Barlow Condensed', 'var(--font-devanagari)', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       fontSize: {
-        // text-3xs is used in 100+ places but was never defined — those
-        // labels silently fell back to inherited sizes. 10px/14px.
-        '3xs': ['0.625rem', { lineHeight: '0.875rem' }],
-        '2xs': ['0.65rem', { lineHeight: '0.875rem' }],
+        // Label floor raised (UX redesign): 3xs (10px) is REMOVED; 2xs
+        // is redefined to 11px. All former text-3xs usages were bumped
+        // to text-2xs (341 sites) — 10px text no longer exists.
+        '2xs': ['0.6875rem', { lineHeight: '0.875rem' }],
         label:   ['12px', '16px'],
         body:    ['14px', '20px'],
         title:   ['17px', '24px'],
+        pageTitle: ['22px', '28px'],
         display: ['32px', '36px'],
+        prominent: ['28px', '32px'],
+        compactMetric: ['20px', '24px'],
+        chartLabel: ['11px', '14px'],
       },
       boxShadow: {
         xs: '0 1px 2px 0 rgba(0, 0, 0, 0.04)',

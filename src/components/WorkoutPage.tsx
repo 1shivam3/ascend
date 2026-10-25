@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
+import { getScheduledPlanEntries } from '@/lib/scheduled-days';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
@@ -95,6 +96,8 @@ import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAU
 import { useToast } from '@/components/ui/Toast';
 
 import ActiveWorkoutScreen from '@/components/ActiveWorkoutScreen';
+import { resolveWorkoutMode } from '@/lib/workout-mode';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import RunSessionScreen from '@/components/RunSessionScreen';
 import {
   getRunProgramProgress,
@@ -261,13 +264,13 @@ function PlanModal({
         <div className="p-4 border-b border-border flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold text-text-primary">
-              {initial ? 'Edit Plan' : 'Create Workout Plan'}
+              {initial ? 'Edit Plan' : 'Build workout plan'}
             </h2>
             <p className="text-2xs text-text-muted font-mono mt-0.5">
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -328,12 +331,12 @@ function PlanModal({
                 />
               </button>
             </div>
-            <p className="text-3xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
+            <p className="text-2xs text-text-muted leading-relaxed">{t('plan.intensityPercentHint')}</p>
             {intensityMode === 'percent' &&
               !planExercises.some(
                 (ex) => isMainCompound(ex.name) && estimateE1rmKg(ex.name, prs, workouts) !== null
               ) && (
-                <p className="text-3xs text-amber-400 leading-relaxed">{t('plan.intensityNoData')}</p>
+                <p className="text-2xs text-amber-400 leading-relaxed">{t('plan.intensityNoData')}</p>
               )}
           </div>
 
@@ -380,14 +383,14 @@ function PlanModal({
 
                   {/* Name */}
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-3xs text-text-muted font-mono">NAME</span>
+                    <span className="text-2xs text-text-muted font-mono">NAME</span>
                     <button
                       type="button"
                       onClick={() => {
                         setTargetExerciseIndex(i);
                         setIsSelectorOpen(true);
                       }}
-                      className="text-3xs text-accent hover:underline font-mono"
+                      className="text-2xs text-accent hover:underline font-mono"
                     >
                       Pick from library
                     </button>
@@ -458,7 +461,7 @@ function PlanModal({
                     const weights = percentSetWeights(e1rmKg, ex.targetSets || 1, unit);
                     const e1rmDisplay = unit === 'lbs' ? Math.round(e1rmKg * 2.20462) : Math.round(e1rmKg);
                     return (
-                      <p className="mt-2 text-3xs font-mono text-accent">
+                      <p className="mt-2 text-2xs font-mono text-accent">
                         {t('plan.suggestedFrom1rm', {
                           weight: weights[0],
                           unit,
@@ -602,9 +605,9 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             })}
             title={t('plan.usePercent')}
             aria-pressed={plan.intensityMode === 'percent'}
-            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-3xs font-mono font-bold transition-colors cursor-pointer ${
+            className={`px-2 py-1.5 min-h-[44px] rounded-lg text-2xs font-mono font-bold transition-colors cursor-pointer ${
               plan.intensityMode === 'percent'
-                ? 'bg-accent text-white'
+                ? 'bg-accent text-accent-on'
                 : 'text-text-muted hover:text-accent hover:bg-accent/10'
             }`}
           >
@@ -667,7 +670,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
       <div className="flex flex-col gap-1">
         {plan.exercises.map((ex, i) => (
           <div key={i} className="flex items-center justify-between text-xs px-1">
-            <span className="text-text-secondary truncate flex-1 mr-2">{ex.name || '—'}</span>
+            <span className="text-text-secondary truncate flex-1 mr-2" title={ex.name || undefined}>{ex.name || '—'}</span>
             <span className="text-text-muted font-mono shrink-0">
               {ex.targetSets}×{ex.targetReps}
               {ex.targetWeight ? ` @ ${ex.targetWeight}${ex.targetUnit ?? ''}` : ''}
@@ -680,7 +683,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           plan can be adopted by the coach without changing it. */}
       {(isBlockPlan || isAdopted) && (
         <div className="flex items-center gap-1.5">
-          <span className="text-3xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+          <span className="text-2xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
             {isBlockPlan ? t('coachBlock.badgeBlock') : t('coachBlock.badgeManaged')}
           </span>
           {isAdopted && !isBlockPlan && (
@@ -739,8 +742,12 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const goals = useStore((state) => state.goals && state.goals.length > 0 ? state.goals : DEFAULT_GOALS);
   const trainingDecisions = useStore((state) => state.trainingDecisions);
   const policyDecisionRecords = useStore((state) => state.policyDecisionRecords);
-  const userMode = useStore((state) => state.userMode) || 'beginner';
-  const toggleUserMode = useStore((state) => state.toggleUserMode);
+  // UX redesign Stage 4 — workout view follows app density unless the
+  // user pinned an explicit override (null = Auto, follows density).
+  const density = useStore((state) => state.uiPreferences?.density ?? 'simple');
+  const workoutModeOverride = useStore((state) => state.uiPreferences?.workoutModeOverride ?? null);
+  const setUiPreferences = useStore((state) => state.setUiPreferences);
+  const workoutMode = resolveWorkoutMode(density, workoutModeOverride);
   const weeklySchedule = useStore((state) => state.weeklySchedule);
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   // Coach blocks (PR-B)
@@ -1840,13 +1847,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ─── Screen 4 Figma Blueprint Helpers ─────────────────────────────────────
   const splitLabel = useMemo(() => {
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
+    // FND-02: pinned scheduled-day definition — a day counts only when
+    // its plan still exists, matching the adherence denominator.
+    const scheduledDaysCount = getScheduledPlanEntries(weeklySchedule, plannedWorkouts).length;
     const days = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
     const splitType = trainingProfile?.preferredSplit === 'push_pull_legs' ? 'PUSH / PULL / LEGS' : trainingProfile?.preferredSplit === 'bro_split' ? 'BRO SPLIT' : 'UPPER / LOWER';
     return `${days}-DAY ${splitType}`;
-  }, [weeklySchedule, trainingProfile]);
+  }, [weeklySchedule, plannedWorkouts, trainingProfile]);
 
   const currentWeekDateRange = useMemo(() => {
     const now = new Date();
@@ -1872,9 +1879,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const weekWorkouts = workouts.filter((w) => parseLocalDate(w.date) >= startOfWeek);
     const trainedDates = new Set(weekWorkouts.map((w) => w.date.split('T')[0]));
 
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
+    // FND-02: pinned scheduled-day definition — a day counts only when
+    // its plan still exists, matching the adherence denominator.
+    const scheduledDaysCount = getScheduledPlanEntries(weeklySchedule, plannedWorkouts).length;
     const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
 
     const daysLabels: { day: DayOfWeek; short: string }[] = [
@@ -2052,7 +2059,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={goBack}
-                className="w-10 h-10 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
+                className="w-11 h-11 rounded-full bg-bg-card border border-border/80 flex items-center justify-center text-text-primary hover:border-accent/40 transition-colors cursor-pointer"
                 aria-label="Go back"
               >
                 <ChevronLeft className="w-5 h-5 text-accent" />
@@ -2064,11 +2071,11 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           </div>
 
           <div className="flex items-center gap-2">
-            {userMode === 'advanced' && (
+            {workoutMode === 'advanced' && (
               <button
                 type="button"
                 onClick={() => setIsPlateModalOpen(true)}
-                className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+                className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
                 title="Plate Calculator"
                 aria-label="Plate Calculator"
               >
@@ -2078,7 +2085,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={() => setIsToolsMenuOpen(true)}
-              className="w-10 h-10 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
+              className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
               title="Training Tools & Actions"
               aria-label="Training Tools"
             >
@@ -2343,7 +2350,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {plannedWorkouts.map((plan) => (
               <PlanCard
                 key={plan.id}
@@ -2452,7 +2459,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               {runProgress.nextSession && (
                 <div className="flex items-center justify-between gap-3 p-3 rounded-xl bg-bg-secondary border border-border/60">
                   <div className="min-w-0">
-                    <p className="text-3xs font-bold text-text-muted uppercase tracking-wide">{t('run.nextRun')}</p>
+                    <p className="text-2xs font-bold text-text-muted uppercase tracking-wide">{t('run.nextRun')}</p>
                     <p className="text-xs font-semibold text-text-primary mt-0.5">
                       {t('run.sessionLabel', { week: runProgress.nextSession.week, day: runProgress.nextSession.day })}
                       {' · '}
@@ -2500,7 +2507,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 onClick={() => startTimer(s)}
                 className={`px-2 py-1 rounded-lg text-2xs font-semibold border transition-all ${
                   restTotalSeconds === s && restSecondsLeft > 0
-                    ? 'bg-accent text-white border-accent'
+                    ? 'bg-accent text-accent-on border-accent'
                     : 'bg-bg-secondary border-border text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -2510,7 +2517,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <button
               type="button"
               onClick={togglePauseTimer}
-              className="p-1.5 rounded-lg bg-accent text-white hover:brightness-105 active:scale-95 transition-all"
+              className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
               title={isRestRunning ? 'Pause' : 'Start'}
             >
               {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
@@ -2574,7 +2581,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </section>
 
       {/* ── ASCEND AUDITABLE PRESCRIPTION: DECISION LEDGER (Advanced mode) ── */}
-      {userMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
+      {workoutMode === 'advanced' && (activePolicyDecision || (activeTrainingDecision && activeTrainingDecision.evidenceCount >= 1)) && (
         <section className="space-y-2" aria-label="Progression Policy Recommendation">
           <div
             className="flex items-center justify-between cursor-pointer p-3 rounded-xl bg-bg-card border border-border/70 hover:border-accent/40 transition-colors shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -2591,7 +2598,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             aria-label="Toggle progression policy recommendation"
           >
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-accent" />
               <h2 className="section-title text-[11px] mb-0 font-mono">
                 {activePolicyDecision
                   ? 'TRAINING DECISION POLICY RECOMMENDATION'
@@ -2599,7 +2606,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </h2>
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-3xs text-text-muted font-mono hidden sm:inline">
+              <span className="text-2xs text-text-muted font-mono hidden sm:inline">
                 {isDecisionExpanded ? 'Collapse' : 'Inspect Insights'}
               </span>
               {isDecisionExpanded ? (
@@ -2742,7 +2749,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             <div className="flex items-center justify-between flex-wrap gap-1">
                               <p className="font-medium text-accent text-sm">{ex.name}</p>
                               {effortSummary && effortSummary.averageRpe > 0 && (
-                                <div className="flex items-center gap-1.5 text-3xs font-mono">
+                                <div className="flex items-center gap-1.5 text-2xs font-mono">
                                   <span className="text-text-muted">Effort:</span>
                                   <span className="px-1.5 py-0.5 rounded bg-bg-primary border border-border text-accent font-bold">
                                     Avg @{effortSummary.averageRpe} RPE
@@ -2819,7 +2826,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                       )}
                                       {isDone && rpeVal !== undefined && (
                                         <span
-                                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
+                                          className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
                                           title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
                                         >
                                           @{rpeVal}
@@ -3116,7 +3123,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3141,7 +3148,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <span className="text-xs font-bold text-text-primary block group-hover:text-accent transition-colors">
                       Log Finished / Past Workout
                     </span>
-                    <span className="text-3xs text-text-muted">
+                    <span className="text-2xs text-text-muted">
                       Already completed your session? Record weights and reps now
                     </span>
                   </div>
@@ -3205,13 +3212,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                 {plan.name}
                               </span>
                               {scheduledDays.length > 0 && (
-                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-3xs font-mono font-bold text-text-muted">
+                                <span className="px-1.5 py-0.2 rounded bg-bg-card border border-border text-2xs font-mono font-bold text-text-muted">
                                   {scheduledDays.join(', ')}
                                 </span>
                               )}
                             </div>
                             {bodyParts.length > 0 ? (
-                              <span className="text-3xs text-accent font-medium block mt-0.5">
+                              <span className="text-2xs text-accent font-medium block mt-0.5">
                                 {bodyParts.join(' • ')}
                               </span>
                             ) : null}
@@ -3278,7 +3285,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3379,7 +3386,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Create Workout Plan</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Build workout plan</h4>
                     <p className="text-2xs text-text-muted">Design a reusable custom workout routine</p>
                   </div>
                 </div>
@@ -3387,21 +3394,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               </button>
             </div>
 
-            {/* Display Mode Switch */}
-            <div className="pt-3 border-t border-border/80 flex items-center justify-between">
+            {/* Workout view — follows app density unless overridden (Stage 4) */}
+            <div className="pt-3 border-t border-border/80 space-y-2">
               <div>
-                <span className="text-xs font-bold text-text-primary block">Display Mode</span>
+                <span className="text-xs font-bold text-text-primary block">{t('workout.viewMode')}</span>
                 <span className="text-2xs text-text-muted">
-                  {userMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                  {workoutMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                  {workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}
                 </span>
               </div>
-              <button
-                type="button"
-                onClick={() => toggleUserMode()}
-                className="px-3 py-1.5 rounded-lg border border-border bg-bg-secondary text-xs font-bold text-accent hover:border-accent/40 transition-colors cursor-pointer"
-              >
-                Switch to {userMode === 'advanced' ? 'Simple' : 'Advanced'}
-              </button>
+              <SegmentedControl
+                ariaLabel={t('workout.viewMode')}
+                value={workoutModeOverride ?? 'auto'}
+                options={[
+                  { value: 'auto', label: t('workout.viewAuto') },
+                  { value: 'beginner', label: t('workout.viewSimple') },
+                  { value: 'advanced', label: t('workout.viewAdvanced') },
+                ]}
+                onChange={(v) => setUiPreferences({ workoutModeOverride: v === 'auto' ? null : v })}
+              />
             </div>
           </div>
         </div>

@@ -162,7 +162,9 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       expect(html).toContain('Share Workout Split');
       expect(html).toContain('Weekly Training Card');
       expect(html).toContain('App Settings');
-      expect(html).toContain('Log Out');
+      // FND-05: Log Out moved to Settings → Data & Account; Profile
+      // now shows the Data & Account row that lands there.
+      expect(html).toContain('Data &amp; Account');
     });
 
     it('correctly adapts when unit is lbs', () => {
@@ -202,12 +204,20 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
 
       expect(html).toContain('Settings');
       expect(html).toContain('Account &amp; Security');
-      expect(html).toContain('App Preferences');
+      // UX redesign Stage 6 — IA regroup: App Preferences / Customization
+      // became Appearance & personalization + Training preferences.
+      expect(html).toContain('Appearance &amp; personalization');
+      expect(html).toContain('Training preferences');
       expect(html).toContain('Appearance');
       expect(html).toContain('Chalk');
       expect(html).toContain('Graphite');
+      expect(html).toContain('Accent theme');
+      expect(html).toContain('Information density');
+      expect(html).toContain('Customize Today');
       expect(html).toContain('Units of Measure');
-      expect(html).toContain('Athlete Experience');
+      // Live-fix L3: the row is the workout view mode, not athlete
+      // experience — the old label misled users on density switches.
+      expect(html).toContain('Workout view');
       expect(html).toContain('Data, Privacy &amp; Legal');
       expect(html).toContain('Export JSON Backup');
       expect(html).toContain('Import Backup File');

@@ -95,7 +95,7 @@ export default function ReportAIModal({
               <h3 className="font-bold text-sm text-text-primary">
                 {t('report.title')}
               </h3>
-              <p className="text-3xs text-text-muted font-mono">
+              <p className="text-2xs text-text-muted font-mono">
                 {t('report.subtitle')}
               </p>
             </div>
@@ -103,7 +103,7 @@ export default function ReportAIModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary"
             aria-label="Close report form"
           >
             <X className="w-4 h-4" />
@@ -125,7 +125,7 @@ export default function ReportAIModal({
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="p-2.5 rounded-xl bg-bg-secondary/70 border border-border text-2xs space-y-1">
-              <span className="text-3xs font-mono font-bold uppercase text-text-muted block">
+              <span className="text-2xs font-mono font-bold uppercase text-text-muted block">
                 {t('report.flaggedSource', { source: sourceFeature })}
               </span>
               {aiContentSnippet && (

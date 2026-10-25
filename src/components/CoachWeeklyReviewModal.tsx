@@ -62,7 +62,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -71,7 +71,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {/* The one focus */}
         <div className="p-3 rounded-xl bg-accent/10 border border-accent/30">
-          <p className="text-3xs font-mono font-bold uppercase text-accent">
+          <p className="text-2xs font-mono font-bold uppercase text-accent">
             {t('weeklyReview.focusLabel')}
           </p>
           <p className="text-sm font-bold text-text-primary mt-0.5">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
@@ -87,7 +87,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
         {/* The week in numbers */}
         <div className="grid grid-cols-2 gap-2">
           <div className="p-3 rounded-xl bg-bg-secondary border border-border/70">
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted">
               {t('weeklyReview.sessions')}
             </p>
             <p className="text-lg font-black text-text-primary">
@@ -101,7 +101,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             )}
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary border border-border/70">
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted">
               {t('weeklyReview.tonnage')}
             </p>
             <p className="text-lg font-black text-text-primary">
@@ -119,7 +119,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {review.volumeHighlights.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.volumeTitle')}
             </p>
             <div className="space-y-1">
@@ -142,7 +142,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {review.prs.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.prsTitle')}
             </p>
             <div className="space-y-1">
@@ -157,7 +157,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {review.recoveryLines.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.recoveryTitle')}
             </p>
             <div className="space-y-1">
@@ -172,7 +172,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {review.coachLines.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.coachChangedTitle')}
             </p>
             <div className="space-y-1">
@@ -187,7 +187,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {review.revisions.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.nextWeekTitle')}
             </p>
             <div className="space-y-2">

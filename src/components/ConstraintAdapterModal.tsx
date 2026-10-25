@@ -120,7 +120,7 @@ export default function ConstraintAdapterModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -192,7 +192,7 @@ export default function ConstraintAdapterModal({
                       onClick={() => setSelectedMinutes(m)}
                       className={`px-3 py-1 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                         selectedMinutes === m
-                          ? 'bg-accent text-white shadow-xs'
+                          ? 'bg-accent text-accent-on shadow-xs'
                           : 'bg-bg-secondary text-text-muted border border-border/70 hover:text-text-primary'
                       }`}
                     >

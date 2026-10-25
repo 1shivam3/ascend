@@ -27,7 +27,6 @@ import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
 import EditProfileModal from '@/components/EditProfileModal';
-import ConfirmationModal from '@/components/ConfirmationModal';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
 import DataVaultModal from '@/components/DataVaultModal';
@@ -46,12 +45,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   const plannedWorkouts = useStore((state) => state.plannedWorkouts || []);
   const prs = useStore((state) => state.prs || []);
   const goals = useStore((state) => state.goals || []);
-  const logout = useStore((state) => state.logout);
   const toast = useToast();
   const { t } = useTranslation();
 
   const { goBack, canGoBack } = useAppNavigation();
-  const { user, signOut } = useSupabaseSync();
+  const { user } = useSupabaseSync();
 
   // Modals
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -78,7 +76,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     }
     setIsSharePickerOpen(true);
   };
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const handleBack = useCallback(() => {
     if (onBack) {
@@ -93,18 +90,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
   // NOTE: no system-back handler is registered in page mode. Tab-level back is
   // already handled by the navigation stack; registering handleBack here would
   // recurse (handleBack -> goBack -> runBackHandlers -> handleBack ...).
-
-  const handleConfirmLogout = async () => {
-    setShowLogoutConfirm(false);
-    try {
-      await signOut();
-    } catch (err) {
-      console.warn('Sign out warning:', err);
-    }
-    logout({ clearLocalData: false });
-    toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
-    if (onNavigate) onNavigate('home');
-  };
 
   const athleteName = profile?.name ? profile.name.trim() : 'Alex';
   const athleteInitial = athleteName.charAt(0).toUpperCase();
@@ -211,12 +196,12 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 {user?.email || athleteEmail}
               </p>
               <div className="pt-1">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-3xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-sage" />
                   {athleteTier.title} · {t('profile.level', { level: athleteTier.level })}
                 </span>
                 {athleteTier.estimatedCount > 0 && (
-                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                  <p className="text-2xs text-amber-500 mt-1 leading-relaxed">
                     {t('profile.estimatedLifts', {
                       estimated: athleteTier.estimatedCount,
                       total: athleteTier.totalLifts,
@@ -227,11 +212,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                     "excluded" copy above while actually being INCLUDED.
                     Say so plainly, plus the tables' real basis. */}
                 {athleteTier.isEstimate && (
-                  <p className="text-3xs text-amber-500 mt-1 leading-relaxed">
+                  <p className="text-2xs text-amber-500 mt-1 leading-relaxed">
                     {t('profile.allEstimated')}
                   </p>
                 )}
-                <p className="text-3xs text-text-muted mt-1 leading-relaxed">
+                <p className="text-2xs text-text-muted mt-1 leading-relaxed">
                   {t('profile.levelTablesNote')}
                 </p>
               </div>
@@ -252,7 +237,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         {/* ── 3-Column Quick Metrics Card ──────────────────────────────────── */}
         <div className="grid grid-cols-3 gap-2.5 pt-2 border-t border-border/60">
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('profile.height')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -261,7 +246,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           </div>
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('home.weight')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -270,7 +255,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           </div>
 
           <div className="p-3 rounded-xl bg-bg-secondary/60 border border-border/80 text-center shadow-2xs">
-            <span className="text-3xs uppercase tracking-wider text-text-muted font-mono font-bold block">
+            <span className="text-2xs uppercase tracking-wider text-text-muted font-mono font-bold block">
               {t('profile.age')}
             </span>
             <span className="text-base sm:text-lg font-black text-text-primary font-mono block mt-0.5">
@@ -282,7 +267,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
       {/* ── SECTION 1: ACCOUNT & TRAINING MENU ──────────────────────────────── */}
       <div className="space-y-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('profile.sectionAccount')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
@@ -298,7 +283,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.personalDetails')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.personalDetailsHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.personalDetailsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -316,7 +301,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.fitnessGoals')}</p>
-                <p className="text-3xs text-text-muted">
+                <p className="text-2xs text-text-muted">
                   {goals.length > 0
                     ? goals.map((g) => ATHLETE_GOAL_CONFIGS[g]?.label || g).join(', ')
                     : t('profile.defaultGoal')}
@@ -338,7 +323,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.reminders')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.remindersHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.remindersHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -356,7 +341,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.dataStorage')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.dataStorageHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.dataStorageHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -374,7 +359,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.appSettings')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.appSettingsHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.appSettingsHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -384,7 +369,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
 
       {/* ── SECTION 2: SHARING & COMMUNITY ──────────────────────────────────── */}
       <div className="space-y-2">
-        <span className="text-3xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('profile.sectionSharing')}
         </span>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
@@ -400,7 +385,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.shareSplit')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.shareSplitHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.shareSplitHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -418,7 +403,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.weeklyCard')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.weeklyCardHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.weeklyCardHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -436,7 +421,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
               </div>
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.feedback')}</p>
-                <p className="text-3xs text-text-muted">{t('profile.feedbackHint')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.feedbackHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -444,15 +429,24 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         </div>
       </div>
 
-      {/* ── Log Out Button ──────────────────────────────────────────────────── */}
+      {/* ── Data & Account (FND-05) ───────────────────────────────────────────
+          Log Out no longer lives here: all destructive actions sit in
+          one place, Settings → Data & Account. This row navigates there
+          and lands scrolled on that section. */}
       <div className="pt-2">
         <button
           type="button"
-          onClick={() => setShowLogoutConfirm(true)}
+          onClick={() => {
+            try {
+              sessionStorage.setItem('ascend_settings_section', 'data-account');
+            } catch {}
+            onNavigate?.('settings');
+          }}
           className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border text-xs font-bold text-text-secondary hover:text-accent transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
           <LogOut className="w-4 h-4 text-accent" />
-          <span>{t('profile.logOut')}</span>
+          <span>{t('settings.dataAccount')}</span>
+          <ChevronRight className="w-4 h-4 text-text-muted" />
         </button>
       </div>
 
@@ -536,18 +530,6 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
         onClose={() => setSharePlan(null)}
       />
 
-      {/* Screen 24: Log Out Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showLogoutConfirm}
-        onClose={() => setShowLogoutConfirm(false)}
-        onConfirm={handleConfirmLogout}
-        title={t('profile.logoutTitle')}
-        message={user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}
-        confirmText={t('profile.logOut')}
-        cancelText={t('common.cancel')}
-        variant="default"
-        icon="logout"
-      />
     </div>
   );
 }

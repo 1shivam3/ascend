@@ -72,7 +72,7 @@ export default function RankBadge({
       case 'GRANDMASTER':
         return {
           icon: Sparkles,
-          containerClass: 'border-accent bg-gradient-to-r from-accent/20 via-warning/25 to-accent/20 text-accent rounded-md shadow-lg ring-2 ring-accent/50 animate-pulse',
+          containerClass: 'border-accent bg-gradient-to-r from-accent/20 via-warning/25 to-accent/20 text-accent rounded-md shadow-lg ring-2 ring-accent/50',
           label: t('ui.rankGrandmaster'),
           accentBorder: 'border-accent ring-2 ring-accent/60 shadow-[0_0_12px_rgba(229,192,123,0.25)]'
         };

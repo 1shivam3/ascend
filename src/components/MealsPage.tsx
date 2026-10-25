@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
+import { mergeEditedMealFoods } from '@/lib/meal-edit';
 import {
   estimateMacros,
   calculateMealMacros,
@@ -56,6 +57,7 @@ import { resolveIndianMeta } from '@/lib/indian-foods';
 import { OIL_LEVELS, OIL_LEVEL_LABEL_KEYS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
 import { getFoodHindiName } from '@/lib/food-hindi';
+import { isExactFoodItem, foodsAllExact, tildeForFoods } from '@/lib/meal-display';
 import {
   getProteinGapSuggestion,
   getWholeDayAdaptation,
@@ -170,6 +172,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const macroGoals         = useStore((state) => state.macroGoals);
   const favoriteFoods      = useStore((state) => state.favoriteFoods || []);
   const addMeal            = useStore((state) => state.addMeal);
+  const updateMeal         = useStore((state) => state.updateMeal);
   const deleteMeal         = useStore((state) => state.deleteMeal);
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const restoreFoodToMeal  = useStore((state) => state.restoreFoodToMeal);
@@ -232,6 +235,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealToDelete,          setMealToDelete]          = useState<{ id: string; name: string } | null>(null);
+  // FND-03: the meal being edited in the LOG MEAL form (null = adding).
+  // The snapshot holds the ORIGINAL foods so their exact/estimated
+  // provenance flags survive a quantity/unit/macro edit unchanged.
+  const [editingMeal,           setEditingMeal]           = useState<{ id: string; foods: FoodItem[] } | null>(null);
   const deleteMealRef = useRef<HTMLDivElement>(null); const { dialogProps: deleteMealDialogProps } = useModalA11y(deleteMealRef, mealToDelete !== null, () => setMealToDelete(null));
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
@@ -361,6 +368,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const resetBuilderForm = () => {
     setMealName('');
     setFoods([]);
+    setEditingMeal(null);
+  };
+
+  // FND-03: open the LOG MEAL form prefilled with a logged meal, for
+  // per-meal edit (header button) and per-item edit (item-row button —
+  // the item's own row in the form is where its quantity/unit/macros
+  // change). Copies, so cancelling never mutates the logged meal.
+  const handleEditMeal = (meal: MealEntry) => {
+    setEditingMeal({ id: meal.id, foods: meal.foods.map((f) => ({ ...f })) });
+    setMealName(meal.name);
+    setFoods(meal.foods.map((f) => ({ ...f })));
+    setIsModalOpen(true);
   };
 
   // ── Natural language meal logging ──────────────────────────────────────────
@@ -945,9 +964,27 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     const mealMacros = calculateMealMacros(cleanedFoods);
 
+    // FND-03: edit in place — same meal id, same date, no duplicate
+    // history row, NOT delete + recreate. Provenance rule lives in
+    // lib/meal-edit (an item whose name still matches an original
+    // keeps that item's exact/estimated flags verbatim, so a quantity
+    // edit cannot flip an estimate into an exact value or vice versa
+    // — the FND-10 inconsistency).
+    if (editingMeal) {
+      const mergedFoods: FoodItem[] = mergeEditedMealFoods(cleanedFoods, editingMeal.foods);
+      updateMeal(editingMeal.id, { name: finalMealName, foods: mergedFoods });
+      toast.success(
+        t('toast.mealUpdated', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG), tilde: tildeForFoods(mergedFoods) }),
+        t('toast.titleMealLogged')
+      );
+      resetBuilderForm();
+      setIsModalOpen(false);
+      return;
+    }
+
     addMeal(newMeal);
     toast.success(
-      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG) }),
+      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG), tilde: tildeForFoods(cleanedFoods) }),
       t('toast.titleMealLogged')
     );
     resetBuilderForm();
@@ -1167,7 +1204,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             snippet: [
               q,
               data.foods.map((f: FoodItem) => f.name).join(', '),
-              `~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
+              `${tildeForFoods(data.foods)}${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
             ]
               .filter(Boolean)
               .join(' — '),
@@ -1176,8 +1213,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         warnUnmatched(data.foods);
         toast.success(
           data.foods.length === 1
-            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 })
-            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 }),
+            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0, tilde: tildeForFoods(data.foods) })
+            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0, tilde: tildeForFoods(data.foods) }),
           t('toast.titleMealLogged')
         );
         return;
@@ -1219,8 +1256,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           warnUnmatched(offlineFoods);
           toast.success(
             offlineFoods.length === 1
-              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG })
-              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG }),
+              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG, tilde: tildeForFoods(offlineFoods) })
+              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG, tilde: tildeForFoods(offlineFoods) }),
             t('toast.titleMealLoggedOffline')
           );
           return;
@@ -1675,9 +1712,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       key={opt.labelKey}
                       type="button"
                       onClick={() => setMealDayKind(todayDate, opt.kind ?? null)}
-                      className={`px-2 py-1 rounded-full text-3xs font-semibold transition-all cursor-pointer ${
+                      className={`px-2 py-1 rounded-full text-2xs font-semibold transition-all cursor-pointer ${
                         active
-                          ? 'bg-accent text-white'
+                          ? 'bg-accent text-accent-on'
                           : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                       }`}
                     >
@@ -1687,7 +1724,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 })}
               </div>
               {dayTargets && (
-                <p className="text-3xs text-text-muted text-center leading-relaxed px-2">
+                <p className="text-2xs text-text-muted text-center leading-relaxed px-2">
                   {dayTargets.note}
                 </p>
               )}
@@ -1698,7 +1735,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {((!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
               <CollapsibleDetails label={t('meals.why')} className="w-full">
                 {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
-                  <span className="text-3xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
+                  <span className="text-2xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
                     {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
                     {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
                     {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
@@ -1713,7 +1750,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   </span>
                 )}
                 {typeof todayMacros.sugarG === 'number' && (
-                  <p className="w-full text-center text-3xs text-text-muted pt-1">
+                  <p className="w-full text-center text-2xs text-text-muted pt-1">
                     {t('meals.sugarNote')}{' '}
                     <span className="font-bold text-text-secondary">{Math.round(todayMacros.sugarG)}g</span>{' '}
                     {t('meals.sugarNoteSuffix')}
@@ -1726,33 +1763,33 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="w-full grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
               {/* Protein */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-accent tracking-wider block">{t('meals.protein')}</span>
+                <span className="text-2xs uppercase font-bold text-accent tracking-wider block">{t('meals.protein')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.proteinG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {displayGoals?.proteinG || proteinTargetG}g
                 </span>
               </div>
 
               {/* Carbs */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-text-secondary tracking-wider block">{t('meals.carbs')}</span>
+                <span className="text-2xs uppercase font-bold text-text-secondary tracking-wider block">{t('meals.carbs')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.carbsG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {macroGoals?.carbsG || 220}g
                 </span>
               </div>
 
               {/* Fat */}
               <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/50 text-center space-y-1">
-                <span className="text-3xs uppercase font-bold text-text-muted tracking-wider block">{t('meals.fat')}</span>
+                <span className="text-2xs uppercase font-bold text-text-muted tracking-wider block">{t('meals.fat')}</span>
                 <span className="text-base font-extrabold text-text-primary tabular-nums block">
                   {Math.round(todayMacros.fatG)}g
                 </span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   / {macroGoals?.fatG || 70}g
                 </span>
               </div>
@@ -1868,7 +1905,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('meals.scanFood')}</span>
-                <span className="text-3xs text-text-muted">{t('meals.takePhoto')}</span>
+                <span className="text-2xs text-text-muted">{t('meals.takePhoto')}</span>
               </div>
             </button>
 
@@ -1882,7 +1919,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </div>
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('meals.scanBarcode')}</span>
-                <span className="text-3xs text-text-muted">{t('meals.packagedProducts')}</span>
+                <span className="text-2xs text-text-muted">{t('meals.packagedProducts')}</span>
               </div>
             </button>
           </div>
@@ -1930,10 +1967,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label={t('meals.logMealAria')}
-                className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3 py-1.5 min-h-[44px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
-                  <span className="animate-pulse text-2xs">...</span>
+                  <span className="text-2xs">...</span>
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" />
@@ -2047,7 +2084,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <div className="truncate">
                 <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block font-mono">{t('meals.water')}</span>
                 <span className="text-xs font-bold text-text-primary font-mono block">
-                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-3xs">/ {formatWaterMl(waterTargetMl)}</span>
+                  {formatWaterMl(waterToday)} <span className="text-text-muted font-normal text-2xs">/ {formatWaterMl(waterTargetMl)}</span>
                 </span>
               </div>
             </button>
@@ -2129,10 +2166,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {t('meals.whatYouAte', { count: todayMeals.length })}
             </h2>
           </div>
+          {/* Live-fix L8: the day total is exact only when every food in
+              every meal is exact — otherwise "~" plus the "est." label.
+              No meals → plain 0, no prefix, no label. */}
           <div className="text-2xs font-mono font-bold">
-            <span className="text-accent">~{Math.round(todayMacros.calories)} kcal</span>
+            <span className="text-accent">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.calories)} kcal</span>
             <span className="text-text-muted mx-1">•</span>
-            <span className="text-emerald-400">~{Math.round(todayMacros.proteinG)}g P</span>
+            <span className="text-emerald-400">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.proteinG)}g P</span>
+            {todayMeals.length > 0 && !foodsAllExact(todayMeals.flatMap((m) => m.foods)) && (
+              <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans font-bold">{t('common.estimatedShort')}</span>
+            )}
           </div>
         </div>
 
@@ -2159,18 +2202,38 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <h3 className="font-bold text-xs sm:text-sm text-text-primary truncate">
                           {displayMealName(meal.name)}
                         </h3>
-                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
-                          ~{Math.round(mMacros.calories)} kcal
+                        {/* Live-fix L8: exact meals render no "~"; mixed
+                            meals carry "~" plus the "est." label. */}
+                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                          {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} kcal
                         </span>
-                        <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                          ~{Math.round(mMacros.proteinG)}g P
+                        <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                          {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                         </span>
+                        {!foodsAllExact(meal.foods) && (
+                          <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                            {t('common.estimatedShort')}
+                          </span>
+                        )}
                       </div>
                       <p className="text-2xs text-text-muted truncate mt-1">
                         {meal.foods.map((f) => f.name).join(", ")}
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {/* FND-03: per-meal edit — reopens this meal in the LOG MEAL form. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditMeal(meal);
+                        }}
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                        title={t('common.edit')}
+                        aria-label={`${t('common.edit')}: ${meal.name}`}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -2199,19 +2262,39 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
-                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                                <span className="text-text-secondary text-2xs shrink-0">({hiName})</span>
                               ) : null;
                             })()}
-                            <span className="text-text-muted text-3xs">
+                            <span className="text-text-muted text-2xs">
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
+                            {food.isUnmatched ? (
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                            ) : food.isApproximateMatch ? (
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                            ) : (
+                              <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <div className="text-3xs font-mono text-text-muted shrink-0">
-                              <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
+                            <div className="text-2xs font-mono text-text-muted shrink-0">
+                              {/* Live-fix L8: exact rows render no "~" — the
+                                  green Exact chip and the number must agree. */}
+                              <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal</span>
                               <span className="mx-1">•</span>
-                              <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                              <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                             </div>
+                            {/* FND-03: per-item edit — opens the meal in the
+                                LOG MEAL form, where this item's row edits. */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleEditMeal(meal); }}
+                              className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                              title={t('common.edit')}
+                              aria-label={`${t('common.edit')}: ${food.name}`}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
@@ -2259,7 +2342,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <button
             type="button"
             onClick={() => setIsScanModalOpen(true)}
-            className="py-1.5 px-3 rounded-xl bg-accent text-white text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            className="py-1.5 px-3 rounded-xl bg-accent text-accent-on text-xs font-bold hover:brightness-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
             <Camera className="w-3.5 h-3.5" />
             <span>{t('meals.scanMeal')}</span>
@@ -2317,7 +2400,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <h3 className="text-xs font-bold text-text-primary">
                         {isToday ? t('common.today') : isYesterday ? t('meals.yesterday') : new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
                       </h3>
-                      <span className="text-3xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
+                      <span className="text-2xs font-mono px-1.5 py-0.5 rounded bg-bg-secondary text-text-muted">
                         {t(dayMeals.length === 1 ? 'meals.mealCountOne' : 'meals.mealCountMany', { count: dayMeals.length })}
                       </span>
                     </div>
@@ -2326,7 +2409,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                     <span className="text-xs font-black text-text-primary tabular-nums block font-mono">
                       ~{Math.round(dayMacros.calories)} cal
                     </span>
-                    <span className="text-3xs text-accent font-semibold block font-mono">
+                    <span className="text-2xs text-accent font-semibold block font-mono">
                       {Math.round(dayMacros.proteinG)}g P • {Math.round(dayMacros.carbsG)}g C • {Math.round(dayMacros.fatG)}g F
                     </span>
                   </div>
@@ -2348,18 +2431,36 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <h4 className="font-bold text-xs text-text-primary truncate">
                                 {displayMealName(meal.name)}
                               </h4>
-                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
-                                ~{Math.round(mMacros.calories)} cal
+                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
+                                {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} cal
                               </span>
-                              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                                ~{Math.round(mMacros.proteinG)}g P
+                              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
+                                {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                               </span>
+                              {!foodsAllExact(meal.foods) && (
+                                <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                                  {t('common.estimatedShort')}
+                                </span>
+                              )}
                             </div>
                             <p className="text-2xs text-text-muted truncate mt-0.5">
                               {meal.foods.map((f) => f.name).join(", ")}
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
+                            {/* FND-03: per-meal edit — reopens this meal in the LOG MEAL form. */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditMeal(meal);
+                              }}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                              title={t('common.edit')}
+                              aria-label={`${t('common.edit')}: ${meal.name}`}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2387,19 +2488,38 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             {language === 'hi' && (() => {
                               const hiName = getFoodHindiName(food.name);
                               return hiName ? (
-                                <span className="text-text-secondary text-3xs shrink-0">({hiName})</span>
+                                <span className="text-text-secondary text-2xs shrink-0">({hiName})</span>
                               ) : null;
                             })()}
-                                  <span className="text-text-muted text-3xs">
+                                  <span className="text-text-muted text-2xs">
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
+                                  {food.isUnmatched ? (
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                                  ) : food.isApproximateMatch ? (
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                                  ) : (
+                                    <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
-                                  <div className="text-3xs font-mono text-text-muted shrink-0">
-                                    <span className="text-accent font-semibold">~{Math.round(food.calories)} cal</span>
+                                  <div className="text-2xs font-mono text-text-muted shrink-0">
+                                    {/* Live-fix L8: same exact/estimated rule as the today list. */}
+                                    <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} cal</span>
                                     <span className="mx-1">•</span>
-                                    <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                                    <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                                   </div>
+                                  {/* FND-03: per-item edit — opens the meal in the
+                                      LOG MEAL form, where this item's row edits. */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleEditMeal(meal); }}
+                                    className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                    title={t('common.edit')}
+                                    aria-label={`${t('common.edit')}: ${food.name}`}
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
@@ -2448,36 +2568,36 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         {/* Big numbers row */}
         <div className="grid grid-cols-4 gap-2 text-center">
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
+            <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.calories || 2400}
             </span>
-            <span className="text-3xs text-text-muted">cal</span>
+            <span className="text-2xs text-text-muted">cal</span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-accent block">{t('meals.protein')}</span>
+            <span className="text-2xs uppercase font-bold text-accent block">{t('meals.protein')}</span>
             <span className="text-lg font-black text-accent tabular-nums block font-mono">
               {macroGoals?.proteinG || proteinTargetG}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
+            <span className="text-2xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.carbsG || 220}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
-            <span className="text-3xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
+            <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
               {macroGoals?.fatG || 70}g
             </span>
-            <span className="text-3xs text-text-muted">
+            <span className="text-2xs text-text-muted">
               {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%
             </span>
           </div>
@@ -2485,7 +2605,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
         {/* Visual Macro Ratio Bar */}
         <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between text-3xs text-text-muted font-mono">
+          <div className="flex justify-between text-2xs text-text-muted font-mono">
             <span>{t('meals.macroSplit')}</span>
             <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}% • C {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}% • F {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%</span>
           </div>
@@ -2586,7 +2706,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ LOG MEAL MODAL ══════════════════ */}
       {isModalOpen && (
-        <div ref={mealModalRef} {...mealDialogProps} className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+        <div ref={mealModalRef} {...mealDialogProps} className="modal-overlay" onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
@@ -2602,7 +2722,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <BarcodeIcon className="w-3.5 h-3.5" />
                   <span>{t('home.scan')}</span>
                 </button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
+                <button type="button" onClick={() => { resetBuilderForm(); setIsModalOpen(false); }} className="text-text-secondary hover:text-text-primary p-1">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -2647,7 +2767,12 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <label className="text-2xs font-mono text-text-muted uppercase block mb-1">
                     {t('meals.quickAddFavorites')}
                   </label>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono">
+                  {/* Micro-fix L9b (round 2): wrap, don't scroll. The
+                      L9 mask+padding still truncated the edge chip in
+                      the initial view (scrollable ≠ visible); in this
+                      narrow dialog every chip must be visible without
+                      scrolling. */}
+                  <div className="flex flex-wrap gap-1.5 pb-1 font-mono">
                     {favoriteFoods.map((fav) => (
                       <button
                         key={fav.id}
@@ -2793,11 +2918,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         {language === 'hi' && (() => {
                                           const hiName = getFoodHindiName(sugg.name);
                                           return hiName ? (
-                                            <span className="text-3xs text-text-secondary">({hiName})</span>
+                                            <span className="text-2xs text-text-secondary">({hiName})</span>
                                           ) : null;
                                         })()}
                                         {sugg.kind === 'custom' && (
-                                          <span className="text-3xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                                          <span className="text-2xs font-bold uppercase tracking-wide bg-accent/15 text-accent px-1.5 py-0.5 rounded">
                                             {t('meals.myVersionBadge')}
                                           </span>
                                         )}
@@ -2853,7 +2978,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           {/* Recipe assumption — what the DB values already
                               count for this dish (muted, honest). */}
                           {indianMeta && hasName && (
-                            <p className="text-3xs text-text-muted leading-relaxed">
+                            <p className="text-2xs text-text-muted leading-relaxed">
                               {indianMeta.meta.assumption}
                             </p>
                           )}
@@ -2879,10 +3004,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
                                     <span className="flex items-center gap-1 text-accent font-semibold">
                                       <Sparkles className="w-3 h-3" />
-                                      ~{Math.round(food.calories)} kcal
+                                      {/* Live-fix L8: exact rows render no "~". */}
+                                      {isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal
                                     </span>
                                     <span>
-                                      P:~{food.proteinG}g • C:~{food.carbsG}g • F:~{food.fatG}g
+                                      P:{isExactFoodItem(food) ? '' : '~'}{food.proteinG}g • C:{isExactFoodItem(food) ? '' : '~'}{food.carbsG}g • F:{isExactFoodItem(food) ? '' : '~'}{food.fatG}g
                                     </span>
                                   </div>
                                 </div>
@@ -2972,7 +3098,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                         onClick={() => handleOilChange(i, level.id)}
                                         className={`px-2 py-1 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
                                           (food.oilLevel || 'none') === level.id
-                                            ? 'bg-accent text-white'
+                                            ? 'bg-accent text-accent-on'
                                             : 'bg-bg-elevated text-text-muted border border-border/60 hover:text-text-primary'
                                         }`}
                                       >
@@ -2996,14 +3122,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="p-4 border-t border-border bg-bg-card">
               <div className="flex justify-between text-xs mb-1.5 font-mono">
                 <span className="text-text-muted">{t('meals.mealTotal')}</span>
-                <span className="font-bold text-accent">~{Math.round(currentMealMacros.calories)} kcal</span>
+                {/* Live-fix L8: builder total follows the same rule —
+                    exact only when every builder food is exact. */}
+                <span className="font-bold text-accent">{foods.length === 0 ? '' : tildeForFoods(foods)}{Math.round(currentMealMacros.calories)} kcal{foods.length > 0 && !foodsAllExact(foods) && <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans text-2xs">{t('common.estimatedShort')}</span>}</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
-                <span>~{round1(currentMealMacros.proteinG)}g P</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.proteinG)}g P</span>
                 <span>•</span>
-                <span>~{round1(currentMealMacros.carbsG)}g C</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.carbsG)}g C</span>
                 <span>•</span>
-                <span>~{round1(currentMealMacros.fatG)}g F</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.fatG)}g F</span>
               </div>
               <div className="flex gap-3">
                 <button
@@ -3049,7 +3177,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsGoalsModalOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3161,7 +3289,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <button
                         type="button"
                         onClick={handleReconcileCarbs}
-                        className="px-2 py-0.5 rounded bg-accent/15 text-accent text-3xs font-bold hover:bg-accent/25 transition-colors"
+                        className="px-2 py-0.5 rounded bg-accent/15 text-accent text-2xs font-bold hover:bg-accent/25 transition-colors"
                       >
                         {t('meals.autoBalanceCarbs')}
                       </button>
@@ -3248,7 +3376,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsManagePinnedOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3377,7 +3505,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsEditPinnedOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3538,7 +3666,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               <button
                 type="button"
                 onClick={() => setIsToolsMenuOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -3673,7 +3801,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       </p>
                     </div>
                   </div>
-                  <span className="text-3xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
+                  <span className="text-2xs font-mono font-bold text-accent px-2 py-0.5 rounded bg-accent/15">
                     {t('meals.oneTap')}
                   </span>
                 </button>

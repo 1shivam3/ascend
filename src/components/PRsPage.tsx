@@ -310,7 +310,7 @@ function LevelProgressionModal({
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
             <p className="text-2xs text-text-muted font-mono mt-0.5">{t('prs.levelProgression')}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
             <X size={18} />
           </button>
         </div>
@@ -401,7 +401,7 @@ function LevelProgressionModal({
                   >
                     <div className="flex items-center gap-2">
                       {isCurrent && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0 animate-pulse" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
                       )}
                       {!isCurrent && passed && (
                         <span className="w-1.5 h-1.5 rounded-full bg-text-muted/40 shrink-0" />
@@ -592,7 +592,7 @@ function LiftCard({
               <span className="text-2xs text-text-muted font-mono">{item.levelInfo.ratio}× BW</span>
             </div>
             {isMain && (
-              <span className="text-3xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
+              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
                 {t('prs.coreLift')}
               </span>
             )}
@@ -1100,8 +1100,8 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#E44427] uppercase">{t('prs.personalBests')}</div>
-            <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">
+            <div className="text-[10px] font-mono font-bold tracking-widest text-accent uppercase">{t('prs.personalBests')}</div>
+            <h1 className="display-title uppercase">
               {t('prs.title')}
             </h1>
           </div>
@@ -1160,14 +1160,14 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
                     {Math.round(dotsScore)} DOTS
                   </span>
-                  <span className="text-3xs text-text-muted block">{t('prs.normalizedScore')}</span>
+                  <span className="text-2xs text-text-muted block">{t('prs.normalizedScore')}</span>
                 </>
               ) : (
                 <>
                   <span className="text-base font-bold text-accent tabular-nums font-mono block">
                     {t('prs.liftsCount', { count: exerciseStats.length })}
                   </span>
-                  <span className="text-3xs text-text-muted block">{t('prs.calibratedPrs')}</span>
+                  <span className="text-2xs text-text-muted block">{t('prs.calibratedPrs')}</span>
                 </>
               )}
             </div>
@@ -1180,7 +1180,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.squatMax > 0 ? displayWeight(bigThreeStats.squatMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.squatMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.squatMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1191,7 +1191,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.benchMax > 0 ? displayWeight(bigThreeStats.benchMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.benchMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.benchMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1202,7 +1202,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 {bigThreeStats.deadliftMax > 0 ? displayWeight(bigThreeStats.deadliftMax) : '—'}
               </span>
               {profile?.bodyweightKg && bigThreeStats.deadliftMax > 0 && (
-                <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                <span className="text-2xs text-text-muted font-mono block mt-0.5">
                   {(bigThreeStats.deadliftMax / profile.bodyweightKg).toFixed(2)}× BW
                 </span>
               )}
@@ -1277,7 +1277,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   >
                     {Icon && <Icon className="w-3 h-3 text-accent shrink-0" />}
                     <span>{chip.label}</span>
-                    <span className="text-3xs opacity-75 font-mono">({chip.count})</span>
+                    <span className="text-2xs opacity-75 font-mono">({chip.count})</span>
                   </button>
                 );
               })}
@@ -1557,7 +1557,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center border-b border-border pb-3">
               <h3 className="font-bold text-text-primary text-base">{t('prs.setTargetTitle')}</h3>
-              <button type="button" onClick={() => setTargetModalExercise(null)} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
+              <button type="button" onClick={() => setTargetModalExercise(null)} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>
@@ -1603,7 +1603,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex justify-between items-center">
               <h2 className="text-base font-bold text-text-primary">{t('prs.recordTitle')}</h2>
-              <button type="button" onClick={() => setShowAddModal(false)} className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
+              <button type="button" onClick={() => setShowAddModal(false)} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer">
                 <X size={18} />
               </button>
             </div>

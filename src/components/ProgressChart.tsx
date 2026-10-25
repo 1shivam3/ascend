@@ -338,7 +338,7 @@ export default function ProgressChart() {
               }}
               className={`px-2.5 py-1 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all ${
                 isSelected
-                  ? 'bg-accent text-white border-accent shadow-xs'
+                  ? 'bg-accent text-accent-on border-accent shadow-xs'
                   : hasRecord
                   ? 'bg-bg-secondary border-border text-text-primary hover:border-accent/40'
                   : 'bg-bg-secondary/40 border-border/40 text-text-muted/60'
@@ -492,7 +492,7 @@ export default function ProgressChart() {
           {metricMode === 'volume' && (
             <div className="pt-2 border-t border-border/50 space-y-2">
               {/* RPE & Fatigue Legend */}
-              <div className="flex items-center justify-between text-3xs font-mono text-text-muted flex-wrap gap-2">
+              <div className="flex items-center justify-between text-2xs font-mono text-text-muted flex-wrap gap-2">
                 <span className="font-semibold text-text-secondary">{t('chart.autoregStatus')}</span>
                 <div className="flex items-center gap-3">
                   <span className="flex items-center gap-1">
@@ -518,7 +518,7 @@ export default function ProgressChart() {
                     <span>{t('chart.insight')}</span>
                     <span className="text-text-primary">{autoregulationInsight.headline}</span>
                   </div>
-                  <p className="text-text-secondary text-3xs leading-relaxed">
+                  <p className="text-text-secondary text-2xs leading-relaxed">
                     {autoregulationInsight.explanation}
                   </p>
                 </div>

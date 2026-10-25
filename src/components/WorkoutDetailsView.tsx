@@ -93,7 +93,7 @@ export default function WorkoutDetailsView({
           type="button"
           onClick={onBack}
           aria-label="Back to workouts"
-          className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+          className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -108,7 +108,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onShare(plan)}
               aria-label="Share workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Share2 className="w-4 h-4 text-[#858076]" />
             </button>
@@ -118,7 +118,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onEdit(plan)}
               aria-label="Edit workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Edit2 className="w-4 h-4 text-[#858076]" />
             </button>
@@ -128,7 +128,7 @@ export default function WorkoutDetailsView({
               type="button"
               onClick={() => onDelete(plan)}
               aria-label="Delete workout plan"
-              className="w-10 h-10 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
+              className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
               <Trash2 className="w-4 h-4 text-[#858076]" />
             </button>
@@ -148,11 +148,11 @@ export default function WorkoutDetailsView({
           <div className="absolute inset-0 bg-gradient-to-t from-[#171916] via-transparent to-transparent opacity-90" />
           <div className="absolute bottom-3 left-3 flex items-center gap-2">
             <span className="px-2.5 py-1 rounded-full bg-[#171916]/80 backdrop-blur-sm border border-[#2C302B] text-2xs font-semibold text-[#F3F0E7] flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#E44427]" />
+              <Clock className="w-3 h-3 text-accent" />
               {estimatedDuration} min
             </span>
             <span className="px-2.5 py-1 rounded-full bg-[#171916]/80 backdrop-blur-sm border border-[#2C302B] text-2xs font-semibold text-[#F3F0E7] flex items-center gap-1">
-              <Flame className="w-3 h-3 text-[#E44427]" />
+              <Flame className="w-3 h-3 text-accent" />
               {exerciseCount} exercises
             </span>
           </div>
@@ -211,7 +211,7 @@ export default function WorkoutDetailsView({
               aria-label={t('packed.toggle')}
               onClick={() => setGymPacked((v) => !v)}
               className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer shrink-0 ${
-                gymPacked ? 'bg-[#E44427]' : 'bg-[#2A2E29] border border-[#2C302B]'
+                gymPacked ? 'bg-accent' : 'bg-[#2A2E29] border border-[#2C302B]'
               }`}
             >
               <span
@@ -236,7 +236,7 @@ export default function WorkoutDetailsView({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-10 h-10 rounded-lg bg-[#2A2E29] border border-[#2C302B] flex items-center justify-center shrink-0 text-[#858076]">
-                      <Dumbbell className="w-4 h-4 text-[#E44427]" />
+                      <Dumbbell className="w-4 h-4 text-accent" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-sm text-[#F3F0E7] truncate">
@@ -248,7 +248,7 @@ export default function WorkoutDetailsView({
                           {targetW ? ` @ ${targetW} ${ex.targetUnit || userUnit}` : ''}
                         </span>
                         {!targetW && percentSuggestions[idx] && (
-                          <span className="text-2xs text-[#E44427] font-mono">
+                          <span className="text-2xs text-accent font-mono">
                             {t('plan.suggestedFrom1rm', {
                               weight: percentSuggestions[idx].weights[0],
                               unit: percentSuggestions[idx].unit,
@@ -267,7 +267,7 @@ export default function WorkoutDetailsView({
                         )}
                       </div>
                       {gymPacked && ex.notes && (
-                        <p className="text-2xs text-[#E44427] mt-0.5">{ex.notes}</p>
+                        <p className="text-2xs text-accent mt-0.5">{ex.notes}</p>
                       )}
                     </div>
                   </div>
@@ -285,7 +285,7 @@ export default function WorkoutDetailsView({
         <button
           type="button"
           onClick={() => onStart(displayPlan)}
-          className="w-full py-4 rounded-xl bg-[#E44427] hover:bg-[#d03b20] active:scale-[0.99] text-white font-bold text-base shadow-lg shadow-[#E44427]/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
+          className="w-full py-4 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-bold text-base shadow-lg shadow-accent/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
         >
           <Play className="w-4 h-4 fill-white" />
           <span>{t('train.startWorkout')}</span>

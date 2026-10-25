@@ -56,7 +56,7 @@ export default function ExperienceLevelScreen({
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
         <div className="text-left space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-text-primary tracking-tight">
+          <h1 className="page-title">
             {t('onboarding.experienceTitle')}
           </h1>
           <p className="text-sm text-text-muted">
@@ -121,7 +121,7 @@ export default function ExperienceLevelScreen({
         <button
           type="button"
           onClick={onContinue}
-          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
+          className="w-full py-4 px-6 rounded-xl bg-accent hover:bg-accent-dim active:scale-[0.99] text-accent-on font-semibold text-sm transition-all shadow-md cursor-pointer text-center"
         >
           {t('common.continue')}
         </button>

@@ -331,7 +331,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -342,7 +342,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             grey placeholder examples are never mistaken for saved
             values. Weight/height come from the profile; a blank field
             means "not measured", not zero. */}
-        <p className="text-3xs text-text-muted leading-relaxed">
+        <p className="text-2xs text-text-muted leading-relaxed">
           {t('bodyMetrics.prefillHint')}
         </p>
 
@@ -421,7 +421,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 CM
               </span>
             </div>
-            <p className="text-3xs text-text-muted mt-1 font-mono">
+            <p className="text-2xs text-text-muted mt-1 font-mono">
               {t('bodyMetrics.heightHint')}
             </p>
             {errors.height && <p className="text-danger text-xs mt-1.5 font-medium">{errors.height}</p>}
@@ -434,7 +434,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             </span>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label htmlFor="modal-fat-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                <label htmlFor="modal-fat-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
                   {t('bodyMetrics.bodyFatPct')}
                 </label>
                 <input
@@ -451,7 +451,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 {errors.bodyFat && <p className="text-danger text-xs mt-1 font-medium">{errors.bodyFat}</p>}
               </div>
               <div>
-                <label htmlFor="modal-chest-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                <label htmlFor="modal-chest-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
                   {t('bodyMetrics.chestUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input
@@ -468,7 +468,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 {errors.chest && <p className="text-danger text-xs mt-1 font-medium">{errors.chest}</p>}
               </div>
               <div>
-                <label htmlFor="modal-waist-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                <label htmlFor="modal-waist-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
                   {t('bodyMetrics.waistUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input
@@ -485,7 +485,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 {errors.waist && <p className="text-danger text-xs mt-1 font-medium">{errors.waist}</p>}
               </div>
               <div>
-                <label htmlFor="modal-hips-input" className="text-3xs font-mono text-text-muted uppercase block mb-1">
+                <label htmlFor="modal-hips-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
                   {t('bodyMetrics.hipsUnit', { unit: unit === 'lbs' ? 'IN' : 'CM' })}
                 </label>
                 <input

@@ -92,8 +92,16 @@ export default function MuscleVolumeSection({ workouts }: { workouts: WorkoutEnt
             </div>
           </div>
         ))}
-        <p className="text-3xs text-text-muted">
-          Orange = this week · grey = last week
+        {/* Live-fix L7: legend swatches mirror the bar colors (accent +
+            border) instead of naming "Orange" — the accent may be Cobalt
+            or a custom color, and the words would then lie. The words
+            themselves stay English: no thisWeek/lastWeek i18n keys exist,
+            and inventing translations is out of scope. */}
+        <p className="text-2xs text-text-muted flex items-center gap-1.5">
+          <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full bg-accent shrink-0" />
+          this week
+          <span aria-hidden="true" className="inline-block w-2.5 h-2.5 rounded-full bg-border shrink-0" />
+          last week
         </p>
       </div>
 
@@ -110,7 +118,7 @@ export default function MuscleVolumeSection({ workouts }: { workouts: WorkoutEnt
             >
               <div className="min-w-0">
                 <span className="text-xs font-bold text-text-primary block">{row.muscle}</span>
-                <span className="text-3xs text-text-muted block">
+                <span className="text-2xs text-text-muted block">
                   {row.daysSince === null
                     ? t('progress.recoveryNever')
                     : row.daysSince === 0
@@ -119,7 +127,7 @@ export default function MuscleVolumeSection({ workouts }: { workouts: WorkoutEnt
                 </span>
               </div>
               <span
-                className={`shrink-0 px-2 py-0.5 rounded-full border text-3xs font-bold ${STATUS_STYLES[row.status]}`}
+                className={`shrink-0 px-2 py-0.5 rounded-full border text-2xs font-bold ${STATUS_STYLES[row.status]}`}
               >
                 {statusLabel(row.status)}
               </span>

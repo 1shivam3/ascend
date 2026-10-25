@@ -421,6 +421,165 @@ describe('accountability', () => {
     expect(missed.length).toBe(0);
   });
 
+  // Live-fix L6 pin, updated by the FND-02 follow-up: the missed count is
+  // an exact-date contract PLUS same-plan make-up coverage for the
+  // check-in only. A session logged on an unscheduled day clears a missed
+  // entry only when it carries the same plan (planId, else name) — this
+  // answers the open L6 question as YES for the check-in, and is
+  // revertible by deleting the make-up block in detectMissedSessions.
+  // A planless or different-plan session still clears nothing, which is
+  // what this test pins: the Sunday log below has no planId and no name
+  // matching any planned session, so the count correctly stays 4.
+  it('a session logged on an unscheduled day does not clear a missed planned day', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const fourDay = [
+      { weekday: 0, name: 'Upper A' },
+      { weekday: 2, name: 'Lower A' },
+      { weekday: 4, name: 'Upper B' },
+      { weekday: 5, name: 'Lower B' },
+    ];
+    const sundayLog = [wentry(at(6), [wex('Barbell Bench Press', [wset(80, 8, 8)])])];
+    const missed = detectMissedSessions(fourDay, sundayLog, { start: monday, end: at(6) });
+    expect(missed.length).toBe(4);
+    expect(missed.map((m) => m.date).sort()).toEqual([at(0), at(2), at(4), at(5)].sort());
+  });
+
+  // FND-02 follow-up: same-plan make-up coverage. These tests pin the
+  // derivation the Today coach headline reads, so a workout save that
+  // adds a same-plan session on an unscheduled day moves the headline
+  // without a reload (the digest memo already depends on workouts, and
+  // addWorkout replaces the array — see use-coach-digest).
+  it('a same-plan session logged on an unscheduled day clears that plan\'s missed entry', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const week = [
+      { weekday: 0, name: 'Upper A', planId: 'p-upper-a' },
+      { weekday: 1, name: 'Lower A', planId: 'p-lower-a' },
+      { weekday: 3, name: 'Upper B', planId: 'p-upper-b' },
+      { weekday: 4, name: 'Lower B', planId: 'p-lower-b' },
+    ];
+    const sundayMakeUp = [wentry(at(6), [wex('Barbell Bench Press', [wset(20, 8)])], { planId: 'p-upper-a', name: 'Upper A' })];
+    const missed = detectMissedSessions(week, sundayMakeUp, { start: monday, end: at(6) });
+    expect(missed.length).toBe(3);
+    expect(missed.map((m) => m.date).sort()).toEqual([at(1), at(3), at(4)].sort());
+  });
+
+  it('a different-plan session on an unscheduled day clears nothing', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const week = [
+      { weekday: 0, name: 'Upper A', planId: 'p-upper-a' },
+      { weekday: 1, name: 'Lower A', planId: 'p-lower-a' },
+      { weekday: 3, name: 'Upper B', planId: 'p-upper-b' },
+      { weekday: 4, name: 'Lower B', planId: 'p-lower-b' },
+    ];
+    const sundayOther = [wentry(at(6), [wex('Barbell Squat', [wset(40, 8)])], { planId: 'p-squat', name: 'Squat Day' })];
+    const missed = detectMissedSessions(week, sundayOther, { start: monday, end: at(6) });
+    expect(missed.length).toBe(4);
+  });
+
+  it('a planless same-name session does not clear a planId missed entry', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const week = [
+      { weekday: 0, name: 'Upper A', planId: 'p-upper-a' },
+      { weekday: 1, name: 'Lower A', planId: 'p-lower-a' },
+      { weekday: 3, name: 'Upper B', planId: 'p-upper-b' },
+      { weekday: 4, name: 'Lower B', planId: 'p-lower-b' },
+    ];
+    const sundayNoPlan = [wentry(at(6), [wex('Barbell Bench Press', [wset(20, 8)])], { name: 'Upper A' })];
+    const missed = detectMissedSessions(week, sundayNoPlan, { start: monday, end: at(6) });
+    expect(missed.length).toBe(4);
+  });
+
+  it('one make-up workout covers exactly one missed entry (earliest first)', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const week = [
+      { weekday: 0, name: 'Upper A', planId: 'p-upper-a' },
+      { weekday: 1, name: 'Lower A', planId: 'p-lower-a' },
+      { weekday: 3, name: 'Upper A', planId: 'p-upper-a' },
+      { weekday: 4, name: 'Lower B', planId: 'p-lower-b' },
+    ];
+    const sundayMakeUp = [wentry(at(6), [wex('Barbell Bench Press', [wset(20, 8)])], { planId: 'p-upper-a', name: 'Upper A' })];
+    const missed = detectMissedSessions(week, sundayMakeUp, { start: monday, end: at(6) });
+    expect(missed.length).toBe(3);
+    expect(missed.map((m) => m.date).sort()).toEqual([at(1), at(3), at(4)].sort());
+  });
+
+  it('a session logged on a scheduled day clears exactly that day', () => {
+    const monday = (() => {
+      const d = new Date();
+      const wd = (d.getDay() + 6) % 7;
+      d.setDate(d.getDate() - wd - 7);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    })();
+    const at = (offset: number) => {
+      const d = new Date(monday + 'T00:00:00');
+      d.setDate(d.getDate() + offset);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const fourDay = [
+      { weekday: 0, name: 'Upper A' },
+      { weekday: 2, name: 'Lower A' },
+      { weekday: 4, name: 'Upper B' },
+      { weekday: 5, name: 'Lower B' },
+    ];
+    const logs = [
+      wentry(at(6), [wex('Barbell Bench Press', [wset(80, 8, 8)])]),
+      wentry(at(2), [wex('Barbell Back Squat', [wset(100, 6, 8)])]),
+    ];
+    const missed = detectMissedSessions(fourDay, logs, { start: monday, end: at(6) });
+    expect(missed.length).toBe(3);
+    expect(missed.map((m) => m.date)).not.toContain(at(2));
+  });
+
   it('detects skipped legs across weeks', () => {
     // 4 weeks of training, only upper body in the last 3
     const workouts: WorkoutEntry[] = [];

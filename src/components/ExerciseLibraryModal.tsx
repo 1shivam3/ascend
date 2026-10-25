@@ -170,13 +170,13 @@ export default function ExerciseLibraryModal({
             </div>
             <div>
               <h2 className="text-base font-bold text-text-primary">{t('lib.title')}</h2>
-              <p className="text-3xs text-text-muted">{t('lib.subtitle')}</p>
+              <p className="text-2xs text-text-muted">{t('lib.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -222,7 +222,7 @@ export default function ExerciseLibraryModal({
                 onClick={() => setSelectedEquipment(tab.id)}
                 className={`px-2.5 py-1 rounded-lg text-2xs font-semibold whitespace-nowrap transition-colors ${
                   selectedEquipment === tab.id
-                    ? 'bg-accent text-white font-bold'
+                    ? 'bg-accent text-accent-on font-bold'
                     : 'bg-bg-card border border-border text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -245,7 +245,7 @@ export default function ExerciseLibraryModal({
                 key={muscle.id}
                 type="button"
                 onClick={() => setSelectedMuscle(muscle.id)}
-                className={`px-2 py-0.5 rounded-md text-3xs font-medium whitespace-nowrap transition-colors ${
+                className={`px-2 py-0.5 rounded-md text-2xs font-medium whitespace-nowrap transition-colors ${
                   selectedMuscle === muscle.id
                     ? 'bg-text-primary text-bg-primary font-bold'
                     : 'text-text-muted hover:text-text-secondary'
@@ -305,16 +305,16 @@ export default function ExerciseLibraryModal({
                           </span>
                         ) : null;
                       })()}
-                      <span className="text-3xs uppercase font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted">
+                      <span className="text-2xs uppercase font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted">
                         {ex.equipment}
                       </span>
-                      <span className="text-3xs uppercase font-mono px-1.5 py-0.2 rounded bg-accent/10 text-accent">
+                      <span className="text-2xs uppercase font-mono px-1.5 py-0.2 rounded bg-accent/10 text-accent">
                         {ex.muscle}
                       </span>
                     </div>
 
                     {/* History & PR Pills */}
-                    <div className="flex items-center gap-2 text-3xs font-mono text-text-muted">
+                    <div className="flex items-center gap-2 text-2xs font-mono text-text-muted">
                       {lastPerf ? (
                         <span className="flex items-center gap-1 text-text-secondary">
                           <History className="w-3 h-3 text-text-muted shrink-0" />
@@ -368,7 +368,7 @@ export default function ExerciseLibraryModal({
                         {cues.length > 0 ? (
                           cues.map((cue, idx) => (
                             <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
-                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
                                 {idx + 1}
                               </span>
                               <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>

@@ -2,12 +2,16 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
-import { Home, Dumbbell, TrendingUp, UtensilsCrossed } from 'lucide-react';
+import { Home, Dumbbell, TrendingUp, UtensilsCrossed, User } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
+import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
+import HistoryForkScreen from '@/components/HistoryForkScreen';
+import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
 import SplashScreen from '@/components/onboarding/SplashScreen';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 
 import LoadingState from '@/components/LoadingState';
 import ErrorState from '@/components/ErrorState';
@@ -52,10 +56,15 @@ import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 
 const tabs = [
-  { id: 'home', labelKey: 'nav.today', icon: Home },
-  { id: 'workout', labelKey: 'nav.train', icon: Dumbbell },
-  { id: 'progress', labelKey: 'nav.progress', icon: TrendingUp },
-  { id: 'meals', labelKey: 'nav.fuel', icon: UtensilsCrossed },
+  { id: 'home', labelKey: 'nav.today', icon: Home, target: 'home' },
+  { id: 'workout', labelKey: 'nav.train', icon: Dumbbell, target: 'workout' },
+  { id: 'progress', labelKey: 'nav.progress', icon: TrendingUp, target: 'progress' },
+  { id: 'meals', labelKey: 'nav.fuel', icon: UtensilsCrossed, target: 'meals' },
+  // UX redesign Stage 2: "You" is a PRESENTATION grouping over the
+  // profile/settings TabIds — routes and TabIds do not change. Tapping
+  // You lands on Profile; the segmented bar above the view switches
+  // between Profile and Settings.
+  { id: 'you', labelKey: 'nav.you', icon: User, target: 'profile' },
 ] as const;
 
 export default function AppPage() {
@@ -71,7 +80,10 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, startFreshFromRetainedHistory } = useStore();
+  // FND-06: the fork decision lives only for this session — closing
+  // the app undecided re-shows the fork, which is the safe default.
+  const [forkResolved, setForkResolved] = useState(false);
 
   // True zustand-persist hydration (distinct from the _hasHydrated splash
   // fallback, which can fire before the persisted state is merged). Theme
@@ -168,6 +180,20 @@ export default function AppPage() {
       document.documentElement.setAttribute('data-theme', 'light');
     }
   }, [theme, _hasHydrated, persistHydrated]);
+
+  // UX redesign Stage 6 — apply the selected accent theme (preset or custom)
+  // as CSS vars on <html>. This is NOT a theme-mode pick: it never touches
+  // hasCustomTheme or the light/dark class above. Re-applied when the accent
+  // selection or the mode changes (every preset has light + dark variants).
+  useEffect(() => {
+    if (typeof document === 'undefined' || !_hasHydrated || !persistHydrated) return;
+    const variant = resolveAccentVariant(
+      uiPreferences?.accentTheme ?? 'vermilion',
+      uiPreferences?.customAccentHex ?? null,
+      theme === 'dark' ? 'dark' : 'light',
+    );
+    applyAccentVars(accentVariantToCssVars(variant));
+  }, [uiPreferences?.accentTheme, uiPreferences?.customAccentHex, theme, _hasHydrated, persistHydrated]);
 
   // SIM-P1-08: apply the saved text size on load and whenever it
   // changes in Settings. Root font-size scaling covers all rem text.
@@ -307,6 +333,26 @@ export default function AppPage() {
 
   // If hydrated and no athlete profile exists, render the onboarding & sign-in screen
   if (!profile) {
+    // FND-06: retained local history with no profile must never
+    // silently attach to the next profile. Offer the explicit fork
+    // first; Start fresh archives (never deletes) and only then shows
+    // onboarding over empty state.
+    const retainedInput = { workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals };
+    if (!forkResolved && hasRetainedHistory(retainedInput)) {
+      return (
+        <main id="main-content" className="w-full min-h-[100dvh]">
+          <TabGuardBanner />
+          <HistoryForkScreen
+            counts={retainedHistoryCounts(retainedInput)}
+            onContinue={() => setForkResolved(true)}
+            onStartFresh={() => {
+              startFreshFromRetainedHistory();
+              setForkResolved(true);
+            }}
+          />
+        </main>
+      );
+    }
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <TabGuardBanner />
@@ -315,106 +361,182 @@ export default function AppPage() {
     );
   }
 
+  // UX redesign Stage 2 — navigation chrome rules:
+  // - 5 destinations: Today / Train / Progress / Fuel / You ("You" is a
+  //   presentation grouping over the profile/settings TabIds).
+  // - During an active workout the perform surface is fullscreen on the
+  //   workout tab (chrome hidden, as before); from any other tab the
+  //   chrome stays visible with a persistent Resume affordance, so the
+  //   session is never hidden behind navigation.
+  // - Desktop ≥1024px: left rail (232px) with the same destinations;
+  //   content is offset beside it. The bottom bar is mobile-only.
+  const isYouTab = activeTab === 'profile' || activeTab === 'settings';
+  const showResumeBar = !!activeWorkoutDraft && activeTab !== 'workout';
+  const showChrome = !activeWorkoutDraft || activeTab !== 'workout';
+  const isNavActive = (id: string) =>
+    id === 'progress'
+      ? activeTab === 'progress' || activeTab === 'prs'
+      : id === 'you'
+        ? isYouTab
+        : activeTab === id;
+  const goTab = (entry: (typeof tabs)[number]) => {
+    navigate(entry.target as TabId, {
+      progressTab: entry.target === 'progress' ? 'overview' : undefined,
+    });
+  };
+
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       <TabGuardBanner />
-      {isOffline && (
-        <aside
-          role="status"
-          aria-live="polite"
-          onClick={() => setShowOfflineModal(true)}
-          className="bg-amber-950/70 border-b border-amber-500/30 text-amber-200 text-xs px-3 py-1.5 flex items-center justify-center text-center sticky top-0 z-50 backdrop-blur cursor-pointer hover:bg-amber-950/90 transition-colors"
-        >
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-2" />
-          <span>Offline Gym Mode Active &bull; Tap for details</span>
-        </aside>
-      )}
-      <main id="main-content" className="w-full">
-        {/* Keyed by tab: every tab switch replays one consistent enter
-            animation (fade + rise). Pages already mount/unmount per tab,
-            so this adds motion without changing mount behavior. */}
-        <div key={activeTab} className="animate-tab-enter">
-        {activeTab === 'home' && (
-          <HomePage
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        {activeTab === 'workout' && (
-          <WorkoutPage
-            startPlanOnMount={pendingStartPlan}
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        {(activeTab === 'progress' || activeTab === 'prs') && (
-          <ProgressPage
-            initialTab={progressInitialTab}
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        {activeTab === 'meals' && (
-          <MealsPage
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        {activeTab === 'profile' && (
-          <ProfileView
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        {activeTab === 'settings' && (
-          <SettingsView
-            onNavigate={(tab) => {
-              navigate(tab as TabId);
-            }}
-          />
-        )}
-        </div>
-      </main>
-
-      {/* Native 4-Destination Bottom Navigation (Part 5 Spec) */}
-      {!activeWorkoutDraft && (
-        <nav
-          className="native-tab-bar"
-          aria-label="Main Navigation"
-        >
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = tab.id === 'progress'
-              ? (activeTab === 'progress' || activeTab === 'prs')
-              : activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                aria-current={isActive ? 'page' : undefined}
-                aria-label={t(tab.labelKey as StringKey)}
-                onClick={() => {
-                  navigate(tab.id, { progressTab: tab.id === 'progress' ? 'overview' : undefined });
-                }}
-                className={`native-tab-item ${
-                  isActive ? 'active' : ''
-                }`}
+            {showChrome && (
+              <nav
+                aria-label="Main Navigation"
+                className="fixed bottom-0 left-0 top-0 z-40 hidden w-[232px] flex-col border-r border-border bg-bg-primary px-3 py-4 lg:flex"
               >
-                {isActive && <div className="native-tab-indicator" />}
-                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-accent' : 'text-text-muted'} />
-                <span className={`text-[12px] mt-1 ${isActive ? 'text-accent font-semibold' : 'text-text-muted font-normal'}`}>
-                  {t(tab.labelKey as StringKey)}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-      )}
+                <div className="font-display px-2 pb-5 text-[28px] font-semibold leading-none tracking-wide">
+                  ASCEND
+                </div>
+                {tabs.map((entry) => {
+                  const Icon = entry.icon;
+                  const active = isNavActive(entry.id);
+                  return (
+                    <button
+                      key={entry.id}
+                      type="button"
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={t(entry.labelKey as StringKey)}
+                      onClick={() => goTab(entry)}
+                      className={`pressable mb-1 flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-medium ${
+                        active ? 'bg-accent-subtle text-accent' : 'text-text-secondary hover:text-text-primary'
+                      }`}
+                    >
+                      <Icon size={20} strokeWidth={active ? 2.2 : 1.75} />
+                      <span className={active ? 'font-semibold' : ''}>{t(entry.labelKey as StringKey)}</span>
+                    </button>
+                  );
+                })}
+                <div className="mt-auto">
+                  {showResumeBar && (
+                    <button type="button" onClick={() => navigate('workout')} className="btn-primary w-full">
+                      {t('home.resumeWorkout')}
+                    </button>
+                  )}
+                </div>
+              </nav>
+            )}
+            <div className="lg:ml-[232px]">
+              {isOffline && (
+                <aside
+                  role="status"
+                  aria-live="polite"
+                  onClick={() => setShowOfflineModal(true)}
+                  className="sticky top-0 z-50 flex cursor-pointer items-center justify-center border-b border-amber-500/30 bg-amber-950/70 px-3 py-1.5 text-center text-xs text-amber-200 backdrop-blur transition-colors hover:bg-amber-950/90"
+                >
+                  <span className="mr-2 h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  <span>Offline Gym Mode Active &bull; Tap for details</span>
+                </aside>
+              )}
+              <main id="main-content" className="w-full">
+                {isYouTab && (
+                  <div className="sticky top-0 z-30 mx-auto w-full max-w-md bg-bg-primary/95 px-5 pt-3 backdrop-blur">
+                    <SegmentedControl
+                      ariaLabel={t('nav.you')}
+                      value={activeTab === 'settings' ? 'settings' : 'profile'}
+                      options={[
+                        { value: 'profile', label: t('profile.title') },
+                        { value: 'settings', label: t('settings.title') },
+                      ]}
+                      onChange={(v) => navigate(v as TabId)}
+                    />
+                  </div>
+                )}
+                {/* Keyed by tab: every tab switch replays one consistent enter
+                    animation (fade + rise). Pages already mount/unmount per tab,
+                    so this adds motion without changing mount behavior. */}
+                <div key={activeTab} className="animate-tab-enter">
+                {activeTab === 'home' && (
+                  <HomePage
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                {activeTab === 'workout' && (
+                  <WorkoutPage
+                    startPlanOnMount={pendingStartPlan}
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                {(activeTab === 'progress' || activeTab === 'prs') && (
+                  <ProgressPage
+                    initialTab={progressInitialTab}
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                {activeTab === 'meals' && (
+                  <MealsPage
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                {activeTab === 'profile' && (
+                  <ProfileView
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                {activeTab === 'settings' && (
+                  <SettingsView
+                    onNavigate={(tab) => {
+                      navigate(tab as TabId);
+                    }}
+                  />
+                )}
+                </div>
+                {showResumeBar && <div aria-hidden className="h-16 lg:hidden" />}
+              </main>
+
+              {/* Mobile bottom chrome: 5 destinations + Resume affordance */}
+              {showChrome && (
+                <div className="fixed inset-x-0 bottom-0 z-40 lg:hidden">
+                  {showResumeBar && (
+                    <div className="bg-bg-primary/95 px-3 py-2 backdrop-blur-xl">
+                      <button type="button" onClick={() => navigate('workout')} className="btn-primary w-full">
+                        {t('home.resumeWorkout')}
+                      </button>
+                    </div>
+                  )}
+                  <nav className="native-tab-bar" aria-label="Main Navigation">
+                    {tabs.map((tab) => {
+                      const Icon = tab.icon;
+                      const isActive = isNavActive(tab.id);
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          aria-current={isActive ? 'page' : undefined}
+                          aria-label={t(tab.labelKey as StringKey)}
+                          onClick={() => goTab(tab)}
+                          className={`native-tab-item ${isActive ? 'active' : ''}`}
+                        >
+                          {isActive && <div className="native-tab-indicator" />}
+                          <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-accent' : 'text-text-muted'} />
+                          <span className={`mt-1 text-[12px] ${isActive ? 'font-semibold text-accent' : 'font-normal text-text-muted'}`}>
+                            {t(tab.labelKey as StringKey)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </nav>
+                </div>
+              )}
+            </div>
 
       {/* Shared Program Import Modal (Distribution Loop) */}
       <ImportProgramModal

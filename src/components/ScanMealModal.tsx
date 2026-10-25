@@ -9,6 +9,7 @@ import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
+import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
@@ -692,6 +693,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         protein: savedProtein,
         today: currentProteinTotal,
         target: targetProtein,
+        tilde: tildeForFoods(validFoods),
       }),
       t('scan.mealLoggedTitle')
     );
@@ -740,7 +742,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -799,7 +801,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <div className="w-8 h-8 border-t-2 border-r-2 border-accent absolute top-0 right-0 rounded-tr" />
                     <div className="w-8 h-8 border-b-2 border-l-2 border-accent absolute bottom-0 left-0 rounded-bl" />
                     <div className="w-8 h-8 border-b-2 border-r-2 border-accent absolute bottom-0 right-0 rounded-br" />
-                    <span className="text-3xs font-mono font-bold uppercase tracking-wider text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 shadow-xs">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-white/90 bg-black/60 px-2.5 py-0.5 rounded-full border border-white/10 shadow-xs">
                       {t('scan.framePlate')}
                     </span>
                   </div>
@@ -987,8 +989,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         {step === 'analyzing' && (
           <div className="p-8 sm:p-12 text-center space-y-4">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-accent/10 border border-accent/30 flex items-center justify-center text-accent relative">
-              <Sparkles className="w-8 h-8 animate-pulse" />
-              <div className="absolute inset-0 rounded-2xl border-2 border-accent animate-ping opacity-25" />
+              <Sparkles className="w-8 h-8" />
             </div>
 
             <div className="space-y-1.5">
@@ -1237,11 +1238,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                           </span>
                         </div>
                         {isCreatineLoggedToday ? (
-                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-500 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> {t('scan.loggedToday')}
                           </span>
                         ) : (
-                          <span className="text-3xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
+                          <span className="text-2xs font-semibold px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 font-mono">
                             {t('scan.dailyHabit')}
                           </span>
                         )}
@@ -1358,7 +1359,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                       confidence but never showed it — a
                                       low-confidence guess used to look as
                                       certain as a clean read. */}
-                                  <span className={`text-3xs font-mono font-semibold uppercase tracking-wide ${
+                                  <span className={`text-2xs font-mono font-semibold uppercase tracking-wide ${
                                     item.confidence === 'high'
                                       ? 'text-emerald-500'
                                       : item.confidence === 'medium'
@@ -1387,7 +1388,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                   <span className="font-bold text-xs text-accent block">
                                     ~{adjItem.calories} kcal
                                   </span>
-                                  <span className="text-3xs text-text-muted block">
+                                  <span className="text-2xs text-text-muted block">
                                     P: {item.proteinG}g • C: {item.carbsG}g • F: {adjItem.fatG}g
                                   </span>
                                 </div>
@@ -1417,7 +1418,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 absorbed fat; one tap corrects it. */}
                             {oilDefault && oilLevel && (
                               <div className="flex items-center justify-between gap-2 pt-1">
-                                <span className="text-3xs text-text-muted font-mono shrink-0">
+                                <span className="text-2xs text-text-muted font-mono shrink-0">
                                   {t('scan.gheeOil')}
                                 </span>
                                 <div className="flex gap-1">
@@ -1428,9 +1429,9 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                       onClick={() =>
                                         setOilLevels((prev) => ({ ...prev, [idx]: level.id }))
                                       }
-                                      className={`px-2 py-0.5 rounded-md text-3xs font-semibold transition-all cursor-pointer ${
+                                      className={`px-2 py-0.5 rounded-md text-2xs font-semibold transition-all cursor-pointer ${
                                         oilLevel === level.id
-                                          ? 'bg-accent text-white'
+                                          ? 'bg-accent text-accent-on'
                                           : 'bg-bg-secondary text-text-muted border border-border/60 hover:text-text-primary'
                                       }`}
                                     >

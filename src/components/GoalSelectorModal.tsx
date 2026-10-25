@@ -137,7 +137,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
               <h2 className="text-base font-bold text-text-primary leading-tight">
                 {t('goals.title')}
               </h2>
-              <p className="text-3xs text-text-muted font-mono">
+              <p className="text-2xs text-text-muted font-mono">
                 {t('goals.subtitle')}
               </p>
             </div>
@@ -145,7 +145,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -186,7 +186,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
               >
                 <div
                   className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                    isSelected ? 'bg-accent text-white' : 'bg-bg-secondary text-text-muted'
+                    isSelected ? 'bg-accent text-accent-on' : 'bg-bg-secondary text-text-muted'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -204,7 +204,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
                     <div
                       className={`w-4 h-4 rounded-md border flex items-center justify-center shrink-0 transition-colors ${
                         isSelected
-                          ? 'border-accent bg-accent text-white'
+                          ? 'border-accent bg-accent text-accent-on'
                           : 'border-border bg-bg-secondary'
                       }`}
                     >
@@ -212,7 +212,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
                     </div>
                   </div>
 
-                  <p className="text-3xs text-text-muted mt-0.5 line-clamp-1">{config.tagline}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 line-clamp-1">{config.tagline}</p>
 
                   {/* Impact preview pills */}
                   <div className="mt-1.5 flex flex-wrap gap-1">
@@ -231,14 +231,14 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
         {/* Real Impact Summary */}
         <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5 text-left">
-          <div className="flex items-center gap-1.5 text-3xs font-mono font-bold uppercase text-accent">
+          <div className="flex items-center gap-1.5 text-2xs font-mono font-bold uppercase text-accent">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>{t('goals.howTitle')}</span>
           </div>
           <p className="text-2xs text-text-secondary leading-relaxed">
             {t('goals.howIntro')}
           </p>
-          <ul className="text-3xs text-text-muted space-y-0.5 list-disc list-inside">
+          <ul className="text-2xs text-text-muted space-y-0.5 list-disc list-inside">
             <li><strong>Your workouts:</strong> Changes how many reps you aim for in each set and how long you rest between sets.</li>
             <li><strong>Your food targets:</strong> Recalculates how much to eat each day — a little extra (+250 kcal) to gain, or less (-450 kcal) to lose fat — and how much protein to aim for.</li>
             <li><strong>Your home screen:</strong> Shows the progress that matters for this goal — your strongest lifts, the total weight you have lifted, or how your body weight is changing.</li>
@@ -258,7 +258,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
               <span className="font-semibold text-text-primary block">
                 {t('goals.recalcTitle')}
               </span>
-              <span className="text-3xs text-text-muted">
+              <span className="text-2xs text-text-muted">
                 {t('goals.recalcHint')}
               </span>
             </div>

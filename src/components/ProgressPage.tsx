@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
-import { isSetCompleted, BodyMetricEntry, WorkoutEntry } from '@/lib/types';
+import { isSetCompleted, BodyMetricEntry, WorkoutEntry, resolvePrimaryGoal } from '@/lib/types';
 import {
   TrendingUp,
   Dumbbell,
@@ -30,6 +30,9 @@ import { calculateOneRepMax } from '@/lib/strength-standards';
 import { getExerciseHistorySessions } from '@/lib/lifter-twin';
 import WorkoutHeatmap from '@/components/WorkoutHeatmap';
 import MuscleVolumeSection from '@/components/MuscleVolumeSection';
+import EmptyState from '@/components/ui/EmptyState';
+import SegmentedControl from '@/components/ui/SegmentedControl';
+import { resolveSpotlightChart, SPOTLIGHT_CHARTS, SPOTLIGHT_CHART_NAME_KEYS } from '@/lib/spotlight';
 import PRsPage from '@/components/PRsPage';
 import BodyMetricsModal from '@/components/BodyMetricsModal';
 import MeetAttemptPlannerModal from '@/components/MeetAttemptPlannerModal';
@@ -37,7 +40,7 @@ import WeeklyRecapModal from '@/components/WeeklyRecapModal';
 import { plural, safeRandomId, getLocalTodayStr, getWeekDateStrings } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
-import { useTranslation } from '@/lib/i18n';
+import { useTranslation, type StringKey } from '@/lib/i18n';
 import { resizeAndCompressImage } from '@/lib/image-processing';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import type { ProgressPhoto } from '@/lib/types';
@@ -172,6 +175,34 @@ function getDataDateLabels(dates: string[]): string[] {
   return idxs.map((i) => fmt(dates[i]));
 }
 
+type ChartRange = '1M' | '3M' | '6M' | '1Y';
+
+// Chart ranges persist per chart in localStorage only (never synced):
+// the range pills must survive leaving the tab.
+function readPersistedRange(key: string, fallback: ChartRange): ChartRange {
+  try {
+    if (typeof window === 'undefined') return fallback;
+    const parsed = JSON.parse(localStorage.getItem('ascend-progress-ranges') || '{}');
+    return ['1M', '3M', '6M', '1Y'].includes(parsed[key]) ? parsed[key] : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Chart-frame captions (Stage 5): the data window actually covered, and
+// the plotted value span with its unit — never a range the data lacks.
+function dataWindow(points: { date: string }[]): string {
+  if (points.length === 0) return '';
+  if (points.length === 1) return formatProgressDate(points[0].date);
+  return `${formatProgressDate(points[0].date)} – ${formatProgressDate(points[points.length - 1].date)}`;
+}
+
+function minMaxLabel(points: { value: number }[], unit: string): string | null {
+  if (points.length === 0) return null;
+  const vals = points.map((pt) => pt.value);
+  return `${Math.min(...vals)} – ${Math.max(...vals)} ${unit}`;
+}
+
 interface ProgressPageProps {
   initialTab?: 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training' | 'body' | 'consistency';
   onNavigate?: (tab: 'home' | 'workout' | 'progress' | 'meals' | 'prs') => void;
@@ -194,10 +225,10 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
 
   // Exercise & time range controls for Screen 15 (Strength Analytics)
   const [selectedExercise, setSelectedExercise] = useState<string>('Bench Press');
-  const [strengthTimeRange, setStrengthTimeRange] = useState<'1M' | '3M' | '6M' | '1Y'>('3M');
+  const [strengthTimeRange, setStrengthTimeRange] = useState<ChartRange>(() => readPersistedRange('strength', '3M'));
 
   // Time range control for Screen 16 (Bodyweight Trend)
-  const [bodyTimeRange, setBodyTimeRange] = useState<'1M' | '3M' | '6M' | '1Y'>('3M');
+  const [bodyTimeRange, setBodyTimeRange] = useState<ChartRange>(() => readPersistedRange('body', '3M'));
 
   // Auxiliary modals
   const [isWeightModalOpen, setIsWeightModalOpen] = useState(false);
@@ -231,6 +262,8 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
   const addProgressPhoto = useStore((state) => state.addProgressPhoto);
   const removeProgressPhoto = useStore((state) => state.removeProgressPhoto);
   const trainingProfile = useStore((state) => state.trainingProfile);
+  const uiPreferences = useStore((state) => state.uiPreferences);
+  const setUiPreferences = useStore((state) => state.setUiPreferences);
   const toast = useToast();
   const { t } = useTranslation();
   const photoInputRef = useRef<HTMLInputElement>(null);
@@ -369,6 +402,9 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       }
     } catch {}
   }, [activeTab, strengthSubView]);
+
+  // (Chart-range persistence lives below, after the big-three lift state
+  // it also persists — a deps array may not reference a later const.)
 
   // ── 1. REAL STRENGTH ANALYTICS & PRs DATA ─────────────────────────────────
   // Core compound lifts computed strictly from real records
@@ -763,6 +799,74 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
     return computeChartGeometry(bodyweightAnalytics.dataPoints, 320, 100, 10, 20);
   }, [bodyweightAnalytics.dataPoints]);
 
+  // ── UX redesign Stage 5 — goal-aware spotlight ─────────────────────
+  const primaryGoal = resolvePrimaryGoal(profile?.goals);
+  const spotlightChart = resolveSpotlightChart(primaryGoal, uiPreferences.pinnedProgressChart);
+  const [big3Lift, setBig3Lift] = useState<'Squat' | 'Bench Press' | 'Deadlift'>(() => {
+    // Stage 10: the big-three lift filter persists like the chart ranges
+    // (local only); an invalid stored value falls back to Squat.
+    if (typeof window === 'undefined') return 'Squat';
+    try {
+      const parsed = JSON.parse(localStorage.getItem('ascend-progress-ranges') || '{}');
+      return parsed.big3 === 'Bench Press' || parsed.big3 === 'Deadlift' ? parsed.big3 : 'Squat';
+    } catch {
+      return 'Squat';
+    }
+  });
+  // Big-three trend mirrors the hero computation (sessions + PRs).
+  const big3Analytics = useMemo(() => {
+    const sessions = getExerciseHistorySessions(big3Lift, workouts, userUnit);
+    const prMatches = prs
+      .filter((pr) => pr.exercise.toLowerCase().includes(big3Lift.toLowerCase()))
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const pointsMap = new Map<string, number>();
+    prMatches.forEach((pr) => {
+      const val = userUnit === 'lbs' ? pr.weightLbs : pr.weightKg;
+      pointsMap.set(pr.date, Math.round(calculateOneRepMax(val, pr.reps) * 10) / 10);
+    });
+    sessions.forEach((sess) => pointsMap.set(sess.date, Math.round(sess.bestE1RM * 10) / 10));
+    const sortedDates = Array.from(pointsMap.keys()).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+    const dataPoints = sortedDates.map((d) => ({ date: d, value: pointsMap.get(d)! }));
+    let deltaText = 'No data';
+    if (dataPoints.length >= 2) {
+      const latest = dataPoints[dataPoints.length - 1].value;
+      const first = dataPoints[0].value;
+      const delta = latest - first;
+      const pct = first > 0 ? (delta / first) * 100 : 0;
+      deltaText = `${delta >= 0 ? '+' : ''}${Math.round(delta)} ${userUnit} (${delta >= 0 ? '+' : ''}${Math.round(pct)}%)`;
+    } else if (dataPoints.length === 1) {
+      deltaText = 'Baseline';
+    }
+    return { dataPoints, deltaText, latest1RM: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].value : null };
+  }, [big3Lift, workouts, prs, userUnit]);
+  const big3Geometry = useMemo(
+    () => computeChartGeometry(big3Analytics.dataPoints, 320, 110, 10, 20),
+    [big3Analytics.dataPoints],
+  );
+
+  // Persist chart ranges + big-three lift filter (local only) whenever one
+  // changes. Placed here (not with the other effects above) because the
+  // deps array evaluates during render and big3Lift is declared above.
+  useEffect(() => {
+    try {
+      localStorage.setItem('ascend-progress-ranges', JSON.stringify({ strength: strengthTimeRange, body: bodyTimeRange, big3: big3Lift }));
+    } catch {}
+  }, [strengthTimeRange, bodyTimeRange, big3Lift]);
+
+  // Goal change clears a pinned chart (with a toast) — the spotlight
+  // follows the new goal until the user pins again. Mount does not
+  // clear: prevGoalRef starts at the current goal.
+  const prevGoalRef = useRef(primaryGoal);
+  useEffect(() => {
+    if (prevGoalRef.current !== primaryGoal) {
+      prevGoalRef.current = primaryGoal;
+      if (uiPreferences.pinnedProgressChart) {
+        setUiPreferences({ pinnedProgressChart: null });
+        toast.info(t('progress.spotlightReset'));
+      }
+    }
+  }, [primaryGoal, uiPreferences.pinnedProgressChart, setUiPreferences, toast, t]);
+
   return (
     <div className="page animate-fade-in space-y-4 max-w-md mx-auto pb-12">
       {/* ── TOP HEADER ────────────────────────────────────────────────────── */}
@@ -801,7 +905,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold font-sans text-text-primary tracking-tight">
               {activeTab === 'strength' && strengthSubView === 'overview'
-                ? t('progress.title')
+                ? t('progress.strength')
                 : activeTab === 'strength'
                 ? t('progress.strength')
                 : activeTab === 'body'
@@ -865,83 +969,268 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {activeTab === 'strength' && strengthSubView === 'overview' && (
         <div className="space-y-4 animate-fade-in">
-          {/* Card 1: Strength Progress (Area Chart) */}
-          <div
-            onClick={() => {
-              setSelectedExercise(heroLift.name);
-              setStrengthSubView('analytics');
-            }}
-            className="card p-5 bg-bg-card border border-border space-y-3 cursor-pointer hover:border-accent/40 transition-all shadow-xs group"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-base font-bold text-text-primary">{t('progress.strengthProgress')}</h2>
-                <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
+          {/* ── SPOTLIGHT (UX redesign Stage 5): goal-aware first card ── */}
+          {spotlightChart === 'volume' ? (
+            uiPreferences.showMuscleVolume !== false ? (
+              <MuscleVolumeSection workouts={workouts} />
+            ) : (
+              <div className="card p-5 bg-bg-card border border-border shadow-xs">
+                <EmptyState
+                  title={t('progress.spotVolumeOffTitle')}
+                  explanation={t('progress.spotVolumeOffHint')}
+                  actionLabel={t('progress.spotVolumeOffAction')}
+                  onAction={() => setUiPreferences({ showMuscleVolume: true })}
+                />
               </div>
-              <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
-            </div>
-
-            <div className="flex items-baseline justify-between pt-1">
-              <div>
-                <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
-                  {heroLiftAnalytics.latest1RM ? `${heroLiftAnalytics.latest1RM} ${userUnit}` : displayWeight(heroLift.best1RMKg)}
+            )
+          ) : spotlightChart === 'consistency' ? (
+            <WorkoutHeatmap onNavigate={onNavigate} />
+          ) : spotlightChart === 'weight' ? (
+            bodyweightAnalytics.dataPoints.length > 0 || bodyweightAnalytics.latestWeight ? (
+              <div
+                onClick={() => setActiveTab('body')}
+                className="card p-5 bg-bg-card border border-border space-y-3 cursor-pointer hover:border-accent/40 transition-all shadow-xs group"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionWeight')}</h2>
+                    <span className="text-xs font-semibold text-text-secondary">{t('progress.chartWeight')}</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
                 </div>
-                <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
-              </div>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
-                {heroLiftAnalytics.deltaText}
-              </span>
-            </div>
-
-            {/* Dynamic Smooth Area Chart */}
-            <div className="pt-2">
-              <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
-                    <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
-                  </linearGradient>
-                </defs>
-                <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
-                {heroChartGeometry.points.length > 0 ? (
-                  <>
-                    {heroChartGeometry.pathD ? (
+                <div className="flex items-baseline justify-between pt-1">
+                  <div>
+                    <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
+                      {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                    {bodyweightAnalytics.deltaText}
+                  </span>
+                </div>
+                <div className="pt-2">
+                  <svg viewBox="0 0 320 110" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="spotWeightGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#858076" stopOpacity="0.2" />
+                        <stop offset="100%" stopColor="#858076" stopOpacity="0.0" />
+                      </linearGradient>
+                    </defs>
+                    <line x1="0" y1="30" x2="320" y2="30" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    <line x1="0" y1="80" x2="320" y2="80" stroke="currentColor" strokeOpacity="0.08" strokeDasharray="3 3" />
+                    {bodyChartGeometry.points.length > 0 ? (
                       <>
-                        <path d={heroChartGeometry.areaD} fill="url(#strengthGradient)" />
-                        <path
-                          d={heroChartGeometry.pathD}
-                          fill="none"
-                          stroke="#E44427"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                        />
+                        {bodyChartGeometry.pathD ? (
+                          <>
+                            <path d={bodyChartGeometry.areaD} fill="url(#spotWeightGradient)" />
+                            <path d={bodyChartGeometry.pathD} fill="none" stroke="#858076" strokeWidth="2.5" strokeLinecap="round" />
+                          </>
+                        ) : null}
+                        {bodyChartGeometry.points.map((pt, i) => (
+                          <circle key={i} cx={pt.x} cy={pt.y} r={i === bodyChartGeometry.points.length - 1 ? 4 : 3} fill="#858076" stroke={i === bodyChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === bodyChartGeometry.points.length - 1 ? 2 : 0} />
+                        ))}
                       </>
-                    ) : null}
-                    {heroChartGeometry.points.map((pt, i) => (
-                      <circle
-                        key={i}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={i === heroChartGeometry.points.length - 1 ? 4 : 3}
-                        fill="#E44427"
-                        stroke={i === heroChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
-                        strokeWidth={i === heroChartGeometry.points.length - 1 ? 2 : 0}
-                      />
+                    ) : (
+                      <text x="160" y="60" textAnchor="middle" className="text-xs fill-text-muted font-sans">
+                        {t('progress.chartEmptyBodyweight')}
+                      </text>
+                    )}
+                  </svg>
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                    {getDataDateLabels(bodyweightAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
+                      <span key={i}>{m}</span>
                     ))}
-                  </>
-                ) : (
-                  <text x="160" y="60" textAnchor="middle" className="text-xs fill-text-muted font-sans">
-                    {t('progress.chartEmptyWorkouts')}
-                  </text>
-                )}
-              </svg>
-              {/* Date-based axis labels (from actual data, not the range) */}
-              <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
-                {getDataDateLabels(heroLiftAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
-                  <span key={i}>{m}</span>
-                ))}
+                  </div>
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{dataWindow(bodyweightAnalytics.dataPoints)}{dataWindow(bodyweightAnalytics.dataPoints) ? ` · ${bodyTimeRange}` : ''}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="card p-5 bg-bg-card border border-border shadow-xs">
+                <EmptyState
+                  title={t('progress.chartEmptyBodyweight')}
+                  explanation={t('progress.spotEmptyWeightHint')}
+                  actionLabel={t('progress.logMeasurement')}
+                  onAction={() => setIsWeightModalOpen(true)}
+                />
+              </div>
+            )
+          ) : spotlightChart === 'big3' ? (
+            <div className="card p-5 bg-bg-card border border-border space-y-3 shadow-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionBig3')}</h2>
+                  <span className="text-xs font-semibold text-text-secondary">{t('progress.chartBig3')}</span>
+                </div>
+                <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
+              </div>
+              <SegmentedControl
+                ariaLabel={t('progress.chartBig3')}
+                value={big3Lift}
+                options={[
+                  { value: 'Squat', label: 'Squat' },
+                  { value: 'Bench Press', label: 'Bench Press' },
+                  { value: 'Deadlift', label: 'Deadlift' },
+                ]}
+                onChange={(v) => setBig3Lift(v)}
+              />
+              {big3Analytics.dataPoints.length > 0 ? (
+                <>
+                  <div className="flex items-baseline justify-between pt-1">
+                    <div>
+                      <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
+                        {big3Analytics.latest1RM ? `${big3Analytics.latest1RM} ${userUnit}` : '—'}
+                      </div>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                      {big3Analytics.deltaText}
+                    </span>
+                  </div>
+                  <div className="pt-2">
+                    <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                      <defs>
+                        <linearGradient id="spotBig3Gradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                      {big3Geometry.pathD ? (
+                        <>
+                          <path d={big3Geometry.areaD} fill="url(#spotBig3Gradient)" />
+                          <path d={big3Geometry.pathD} fill="none" stroke="#E44427" strokeWidth="2.5" strokeLinecap="round" strokeDasharray="6 3" />
+                        </>
+                      ) : null}
+                      {big3Geometry.points.map((pt, i) => (
+                        <circle key={i} cx={pt.x} cy={pt.y} r={i === big3Geometry.points.length - 1 ? 4 : 3} fill="#E44427" stroke={i === big3Geometry.points.length - 1 ? '#FFFFFF' : 'none'} strokeWidth={i === big3Geometry.points.length - 1 ? 2 : 0} />
+                      ))}
+                    </svg>
+                    <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                      {getDataDateLabels(big3Analytics.dataPoints.map((d) => d.date)).map((m, i) => (
+                        <span key={i}>{m}</span>
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                      <span>{t('progress.legendEstimated')}</span>
+                      <span>{dataWindow(big3Analytics.dataPoints)}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <EmptyState
+                  title={t('progress.chartEmptySessions')}
+                  explanation={t('progress.spotEmptyBig3Hint')}
+                  actionLabel={t('train.startWorkout')}
+                  onAction={() => onNavigate?.('workout')}
+                />
+              )}
+            </div>
+          ) : heroLiftAnalytics.dataPoints.length > 0 || heroLiftAnalytics.latest1RM ? (
+            <div
+              onClick={() => {
+                setSelectedExercise(heroLift.name);
+                setStrengthSubView('analytics');
+              }}
+              className="card p-5 bg-bg-card border border-border space-y-3 cursor-pointer hover:border-accent/40 transition-all shadow-xs group"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionE1rm', { lift: heroLift.name })}</h2>
+                  <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
+                  <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
+              </div>
+              <div className="flex items-baseline justify-between pt-1">
+                <div>
+                  <div className="text-3xl font-black text-text-primary font-sans tabular-nums">
+                    {heroLiftAnalytics.latest1RM ? `${heroLiftAnalytics.latest1RM} ${userUnit}` : displayWeight(heroLift.best1RMKg)}
+                  </div>
+                  <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
+                </div>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                  {heroLiftAnalytics.deltaText}
+                </span>
+              </div>
+              <div className="pt-2">
+                <svg viewBox="0 0 320 120" className="w-full h-28 overflow-visible" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="strengthGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#E44427" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#E44427" stopOpacity="0.0" />
+                    </linearGradient>
+                  </defs>
+                  <line x1="0" y1="90" x2="320" y2="90" stroke="currentColor" strokeOpacity="0.1" strokeDasharray="3 3" />
+                  {heroChartGeometry.points.length > 0 ? (
+                    <>
+                      {heroChartGeometry.pathD ? (
+                        <>
+                          <path d={heroChartGeometry.areaD} fill="url(#strengthGradient)" />
+                          <path
+                            d={heroChartGeometry.pathD}
+                            fill="none"
+                            stroke="#E44427"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeDasharray="6 3"
+                          />
+                        </>
+                      ) : null}
+                      {heroChartGeometry.points.map((pt, i) => (
+                        <circle
+                          key={i}
+                          cx={pt.x}
+                          cy={pt.y}
+                          r={i === heroChartGeometry.points.length - 1 ? 4 : 3}
+                          fill="#E44427"
+                          stroke={i === heroChartGeometry.points.length - 1 ? '#FFFFFF' : 'none'}
+                          strokeWidth={i === heroChartGeometry.points.length - 1 ? 2 : 0}
+                        />
+                      ))}
+                    </>
+                  ) : (
+                    <text x="160" y="60" textAnchor="middle" className="text-xs fill-text-muted font-sans">
+                      {t('progress.chartEmptyWorkouts')}
+                    </text>
+                  )}
+                </svg>
+                <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                  {getDataDateLabels(heroLiftAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
+                    <span key={i}>{m}</span>
+                  ))}
+                </div>
+                <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                  <span>{t('progress.legendEstimated')}</span>
+                  <span>{dataWindow(heroLiftAnalytics.dataPoints)}</span>
+                </div>
               </div>
             </div>
+          ) : (
+            <div className="card p-5 bg-bg-card border border-border shadow-xs">
+              <EmptyState
+                title={t('progress.chartEmptyWorkouts')}
+                explanation={t('progress.spotEmptyE1rmHint')}
+                actionLabel={t('train.startWorkout')}
+                onAction={() => onNavigate?.('workout')}
+              />
+            </div>
+          )}
+          {/* Pin control — surfaced on the overview, not buried in Settings */}
+          <div className="card p-4 bg-bg-card border border-border shadow-xs flex items-center gap-3">
+            <label htmlFor="spotlight-pin" className="text-xs font-semibold text-text-secondary shrink-0">{t('progress.pinChart')}</label>
+            <select
+              id="spotlight-pin"
+              value={uiPreferences.pinnedProgressChart ?? 'auto'}
+              onChange={(e) => setUiPreferences({ pinnedProgressChart: e.target.value === 'auto' ? null : e.target.value })}
+              className="appearance-none flex-1 bg-bg-secondary border border-border text-text-primary font-bold text-sm py-2 px-3 rounded-xl focus:outline-none focus:border-accent cursor-pointer"
+            >
+              <option value="auto">{t('progress.spotlightAuto')}</option>
+              {SPOTLIGHT_CHARTS.map((id) => (
+                <option key={id} value={id}>{t(SPOTLIGHT_CHART_NAME_KEYS[id] as StringKey)}</option>
+              ))}
+            </select>
           </div>
 
           {/* Card 2: Personal Records List */}
@@ -949,7 +1238,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-text-primary">{t('progress.personalRecords')}</h2>
-                <p className="text-3xs text-text-muted mt-0.5">
+                <p className="text-2xs text-text-muted mt-0.5">
                   {t('progress.prExplainer')}
                 </p>
               </div>
@@ -1048,7 +1337,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         onClick={() => setStrengthTimeRange(r)}
                         className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                           strengthTimeRange === r
-                            ? 'bg-accent text-white shadow-xs'
+                            ? 'bg-accent text-accent-on shadow-xs'
                             : 'text-text-muted hover:text-text-primary'
                         }`}
                       >
@@ -1061,8 +1350,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 {/* 1RM readout + delta badge */}
                 <div className="flex items-baseline justify-between pt-1">
                   <div>
-                    <div className="text-4xl font-black text-text-primary font-sans tabular-nums">
-                      {selectedExerciseAnalytics.latest1RM ? `${selectedExerciseAnalytics.latest1RM} ${userUnit}` : '—'}
+                    <div className="flex items-center gap-2">
+                      <div className="text-4xl font-black text-text-primary font-sans tabular-nums">
+                        {selectedExerciseAnalytics.latest1RM ? `${selectedExerciseAnalytics.latest1RM} ${userUnit}` : '—'}
+                      </div>
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
                     </div>
                     <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
@@ -1094,6 +1386,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                               stroke="#E44427"
                               strokeWidth="2.5"
                               strokeLinecap="round"
+                              strokeDasharray="6 3"
                             />
                           </>
                         ) : null}
@@ -1115,10 +1408,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </text>
                     )}
                   </svg>
-                  <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
                     {getDataDateLabels(selectedExerciseAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
+                  </div>
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                    <span>{t('progress.legendEstimated')}</span>
+                    <span>{minMaxLabel(selectedExerciseAnalytics.dataPoints, userUnit) ?? ''}</span>
                   </div>
                 </div>
               </div>
@@ -1139,7 +1436,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="font-bold text-text-primary font-mono block">
                             {userUnit === 'lbs' ? `${s.bestWeight} lbs` : `${s.bestWeight} kg`} × {s.bestReps} reps
                           </span>
-                          <span className="text-3xs text-text-muted font-mono">
+                          <span className="text-2xs text-text-muted font-mono">
                             Est. 1RM: {userUnit === 'lbs' ? `${s.bestE1RM} lbs` : `${s.bestE1RM} kg`}
                           </span>
                         </div>
@@ -1147,7 +1444,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="text-2xs font-mono font-medium text-text-secondary block">
                             {formatShortDate(s.date)}
                           </span>
-                          <span className="text-3xs font-mono text-[#858076] font-bold">
+                          <span className="text-2xs font-mono text-[#858076] font-bold">
                             {s.deltaStr}
                           </span>
                         </div>
@@ -1222,7 +1519,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         onClick={() => setBodyTimeRange(r)}
                         className={`px-2 py-0.5 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
                           bodyTimeRange === r
-                            ? 'bg-accent text-white shadow-xs'
+                            ? 'bg-accent text-accent-on shadow-xs'
                             : 'text-text-muted hover:text-text-primary'
                         }`}
                       >
@@ -1275,10 +1572,14 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       </text>
                     )}
                   </svg>
-                  <div className="flex justify-between text-3xs text-text-muted font-mono pt-1">
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
                     {getDataDateLabels(bodyweightAnalytics.dataPoints.map((d) => d.date)).map((m, i) => (
                       <span key={i}>{m}</span>
                     ))}
+                  </div>
+                  <div className="flex justify-between text-2xs text-text-muted font-mono pt-1">
+                    <span>{t('progress.legendMeasured')}</span>
+                    <span>{minMaxLabel(bodyweightAnalytics.dataPoints, userUnit) ?? ''}</span>
                   </div>
                 </div>
               </div>
@@ -1384,7 +1685,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                             role="radio"
                             aria-checked={photoPose === pose}
                             onClick={() => setPhotoPose(pose)}
-                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-white' : 'text-text-muted hover:text-text-primary'}`}
+                            className={`px-2.5 py-1 rounded-full text-2xs font-bold cursor-pointer transition-all ${photoPose === pose ? 'bg-accent text-accent-on' : 'text-text-muted hover:text-text-primary'}`}
                           >
                             {pose}
                           </button>
@@ -1486,7 +1787,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       >
                         {bar.isCompleted ? <Check className="w-4 h-4 stroke-[2.5]" /> : null}
                       </div>
-                      <span className="text-3xs font-mono text-text-muted">{bar.label}</span>
+                      <span className="text-2xs font-mono text-text-muted">{bar.label}</span>
                     </div>
                   ))}
                 </div>
@@ -1509,7 +1810,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <div
                           style={{ height: `${bar.heightPct}%` }}
                           className={`w-full rounded-lg transition-all ${
-                            bar.isCompleted ? 'bg-[#E44427]' : 'bg-border/60'
+                            bar.isCompleted ? 'bg-accent' : 'bg-border/60'
                           }`}
                         />
                       </div>
@@ -1629,7 +1930,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       if (profile) setProfile({ ...profile, unit: 'lbs' });
                     }}
                     className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'lbs' ? 'bg-accent text-white shadow-xs' : 'text-text-muted hover:text-text-primary'
+                      userUnit === 'lbs' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
                     LBS
@@ -1640,7 +1941,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       if (profile) setProfile({ ...profile, unit: 'kg' });
                     }}
                     className={`px-3 py-1 text-2xs font-mono font-bold rounded transition-all cursor-pointer ${
-                      userUnit === 'kg' ? 'bg-accent text-white shadow-xs' : 'text-text-muted hover:text-text-primary'
+                      userUnit === 'kg' ? 'bg-accent text-accent-on shadow-xs' : 'text-text-muted hover:text-text-primary'
                     }`}
                   >
                     KG

@@ -610,7 +610,7 @@ export default function BarcodeScannerModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -658,13 +658,13 @@ export default function BarcodeScannerModal({
                 {isScanning && (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                     <div className="relative w-56 h-28 border-2 border-accent rounded-xl overflow-hidden shadow-[0_0_24px_rgba(249,115,22,0.35)]">
-                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent animate-pulse" />
+                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-accent to-transparent" />
                       <span className="absolute top-1 left-1 w-3.5 h-3.5 border-t-2 border-l-2 border-accent" />
                       <span className="absolute top-1 right-1 w-3.5 h-3.5 border-t-2 border-r-2 border-accent" />
                       <span className="absolute bottom-1 left-1 w-3.5 h-3.5 border-b-2 border-l-2 border-accent" />
                       <span className="absolute bottom-1 right-1 w-3.5 h-3.5 border-b-2 border-r-2 border-accent" />
                     </div>
-                    <span className="absolute bottom-3 text-center text-3xs font-mono font-semibold text-white/90 bg-black/70 px-3 py-1 rounded-full backdrop-blur-xs">
+                    <span className="absolute bottom-3 text-center text-2xs font-mono font-semibold text-white/90 bg-black/70 px-3 py-1 rounded-full backdrop-blur-xs">
                       {t('scan2.align')}
                     </span>
                   </div>
@@ -699,7 +699,7 @@ export default function BarcodeScannerModal({
               {/* Manual Barcode Input Fallback — always visible */}
               {
                 <div className="p-3 rounded-2xl bg-bg-secondary/40 border border-border/70 space-y-2">
-                  <span className="text-3xs font-mono text-text-muted uppercase font-semibold block">
+                  <span className="text-2xs font-mono text-text-muted uppercase font-semibold block">
                     {t('scan2.manualTitle')}
                   </span>
                   <div className="flex gap-2">
@@ -745,7 +745,7 @@ export default function BarcodeScannerModal({
                 {/* Confirmation Prompt Header */}
                 <div className="flex items-center justify-between pb-2 border-b border-border/50">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${isNotFoundInDB ? 'bg-amber-400' : 'bg-emerald-500'} animate-pulse`} />
+                    <span className={`w-2 h-2 rounded-full ${isNotFoundInDB ? 'bg-amber-400' : 'bg-emerald-500'}`} />
                     <span className={`text-2xs font-mono font-bold uppercase tracking-wider ${
                       isNotFoundInDB ? 'text-amber-400' : 'text-emerald-500'
                     }`}>
@@ -770,7 +770,7 @@ export default function BarcodeScannerModal({
                           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                           {t('scan2.notInDb')}
                         </p>
-                        <p className="text-3xs text-text-muted leading-relaxed mt-0.5">
+                        <p className="text-2xs text-text-muted leading-relaxed mt-0.5">
                           {t('scan2.notInDbBody')}
                         </p>
                       </div>
@@ -840,7 +840,7 @@ export default function BarcodeScannerModal({
                               className="w-full text-left px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-secondary flex items-center justify-between cursor-pointer"
                             >
                               <span>{s}</span>
-                              <span className="text-3xs font-mono text-accent">{t('scan2.autoFill')}</span>
+                              <span className="text-2xs font-mono text-accent">{t('scan2.autoFill')}</span>
                             </button>
                           ))}
                         </div>
@@ -867,11 +867,11 @@ export default function BarcodeScannerModal({
                         <label className="text-2xs font-mono font-semibold text-text-muted uppercase">
                           {t('scan2.per100')}
                         </label>
-                        <span className="text-3xs font-mono text-accent">{t('scan2.editable')}</span>
+                        <span className="text-2xs font-mono text-accent">{t('scan2.editable')}</span>
                       </div>
                       <div className="grid grid-cols-4 gap-2">
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.calories')}</span>
+                          <span className="text-2xs font-mono text-text-muted block mb-0.5">{t('meals.calories')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -882,7 +882,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.protein')}</span>
+                          <span className="text-2xs font-mono text-text-muted block mb-0.5">{t('meals.protein')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -893,7 +893,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.carbs')}</span>
+                          <span className="text-2xs font-mono text-text-muted block mb-0.5">{t('meals.carbs')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -904,7 +904,7 @@ export default function BarcodeScannerModal({
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
-                          <span className="text-3xs font-mono text-text-muted block mb-0.5">{t('meals.fat')}</span>
+                          <span className="text-2xs font-mono text-text-muted block mb-0.5">{t('meals.fat')}</span>
                           <input
                             type="text"
                             inputMode="decimal"
@@ -921,14 +921,14 @@ export default function BarcodeScannerModal({
                   /* Verified Product Display */
                   <div>
                     {scannedProduct.brand && (
-                      <span className="text-3xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
+                      <span className="text-2xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
                         {scannedProduct.brand}
                       </span>
                     )}
                     <h3 className="text-base font-bold text-text-primary leading-snug">
                       {scannedProduct.name}
                     </h3>
-                    <span className="text-3xs text-text-muted font-mono block mt-0.5">
+                    <span className="text-2xs text-text-muted font-mono block mt-0.5">
                       {t('scan2.barcodeLabel')} {scannedProduct.barcode}
                     </span>
                   </div>
@@ -992,25 +992,25 @@ export default function BarcodeScannerModal({
                     <span className="text-xs font-bold text-accent block">
                       {currentFoodItem.calories}
                     </span>
-                    <span className="text-3xs text-text-muted uppercase">CAL</span>
+                    <span className="text-2xs text-text-muted uppercase">CAL</span>
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-emerald-500 block">
                       {currentFoodItem.proteinG}g
                     </span>
-                    <span className="text-3xs text-text-muted uppercase">PRO</span>
+                    <span className="text-2xs text-text-muted uppercase">PRO</span>
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
                       {currentFoodItem.carbsG}g
                     </span>
-                    <span className="text-3xs text-text-muted uppercase">CARB</span>
+                    <span className="text-2xs text-text-muted uppercase">CARB</span>
                   </div>
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
                     <span className="text-xs font-bold text-text-primary block">
                       {currentFoodItem.fatG}g
                     </span>
-                    <span className="text-3xs text-text-muted uppercase">FAT</span>
+                    <span className="text-2xs text-text-muted uppercase">FAT</span>
                   </div>
                 </div>
 

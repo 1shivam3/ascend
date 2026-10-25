@@ -97,7 +97,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -108,7 +108,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
         <div className="p-3 rounded-xl bg-bg-secondary border border-border/70 space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-text-primary">{plan.name}</span>
-            <span className="text-3xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+            <span className="text-2xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
               {t('share.exercises', { count: plan.exercises.length })}
             </span>
           </div>
@@ -191,7 +191,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
             </button>
 
             <div className="space-y-1.5">
-              <label className="text-3xs font-mono uppercase font-bold text-text-muted block">
+              <label className="text-2xs font-mono uppercase font-bold text-text-muted block">
                 {t('share.directLink')}
               </label>
               <div className="flex items-center gap-1.5 bg-bg-secondary p-1.5 rounded-xl border border-border/70">
@@ -199,7 +199,7 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
                   type="text"
                   readOnly
                   value={shareUrl}
-                  className="bg-transparent text-3xs font-mono text-text-secondary flex-1 px-1 outline-none truncate"
+                  className="bg-transparent text-2xs font-mono text-text-secondary flex-1 px-1 outline-none truncate"
                 />
                 <button
                   type="button"
@@ -225,11 +225,11 @@ export default function ShareProgramModal({ plan, isOpen, onClose }: ShareProgra
                 />
               </div>
             ) : (
-              <div className="w-56 h-56 rounded-2xl bg-bg-secondary animate-pulse flex items-center justify-center text-text-muted text-xs font-mono">
+              <div className="w-56 h-56 rounded-2xl bg-bg-secondary flex items-center justify-center text-text-muted text-xs font-mono">
                 {t('share.generatingQr')}
               </div>
             )}
-            <p className="text-3xs text-text-muted text-center font-mono max-w-xs">
+            <p className="text-2xs text-text-muted text-center font-mono max-w-xs">
               {t('share.qrHint')}
             </p>
           </div>

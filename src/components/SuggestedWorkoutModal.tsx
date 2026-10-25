@@ -584,7 +584,7 @@ export default function SuggestedWorkoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label="Close workout generator"
           >
             <X className="w-5 h-5" />
@@ -781,7 +781,7 @@ export default function SuggestedWorkoutModal({
                         onClick={() => setSelectedSplitDayIdx(idx)}
                         className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
                           isDaySelected
-                            ? 'bg-accent text-white border-accent shadow-xs'
+                            ? 'bg-accent text-accent-on border-accent shadow-xs'
                             : 'bg-bg-secondary border-border text-text-secondary hover:text-text-primary'
                         }`}
                       >
@@ -799,7 +799,7 @@ export default function SuggestedWorkoutModal({
                     <span className="text-xs font-bold text-text-primary block">
                       {t('sg.genWeekly')}
                     </span>
-                    <span className="text-3xs text-text-secondary block mt-0.5">
+                    <span className="text-2xs text-text-secondary block mt-0.5">
                       {t('sg.genWeeklySub', { name: currentSplit.name })}
                     </span>
                   </div>

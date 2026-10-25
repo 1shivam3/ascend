@@ -255,7 +255,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent text-white flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-accent text-accent-on flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer"
                 title={t('editProfile.changePhoto')}
                 aria-label={t('editProfile.changePhoto')}
               >
@@ -321,7 +321,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                   onClick={() => setGender(g)}
                   className={`py-2 px-3 rounded-xl text-xs font-bold font-sans transition-all capitalize border cursor-pointer ${
                     gender === g
-                      ? 'bg-accent text-white border-accent shadow-xs'
+                      ? 'bg-accent text-accent-on border-accent shadow-xs'
                       : 'bg-bg-secondary text-text-muted border-border hover:text-text-primary'
                   }`}
                 >
@@ -436,7 +436,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </button>
             <button
               type="submit"
-              className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-accent hover:bg-accent-dim text-white text-xs font-bold transition-all shadow-sm shadow-accent/20 cursor-pointer"
+              className="flex-1 min-h-[44px] py-2.5 px-4 rounded-xl bg-accent hover:bg-accent-dim text-accent-on text-xs font-bold transition-all shadow-sm shadow-accent/20 cursor-pointer"
             >
               {t('scan.saveChanges')}
             </button>

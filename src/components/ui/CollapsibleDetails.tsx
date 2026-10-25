@@ -26,7 +26,7 @@ export function CollapsibleDetails({ label, children, className = '' }: Collapsi
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex items-center gap-1 py-1 text-3xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+        className="flex items-center gap-1 py-1 text-2xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer"
       >
         {label ?? t('ui.details')}
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true" />

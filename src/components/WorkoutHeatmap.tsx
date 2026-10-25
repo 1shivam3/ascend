@@ -234,7 +234,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('all')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 ${
             activeFilter === 'all'
-              ? 'bg-accent text-white shadow-xs'
+              ? 'bg-accent text-accent-on shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -331,6 +331,7 @@ export default function WorkoutHeatmap({
                 <button
                   key={dateStr}
                   type="button"
+                  aria-label={t('heat.cellSummary', { date: dateStr, done: totalHabitsDone })}
                   onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                   className={`aspect-square rounded-xl flex flex-col items-center justify-between p-1 text-xs font-mono transition-all duration-150 relative select-none border ${
                     activeFilter !== 'all'

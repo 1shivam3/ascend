@@ -25,9 +25,15 @@ import {
 interface DataVaultModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /**
+   * FND-05: open straight at the delete-confirm safeguard view, for the
+   * Settings → Data & Account row. The main view no longer carries its
+   * own delete button — deletion lives in that one place.
+   */
+  startAtDeleteConfirm?: boolean;
 }
 
-export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps) {
+export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }: DataVaultModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
@@ -49,7 +55,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
   const toast = useToast();
 
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(!!startAtDeleteConfirm);
   const [showFileAccessPrompt, setShowFileAccessPrompt] = useState(false);
   const csvFileInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -415,7 +421,7 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
                     {t('vault.csvTitle')}
                   </span>
                 </div>
-                <span className="text-3xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
+                <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
                   Strong / Hevy / FitNotes
                 </span>
               </div>
@@ -445,17 +451,9 @@ export default function DataVaultModal({ isOpen, onClose }: DataVaultModalProps)
               <span>{t('vault.privacyGuarantee')}</span>
             </div>
 
-            {/* Reset / Delete Danger Area */}
-            <div className="pt-2 border-t border-border/60">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="w-full py-2 px-3 rounded-lg border border-rose-500/30 text-rose-400/80 hover:text-rose-400 hover:bg-rose-500/10 text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-all"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>{t('vault.deleteReset')}</span>
-              </button>
-            </div>
+            {/* FND-05: no delete button here anymore — deletion lives
+                in Settings → Data & Account, which opens this modal
+                straight at the safeguard view above. */}
           </>
         )}
 

@@ -380,13 +380,13 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
               <h3 className="font-bold text-sm text-text-primary leading-tight">
                 {t('recap.modalTitle')}
               </h3>
-              <p className="text-3xs text-text-muted font-mono">{t('recap.modalSubtitle')}</p>
+              <p className="text-2xs text-text-muted font-mono">{t('recap.modalSubtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
           aria-label="Close"
           >
             <X className="w-5 h-5" />

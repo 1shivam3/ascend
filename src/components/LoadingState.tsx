@@ -24,8 +24,6 @@ export default function LoadingState({
     <div className="w-full max-w-sm mx-auto p-6 sm:p-8 space-y-6 text-center animate-fade-in select-none">
       {/* ── Screen 26: Centered Vermilion Spinner Indicator ────────────── */}
       <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
-        {/* Subtle background pulse */}
-        <div className="absolute inset-0 rounded-full bg-accent/10 animate-ping opacity-75" />
         {/* Animated track spinner */}
         <div className="w-12 h-12 rounded-full border-[3px] border-border border-t-accent animate-spin shadow-xs" />
         {/* Inner center dot in Sage */}

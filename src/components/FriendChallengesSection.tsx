@@ -55,13 +55,13 @@ function CodeShareBox({ text, shareText }: { text: string; shareText: string }) 
   return (
     <div className="space-y-1.5">
       <div className="flex items-stretch gap-1.5">
-        <code className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-bg-primary border border-border/60 text-3xs font-mono text-text-secondary break-all select-all">
+        <code className="flex-1 min-w-0 px-2.5 py-2 rounded-lg bg-bg-primary border border-border/60 text-2xs font-mono text-text-secondary break-all select-all">
           {text}
         </code>
         <button
           type="button"
           onClick={copy}
-          className="px-2.5 rounded-lg bg-bg-primary border border-border text-text-secondary hover:text-text-primary flex items-center gap-1 text-3xs font-semibold shrink-0 cursor-pointer"
+          className="px-2.5 rounded-lg bg-bg-primary border border-border text-text-secondary hover:text-text-primary flex items-center gap-1 text-2xs font-semibold shrink-0 cursor-pointer"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? t('friends.copied') : t('friends.copyCode')}
@@ -71,7 +71,7 @@ function CodeShareBox({ text, shareText }: { text: string; shareText: string }) 
         href={whatsappUrl(shareText)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-3xs font-semibold text-accent hover:underline"
+        className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent hover:underline"
       >
         <Share2 className="w-3 h-3" />
         WhatsApp
@@ -238,14 +238,14 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
         </div>
       </div>
 
-      <p className="text-3xs text-text-muted leading-relaxed">{t('friends.howItWorks')}</p>
+      <p className="text-2xs text-text-muted leading-relaxed">{t('friends.howItWorks')}</p>
 
       {/* Create / Join */}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setShowCreate((v) => !v)}
-          className="py-2 px-3.5 rounded-xl bg-accent text-white text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+          className="py-2 px-3.5 rounded-xl bg-accent text-accent-on text-xs font-bold flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
           {t('friends.create')}
@@ -260,9 +260,9 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                 key={p.metric}
                 type="button"
                 onClick={() => setPresetIdx(i)}
-                className={`px-2.5 py-1.5 rounded-lg text-3xs font-semibold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg text-2xs font-semibold transition-colors cursor-pointer ${
                   presetIdx === i
-                    ? 'bg-accent text-white font-bold'
+                    ? 'bg-accent text-accent-on font-bold'
                     : 'bg-bg-primary border border-border text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -276,9 +276,9 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                 key={d}
                 type="button"
                 onClick={() => setDuration(d)}
-                className={`px-2.5 py-1.5 rounded-lg text-3xs font-semibold transition-colors cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg text-2xs font-semibold transition-colors cursor-pointer ${
                   duration === d
-                    ? 'bg-accent text-white font-bold'
+                    ? 'bg-accent text-accent-on font-bold'
                     : 'bg-bg-primary border border-border text-text-muted hover:text-text-primary'
                 }`}
               >
@@ -297,7 +297,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
           <button
             type="button"
             onClick={handleCreate}
-            className="py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            className="py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
           >
             {t('friends.create')}
           </button>
@@ -325,7 +325,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
 
       {/* My friend challenges */}
       {records.length === 0 ? (
-        <p className="text-3xs text-text-muted">{t('friends.noChallenges')}</p>
+        <p className="text-2xs text-text-muted">{t('friends.noChallenges')}</p>
       ) : (
         records.map((rec) => {
           const { def } = rec;
@@ -339,7 +339,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-text-primary">{def.title}</p>
-                  <p className="text-3xs text-text-muted mt-0.5">
+                  <p className="text-2xs text-text-muted mt-0.5">
                     {def.creatorName} · {formatDate(def.startDate)} – {formatDate(def.endDate)} ·{' '}
                     {status === 'expired'
                       ? t('friends.ended')
@@ -348,7 +348,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                         : t('friends.daysLeft', { days: friendChallengeDaysLeft(def, todayStr) })}
                   </p>
                 </div>
-                <span className="text-3xs font-bold text-amber-500 tabular-nums shrink-0 pt-0.5">
+                <span className="text-2xs font-bold text-amber-500 tabular-nums shrink-0 pt-0.5">
                   +{XP_CHALLENGE_COMPLETE} XP
                 </span>
               </div>
@@ -359,7 +359,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                   style={{ width: `${evaluation?.pct ?? 0}%` }}
                 />
               </div>
-              <p className="text-3xs text-text-muted tabular-nums">
+              <p className="text-2xs text-text-muted tabular-nums">
                 {evaluation?.progress ?? 0} of {def.target} {metricLabel(def.metric)}
               </p>
 
@@ -372,31 +372,31 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                       row.isMe ? 'bg-accent/10 border border-accent/30' : 'bg-bg-primary border border-border/40'
                     }`}
                   >
-                    <span className="text-3xs font-bold text-text-muted w-4 tabular-nums">{row.rank}</span>
+                    <span className="text-2xs font-bold text-text-muted w-4 tabular-nums">{row.rank}</span>
                     {row.rank === 1 && <Trophy className="w-3 h-3 text-amber-500 shrink-0" />}
                     <span className="font-semibold text-text-primary truncate">
                       {row.isMe ? `${row.name} (${t('friends.you')})` : row.name}
                     </span>
-                    <span className="ml-auto text-3xs font-mono text-text-secondary tabular-nums shrink-0">
+                    <span className="ml-auto text-2xs font-mono text-text-secondary tabular-nums shrink-0">
                       {row.progress}/{row.target}
                     </span>
                   </div>
                 ))}
               </div>
-              <p className="text-3xs text-text-muted">{t('friends.boardHint')}</p>
+              <p className="text-2xs text-text-muted">{t('friends.boardHint')}</p>
 
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => setOpenCodeBox(openCodeBox === `invite:${def.id}` ? null : `invite:${def.id}`)}
-                  className="px-2.5 py-1.5 rounded-lg bg-bg-primary border border-border text-3xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-bg-primary border border-border text-2xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
                 >
                   {t('friends.shareInvite')}
                 </button>
                 <button
                   type="button"
                   onClick={() => setOpenCodeBox(openCodeBox === `score:${def.id}` ? null : `score:${def.id}`)}
-                  className="px-2.5 py-1.5 rounded-lg bg-bg-primary border border-border text-3xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-bg-primary border border-border text-2xs font-semibold text-text-secondary hover:text-text-primary cursor-pointer"
                 >
                   {t('friends.shareMyScore')}
                 </button>
@@ -406,7 +406,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                     removeFriendChallenge(def.id);
                     toast.info(t('friends.leave'), def.title);
                   }}
-                  className="px-2.5 py-1.5 rounded-lg text-3xs font-semibold text-text-muted hover:text-text-primary cursor-pointer ml-auto"
+                  className="px-2.5 py-1.5 rounded-lg text-2xs font-semibold text-text-muted hover:text-text-primary cursor-pointer ml-auto"
                 >
                   {t('friends.leave')}
                 </button>

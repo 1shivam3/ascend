@@ -47,7 +47,10 @@ import {
   ApplyPolicyDecisionResult,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
-import { purgeLocalAppData, isRecognizedBackupData } from './storage';
+import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
+import { normalizeHex } from './accent-themes';
+import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes } from './storage';
+import { ARCHIVED_HISTORY_KEY } from './history-fork';
 import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
@@ -191,6 +194,32 @@ export interface UiPreferences {
    * old saves lack the field, so consumers check `!== false`.
    */
   showMuscleVolume: boolean;
+  /**
+   * UX redesign — accent theme (personalization-spec §5.1). 'custom'
+   * uses customAccentHex. Local-only: never synced (the sync payload
+   * carries no uiPreferences field at all — see the Stage 1 sync
+   * audit in docs/ux-redesign/implementation-summary.md). UI copy
+   * must never promise cross-device sync for this key.
+   */
+  accentTheme: 'vermilion' | 'cobalt' | 'forest' | 'plum' | 'teal' | 'rose' | 'custom';
+  /** Custom accent hex (normalized #RRGGBB) or null. Local-only. */
+  customAccentHex: string | null;
+  /**
+   * UX redesign — information density. 'simple' | 'detailed',
+   * presentation only (same data, logic, features). New accounts
+   * default 'simple'; pre-redesign blobs migrate to 'detailed'
+   * (persist version bump + migrate()). Local-only.
+   */
+  density: 'simple' | 'detailed';
+  /** UX redesign — Today section visibility/order. Local-only. */
+  todayLayout: { visible: Record<string, boolean | 'unset'>; order: string[] };
+  /**
+   * UX redesign — explicit workout-mode override. null = follow
+   * density (Beginner in Simple, Advanced in Detailed). Local-only.
+   */
+  workoutModeOverride: 'beginner' | 'advanced' | null;
+  /** UX redesign — pinned Progress spotlight chart id, or null. Local-only. */
+  pinnedProgressChart: string | null;
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -202,6 +231,13 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   textScale: 'normal',
   healthConnectEnabled: false,
   showMuscleVolume: true,
+  // UX redesign defaults (fresh stores = new accounts = Simple).
+  accentTheme: 'vermilion',
+  customAccentHex: null,
+  density: 'simple',
+  todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] },
+  workoutModeOverride: null,
+  pinnedProgressChart: null,
 };
 
 export interface AppState {
@@ -515,7 +551,12 @@ export interface AppState {
 
   clearAllData: () => void;
   logout: (options?: { clearLocalData?: boolean }) => void;
-  
+  // FND-06: Start fresh archives instead of deleting, and the archive
+  // is restorable from Settings → Data & Account. Local-state only;
+  // no sync/serialization shape changes, no profile partitioning.
+  startFreshFromRetainedHistory: () => boolean;
+  restoreArchivedHistory: () => boolean;
+
   importAllData: (data: any) => boolean;
 }
 
@@ -733,17 +774,85 @@ export function syncWorkoutReminderDays(
  * Flat slices and collections are user data with no defaults to merge
  * and pass through untouched.
  */
-export const PERSIST_VERSION = 1;
+export const PERSIST_VERSION = 2;
+
+const ACCENT_THEME_IDS = ['vermilion', 'cobalt', 'forest', 'plum', 'teal', 'rose', 'custom'];
+
+/**
+ * UX redesign — value validation for uiPreferences
+ * (personalization-spec §5.4). Silent by design: invalid values fall
+ * back to defaults, never a crash or blank screen; corrected values
+ * are written back on the next persist so the blob heals itself.
+ * Non-object uiPreferences is returned as a fresh default set here —
+ * the merge path uses this; migratePersistedState deliberately leaves
+ * non-object uiPreferences untouched (QA4-012 pins that behavior).
+ */
+export function sanitizeUiPreferences(
+  prefs: unknown,
+  hasUserData: boolean,
+): Record<string, unknown> {
+  if (!prefs || typeof prefs !== 'object' || Array.isArray(prefs)) {
+    return { ...DEFAULT_UI_PREFERENCES };
+  }
+  const out: Record<string, unknown> = {
+    ...DEFAULT_UI_PREFERENCES,
+    ...(prefs as Record<string, unknown>),
+  };
+  if (!ACCENT_THEME_IDS.includes(out.accentTheme as string)) {
+    out.accentTheme = 'vermilion';
+  }
+  const hex =
+    typeof out.customAccentHex === 'string' ? normalizeHex(out.customAccentHex) : null;
+  out.customAccentHex = hex;
+  if (out.accentTheme === 'custom' && !hex) out.accentTheme = 'vermilion';
+  // Invalid/missing density → the §5.2 account default (existing users
+  // keep Detailed; fresh accounts get Simple). A stored valid value is
+  // always honored.
+  if (out.density !== 'simple' && out.density !== 'detailed') {
+    out.density = hasUserData ? 'detailed' : 'simple';
+  }
+  out.todayLayout = sanitizeTodayLayout(out.todayLayout);
+  if (
+    out.workoutModeOverride !== 'beginner' &&
+    out.workoutModeOverride !== 'advanced' &&
+    out.workoutModeOverride !== null
+  ) {
+    out.workoutModeOverride = null;
+  }
+  if (typeof out.pinnedProgressChart !== 'string') out.pinnedProgressChart = null;
+  return out;
+}
+
+function blobHasUserData(state: Record<string, any>): boolean {
+  return Boolean(
+    state.profile ||
+      (Array.isArray(state.workouts) && state.workouts.length > 0) ||
+      (Array.isArray(state.meals) && state.meals.length > 0),
+  );
+}
 
 export function migratePersistedState(
   persisted: unknown,
-  _version: number,
+  version: number,
 ): Record<string, unknown> {
   const state = (persisted ?? {}) as Record<string, any>;
   const next: Record<string, any> = { ...state };
 
   if (state.uiPreferences && typeof state.uiPreferences === 'object') {
-    next.uiPreferences = { ...DEFAULT_UI_PREFERENCES, ...state.uiPreferences };
+    const merged: Record<string, unknown> = {
+      ...DEFAULT_UI_PREFERENCES,
+      ...(state.uiPreferences as Record<string, unknown>),
+    };
+    // UX redesign migration (persist v1 → v2): pre-redesign blobs never
+    // carried a density key. Existing accounts keep the experience they
+    // already have (Detailed). A stored valid density is always honored
+    // — the check reads the STORED value, not the merged one, because
+    // merging defaults first would mask the key's absence.
+    const storedDensity = (state.uiPreferences as Record<string, unknown>).density;
+    if (version < 2 && storedDensity !== 'simple' && storedDensity !== 'detailed') {
+      merged.density = 'detailed';
+    }
+    next.uiPreferences = sanitizeUiPreferences(merged, blobHasUserData(state));
   }
 
   if (state.notificationPreferences && typeof state.notificationPreferences === 'object') {
@@ -1808,6 +1917,12 @@ export const useAppStore = create<AppState>()(
         // persist freeze consumption/refill instead of leaving the
         // streak slice as dead code the UI only reads.
         get().refreshStreak();
+        // FND-02: recompute coach notes/counts on workout save.
+        // Defense-in-depth beside the store subscription (which also
+        // refreshes on signature change): the save path itself must
+        // never leave Today showing pre-save counts. Cheap (pure
+        // recompute, counts only) and idempotent.
+        get().refreshAthleteModel();
       },
       deleteWorkout: (id) => set((state) => {
         const nextWorkouts = state.workouts.filter(w => w.id !== id);
@@ -3188,6 +3303,146 @@ export const useAppStore = create<AppState>()(
         });
       },
 
+      // FND-06: Start fresh WITHOUT deleting. Archive first (a failed
+      // archive write aborts the whole operation — nothing is cleared
+      // unless the old history is safely stored), then clear the live
+      // slices. Deliberately NOT purgeLocalAppData: the purge would
+      // remove the archive key just written. The logged-out flag stays
+      // 'true' so disaster recovery stays gated off and cannot
+      // resurrect the cleared history into the fresh profile. The
+      // archive survives until a later Start fresh overwrites it or
+      // an explicit Delete WebApp Data & Reset purges it.
+      startFreshFromRetainedHistory: () => {
+        if (typeof window === 'undefined') return false;
+        const state = get();
+        try {
+          const archive = {
+            ...buildFullBackup(state as unknown as Record<string, any>, {
+              customBarcodes: getCustomBarcodes(),
+              progressPhotos: state.progressPhotos || [],
+            }),
+            archivedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(ARCHIVED_HISTORY_KEY, JSON.stringify(archive));
+        } catch {
+          return false;
+        }
+        set({
+          profile: null,
+          prs: [],
+          workouts: [],
+          meals: [],
+          bodyMetrics: [],
+          prTargets: {},
+          macroGoals: null,
+          plannedWorkouts: [],
+          favoriteFoods: DEFAULT_FAVORITE_FOODS,
+          customFoods: [],
+          mealDayKinds: {},
+          hasCompletedOnboarding: false,
+          waterLogs: {},
+          waterBatches: {},
+          hydrationConfig: DEFAULT_HYDRATION_CONFIG,
+          creatineLogs: {},
+          creatineConfig: DEFAULT_CREATINE_CONFIG,
+          creatineSupply: DEFAULT_CREATINE_SUPPLY,
+          dayTypeOverrides: {},
+          aiInsightsCache: {},
+          trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
+          todaysAIWorkoutPlan: undefined,
+          latestWeeklyReview: undefined,
+          trainingDecisions: {},
+          decisionsLedgerHistory: [],
+          lifterProfile: null,
+          athleteModel: null,
+          coachBlocks: getInitialCoachBlocksState(),
+          weeklyReviews: [],
+          policyDecisionRecords: {},
+          policyDecisionsLedgerHistory: [],
+          policyDecisionApplications: [],
+          // Beyond the logout field set: a fresh profile starts with
+          // no schedule, no deletion tombstones, no pending draft, no
+          // check-ins and a fresh coach state — all of it archived.
+          weeklySchedule: {
+            monday: { workoutPlanId: 'rest' },
+            tuesday: { workoutPlanId: 'rest' },
+            wednesday: { workoutPlanId: 'rest' },
+            thursday: { workoutPlanId: 'rest' },
+            friday: { workoutPlanId: 'rest' },
+            saturday: { workoutPlanId: 'rest' },
+            sunday: { workoutPlanId: 'rest' },
+          },
+          deletedPlanIds: [],
+          deletedPrIds: [],
+          deletedWorkoutIds: [],
+          deletedMealIds: [],
+          deletedBodyMetricIds: [],
+          dailyCheckins: {},
+          coach: getInitialCoachState(),
+          healthSummary: null,
+          goals: [],
+          activeWorkoutDraft: null,
+          lastActiveTab: 'home',
+        });
+        try {
+          // Legacy mirrors of the same archived data — removing them
+          // is safe (the archive holds the copy) and stops the
+          // disaster-recovery path from re-reading them.
+          localStorage.removeItem('ascend_emergency_snapshot');
+          localStorage.removeItem('ascend_profile');
+          localStorage.removeItem('ascend_workouts');
+          localStorage.removeItem('ascend_prs');
+          localStorage.removeItem('ascend_meals');
+          localStorage.removeItem(PROGRESS_PHOTOS_KEY);
+        } catch {}
+        return true;
+      },
+
+      // FND-06: restore the Start-fresh archive over the current live
+      // state (the user confirms first, in Settings → Data & Account).
+      // Store fields go through importAllData's validated path; photos
+      // and barcodes — which importAllData does not carry — are
+      // restored to their keys directly, mirroring importFullBackupJSON.
+      // The archive itself is kept, so a restore is repeatable.
+      restoreArchivedHistory: () => {
+        if (typeof window === 'undefined') return false;
+        try {
+          const raw = localStorage.getItem(ARCHIVED_HISTORY_KEY);
+          if (!raw) return false;
+          const parsed = JSON.parse(raw);
+          const ok = get().importAllData(parsed);
+          if (!ok) return false;
+          // The archive was written from a logged-out state, so its
+          // hasCompletedOnboarding is false — a restore from inside
+          // the app must not kick the user back to onboarding.
+          set({ hasCompletedOnboarding: true });
+          if (Array.isArray(parsed.progressPhotos)) {
+            const valid = parsed.progressPhotos
+              .filter(
+                (p: any) =>
+                  p &&
+                  typeof p === 'object' &&
+                  typeof p.id === 'string' &&
+                  typeof p.dataUrl === 'string' &&
+                  p.dataUrl.startsWith('data:image/')
+              )
+              .slice(0, 24);
+            try {
+              localStorage.setItem(PROGRESS_PHOTOS_KEY, JSON.stringify(valid));
+            } catch {}
+            set({ progressPhotos: valid });
+          }
+          if (parsed.customBarcodes && typeof parsed.customBarcodes === 'object') {
+            try {
+              localStorage.setItem('ascend_custom_barcodes', JSON.stringify(parsed.customBarcodes));
+            } catch {}
+          }
+          return true;
+        } catch {
+          return false;
+        }
+      },
+
       importAllData: (data) => {
         try {
           if (!data || typeof data !== 'object') return false;
@@ -3853,9 +4108,26 @@ export const useAppStore = create<AppState>()(
       // QA4-012: versioned migrations — legacy blobs (version 0) are
       // deep-merged over current defaults so newer default-ON fields
       // are never lost on rehydration. See migratePersistedState.
+      // UX redesign: v2 adds the six personalization keys; v1 blobs
+      // migrate existing accounts to density 'detailed' (see above).
       version: PERSIST_VERSION,
       migrate: (persistedState: unknown, version: number) =>
         migratePersistedState(persistedState, version) as unknown as AppState,
+      // UX redesign §5.4: validate preference VALUES on read (the
+      // default merge only fills missing keys). Otherwise identical
+      // to zustand's default shallow merge.
+      merge: (persistedState, currentState) => {
+        const persisted = (persistedState ?? {}) as Record<string, any>;
+        const merged = { ...(currentState as unknown as Record<string, unknown>), ...persisted } as Record<
+          string,
+          unknown
+        >;
+        merged.uiPreferences = sanitizeUiPreferences(
+          persisted.uiPreferences ?? (currentState as AppState).uiPreferences,
+          blobHasUserData(persisted),
+        );
+        return merged as unknown as AppState;
+      },
     }
   )
 );

@@ -76,7 +76,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -87,7 +87,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
 
         {debrief.liftChanges.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.debriefLiftsTitle')}
             </p>
             <div className="space-y-1">
@@ -102,7 +102,7 @@ export default function BlockDebriefModal({ isOpen, onClose, block, onStartNextB
 
         {debrief.learned.length > 0 && (
           <div>
-            <p className="text-3xs font-mono font-bold uppercase text-text-muted mb-1.5">
+            <p className="text-2xs font-mono font-bold uppercase text-text-muted mb-1.5">
               {t('weeklyReview.debriefLearnedTitle')}
             </p>
             <div className="space-y-1">

@@ -73,7 +73,7 @@ export default function ReadinessSheet({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             aria-label={t('ready.closeAria')}
           >
             <X className="w-5 h-5" />
@@ -147,7 +147,7 @@ export default function ReadinessSheet({
                       }}
                       className={`w-8 h-8 rounded-full text-xs font-bold transition-all cursor-pointer ${
                         current === v
-                          ? 'bg-accent text-white'
+                          ? 'bg-accent text-accent-on'
                           : 'bg-bg-secondary text-text-muted hover:text-text-primary border border-border/60'
                       }`}
                     >
@@ -158,7 +158,7 @@ export default function ReadinessSheet({
               </div>
             </div>
           ))}
-          <p className="text-3xs text-text-muted pt-0.5">
+          <p className="text-2xs text-text-muted pt-0.5">
             {todayCheckin
               ? t('ready.checkedIn')
               : t('ready.howFeel')}

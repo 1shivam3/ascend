@@ -59,6 +59,7 @@ import { calculatePlates, PlateInfo, BARBELL_PRESETS } from '@/lib/plate-calcula
 import { compareSetAdherence } from '@/lib/workout-adherence';
 import { useToast } from '@/components/ui/Toast';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
+import { resolveWorkoutMode } from '@/lib/workout-mode';
 import { getPackedGymSwapsForNames } from '@/lib/crowded-gym';
 import { useTranslation, type StringKey } from '@/lib/i18n';
 import VoiceWorkoutLoggerModal from '@/components/VoiceWorkoutLoggerModal';
@@ -131,14 +132,14 @@ function PackedSwapBanner({
         <button
           type="button"
           onClick={onSwap}
-          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent text-white text-3xs font-bold active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-accent text-accent-on text-2xs font-bold active:scale-95 transition-all cursor-pointer"
         >
           {swapLabel}
         </button>
         <button
           type="button"
           onClick={onKeep}
-          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary border border-border text-3xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
+          className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary border border-border text-2xs font-semibold text-text-secondary active:scale-95 transition-all cursor-pointer"
         >
           {keepLabel}
         </button>
@@ -156,8 +157,10 @@ export default function ActiveWorkoutScreen({
   onCancel,
   onPause,
 }: ActiveWorkoutScreenProps) {
-  const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions } = useStore();
-  const userMode = useStore((state) => state.userMode) || 'beginner';
+  const { profile, workouts, addPR, prs, saveWorkoutDraft, trainingDecisions, uiPreferences } = useStore();
+  // UX redesign Stage 4 — perform view follows app density unless pinned.
+  const workoutMode = resolveWorkoutMode(uiPreferences.density, uiPreferences.workoutModeOverride);
+  const density = uiPreferences.density === 'detailed' ? 'detailed' : 'simple';
   const toggleUserMode = useStore((state) => state.toggleUserMode);
   const toast = useToast();
   const userUnit = profile?.unit || 'kg';
@@ -423,8 +426,8 @@ export default function ActiveWorkoutScreen({
     }, 95);
   }, [registerBackHandler]);
 
-  // Sticky Rest Timer state (initialized to athlete's goal rest duration)
-  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);
+  // Rest Timer state (live-fix L4: the idle preset shown by the pill and
+  // the overlay is defaultRestDuration — one source, no stale copy).
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
@@ -442,14 +445,73 @@ export default function ActiveWorkoutScreen({
   } | null>(null);
   const [isCompletingSet, setIsCompletingSet] = useState(false);
 
+  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
+  // timer (remaining time stays resumable from the pill) — it must never
+  // keep running invisibly after its UI is gone. Shared by the X button,
+  // the Escape handler, and the Android-back handler so every close path
+  // behaves identically. (Defined before the effects below: the back
+  // handler's deps array reads it during render.)
+  const dismissSetComplete = useCallback(() => {
+    setCompletedSetSummary(null);
+    if (isRestRunning) {
+      restTargetEndTimeRef.current = null;
+      setIsRestRunning(false);
+    }
+  }, [isRestRunning]);
+
+  // Micro-fix L4 (round 2): the live path is the pill + popover, NOT the
+  // Set Complete overlay — the first round hid the pill only while the
+  // overlay was open, so pill + popover counted side by side and Escape
+  // did nothing on the popover. Dismissing the popover pauses the rest
+  // timer (remaining time stays resumable from the pill); collapsing the
+  // popover via its X button does NOT pause — Escape is the pause path.
+  const dismissRestPopover = useCallback(() => {
+    setIsRestPopoverOpen(false);
+    if (isRestRunning) {
+      restTargetEndTimeRef.current = null;
+      setIsRestRunning(false);
+    }
+  }, [isRestRunning]);
+
   useEffect(() => {
     if (completedSetSummary) {
       return registerBackHandler(() => {
-        setCompletedSetSummary(null);
+        dismissSetComplete();
         return true;
       }, 105);
     }
-  }, [completedSetSummary, registerBackHandler]);
+  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
+
+  // Escape closes the Set Complete overlay (it previously did nothing —
+  // the overlay is not a useModalA11y modal, so nothing handled the key).
+  useEffect(() => {
+    if (!completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissSetComplete();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completedSetSummary, dismissSetComplete]);
+
+  // Micro-fix L4 (round 2): Escape closes the rest popover AND pauses
+  // (same dismiss+pause semantics as the overlay). Without this, Escape
+  // did nothing on the popover — the only close paths were Skip (which
+  // kills the timer) and re-tapping the pill (hidden once open).
+  useEffect(() => {
+    if (!isRestPopoverOpen || completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissRestPopover();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isRestPopoverOpen, completedSetSummary, dismissRestPopover]);
+
+  // Micro-fix L4 (round 2): single timer UI across transitions — when
+  // the Set Complete overlay opens, the popover closes so pill + popover
+  // + overlay can never stack.
+  useEffect(() => {
+    if (completedSetSummary) setIsRestPopoverOpen(false);
+  }, [completedSetSummary]);
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
@@ -904,7 +966,6 @@ export default function ActiveWorkoutScreen({
     (seconds?: number) => {
       const targetSec = seconds || defaultRestDuration;
       restTargetEndTimeRef.current = Date.now() + targetSec * 1000;
-      setRestTotalSeconds(targetSec);
       setRestSecondsLeft(targetSec);
       setIsRestRunning(true);
       setIsRestFinished(false);
@@ -951,6 +1012,25 @@ export default function ActiveWorkoutScreen({
   const lastPerf = useMemo(() => {
     if (!currentExercise?.name) return null;
     return getLastExercisePerformance(currentExercise.name, workouts);
+  }, [currentExercise?.name, workouts]);
+
+  // UX redesign Stage 4 — last 3 sessions for the current lift, shown
+  // in a Detailed-only expander below the target card. Matching mirrors
+  // getLastExercisePerformance (trim + lowercase, exact or contains).
+  const previousSessions = useMemo(() => {
+    if (!currentExercise?.name) return [];
+    const target = currentExercise.name.trim().toLowerCase();
+    return [...workouts]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .map((w) => ({
+        date: w.date,
+        sets: (w.exercises.find((e) => {
+          const n = e.name.trim().toLowerCase();
+          return n === target || n.includes(target) || target.includes(n);
+        })?.sets ?? []).filter((set) => set.reps > 0),
+      }))
+      .filter((entry) => entry.sets.length > 0)
+      .slice(0, 3);
   }, [currentExercise?.name, workouts]);
 
   const fallbackPR = useMemo(() => {
@@ -1261,7 +1341,6 @@ export default function ActiveWorkoutScreen({
       triggerHaptic('set_complete');
       // Auto start rest timer immediately based on athlete goal & lift type
       const restDuration = defaultRestDuration;
-      setRestTotalSeconds(restDuration);
       setRestSecondsLeft(restDuration);
       setIsRestRunning(true);
       setIsRestFinished(false);
@@ -1545,7 +1624,6 @@ export default function ActiveWorkoutScreen({
 
     // Auto-trigger rest interval timer
     const restDuration = defaultRestDuration;
-    setRestTotalSeconds(restDuration);
     setRestSecondsLeft(restDuration);
     setIsRestRunning(true);
     setIsRestFinished(false);
@@ -1888,7 +1966,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsDiscardConfirmOpen(true)}
-            className="w-10 h-10 min-h-[40px] min-w-[40px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95 cursor-pointer shrink-0"
+            className="w-11 h-11 min-h-[44px] min-w-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-danger flex items-center justify-center transition-colors active:scale-95 cursor-pointer shrink-0"
             aria-label="Discard Workout"
             title="Discard Workout"
           >
@@ -1898,7 +1976,7 @@ export default function ActiveWorkoutScreen({
             <h1 className="text-xs sm:text-sm font-bold text-text-primary tracking-tight truncate max-w-[200px] sm:max-w-md font-sans">
               {workoutName}
             </h1>
-            <div className="flex items-center gap-1.5 text-3xs font-mono text-text-muted">
+            <div className="flex items-center gap-1.5 text-2xs font-mono text-text-muted">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               <span>{formatTime(elapsedSeconds)}</span>
             </div>
@@ -1909,7 +1987,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={handlePauseWorkout}
-            className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-muted hover:text-text-primary border border-border/80 flex items-center justify-center transition-all cursor-pointer"
             title="Pause and save draft"
             aria-label="Pause and save draft"
           >
@@ -1919,7 +1997,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsFinishModalOpen(true)}
-            className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-emerald-500/15 border border-border/80 hover:border-emerald-500/40 text-text-secondary hover:text-emerald-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
             title="Finish workout"
             aria-label="Finish workout"
           >
@@ -1934,7 +2012,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setShowFormCues((prev) => !prev)}
-              className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+              className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-accent/15 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
               title="How to do this exercise — form cues"
               aria-label="Form cues for this exercise"
             >
@@ -1945,7 +2023,7 @@ export default function ActiveWorkoutScreen({
           <button
             type="button"
             onClick={() => setIsWarmupModalOpen(true)}
-            className="px-2.5 py-1.5 min-h-[40px] rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 min-h-[44px] rounded-lg bg-bg-secondary hover:bg-amber-500/15 border border-border/80 hover:border-amber-500/40 text-text-secondary hover:text-amber-400 font-semibold text-xs flex items-center gap-1 transition-all cursor-pointer"
             title="Generate warm-up sets"
             aria-label="Warm-up sets"
           >
@@ -1958,7 +2036,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/80 text-text-secondary hover:text-text-primary transition-all flex items-center justify-center active:scale-95 cursor-pointer"
               aria-label="Workout Tools & Options"
               title="Workout Tools & Options"
             >
@@ -2095,7 +2173,7 @@ export default function ActiveWorkoutScreen({
             <span className="text-xs font-mono font-bold text-text-secondary">
               {exercises.length}
             </span>
-            <span className="text-[10px] text-accent font-sans">▾</span>
+            <span className="text-2xs text-accent font-sans">▾</span>
           </div>
           {/* Hairline progress track */}
           <div className="w-24 h-1 bg-bg-secondary rounded-full overflow-hidden mt-1">
@@ -2229,7 +2307,7 @@ export default function ActiveWorkoutScreen({
                           setLocalExerciseName('');
                           renameInputRef.current?.focus();
                         }}
-                        className="absolute right-2.5 p-1 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary transition-colors"
+                        className="absolute right-2.5 p-1 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-text-muted hover:text-text-primary transition-colors"
                         title="Clear search"
                         aria-label="Clear search"
                       >
@@ -2241,7 +2319,7 @@ export default function ActiveWorkoutScreen({
                   {/* Dropdown Menu for Exercise Suggestions */}
                   <div className="absolute left-0 right-0 top-full mt-1.5 bg-bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden z-50 animate-scale-in">
                     {/* Suggestions Header */}
-                    <div className="px-3 py-2 bg-bg-secondary/80 border-b border-border/50 flex items-center justify-between text-3xs font-semibold text-text-muted uppercase tracking-wider">
+                    <div className="px-3 py-2 bg-bg-secondary/80 border-b border-border/50 flex items-center justify-between text-2xs font-semibold text-text-muted uppercase tracking-wider">
                       <span className="truncate">
                         {localExerciseName.trim()
                           ? t('workout.matchesFor', { query: localExerciseName.trim() })
@@ -2275,12 +2353,12 @@ export default function ActiveWorkoutScreen({
                                   {item.name}
                                 </span>
                                 {isCurrent && (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-accent/20 text-accent font-semibold shrink-0">
+                                  <span className="text-2xs px-1.5 py-0.2 rounded bg-accent/20 text-accent font-semibold shrink-0">
                                     {t('workout.current')}
                                   </span>
                                 )}
                               </div>
-                              <div className="flex items-center gap-1.5 mt-0.5 text-3xs text-text-muted">
+                              <div className="flex items-center gap-1.5 mt-0.5 text-2xs text-text-muted">
                                 <span className="px-1.5 py-0.5 rounded bg-bg-secondary border border-border/40 font-medium">
                                   {item.muscle}
                                 </span>
@@ -2322,7 +2400,7 @@ export default function ActiveWorkoutScreen({
                                 {t('workout.useCustomName', { name: localExerciseName.trim() })}
                               </span>
                             </div>
-                            <span className="text-3xs font-mono uppercase text-accent/80 shrink-0">{t('workout.custom')}</span>
+                            <span className="text-2xs font-mono uppercase text-accent/80 shrink-0">{t('workout.custom')}</span>
                           </button>
                         )}
                     </div>
@@ -2369,12 +2447,12 @@ export default function ActiveWorkoutScreen({
                   aria-label={t('workout.changeAria', { name: currentExercise.name || t('workout.untitled') })}
                   title={t('workout.changeTitle')}
                 >
-                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#E44427] transition-colors truncate">
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors truncate">
                     {(currentExercise.name || t('workout.untitled')).toUpperCase()}.
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
                     <Edit2 className="w-3 h-3" />
-                    <span className="text-[10px] font-semibold hidden sm:inline">{t('workout.change')}</span>
+                    <span className="text-2xs font-semibold hidden sm:inline">{t('workout.change')}</span>
                   </div>
                 </button>
               )}
@@ -2397,14 +2475,14 @@ export default function ActiveWorkoutScreen({
           <div className="p-3.5 rounded-2xl bg-bg-card border border-border/80 mt-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
                   {t('workout.todaysTarget')}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-base sm:text-lg font-bold font-sans text-accent">
                     {targetDisplay.text}
                   </span>
-                  {userMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
+                  {workoutMode === 'advanced' && targetDisplay.targetRpe !== undefined && (
                     <span className="text-xs font-mono text-text-muted">
                       @{targetDisplay.targetRpe}
                     </span>
@@ -2413,7 +2491,7 @@ export default function ActiveWorkoutScreen({
               </div>
 
               <div className="text-right space-y-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-text-muted block">
                   {t('workout.lastTime')}
                 </span>
                 <span className="text-xs font-semibold text-text-secondary block">
@@ -2438,7 +2516,27 @@ export default function ActiveWorkoutScreen({
           </div>
         </section>
 
-        {userMode === 'beginner' ? (
+        {density === 'detailed' && previousSessions.length > 0 && (
+          <CollapsibleDetails label={t('workout.previousSessions')}>
+            <ul className="space-y-2">
+              {previousSessions.map((entry, i) => (
+                <li key={`${entry.date}-${i}`} className="text-xs">
+                  <span className="font-mono text-text-muted">{entry.date.split('T')[0]} · </span>
+                  <span className="text-text-secondary">
+                    {entry.sets.map((set, j) => (
+                      <span key={j}>
+                        {j > 0 ? ', ' : ''}
+                        {set.weight ? `${set.weight}${set.unit} × ${set.reps}` : `BW × ${set.reps}`}
+                      </span>
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </CollapsibleDetails>
+        )}
+
+        {workoutMode === 'beginner' ? (
           /* ── BEGINNER MODE: ONE SET AT A TIME (Idea 4 & 5) ── */
           <section className="space-y-4">
             {/* Set pills navigator */}
@@ -2455,9 +2553,9 @@ export default function ActiveWorkoutScreen({
                       setActiveSetIdx(idx);
                       setShowEffortPrompt(false);
                     }}
-                    className={`w-10 h-10 min-w-[40px] min-h-[40px] rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
+                    className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
-                        ? 'bg-[#E44427] text-white font-black shadow-xs'
+                        ? 'bg-accent text-accent-on font-black shadow-xs'
                         : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : s.status === 'skipped'
@@ -2474,7 +2572,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={handleAddSet}
-                  className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-bg-secondary text-accent border border-accent/30 hover:bg-accent/15 flex items-center justify-center text-xs ml-1 cursor-pointer"
                   title="Add set"
                   aria-label="Add set"
                 >
@@ -2487,7 +2585,7 @@ export default function ActiveWorkoutScreen({
                       handleRemoveSet(currentExercise.sets.length - 1);
                       setActiveSetIdx((prev) => Math.min(prev, currentExercise.sets.length - 2));
                     }}
-                    className="h-10 min-h-[40px] px-2.5 rounded-full bg-bg-secondary text-text-muted border border-border/60 hover:text-danger hover:border-danger/40 flex items-center justify-center text-[11px] font-bold font-mono ml-1 cursor-pointer"
+                    className="h-10 min-h-[44px] px-2.5 rounded-full bg-bg-secondary text-text-muted border border-border/60 hover:text-danger hover:border-danger/40 flex items-center justify-center text-[11px] font-bold font-mono ml-1 cursor-pointer"
                     title="Remove last set"
                     aria-label="Remove last set"
                   >
@@ -2526,7 +2624,7 @@ export default function ActiveWorkoutScreen({
                       @7
                     </span>
                     <span className="text-xs font-bold text-text-primary block">{t('workout.easy')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.easyDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.easyDesc')}</span>
                   </button>
                   <button
                     type="button"
@@ -2541,7 +2639,7 @@ export default function ActiveWorkoutScreen({
                       @8
                     </span>
                     <span className="text-xs font-bold text-accent block">{t('workout.target')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.targetDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.targetDesc')}</span>
                   </button>
                   <button
                     type="button"
@@ -2556,7 +2654,7 @@ export default function ActiveWorkoutScreen({
                       @9.5
                     </span>
                     <span className="text-xs font-bold text-text-primary block">{t('workout.hard')}</span>
-                    <span className="text-3xs text-text-muted">{t('workout.hardDesc')}</span>
+                    <span className="text-2xs text-text-muted">{t('workout.hardDesc')}</span>
                   </button>
                 </div>
 
@@ -2636,7 +2734,7 @@ export default function ActiveWorkoutScreen({
                           </span>
                         </div>
                         {isCurrentBodyweight && (
-                          <span className="text-3xs text-accent font-semibold mt-0.5">
+                          <span className="text-2xs text-accent font-semibold mt-0.5">
                             {currentExercise.sets[activeSetIdx]?.weight === undefined || currentExercise.sets[activeSetIdx]?.weight === 0 ? t('workout.bodyweight') : `+${currentExercise.sets[activeSetIdx]?.weight} ${userUnit}`}
                           </span>
                         )}
@@ -2676,7 +2774,7 @@ export default function ActiveWorkoutScreen({
                           type="button"
                           onClick={() => handleWeightStep(activeSetIdx, delta)}
                           aria-label={t('workout.adjustWeightBy', { delta: delta > 0 ? `+${delta}` : delta, unit: userUnit })}
-                          className="px-2.5 py-1 min-h-[40px] rounded-lg bg-bg-card hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                          className="px-2.5 py-1 min-h-[44px] rounded-lg bg-bg-card hover:bg-bg-tertiary border border-border/70 text-text-secondary hover:text-text-primary text-2xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
                         >
                           {delta > 0 ? `+${delta}` : delta}
                         </button>
@@ -2732,7 +2830,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveRpePickerSetIdx(activeSetIdx)}
-                    className="inline-flex items-center gap-2 px-3 py-2 min-h-[40px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border/70 hover:border-accent/40 text-xs font-mono font-bold text-text-secondary hover:text-text-primary active:scale-95 transition-all cursor-pointer"
                     title="Tap to select target effort / RPE"
                   >
                     <span className="text-accent font-black text-xs sm:text-sm">{currentExercise.sets[activeSetIdx]?.rpe ? `@${currentExercise.sets[activeSetIdx].rpe}` : 'RPE'}</span>
@@ -2763,7 +2861,7 @@ export default function ActiveWorkoutScreen({
                     className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
                       isActiveSetCompleted(currentExercise.sets[activeSetIdx])
                         ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                        : 'bg-[#E44427] hover:bg-[#c9361e] text-white shadow-[#E44427]/25'
+                        : 'bg-accent hover:bg-accent-dim text-accent-on shadow-accent/25'
                     }`}
                   >
                     <Check className="w-5 h-5 stroke-[3]" />
@@ -2801,7 +2899,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                    className="w-full py-2 min-h-[40px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                    className="w-full py-2 min-h-[44px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                     <span>{t('workout.previousWithName', { name: exercises[activeExerciseIdx - 1]?.name })}</span>
@@ -2822,11 +2920,11 @@ export default function ActiveWorkoutScreen({
                   {/* Set number */}
                   <div className="w-8 sm:w-12 shrink-0 flex items-center gap-1">
                     {set.status === 'skipped' ? (
-                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.skippedSetTitle')}>
+                      <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.skippedSetTitle')}>
                         S{sIdx + 1}
                       </span>
                     ) : set.isWarmup ? (
-                      <span className="text-[10px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.warmupRampTitle')}>
+                      <span className="text-2xs font-mono font-black px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30" title={t('workout.warmupRampTitle')}>
                         W{sIdx + 1}
                       </span>
                     ) : (
@@ -2864,10 +2962,10 @@ export default function ActiveWorkoutScreen({
                           }}
                           className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                         />
-                        <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
+                        <span className="text-2xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">{userUnit}</span>
                       </div>
                       {isCurrentDumbbell && (
-                        <span className="text-3xs font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
+                        <span className="text-2xs font-mono text-amber-500/90 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title="Weight per dumbbell">
                           / db
                         </span>
                       )}
@@ -2876,7 +2974,7 @@ export default function ActiveWorkoutScreen({
                           const w = typeof set.weight === 'number' && !isNaN(set.weight) ? set.weight : 0;
                           const plates = w > 0 ? getPlateSummary(w, userUnit) : null;
                           return plates ? (
-                            <span className="text-3xs font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
+                            <span className="text-2xs font-mono text-accent/80 mt-0.5 truncate max-w-[80px] sm:max-w-[100px] text-center" title={plates}>
                               {plates}
                             </span>
                           ) : null;
@@ -2907,7 +3005,7 @@ export default function ActiveWorkoutScreen({
                         }}
                         className="w-full min-w-0 p-0 text-center font-mono font-bold text-base text-text-primary bg-transparent outline-none tabular-nums"
                       />
-                      <span className="text-3xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
+                      <span className="text-2xs sm:text-2xs text-text-muted font-medium ml-0.5 shrink-0">
                         <span className="sm:hidden">r</span>
                         <span className="hidden sm:inline">{t('workout.reps').toLowerCase()}</span>
                       </span>
@@ -2917,7 +3015,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => setActiveRpePickerSetIdx(sIdx)}
-                      className="min-w-[42px] px-2 py-2 min-h-[40px] text-2xs sm:text-xs font-mono font-bold rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
+                      className="min-w-[42px] px-2 py-2 min-h-[44px] text-2xs sm:text-xs font-mono font-bold rounded-xl bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 active:scale-95 transition-all shrink-0 text-center cursor-pointer"
                       title={t('workout.rpeBadgeTitle')}
                     >
                       {set.rpe ? `@${set.rpe}` : 'RPE'}
@@ -2929,7 +3027,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleSkipSet(sIdx)}
-                      className={`px-2.5 sm:px-3 py-2 min-h-[40px] rounded-lg text-3xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
+                      className={`px-2.5 sm:px-3 py-2 min-h-[44px] rounded-lg text-2xs sm:text-2xs font-mono font-semibold transition-all border cursor-pointer ${
                         set.status === 'skipped'
                           ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
                           : 'text-text-muted hover:text-text-primary border-transparent hover:border-border/60'
@@ -2942,7 +3040,7 @@ export default function ActiveWorkoutScreen({
                     <button
                       type="button"
                       onClick={() => handleToggleSetComplete(sIdx)}
-                      className={`w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
+                      className={`w-11 h-11 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 transition-all active:scale-95 ${
                         isActiveSetCompleted(set)
                           ? 'bg-emerald-500 text-white shadow-sm'
                           : 'border-2 border-border/80 hover:border-text-secondary text-transparent'
@@ -2961,7 +3059,7 @@ export default function ActiveWorkoutScreen({
               <button
                 type="button"
                 onClick={handleAddSet}
-                className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 min-h-[40px] px-3 rounded-xl hover:bg-accent/10 transition-colors"
+                className="text-xs font-bold text-accent hover:underline flex items-center gap-1.5 py-2 min-h-[44px] px-3 rounded-xl hover:bg-accent/10 transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 <span>{t('workout.addSet')}</span>
@@ -2970,7 +3068,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => handleRemoveSet(currentExercise.sets.length - 1)}
-                  className="text-xs font-medium text-text-muted hover:text-danger py-2 min-h-[40px] px-3 rounded-xl hover:bg-danger/10 transition-colors"
+                  className="text-xs font-medium text-text-muted hover:text-danger py-2 min-h-[44px] px-3 rounded-xl hover:bg-danger/10 transition-colors"
                 >
                   {t('workout.removeSet')}
                 </button>
@@ -2988,7 +3086,7 @@ export default function ActiveWorkoutScreen({
                     <p className="text-xs font-black text-text-primary">
                       {t('workout.exerciseComplete', { name: currentExercise.name })}
                     </p>
-                    <p className="text-3xs text-text-muted">
+                    <p className="text-2xs text-text-muted">
                       {t('workout.allSetsLogged', { count: currentExercise.sets.length })}
                     </p>
                   </div>
@@ -2997,7 +3095,7 @@ export default function ActiveWorkoutScreen({
                   <button
                     type="button"
                     onClick={() => setActiveExerciseIdx((prev) => prev + 1)}
-                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-white text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
+                    className="px-3.5 py-2 rounded-xl bg-accent hover:bg-accent-hover text-accent-on text-xs font-bold flex items-center gap-1.5 shadow-sm active:scale-95 transition-all shrink-0"
                   >
                     <span>{t('workout.nextWithName', { name: exercises[activeExerciseIdx + 1]?.name })}</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -3041,7 +3139,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => setActiveExerciseIdx((prev) => prev - 1)}
-                  className="w-full py-2 min-h-[40px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
+                  className="w-full py-2 min-h-[44px] text-2xs text-text-muted hover:text-text-primary flex items-center justify-center gap-1 transition-colors"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" />
                   <span>{t('workout.previousWithName', { name: exercises[activeExerciseIdx - 1]?.name })}</span>
@@ -3056,10 +3154,17 @@ export default function ActiveWorkoutScreen({
       <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-1.5 select-none pointer-events-auto">
         {isRestPopoverOpen && (
           <div className="bg-bg-card/95 backdrop-blur-md border border-border shadow-2xl rounded-2xl p-2 flex items-center gap-1.5 animate-scale-in">
+            {/* Micro-fix L4 (round 2): the popover carries the countdown
+                itself, so hiding the pill while it is open loses nothing. */}
+            <span className="px-1 font-mono text-xs font-bold text-text-primary tabular-nums">
+              {isRestFinished
+                ? t('workout.ready')
+                : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
+            </span>
             <button
               type="button"
               onClick={() => adjustTimer(-30)}
-              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Subtract 30 seconds"
             >
               -30s
@@ -3067,7 +3172,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={() => adjustTimer(30)}
-              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-accent hover:bg-accent/15 text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[44px] rounded-lg bg-bg-secondary text-accent hover:bg-accent/15 text-xs font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Add 30 seconds"
             >
               +30s
@@ -3075,7 +3180,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={togglePauseTimer}
-              className="px-2 py-2 min-h-[40px] rounded-lg bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+              className="px-2 py-2 min-h-[44px] rounded-lg bg-bg-secondary text-text-secondary hover:text-text-primary text-xs font-semibold active:scale-95 transition-all cursor-pointer"
             >
               {isRestRunning ? t('workout.pause') : t('workout.resume')}
             </button>
@@ -3085,13 +3190,34 @@ export default function ActiveWorkoutScreen({
                 skipTimer();
                 setIsRestPopoverOpen(false);
               }}
-              className="px-2.5 py-2 min-h-[40px] rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2.5 py-2 min-h-[44px] rounded-lg bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               {t('workout.skip')}
+            </button>
+            {/* Micro-fix L4 (round 2): collapse-only close. The pill hides
+                while the popover is open, so without this the only
+                non-destructive close on mobile would be Escape (which
+                has no mobile equivalent); Skip kills the timer. */}
+            <button
+              type="button"
+              onClick={() => setIsRestPopoverOpen(false)}
+              aria-label={t('common.close')}
+              className="px-2 py-2 min-h-[44px] rounded-lg bg-bg-secondary text-text-muted hover:text-text-primary text-xs font-bold active:scale-95 transition-all cursor-pointer"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
+        {/* Micro-fix L4 (round 2): one timer UI at a time — while the Set
+            Complete overlay is open it IS the timer, so the pill hides and
+            the two never count side by side. After Next Set the pill
+            returns, showing the still-running timer (rest deliberately
+            spans into next-set setup; that is one timer, not a second
+            one). Same rule for the popover: while it is open IT is the
+            timer (it now carries the countdown readout), so the pill
+            hides until it closes. */}
+        {!completedSetSummary && !isRestPopoverOpen && (
         <button
           type="button"
           onClick={() => {
@@ -3104,22 +3230,26 @@ export default function ActiveWorkoutScreen({
               setIsRestPopoverOpen((prev) => !prev);
             }
           }}
-          className={`flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
+          className={`flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full shadow-xl backdrop-blur-md font-mono text-xs font-bold transition-all active:scale-95 cursor-pointer border ${
             isRestFinished
               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
               : isRestRunning
-              ? 'bg-bg-card/95 border-accent text-accent shadow-accent/20 animate-pulse'
+              ? 'bg-bg-card/95 border-accent text-accent shadow-accent/20'
               : 'bg-bg-card/90 border-border text-text-secondary hover:text-text-primary hover:border-accent/40'
           }`}
           title={isRestRunning ? t('workout.timerControls') : t('workout.restTimer')}
         >
           <Timer className={`w-3.5 h-3.5 ${isRestRunning ? 'text-accent' : 'text-text-muted'}`} />
+          {/* Live-fix L4: idle shows the preset that WILL start
+              (defaultRestDuration, per current lift/reps) — not the stale
+              goal rest total — so pill and overlay always agree. */}
           <span>
             {isRestFinished
               ? t('workout.ready')
-              : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+              : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
           </span>
         </button>
+        )}
       </div>
 
       {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
@@ -3131,7 +3261,7 @@ export default function ActiveWorkoutScreen({
           >
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <div>
-                <span className="text-3xs font-mono font-bold uppercase tracking-wider text-accent">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
                   {t('workout.quickNavigation')}
                 </span>
                 <h3 className="text-base font-black text-text-primary font-sans mt-0.5">
@@ -3178,7 +3308,7 @@ export default function ActiveWorkoutScreen({
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                           isCurrent
-                            ? 'bg-[#E44427] text-white'
+                            ? 'bg-accent text-accent-on'
                             : isDone
                             ? 'bg-emerald-500 text-white'
                             : 'bg-bg-secondary text-text-muted border border-border'
@@ -3190,7 +3320,7 @@ export default function ActiveWorkoutScreen({
                         <div className="font-bold text-xs truncate font-sans">
                           {ex.name}
                         </div>
-                        <div className="text-3xs font-mono text-text-muted">
+                        <div className="text-2xs font-mono text-text-muted">
                           {t('workout.setsCompleted', { done: completedCount, total: totalCount })}
                         </div>
                       </div>
@@ -3198,7 +3328,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-3xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
+                        <span className="text-2xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent text-accent-on">
                           {t('workout.active')}
                         </span>
                       )}
@@ -3250,7 +3380,7 @@ export default function ActiveWorkoutScreen({
               <div className="p-3 rounded-xl bg-bg-secondary border border-border/80 space-y-2 font-mono text-2xs">
                 <div className="flex items-center justify-between text-accent font-bold">
                   <span>{t('workout.plannedWarmup')}</span>
-                  <span className="text-text-muted font-normal text-3xs">
+                  <span className="text-text-muted font-normal text-2xs">
                     {t('workout.targetLabel', { weight: generatedWarmupPreview.workingWeight, unit: userUnit })}
                   </span>
                 </div>
@@ -3258,14 +3388,14 @@ export default function ActiveWorkoutScreen({
                   {generatedWarmupPreview.warmups.map((w, idx) => (
                     <div key={idx} className="pt-1.5 first:pt-0 flex items-center justify-between text-text-secondary">
                       <div className="flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold text-3xs border border-amber-500/20">
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 font-bold text-2xs border border-amber-500/20">
                           W{idx + 1}
                         </span>
                         <span className="font-semibold text-text-primary">
                           {w.weight} {w.unit} × {t('prs.repsWord', { reps: w.reps })}
                         </span>
                       </div>
-                      <span className="text-3xs text-text-muted truncate max-w-[130px]">{w.label}</span>
+                      <span className="text-2xs text-text-muted truncate max-w-[130px]">{w.label}</span>
                     </div>
                   ))}
                 </div>
@@ -3324,7 +3454,7 @@ export default function ActiveWorkoutScreen({
               )}
               {formCues.map((cue, idx) => (
                 <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
-                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-3xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                  <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
                     {idx + 1}
                   </span>
                   <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>
@@ -3400,7 +3530,7 @@ export default function ActiveWorkoutScreen({
 
             <div className="p-4 space-y-4">
               <div className="text-center p-3 rounded-xl bg-bg-secondary border border-border space-y-2">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.targetBarbellWeight')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.targetBarbellWeight')}</span>
                 <div className="flex items-center justify-center gap-2">
                   <button
                     type="button"
@@ -3449,7 +3579,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Barbell Type Selection */}
               <div className="space-y-1.5">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.barbellType')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.barbellType')}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {BARBELL_PRESETS.map((preset) => {
                     const presetWeight = userUnit === 'kg' ? preset.weightKg : preset.weightLbs;
@@ -3475,7 +3605,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Plate List Breakdown */}
               <div className="space-y-1.5">
-                <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.platesPerSide')}</span>
+                <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.platesPerSide')}</span>
                 {plateResult.plates.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-2">{t('workout.emptyBarbell', { weight: plateResult.barWeight, unit: userUnit })}</p>
                 ) : (
@@ -3494,7 +3624,7 @@ export default function ActiveWorkoutScreen({
                           <span className="text-xs font-black font-mono text-text-primary block">
                             {p.count}× {p.weight} {userUnit}
                           </span>
-                          <span className="text-3xs text-text-muted font-mono">{t('workout.totalSuffix', { total: p.count * p.weight, unit: userUnit })}</span>
+                          <span className="text-2xs text-text-muted font-mono">{t('workout.totalSuffix', { total: p.count * p.weight, unit: userUnit })}</span>
                         </div>
                       </div>
                     ))}
@@ -3523,7 +3653,7 @@ export default function ActiveWorkoutScreen({
             <div className="flex items-start justify-between">
               <div>
                 <h3 className="font-bold text-text-primary text-sm">{t('workout.swapTitle', { name: currentExercise.name })}</h3>
-                <p className="text-3xs text-text-muted mt-0.5">{t('workout.swapSubtitle')}</p>
+                <p className="text-2xs text-text-muted mt-0.5">{t('workout.swapSubtitle')}</p>
               </div>
               <button
                 type="button"
@@ -3548,7 +3678,7 @@ export default function ActiveWorkoutScreen({
                     key={r.id}
                     type="button"
                     onClick={() => setSwapReason(r.id)}
-                    className={`px-2.5 py-1.5 rounded-full text-2xs font-bold cursor-pointer transition-all ${swapReason === r.id ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
+                    className={`px-2.5 py-1.5 rounded-full text-2xs font-bold cursor-pointer transition-all ${swapReason === r.id ? 'bg-accent text-accent-on' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
                   >
                     {t(r.labelKey)}
                   </button>
@@ -3741,7 +3871,7 @@ export default function ActiveWorkoutScreen({
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#E44427]" />
+                <Trophy className="w-5 h-5 text-accent" />
                 {/* Honest title: a 2-of-17 bail is "SESSION SAVED.", not a trophy ceremony. */}
                 <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{isPartial ? t('workout.sessionSaved') : t('workout.workoutComplete')}</h3>
               </div>
@@ -3758,19 +3888,19 @@ export default function ActiveWorkoutScreen({
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-2">
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.volume')}</span>
                   <span className="text-lg font-black font-mono text-accent block mt-0.5">
                     {sessionStats.totalVolumeKg}kg
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.sets')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.sets')}</span>
                   <span className="text-lg font-black font-mono text-emerald-400 block mt-0.5">
                     {sessionStats.completedSetsCount}/{sessionStats.totalSetsCount}
                   </span>
                 </div>
                 <div className="p-3 rounded-xl bg-bg-secondary text-center border border-border">
-                  <span className="text-3xs uppercase font-mono text-text-muted block">{t('workout.time')}</span>
+                  <span className="text-2xs uppercase font-mono text-text-muted block">{t('workout.time')}</span>
                   <span className="text-lg font-black font-mono text-text-primary block mt-0.5">
                     {sessionStats.durationFormatted}
                   </span>
@@ -3779,7 +3909,7 @@ export default function ActiveWorkoutScreen({
 
               {/* Post-Workout Adaptation Ledger */}
               <div className="space-y-2 pt-1 text-left">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+                <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted block">
                   {t('workout.adaptationSummary')}
                 </span>
 
@@ -3864,7 +3994,7 @@ export default function ActiveWorkoutScreen({
                 <h3 className="font-bold text-text-primary text-sm font-sans">
                   {t('workout.howHardSet')}
                 </h3>
-                <p className="text-3xs text-text-muted">
+                <p className="text-2xs text-text-muted">
                   {t('workout.rpeExplainer', { n: activeRpePickerSetIdx + 1 })}
                 </p>
               </div>
@@ -3907,14 +4037,14 @@ export default function ActiveWorkoutScreen({
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-mono font-black text-sm">@{item.rpe}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-2xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         isSelected ? 'bg-accent/20 text-accent' : 'bg-bg-tertiary text-text-muted'
                       }`}>
                         {t(item.rirKey as StringKey)}
                       </span>
                     </div>
                     <div className="text-2xs font-bold truncate">{t(item.labelKey as StringKey)}</div>
-                    <div className="text-[10px] text-text-muted truncate">{t(item.descKey as StringKey)}</div>
+                    <div className="text-2xs text-text-muted truncate">{t(item.descKey as StringKey)}</div>
                   </button>
                 );
               })}
@@ -3945,7 +4075,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Screen 13: Set Complete! Transition View (Reference: Flow Board Screen 13) ── */}
       {completedSetSummary && (
-        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in max-w-md mx-auto">
+        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in">
           {/* Top Bar with subtle workout info */}
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs font-mono font-bold tracking-wider uppercase text-[#858076]">
@@ -3953,8 +4083,8 @@ export default function ActiveWorkoutScreen({
             </span>
             <button
               type="button"
-              onClick={() => setCompletedSetSummary(null)}
-              className="w-10 h-10 min-w-[40px] min-h-[40px] rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+              onClick={dismissSetComplete}
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
               aria-label="Dismiss set complete screen"
             >
               <X className="w-4 h-4" />
@@ -3988,7 +4118,7 @@ export default function ActiveWorkoutScreen({
                 {t('prs.repsWord', { reps: completedSetSummary.reps })}
               </span>
               {completedSetSummary.isPR && (
-                <span className="px-2 py-0.5 rounded-full bg-[#E44427] text-white text-xs font-black uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-accent text-accent-on text-xs font-black uppercase tracking-wider">
                   {t('workout.newPr')}
                 </span>
               )}
@@ -4002,7 +4132,7 @@ export default function ActiveWorkoutScreen({
               <div className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
                 {isRestFinished
                   ? t('workout.ready')
-                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
               </div>
 
               {/* Timer Controls */}
@@ -4010,14 +4140,14 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => adjustTimer(-30)}
-                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                  className="px-3 py-1.5 min-h-[44px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
                 >
                   -30s
                 </button>
                 <button
                   type="button"
                   onClick={togglePauseTimer}
-                  className="px-4 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-1.5 min-h-[44px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-bold text-[#F3F0E7] flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {isRestRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                   <span>{isRestRunning ? t('workout.pause') : t('workout.resume')}</span>
@@ -4025,7 +4155,7 @@ export default function ActiveWorkoutScreen({
                 <button
                   type="button"
                   onClick={() => adjustTimer(30)}
-                  className="px-3 py-1.5 min-h-[40px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
+                  className="px-3 py-1.5 min-h-[44px] rounded-lg bg-[#212420] border border-[#2C302B] text-xs font-mono text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
                 >
                   +30s
                 </button>
@@ -4038,7 +4168,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={handleProceedNextSet}
-              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#E44427]/25 cursor-pointer active:scale-[0.98]"
+              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-accent/25 cursor-pointer active:scale-[0.98]"
             >
               <span>{t('workout.nextSet')}</span>
               <ArrowRight className="w-4 h-4" />

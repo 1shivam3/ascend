@@ -64,7 +64,7 @@ export default function AthleteModelCard() {
         </span>
         <div className="min-w-0">
           <h2 className="text-sm font-bold text-text-primary leading-tight">{t('coachModel.title')}</h2>
-          <p className="text-3xs text-text-muted font-mono">{t('coachModel.subtitle')}</p>
+          <p className="text-2xs text-text-muted font-mono">{t('coachModel.subtitle')}</p>
         </div>
       </div>
       <ul className="mt-3 space-y-2.5">

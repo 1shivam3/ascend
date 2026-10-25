@@ -54,6 +54,9 @@ import CoachNotesSection from '@/components/CoachNotesSection';
 import LevelSheet from '@/components/LevelSheet';
 import ChallengesSheet from '@/components/ChallengesSheet';
 import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
+import CustomizeSheet from '@/components/CustomizeSheet';
+import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
+import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 
 const READINESS_LABEL_KEY: Record<string, StringKey> = {
   primed: 'home.readinessPrimed',
@@ -131,6 +134,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     grantChallengeReward,
     awardXpEvents,
     uiPreferences,
+    setUiPreferences,
   } = useStore();
 
   const toast = useToast();
@@ -210,6 +214,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       ),
     [normalizedWorkouts, bodyMetrics, todayCheckin, healthSummary]
   );
+
+  // FND-02: recompute the coach model on Today mount, so Coach notes
+  // and completed counts reflect the latest saves without a reload.
+  // The store subscription already refreshes on save; this covers a
+  // mount after an overnight/day-boundary gap. Zustand actions are
+  // stable, so this runs once in practice, and the model slice is
+  // excluded from the refresh signature, so it cannot loop.
+  const refreshAthleteModel = useStore((state) => state.refreshAthleteModel);
+  useEffect(() => {
+    refreshAthleteModel();
+  }, [refreshAthleteModel]);
 
   // Coach digest: missed-session check-in + weight-trend nutrition advice.
   const coachDigest = useCoachDigest();
@@ -523,6 +538,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       targetCalories: calTarget,
       protein: Math.round(macros.proteinG),
       targetProtein: protTarget,
+      carbs: Math.round(macros.carbsG),
+      fat: Math.round(macros.fatG),
     };
   }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
 
@@ -538,8 +555,89 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         })
       : null;
 
+  // ── UX redesign Stage 3 — density + Today layout ─────────────────────
+  const density = uiPreferences.density === 'detailed' ? 'detailed' : 'simple';
+  const resolvedToday = useMemo(
+    () => resolveTodayLayout(uiPreferences.todayLayout, density),
+    [uiPreferences.todayLayout, density],
+  );
+  const rawTodayLayout = useMemo(
+    () => sanitizeTodayLayout(uiPreferences.todayLayout),
+    [uiPreferences.todayLayout],
+  );
+  // Visual order: header 0 (DOM first), workout card 1 (pinned),
+  // sections 10 + 10 * position-in-user-order, Customize button 1000.
+  const orderOf = (id: string) => 10 + Math.max(0, resolvedToday.findIndex((s) => s.id === id)) * 10;
+  const shown = (id: string) => resolvedToday.find((s) => s.id === id)?.shown ?? true;
+  const stepsVisible = !!(healthSummary && healthSummary.date === todayStr && healthSummary.stepsToday > 0);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+
+  const handleToggleSection = (id: string, next: boolean) => {
+    setUiPreferences({
+      todayLayout: { ...rawTodayLayout, visible: { ...rawTodayLayout.visible, [id]: next } },
+    });
+  };
+  const handleMoveSection = (id: string, dir: -1 | 1) => {
+    const order = [...rawTodayLayout.order];
+    const idx = order.indexOf(id);
+    const next = idx + dir;
+    if (idx < 0 || next < 0 || next >= order.length) return;
+    [order[idx], order[next]] = [order[next], order[idx]];
+    setUiPreferences({ todayLayout: { ...rawTodayLayout, order } });
+  };
+  const handleRestoreLayout = () => {
+    setUiPreferences({ todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] } });
+    toast.success(t('customize.layoutRestored'));
+  };
+
+  // Sheet labels must match the visible section titles exactly.
+  const sectionTitles: Record<string, string> = {
+    'nutrition-strip': t('home.nutrition'),
+    coach: t('home.coachSection'),
+    'habit-matrix': t('home.habitsThisWeek'),
+    'quick-actions': t('home.quickActions'),
+    hydration: t('home.hydration'),
+    readiness: t('home.readiness'),
+    level: t('home.level'),
+    steps: t('health.stepsToday'),
+    challenge: t('home.monthlyChallenge'),
+    'weekly-review-detail': t('weeklyReview.cardTitle'),
+  };
+
+  // Sync caption: honest status for cloud-synced data only. The new
+  // personalization keys are local-only and are never described as synced.
+  const { status: syncStatus } = useSupabaseSync();
+  const syncText =
+    syncStatus === 'syncing' ? t('home.syncSyncing')
+    : syncStatus === 'synced' ? t('home.syncSynced')
+    : syncStatus === 'error' ? t('home.syncFailed')
+    : t('home.syncLocalOnly');
+
+  // Welcome-back: returning after >= 2 days away, no guilt copy. A user
+  // with no workouts ever gets the new-user state, not this line.
+  const lastWorkout = useMemo(() => {
+    if (!workouts || workouts.length === 0) return null;
+    const sorted = [...workouts].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    return sorted[0] || null;
+  }, [workouts]);
+  const welcomeBack = useMemo(() => {
+    if (!lastWorkout?.date) return null;
+    const lastDate = lastWorkout.date.split('T')[0];
+    const diffDays = Math.floor(
+      (new Date(`${todayStr}T00:00:00`).getTime() - new Date(`${lastDate}T00:00:00`).getTime()) / 86400000,
+    );
+    if (diffDays < 2) return null;
+    const dateLabel = new Date(`${lastDate}T00:00:00`).toLocaleDateString(
+      language === 'hi' ? 'hi-IN' : 'en-US',
+      { month: 'short', day: 'numeric' },
+    );
+    return lastWorkout.name
+      ? t('home.welcomeBackPlan', { date: dateLabel, plan: lastWorkout.name })
+      : t('home.welcomeBack', { date: dateLabel });
+  }, [lastWorkout, todayStr, language, t]);
+
   return (
-    <div className="page animate-fade-in space-y-6 pb-24 max-w-md mx-auto px-5 pt-3">
+    <div className="page animate-fade-in flex flex-col gap-6 pb-24 max-w-md mx-auto px-5 pt-3">
       {/* ── 1. HEADER (Screen 8 & Screen 9) ─────────────────────────────────── */}
       <header className="flex items-center justify-between pt-1">
         <div>
@@ -556,7 +654,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => setIsNotificationsOpen(true)}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
             title={t('home.notifications')}
             aria-label={t('home.notifications')}
           >
@@ -565,7 +663,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('settings')}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
             title={t('settings.title')}
             aria-label={t('settings.title')}
           >
@@ -574,7 +672,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <button
             type="button"
             onClick={() => onNavigate('profile')}
-            className="w-10 h-10 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
+            className="w-11 h-11 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
             title={t('home.athleteProfile')}
             aria-label={t('home.athleteProfile')}
           >
@@ -587,8 +685,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </header>
+      {welcomeBack && (
+        <p className="-mt-4 text-sm text-text-secondary">{welcomeBack}</p>
+      )}
+      <p className="-mt-4 text-right text-2xs text-text-muted">{syncText}</p>
 
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
+      <div style={{ order: 1 }}>
       <div className="bg-bg-card border border-border/80 rounded-2xl p-5 shadow-xs transition-all">
         <div className="flex items-center justify-between text-xs text-text-muted mb-2">
           <span className="font-medium text-text-muted">{t('home.todaysWorkout')}</span>
@@ -630,7 +733,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               handleStartWorkoutFromHome();
             }
           }}
-          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-white font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
+          className="w-full mt-5 py-3.5 px-4 rounded-xl bg-accent hover:brightness-105 active:scale-[0.99] text-accent-on font-bold text-sm tracking-wide shadow-sm shadow-accent/25 transition-all cursor-pointer text-center"
         >
           {activeWorkoutDraft
             ? t('home.resumeWorkout')
@@ -650,7 +753,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       </div>
 
+      </div>
+
       {/* ── 3. NUTRITION SUMMARY (Screen 8 & Screen 9: 2-Column Grid) ──────── */}
+      <div style={{ order: orderOf('nutrition-strip') }} className={shown('nutrition-strip') ? undefined : 'hidden'}>
       <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {/* Nutrition (Calories) Card */}
         <div
@@ -716,40 +822,47 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </button>
       )}
 
+        {density === 'detailed' && (
+          <button
+            type="button"
+            onClick={() => onNavigate('meals')}
+            className="text-2xs text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+          >
+            {t('home.carbsFat', { carbs: fuelStats.carbs, fat: fuelStats.fat })}
+          </button>
+        )}
+      </div>
+
       {/* ── 4. READINESS + LEVEL (each hideable in Settings) ────────────── */}
-      {(uiPreferences.coachEnabled || uiPreferences.gamificationEnabled) && (
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 items-start">
-        {/* Readiness Card (coach engine) — compact; the whole card opens
-            the Readiness sheet (factors + optional feel check-in live there).
-            Readiness is computed internally; the card shows the score only. */}
+      <div style={{ order: orderOf('readiness') }} className={uiPreferences.coachEnabled && shown('readiness') ? undefined : 'hidden'}>
         {uiPreferences.coachEnabled && (
         <button
           type="button"
           onClick={() => setIsReadinessSheetOpen(true)}
           aria-label={t('home.viewReadinessDetails')}
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.gamificationEnabled ? '' : 'col-span-2'}`}
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable`}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.readiness')}</span>
           <span className="mt-1.5 block">
             <span className="text-xl sm:text-2xl font-bold text-text-primary tabular-nums leading-tight">
               {readiness.score} <span className="text-sm font-semibold text-text-muted">{t(READINESS_LABEL_KEY[readiness.band] ?? 'home.readinessReady')}</span>
             </span>
-            <span className="flex items-center gap-0.5 text-3xs font-semibold text-text-muted mt-1">
+            <span className="flex items-center gap-0.5 text-2xs font-semibold text-text-muted mt-1">
               {t('home.details')}
               <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
             </span>
           </span>
         </button>
         )}
+      </div>
 
-        {/* Level Card (XP system) — compact; the whole card opens the Level
-            sheet (how XP is earned, this week, the level ladder). */}
+      <div style={{ order: orderOf('level') }} className={uiPreferences.gamificationEnabled && shown('level') ? undefined : 'hidden'}>
         {uiPreferences.gamificationEnabled && (
         <button
           type="button"
           onClick={() => setIsLevelSheetOpen(true)}
           aria-label={t('home.viewLevelDetails')}
-          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable ${uiPreferences.coachEnabled ? '' : 'col-span-2'}`}
+          className={`bg-bg-card border border-border/80 rounded-2xl p-3.5 shadow-xs text-left cursor-pointer hover:border-accent/40 transition-colors pressable`}
         >
           <span className="text-xs font-medium text-text-muted">{t('home.level')} {levelInfo.level} · {t(levelInfo.nameKey)}</span>
           <span className="mt-1.5 block">
@@ -769,95 +882,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </button>
         )}
       </div>
-      )}
 
-      {/* ── 4b. ATHLETE MODEL — what the coach has learned about you ──── */}
-      {uiPreferences.coachEnabled && <AthleteModelCard />}
-
-      {/* ── 4c. WEEKLY REVIEW (PR-C) ─────────────────────────────────────── */}
-      {uiPreferences.coachEnabled && <CoachWeeklyReviewCard />}
-
-      {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2.5">
-        <button
-          type="button"
-          onClick={() => setIsScanMealModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-        >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Camera className="w-4 h-4" />
-          </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsBarcodeModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-        >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Barcode className="w-4 h-4" />
-          </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.scan')}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsWeightModalOpen(true)}
-          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-        >
-          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
-            <Scale className="w-4 h-4" />
-          </span>
-          <span className="text-3xs font-semibold text-text-secondary">{t('home.weight')}</span>
-        </button>
-      </div>
-
-      {/* ── 6. HYDRATION QUICK-ADD ───────────────────────────────────────── */}
-      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center">
-              <Droplets className="w-4 h-4" />
-            </span>
-            <div>
-              <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
-              <p className="text-3xs text-text-muted tabular-nums">
-                {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                logWater(250);
-                toast.success(t('toast.water250'), t('toast.titleHydration'));
-              }}
-              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
-            >
-              +250
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                logWater(500);
-                toast.success(t('toast.water500'), t('toast.titleHydration'));
-              }}
-              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
-            >
-              +500
-            </button>
-          </div>
-        </div>
-        <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-3">
-          <div
-            className="h-full rounded-full bg-sky-500 transition-all duration-500"
-            style={{ width: `${hydrationPct}%` }}
-          />
-        </div>
-      </div>
-
-      {/* ── 7. COACH NOTES — one section: first card expanded, rest behind taps ── */}
-      <CoachNotesSection
+      {/* ── COACH — one section: today's note + athlete facts (UX redesign Stage 3) ── */}
+      {uiPreferences.coachEnabled && shown('coach') && (
+      <div style={{ order: orderOf('coach') }} className="space-y-4">
+        <h2 className="section-heading px-1">{t('home.coachSection')}</h2>
+<CoachNotesSection
         checkIn={uiPreferences.coachEnabled && checkIn && (
         <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
           <div className="flex items-start justify-between gap-3">
@@ -892,7 +922,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                         for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
                         handleStartWorkoutFromHome(plan);
                       }}
-                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-white text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
+                      className="mt-2 px-3 py-1.5 rounded-lg bg-accent text-accent-on text-2xs font-bold hover:brightness-105 active:scale-[0.99] transition-all cursor-pointer"
                     >
                       {t('home.doItToday', { name: plan.name })}
                     </button>
@@ -951,7 +981,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     recordCalorieAdjustment(record);
                     toast.success(t('toast.targetUpdated', { kcal: nutritionSuggestion.newCalories.toLocaleString() }), t('toast.titleCaloriesAdjusted'));
                   }}
-                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+                  className="mt-2 py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
                 >
                   {t('home.applyKcal', { kcal: nutritionSuggestion.newCalories.toLocaleString() })}
                 </button>
@@ -1001,12 +1031,121 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
       />
+        {density === 'detailed' ? (
+          <AthleteModelCard />
+        ) : (
+          <CollapsibleDetails label={t('customize.athleteFacts')}>
+            <AthleteModelCard />
+          </CollapsibleDetails>
+        )}
+        {density === 'detailed' && (
+<div className="text-center pt-1 pb-2">
+        <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
+        <p className="text-2xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
+      </div>
+        )}
+      </div>
+      )}
+
+      {/* ── 4c. WEEKLY REVIEW (PR-C) ─────────────────────────────────────── */}
+      <div style={{ order: orderOf('weekly-review-detail') }} className={uiPreferences.coachEnabled && shown('weekly-review-detail') ? undefined : 'hidden'}>
+      {uiPreferences.coachEnabled && <CoachWeeklyReviewCard />}
+
+      </div>
+
+      {/* ── 5. QUICK ACTIONS ─────────────────────────────────────────────── */}
+      <div style={{ order: orderOf('quick-actions') }} className={shown('quick-actions') ? 'space-y-3' : 'hidden'}>
+        <h2 className="section-heading px-1">{t('home.quickActions')}</h2>
+      <div className="grid grid-cols-3 gap-2.5">
+        <button
+          type="button"
+          onClick={() => setIsScanMealModalOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Camera className="w-4 h-4" />
+          </span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.mealScan')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsBarcodeModalOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Barcode className="w-4 h-4" />
+          </span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.scan')}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setIsWeightModalOpen(true)}
+          className="bg-bg-card border border-border/80 rounded-2xl p-3 shadow-xs flex flex-col items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+        >
+          <span className="w-9 h-9 rounded-xl bg-accent/15 text-accent flex items-center justify-center">
+            <Scale className="w-4 h-4" />
+          </span>
+          <span className="text-2xs font-semibold text-text-secondary">{t('home.weight')}</span>
+        </button>
+      </div>
+
+      </div>
+
+      {/* ── 6. HYDRATION QUICK-ADD ───────────────────────────────────────── */}
+      <div style={{ order: orderOf('hydration') }} className={shown('hydration') ? undefined : 'hidden'}>
+      <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center">
+              <Droplets className="w-4 h-4" />
+            </span>
+            <div>
+              <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
+              <p className="text-2xs text-text-muted tabular-nums">
+                {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                logWater(250);
+                toast.success(t('toast.water250'), t('toast.titleHydration'));
+              }}
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+            >
+              +250
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                logWater(500);
+                toast.success(t('toast.water500'), t('toast.titleHydration'));
+              }}
+              className="px-3 py-1.5 min-h-[44px] rounded-xl bg-bg-secondary border border-border text-xs font-mono font-bold text-text-primary active:scale-95 transition-all cursor-pointer"
+            >
+              +500
+            </button>
+          </div>
+        </div>
+        <div className="w-full h-1.5 rounded-full bg-border/60 overflow-hidden mt-3">
+          <div
+            className="h-full rounded-full bg-sky-500 transition-all duration-500"
+            style={{ width: `${hydrationPct}%` }}
+          />
+        </div>
+      </div>
+
+      </div>
+
 
       {/* Streak now lives in the habit-matrix header below (or the slim
           fallback after it when the matrix is hidden) — no standalone
           streak section anymore. */}
 
       {/* ── 8a2. STEPS (Health Connect, only when synced data exists) ──── */}
+      <div style={{ order: orderOf('steps') }} className={stepsVisible && shown('steps') ? undefined : 'hidden'}>
       {healthSummary && healthSummary.date === todayStr && healthSummary.stepsToday > 0 && (
         <div className="bg-bg-card border border-border/80 rounded-2xl px-4 py-3 shadow-xs flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
@@ -1016,7 +1155,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <span className="text-xs font-bold text-text-primary block">
               {t('health.stepsToday')}
             </span>
-            <span className="text-3xs text-text-muted block">Health Connect</span>
+            <span className="text-2xs text-text-muted block">Health Connect</span>
           </div>
           <span className="ml-auto text-sm font-black font-mono text-text-primary tabular-nums">
             {healthSummary.stepsToday.toLocaleString()}
@@ -1024,12 +1163,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         </div>
       )}
 
+      </div>
+
       {/* ── 8b. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}
+      <div style={{ order: orderOf('habit-matrix') }} className={(uiPreferences.showHabitMatrix || uiPreferences.gamificationEnabled) && shown('habit-matrix') ? undefined : 'hidden'}>
       {uiPreferences.showHabitMatrix && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
-          <span className="text-3xs font-mono text-text-muted">{t('home.monSun')}</span>
+          <span className="text-xs font-bold text-text-primary">{density === 'simple' ? t('home.habitsToday') : t('home.habitsThisWeek')}</span>
+          {/* Live-fix L2: Simple shows only today's column (todayOnly),
+              so the week-range label would lie — show today's date instead.
+              No new i18n string: the date is computed, like the matrix's
+              own day header. */}
+          <span className="text-2xs font-mono text-text-muted">{density === 'simple' ? new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'short', day: 'numeric' }) : t('home.monSun')}</span>
         </div>
         {uiPreferences.gamificationEnabled && (
           <div className="flex items-center gap-2 mb-3">
@@ -1040,7 +1186,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 : t('home.streakStart')}
             </p>
             {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
-              <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+              <span className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted ml-auto shrink-0">
                 <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
                 {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
               </span>
@@ -1048,12 +1194,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         )}
         {uiPreferences.gamificationEnabled && streakInfo.freezeConsumed && (
-          <p className="text-3xs text-text-muted -mt-1 mb-3">
+          <p className="text-2xs text-text-muted -mt-1 mb-3">
             {t('home.freezeCovered')}
           </p>
         )}
         <WeeklyHabitMatrix
           compact
+          todayOnly={density === 'simple'}
           workouts={workouts}
           waterLogs={waterLogs}
           creatineLogs={creatineLogs}
@@ -1089,7 +1236,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             : t('home.streakStart')}
         </p>
         {streakInfo.currentStreak > 0 && streak.freezesAvailable > 0 && (
-          <span className="inline-flex items-center gap-1 text-3xs font-semibold text-text-muted ml-auto shrink-0">
+          <span className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted ml-auto shrink-0">
             <Snowflake className="w-3.5 h-3.5" aria-hidden="true" />
             {t(streak.freezesAvailable === 1 ? 'home.freezesOne' : 'home.freezesMany', { count: streak.freezesAvailable })}
           </span>
@@ -1097,7 +1244,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </div>
       )}
 
+      </div>
+
       {/* ── 8c. MONTHLY CHALLENGE (opt-in, dismissible) ────────────────────── */}
+      <div style={{ order: orderOf('challenge') }} className={uiPreferences.gamificationEnabled && homeChallenge && shown('challenge') ? undefined : 'hidden'}>
       {uiPreferences.gamificationEnabled && homeChallenge && (
         <div
           className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs cursor-pointer hover:border-amber-500/40 transition-colors pressable"
@@ -1119,7 +1269,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-bold text-text-primary">{homeChallenge.def.titleKey ? t(homeChallenge.def.titleKey) : homeChallenge.def.title}</p>
-                <p className="text-3xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.descriptionKey ? t(homeChallenge.def.descriptionKey) : homeChallenge.def.description}</p>
+                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{homeChallenge.def.descriptionKey ? t(homeChallenge.def.descriptionKey) : homeChallenge.def.description}</p>
               </div>
             </div>
             {!homeChallenge.optedIn && (
@@ -1144,7 +1294,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   style={{ width: `${homeChallenge.evaluation.pct}%` }}
                 />
               </div>
-              <p className="text-3xs text-text-muted tabular-nums mt-1.5">
+              <p className="text-2xs text-text-muted tabular-nums mt-1.5">
                 {homeChallenge.evaluation.progress} of {homeChallenge.evaluation.target} · {homeChallenge.evaluation.pct}%
                 {homeChallenge.evaluation.completed ? ` · ${t('chal.complete', { xp: XP_CHALLENGE_COMPLETE })}` : ''}
               </p>
@@ -1157,13 +1307,38 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 optInChallenge(homeChallenge.key);
                 toast.success(t('toast.challengeJoined'), t('toast.titleChallengeAccepted'));
               }}
-              className="mt-3 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="mt-3 py-2 px-4 rounded-xl bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               {t('home.joinChallenge')}
             </button>
           )}
         </div>
       )}
+
+      </div>
+
+      {/* ── CUSTOMIZE TODAY (UX redesign Stage 3) ── */}
+      <div style={{ order: 1000 }}>
+        <button
+          type="button"
+          onClick={() => setIsCustomizeOpen(true)}
+          className="btn-secondary w-full"
+        >
+          {t('customize.today')}
+        </button>
+      </div>
+      <CustomizeSheet
+        isOpen={isCustomizeOpen}
+        onClose={() => setIsCustomizeOpen(false)}
+        sections={[
+          { id: 'workout-card', title: t('home.todaysWorkout'), locked: true },
+          ...resolvedToday.map((s) => ({ id: s.id, title: sectionTitles[s.id] ?? s.id })),
+        ]}
+        shown={{ 'workout-card': true, ...Object.fromEntries(resolvedToday.map((s) => [s.id, s.shown])) }}
+        onToggle={handleToggleSection}
+        onMove={handleMoveSection}
+        onRestore={handleRestoreLayout}
+      />
 
       {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
       {isNotificationsOpen && (
@@ -1180,7 +1355,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsNotificationsOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1237,7 +1412,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               <button
                 type="button"
                 onClick={() => setIsChangeWorkoutOpen(false)}
-                className="p-2 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1286,13 +1461,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                                   {plan.name}
                                 </span>
                                 {isSelected && (
-                                  <span className="px-1.5 py-0.5 rounded bg-accent text-white text-3xs font-mono font-bold">
+                                  <span className="px-1.5 py-0.5 rounded bg-accent text-accent-on text-2xs font-mono font-bold">
                                     {t('home.todaysPlan')}
                                   </span>
                                 )}
                               </div>
                               {bodyParts.length > 0 && (
-                                <span className="text-3xs text-accent font-medium block mt-0.5">
+                                <span className="text-2xs text-accent font-medium block mt-0.5">
                                   {bodyParts.map((b) => (BODY_PART_KEY[b] ? t(BODY_PART_KEY[b]) : b)).join(' • ')}
                                 </span>
                               )}
@@ -1449,11 +1624,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onClose={() => setIsChallengesSheetOpen(false)}
       />
 
-      {/* ── DAILY QUOTE — always the last element on the page ──────────────── */}
-      <div className="text-center pt-1 pb-2">
-        <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
-        <p className="text-3xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
-      </div>
     </div>
   );
 }
