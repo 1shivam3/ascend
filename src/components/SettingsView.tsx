@@ -33,6 +33,7 @@ import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
 import ConfirmationModal from '@/components/ConfirmationModal';
 import DataVaultModal from '@/components/DataVaultModal';
+import { readArchivedHistory } from '@/lib/history-fork';
 import AuthModal from '@/components/AuthModal';
 import WeeklyScheduleModal from '@/components/WeeklyScheduleModal';
 import ReminderCenterModal from '@/components/ReminderCenterModal';
@@ -115,6 +116,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     deleteAccount,
   } = useSupabaseSync();
   const logout = useStore((state) => state.logout);
+  const restoreArchivedHistory = useStore((state) => state.restoreArchivedHistory);
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -124,6 +126,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   // section below (moved here from ProfileView and the Data Vault).
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
+  // FND-06: the Start-fresh archive, when one exists — its restore row
+  // lives in Data & Account beside the actions that can erase data.
+  const [archivedSummary] = useState(() => readArchivedHistory());
+  const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
 
@@ -440,6 +446,18 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     logout({ clearLocalData: false });
     toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
     if (onNavigate) onNavigate('home');
+  };
+
+  // FND-06: restoring the archive REPLACES current history — the row
+  // and the confirmation both say so before anything is overwritten.
+  const handleConfirmRestoreArchived = () => {
+    setShowRestoreConfirm(false);
+    const ok = restoreArchivedHistory();
+    if (ok) {
+      toast.success(t('settings.restoredMsg'), t('settings.restoredTitle'));
+    } else {
+      toast.error(t('settings.invalidBackupMsg'), t('settings.restoreFailedTitle'));
+    }
   };
 
   // Delete account confirmation
@@ -1260,6 +1278,33 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </div>
             <ChevronRight className="w-4 h-4 text-rose-400" />
           </button>
+
+          {/* FND-06: restore the Start-fresh archive (only when one exists) */}
+          {archivedSummary && (
+            <button
+              type="button"
+              onClick={() => setShowRestoreConfirm(true)}
+              className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                  <Download className="w-4 h-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-text-primary">{t('settings.restoreArchived')}</p>
+                  <p className="text-2xs text-text-muted">
+                    {t('settings.restoreArchivedHint', {
+                      date: archivedSummary.archivedAt ? archivedSummary.archivedAt.slice(0, 10) : '',
+                      sessions: archivedSummary.counts.sessions,
+                      meals: archivedSummary.counts.meals,
+                      plans: archivedSummary.counts.plans,
+                    })}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1290,6 +1335,26 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         variant="default"
         icon="logout"
       />
+
+      {/* Restore Archived History Modal (FND-06) */}
+      {archivedSummary && (
+        <ConfirmationModal
+          isOpen={showRestoreConfirm}
+          onClose={() => setShowRestoreConfirm(false)}
+          onConfirm={handleConfirmRestoreArchived}
+          title={t('settings.restoreArchived')}
+          message={t('settings.restoreArchivedHint', {
+            date: archivedSummary.archivedAt ? archivedSummary.archivedAt.slice(0, 10) : '',
+            sessions: archivedSummary.counts.sessions,
+            meals: archivedSummary.counts.meals,
+            plans: archivedSummary.counts.plans,
+          })}
+          confirmText={t('settings.restoreArchived')}
+          cancelText={t('common.cancel')}
+          variant="default"
+          icon="alert"
+        />
+      )}
 
       {/* Data Vault, opened straight at its delete-confirm view (FND-05) */}
       {isDataVaultOpen && (

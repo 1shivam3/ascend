@@ -8,6 +8,8 @@ import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
 import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
+import HistoryForkScreen from '@/components/HistoryForkScreen';
+import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
 import SplashScreen from '@/components/onboarding/SplashScreen';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 
@@ -78,7 +80,10 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, startFreshFromRetainedHistory } = useStore();
+  // FND-06: the fork decision lives only for this session — closing
+  // the app undecided re-shows the fork, which is the safe default.
+  const [forkResolved, setForkResolved] = useState(false);
 
   // True zustand-persist hydration (distinct from the _hasHydrated splash
   // fallback, which can fire before the persisted state is merged). Theme
@@ -328,6 +333,26 @@ export default function AppPage() {
 
   // If hydrated and no athlete profile exists, render the onboarding & sign-in screen
   if (!profile) {
+    // FND-06: retained local history with no profile must never
+    // silently attach to the next profile. Offer the explicit fork
+    // first; Start fresh archives (never deletes) and only then shows
+    // onboarding over empty state.
+    const retainedInput = { workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals };
+    if (!forkResolved && hasRetainedHistory(retainedInput)) {
+      return (
+        <main id="main-content" className="w-full min-h-[100dvh]">
+          <TabGuardBanner />
+          <HistoryForkScreen
+            counts={retainedHistoryCounts(retainedInput)}
+            onContinue={() => setForkResolved(true)}
+            onStartFresh={() => {
+              startFreshFromRetainedHistory();
+              setForkResolved(true);
+            }}
+          />
+        </main>
+      );
+    }
     return (
       <main id="main-content" className="w-full min-h-[100dvh]">
         <TabGuardBanner />

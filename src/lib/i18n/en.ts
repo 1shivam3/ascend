@@ -1099,6 +1099,20 @@ export const en = {
   // before its confirmation.
   'settings.dataAccount': 'Data & Account',
   'settings.dataAccountHint': 'Log out, delete your account, or reset this device\'s data',
+  // FND-06: restore row for the Start-fresh archive (shown only when
+  // an archive exists). Restoring REPLACES current history — the copy
+  // says so before confirmation.
+  'settings.restoreArchived': 'Restore archived history',
+  'settings.restoreArchivedHint': 'Archived {date}: {sessions} sessions, {meals} meals, {plans} plans — restoring replaces your current history.',
+  // FND-06: first-load fork. No name survives a logout, so the history
+  // is identified by counts, not by "Continue as [name]".
+  'historyFork.title': 'Saved history found on this device',
+  'historyFork.subtitle': 'A previous profile left training history on this device. Choose what happens to it before you set up your profile.',
+  'historyFork.counts': '{sessions} sessions • {meals} meals • {plans} plans • {targets} targets',
+  'historyFork.continue': 'Continue with saved history',
+  'historyFork.continueHint': 'Keep {sessions} sessions, {meals} meals and {plans} plans, and set up your profile around them.',
+  'historyFork.startFresh': 'Start fresh',
+  'historyFork.startFreshHint': 'Begin empty — sessions, plans and targets start at zero. Your previous history is archived, not deleted, and can be restored later from Settings → Data & Account.',
   'settings.exportJson': 'Export JSON Backup',
   'settings.exportJsonHint': 'Download all workouts, PRs, and meals',
   'settings.importBackup': 'Import Backup File',
