@@ -1810,7 +1810,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         <div
                           style={{ height: `${bar.heightPct}%` }}
                           className={`w-full rounded-lg transition-all ${
-                            bar.isCompleted ? 'bg-[#E44427]' : 'bg-border/60'
+                            bar.isCompleted ? 'bg-accent' : 'bg-border/60'
                           }`}
                         />
                       </div>

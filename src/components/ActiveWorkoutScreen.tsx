@@ -426,8 +426,8 @@ export default function ActiveWorkoutScreen({
     }, 95);
   }, [registerBackHandler]);
 
-  // Sticky Rest Timer state (initialized to athlete's goal rest duration)
-  const [restTotalSeconds, setRestTotalSeconds] = useState<number>(() => goalConfig.defaultRestSeconds);
+  // Rest Timer state (live-fix L4: the idle preset shown by the pill and
+  // the overlay is defaultRestDuration — one source, no stale copy).
   const [restSecondsLeft, setRestSecondsLeft] = useState<number>(0);
   const [isRestRunning, setIsRestRunning] = useState<boolean>(false);
   const [isRestFinished, setIsRestFinished] = useState<boolean>(false);
@@ -445,14 +445,39 @@ export default function ActiveWorkoutScreen({
   } | null>(null);
   const [isCompletingSet, setIsCompletingSet] = useState(false);
 
+  // Live-fix L4: dismissing the Set Complete overlay pauses the rest
+  // timer (remaining time stays resumable from the pill) — it must never
+  // keep running invisibly after its UI is gone. Shared by the X button,
+  // the Escape handler, and the Android-back handler so every close path
+  // behaves identically. (Defined before the effects below: the back
+  // handler's deps array reads it during render.)
+  const dismissSetComplete = useCallback(() => {
+    setCompletedSetSummary(null);
+    if (isRestRunning) {
+      restTargetEndTimeRef.current = null;
+      setIsRestRunning(false);
+    }
+  }, [isRestRunning]);
+
   useEffect(() => {
     if (completedSetSummary) {
       return registerBackHandler(() => {
-        setCompletedSetSummary(null);
+        dismissSetComplete();
         return true;
       }, 105);
     }
-  }, [completedSetSummary, registerBackHandler]);
+  }, [completedSetSummary, registerBackHandler, dismissSetComplete]);
+
+  // Escape closes the Set Complete overlay (it previously did nothing —
+  // the overlay is not a useModalA11y modal, so nothing handled the key).
+  useEffect(() => {
+    if (!completedSetSummary) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') dismissSetComplete();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [completedSetSummary, dismissSetComplete]);
 
   // Current active exercise
   const currentExercise = exercises[activeExerciseIdx] || exercises[0];
@@ -907,7 +932,6 @@ export default function ActiveWorkoutScreen({
     (seconds?: number) => {
       const targetSec = seconds || defaultRestDuration;
       restTargetEndTimeRef.current = Date.now() + targetSec * 1000;
-      setRestTotalSeconds(targetSec);
       setRestSecondsLeft(targetSec);
       setIsRestRunning(true);
       setIsRestFinished(false);
@@ -1283,7 +1307,6 @@ export default function ActiveWorkoutScreen({
       triggerHaptic('set_complete');
       // Auto start rest timer immediately based on athlete goal & lift type
       const restDuration = defaultRestDuration;
-      setRestTotalSeconds(restDuration);
       setRestSecondsLeft(restDuration);
       setIsRestRunning(true);
       setIsRestFinished(false);
@@ -1567,7 +1590,6 @@ export default function ActiveWorkoutScreen({
 
     // Auto-trigger rest interval timer
     const restDuration = defaultRestDuration;
-    setRestTotalSeconds(restDuration);
     setRestSecondsLeft(restDuration);
     setIsRestRunning(true);
     setIsRestFinished(false);
@@ -2391,7 +2413,7 @@ export default function ActiveWorkoutScreen({
                   aria-label={t('workout.changeAria', { name: currentExercise.name || t('workout.untitled') })}
                   title={t('workout.changeTitle')}
                 >
-                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-[#E44427] transition-colors truncate">
+                  <h2 className="display-title font-display uppercase tracking-tight text-3xl sm:text-4xl text-text-primary group-hover:text-accent transition-colors truncate">
                     {(currentExercise.name || t('workout.untitled')).toUpperCase()}.
                   </h2>
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-bg-secondary group-hover:bg-accent/15 border border-border/60 group-hover:border-accent/40 text-text-muted group-hover:text-accent transition-all shrink-0">
@@ -2499,7 +2521,7 @@ export default function ActiveWorkoutScreen({
                     }}
                     className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-full text-xs font-bold font-mono transition-all flex items-center justify-center ${
                       idx === activeSetIdx && !showEffortPrompt
-                        ? 'bg-[#E44427] text-white font-black shadow-xs'
+                        ? 'bg-accent text-accent-on font-black shadow-xs'
                         : isActiveSetCompleted(s)
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : s.status === 'skipped'
@@ -2805,7 +2827,7 @@ export default function ActiveWorkoutScreen({
                     className={`w-[65%] py-3.5 rounded-xl text-sm sm:text-base font-bold tracking-wide flex items-center justify-center gap-2 shadow-lg transition-all active:scale-[0.98] cursor-pointer ${
                       isActiveSetCompleted(currentExercise.sets[activeSetIdx])
                         ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                        : 'bg-[#E44427] hover:bg-[#c9361e] text-white shadow-[#E44427]/25'
+                        : 'bg-accent hover:bg-accent-dim text-accent-on shadow-accent/25'
                     }`}
                   >
                     <Check className="w-5 h-5 stroke-[3]" />
@@ -3127,13 +3149,19 @@ export default function ActiveWorkoutScreen({
                 skipTimer();
                 setIsRestPopoverOpen(false);
               }}
-              className="px-2.5 py-2 min-h-[44px] rounded-lg bg-[#E44427] text-white text-xs font-bold active:scale-95 transition-all cursor-pointer"
+              className="px-2.5 py-2 min-h-[44px] rounded-lg bg-accent text-accent-on text-xs font-bold active:scale-95 transition-all cursor-pointer"
             >
               {t('workout.skip')}
             </button>
           </div>
         )}
 
+        {/* Live-fix L4: one timer UI at a time — while the Set Complete
+            overlay is open it IS the timer, so the pill hides and the two
+            never count side by side. After Next Set the pill returns,
+            showing the still-running timer (rest deliberately spans into
+            next-set setup; that is one timer, not a second one). */}
+        {!completedSetSummary && (
         <button
           type="button"
           onClick={() => {
@@ -3156,12 +3184,16 @@ export default function ActiveWorkoutScreen({
           title={isRestRunning ? t('workout.timerControls') : t('workout.restTimer')}
         >
           <Timer className={`w-3.5 h-3.5 ${isRestRunning ? 'text-accent' : 'text-text-muted'}`} />
+          {/* Live-fix L4: idle shows the preset that WILL start
+              (defaultRestDuration, per current lift/reps) — not the stale
+              goal rest total — so pill and overlay always agree. */}
           <span>
             {isRestFinished
               ? t('workout.ready')
-              : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+              : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
           </span>
         </button>
+        )}
       </div>
 
       {/* ── Quick Exercise Jump Drawer ─────────────────────────────────── */}
@@ -3220,7 +3252,7 @@ export default function ActiveWorkoutScreen({
                       <span
                         className={`w-7 h-7 rounded-xl flex items-center justify-center font-mono font-black text-xs shrink-0 ${
                           isCurrent
-                            ? 'bg-[#E44427] text-white'
+                            ? 'bg-accent text-accent-on'
                             : isDone
                             ? 'bg-emerald-500 text-white'
                             : 'bg-bg-secondary text-text-muted border border-border'
@@ -3240,7 +3272,7 @@ export default function ActiveWorkoutScreen({
 
                     <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       {isCurrent && (
-                        <span className="text-2xs font-mono font-bold px-2 py-0.5 rounded-full bg-[#E44427] text-white">
+                        <span className="text-2xs font-mono font-bold px-2 py-0.5 rounded-full bg-accent text-accent-on">
                           {t('workout.active')}
                         </span>
                       )}
@@ -3783,7 +3815,7 @@ export default function ActiveWorkoutScreen({
           <div className="modal-content max-w-sm" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-[#E44427]" />
+                <Trophy className="w-5 h-5 text-accent" />
                 {/* Honest title: a 2-of-17 bail is "SESSION SAVED.", not a trophy ceremony. */}
                 <h3 className="display-title font-display uppercase tracking-tight text-xl text-text-primary">{isPartial ? t('workout.sessionSaved') : t('workout.workoutComplete')}</h3>
               </div>
@@ -3987,7 +4019,7 @@ export default function ActiveWorkoutScreen({
 
       {/* ── Screen 13: Set Complete! Transition View (Reference: Flow Board Screen 13) ── */}
       {completedSetSummary && (
-        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in max-w-md mx-auto">
+        <div className="fixed inset-0 z-50 bg-[#171916] text-[#F3F0E7] flex flex-col justify-between p-6 animate-fade-in">
           {/* Top Bar with subtle workout info */}
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs font-mono font-bold tracking-wider uppercase text-[#858076]">
@@ -3995,7 +4027,7 @@ export default function ActiveWorkoutScreen({
             </span>
             <button
               type="button"
-              onClick={() => setCompletedSetSummary(null)}
+              onClick={dismissSetComplete}
               className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#858076] hover:text-[#F3F0E7] transition-colors cursor-pointer"
               aria-label="Dismiss set complete screen"
             >
@@ -4030,7 +4062,7 @@ export default function ActiveWorkoutScreen({
                 {t('prs.repsWord', { reps: completedSetSummary.reps })}
               </span>
               {completedSetSummary.isPR && (
-                <span className="px-2 py-0.5 rounded-full bg-[#E44427] text-white text-xs font-black uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded-full bg-accent text-accent-on text-xs font-black uppercase tracking-wider">
                   {t('workout.newPr')}
                 </span>
               )}
@@ -4044,7 +4076,7 @@ export default function ActiveWorkoutScreen({
               <div className="text-5xl sm:text-6xl font-black font-mono text-[#F3F0E7] tabular-nums tracking-tight">
                 {isRestFinished
                   ? t('workout.ready')
-                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : restTotalSeconds)}
+                  : formatTime(restSecondsLeft > 0 ? restSecondsLeft : defaultRestDuration)}
               </div>
 
               {/* Timer Controls */}
@@ -4080,7 +4112,7 @@ export default function ActiveWorkoutScreen({
             <button
               type="button"
               onClick={handleProceedNextSet}
-              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#E44427]/25 cursor-pointer active:scale-[0.98]"
+              className="btn-primary w-full py-4 text-base font-bold flex items-center justify-center gap-2 shadow-lg shadow-accent/25 cursor-pointer active:scale-[0.98]"
             >
               <span>{t('workout.nextSet')}</span>
               <ArrowRight className="w-4 h-4" />

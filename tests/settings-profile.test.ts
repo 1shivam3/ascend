@@ -213,7 +213,9 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       expect(html).toContain('Information density');
       expect(html).toContain('Customize Today');
       expect(html).toContain('Units of Measure');
-      expect(html).toContain('Athlete Experience');
+      // Live-fix L3: the row is the workout view mode, not athlete
+      // experience — the old label misled users on density switches.
+      expect(html).toContain('Workout view');
       expect(html).toContain('Data, Privacy &amp; Legal');
       expect(html).toContain('Export JSON Backup');
       expect(html).toContain('Import Backup File');

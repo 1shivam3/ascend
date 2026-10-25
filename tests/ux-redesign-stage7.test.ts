@@ -55,7 +55,12 @@ describe('Stage 7 — onboarding', () => {
       expect(src, `summary missing ${key}`).toContain(key);
     }
     const ob = read('src/components/Onboarding.tsx');
-    expect(ob).toContain('resolvePrimaryGoal(profile?.goals)');
+    // Live-fix L1: the summary reads goal/diet from the STAGED profile
+    // first — the store profile is not applied yet at summary time (it
+    // applies on Continue/Edit), so reading only profile?.goals would
+    // restate stale/default values.
+    expect(ob).toContain('pendingProfile?.goals ?? profile?.goals');
+    expect(ob).toContain("pendingProfile?.dietPreference ?? profile?.dietPreference");
     expect(ob).toContain('trainingProfile?.injuriesOrLimitations');
     expect(ob).toContain('trainingProfile?.daysPerWeek');
   });

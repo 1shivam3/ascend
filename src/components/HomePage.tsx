@@ -1160,7 +1160,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs font-bold text-text-primary">{t('home.habitsThisWeek')}</span>
-          <span className="text-2xs font-mono text-text-muted">{t('home.monSun')}</span>
+          {/* Live-fix L2: Simple shows only today's column (todayOnly),
+              so the week-range label would lie — show today's date instead.
+              No new i18n string: the date is computed, like the matrix's
+              own day header. */}
+          <span className="text-2xs font-mono text-text-muted">{density === 'simple' ? new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'short', day: 'numeric' }) : t('home.monSun')}</span>
         </div>
         {uiPreferences.gamificationEnabled && (
           <div className="flex items-center gap-2 mb-3">

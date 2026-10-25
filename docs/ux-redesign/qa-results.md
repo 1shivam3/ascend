@@ -239,11 +239,130 @@ Diff `2c6512d7..HEAD`: **116 files changed, +8,650 / −1,077** — exactly Stag
     transitions kept as data, preset opaque subtles vs custom rgba washes (both
     audit-passing, not harmonized), translucent `bg-accent/85` contrast-audit limitation.
 
-### Live defects (browser phase) — recorded, untriaged
+### Live defects (browser phase) — FIX ROUND 2026-10-25 (this worker)
 
-L1–L12 are recorded in full in §3. Triage and fixes are a separate worker after this push;
-this phase changes no app code. Until triaged (fixed or explicitly accepted each), the PR
-should not be finalized on visual grounds alone.
+§3 is the historical record of what the browser saw. The fix round below
+changed app code + tests only (no PR, no merge, no deploy, master
+untouched); live re-verification of these fixes is a later parent-run
+phase and is NOT claimed here. Regression pins:
+`tests/ux-redesign-live-fixes.test.ts` (27 tests) + 2 new pins in
+`tests/coach-engine.test.ts` + the updated Stage 7 summary assertion.
+
+- **L1 Summary screen — FIXED (flow, not a missing component).**
+  Root cause: `src/app/page.tsx` gates onboarding on `if (!profile)`, so
+  calling `setProfile` unmounts `Onboarding` immediately. `handleAcceptPlans`,
+  `handleDeclinePlans`, and the no-plan branch of `handleFinishCalibration`
+  all applied the profile and then set `summary` — the summary never
+  painted. Fix (contained to `Onboarding.tsx`): Accept/Decline only apply
+  plans/schedule and go to `summary`, leaving the profile staged in
+  `pendingProfile`; the no-plan branch stages the same way; the summary
+  reads goal/diet from `pendingProfile` first; `completeOnboarding` and
+  `handleSummaryEdit` apply the staged profile, then navigate. The toast
+  variant now reads landed plans from the store (pendingPlans is nulled
+  at Accept/Decline). Caveat (pre-existing, unchanged): refresh mid-summary
+  restarts onboarding, same as the plan_offer staging edge.
+- **L2 Simple habit matrix — FIXED (label, not rendering).** Simple
+  intentionally shows only today's column (`todayOnly`, documented in
+  `WeeklyHabitMatrix`). The bug was `HomePage` rendering `MON — SUN`
+  unconditionally next to it. Fix: Simple shows today's computed date
+  label (weekday-short + day, hi-IN/en-US by language; no new i18n key
+  invented) and single-day cells are capped to `w-10` so the column does
+  not stretch like a progress bar. Detailed keeps the full grid + MON—SUN.
+- **L3 Experience flip — FIXED (label, not data).** No experience store
+  key exists: the Settings row labeled `settings.experience` displayed
+  the density-following workout mode (`modeLabel(workoutMode)` +
+  " · Auto"), so a Simple→Detailed switch that moved the view to
+  Advanced read as the user's level flipping. Fix: row relabeled to the
+  existing key `workout.viewMode` ("Workout view" / "वर्कआउट व्यू") and
+  the toast rebuilt from existing keys only (`"<viewMode>: <mode>"` +
+  `modeUpdatedTitle`). A density switch cannot change stored experience
+  because there is no stored experience to change — pinned by test.
+  `settings.modeSetMsg` is now unused and retained (harmless; dictionaries
+  are not usage-tree-shaken).
+- **L4 Rest timer — FIXED.** Single preset source: the pill idle display
+  and the overlay idle fallback now both read `defaultRestDuration`
+  (dynamic per lift/reps); the stale second source `restTotalSeconds`
+  (goal rest total, 90s → 1:30) is removed entirely. One timer UI: the
+  pill hides while the Set Complete overlay is open (the overlay has its
+  own −30/pause/+30 controls, so nothing is lost). Escape now closes the
+  overlay (it previously did nothing — the overlay is not a
+  `useModalA11y` modal), and X, Escape, and Android-back all share one
+  dismiss+pause handler (remaining time preserved, resumable from the
+  pill; the timer never runs invisibly after close). Overlay root lost
+  `max-w-md mx-auto`, so it covers the full viewport on desktop (inner
+  content was already centered). Deliberately NOT changed: Next Set does
+  not stop the timer — rest spanning into next-set setup is correct
+  behavior; the defect was simultaneous display + preset mismatch.
+- **L5 Train plan cards — FIXED.** Plan-list grid is now single-column
+  (`grid-cols-1`; the 2-column grid inside the narrow centered column
+  truncated names and wrapped durations). Exercise-name spans carry
+  `title={ex.name}` so a truncated name still reveals its full text.
+  The unrelated `grid-cols-2` at `WorkoutPage.tsx:407` is untouched.
+  No data/logic change.
+- **L6 Stale Coach note — NOT A BUG; contract PINNED, decision OWED.**
+  Investigation found no refresh bug: `detectMissedSessions` matches by
+  exact date ("a session counts as done if any workout is logged on its
+  exact date"), `useCoachDigest` recomputes on schedule/workout/dismissal
+  changes, and the browser scenario (4 scheduled days, one session logged
+  on the unscheduled Sunday) correctly leaves the count at 4 under that
+  contract. No calculation changed. Tests pin the contract (unscheduled
+  log → count unchanged; scheduled log → that day clears). Consequence
+  to carry to the user: after a Sunday session the note still reads "4
+  planned sessions didn't get logged" — accurate under the contract.
+  If he wants plan-based recovery (a make-up clearing a missed weekday),
+  that is a PRODUCT decision, not a fix — listed in §7.
+- **L7 Accent leaks — FIXED (classes) + documented remainder.**
+  Converted to tokens (`bg-accent`, `hover:bg-accent-dim`,
+  `text-accent`, `text-accent-on`, `shadow-accent/25`): all 9
+  `ActiveWorkoutScreen` sites, all 7 `WorkoutDetailsView` sites, the
+  `PostWorkoutTakeModal` Done button, plus 2 more found by a repo-wide
+  audit (`PRsPage` label, `ProgressPage` completion bar) — class-based
+  accent usages are now zero repo-wide. Muscle Volume legend uses swatch
+  dots (accent + border) with the same English words (no i18n regression;
+  no thisWeek/lastWeek keys exist). Kept deliberately: the Set Complete
+  overlay's dark graphite/chalk/sage (a dark takeover, not an accent
+  leak); palette comments; token definitions; preset definitions.
+  Remainder (documented limitation, not a live-defect fix):
+  `ProgressPage` SVG chart attributes (`stopColor`/`stroke`/`fill`)
+  still hardcode Vermilion — Tailwind tokens cannot go in SVG
+  attributes, and plumbing the runtime accent hex into ~15 chart sites
+  is a chart-color feature. Charts stay Vermilion under all presets.
+  "View Completed Workout" re-checked and passing (Cobalt `#2563EB` +
+  white ≈ 5.17:1, ≥4.5:1) — no change; the report was most plausibly a
+  loose description of Cobalt blue.
+- **L8 Exact/~ honesty — FIXED at the source.** New
+  `src/lib/meal-display.ts`: `isExactFoodItem` (neither unmatched nor
+  approximate — exactly the green "Exact" chip's condition),
+  `foodsAllExact`, `tildeForFoods`. Applied to: all three food-row
+  variants, both meal headers (with an amber `common.estimatedShort`
+  "est." / "अनु." chip when not all exact), the day total (plain 0 with
+  no prefix/label when no meals exist), the builder total, and the
+  toasts — `toast.mealAdded`, `toast.mealLoggedQuickOne/Many`,
+  `scan.mealLogged` carry a `{tilde}` param in both `en.ts` and `hi.ts`
+  (placeholder insertion only, same positions). Extension beyond the
+  brief, same rule: the offline toast pair was updated too (offline items
+  carry the same estimator flags). Left unchanged with reason: favorites
+  chips + `mealLoggedFav` toast (`FavoriteFood` carries no exactness
+  flags, so conservative "~" is honest, not a contradiction); the
+  builder's `~CAL` quantity-scaling label (a different meaning).
+- **L9 Clipping/overlap — FIXED.** Settings jump row wraps on desktop
+  (`sm:flex-wrap sm:overflow-visible`) and carries a mobile-only fade
+  mask so the scrollable end reads as scrollable, not broken; favorites
+  row gains the same mask + `pr-2`; toasts moved from `fixed top-3` to
+  `fixed bottom-24` (clears the ~64px mobile bottom nav, headings
+  uncovered). Widths themselves remain unverified (L11).
+- **L12 Focus — VERIFIED, no code change.** The global unlayered
+  `:focus-visible` rule in `globals.css` (2px accent outline + 2px
+  offset, designed to beat ~138 `outline-none` sites) is correct;
+  `use-modal-a11y` returns focus on close; `outline-none` hits are
+  inputs carrying their own `focus:border-accent` ring. Live
+  indistinguishability is most plausibly screenshot fidelity. A full
+  keyboard pass is still owed (needs live eyes) and is NOT claimed.
+- **L10 — OUT OF SCOPE, unchanged.** Mixed Hindi strings are pre-existing
+  i18n gaps; needs native review + translation work, never
+  machine-translate.
+- **L11 — OUT OF SCOPE, unchanged.** Widths 390/1024/1440 stay pending;
+  never claimed.
 
 ### Not fixed, shipped as known issues (unchanged from Stage 10/11)
 
@@ -260,16 +379,32 @@ attributed to pre-existing defects, not the redesign; all decision-doc deviation
 in the implementation summary (Sheet migration, SetRow/SetTable, desktop grids, sub-44
 chips, data-bar transitions, rest-timer placement, finish-flow order, subtle harmonization).
 Visual acceptance is now substantially filled (§3) EXCEPT widths. What still blocks
-finalization: (a) triage + fixes for live defects L1–L12 (separate worker after this push)
-or explicit acceptance of each; (b) widths verification (390/1024/1440); (c) the still-open
-items in §3 (screenshots as artifacts, low-end motion feel, live sign-in, copy reads,
-Hindi-keys review, full keyboard pass); (d) the user decisions below.
+finalization: (a) live re-verification of the fix-round changes below (parent-run
+browser phase — code + tests only, no live claim); (b) widths verification
+(390/1024/1440); (c) the still-open items in §3 (screenshots as artifacts, low-end
+motion feel, live sign-in, copy reads, Hindi-keys review, full keyboard pass);
+(d) the user decisions below.
+
+**Fix round 2026-10-25 (this worker, branch only, master untouched):**
+L1–L5, L7–L9 fixed with regression tests; L12 verified with no code change;
+L6 investigated and pinned as intended exact-date behavior (not a bug);
+L10/L11 explicitly out of scope and unchanged. Gates on the fix tip:
+vitest 1817 passed / 20 failed (the 20 ONLY in
+`tests/security-integration-gate.test.ts`, the known Docker-infra gate —
+baseline was 1788/20; +29 tests: 27 new live-fix pins + 2 L6 contract
+pins; one pre-existing test updated for the intentional L3 label change);
+tsc clean; `npm run build` passes (shared First Load JS 88.2 kB,
+unchanged from Stage 10); lint exit 0 with the same 15 pre-existing
+warnings; `git diff --check` clean. No data/auth/schema/sync change, no
+new dependencies, boundaries intact. Per-defect verdicts in §6.
 
 **Blocked on user decisions (NOT decidable by this program):** P0-1 D1, P0-2 D6,
 D5 ui-mockups removal, Supabase custom domain ($25/mo Pro), in-Settings Apple/OTP/email
 sign-in forms (new auth surface), landing decision (Today-first vs last-tab restore),
 desktop wide grids (build or explicitly accept rail + centered column), any capability
-removal (none proposed).
+removal (none proposed), L6 plan-based recovery (whether a make-up session logged on
+an unscheduled day should clear a missed planned weekday — currently it correctly does
+not, by the exact-date contract).
 
 **Carried forward unchanged:** the #42 rebuild (when unparked) must adopt this design
 system, carrying the D11 `analyzeUpload` timestamp-reset caveat, the temporary debug

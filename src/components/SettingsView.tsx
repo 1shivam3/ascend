@@ -439,8 +439,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         </div>
       </header>
 
-      {/* ── Section chips: jump links for the long page (sticky, below the You bar) ── */}
-      <div className="sticky top-14 z-20 bg-bg-primary/95 backdrop-blur py-2 -mx-1 px-1 flex gap-1.5 overflow-x-auto">
+      {/* ── Section chips: jump links for the long page (sticky, below the You bar) ──
+          Live-fix L9: on desktop the row now wraps instead of clipping
+          buttons off the right edge; on mobile it still scrolls, with a
+          fade mask so the cut-off end reads as scrollable, not broken. */}
+      <div className="sticky top-14 z-20 bg-bg-primary/95 backdrop-blur py-2 -mx-1 px-1 flex gap-1.5 overflow-x-auto sm:flex-wrap sm:overflow-visible max-sm:[mask-image:linear-gradient(to_right,black_88%,transparent)]">
         {(
           [
             { labelKey: 'settings.accountSecurity', ref: accountSectionRef },
@@ -809,10 +812,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             <DietPreferencePicker />
           </div>
 
-          {/* Experience Mode */}
+          {/* Workout view mode — density-following, NOT the athlete's
+              experience level (live-fix L3: this row used to be labeled
+              "Athlete Experience", so a Simple→Detailed switch that moved
+              the view to Advanced read as the user's level flipping). */}
           <div className="space-y-2 pt-2 border-t border-border/60">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.experience')}</span>
+              <span className="text-xs font-semibold text-text-secondary font-sans">{t('workout.viewMode')}</span>
               <span className="text-2xs font-mono text-text-muted capitalize">{modeLabel(workoutMode)}{uiPreferences.workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}</span>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-bg-secondary border border-border">
@@ -822,7 +828,10 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                   type="button"
                   onClick={() => {
                     setUiPreferences({ workoutModeOverride: m === 'auto' ? null : m });
-                    toast.info(t('settings.modeSetMsg', { mode: m === 'auto' ? t('workout.viewAuto') : modeLabel(m) }), t('settings.modeUpdatedTitle'));
+                    // Toast names the control it came from (workout view),
+                    // not "experience mode" — same L3 mislabel, same fix.
+                    // Built from existing keys only, no new strings.
+                    toast.info(`${t('workout.viewMode')}: ${m === 'auto' ? t('workout.viewAuto') : modeLabel(m)}`, t('settings.modeUpdatedTitle'));
                   }}
                   className={`py-1.5 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer ${
                     (uiPreferences.workoutModeOverride ?? 'auto') === m

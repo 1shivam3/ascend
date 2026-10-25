@@ -9,6 +9,7 @@ import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import { estimateMacros } from '@/lib/macros';
+import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
 import ReportAIModal from '@/components/ReportAIModal';
@@ -692,6 +693,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         protein: savedProtein,
         today: currentProteinTotal,
         target: targetProtein,
+        tilde: tildeForFoods(validFoods),
       }),
       t('scan.mealLoggedTitle')
     );

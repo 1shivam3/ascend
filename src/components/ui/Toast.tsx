@@ -77,9 +77,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast, success, error, info }}>
       {children}
-      {/* Toast Notification Container (Mobile Optimized, Fixed Top) */}
+      {/* Toast Notification Container (Mobile Optimized, Fixed Bottom).
+          Live-fix L9: toasts used to sit top-3, overlapping page headings
+          (and the sticky You bar). Bottom-24 clears the mobile bottom nav
+          (fixed bottom-0, ~64px) and keeps headings uncovered. */}
       <div
-        className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm flex flex-col gap-2 pointer-events-none transition-all"
+        className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] w-[92%] max-w-sm flex flex-col gap-2 pointer-events-none transition-all"
         aria-live="polite"
       >
         {toasts.map((toast) => (

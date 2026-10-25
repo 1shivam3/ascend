@@ -289,9 +289,11 @@ export default function Onboarding() {
     };
 
     // NOTE: setProfile is intentionally NOT called here yet. On the plan-offer
-    // path the profile is staged in pendingProfile and applied when the user
-    // accepts/declines — calling setProfile now would unmount Onboarding via
-    // the page.tsx gate and the offer screen would never render.
+    // path the profile is staged in pendingProfile and applied on the summary
+    // screen's Continue/Edit buttons — calling setProfile now would unmount
+    // Onboarding via the page.tsx gate and the offer screen would never render.
+    // (Live-fix L1: Accept/Decline used to apply it too, which unmounted
+    // Onboarding before the summary could paint — same gate, same fix.)
     setGoals(finalGoals);
     setUserMode(experienceLevel);
 
@@ -406,29 +408,40 @@ export default function Onboarding() {
     setSavedFirstName(nameToSave.split(' ')[0] || 'Athlete');
 
     // If we generated plans, ask the user BEFORE adding them.
-    // If they already had plans, complete directly.
+    // If they already had plans, skip the offer and go to the summary —
+    // the profile still applies on the summary's Continue, never here,
+    // or the summary would never paint (live-fix L1).
     // Note: use generatedSplit directly — setPendingPlans hasn't applied yet.
     const hasNewPlans = !existingPlans || existingPlans.length === 0;
     if (hasNewPlans && generatedSplit && generatedSplit.length > 0) {
-      // Stage the profile — applied when the user answers the offer.
+      // Stage the profile — applied on the summary's Continue/Edit.
       setPendingProfile(profileData);
       setCurrentScreen('plan_offer');
     } else {
-      applyProfileWithAgeGuards(profileData);
+      // No offer: stage the profile the same way and show the summary.
+      setPendingProfile(profileData);
       setCurrentScreen('summary');
     }
   };
 
   const completeOnboarding = () => {
-    toast.success(t('toast.welcome', { name: savedFirstName }), pendingPlans ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
+    // Live-fix L1: the profile was staged, not applied, so the summary
+    // could render (applying it earlier unmounts Onboarding via the
+    // page.tsx gate). Apply it here, on the summary's Continue.
+    applyPendingProfile();
+    // pendingPlans was nulled at Accept/Decline, so judge the toast by
+    // what actually landed in the store: plans added → Training Ready.
+    const plansAdded = (useStore.getState().plannedWorkouts?.length ?? 0) > 0;
+    toast.success(t('toast.welcome', { name: savedFirstName }), plansAdded ? t('toast.titleTrainingReady') : t('toast.titleAllSet'));
     try {
       navigate('home', { clearHistory: true });
     } catch {}
   };
 
-  // Summary edit link: finish onboarding (the profile is already applied)
-  // and land on You → Settings, where Training Preferences holds the editors.
+  // Summary edit link: apply the staged profile, finish onboarding, and
+  // land on You → Settings, where Training Preferences holds the editors.
   const handleSummaryEdit = () => {
+    applyPendingProfile();
     toast.success(t('toast.welcome', { name: savedFirstName }), t('toast.titleAllSet'));
     try {
       navigate('settings', { clearHistory: true });
@@ -453,7 +466,10 @@ export default function Onboarding() {
   };
 
   const handleAcceptPlans = () => {
-    applyPendingProfile();
+    // NOTE (live-fix L1): do NOT apply the staged profile here. setProfile
+    // unmounts Onboarding via the page.tsx gate (profile presence), so
+    // applying it would skip the summary screen entirely — the summary
+    // renders only because the profile stays staged until its Continue.
     if (pendingPlans && pendingPlans.length > 0) {
       setPlannedWorkouts(pendingPlans);
       if (pendingSchedule) {
@@ -466,7 +482,8 @@ export default function Onboarding() {
   };
 
   const handleDeclinePlans = () => {
-    applyPendingProfile();
+    // Same staging rule as Accept (live-fix L1): profile applies on the
+    // summary's Continue/Edit, not here, or the summary never paints.
     setPendingPlans(null);
     setPendingSchedule(null);
     setCurrentScreen('summary');
@@ -760,14 +777,19 @@ export default function Onboarding() {
   // Shown after the plan offer (or directly after details when no plan was
   // generated) and before the tabs. Rows restate stored choices only.
   if (currentScreen === 'summary') {
-    const summaryGoal = resolvePrimaryGoal(profile?.goals);
+    // Live-fix L1: the store profile is NOT applied yet at this point
+    // (it applies on Continue/Edit), so goal/diet read from the staged
+    // pendingProfile first — otherwise the summary would restate stale
+    // or default values. Level/days/injuries come from trainingProfile,
+    // which handleFinishCalibration already wrote.
+    const summaryGoal = resolvePrimaryGoal(pendingProfile?.goals ?? profile?.goals);
     const summaryLevelKey =
       trainingProfile?.experience === 'advanced'
         ? 'settings.modeAdvanced'
         : trainingProfile?.experience === 'intermediate'
           ? 'settings.modeIntermediate'
           : 'settings.modeBeginner';
-    const summaryDiet = profile?.dietPreference ?? 'non_vegetarian';
+    const summaryDiet = pendingProfile?.dietPreference ?? profile?.dietPreference ?? 'non_vegetarian';
     const summaryDietKey =
       summaryDiet === 'vegetarian'
         ? 'settings.dietVegetarian'

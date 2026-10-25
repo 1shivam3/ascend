@@ -67,6 +67,11 @@ export default function WeeklyHabitMatrix({
     return filtered.length ? filtered : all;
   }, [weekStart, language, todayOnly, todayStr]);
 
+  // Live-fix L2: a single day stretched flex-1 across the card reads as
+  // a progress bar, not a day cell — cap single-day cells to a fixed
+  // width so the Simple view reads as one day, honestly.
+  const singleDay = days.length === 1;
+
   const workoutDays = useMemo(() => {
     const set = new Set<string>();
     for (const w of workouts) {
@@ -128,7 +133,7 @@ export default function WeeklyHabitMatrix({
           {days.map((d) => (
             <div
               key={d.dateStr}
-              className={`flex-1 text-center text-[9px] ${d.dateStr === todayStr ? 'text-accent font-bold' : 'text-text-muted'}`}
+              className={`${singleDay ? 'w-10 shrink-0' : 'flex-1'} text-center text-[9px] ${d.dateStr === todayStr ? 'text-accent font-bold' : 'text-text-muted'}`}
             >
               {d.letter} {d.date.getDate()}
             </div>
@@ -145,7 +150,7 @@ export default function WeeklyHabitMatrix({
             {days.map((d) => {
               const done = row.done(d.dateStr);
               const isToday = d.dateStr === todayStr;
-              const cellClass = `${compact ? 'h-5' : 'h-6'} flex-1 rounded ${
+              const cellClass = `${compact ? 'h-5' : 'h-6'} ${singleDay ? 'w-10 shrink-0' : 'flex-1'} rounded ${
                 onSelectDate ? 'cursor-pointer' : ''
               } ${done ? '' : 'bg-bg-secondary border border-border/40'} ${isToday && !done ? 'ring-1 ring-accent/60' : ''}`;
               return (

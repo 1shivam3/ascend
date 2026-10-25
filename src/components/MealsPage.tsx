@@ -56,6 +56,7 @@ import { resolveIndianMeta } from '@/lib/indian-foods';
 import { OIL_LEVELS, OIL_LEVEL_LABEL_KEYS, defaultOilForFood, withOilLevel } from '@/lib/oil-adjust';
 import { searchFoods, type FoodSearchResult } from '@/lib/food-search';
 import { getFoodHindiName } from '@/lib/food-hindi';
+import { isExactFoodItem, foodsAllExact, tildeForFoods } from '@/lib/meal-display';
 import {
   getProteinGapSuggestion,
   getWholeDayAdaptation,
@@ -947,7 +948,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
     addMeal(newMeal);
     toast.success(
-      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG) }),
+      t('toast.mealAdded', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG), tilde: tildeForFoods(cleanedFoods) }),
       t('toast.titleMealLogged')
     );
     resetBuilderForm();
@@ -1167,7 +1168,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             snippet: [
               q,
               data.foods.map((f: FoodItem) => f.name).join(', '),
-              `~${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
+              `${tildeForFoods(data.foods)}${data.totalCalories || 0} kcal, ${data.totalProteinG || 0}g protein`,
             ]
               .filter(Boolean)
               .join(' — '),
@@ -1176,8 +1177,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         warnUnmatched(data.foods);
         toast.success(
           data.foods.length === 1
-            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 })
-            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0 }),
+            ? t('toast.mealLoggedQuickOne', { source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0, tilde: tildeForFoods(data.foods) })
+            : t('toast.mealLoggedQuickMany', { count: data.foods.length, source: sourceBadge, kcal: data.totalCalories || 0, protein: data.totalProteinG || 0, tilde: tildeForFoods(data.foods) }),
           t('toast.titleMealLogged')
         );
         return;
@@ -1219,8 +1220,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           warnUnmatched(offlineFoods);
           toast.success(
             offlineFoods.length === 1
-              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG })
-              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG }),
+              ? t('toast.mealLoggedOfflineOne', { kcal: totals.calories, protein: totals.proteinG, tilde: tildeForFoods(offlineFoods) })
+              : t('toast.mealLoggedOfflineMany', { count: offlineFoods.length, kcal: totals.calories, protein: totals.proteinG, tilde: tildeForFoods(offlineFoods) }),
             t('toast.titleMealLoggedOffline')
           );
           return;
@@ -2129,10 +2130,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {t('meals.whatYouAte', { count: todayMeals.length })}
             </h2>
           </div>
+          {/* Live-fix L8: the day total is exact only when every food in
+              every meal is exact — otherwise "~" plus the "est." label.
+              No meals → plain 0, no prefix, no label. */}
           <div className="text-2xs font-mono font-bold">
-            <span className="text-accent">~{Math.round(todayMacros.calories)} kcal</span>
+            <span className="text-accent">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.calories)} kcal</span>
             <span className="text-text-muted mx-1">•</span>
-            <span className="text-emerald-400">~{Math.round(todayMacros.proteinG)}g P</span>
+            <span className="text-emerald-400">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.proteinG)}g P</span>
+            {todayMeals.length > 0 && !foodsAllExact(todayMeals.flatMap((m) => m.foods)) && (
+              <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans font-bold">{t('common.estimatedShort')}</span>
+            )}
           </div>
         </div>
 
@@ -2159,12 +2166,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                         <h3 className="font-bold text-xs sm:text-sm text-text-primary truncate">
                           {displayMealName(meal.name)}
                         </h3>
+                        {/* Live-fix L8: exact meals render no "~"; mixed
+                            meals carry "~" plus the "est." label. */}
                         <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
-                          ~{Math.round(mMacros.calories)} kcal
+                          {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} kcal
                         </span>
                         <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                          ~{Math.round(mMacros.proteinG)}g P
+                          {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                         </span>
+                        {!foodsAllExact(meal.foods) && (
+                          <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                            {t('common.estimatedShort')}
+                          </span>
+                        )}
                       </div>
                       <p className="text-2xs text-text-muted truncate mt-1">
                         {meal.foods.map((f) => f.name).join(", ")}
@@ -2215,9 +2229,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
                             <div className="text-2xs font-mono text-text-muted shrink-0">
-                              <span className="text-accent font-semibold">~{Math.round(food.calories)} kcal</span>
+                              {/* Live-fix L8: exact rows render no "~" — the
+                                  green Exact chip and the number must agree. */}
+                              <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal</span>
                               <span className="mx-1">•</span>
-                              <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                              <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                             </div>
                             <button
                               type="button"
@@ -2356,11 +2372,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 {displayMealName(meal.name)}
                               </h4>
                               <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent">
-                                ~{Math.round(mMacros.calories)} cal
+                                {tildeForFoods(meal.foods)}{Math.round(mMacros.calories)} cal
                               </span>
                               <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">
-                                ~{Math.round(mMacros.proteinG)}g P
+                                {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                               </span>
+                              {!foodsAllExact(meal.foods) && (
+                                <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                                  {t('common.estimatedShort')}
+                                </span>
+                              )}
                             </div>
                             <p className="text-2xs text-text-muted truncate mt-0.5">
                               {meal.foods.map((f) => f.name).join(", ")}
@@ -2410,9 +2431,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0 ml-2">
                                   <div className="text-2xs font-mono text-text-muted shrink-0">
-                                    <span className="text-accent font-semibold">~{Math.round(food.calories)} cal</span>
+                                    {/* Live-fix L8: same exact/estimated rule as the today list. */}
+                                    <span className="text-accent font-semibold">{isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} cal</span>
                                     <span className="mx-1">•</span>
-                                    <span className="text-emerald-400 font-semibold">P: ~{Math.round(food.proteinG)}g</span>
+                                    <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                                   </div>
                                   <button
                                     type="button"
@@ -2661,7 +2683,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <label className="text-2xs font-mono text-text-muted uppercase block mb-1">
                     {t('meals.quickAddFavorites')}
                   </label>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none font-mono">
+                  {/* Live-fix L9: fade mask + end padding so the scrollable
+                      favorites row never reads as clipped buttons. */}
+                  <div className="flex gap-1.5 overflow-x-auto pb-1 pr-2 scrollbar-none font-mono [mask-image:linear-gradient(to_right,black_92%,transparent)]">
                     {favoriteFoods.map((fav) => (
                       <button
                         key={fav.id}
@@ -2893,10 +2917,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                   <div className="flex items-center justify-between text-2xs font-mono text-text-muted pb-0.5 border-b border-border/40">
                                     <span className="flex items-center gap-1 text-accent font-semibold">
                                       <Sparkles className="w-3 h-3" />
-                                      ~{Math.round(food.calories)} kcal
+                                      {/* Live-fix L8: exact rows render no "~". */}
+                                      {isExactFoodItem(food) ? '' : '~'}{Math.round(food.calories)} kcal
                                     </span>
                                     <span>
-                                      P:~{food.proteinG}g • C:~{food.carbsG}g • F:~{food.fatG}g
+                                      P:{isExactFoodItem(food) ? '' : '~'}{food.proteinG}g • C:{isExactFoodItem(food) ? '' : '~'}{food.carbsG}g • F:{isExactFoodItem(food) ? '' : '~'}{food.fatG}g
                                     </span>
                                   </div>
                                 </div>
@@ -3010,14 +3035,16 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="p-4 border-t border-border bg-bg-card">
               <div className="flex justify-between text-xs mb-1.5 font-mono">
                 <span className="text-text-muted">{t('meals.mealTotal')}</span>
-                <span className="font-bold text-accent">~{Math.round(currentMealMacros.calories)} kcal</span>
+                {/* Live-fix L8: builder total follows the same rule —
+                    exact only when every builder food is exact. */}
+                <span className="font-bold text-accent">{foods.length === 0 ? '' : tildeForFoods(foods)}{Math.round(currentMealMacros.calories)} kcal{foods.length > 0 && !foodsAllExact(foods) && <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans text-2xs">{t('common.estimatedShort')}</span>}</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
-                <span>~{round1(currentMealMacros.proteinG)}g P</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.proteinG)}g P</span>
                 <span>•</span>
-                <span>~{round1(currentMealMacros.carbsG)}g C</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.carbsG)}g C</span>
                 <span>•</span>
-                <span>~{round1(currentMealMacros.fatG)}g F</span>
+                <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.fatG)}g F</span>
               </div>
               <div className="flex gap-3">
                 <button

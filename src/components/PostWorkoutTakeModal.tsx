@@ -391,7 +391,7 @@ export default function PostWorkoutTakeModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-full py-3.5 rounded-xl bg-[#E44427] text-white font-bold text-xs hover:bg-[#d03b20] active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
+            className="w-full py-3.5 rounded-xl bg-accent text-accent-on font-bold text-xs hover:bg-accent-dim active:scale-98 transition-all shadow-md cursor-pointer flex items-center justify-center gap-1.5"
             aria-label={t('take.doneAria')}
           >
             <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
