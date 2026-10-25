@@ -13,8 +13,8 @@ import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
 
-import SplashScreen from './onboarding/SplashScreen';
 import WelcomeScreen from './onboarding/WelcomeScreen';
+import MascotSplash from './onboarding/MascotSplash';
 import CreateAccountScreen from './onboarding/CreateAccountScreen';
 import LoginScreen from './onboarding/LoginScreen';
 import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
@@ -42,6 +42,10 @@ export default function Onboarding() {
   const { navigate } = useAppNavigation();
   const [currentScreen, setCurrentScreen] = useState<OnboardingScreenId>('splash');
   const [authOrigin, setAuthOrigin] = useState<'welcome' | 'create_account'>('welcome');
+  // True once the mascot intro has played. The welcome screen shows the
+  // settled small mascot only after the intro (deep links straight to
+  // ?screen=welcome skip it, and the intro never replays).
+  const [introDone, setIntroDone] = useState(false);
 
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [isRestoringAccount, setIsRestoringAccount] = useState(false);
@@ -541,11 +545,18 @@ export default function Onboarding() {
     />
   );
 
-  // ── SCREEN 1: SPLASH SCREEN ──────────────────────────────────────────────
+  // ── SCREEN 1: MASCOT SPLASH (intro) ────────────────────────────────────
+  // Replaces the old photo splash on the onboarding entry path: vermilion
+  // splash + flame mascot, then the welcome screen with the settled small
+  // mascot + staggered content. The hydrating skeleton in page.tsx still
+  // uses the photo SplashScreen (SSR first paint, untouched). Deep links
+  // to ?screen=<later> bypass this branch entirely, so the intro never
+  // hijacks a deep-linked screen.
   if (currentScreen === 'splash') {
     return (
-      <SplashScreen
-        onContinue={() => {
+      <MascotSplash
+        onDone={() => {
+          setIntroDone(true);
           setCurrentScreen('welcome');
         }}
       />
@@ -558,6 +569,7 @@ export default function Onboarding() {
       <>
         {hiddenFileInput}
         <WelcomeScreen
+          showMascot={introDone}
           onGetStarted={() => {
             setAuthOrigin('welcome');
             setCurrentScreen('create_account');
@@ -707,7 +719,7 @@ export default function Onboarding() {
       <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
         <StepProgressBar currentStep={4} onBack={() => setCurrentScreen('details')} />
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
-          <div className="text-left space-y-1">
+          <div className="text-left space-y-1 animate-fade-in">
             <h1 className="page-title">
               {t('onboarding.planOfferTitle')}
             </h1>
@@ -717,7 +729,7 @@ export default function Onboarding() {
           </div>
           {/* Preview what's inside — never ask for blind acceptance. */}
           {(pendingPlans || []).length > 0 && (
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1 animate-fade-in stagger-60">
               {(pendingPlans || []).map((plan: any, i: number) => {
                 const exNames = (plan.exercises || []).map((e: any) => e.name);
                 const estMin = estimateSessionMinutes(plan);
@@ -738,7 +750,7 @@ export default function Onboarding() {
               A fat-loss user previously got a lower number with no
               idea why; a diabetic got no safety framing at all. */}
           {currentMacroGoals && currentMacroGoals.maintenanceCalories ? (
-            <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1">
+            <div className="bg-bg-card border border-border rounded-2xl px-4 py-3 shadow-2xs space-y-1 animate-fade-in stagger-60">
               <p className="text-sm font-bold">Your daily food target: {currentMacroGoals.calories.toLocaleString()} kcal</p>
               <p className="text-xs text-text-primary/70 leading-relaxed">
                 Your body burns about {currentMacroGoals.maintenanceCalories.toLocaleString()} kcal a day.
@@ -752,7 +764,7 @@ export default function Onboarding() {
               </p>
             </div>
           ) : null}
-          <div className="space-y-3">
+          <div className="space-y-3 animate-fade-in stagger-120">
             <button
               type="button"
               onClick={handleAcceptPlans}

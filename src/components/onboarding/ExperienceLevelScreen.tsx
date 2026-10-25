@@ -55,7 +55,7 @@ export default function ExperienceLevelScreen({
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
-        <div className="text-left space-y-1">
+        <div className="text-left space-y-1 animate-fade-in">
           <h1 className="page-title">
             {t('onboarding.experienceTitle')}
           </h1>
@@ -65,7 +65,7 @@ export default function ExperienceLevelScreen({
         </div>
 
         {/* 3 Single-Select Cards */}
-        <div className="space-y-3" role="radiogroup" aria-label="Experience level">
+        <div className="space-y-3 animate-fade-in stagger-60" role="radiogroup" aria-label="Experience level">
           {EXPERIENCE_OPTIONS.map((item) => {
             const isSelected = selectedLevel === item.id;
 
@@ -117,7 +117,7 @@ export default function ExperienceLevelScreen({
       </div>
 
       {/* Bottom Actions */}
-      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3">
+      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3 animate-fade-in stagger-120">
         <button
           type="button"
           onClick={onContinue}

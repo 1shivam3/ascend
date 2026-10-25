@@ -3,6 +3,7 @@
 import React from 'react';
 import { Dumbbell, RotateCcw } from 'lucide-react';
 import LanguagePicker from '@/components/ui/LanguagePicker';
+import FlameMascot from './FlameMascot';
 import { useTranslation } from '@/lib/i18n';
 
 interface WelcomeScreenProps {
@@ -11,6 +12,13 @@ interface WelcomeScreenProps {
   onContinueAsGuest: () => void;
   backupFound?: boolean;
   onRestoreBackup?: () => void;
+  /**
+   * True only right after the mascot intro played (set by Onboarding when
+   * the splash completes). Shows the settled small flame mascot in the
+   * branding slot + staggers the hero/actions fade-in. Deep links
+   * straight to welcome leave this false, so the intro never replays.
+   */
+  showMascot?: boolean;
 }
 
 export default function WelcomeScreen({
@@ -19,6 +27,7 @@ export default function WelcomeScreen({
   onContinueAsGuest,
   backupFound,
   onRestoreBackup,
+  showMascot = false,
 }: WelcomeScreenProps) {
   const { t } = useTranslation();
   return (
@@ -26,9 +35,15 @@ export default function WelcomeScreen({
       {/* Top spacer / subtle branding */}
       <div className="w-full max-w-md mx-auto pt-6 flex flex-col items-center gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-xl bg-bg-card border border-border flex items-center justify-center shadow-2xs">
-            <Dumbbell className="w-5 h-5 text-accent" strokeWidth={2.4} />
-          </div>
+          {showMascot ? (
+            <span className="animate-scale-in" aria-hidden="true">
+              <FlameMascot size={36} tone="brand" />
+            </span>
+          ) : (
+            <div className="w-9 h-9 rounded-xl bg-bg-card border border-border flex items-center justify-center shadow-2xs">
+              <Dumbbell className="w-5 h-5 text-accent" strokeWidth={2.4} />
+            </div>
+          )}
           <span className="text-sm font-bold tracking-widest text-text-primary uppercase font-sans">
             ASCEND
           </span>
@@ -43,7 +58,7 @@ export default function WelcomeScreen({
       </div>
 
       {/* Hero Content */}
-      <div className="w-full max-w-md mx-auto my-auto text-center py-8">
+      <div className={`w-full max-w-md mx-auto my-auto text-center py-8${showMascot ? ' animate-fade-in stagger-60' : ''}`}>
         <h1 className="display-title leading-tight">
           {t('onboarding.welcomeTitle')}
         </h1>
@@ -77,7 +92,7 @@ export default function WelcomeScreen({
       </div>
 
       {/* Actions */}
-      <div className="w-full max-w-md mx-auto pb-6 space-y-3">
+      <div className={`w-full max-w-md mx-auto pb-6 space-y-3${showMascot ? ' animate-fade-in stagger-120' : ''}`}>
         <button
           type="button"
           onClick={onGetStarted}

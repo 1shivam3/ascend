@@ -113,6 +113,8 @@ describe('i18n wiring coverage (pinned)', () => {
     'src/components/ServiceWorkerRegister.tsx',
     'src/components/TabSkeleton.tsx',
     'src/components/TelemetryProvider.tsx',
+    // Mascot: pure SVG, aria-hidden, no copy of its own.
+    'src/components/onboarding/FlameMascot.tsx',
     'src/components/ui/Badge.tsx',
     'src/components/ui/Button.tsx',
     'src/components/ui/Card.tsx',

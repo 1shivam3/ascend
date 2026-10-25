@@ -169,7 +169,7 @@ export default function PersonalDetailsScreen({
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
-        <div className="text-left space-y-1">
+        <div className="text-left space-y-1 animate-fade-in">
           <h1 className="page-title">
             {t('onboarding.detailsTitle')}
           </h1>
@@ -187,7 +187,7 @@ export default function PersonalDetailsScreen({
         )}
 
         {/* Details Form */}
-        <form id="personal-details-form" onSubmit={handleSubmit} className="space-y-4">
+        <form id="personal-details-form" onSubmit={handleSubmit} className="space-y-4 animate-fade-in stagger-60">
           {/* Athlete Name */}
           <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-1.5">
             <label htmlFor="details-name" className="block text-xs font-semibold text-text-primary">
@@ -402,7 +402,7 @@ export default function PersonalDetailsScreen({
       </div>
 
       {/* Bottom Actions */}
-      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3">
+      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3 animate-fade-in stagger-120">
         <button
           type="submit"
           form="personal-details-form"

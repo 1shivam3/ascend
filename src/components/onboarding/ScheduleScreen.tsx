@@ -57,7 +57,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       <StepProgressBar currentStep={3} onBack={onBack} />
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
-        <div className="text-left space-y-1">
+        <div className="text-left space-y-1 animate-fade-in">
           <h1 className="page-title">
             Your week, your setup
           </h1>
@@ -66,7 +66,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
           </p>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in stagger-60">
           <p className="text-sm font-bold">{t('onboarding.scheduleDaysTitle')}</p>
           <p className="text-xs text-text-muted -mt-1.5">These are your weight-training days — runs, walks and cardio can happen on any day.</p>
           <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="Training days per week">
@@ -198,7 +198,7 @@ export default function ScheduleScreen({ initialDays, initialEquipment, initialA
       </div>
 
       {/* Bottom Actions */}
-      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3">
+      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3 animate-fade-in stagger-120">
         <button
           type="button"
           onClick={() => onContinue(days, equipment, activity, limitations)}

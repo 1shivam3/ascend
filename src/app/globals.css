@@ -420,6 +420,23 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 }
 
+/* ── Onboarding stagger ──────────────────────────────────────────────── */
+/* Delay utilities for the mascot-intro staggered fade-in. They only set
+   delay + fill mode on the EXISTING fadeIn keyframe (no new keyframes),
+   and only apply when motion is allowed — under reduced motion the
+   blocks render immediately with the collapsed root fade. Combine with
+   animate-fade-in. */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-60 {
+    animation-delay: 60ms;
+    animation-fill-mode: backwards;
+  }
+  .stagger-120 {
+    animation-delay: 120ms;
+    animation-fill-mode: backwards;
+  }
+}
+
 /* ── Dark-mode depth polish ────────────────────────────────────────────── */
 /* Subtle top highlight gives cards physical lift on dark backgrounds, */
 /* matching the crisp separation the light theme gets for free. */

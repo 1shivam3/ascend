@@ -72,7 +72,7 @@ export default function FitnessGoalsScreen({
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
         {/* Header */}
-        <div className="text-left space-y-1">
+        <div className="text-left space-y-1 animate-fade-in">
           <h1 className="page-title">
             {t('onboarding.goalsTitle')}
           </h1>
@@ -82,7 +82,7 @@ export default function FitnessGoalsScreen({
         </div>
 
         {/* 5 Multi-Select Cards in exact order */}
-        <div className="space-y-3" role="group" aria-label="Fitness goals">
+        <div className="space-y-3 animate-fade-in stagger-60" role="group" aria-label="Fitness goals">
           {GOAL_OPTIONS.map((item) => {
             const isSelected = selectedGoals.includes(item.id);
             const Icon = item.icon;
@@ -138,7 +138,7 @@ export default function FitnessGoalsScreen({
       </div>
 
       {/* Bottom Actions */}
-      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3">
+      <div className="w-full max-w-md mx-auto px-6 pt-4 space-y-3 animate-fade-in stagger-120">
         <button
           type="button"
           onClick={onContinue}

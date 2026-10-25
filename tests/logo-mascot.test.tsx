@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import fs from 'fs';
 import path from 'path';
+import FlameMascot from '@/components/onboarding/FlameMascot';
+import MascotSplash from '@/components/onboarding/MascotSplash';
 
 // PNG IHDR dimensions without an image library: signature(8) + length(4)
 // + 'IHDR'(4) + width(4 BE) + height(4 BE).
@@ -42,3 +46,48 @@ describe('logo icon set (flame-2 mark)', () => {
   });
 });
 
+describe('flame mascot (SVG)', () => {
+  it('renders a flame with an A cutout, eyes, and a smile', () => {
+    const markup = renderToStaticMarkup(<FlameMascot size={56} tone="brand" />);
+    expect(markup).toContain('<svg');
+    expect(markup).toContain('evenodd'); // A-shaped negative space
+    expect(markup.match(/<circle/g)?.length).toBeGreaterThanOrEqual(4); // eyes + pupils
+    expect(markup).toContain('Q100 118'); // smile curve
+  });
+
+  it('dark tone uses the graphite token, brand tone uses accent', () => {
+    const dark = renderToStaticMarkup(<FlameMascot size={56} tone="dark" />);
+    const brand = renderToStaticMarkup(<FlameMascot size={56} tone="brand" />);
+    expect(dark).toContain('text-brand-graphite');
+    expect(brand).toContain('text-accent');
+  });
+});
+
+describe('mascot splash intro', () => {
+  it('renders the full-screen splash overlay (non-reduced-motion)', () => {
+    (global as any).window = {
+      matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+    };
+    const markup = renderToStaticMarkup(<MascotSplash onDone={() => {}} />);
+    expect(markup).toContain('Tap to continue');
+    expect(markup).toContain('bg-accent');
+    expect(markup).toContain('<svg');
+  });
+
+  it('renders nothing under reduced motion (straight to content)', () => {
+    (global as any).window = {
+      matchMedia: () => ({ matches: true, addEventListener: () => {}, removeEventListener: () => {} }),
+    };
+    const markup = renderToStaticMarkup(<MascotSplash onDone={() => {}} />);
+    expect(markup).toBe('');
+  });
+
+  it('stagger utilities exist and are gated to motion-allowed', () => {
+    const css = fs.readFileSync(path.resolve('src/app/globals.css'), 'utf8');
+    expect(css).toContain('.stagger-60');
+    expect(css).toContain('.stagger-120');
+    const noPref = css.indexOf('prefers-reduced-motion: no-preference');
+    expect(noPref).toBeGreaterThan(-1);
+    expect(css.indexOf('.stagger-60')).toBeGreaterThan(noPref);
+  });
+});

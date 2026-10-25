@@ -47,11 +47,11 @@ export default function SummaryScreen({
   return (
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
-        <div className="text-left space-y-1">
+        <div className="text-left space-y-1 animate-fade-in">
           <h1 className="page-title">{t('onboarding.summaryTitle')}</h1>
           <p className="text-sm text-text-primary/70">{t('onboarding.summarySubtitle')}</p>
         </div>
-        <div className="bg-bg-card border border-border rounded-2xl shadow-2xs divide-y divide-border/60">
+        <div className="bg-bg-card border border-border rounded-2xl shadow-2xs divide-y divide-border/60 animate-fade-in stagger-60">
           {rows.map((row) => (
             <div key={row.label} className="flex items-baseline justify-between gap-4 px-4 py-3">
               <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted shrink-0">
@@ -61,7 +61,7 @@ export default function SummaryScreen({
             </div>
           ))}
         </div>
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in stagger-120">
           <button
             type="button"
             onClick={onContinue}
