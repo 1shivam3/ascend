@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from '@/lib/i18n';
 
 interface SplashScreenProps {
@@ -8,55 +8,35 @@ interface SplashScreenProps {
   isHydrating?: boolean;
 }
 
+// Clean splash: wordmark only — no photo, no mascot, no logo mark,
+// no animation, no auto-advance timer. Tap-only, static.
 export default function SplashScreen({ onContinue, isHydrating = false }: SplashScreenProps) {
   const { t } = useTranslation();
-  useEffect(() => {
-    if (isHydrating || !onContinue) return;
-    if (typeof window !== 'undefined' && window.location.search.includes('no_auto_advance=true')) {
-      return;
-    }
-    // Auto-advance after 1.8 seconds if user does not tap
-    const timer = setTimeout(() => {
-      onContinue();
-    }, 1800);
-    return () => clearTimeout(timer);
-  }, [isHydrating, onContinue]);
 
   return (
     <div
       onClick={!isHydrating && onContinue ? onContinue : undefined}
-      className={`relative min-h-screen w-full bg-brand-graphite text-brand-chalk flex flex-col items-center justify-between p-8 select-none overflow-hidden transition-opacity duration-300 ${
+      className={`relative min-h-screen w-full bg-brand-graphite text-brand-chalk flex flex-col items-center justify-between p-8 select-none overflow-hidden ${
         !isHydrating && onContinue ? 'cursor-pointer' : ''
       }`}
       role="banner"
       aria-label={t('auth.splashAria')}
     >
-      {/* Background Photograph with Vignette & Fallback */}
-      <div className="absolute inset-0 z-0 pointer-events-none select-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/splash-athlete.jpg"
-          alt=""
-          role="presentation"
-          className="w-full h-full object-cover object-center"
-          loading="eager"
-        />
-        {/* Cinematic gradient overlay matching reference darkness and contrast */}
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-graphite/80 via-brand-graphite/40 to-brand-graphite/85" />
-      </div>
-
       {/* Top spacer */}
       <div className="relative z-10 w-full flex justify-end pt-4" aria-hidden="true" />
 
-      {/* Center Branding Hero (Screen 1 Reference Lock) */}
-      <div className="relative z-10 flex flex-col items-center text-center space-y-3 animate-fade-in my-auto">
+      {/* Center Branding */}
+      <div className="relative z-10 flex flex-col items-center text-center space-y-3 my-auto">
         {/* Wordmark */}
-        <h1 className="text-4xl sm:text-5xl font-black tracking-[0.25em] text-white uppercase font-sans drop-shadow-md">
+        <h1 className="text-4xl sm:text-5xl font-black tracking-[0.25em] text-white uppercase font-sans">
           ASCEND
         </h1>
 
-        {/* Tagline matching reference */}
-        <p className="text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase drop-shadow">
+        {/* Short vermilion rule */}
+        <div className="w-7 h-0.5 bg-accent" aria-hidden="true" />
+
+        {/* Tagline */}
+        <p className="text-xs sm:text-sm font-medium tracking-widest text-brand-chalk/80 uppercase">
           {t('auth.tagline')}
         </p>
       </div>
