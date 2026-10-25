@@ -215,6 +215,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     [normalizedWorkouts, bodyMetrics, todayCheckin, healthSummary]
   );
 
+  // FND-02: recompute the coach model on Today mount, so Coach notes
+  // and completed counts reflect the latest saves without a reload.
+  // The store subscription already refreshes on save; this covers a
+  // mount after an overnight/day-boundary gap. Zustand actions are
+  // stable, so this runs once in practice, and the model slice is
+  // excluded from the refresh signature, so it cannot loop.
+  const refreshAthleteModel = useStore((state) => state.refreshAthleteModel);
+  useEffect(() => {
+    refreshAthleteModel();
+  }, [refreshAthleteModel]);
+
   // Coach digest: missed-session check-in + weight-trend nutrition advice.
   const coachDigest = useCoachDigest();
   const dismissCheckIn = useStore((state) => state.dismissCheckIn);

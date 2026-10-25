@@ -21,6 +21,7 @@ import { getWeekRange, getLocalTodayStr } from './formatters';
 import { buildHealthSignals } from './health-connect';
 import { resolvePrimaryGoal } from './types';
 import { calculateStreak, buildActiveDays } from './streak-freeze';
+import { getScheduledPlanEntries } from './scheduled-days';
 import { getLevel, progressToNext, getLevelName, getLevelNameKey } from './xp-system';
 
 /**
@@ -78,26 +79,22 @@ export function useCoachDigest() {
 
   const checkIn = useMemo(() => {
     const week = getWeekRange(new Date());
-    // Convert WeeklySchedule (Record<DayOfWeek, config>) to PlannedSession[]
-    const dayOrder = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-    const planned: { weekday: number; name: string; planId?: string }[] = [];
-    dayOrder.forEach((day, idx) => {
-      const cfg = (weeklySchedule as any)?.[day];
-      if (cfg && cfg.workoutPlanId && cfg.workoutPlanId !== 'rest') {
-        planned.push({
-          weekday: idx,
-          name: cfg.customTitle || `Workout`,
-          planId: cfg.workoutPlanId,
-        });
-      }
-    });
+    // FND-02: planned sessions come from the pinned scheduled-day
+    // definition — a day whose plan no longer exists is not scheduled,
+    // matching the adherence denominator exactly.
+    const planned: { weekday: number; name: string; planId?: string }[] =
+      getScheduledPlanEntries(weeklySchedule, plannedWorkouts).map((e) => ({
+        weekday: e.weekday,
+        name: e.customTitle || `Workout`,
+        planId: e.planId,
+      }));
     const missed = detectMissedSessions(planned, workouts, week);
     const active = missed.filter(
       (m) => !coach.dismissedCheckIns.includes(`missed:${m.date}:${m.name}`)
     );
     if (active.length === 0) return null;
     return { message: generateCheckIn(active), details: generateCheckInDetails(active), sessions: active };
-  }, [weeklySchedule, workouts, coach.dismissedCheckIns]);
+  }, [weeklySchedule, plannedWorkouts, workouts, coach.dismissedCheckIns]);
 
   const patterns = useMemo(
     () => detectPatterns(workouts),

@@ -34,6 +34,7 @@ import {
 } from './workout-engine';
 import { resolveExerciseMuscle, type MuscleGroup } from './exercise-library';
 import { parseLocalDate } from './formatters';
+import { getScheduledPlanEntries } from './scheduled-days';
 import type { LocalizedSentence } from './coach-i18n';
 
 /**
@@ -625,17 +626,17 @@ function buildAdherence(
   input: AthleteModelInput,
   todayStr: string
 ): AdherenceProfile {
-  const planIds = new Set(
-    (Array.isArray(input.plannedWorkouts) ? input.plannedWorkouts : []).map((p) => p.id)
-  );
+  // FND-02: the scheduled-day definition is pinned in scheduled-days.ts
+  // and shared with the coach check-in and the week stats — one
+  // definition, so the denominator cannot drift between passes.
   const rawScheduledDays = DAY_KEYS.filter((d) => {
     const cfg = input.weeklySchedule?.[d];
     return !!cfg?.workoutPlanId && cfg.workoutPlanId !== 'rest';
   });
-  const scheduledDays = rawScheduledDays.filter((d) => {
-    const cfg = input.weeklySchedule?.[d];
-    return !!cfg?.workoutPlanId && planIds.has(cfg.workoutPlanId as string);
-  });
+  const scheduledDays = getScheduledPlanEntries(
+    input.weeklySchedule,
+    input.plannedWorkouts
+  ).map((e) => e.day);
 
   const thisMonday = (() => {
     const d = parseLocalDate(todayStr);
@@ -718,7 +719,7 @@ function buildAdherence(
           n: planned,
           tier: tierFor(planned, 8, 24),
           evidence:
-            `You completed ${completed} of ${planned} planned sessions over the last 8 weeks, measured against your current weekly schedule.` +
+            `You completed ${completed} of ${planned} planned sessions over the last 8 complete weeks (the current week isn't counted yet), measured against your current weekly schedule.` +
             (unscheduled > 0
               ? ` Plus ${unscheduled} extra session${unscheduled === 1 ? '' : 's'} trained on unscheduled days.`
               : ''),

@@ -1911,6 +1911,12 @@ export const useAppStore = create<AppState>()(
         // persist freeze consumption/refill instead of leaving the
         // streak slice as dead code the UI only reads.
         get().refreshStreak();
+        // FND-02: recompute coach notes/counts on workout save.
+        // Defense-in-depth beside the store subscription (which also
+        // refreshes on signature change): the save path itself must
+        // never leave Today showing pre-save counts. Cheap (pure
+        // recompute, counts only) and idempotent.
+        get().refreshAthleteModel();
       },
       deleteWorkout: (id) => set((state) => {
         const nextWorkouts = state.workouts.filter(w => w.id !== id);

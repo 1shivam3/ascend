@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
+import { getScheduledPlanEntries } from '@/lib/scheduled-days';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
@@ -1846,13 +1847,13 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ─── Screen 4 Figma Blueprint Helpers ─────────────────────────────────────
   const splitLabel = useMemo(() => {
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
+    // FND-02: pinned scheduled-day definition — a day counts only when
+    // its plan still exists, matching the adherence denominator.
+    const scheduledDaysCount = getScheduledPlanEntries(weeklySchedule, plannedWorkouts).length;
     const days = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
     const splitType = trainingProfile?.preferredSplit === 'push_pull_legs' ? 'PUSH / PULL / LEGS' : trainingProfile?.preferredSplit === 'bro_split' ? 'BRO SPLIT' : 'UPPER / LOWER';
     return `${days}-DAY ${splitType}`;
-  }, [weeklySchedule, trainingProfile]);
+  }, [weeklySchedule, plannedWorkouts, trainingProfile]);
 
   const currentWeekDateRange = useMemo(() => {
     const now = new Date();
@@ -1878,9 +1879,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     const weekWorkouts = workouts.filter((w) => parseLocalDate(w.date) >= startOfWeek);
     const trainedDates = new Set(weekWorkouts.map((w) => w.date.split('T')[0]));
 
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
+    // FND-02: pinned scheduled-day definition — a day counts only when
+    // its plan still exists, matching the adherence denominator.
+    const scheduledDaysCount = getScheduledPlanEntries(weeklySchedule, plannedWorkouts).length;
     const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 4);
 
     const daysLabels: { day: DayOfWeek; short: string }[] = [
