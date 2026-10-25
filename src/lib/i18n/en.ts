@@ -557,6 +557,9 @@ export const en = {
   'toast.titleRestDay': 'Rest Day Set',
   'toast.mealLoggedFav': 'Logged {name} (~{kcal} kcal, ~{protein}g P)!',
   'toast.mealAdded': 'Added {name} ({tilde}{kcal} kcal, {tilde}{protein}g protein)!',
+  // FND-03: edit confirmation; mirrors mealAdded. Flag for native-speaker
+  // review only in hi — en is the source wording.
+  'toast.mealUpdated': 'Updated {name} ({tilde}{kcal} kcal, {tilde}{protein}g protein)!',
   'toast.mealNameRequired': 'Please give this meal a name (e.g. "Post-Workout Shake").',
   'toast.noFoodItems': 'Please add at least one food item with a name.',
   'toast.zeroDataBuilder': '{names} has no nutrition values yet. Enter its calories/macros (tap the item) or remove it before saving.',
