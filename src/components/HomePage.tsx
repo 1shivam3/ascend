@@ -637,7 +637,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [lastWorkout, todayStr, language, t]);
 
   return (
-    <div className="page animate-fade-in flex flex-col gap-6 pb-24 max-w-md mx-auto px-5 pt-3">
+    <div className="page animate-fade-in flex flex-col gap-6 page-bottom-safe max-w-md mx-auto px-5 pt-3">
       {/* ── 1. HEADER (Screen 8 & Screen 9) ─────────────────────────────────── */}
       <header className="flex items-center justify-between pt-1">
         <div>

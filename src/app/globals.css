@@ -331,6 +331,18 @@
     padding-bottom: calc(76px + env(safe-area-inset-bottom, 1rem));
   }
 
+  /* Today keeps the same clearance above the fixed tab bar, but the
+     flat pb-24 utility on the page root used to override .page's
+     safe-area term: on devices with a large bottom safe area (or
+     larger text, which grows the tab items) the bar grows taller
+     than the 96px padding and covers the last rows of Today. This
+     keeps the 96px floor and adds the safe area back, so the
+     clearance holds on every device. No visible change where the
+     safe area is 0 (padding stays exactly 96px). */
+  .page-bottom-safe {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
