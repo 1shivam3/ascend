@@ -158,6 +158,45 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
   return { tab: 'home', progressTab: 'overview' };
 }
 
+/**
+ * Seeds the browser session history for the app's first mount so the
+ * in-app stack and the browser entries agree.
+ *
+ * Fresh-tab deep-link bug: the mount effect used to replaceState() the
+ * single fresh-tab entry to the deep-linked tab while the in-app stack
+ * was ['home', tab] (length 2). With only one browser entry, Back —
+ * the browser button, or the app's Back control, which calls
+ * window.history.back() whenever the stack has length > 1 — had no
+ * previous entry and exited the app instead of landing on home.
+ *
+ * Fix: for a non-home initial tab, replace the fresh entry with home
+ * and push the deep-linked tab on top, so the browser holds
+ * [home, tab] exactly like the in-app stack. Back then pops to the
+ * home entry and the popstate handler lands in-app on Today.
+ * For a home initial tab nothing changes: a single replaceState, so
+ * the double-back exit path on home is untouched. goBack() and the
+ * popstate handler are unchanged — they already do the right thing
+ * once a previous entry exists.
+ */
+export function seedInitialBrowserHistory(
+  initialTab: TabId,
+  initialProgressTab: ProgressTabId
+): void {
+  if (typeof window === 'undefined') return;
+  const homeUrl = buildTabUrl('home');
+  if (initialTab === 'home') {
+    window.history.replaceState({ tab: 'home', root: true, stackDepth: 1 }, '', homeUrl);
+    return;
+  }
+  const initialUrl = buildTabUrl(initialTab, initialProgressTab);
+  window.history.replaceState({ tab: 'home', root: true, stackDepth: 1 }, '', homeUrl);
+  window.history.pushState(
+    { tab: initialTab, root: false, stackDepth: 2 },
+    '',
+    initialUrl
+  );
+}
+
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
   const toast = useToast();
   const { t } = useTranslation();
@@ -354,8 +393,6 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     if (typeof window === 'undefined') return;
 
     const initial = getInitialNavigationState();
-    const initialUrl = buildTabUrl(initial.tab, initial.progressTab);
-
     setActiveTab(initial.tab);
     setProgressInitialTab(initial.progressTab);
     const initialStack: TabId[] = initial.tab === 'home' ? ['home'] : ['home', initial.tab];
@@ -364,11 +401,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     activeTabRef.current = initial.tab;
 
     try {
-      window.history.replaceState(
-        { tab: initial.tab, root: initial.tab === 'home', stackDepth: initialStack.length },
-        '',
-        initialUrl
-      );
+      seedInitialBrowserHistory(initial.tab, initial.progressTab);
       persistActiveTab(initial.tab, initial.progressTab);
     } catch {}
 
