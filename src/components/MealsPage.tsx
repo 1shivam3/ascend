@@ -6,6 +6,7 @@ import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
 import { renderLocalizedSentence } from '@/lib/coach-i18n';
+import { mergeEditedMealFoods } from '@/lib/meal-edit';
 import {
   estimateMacros,
   calculateMealMacros,
@@ -171,6 +172,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const macroGoals         = useStore((state) => state.macroGoals);
   const favoriteFoods      = useStore((state) => state.favoriteFoods || []);
   const addMeal            = useStore((state) => state.addMeal);
+  const updateMeal         = useStore((state) => state.updateMeal);
   const deleteMeal         = useStore((state) => state.deleteMeal);
   const deleteFoodFromMeal = useStore((state) => state.deleteFoodFromMeal);
   const restoreFoodToMeal  = useStore((state) => state.restoreFoodToMeal);
@@ -233,6 +235,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const [selectedHistoryDate,   setSelectedHistoryDate]   = useState<string | null>(null);
   const [expandedHistoryDays,   setExpandedHistoryDays]   = useState<Set<string>>(new Set());
   const [mealToDelete,          setMealToDelete]          = useState<{ id: string; name: string } | null>(null);
+  // FND-03: the meal being edited in the LOG MEAL form (null = adding).
+  // The snapshot holds the ORIGINAL foods so their exact/estimated
+  // provenance flags survive a quantity/unit/macro edit unchanged.
+  const [editingMeal,           setEditingMeal]           = useState<{ id: string; foods: FoodItem[] } | null>(null);
   const deleteMealRef = useRef<HTMLDivElement>(null); const { dialogProps: deleteMealDialogProps } = useModalA11y(deleteMealRef, mealToDelete !== null, () => setMealToDelete(null));
 
   // ── Progressive Disclosure UI States ──────────────────────────────────────
@@ -362,6 +368,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const resetBuilderForm = () => {
     setMealName('');
     setFoods([]);
+    setEditingMeal(null);
+  };
+
+  // FND-03: open the LOG MEAL form prefilled with a logged meal, for
+  // per-meal edit (header button) and per-item edit (item-row button —
+  // the item's own row in the form is where its quantity/unit/macros
+  // change). Copies, so cancelling never mutates the logged meal.
+  const handleEditMeal = (meal: MealEntry) => {
+    setEditingMeal({ id: meal.id, foods: meal.foods.map((f) => ({ ...f })) });
+    setMealName(meal.name);
+    setFoods(meal.foods.map((f) => ({ ...f })));
+    setIsModalOpen(true);
   };
 
   // ── Natural language meal logging ──────────────────────────────────────────
@@ -945,6 +963,24 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
 
     const mealMacros = calculateMealMacros(cleanedFoods);
+
+    // FND-03: edit in place — same meal id, same date, no duplicate
+    // history row, NOT delete + recreate. Provenance rule lives in
+    // lib/meal-edit (an item whose name still matches an original
+    // keeps that item's exact/estimated flags verbatim, so a quantity
+    // edit cannot flip an estimate into an exact value or vice versa
+    // — the FND-10 inconsistency).
+    if (editingMeal) {
+      const mergedFoods: FoodItem[] = mergeEditedMealFoods(cleanedFoods, editingMeal.foods);
+      updateMeal(editingMeal.id, { name: finalMealName, foods: mergedFoods });
+      toast.success(
+        t('toast.mealUpdated', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG), tilde: tildeForFoods(mergedFoods) }),
+        t('toast.titleMealLogged')
+      );
+      resetBuilderForm();
+      setIsModalOpen(false);
+      return;
+    }
 
     addMeal(newMeal);
     toast.success(
@@ -2185,6 +2221,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                      {/* FND-03: per-meal edit — reopens this meal in the LOG MEAL form. */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditMeal(meal);
+                        }}
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                        title={t('common.edit')}
+                        aria-label={`${t('common.edit')}: ${meal.name}`}
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -2235,6 +2284,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               <span className="mx-1">•</span>
                               <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                             </div>
+                            {/* FND-03: per-item edit — opens the meal in the
+                                LOG MEAL form, where this item's row edits. */}
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleEditMeal(meal); }}
+                              className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                              title={t('common.edit')}
+                              aria-label={`${t('common.edit')}: ${food.name}`}
+                            >
+                              <Edit3 className="w-3 h-3" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
@@ -2388,6 +2448,19 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                             </p>
                           </div>
                           <div className="flex items-center gap-1.5 shrink-0">
+                            {/* FND-03: per-meal edit — reopens this meal in the LOG MEAL form. */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditMeal(meal);
+                              }}
+                              className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                              title={t('common.edit')}
+                              aria-label={`${t('common.edit')}: ${meal.name}`}
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2436,6 +2509,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     <span className="mx-1">•</span>
                                     <span className="text-emerald-400 font-semibold">P: {isExactFoodItem(food) ? '' : '~'}{Math.round(food.proteinG)}g</span>
                                   </div>
+                                  {/* FND-03: per-item edit — opens the meal in the
+                                      LOG MEAL form, where this item's row edits. */}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleEditMeal(meal); }}
+                                    className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                                    title={t('common.edit')}
+                                    aria-label={`${t('common.edit')}: ${food.name}`}
+                                  >
+                                    <Edit3 className="w-3 h-3" />
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => handleDeleteFoodWithUndo(e, meal, idx)}
@@ -2622,7 +2706,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
       {/* ══════════════════ LOG MEAL MODAL ══════════════════ */}
       {isModalOpen && (
-        <div ref={mealModalRef} {...mealDialogProps} className="modal-overlay" onClick={() => setIsModalOpen(false)}>
+        <div ref={mealModalRef} {...mealDialogProps} className="modal-overlay" onClick={() => { resetBuilderForm(); setIsModalOpen(false); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
 
             {/* Header */}
@@ -2638,7 +2722,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   <BarcodeIcon className="w-3.5 h-3.5" />
                   <span>{t('home.scan')}</span>
                 </button>
-                <button type="button" onClick={() => setIsModalOpen(false)} className="text-text-secondary hover:text-text-primary p-1">
+                <button type="button" onClick={() => { resetBuilderForm(); setIsModalOpen(false); }} className="text-text-secondary hover:text-text-primary p-1">
                   <X className="w-5 h-5" />
                 </button>
               </div>

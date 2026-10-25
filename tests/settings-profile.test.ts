@@ -162,7 +162,9 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       expect(html).toContain('Share Workout Split');
       expect(html).toContain('Weekly Training Card');
       expect(html).toContain('App Settings');
-      expect(html).toContain('Log Out');
+      // FND-05: Log Out moved to Settings → Data & Account; Profile
+      // now shows the Data & Account row that lands there.
+      expect(html).toContain('Data &amp; Account');
     });
 
     it('correctly adapts when unit is lbs', () => {

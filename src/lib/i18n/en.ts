@@ -141,7 +141,10 @@ export const en = {
   'onboarding.summaryInjuries': 'Injuries',
   'onboarding.summaryNoInjuries': 'No injuries',
   'onboarding.summaryContinue': 'Start training',
-  'onboarding.summaryEdit': 'Edit in Settings → Training Preferences',
+  // FND-05: the button used to name a "Training Preferences" screen
+  // that does not exist — it lands on the Settings screen, so it now
+  // says so. (It still scrolls to the Training Preferences section.)
+  'onboarding.summaryEdit': 'Edit in You → Settings',
   'onboarding.guestNote': 'No account needed — your data stays on this device.',
   'onboarding.dietPreference': 'Diet Preference',
   'onboarding.dietHint': 'Used by the protein coach for suggestions that fit how you eat.',
@@ -557,6 +560,9 @@ export const en = {
   'toast.titleRestDay': 'Rest Day Set',
   'toast.mealLoggedFav': 'Logged {name} (~{kcal} kcal, ~{protein}g P)!',
   'toast.mealAdded': 'Added {name} ({tilde}{kcal} kcal, {tilde}{protein}g protein)!',
+  // FND-03: edit confirmation; mirrors mealAdded. Flag for native-speaker
+  // review only in hi — en is the source wording.
+  'toast.mealUpdated': 'Updated {name} ({tilde}{kcal} kcal, {tilde}{protein}g protein)!',
   'toast.mealNameRequired': 'Please give this meal a name (e.g. "Post-Workout Shake").',
   'toast.noFoodItems': 'Please add at least one food item with a name.',
   'toast.zeroDataBuilder': '{names} has no nutrition values yet. Enter its calories/macros (tap the item) or remove it before saving.',
@@ -1088,6 +1094,25 @@ export const en = {
   'settings.muscleVolumeHint': 'Per-muscle weekly sets and the recovery map on Progress',
   'settings.healthOpening': 'Opening Health Connect…',
   'settings.dataPrivacyLegal': 'Data, Privacy & Legal',
+  // FND-05: the single place for destructive actions (Log Out, Delete
+  // Account, Delete WebApp Data & Reset), each with scope copy shown
+  // before its confirmation.
+  'settings.dataAccount': 'Data & Account',
+  'settings.dataAccountHint': 'Log out, delete your account, or reset this device\'s data',
+  // FND-06: restore row for the Start-fresh archive (shown only when
+  // an archive exists). Restoring REPLACES current history — the copy
+  // says so before confirmation.
+  'settings.restoreArchived': 'Restore archived history',
+  'settings.restoreArchivedHint': 'Archived {date}: {sessions} sessions, {meals} meals, {plans} plans — restoring replaces your current history.',
+  // FND-06: first-load fork. No name survives a logout, so the history
+  // is identified by counts, not by "Continue as [name]".
+  'historyFork.title': 'Saved history found on this device',
+  'historyFork.subtitle': 'A previous profile left training history on this device. Choose what happens to it before you set up your profile.',
+  'historyFork.counts': '{sessions} sessions • {meals} meals • {plans} plans • {targets} targets',
+  'historyFork.continue': 'Continue with saved history',
+  'historyFork.continueHint': 'Keep {sessions} sessions, {meals} meals and {plans} plans, and set up your profile around them.',
+  'historyFork.startFresh': 'Start fresh',
+  'historyFork.startFreshHint': 'Begin empty — sessions, plans and targets start at zero. Your previous history is archived, not deleted, and can be restored later from Settings → Data & Account.',
   'settings.exportJson': 'Export JSON Backup',
   'settings.exportJsonHint': 'Download all workouts, PRs, and meals',
   'settings.importBackup': 'Import Backup File',

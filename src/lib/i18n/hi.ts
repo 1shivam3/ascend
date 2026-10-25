@@ -138,7 +138,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.summaryInjuries': 'चोटें',
   'onboarding.summaryNoInjuries': 'कोई चोट नहीं',
   'onboarding.summaryContinue': 'ट्रेनिंग शुरू करें',
-  'onboarding.summaryEdit': 'Settings → Training Preferences में बदलें',
+  // FND-05: same rename as en — the destination is the Settings screen.
+  'onboarding.summaryEdit': 'You → Settings में बदलें',
   'onboarding.guestNote': 'कोई खाता ज़रूरी नहीं — आपका डेटा इसी डिवाइस पर रहता है।',
   'onboarding.dietPreference': 'आहार पसंद',
   'onboarding.dietHint': 'आपका प्रोटीन कोच इसके आधार पर आपकी खाने की आदतों के अनुसार सुझाव देता है।',
@@ -553,6 +554,9 @@ export const hi: Partial<Record<StringKey, string>> = {
   'toast.titleRestDay': 'आराम का दिन सेट हुआ',
   'toast.mealLoggedFav': '{name} लॉग हुआ (~{kcal} kcal, ~{protein}g प्रोटीन)!',
   'toast.mealAdded': '{name} जुड़ा ({tilde}{kcal} kcal, {tilde}{protein}g प्रोटीन)!',
+  // FND-03: mirrors mealAdded, composed from its existing hi vocabulary
+  // ('अपडेट हुआ' as in planUpdated) — flag for native-speaker review.
+  'toast.mealUpdated': '{name} अपडेट हुआ ({tilde}{kcal} kcal, {tilde}{protein}g प्रोटीन)!',
   'toast.mealNameRequired': 'कृपया इस भोजन को नाम दें (जैसे "पोस्ट-वर्कआउट शेक")।',
   'toast.noFoodItems': 'कृपया नाम सहित कम से कम एक खाद्य आइटम जोड़ें।',
   'toast.zeroDataBuilder': '{names} का पोषण डेटा अभी नहीं है। इसकी कैलोरी/मैक्रो दर्ज करें (आइटम पर टैप करें) या सेव करने से पहले हटाएं।',
@@ -1085,6 +1089,21 @@ export const hi: Partial<Record<StringKey, string>> = {
   'settings.muscleVolumeHint': 'प्रगति पर हर मसल के हफ़्ते के सेट और रिकवरी मैप',
   'settings.healthOpening': 'Health Connect खुल रहा है…',
   'settings.dataPrivacyLegal': 'डेटा, प्राइवेसी और कानूनी',
+  // FND-05: composed from existing hi words ('डेटा', 'खाता') — flag
+  // for native-speaker review.
+  'settings.dataAccount': 'डेटा और खाता',
+  'settings.dataAccountHint': 'लॉग आउट करें, खाता हटाएं या इस डिवाइस का डेटा रीसेट करें',
+  // FND-06: hi wording composed from existing vocabulary — flag for
+  // native-speaker review.
+  'settings.restoreArchived': 'संग्रहीत इतिहास पुनर्स्थापित करें',
+  'settings.restoreArchivedHint': 'संग्रहीत {date}: {sessions} सत्र, {meals} भोजन, {plans} योजनाएं — पुनर्स्थापित करने पर वर्तमान इतिहास बदल जाएगा।',
+  'historyFork.title': 'इस डिवाइस पर सहेजा इतिहास मिला',
+  'historyFork.subtitle': 'पिछली प्रोफ़ाइल ने इस डिवाइस पर प्रशिक्षण इतिहास छोड़ा है। अपनी प्रोफ़ाइल सेट करने से पहले चुनें कि उसके साथ क्या हो।',
+  'historyFork.counts': '{sessions} सत्र • {meals} भोजन • {plans} योजनाएं • {targets} लक्ष्य',
+  'historyFork.continue': 'सहेजे इतिहास के साथ जारी रखें',
+  'historyFork.continueHint': '{sessions} सत्र, {meals} भोजन और {plans} योजनाएं रखें, और उनके आसपास अपनी प्रोफ़ाइल सेट करें।',
+  'historyFork.startFresh': 'नई शुरुआत करें',
+  'historyFork.startFreshHint': 'खाली शुरुआत करें — सत्र, योजनाएं और लक्ष्य शून्य से शुरू होंगे। पिछला इतिहास हटाया नहीं, संग्रहीत किया गया है — बाद में Settings → Data & Account से पुनर्स्थापित करें।',
   'settings.exportJson': 'JSON बैकअप एक्सपोर्ट करें',
   'settings.exportJsonHint': 'सभी वर्कआउट, PR और खाना डाउनलोड करें',
   'settings.importBackup': 'बैकअप फ़ाइल इम्पोर्ट करें',
