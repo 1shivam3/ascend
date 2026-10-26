@@ -43,6 +43,8 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.todaysWorkout': 'आज का वर्कआउट',
   'home.nutrition': 'पोषण',
   'home.protein': 'प्रोटीन',
+  // Simple-default quote section label — composed from dictionary word, flagged for native review.
+  'home.quote': 'उद्धरण',
   'home.calories': 'कैलोरी',
   'home.readiness': 'रेडीनेस',
   'home.mealScan': 'मील स्कैन',

@@ -46,6 +46,7 @@ export const en = {
   'home.todaysWorkout': "Today's Workout",
   'home.nutrition': 'Nutrition',
   'home.protein': 'Protein',
+  'home.quote': 'Quote',
   'home.calories': 'Calories',
   'home.readiness': 'Readiness',
   'home.mealScan': 'Meal Scan',

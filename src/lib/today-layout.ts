@@ -14,7 +14,7 @@
 
 export type Density = 'simple' | 'detailed';
 
-/** Movable Today sections, in default order (workout card excluded). */
+/** Movable Today sections, in canonical order (workout card excluded). */
 export const TODAY_SECTION_IDS = [
   'nutrition-strip',
   'coach',
@@ -26,7 +26,58 @@ export const TODAY_SECTION_IDS = [
   'steps',
   'challenge',
   'weekly-review-detail',
+  'quote',
 ] as const;
+
+/** Pre-quote section order (the default order before quote became a section). */
+const LEGACY_TODAY_ORDER: readonly string[] = [
+  'nutrition-strip',
+  'coach',
+  'habit-matrix',
+  'quick-actions',
+  'hydration',
+  'readiness',
+  'level',
+  'steps',
+  'challenge',
+  'weekly-review-detail',
+];
+
+/**
+ * Default section order for a user who has never reordered, per density.
+ * Simple follows the owner's minimal default list: workout card (pinned),
+ * nutrition, quick actions, hydration, today's habits, quote last; the
+ * remaining sections follow hidden. Detailed keeps the pre-change layout
+ * with quote right after coach (where it used to render inside the coach
+ * block), so Detailed's visible order is unchanged.
+ */
+export const SIMPLE_DEFAULT_ORDER: readonly string[] = [
+  'nutrition-strip',
+  'quick-actions',
+  'hydration',
+  'habit-matrix',
+  'quote',
+  'coach',
+  'readiness',
+  'level',
+  'steps',
+  'challenge',
+  'weekly-review-detail',
+];
+
+export const DETAILED_DEFAULT_ORDER: readonly string[] = [
+  'nutrition-strip',
+  'coach',
+  'quote',
+  'habit-matrix',
+  'quick-actions',
+  'hydration',
+  'readiness',
+  'level',
+  'steps',
+  'challenge',
+  'weekly-review-detail',
+];
 
 export type TodaySectionId = (typeof TODAY_SECTION_IDS)[number];
 
@@ -34,7 +85,7 @@ export type TodaySectionId = (typeof TODAY_SECTION_IDS)[number];
 export const DENSITY_DEFAULT_VISIBLE: Record<Density, Record<string, boolean>> = {
   simple: {
     'nutrition-strip': true,
-    coach: true,
+    coach: false,
     'habit-matrix': true,
     'quick-actions': true,
     hydration: true,
@@ -43,6 +94,7 @@ export const DENSITY_DEFAULT_VISIBLE: Record<Density, Record<string, boolean>> =
     steps: false,
     challenge: false,
     'weekly-review-detail': false,
+    quote: true,
   },
   detailed: {
     'nutrition-strip': true,
@@ -55,6 +107,7 @@ export const DENSITY_DEFAULT_VISIBLE: Record<Density, Record<string, boolean>> =
     steps: true,
     challenge: true,
     'weekly-review-detail': true,
+    quote: true,
   },
 };
 
@@ -109,11 +162,35 @@ export interface ResolvedTodaySection {
   shown: boolean;
 }
 
-/** Resolve a stored layout + density into the ordered, visible section list. */
+/** Resolve a stored layout + density into the ordered, visible section list.
+ *
+ * Order rule: a layout the user has never reordered (stored order empty,
+ * the legacy pre-quote sequence, or the canonical sequence — i.e. exactly
+ * what a fresh install stores) resolves to the density's default order, so
+ * Simple defaults to the owner's minimal list and Detailed keeps its old
+ * layout. Any other stored order is the user's own and is kept verbatim.
+ * Visibility is unchanged: an explicit show/hide always beats the density
+ * default; only 'unset' sections resolve via the density default.
+ */
 export function resolveTodayLayout(layout: TodayLayout, density: Density): ResolvedTodaySection[] {
   const clean = sanitizeTodayLayout(layout);
   const defaults = DENSITY_DEFAULT_VISIBLE[density];
-  return clean.order.map((id) => {
+  const rawOrder: string[] = [];
+  const raw = (layout as unknown as { order?: unknown } | null)?.order;
+  if (Array.isArray(raw)) {
+    for (const id of raw) {
+      if (typeof id === 'string' && isTodaySectionId(id) && !rawOrder.includes(id)) rawOrder.push(id);
+    }
+  }
+  const canonical = [...TODAY_SECTION_IDS];
+  const isPristine =
+    rawOrder.length === 0 ||
+    rawOrder.join(',') === LEGACY_TODAY_ORDER.join(',') ||
+    rawOrder.join(',') === canonical.join(',');
+  const order = isPristine
+    ? [...(density === 'simple' ? SIMPLE_DEFAULT_ORDER : DETAILED_DEFAULT_ORDER)]
+    : clean.order;
+  return order.map((id) => {
     const v = clean.visible[id];
     return { id: id as TodaySectionId, shown: v === 'unset' || v === undefined ? defaults[id] : v };
   });
