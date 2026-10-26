@@ -236,6 +236,128 @@ describe('AI Multi-Provider Engine', () => {
       fetchSpy.mockRestore();
     });
 
+    it('uses Cloudflare vision when Groq fails and Cloudflare keys are present', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.CLOUDFLARE_ACCOUNT_ID = 'mock_cf_account_id_12345';
+      process.env.CLOUDFLARE_API_TOKEN = 'mock_cf_api_token_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      let cfRequestBody: any = null;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any, init: any) => {
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (String(url).includes('api.cloudflare.com')) {
+          cfRequestBody = JSON.parse(String(init?.body || '{}'));
+          return new Response(
+            JSON.stringify({
+              success: true,
+              errors: [],
+              result: {
+                response: JSON.stringify({
+                  mealName: 'Cloudflare Scanned Meal',
+                  items: [{ name: 'Dal & Rice', calories: 380, proteinG: 14, carbsG: 62, fatG: 8 }],
+                }),
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      const result = await executeMultiProviderVision<any>({
+        imageBase64: 'fakebase64',
+        prompt: 'Analyze food',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('cloudflare');
+      expect(result.model).toBe('@cf/meta/llama-3.2-11b-vision-instruct');
+      expect(result.data.mealName).toBe('Cloudflare Scanned Meal');
+      // Verifies the documented Workers AI REST shape: messages + image data URL, no wrapper
+      expect(cfRequestBody.messages).toBeDefined();
+      expect(cfRequestBody.image).toBe('data:image/jpeg;base64,fakebase64');
+      fetchSpy.mockRestore();
+    });
+
+    it('falls over from failed Cloudflare to Gemini vision model', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      process.env.CLOUDFLARE_ACCOUNT_ID = 'mock_cf_account_id_12345';
+      process.env.CLOUDFLARE_API_TOKEN = 'mock_cf_api_token_12345';
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        if (String(url).includes('api.cloudflare.com')) {
+          return new Response(
+            JSON.stringify({ success: false, errors: [{ message: 'Model unavailable' }] }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          mealName: 'Gemini After Cloudflare Meal',
+          items: [{ name: 'Idli', calories: 180, proteinG: 6, carbsG: 34, fatG: 2 }],
+        }),
+      });
+
+      const result = await executeMultiProviderVision<any>({
+        imageBase64: 'fakebase64',
+        prompt: 'Analyze food',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('gemini');
+      expect(result.data.mealName).toBe('Gemini After Cloudflare Meal');
+      fetchSpy.mockRestore();
+    });
+
+    it('skips Cloudflare when its keys are absent and falls through to Gemini', async () => {
+      process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
+      delete process.env.CLOUDFLARE_ACCOUNT_ID;
+      delete process.env.CLOUDFLARE_API_TOKEN;
+      process.env.GEMINI_API_KEY = 'mock_gemini_key_12345';
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+        if (String(url).includes('groq.com')) {
+          return new Response(JSON.stringify({ error: { message: 'Groq rate limited' } }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return new Response('Not found', { status: 404 });
+      });
+
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify({
+          mealName: 'Gemini No Cloudflare Meal',
+          items: [{ name: 'Upma', calories: 240, proteinG: 6, carbsG: 42, fatG: 6 }],
+        }),
+      });
+
+      const result = await executeMultiProviderVision<any>({
+        imageBase64: 'fakebase64',
+        prompt: 'Analyze food',
+        timeoutMs: 1000,
+      });
+
+      expect(result.provider).toBe('gemini');
+      expect(fetchSpy.mock.calls.some(([url]: any[]) => String(url).includes('cloudflare.com'))).toBe(false);
+      fetchSpy.mockRestore();
+    });
+
     it('enforces one shared wall-clock deadline when all providers hang or time out', async () => {
       process.env.GROQ_API_KEY = 'gsk_mock_groq_key_12345';
       process.env.OPENROUTER_API_KEY = 'sk-or-mock_openrouter_key_12345';
