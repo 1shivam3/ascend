@@ -45,12 +45,14 @@ import {
   PolicyDecisionApplicationAudit,
   ApplyPolicyDecisionOptions,
   ApplyPolicyDecisionResult,
+  MAX_ATHLETE_NAME_LENGTH,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
 import { normalizeHex } from './accent-themes';
-import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes } from './storage';
+import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
 import { ARCHIVED_HISTORY_KEY } from './history-fork';
+import { clearHowToSeenFlag } from './howto-guide';
 import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
@@ -75,7 +77,8 @@ import {
   type WeeklyReview,
 } from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId } from './formatters';
+import { safeRandomId, sanitizeAthleteName } from './formatters';
+import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
@@ -3428,6 +3431,57 @@ export const useAppStore = create<AppState>()(
           localStorage.removeItem('ascend_meals');
           localStorage.removeItem(PROGRESS_PHOTOS_KEY);
         } catch {}
+        // NEW (user decision, 2026-10-26): Start fresh no longer
+        // strands the user on the onboarding start screen. The
+        // archive above already holds the old history, so build the
+        // same default profile untouched onboarding produces and land
+        // on Today: ONBOARDING_DEFAULTS in Onboarding.tsx (beginner /
+        // male / kg / 70 kg / 175 cm / 4 days / full gym / light
+        // activity / non-vegetarian), name 'Athlete' (the details
+        // form's fallback), no injuries, no DOB (age stays unset —
+        // never fabricated), no plans (the plan offer is an onboarding
+        // choice). Goals have no untouched value — onboarding requires
+        // a choice — so use the repo's own fallback DEFAULT_GOALS
+        // (['build_muscle']), the same fallback setProfile applies to
+        // an empty goals list. Macro targets use the same derivation
+        // onboarding calls, with age unspecified (the macro lib
+        // defaults to 25 internally). setProfile also clears the
+        // logged-out flag, exactly as a normal onboarding completion
+        // does; disaster recovery has nothing to resurrect here
+        // (snapshot + legacy keys deleted above). The guide flag is
+        // cleared so the new user sees the guide once on first Today
+        // arrival, same as a fresh onboarding completion.
+        const store = get();
+        store.setProfile({
+          id: getOrCreateGuestId(),
+          name: sanitizeAthleteName('Athlete', MAX_ATHLETE_NAME_LENGTH),
+          gender: 'male',
+          bodyweightKg: 70,
+          bodyweightLbs: Math.round(70 * 2.20462 * 10) / 10,
+          heightCm: 175,
+          unit: 'kg',
+          dietPreference: 'non_vegetarian',
+          createdAt: new Date().toISOString(),
+          goals: [...DEFAULT_GOALS],
+          userMode: 'beginner',
+        });
+        store.setUserMode('beginner');
+        store.setTrainingProfile({
+          goal: 'build_muscle',
+          experience: 'beginner',
+          daysPerWeek: 4,
+          preferredDurationMin: 45,
+          equipment: 'full_gym',
+          activityLevel: 'light',
+          preferredSplit: 'upper_lower',
+          dislikedExercises: [],
+          injuriesOrLimitations: [],
+          coachingStyle: 'balanced',
+        });
+        store.setMacroGoals(
+          calculateRecommendedMacroGoals(70, 'build_muscle', 'male', 175, undefined, 'light')
+        );
+        clearHowToSeenFlag(typeof window !== 'undefined' ? window.localStorage : undefined);
         return true;
       },
 

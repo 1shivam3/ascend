@@ -388,8 +388,17 @@ export default function AppPage() {
             counts={retainedHistoryCounts(retainedInput)}
             onContinue={() => setForkResolved(true)}
             onStartFresh={() => {
-              startFreshFromRetainedHistory();
-              setForkResolved(true);
+              // Start fresh now lands on Today with a default profile
+              // (store action). Navigate home explicitly: the
+              // saved-navigation restore may otherwise reopen the tab
+              // the user was last on (e.g. Settings, where logout
+              // lives). On archive-write failure the action returns
+              // false and the fork stays, so the user can retry or
+              // Continue.
+              if (startFreshFromRetainedHistory()) {
+                setForkResolved(true);
+                navigate('home', { clearHistory: true });
+              }
             }}
           />
         </main>
