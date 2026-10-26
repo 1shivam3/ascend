@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 import {
+  getServerCloudflareAccountId,
+  getServerCloudflareApiToken,
   getServerGeminiApiKey,
   getServerGroqApiKey,
   getServerOpenRouterApiKey,
@@ -78,7 +80,7 @@ export interface TextOptions {
 
 export interface ProviderExecutionResult<T> {
   data: T;
-  provider: 'gemini' | 'groq' | 'openrouter';
+  provider: 'gemini' | 'groq' | 'openrouter' | 'cloudflare';
   model: string;
 }
 
@@ -149,6 +151,7 @@ export function cleanAndParseJson<T = any>(rawText: string): T {
 export const DEFAULT_AI_TIMEOUT_MS = 19000;
 export const GROQ_STAGE_TIMEOUT_MS = 5000;
 export const OPENROUTER_STAGE_TIMEOUT_MS = 6000;
+export const CLOUDFLARE_STAGE_TIMEOUT_MS = 8000;
 export const GEMINI_STAGE_TIMEOUT_MS = 8000;
 
 // Groq models: ultra-fast inference with dedicated LPU
@@ -170,6 +173,17 @@ export const GROQ_TEXT_MODELS = [
 // Production meal photos route directly to verified first-party developer endpoints (Groq LPU and Google Gemini API).
 // OpenRouter is intentionally skipped for vision (empty array) to guarantee user photo privacy.
 export const OPENROUTER_VISION_MODELS: string[] = [];
+
+// Cloudflare Workers AI Vision Models:
+// Free tier (10,000 neurons/day, hard $0 ceiling — requests fail, never bill).
+// Privacy verified against Cloudflare's official Workers AI data-usage policy:
+// zero data retention for standard inference and NO training on customer content.
+// Llama 3.2 11B Vision is a first-party Cloudflare-hosted open-weight model; the
+// request goes to Cloudflare's own REST endpoint (no third-party host aggregator),
+// so meal photos are never routed to a logging/training endpoint.
+export const CLOUDFLARE_VISION_MODELS = [
+  '@cf/meta/llama-3.2-11b-vision-instruct',
+];
 
 // OpenRouter verified models for text-only (natural language logging, coach)
 // Empirically tested live with sub-3s response latencies under valid JSON completion
@@ -365,8 +379,78 @@ async function callOpenRouterVision<T>(
 }
 
 /**
+ * 4. Executes Cloudflare Workers AI calls via its REST endpoint.
+ *
+ * Request shape follows Cloudflare's official Workers AI API: the model's inputs
+ * go directly in the request body (no wrapper). For the vision model, the image
+ * travels as a data-URL string in the `image` field alongside `messages`
+ * (same shape as the documented Worker binding). The response envelope is
+ * `{ result: { response: string }, success: boolean, errors: [...] }`.
+ *
+ * The account ID is deliberately never interpolated into error messages, so a
+ * failed call cannot leak account identifiers into logs.
+ */
+async function callCloudflareVision<T>(
+  accountId: string,
+  apiToken: string,
+  model: string,
+  opts: VisionOptions,
+  timeoutMs: number
+): Promise<T> {
+  const { signal, cleanup } = createTimeoutController(timeoutMs, opts.signal);
+
+  try {
+    const mime = opts.mimeType || 'image/jpeg';
+    const messages: any[] = [];
+
+    if (opts.systemPrompt) {
+      messages.push({ role: 'system', content: opts.systemPrompt });
+    }
+
+    messages.push({
+      role: 'user',
+      content: `${opts.prompt}\n\nIMPORTANT: Return ONLY valid JSON.`,
+    });
+
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({
+          messages,
+          image: `data:${mime};base64,${opts.imageBase64}`,
+        }),
+        signal,
+      }
+    );
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Cloudflare ${model} error (${res.status}): ${redactSecrets(errText)}`);
+    }
+
+    const json = await res.json();
+    if (!json.success) {
+      const errMsg = JSON.stringify(json.errors || json.error || 'unknown error');
+      throw new Error(`Cloudflare ${model} error: ${redactSecrets(errMsg)}`);
+    }
+    const rawContent = json.result?.response || '';
+    if (!rawContent) {
+      throw new Error(`Cloudflare ${model} error: empty response (unexpected envelope shape)`);
+    }
+    return cleanAndParseJson<T>(rawContent);
+  } finally {
+    cleanup();
+  }
+}
+
+/**
  * Unified Multi-Provider Vision Execution with Automatic Cascading Fallback:
- * Groq -> OpenRouter -> Gemini
+ * Groq -> OpenRouter -> Cloudflare -> Gemini
  *
  * Enforces one strict shared wall-clock deadline (default 19s) across all stages and models,
  * with real-time AbortSignal propagation and user cancellation.
@@ -446,7 +530,28 @@ export async function executeMultiProviderVision<T>(
       }
     }
 
-    // --- STAGE 3: GOOGLE GEMINI (Enterprise developer endpoints, max 8s per model) ---
+    // --- STAGE 3: CLOUDFLARE WORKERS AI (Free tier, no-training policy, max 8s per model) ---
+    const cfAccountId = getServerCloudflareAccountId();
+    const cfApiToken = getServerCloudflareApiToken();
+    if (cfAccountId && cfApiToken) {
+      for (const model of CLOUDFLARE_VISION_MODELS) {
+        const remaining = getRemainingTime();
+        if (remaining <= 50 || masterController.signal.aborted) break;
+        const attemptTimeout = Math.min(CLOUDFLARE_STAGE_TIMEOUT_MS, remaining);
+        try {
+          const data = await callCloudflareVision<T>(cfAccountId, cfApiToken, model, scopedOpts, attemptTimeout);
+          return { data, provider: 'cloudflare', model };
+        } catch (err: any) {
+          if (masterController.signal.aborted && parentSignal?.aborted) throw err;
+          const msg = redactSecrets(err?.message || String(err));
+          errors.push(`Cloudflare [${model}]: ${msg}`);
+        }
+      }
+    } else {
+      errors.push('Cloudflare: CLOUDFLARE_ACCOUNT_ID or CLOUDFLARE_API_TOKEN not configured');
+    }
+
+    // --- STAGE 4: GOOGLE GEMINI (Enterprise developer endpoints, max 8s per model) ---
     const geminiKey = getServerGeminiApiKey();
     if (geminiKey) {
       for (const model of GEMINI_VISION_MODELS) {
