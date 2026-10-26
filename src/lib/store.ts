@@ -775,7 +775,7 @@ export function syncWorkoutReminderDays(
  * Flat slices and collections are user data with no defaults to merge
  * and pass through untouched.
  */
-export const PERSIST_VERSION = 2;
+export const PERSIST_VERSION = 3;
 
 const ACCENT_THEME_IDS = ['vermilion', 'cobalt', 'forest', 'plum', 'teal', 'rose', 'custom'];
 
@@ -852,6 +852,16 @@ export function migratePersistedState(
     const storedDensity = (state.uiPreferences as Record<string, unknown>).density;
     if (version < 2 && storedDensity !== 'simple' && storedDensity !== 'detailed') {
       merged.density = 'detailed';
+    }
+    // Simple-for-everyone migration (persist v2 → v3, owner's decision):
+    // every existing account moves to Simple; Detailed stays one tap away
+    // in Settings. LIMITATION, disclosed: the v2 migration assigned
+    // Detailed unconditionally, so no flag distinguishes "user explicitly
+    // chose Detailed" from "migration assigned Detailed" — this flips both.
+    // No such flag is invented here; explicit per-section choices in
+    // todayLayout are untouched by this migration.
+    if (version < 3) {
+      merged.density = 'simple';
     }
     next.uiPreferences = sanitizeUiPreferences(merged, blobHasUserData(state));
   }
@@ -4127,6 +4137,8 @@ export const useAppStore = create<AppState>()(
       // are never lost on rehydration. See migratePersistedState.
       // UX redesign: v2 adds the six personalization keys; v1 blobs
       // migrate existing accounts to density 'detailed' (see above).
+      // Simple-for-everyone: v3 migrates all existing accounts to
+      // density 'simple' (see above).
       version: PERSIST_VERSION,
       migrate: (persistedState: unknown, version: number) =>
         migratePersistedState(persistedState, version) as unknown as AppState,

@@ -80,9 +80,16 @@ describe('UX discoverability: DietPreferencePicker renders the shared picker', (
 });
 
 describe('UX discoverability: placement wiring (source assertions)', () => {
-  it('Today header has a Settings gear next to the bell', () => {
+  it('Today header has NO Settings gear or profile button — You tab owns them; bell stays', () => {
     const home = src('src/components/HomePage.tsx');
-    expect(home).toContain("onNavigate('settings')");
+    // The header previously navigated to Settings and Profile; both now
+    // live only in the You tab (Profile | Settings segments). Any
+    // reintroduction of these header buttons must be a deliberate product
+    // decision, not an accident.
+    expect(home).not.toContain("onNavigate('settings')");
+    expect(home).not.toContain("onNavigate('profile')");
+    // Notifications bell stays in the header.
+    expect(home).toContain('<Bell className="w-5 h-5" />');
     expect(home).toContain('CoachNotesSection');
   });
 

@@ -10,7 +10,6 @@ import {
   X,
   Calendar,
   Dumbbell,
-  Settings,
   Sparkles,
   Camera,
   Barcode,
@@ -578,7 +577,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     });
   };
   const handleMoveSection = (id: string, dir: -1 | 1) => {
-    const order = [...rawTodayLayout.order];
+    // Move in RESOLVED order (what the sheet displays), not raw stored
+    // order: for a never-reordered layout the resolved order is the
+    // density default, which differs from the stored canonical order.
+    // Moving in raw order would first "un-pristine" the layout and jump
+    // the whole list to the stored order. Materializing the resolved
+    // order on first move keeps the displayed list stable.
+    // Typed string[] to match TodayLayout.order (raw stored order is string[]).
+    const order: string[] = resolvedToday.map((s) => s.id);
     const idx = order.indexOf(id);
     const next = idx + dir;
     if (idx < 0 || next < 0 || next >= order.length) return;
@@ -602,6 +608,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     steps: t('health.stepsToday'),
     challenge: t('home.monthlyChallenge'),
     'weekly-review-detail': t('weeklyReview.cardTitle'),
+    quote: t('home.quote'),
   };
 
   // Sync caption: honest status for cloud-synced data only. The new
@@ -659,29 +666,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             aria-label={t('home.notifications')}
           >
             <Bell className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('settings')}
-            className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
-            title={t('settings.title')}
-            aria-label={t('settings.title')}
-          >
-            <Settings className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onNavigate('profile')}
-            className="w-11 h-11 rounded-full bg-accent/15 border border-accent/30 flex items-center justify-center font-bold text-accent text-sm font-mono hover:bg-accent/25 active:scale-95 transition-all cursor-pointer select-none shadow-2xs overflow-hidden"
-            title={t('home.athleteProfile')}
-            aria-label={t('home.athleteProfile')}
-          >
-            {profile?.avatar ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.avatar} alt="Profile" className="w-full h-full object-cover" />
-            ) : (
-              athleteDisplayName.charAt(0).toUpperCase()
-            )}
           </button>
         </div>
       </header>
@@ -1038,14 +1022,16 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             <AthleteModelCard />
           </CollapsibleDetails>
         )}
-        {density === 'detailed' && (
-<div className="text-center pt-1 pb-2">
+      </div>
+      )}
+
+      {/* ── QUOTE — its own section, last in the Simple default order ── */}
+      <div style={{ order: orderOf('quote') }} className={shown('quote') ? undefined : 'hidden'}>
+      <div className="text-center pt-1 pb-2">
         <p className="text-xs text-text-muted italic leading-relaxed">&ldquo;{dailyQuote.text}&rdquo;</p>
         <p className="text-2xs text-text-muted mt-1 font-mono">— {dailyQuote.author}</p>
       </div>
-        )}
       </div>
-      )}
 
       {/* ── 4c. WEEKLY REVIEW (PR-C) ─────────────────────────────────────── */}
       <div style={{ order: orderOf('weekly-review-detail') }} className={uiPreferences.coachEnabled && shown('weekly-review-detail') ? undefined : 'hidden'}>

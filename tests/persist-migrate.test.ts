@@ -84,4 +84,38 @@ describe('persist migrate (QA4-012)', () => {
     const out = migratePersistedState({ uiPreferences: 'junk' }, 0) as any;
     expect(out.uiPreferences).toBe('junk'); // not an object — left for normal validation paths
   });
+
+  it('simple-for-everyone (v3): v2 blobs migrate to Simple whatever they stored', () => {
+    const detailed = migratePersistedState(
+      { uiPreferences: { ...DEFAULT_UI_PREFERENCES, density: 'detailed' } }, 2,
+    ) as any;
+    expect(detailed.uiPreferences.density).toBe('simple');
+    const simple = migratePersistedState(
+      { uiPreferences: { ...DEFAULT_UI_PREFERENCES, density: 'simple' } }, 2,
+    ) as any;
+    expect(simple.uiPreferences.density).toBe('simple');
+    // Pre-redesign v1 blob (no density key): v2 would have set Detailed, v3 overrides to Simple.
+    const v1out = migratePersistedState({ uiPreferences: {} }, 1) as any;
+    expect(v1out.uiPreferences.density).toBe('simple');
+  });
+
+  it('simple-for-everyone (v3): a post-migration Detailed choice is respected', () => {
+    // A v3 blob already carries the user's own choice — migration must not flip it back.
+    const out = migratePersistedState(
+      { uiPreferences: { ...DEFAULT_UI_PREFERENCES, density: 'detailed' } }, 3,
+    ) as any;
+    expect(out.uiPreferences.density).toBe('detailed');
+  });
+
+  it('simple-for-everyone (v3): explicit section choices survive the density migration', () => {
+    const layout = { visible: { coach: false, readiness: true }, order: ['coach', 'nutrition-strip'] };
+    const out = migratePersistedState(
+      { uiPreferences: { ...DEFAULT_UI_PREFERENCES, density: 'detailed', todayLayout: layout } }, 2,
+    ) as any;
+    expect(out.uiPreferences.density).toBe('simple');
+    // Explicit visibility choices survive verbatim; the partial order is
+    // healed by sanitize (missing sections appended), never reordered.
+    expect(out.uiPreferences.todayLayout.visible).toEqual(layout.visible);
+    expect(out.uiPreferences.todayLayout.order.slice(0, 2)).toEqual(layout.order);
+  });
 });

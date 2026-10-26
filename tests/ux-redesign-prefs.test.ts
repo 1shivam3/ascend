@@ -13,12 +13,16 @@ describe('UX redesign personalization prefs', () => {
     expect(DEFAULT_UI_PREFERENCES.workoutModeOverride).toBeNull();
     expect(DEFAULT_UI_PREFERENCES.pinnedProgressChart).toBeNull();
   });
-  it('pre-redesign blobs migrate existing accounts to Detailed', () => {
+  it('simple-for-everyone (v3): pre-redesign blobs migrate existing accounts to Simple', () => {
+    // SUPERSEDES the redesign-era v2 behavior (pre-redesign → Detailed):
+    // v3 migrates every existing account to Simple; users switch back to
+    // Detailed in Settings in one tap. See the persist-migrate tests for
+    // the full v3 cases, including the post-migration choice guard.
     const out = migratePersistedState(
       { profile: { name: 'Test' }, uiPreferences: { coachEnabled: false } },
       1,
     ) as any;
-    expect(out.uiPreferences.density).toBe('detailed');
+    expect(out.uiPreferences.density).toBe('simple');
     expect(out.uiPreferences.coachEnabled).toBe(false); // user value kept
     expect(out.uiPreferences.accentTheme).toBe('vermilion');
   });
