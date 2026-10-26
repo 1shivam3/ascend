@@ -344,9 +344,9 @@ export interface AppState {
   // navigation layer validates values before using them).
   lastActiveTab: string;
   lastProgressSubTab: string;
-  lastTrainSubTab: 'plans' | 'history';
+  lastTrainSubTab: 'plans' | 'coach' | 'history';
   setLastActiveTab: (tab: string, progressSubTab?: string) => void;
-  setLastTrainSubTab: (subTab: 'plans' | 'history') => void;
+  setLastTrainSubTab: (subTab: 'plans' | 'coach' | 'history') => void;
 
   // Monthly Challenges (opt-in, dismissible)
   challenges: ChallengesXState;

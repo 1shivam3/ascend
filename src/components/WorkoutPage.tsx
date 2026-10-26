@@ -88,6 +88,7 @@ import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
+import CoachChatTab from '@/components/CoachChatTab';
 import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
@@ -935,7 +936,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   // Restore the sub-view (Plans vs History) the user was last in, and keep
   // it persisted so a refresh lands back on the same sub-view.
   const setLastTrainSubTab = useStore((state) => state.setLastTrainSubTab);
-  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'history'>(
+  const [trainSubTab, setTrainSubTab] = useState<'plans' | 'coach' | 'history'>(
     () => useStore.getState().lastTrainSubTab ?? 'plans'
   );
   const [selectedDetailsPlan, setSelectedDetailsPlan] = useState<PlannedWorkout | null>(null);
@@ -2136,7 +2137,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       </header>
 
-      {/* ── Segmented Control: Plans + History ── */}
+      {/* ── Segmented Control: Plans + Coach + History ── */}
       <div role="tablist" aria-label="Train navigation" className="segmented-control">
         <button
           type="button"
@@ -2146,6 +2147,15 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           className={`segmented-item ${trainSubTab === 'plans' ? 'active' : ''}`}
         >
           {t('train.plans')} {plannedWorkouts.length > 0 && `(${plannedWorkouts.length})`}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={trainSubTab === 'coach'}
+          onClick={() => setTrainSubTab('coach')}
+          className={`segmented-item ${trainSubTab === 'coach' ? 'active' : ''}`}
+        >
+          {t('train.coach')}
         </button>
         <button
           type="button"
@@ -3003,6 +3013,16 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         )}
       </section>
         </div>
+      )}
+
+      {/* ── TAB: COACH (simple coach chat — designs today's session from
+          the check-in; readiness comes from the existing coach engine) ── */}
+      {trainSubTab === 'coach' && (
+        <CoachChatTab
+          onStartPlan={handleStartPlan}
+          onOpenBlockModal={() => setIsCoachBlockOpen(true)}
+          onOpenWeeklyReview={() => setIsReviewOpen(true)}
+        />
       )}
 
       {/* ── Run Session Player ─────────────────────────────────────────── */}

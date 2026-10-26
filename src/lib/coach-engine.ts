@@ -37,6 +37,7 @@ import { calculateWorkoutTonnage } from './ai-coach';
 import { SAFE_MIN_CALORIES } from './macros';
 import { getWeekDateStrings, plural, formatKg, getLocalTodayStr, parseLocalDate } from './formatters';
 import { EXERCISE_LIBRARY } from './exercise-library';
+import type { MuscleGroup } from './exercise-library';
 import { DAY_ORDER, type LocalizedSentence } from './coach-i18n';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -501,6 +502,21 @@ export interface ManualCheckin {
   soreness: number;
   /** 1 (drained) – 5 (buzzing). Optional. */
   energy?: number;
+  /**
+   * Body areas the user flagged as sore. Optional, added for the Coach
+   * tab (2026-10-26): the readiness SCORE ignores areas (a single
+   * freshness number drives it), but the session builder uses them to
+   * skip still-fatigued muscles when soreness is low (≤ 2). Absent on
+   * older entries — treated as [].
+   */
+  soreAreas?: MuscleGroup[];
+  /**
+   * Body areas with sharp, joint, or one-sided pain. Optional, added
+   * for the Coach tab (2026-10-26): any entry triggers the deterministic
+   * pain screen (stop + refer, never diagnose) and blocks the session
+   * unless the user explicitly chooses to train around it.
+   */
+  painAreas?: MuscleGroup[];
 }
 
 export interface ReadinessResult {
