@@ -72,3 +72,16 @@ export function dobPickerBounds(today = new Date()): { min: string; max: string 
   const d = String(today.getDate()).padStart(2, '0');
   return { min: `${y - 120}-${m}-${d}`, max: `${y - 13}-${m}-${d}` };
 }
+
+/**
+ * Age chip value for the onboarding DOB field: the computed age, but ONLY
+ * when the date passes the exact submit rules (valid calendar date, not in
+ * the future, 13–120). Anything else returns null so no chip renders and
+ * the existing validation messages keep their job untouched.
+ */
+export function dobPreviewAge(dob: string, today = new Date()): number | null {
+  if (!isValidDob(dob)) return null;
+  const age = calculateAgeFromDob(dob, today);
+  if (age === null || age < 13 || age > 120) return null;
+  return age;
+}
