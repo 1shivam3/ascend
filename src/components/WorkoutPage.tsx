@@ -7,6 +7,7 @@ import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
 import { useToday } from '@/lib/use-today';
 import { getScheduledPlanEntries } from '@/lib/scheduled-days';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { getExerciseList, calculateOneRepMax, isMainCompoundLift, isBodyweightExercise, getEffectiveExerciseLoad, suggestLoad } from '@/lib/strength-standards';
 import { generateTrainingDecision, calculateSetEffortDrift } from '@/lib/lifter-twin';
 import TrainingDecisionCard from '@/components/TrainingDecisionCard';
@@ -2858,13 +2859,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                             <span className="text-xs text-text-muted">Delete this workout?</span>
                             <button
                               type="button"
-                              onClick={() => {
-                                // SIM-P1-09: snapshot index + session BEFORE
-                                // the delete, so the toast's Undo restores
-                                // it exactly (mirrors the plan/meal undo).
+                              onClick={async () => {
+                                // Follower-tab delete guard: a delete in a
+                                // follower tab never reached storage, so it
+                                // came back after reload behind a success
+                                // toast. Claim leadership + rehydrate FIRST;
+                                // on failure, error out and delete nothing
+                                // (the confirm UI stays open for retry).
+                                const willPersist = await ensureDeleteWillPersist();
+                                if (!willPersist) {
+                                  toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+                                  return;
+                                }
+                                // Snapshot AFTER the rehydrate above, so the
+                                // toast's Undo restores the fresh state at
+                                // the fresh index (mirrors the plan/meal undo).
                                 const st = useStore.getState();
                                 const workoutIndex = st.workouts.findIndex((w) => w.id === workout.id);
-                                const snapshot = workout;
+                                const snapshot = workoutIndex >= 0 ? st.workouts[workoutIndex] : workout;
                                 deleteWorkout(workout.id);
                                 setConfirmDeleteId(null);
                                 toast.showToast('info', `Deleted workout session from ${workout.date}.`, 'Workout Removed', undefined, {
