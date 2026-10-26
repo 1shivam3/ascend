@@ -325,8 +325,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   };
 
   // Modal triggers
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const notificationsRef = useRef<HTMLDivElement>(null); const { dialogProps: notificationsDialogProps } = useModalA11y(notificationsRef, isNotificationsOpen, () => setIsNotificationsOpen(false));
+  // UX #4: the header bell used to open a "Notifications" modal that
+  // showed no notifications at all — just today's training + weekly
+  // target (both already on Today) and a second button to reach the
+  // actual reminder settings. The bell now opens the Reminder Center
+  // directly; the summary modal and its state are deleted, not kept
+  // as a dead detour.
   const [isReminderCenterOpen, setIsReminderCenterOpen] = useState(false);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
   const [isLogPastModalOpen, setIsLogPastModalOpen] = useState(false);
@@ -343,12 +347,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const { registerBackHandler } = useAppNavigation();
 
   // Register Modal Back Handlers (Interconnected Navigation)
-  useEffect(() => {
-    if (isNotificationsOpen) {
-      return registerBackHandler(() => { setIsNotificationsOpen(false); return true; }, 100);
-    }
-  }, [isNotificationsOpen, registerBackHandler]);
-
   useEffect(() => {
     if (isChangeWorkoutOpen) {
       return registerBackHandler(() => { setIsChangeWorkoutOpen(false); return true; }, 100);
@@ -496,33 +494,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   }, [sessionInfo.durationMin, exerciseCount, scheduledPlan]);
 
   // Weekly consistency: accurately calculated from logged sessions in current week
-  const weeklyStats = useMemo(() => {
-    const scheduledDaysCount = weeklySchedule
-      ? Object.values(weeklySchedule).filter((d) => d && d.workoutPlanId !== 'rest').length
-      : 0;
-    const targetDays = scheduledDaysCount > 0 ? scheduledDaysCount : (trainingProfile?.daysPerWeek || 5);
-
-    const now = new Date();
-    const dayOfWeek = (now.getDay() + 6) % 7; // 0 = Mon, 6 = Sun
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-
-    const weekWorkouts = workouts.filter((w) => {
-      const d = new Date(w.date);
-      return d >= startOfWeek;
-    });
-
-    const uniqueTrainedDates = new Set(
-      weekWorkouts.map((w) => w.date.split('T')[0])
-    );
-
-    return {
-      completedCount: uniqueTrainedDates.size,
-      targetDays,
-    };
-  }, [workouts, weeklySchedule, trainingProfile?.daysPerWeek]);
-
   // Today's Fuel summary: real calories and protein vs target
   const fuelStats = useMemo(() => {
     const todayMeals = meals.filter((m) => m.date === todayStr);
@@ -660,7 +631,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           <ThemeToggle />
           <button
             type="button"
-            onClick={() => setIsNotificationsOpen(true)}
+            onClick={() => setIsReminderCenterOpen(true)}
             className="w-11 h-11 rounded-full flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-bg-secondary/60 transition-colors cursor-pointer select-none"
             title={t('home.notifications')}
             aria-label={t('home.notifications')}
@@ -683,9 +654,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             type="button"
             onClick={() => setIsChangeWorkoutOpen(true)}
             className="text-2xs font-semibold text-text-muted hover:text-text-primary flex items-center gap-0.5 transition-colors cursor-pointer"
-            title={t('home.changeWorkoutTitle')}
           >
-            <span>{t('home.adaptiveSplit')}</span>
+            {/* UX #11: the old label "Adaptive Split" meant nothing to a
+                normal user — the button changes today's workout, so it
+                says exactly that (the title tooltip duplicated it). */}
+            <span>{t('home.changeWorkoutTitle')}</span>
             <ChevronRight className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -722,7 +695,12 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           {activeWorkoutDraft
             ? t('home.resumeWorkout')
             : sessionInfo.status === 'completed'
-            ? t('home.viewCompletedWorkout')
+            // UX #10: with Coach off the tap goes to Train history, not
+            // to the completed-workout modal — so the label must say
+            // that instead of promising a view it will not open.
+            ? (completedWorkoutForToday && uiPreferences.coachEnabled
+              ? t('home.viewCompletedWorkout')
+              : t('home.viewInTrain'))
             : t('train.startWorkout')}
         </button>
         {/* Quick Log — one tap to log a session that already happened. */}
@@ -920,7 +898,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 for (const s of checkIn.sessions) dismissCheckIn(`missed:${s.date}:${s.name}`);
                 toast.info(t('toast.checkinSnoozed'), t('toast.titleSnoozed'));
               }}
-              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
               aria-label={t('home.dismissCheckin')}
             >
               <X className="w-4 h-4" />
@@ -984,7 +962,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                 });
                 toast.info(t('toast.suggestionDismissed'), t('toast.titleDismissed'));
               }}
-              className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
               aria-label={t('home.dismissSuggestion')}
             >
               <X className="w-4 h-4" />
@@ -1087,7 +1065,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </span>
             <div>
               <p className="text-xs font-bold text-text-primary">{t('home.hydration')}</p>
-              <p className="text-2xs text-text-muted tabular-nums">
+              <p className="text-xs text-text-muted tabular-nums">
                 {t('home.hydrationToday', { drank: (todayWaterMl / 1000).toFixed(1), target: (hydrationTargetMl / 1000).toFixed(1) })}
               </p>
             </div>
@@ -1265,7 +1243,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   e.stopPropagation();
                   dismissChallenge(homeChallenge.key);
                 }}
-                className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 aria-label={t('home.dismissChallenge')}
               >
                 <X className="w-4 h-4" />
@@ -1280,7 +1258,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   style={{ width: `${homeChallenge.evaluation.pct}%` }}
                 />
               </div>
-              <p className="text-2xs text-text-muted tabular-nums mt-1.5">
+              <p className="text-xs text-text-muted tabular-nums mt-1.5">
                 {homeChallenge.evaluation.progress} of {homeChallenge.evaluation.target} · {homeChallenge.evaluation.pct}%
                 {homeChallenge.evaluation.completed ? ` · ${t('chal.complete', { xp: XP_CHALLENGE_COMPLETE })}` : ''}
               </p>
@@ -1325,62 +1303,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         onMove={handleMoveSection}
         onRestore={handleRestoreLayout}
       />
-
-      {/* ── NOTIFICATIONS & QUICK SETTINGS MODAL ────────────────────────────── */}
-      {isNotificationsOpen && (
-        <div ref={notificationsRef} {...notificationsDialogProps} className="modal-overlay" onClick={() => setIsNotificationsOpen(false)}>
-          <div
-            className="modal-content max-w-sm w-full p-5 space-y-4 rounded-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-border/70">
-              <div className="flex items-center gap-2">
-                <Bell className="w-5 h-5 text-accent" />
-                <h3 className="text-base font-bold text-text-primary">{t('home.notifications')}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsNotificationsOpen(false)}
-                className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
-                <p className="font-semibold text-text-primary">{t('home.todaysTraining')}</p>
-                <p className="text-text-muted mt-0.5">
-                  {t('home.scheduledToday', { name: routineDisplayName, min: durationMinutes })}
-                </p>
-              </div>
-
-              <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/60">
-                <p className="font-semibold text-text-primary">{t('home.weeklyTarget')}</p>
-                <p className="text-text-muted mt-0.5">
-                  {uiPreferences.weeklyTargetDays === 0
-                    ? t('home.workoutsWeek', { count: weeklyStats.completedCount })
-                    : t('home.workoutsWeekOf', { count: weeklyStats.completedCount, target: uiPreferences.weeklyTargetDays ?? weeklyStats.targetDays })}
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsNotificationsOpen(false);
-                  setIsReminderCenterOpen(true);
-                }}
-                className="w-full py-2.5 px-3 rounded-xl bg-bg-secondary hover:bg-bg-elevated border border-border text-xs font-semibold text-text-primary transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <Bell className="w-4 h-4 text-text-muted" />
-                <span>{t('home.notificationSettings')}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── CHANGE TODAY'S WORKOUT MODAL (Plan Sync Contract) ─────────────── */}
       {isChangeWorkoutOpen && (

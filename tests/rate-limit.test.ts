@@ -23,18 +23,23 @@ describe('Server-Side Rate Limiter', () => {
       expect(getClientIp(req)).toBe('203.0.113.195');
     });
 
-    it('extracts client IP from x-real-ip if x-forwarded-for is missing', () => {
+    // REVIEW 2026-10-26 (Track F P1-2): x-real-ip is NOT trusted — it is
+    // client-spoofable and Vercel's edge does not set it. Without a valid
+    // x-forwarded-for the client buckets to the 127.0.0.1 fallback.
+    it('ignores x-real-ip when x-forwarded-for is missing', () => {
       const req = new Request('http://localhost:3000/api/feedback', {
         headers: { 'x-real-ip': '198.51.100.42' },
       });
-      expect(getClientIp(req)).toBe('198.51.100.42');
+      expect(getClientIp(req)).toBe('127.0.0.1');
     });
 
-    it('extracts client IP from cf-connecting-ip if other headers are missing', () => {
+    // REVIEW 2026-10-26 (Track F P1-2): cf-connecting-ip is NOT trusted —
+    // same reason: not set by Vercel's edge, client-spoofable.
+    it('ignores cf-connecting-ip when x-forwarded-for is missing', () => {
       const req = new Request('http://localhost:3000/api/feedback', {
         headers: { 'cf-connecting-ip': '192.0.2.1' },
       });
-      expect(getClientIp(req)).toBe('192.0.2.1');
+      expect(getClientIp(req)).toBe('127.0.0.1');
     });
 
     it('falls back to 127.0.0.1 when no forwarding headers exist', () => {

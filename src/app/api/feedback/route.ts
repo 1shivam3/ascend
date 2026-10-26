@@ -24,6 +24,16 @@ interface FeedbackRequestBody {
   };
 }
 
+// NOTE (2026-10-26 security review, P2-2 deliberate exception): unlike
+// delete-account and subscribe, this route KEEPS the anon fallback on
+// purpose. Feedback is a best-effort channel whose primary delivery is
+// the Resend email below; the DB insert is secondary (and the schema
+// grants INSERT on user_feedback to service_role only, so under anon
+// the insert fails soft — logged, email still sent — rather than
+// corrupting anything). Failing closed with 503 here would drop user
+// feedback entirely on a misconfigured deploy, which is worse than
+// email-only delivery. Do not "fix" this fallback without changing
+// the delivery contract first.
 function getSupabaseServerClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();

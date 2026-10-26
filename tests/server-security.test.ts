@@ -42,24 +42,29 @@ describe('Server Security Utilities', () => {
 });
 
 describe('Rate Limiter IP Extraction & Hardening', () => {
-  it('prioritizes trusted cf-connecting-ip over spoofed x-forwarded-for', () => {
+  // REVIEW 2026-10-26 (Track F P1-2): cf-connecting-ip is no longer
+  // trusted (not set by Vercel's edge, client-spoofable) — the first
+  // x-forwarded-for entry wins, even when a spoofed edge header is present.
+  it('uses x-forwarded-for first entry and ignores cf-connecting-ip', () => {
     const req = new Request('https://ascend.app/api/ai/coach', {
       headers: {
         'x-forwarded-for': '198.51.100.1, 203.0.113.1',
         'cf-connecting-ip': '192.0.2.42',
       },
     });
-    expect(getClientIp(req)).toBe('192.0.2.42');
+    expect(getClientIp(req)).toBe('198.51.100.1');
   });
 
-  it('prioritizes x-real-ip when cf-connecting-ip is absent', () => {
+  // REVIEW 2026-10-26 (Track F P1-2): x-real-ip is likewise untrusted —
+  // x-forwarded-for first entry wins.
+  it('uses x-forwarded-for first entry and ignores x-real-ip', () => {
     const req = new Request('https://ascend.app/api/ai/coach', {
       headers: {
         'x-forwarded-for': '198.51.100.1, 203.0.113.1',
         'x-real-ip': '10.0.0.5',
       },
     });
-    expect(getClientIp(req)).toBe('10.0.0.5');
+    expect(getClientIp(req)).toBe('198.51.100.1');
   });
 
   it('falls back to first IP in x-forwarded-for when edge headers are absent', () => {

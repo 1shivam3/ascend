@@ -16,13 +16,15 @@ import { checkGlobalRateLimit } from './rate-limit';
  * window. When the cap trips, AI calls fail fast with a clear error until
  * the window resets — no provider is contacted, so no quota is spent.
  *
- * Default cap: 2,000 executions/day. Real usage is a small user base making
- * at most a few dozen AI calls per person per day, so 2,000 sits orders of
- * magnitude above legitimate traffic while still bounding worst-case daily
- * burn to a fraction of one day of abusive per-IP traffic. Tune with the
- * AI_DAILY_GLOBAL_CAP env var (set <= 0 to disable the breaker).
+ * Default cap: 500 executions/day (lowered from 2,000 in the 2026-10-26
+ * security review — P2-3). Real usage is a small user base making at
+ * most a few dozen AI calls per person per day, so 500 still sits well
+ * above legitimate traffic while cutting worst-case daily burn to a
+ * quarter of the old bound. Tune with the AI_DAILY_GLOBAL_CAP env var.
+ * NOTE: never set <= 0 in production — that disables the breaker
+ * entirely and leaves provider spend unbounded.
  */
-export const DEFAULT_AI_DAILY_GLOBAL_CAP = 2000;
+export const DEFAULT_AI_DAILY_GLOBAL_CAP = 500;
 
 export class AiGlobalCapExceededError extends Error {
   constructor(cap: number) {

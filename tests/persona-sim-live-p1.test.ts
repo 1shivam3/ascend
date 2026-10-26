@@ -167,7 +167,8 @@ describe('LIVE-P1-04 hasBodyMetricChanges', () => {
 // ── P1-3: i18n parity for every new key ──────────────────────────────────────
 
 const NEW_HOME_KEYS = [
-  'home.adaptiveSplit',
+  // REVIEW 2026-10-26 (Track G #11): 'home.adaptiveSplit' deleted;
+  // the label is now 'home.changeWorkoutTitle' ('Change Today\'s Workout').
   'home.quickLogPast',
   'home.restDayLine',
   'home.durationExercises',

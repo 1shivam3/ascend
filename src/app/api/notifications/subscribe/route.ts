@@ -24,6 +24,22 @@ function getSupabaseServerClient() {
   });
 }
 
+// P2-2: subscription writes must never run under the anon fallback.
+// Anonymous subscriptions need the service role to bypass RLS, and a
+// half-applied write reported as success is worse than a 503. The
+// no-client-at-all offline path below is untouched — this fires only
+// when a URL + anon key exist but the service key is missing.
+function isServiceKeyConfigured(): boolean {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+}
+
+function serviceKeyMissingResponse() {
+  return NextResponse.json(
+    { error: 'CONFIGURATION_ERROR', message: 'Push subscription service is not configured on the server.' },
+    { status: 503 }
+  );
+}
+
 async function resolveUserId(supabase: any, req: Request): Promise<string | null> {
   const authHeader = req.headers.get('authorization');
   if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
@@ -114,6 +130,8 @@ export async function POST(req: Request) {
         message: 'Push subscription registered in local mode',
       });
     }
+
+    if (!isServiceKeyConfigured()) return serviceKeyMissingResponse();
 
     // Optional user authentication via Bearer token
     const userId = await resolveUserId(supabase, req);
@@ -226,6 +244,8 @@ export async function DELETE(req: Request) {
       // No server-side store configured: nothing to delete.
       return NextResponse.json({ success: true, offlineMode: true, message: 'Unsubscribed from push' });
     }
+
+    if (!isServiceKeyConfigured()) return serviceKeyMissingResponse();
 
     let existing: any = null;
     try {

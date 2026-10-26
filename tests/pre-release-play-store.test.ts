@@ -37,7 +37,7 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const enDict = fs.readFileSync(
         path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8');
       expect(enDict).toContain("'settings.accountSecurity': 'Account & Security'");
-      expect(enDict).toContain("'settings.dataPrivacyLegal': 'Data, Privacy & Legal'");
+      expect(enDict).toContain("'settings.dataPrivacyLegal': 'Backup & legal'"); // REVIEW 2026-10-26 (Track G #8): section renamed.
       expect(settingsView).toContain("t('settings.accountSecurity')");
       expect(settingsView).toContain("t('settings.dataPrivacyLegal')");
 
@@ -98,13 +98,13 @@ describe('Google Play Store Launch Readiness Verification', () => {
       const homePagePath = path.join(rootDir, 'src', 'components', 'HomePage.tsx');
       const homeContent = fs.readFileSync(homePagePath, 'utf8');
       expect(homeContent).not.toContain('AI Routine');
-      // LIVE-P1-03: 'Adaptive Split' moved into the i18n dictionary and
-      // HomePage renders it via t('home.adaptiveSplit') — same precedent
-      // as QA4-004's 'Macro Lens' below. The rendered English is unchanged.
-      expect(homeContent).toContain('home.adaptiveSplit');
+      // REVIEW 2026-10-26 (Track G #11): the vague 'Adaptive Split'
+      // label was replaced with the honest 'Change Today's Workout',
+      // rendered via t('home.changeWorkoutTitle').
+      expect(homeContent).toContain('home.changeWorkoutTitle');
       expect(
         fs.readFileSync(path.join(rootDir, 'src', 'lib', 'i18n', 'en.ts'), 'utf8')
-      ).toContain("'home.adaptiveSplit': 'Adaptive Split'");
+      ).toContain("'home.changeWorkoutTitle': 'Change Today\\'s Workout'");
 
       const mealsPagePath = path.join(rootDir, 'src', 'components', 'MealsPage.tsx');
       const mealsContent = fs.readFileSync(mealsPagePath, 'utf8');

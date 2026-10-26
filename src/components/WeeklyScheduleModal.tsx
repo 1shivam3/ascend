@@ -30,6 +30,7 @@ import {
 import { useStore } from '@/lib/store';
 import { prepareGeneratedPlans } from '@/lib/workout-engine';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import { useTranslation } from '@/lib/i18n';
 
 interface WeeklyScheduleModalProps {
@@ -54,6 +55,7 @@ export default function WeeklyScheduleModal({
   const trainingProfile = useStore((state) => state.trainingProfile);
   const profileUnit = useStore((state) => state.profile?.unit || 'kg');
 
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [draft, setDraft] = useState<WeeklySchedule>(() => {
     if (
       currentWeeklySchedule &&
@@ -232,16 +234,7 @@ export default function WeeklyScheduleModal({
           ))}
           <button
             type="button"
-            onClick={() => {
-              setDraft(() => {
-                const cleared = {} as WeeklySchedule;
-                for (const day of DAYS_OF_WEEK) {
-                  cleared[day] = { workoutPlanId: 'rest', customTitle: t('home.restDay'), bodyParts: [] };
-                }
-                return cleared;
-              });
-              toast.info(t('sched.clearedMsg'), t('sched.clearedTitle'));
-            }}
+            onClick={() => setShowClearConfirm(true)}
             className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border border-border/80 bg-bg-card text-text-secondary hover:border-danger/50 hover:text-danger transition-all ml-auto"
           >
             {t('sched.clearAll')}
@@ -402,6 +395,31 @@ export default function WeeklyScheduleModal({
           </div>
         </footer>
       </div>
+
+      {/* UX #2: Clear All used to wipe the draft week on one tap. Now it
+          confirms first — and the copy states the real scope: only the
+          draft is cleared; nothing applies until Save. */}
+      <ConfirmationModal
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={() => {
+          setShowClearConfirm(false);
+          setDraft(() => {
+            const cleared = {} as WeeklySchedule;
+            for (const day of DAYS_OF_WEEK) {
+              cleared[day] = { workoutPlanId: 'rest', customTitle: t('home.restDay'), bodyParts: [] };
+            }
+            return cleared;
+          });
+          toast.info(t('sched.clearedMsg'), t('sched.clearedTitle'));
+        }}
+        title={t('sched.clearAll')}
+        message={t('sched.clearAllConfirm')}
+        confirmText={t('sched.clearAll')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+        icon="alert"
+      />
     </div>
   );
 }

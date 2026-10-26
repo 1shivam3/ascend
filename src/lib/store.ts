@@ -515,7 +515,7 @@ export interface AppState {
   dismissBlockProposal: () => void;
   /** Approve the pending proposal (or an edited copy of it from the
    *  review step): materialize plans + schedule + block state atomically. */
-  approveBlockProposal: (editedProposal?: BlockProposal) => void;
+  approveBlockProposal: (editedProposal?: BlockProposal) => boolean;
   /** Coach adopts an existing user plan (schemes derived; plan untouched). */
   adoptPlanForCoaching: (planId: string) => void;
   unadoptPlanForCoaching: (planId: string) => void;
@@ -2678,7 +2678,7 @@ export const useAppStore = create<AppState>()(
       approveBlockProposal: (editedProposal) => {
         const state = get();
         const pending = state.coachBlocks.pendingProposal;
-        if (!pending) return;
+        if (!pending) return false;
         // An edited copy is only honoured when it IS the pending
         // proposal (same id) — anything else is ignored, never trusted.
         const proposal =
@@ -2690,6 +2690,11 @@ export const useAppStore = create<AppState>()(
           state.weeklySchedule,
           todayStr
         );
+        // Refuse a 0-plan materialization: every day empty (injuries +
+        // equipment + session limits) used to create an "active" block
+        // with no plans in it — a block that could never run. The
+        // proposal stays pending so the user can adjust and retry.
+        if (plans.length === state.plannedWorkouts.length) return false;
         const previous = state.coachBlocks.activeBlock;
         set({
           plannedWorkouts: plans,
@@ -2710,6 +2715,7 @@ export const useAppStore = create<AppState>()(
         // action so its invariants (and any schedule-keyed derivations)
         // stay the single source of truth.
         get().refreshAthleteModel();
+        return true;
       },
 
       adoptPlanForCoaching: (planId) => {

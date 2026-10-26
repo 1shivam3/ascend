@@ -1827,9 +1827,35 @@ export function adaptSplitForEquipment(
       if (regressPullUps) next = regressPullUpsForBeginner(next, access);
 
       // Adaptation converges: two template exercises can land on the same
-      // movement (verified: Dumbbell RDL twice in one session). Keep one.
-      const key = normalizeExerciseKey(next.name);
-      if (seen.has(key)) continue;
+      // movement (verified: Bench → Push-ups and OHP → Push-ups at home).
+      // Dropping the second silently gutted days, so first try a DISTINCT
+      // substitute for it — same movement family, equipment the user has,
+      // not excluded, not already in the day. Only when no distinct
+      // substitute exists is the exercise dropped (the block fill pass
+      // then refills the day or warns honestly about the shortfall).
+      let key = normalizeExerciseKey(next.name);
+      if (seen.has(key)) {
+        const allowed = ALLOWED_EQUIPMENT[access];
+        const distinct = getQuickSubstitutes(next.name).find(
+          (s) =>
+            allowed.has(s.equipment.toLowerCase()) &&
+            !isPlaceholderSubstitute(s.name) &&
+            !seen.has(normalizeExerciseKey(s.name)) &&
+            !exerciseMatchesExclusion(s.name, exclusions) &&
+            !bannedFamilies.has(getMovementFamily(s.name)) &&
+            !isExerciseJointBanned(s.name, bannedJoints)
+        );
+        if (!distinct) continue;
+        next = {
+          ...next,
+          name: distinct.name,
+          targetWeight: adaptedLoadFor(next, distinct.name, isLbs),
+          notes: `${next.notes ? next.notes + ' · ' : ''}Swapped from ${next.name} — ${next.name} was already in this session`,
+        };
+        if (regressPullUps) next = regressPullUpsForBeginner(next, access);
+        key = normalizeExerciseKey(next.name);
+        if (seen.has(key)) continue;
+      }
       seen.add(key);
       out.push(next);
     }
@@ -2392,6 +2418,9 @@ function buildGoalAdaptiveSplitTemplates(
           { name: 'Romanian Deadlift', targetSets: 3, targetReps: 6, targetWeight: isLbs ? 200 : 90, targetUnit: unit },
           { name: 'Leg Press', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 400 : 180, targetUnit: unit },
           { name: 'Calf Raise', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 135 : 60, targetUnit: unit },
+          // Strength without core bracing is a gap the old roster shared
+          // with every other goal; heavy squats need a braced trunk.
+          { name: 'Front Plank (Seconds)', targetSets: 3, targetReps: 45, targetWeight: 0, targetUnit: unit, notes: '3 × 45s isometric core bracing' },
         ],
       },
       {
@@ -2478,6 +2507,9 @@ function buildGoalAdaptiveSplitTemplates(
           { name: 'Front Squat', targetSets: 3, targetReps: 6, targetWeight: isLbs ? 155 : 70, targetUnit: unit },
           { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 35 : 16, targetUnit: unit },
           { name: 'Hamstring Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 100 : 45, targetUnit: unit },
+          // Fat loss keeps muscle via the heavy lifts above; the deficit
+          // is served by conditioning density, not by more grinding sets.
+          { name: 'Kettlebell Swings', targetSets: 4, targetReps: 20, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Explosive hip hinge endurance' },
         ],
       },
     ];
@@ -2571,6 +2603,9 @@ function buildGoalAdaptiveSplitTemplates(
           { name: 'Romanian Deadlift', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 155 : 70, targetUnit: unit, notes: 'Hamstring & glute hinge' },
           { name: 'Leg Press', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 310 : 140, targetUnit: unit, notes: 'Quad overload with back support' },
           { name: 'Calf Raise', targetSets: 3, targetReps: 12, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Ankle stability and calf strength' },
+          // General fitness without any core work was the old roster's
+          // blind spot; a plank fits the "joint health" brief directly.
+          { name: 'Front Plank (Seconds)', targetSets: 3, targetReps: 45, targetWeight: 0, targetUnit: unit, notes: '3 × 45s isometric core bracing' },
         ],
       },
       {
@@ -2657,6 +2692,9 @@ function buildGoalAdaptiveSplitTemplates(
         { name: 'Front Squat', targetSets: 3, targetReps: 8, targetWeight: isLbs ? 145 : 65, targetUnit: unit, notes: 'Double progression: 8–12 reps. Upright torso.' },
         { name: 'Bulgarian Split Squat', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 35 : 16, targetUnit: unit, notes: 'Double progression: 8–12 reps per leg.' },
         { name: 'Hamstring Curl', targetSets: 3, targetReps: 10, targetWeight: isLbs ? 100 : 45, targetUnit: unit, notes: 'Double progression: 10–14 reps. Control eccentric.' },
+        // The old hypertrophy roster trained no core at all; a hanging
+        // knee raise closes that gap without another loaded hinge.
+        { name: 'Hanging Knee Raise', targetSets: 3, targetReps: 15, targetWeight: 0, targetUnit: unit, notes: 'Controlled pelvic tuck without swinging' },
       ],
     },
   ];

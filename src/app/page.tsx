@@ -8,6 +8,8 @@ import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
 import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
+import HowToUseGuide from '@/components/HowToUseGuide';
+import { calculateAgeFromDob, isValidDob } from '@/lib/age';
 import HistoryForkScreen from '@/components/HistoryForkScreen';
 import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
 import SplashScreen from '@/components/onboarding/SplashScreen';
@@ -80,7 +82,7 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, startFreshFromRetainedHistory } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, startFreshFromRetainedHistory, hasCompletedOnboarding } = useStore();
   // FND-06: the fork decision lives only for this session — closing
   // the app undecided re-shows the fork, which is the safe default.
   const [forkResolved, setForkResolved] = useState(false);
@@ -100,6 +102,45 @@ export default function AppPage() {
     const unsub = useStore.persist.onFinishHydration(() => setPersistHydrated(true));
     return unsub;
   }, []);
+
+  // Birthday refresh: a stored date of birth ages the profile once a
+  // year, on the birthday itself. Stored `age` goes stale otherwise —
+  // every consumer (macros, minor gates, training loads) reads
+  // profile.age, so recompute it from DOB after hydration and whenever
+  // the stored DOB changes. Runs only when the computed age differs,
+  // so it never loops; profiles without a DOB are untouched (their
+  // typed age keeps working exactly as before).
+  useEffect(() => {
+    if (typeof window === 'undefined' || !_hasHydrated || !persistHydrated) return;
+    const state = useStore.getState();
+    const prof = state.profile;
+    const dob = prof?.dateOfBirth;
+    if (!prof || !dob || !isValidDob(dob)) return;
+    const computed = calculateAgeFromDob(dob);
+    if (computed !== null && prof.age !== computed) {
+      state.setProfile({ ...prof, age: computed });
+    }
+  }, [_hasHydrated, persistHydrated, profile?.dateOfBirth]);
+
+  // First-run how-to-use guide: shown once, over Today, after the
+  // profile gate (onboarding complete + a profile exist). Dismissing —
+  // via the button, the X, backdrop, or Android back — writes the seen
+  // flag, so it never reappears; Settings re-opens it on demand.
+  const [showGuide, setShowGuide] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !_hasHydrated || !persistHydrated) return;
+    if (!hasCompletedOnboarding || !profile) return;
+    if (activeTab !== 'home') return;
+    try {
+      if (!window.localStorage.getItem('ascend_howto_seen_v1')) setShowGuide(true);
+    } catch {}
+  }, [_hasHydrated, persistHydrated, hasCompletedOnboarding, profile, activeTab]);
+  const closeGuide = () => {
+    try {
+      window.localStorage.setItem('ascend_howto_seen_v1', '1');
+    } catch {}
+    setShowGuide(false);
+  };
 
   // Dynamic device theme synchronization (when not manually overridden in Settings)
   useEffect(() => {
@@ -380,9 +421,11 @@ export default function AppPage() {
         ? isYouTab
         : activeTab === id;
   const goTab = (entry: (typeof tabs)[number]) => {
-    navigate(entry.target as TabId, {
-      progressTab: entry.target === 'progress' ? 'overview' : undefined,
-    });
+    // UX #9: do NOT force progressTab 'overview' here. navigate() keeps
+    // the last Progress section when no sub-tab is given, so tapping
+    // Progress returns the user to where they were (PRs, body, …)
+    // instead of yanking them back to overview every time.
+    navigate(entry.target as TabId);
   };
 
   return (
@@ -499,6 +542,7 @@ export default function AppPage() {
                   />
                 )}
                 </div>
+                <HowToUseGuide isOpen={showGuide} onClose={closeGuide} />
                 {showResumeBar && <div aria-hidden className="h-16 lg:hidden" />}
               </main>
 

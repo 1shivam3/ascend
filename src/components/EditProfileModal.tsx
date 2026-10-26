@@ -8,6 +8,7 @@ import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
+import { calculateAgeFromDob, dobPickerBounds, isValidDob } from '@/lib/age';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { resizeAndCompressImage } from '@/lib/image-processing';
@@ -31,6 +32,10 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
   const [name, setName] = useState('');
   const [gender, setGender] = useState<Gender>('male');
   const [age, setAge] = useState<string>('');
+  // Date of birth (local only). When set, age is calculated from it and
+  // the age field becomes a read-only computed display. Legacy profiles
+  // without a DOB keep the typed-age field exactly as before.
+  const [dob, setDob] = useState<string>('');
   const [unit, setUnit] = useState<Unit>('lbs');
   const [weight, setWeight] = useState<string>('');
   const [height, setHeight] = useState<string>('');
@@ -52,6 +57,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       setName(profile.name || '');
       setGender(profile.gender || 'male');
       setAge(profile.age ? String(profile.age) : '');
+      setDob(profile.dateOfBirth || '');
       setUnit(profile.unit || 'lbs');
 
       if (profile.unit === 'lbs') {
@@ -152,7 +158,25 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
     }
 
     let parsedAge: number | undefined = undefined;
-    if (age.trim()) {
+    if (dob.trim()) {
+      // Date of birth set: age is calculated from it, never typed.
+      // The typed-age field is ignored in this case (its display is
+      // read-only). Legacy profiles without a DOB use the typed path.
+      if (!isValidDob(dob.trim())) {
+        newErrors.dob = t('onboarding.errDobInvalid');
+      } else {
+        const computed = calculateAgeFromDob(dob.trim());
+        if (computed === null) {
+          newErrors.dob = t('onboarding.errDobFuture');
+        } else if (computed < 13) {
+          newErrors.dob = t('onboarding.errDobUnder13');
+        } else if (computed > 120) {
+          newErrors.dob = t('onboarding.errDobRange');
+        } else {
+          parsedAge = computed;
+        }
+      }
+    } else if (age.trim()) {
       parsedAge = parseInt(age, 10);
       if (isNaN(parsedAge) || parsedAge < 13 || parsedAge > 120) {
         newErrors.age = t('editProfile.errAge');
@@ -187,6 +211,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
       name: trimmedName,
       gender,
       age: parsedAge,
+      dateOfBirth: dob.trim() || undefined,
       unit,
       bodyweightKg: weightKg,
       bodyweightLbs: weightLbs,
@@ -362,20 +387,50 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-profile-age" className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.ageYears')}</label>
+              <label htmlFor="edit-profile-dob" className="text-xs font-semibold text-text-secondary font-sans">{t('onboarding.dateOfBirth')}</label>
               <input
-                id="edit-profile-age"
-                type="number"
-                value={age}
+                id="edit-profile-dob"
+                type="date"
+                value={dob}
+                min={dobPickerBounds().min}
+                max={dobPickerBounds().max}
                 onChange={(e) => {
-                  setAge(e.target.value);
-                  if (errors.age) setErrors((prev) => ({ ...prev, age: '' }));
+                  setDob(e.target.value);
+                  if (errors.dob) setErrors((prev) => ({ ...prev, dob: '' }));
                 }}
-                placeholder="e.g. 28"
-                min={13}
-                max={120}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors font-medium"
               />
+              {errors.dob && <p className="text-2xs text-accent mt-0.5">{errors.dob}</p>}
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="edit-profile-age" className="text-xs font-semibold text-text-secondary font-sans">{t('editProfile.ageYears')}</label>
+              {dob.trim() && isValidDob(dob.trim()) && calculateAgeFromDob(dob.trim()) !== null ? (
+                // DOB set: age is computed, not typed. Read-only so the two
+                // can never disagree. Clear the DOB to type an age again.
+                <input
+                  id="edit-profile-age"
+                  type="text"
+                  value={String(calculateAgeFromDob(dob.trim()))}
+                  readOnly
+                  aria-label={t('editProfile.ageYears')}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border text-sm text-text-muted outline-none"
+                />
+              ) : (
+                <input
+                  id="edit-profile-age"
+                  type="number"
+                  value={age}
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    if (errors.age) setErrors((prev) => ({ ...prev, age: '' }));
+                  }}
+                  placeholder="e.g. 28"
+                  min={13}
+                  max={120}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
+                />
+              )}
               {errors.age && <p className="text-2xs text-accent mt-0.5">{errors.age}</p>}
             </div>
           </div>

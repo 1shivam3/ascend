@@ -143,6 +143,13 @@ export interface UserProfile {
   bodyweightLbs: number;
   heightCm?: number;
   age?: number;
+  /**
+   * Date of birth, YYYY-MM-DD. LOCAL DEVICE ONLY — never synced: the
+   * profiles table has no dob column and the sync upsert/pull field lists
+   * are explicit, so this key never leaves the device. Consumers read
+   * `age`, which is (re)calculated from this via calculateAgeFromDob.
+   */
+  dateOfBirth?: string;
   unit: Unit;
   createdAt: string;
   /**

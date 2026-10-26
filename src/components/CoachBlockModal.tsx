@@ -216,7 +216,13 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
 
   const handleApprove = () => {
     if (!proposal) return;
-    approveBlockProposal(proposal);
+    // A block with no live days refuses materialization (the store
+    // returns false) — say so and stay open instead of toasting a
+    // success for a block that was never created.
+    if (!approveBlockProposal(proposal)) {
+      toast.error(t('coachBlock.approveEmpty'), t('toast.titleError'));
+      return;
+    }
     toast.success(t('coachBlock.approvedMsg'), t('coachBlock.approvedTitle'));
     onClose();
   };

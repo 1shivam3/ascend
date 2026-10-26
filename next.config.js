@@ -35,6 +35,23 @@ const nextConfig = {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
+            // SECURITY REVIEW 2026-10-26 (P2-4, deviation — read before
+            // "fixing"): script-src 'unsafe-inline' is KEPT on purpose.
+            // The app's own theme script already lives in
+            // public/theme-init.js and is loaded via next/script, so no
+            // app-authored inline script remains — but Next 14 App Router
+            // itself emits inline <script> flight-data payloads
+            // (self.__next_f.push) on every page. Verified 2026-10-26 by
+            // serving the production build and counting: the home page
+            // carries 8 inline <script> tags, 7 of them framework flight
+            // data. Dropping 'unsafe-inline' without a nonce mechanism
+            // would block those payloads and break hydration (SSR HTML
+            // renders, client interactivity dies). This repo has no
+            // middleware and no nonce plumbing, so the correct follow-up
+            // is a middleware nonce mechanism (Next 14.2 supports
+            // nonces via middleware request headers), NOT deleting this
+            // token. style-src 'unsafe-inline' stays for the same class
+            // of reason (styled-jsx/Tailwind runtime styles).
             "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://*.openfoodfacts.org https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms",

@@ -9,6 +9,7 @@ import { safeRandomId, getLocalTodayStr, sanitizeAthleteName } from '@/lib/forma
 import { getOrCreateGuestId } from '@/lib/storage';
 import { estimateSessionMinutes } from '@/lib/workout-engine';
 import { canContinueFromGoalStep } from '@/lib/onboarding';
+import { calculateAgeFromDob } from '@/lib/age';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
@@ -18,9 +19,7 @@ import WelcomeScreen from './onboarding/WelcomeScreen';
 import CreateAccountScreen from './onboarding/CreateAccountScreen';
 import LoginScreen from './onboarding/LoginScreen';
 import FitnessGoalsScreen from './onboarding/FitnessGoalsScreen';
-import ExperienceLevelScreen from './onboarding/ExperienceLevelScreen';
 import PersonalDetailsScreen from './onboarding/PersonalDetailsScreen';
-import ScheduleScreen from './onboarding/ScheduleScreen';
 import SummaryScreen from './onboarding/SummaryScreen';
 import StepProgressBar from './onboarding/StepProgressBar';
 
@@ -50,17 +49,34 @@ export default function Onboarding() {
   const [athleteName, setAthleteName] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>([]);
-  const [experienceLevel, setExperienceLevel] = useState<UserMode>('beginner');
-  const [gender, setGender] = useState<Gender>('male');
-  const [unit, setUnit] = useState<Unit>('kg');
-  const [age, setAge] = useState<number>(25);
-  const [weight, setWeight] = useState<number>(70);
-  const [heightCm, setHeightCm] = useState<number>(175);
-  const [daysPerWeek, setDaysPerWeek] = useState<number>(4);
-  const [equipmentChoice, setEquipmentChoice] = useState<AITrainingProfile['equipment']>('full_gym');
-  const [limitations, setLimitations] = useState<string[]>([]);
-  const [activityChoice, setActivityChoice] = useState<'sedentary' | 'light' | 'active' | 'very_active'>('light');
-  const [dietPreference, setDietPreference] = useState<DietPreference>('non_vegetarian');
+  // Simplified onboarding: these are DEFAULTS, not answers — the user is
+  // no longer asked for them upfront. They are asked later, contextually
+  // (experience/equipment/days at the first plan build; activity/weight/
+  // height/diet on the first Fuel visit), and edited in Settings after that.
+  // Kept as plain constants (not state) so nothing can drift them.
+  // Object (not bare consts): property access widens literal types, so
+  // the branch code below (unit/days variants) still type-checks even
+  // though every value here is the fixed onboarding default.
+  const ONBOARDING_DEFAULTS = {
+    experienceLevel: 'beginner' as UserMode,
+    gender: 'male' as Gender,
+    unit: 'kg' as Unit,
+    weight: 70,
+    heightCm: 175,
+    daysPerWeek: 4,
+    equipment: 'full_gym' as AITrainingProfile['equipment'],
+    activity: 'light' as 'sedentary' | 'light' | 'active' | 'very_active',
+    diet: 'non_vegetarian' as DietPreference,
+  };
+  const experienceLevel = ONBOARDING_DEFAULTS.experienceLevel;
+  const gender = ONBOARDING_DEFAULTS.gender;
+  const unit = ONBOARDING_DEFAULTS.unit;
+  const weight = ONBOARDING_DEFAULTS.weight;
+  const heightCm = ONBOARDING_DEFAULTS.heightCm;
+  const daysPerWeek = ONBOARDING_DEFAULTS.daysPerWeek;
+  const equipmentChoice = ONBOARDING_DEFAULTS.equipment;
+  const activityChoice = ONBOARDING_DEFAULTS.activity;
+  const dietPreference = ONBOARDING_DEFAULTS.diet;
 
   const [isFinishing, setIsFinishing] = useState(false);
 
@@ -108,7 +124,11 @@ export default function Onboarding() {
         screenParam
       )
     ) {
-      setCurrentScreen(screenParam);
+      // Simplified onboarding removed the experience/schedule steps; old
+      // deep links to them land on details-lite instead of a dead screen.
+      setCurrentScreen(
+        screenParam === 'experience' || screenParam === 'schedule' ? 'details' : screenParam
+      );
     }
     const hashClean = (window.location.hash || '').replace(/^#/, '');
     const hashParams = new URLSearchParams(hashClean);
@@ -247,11 +267,8 @@ export default function Onboarding() {
   const handleFinishCalibration = async (details: {
     name: string;
     gender: Gender;
-    age: number;
-    weight: number;
-    unit: Unit;
-    heightCm: number;
-    dietPreference?: DietPreference;
+    dateOfBirth: string;
+    limitations: string[];
   }) => {
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
@@ -261,27 +278,31 @@ export default function Onboarding() {
 
     setIsFinishing(true);
 
+    // Simplified onboarding: only name/gender/DOB/injury are asked upfront.
+    // Age is calculated from DOB (the details screen already validated
+    // 13–120); weight, height, unit, and diet keep the state defaults and
+    // are asked later — weight/height/diet on the first Fuel visit.
+    const age = calculateAgeFromDob(details.dateOfBirth) ?? 25;
     const nameToSave = sanitizeAthleteName(details.name.trim() || athleteName.trim() || 'Athlete', MAX_ATHLETE_NAME_LENGTH);
     const bodyweightKg =
-      details.unit === 'lbs' ? details.weight * 0.453592 : details.weight;
+      unit === 'lbs' ? weight * 0.453592 : weight;
     const bodyweightLbs =
-      details.unit === 'kg' ? details.weight * 2.20462 : details.weight;
+      unit === 'kg' ? weight * 2.20462 : weight;
 
     const finalGoals = [...selectedGoals];
-    // QA4-019: the details step now asks diet preference explicitly —
-    // prefer the value from the form over the ( previously silent )
-    // state default, and keep the state in sync for any later reads.
-    const chosenDiet = details.dietPreference ?? dietPreference;
-    setDietPreference(chosenDiet);
+    // Diet is deferred to the first Fuel visit; the state default
+    // (non_vegetarian) applies until the user answers there.
+    const chosenDiet = dietPreference;
     const profileData = {
       id: authUser?.id || getOrCreateGuestId(),
       name: nameToSave,
       gender: details.gender,
       bodyweightKg: Math.round(bodyweightKg * 10) / 10,
       bodyweightLbs: Math.round(bodyweightLbs * 10) / 10,
-      heightCm: details.heightCm,
-      age: details.age,
-      unit: details.unit,
+      heightCm: heightCm,
+      age,
+      dateOfBirth: details.dateOfBirth,
+      unit,
       dietPreference: chosenDiet,
       createdAt: new Date().toISOString(),
       goals: finalGoals,
@@ -314,16 +335,16 @@ export default function Onboarding() {
 
     if (daysPerWeek === 6) {
       preferredSplit = 'push_pull_legs';
-      generatedSplit = generateSplitWeeklySchedule('push_pull_legs', details.unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('push_pull_legs', unit).plans;
     } else if (daysPerWeek === 5) {
       preferredSplit = 'bro_split';
-      generatedSplit = generateSplitWeeklySchedule('bro_split', details.unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('bro_split', unit).plans;
     } else if (daysPerWeek <= 3) {
       preferredSplit = 'full_body';
-      generatedSplit = generateSplitWeeklySchedule('full_body', details.unit).plans;
+      generatedSplit = generateSplitWeeklySchedule('full_body', unit).plans;
     } else {
       preferredSplit = 'upper_lower';
-      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, details.unit, {
+      generatedSplit = getGoalAdaptiveSplitTemplates(primaryGoal, unit, {
         bodyweightKg,
         experience: experienceLevel,
       });
@@ -338,13 +359,13 @@ export default function Onboarding() {
     const priorTrainingProfile = useStore.getState().trainingProfile;
     const priorExclusions = priorTrainingProfile?.dislikedExercises || [];
     const priorLimitations = priorTrainingProfile?.injuriesOrLimitations || [];
-    const allLimitations = Array.from(new Set([...priorLimitations, ...limitations]));
+    const allLimitations = Array.from(new Set([...priorLimitations, ...details.limitations]));
     if (generatedSplit) {
       generatedSplit = prepareGeneratedPlans(generatedSplit, {
-        unit: details.unit,
+        unit,
         bodyweightKg,
         experience: experienceLevel,
-        ageYears: details.age,
+        ageYears: age,
         equipment: equipmentChoice,
         exclusions: priorExclusions,
         limitations: allLimitations,
@@ -387,8 +408,8 @@ export default function Onboarding() {
           bodyweightKg,
           primaryGoal,
           details.gender,
-          details.heightCm,
-          details.age,
+          heightCm,
+          age,
           activityChoice
         )
       );
@@ -633,12 +654,12 @@ export default function Onboarding() {
             toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
             return;
           }
-          setCurrentScreen('experience');
+          setCurrentScreen('details');
         }}
         onSkip={() => {
           setSelectedGoals(['general_fitness']);
           toast.info(t('toast.defaultGoalSet'), t('toast.titleGoalSet'));
-          setCurrentScreen('experience');
+          setCurrentScreen('details');
         }}
         onBack={() => {
           if (authOrigin === 'create_account') {
@@ -651,53 +672,22 @@ export default function Onboarding() {
     );
   }
 
-  // ── SCREEN 6: EXPERIENCE LEVEL (Step 2 of 4) ──────────────────────────────
-  if (currentScreen === 'experience') {
-    return (
-      <ExperienceLevelScreen
-        selectedLevel={experienceLevel}
-        onSelectLevel={(level) => setExperienceLevel(level)}
-        onContinue={() => setCurrentScreen('schedule')}
-        onBack={() => setCurrentScreen('goals')}
-      />
-    );
-  }
-
-  // ── SCREEN 7: SCHEDULE + EQUIPMENT (Step 3 of 4) ─────────────────────────
-  // Asks the two questions that define a user's week: how many days, and what
-  // equipment. Fixes the dead daysPerWeek state and hardcoded full_gym.
-  if (currentScreen === 'schedule') {
-    return (
-      <ScheduleScreen
-        initialDays={daysPerWeek}
-        initialEquipment={equipmentChoice}
-        initialActivity={activityChoice}
-        initialLimitations={limitations}
-        onContinue={(days, equipment, activity, chosenLimitations) => {
-          setDaysPerWeek(days);
-          setEquipmentChoice(equipment);
-          setActivityChoice(activity);
-          setLimitations(chosenLimitations);
-          setCurrentScreen('details');
-        }}
-        onBack={() => setCurrentScreen('experience')}
-      />
-    );
-  }
-
-  // ── SCREEN 8: PERSONAL DETAILS (Step 4 of 4) ─────────────────────────────
+  // ── DETAILS-LITE (Step 2 of 2) ───────────────────────────────────────────
+  // Simplified onboarding: only name, gender, date of birth, and the
+  // optional injury dropdown. Experience, schedule, equipment, activity,
+  // weight, height, diet, and unit are NOT asked here — they keep the
+  // state defaults below and are asked later, contextually: experience /
+  // equipment / days at the first plan build, activity / weight / height /
+  // diet on the first Fuel visit. The old experience/schedule screens
+  // still exist as components but are no longer forward steps.
   if (currentScreen === 'details') {
     return (
       <PersonalDetailsScreen
         initialName={athleteName}
         initialGender={gender}
-        initialUnit={unit}
-        initialAge={age}
-        initialWeight={weight}
-        initialHeightCm={heightCm}
-        initialDietPreference={dietPreference}
+        initialLimitations={trainingProfile?.injuriesOrLimitations || []}
         onContinue={handleFinishCalibration}
-        onBack={() => setCurrentScreen('schedule')}
+        onBack={() => setCurrentScreen('goals')}
         loading={isFinishing}
       />
     );
@@ -709,7 +699,7 @@ export default function Onboarding() {
     const planNames = (pendingPlans || []).slice(0, 4).map((p: any) => p.name || 'Workout').join(', ');
     return (
       <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
-        <StepProgressBar currentStep={4} onBack={() => setCurrentScreen('details')} />
+        <StepProgressBar currentStep={2} totalSteps={2} onBack={() => setCurrentScreen('details')} />
         <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">
           <div className="text-left space-y-1">
             <h1 className="page-title">
@@ -752,6 +742,7 @@ export default function Onboarding() {
                     ? ` To build muscle, your target adds ${currentMacroGoals.calorieDelta} kcal on top.`
                     : ' Your target matches what you burn, to maintain your weight.'}{' '}
                 Protein {currentMacroGoals.proteinG}g · Carbs {currentMacroGoals.carbsG}g · Fat {currentMacroGoals.fatG}g.
+                These targets are estimated from default weight and height — add yours in Fuel for exact numbers.
                 You can change this any time in Meals. If you have a medical condition like diabetes, check with your doctor before following a calorie target.
               </p>
             </div>
