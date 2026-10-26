@@ -21,8 +21,10 @@ describe('CoachChatTab', () => {
     const html = renderToStaticMarkup(
       <CoachChatTab
         onStartPlan={() => {}}
-        onOpenBlockModal={() => {}}
+        onBuildBlock={() => {}}
+        onReviewBlock={() => {}}
         onOpenWeeklyReview={() => {}}
+        onOpenDebrief={() => {}}
       />
     );
     expect(html).toContain('No plan yet');
@@ -38,15 +40,21 @@ describe('CoachChatTab', () => {
       'coachChat.buildBlock',
       'coachChat.checkinTitle',
       'coachChat.sameAsUsual',
-      'coachChat.sleepLabel',
-      'coachChat.freshnessLabel',
-      'coachChat.soreAreasLabel',
-      'coachChat.energyLabel',
-      'coachChat.minutesLabel',
-      'coachChat.locationLabel',
+      'coachChat.chatEdit',
+      'coachChat.chatSleepQ',
+      'coachChat.chatFreshQ',
+      'coachChat.chatAreasQ',
+      'coachChat.chatAreasDone',
+      'coachChat.chatAreasNone',
+      'coachChat.chatEnergyQ',
+      'coachChat.chatMinutesQ',
+      'coachChat.chatMinutesShort',
+      'coachChat.chatLocationQ',
       'coachChat.locationGym',
       'coachChat.locationHome',
-      'coachChat.painToggle',
+      'coachChat.chatPainQ',
+      'coachChat.chatPainNo',
+      'coachChat.chatPainYes',
       'coachChat.painStopTitle',
       'coachChat.painStopBody',
       'coachChat.restToday',

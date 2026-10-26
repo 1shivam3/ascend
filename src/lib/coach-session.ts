@@ -40,6 +40,27 @@ import type { ReadinessResult } from './coach-engine';
 /** Gym-only equipment — everything else is doable at home. */
 export const GYM_ONLY_EQUIPMENT = ['Barbell', 'Machine', 'Smith Machine', 'Cable'] as const;
 
+/**
+ * Chat question order. The sore-areas question appears only when
+ * freshness is low (≤ 2) — asking it otherwise changes nothing, and
+ * the chat must only ask questions whose answer changes the session.
+ */
+export type CheckinStep =
+  | 'sleep'
+  | 'freshness'
+  | 'areas'
+  | 'energy'
+  | 'minutes'
+  | 'location'
+  | 'pain';
+
+export function checkinSteps(soreness: number): CheckinStep[] {
+  const steps: CheckinStep[] = ['sleep', 'freshness'];
+  if (soreness <= 2) steps.push('areas');
+  steps.push('energy', 'minutes', 'location', 'pain');
+  return steps;
+}
+
 export interface SessionExercise {
   exercise: PlannedExercise;
   /** True when the exercise needs gym equipment and location is home. */

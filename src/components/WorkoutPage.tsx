@@ -92,8 +92,6 @@ import CoachChatTab from '@/components/CoachChatTab';
 import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
-import { isBlockEnded } from '@/lib/weekly-review';
-import { weekTypeForDate } from '@/lib/block-engine';
 import GoalSelectorModal from '@/components/GoalSelectorModal';
 import { AthleteGoal, ATHLETE_GOAL_CONFIGS, DayOfWeek, SetExecutionStatus, DEFAULT_GOALS, resolvePrimaryGoal, MAX_PLAN_NAME_LENGTH } from '@/lib/types';
 import { useToast } from '@/components/ui/Toast';
@@ -760,8 +758,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   const setWeeklySchedule = useStore((state) => state.setWeeklySchedule);
   // Coach blocks (PR-B)
   const coachBlocks = useStore((state) => state.coachBlocks);
-  const applyPlateauProposal = useStore((state) => state.applyPlateauProposal);
-  const dismissPlateauProposal = useStore((state) => state.dismissPlateauProposal);
   const refreshPlateauProposals = useStore((state) => state.refreshPlateauProposals);
   const weeklyReviews = useStore((state) => state.weeklyReviews);
   const refreshWeeklyReview = useStore((state) => state.refreshWeeklyReview);
@@ -2208,145 +2204,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         </div>
       )}
 
-      {/* ── Your Coach (PR-B) ── */}
-      <section className="space-y-2.5" aria-label={t('coachBlock.sectionTitle')}>
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-accent" />
-          <h2 className="section-title text-[11px] mb-0">{t('coachBlock.sectionTitle').toUpperCase()}</h2>
-          {/* UX #17: the coach section had no off-switch in place — the
-              only toggle lived in Settings. Shown only while coach tips
-              are on; tapping hides the tips (and this button) at once. */}
-          {coachEnabled && (
-            <button
-              type="button"
-              onClick={() => {
-                setUiPreferences({ coachEnabled: false });
-                toast.info(t('coachBlock.tipsOff'), t('toast.titleDismissed'));
-              }}
-              className="ml-auto text-2xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0"
-            >
-              {t('coachBlock.turnOffTips')}
-            </button>
-          )}
-        </div>
-
-        {coachBlocks.pendingProposal ? (
-          <div className="card p-4 flex items-center justify-between gap-3 border-accent/40">
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-text-primary">
-                {t('coachBlock.pendingTitle', { name: coachBlocks.pendingProposal.name })}
-              </p>
-              <p className="text-2xs text-text-muted">{t('coachBlock.pendingHint')}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
-              className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
-            >
-              {t('coachBlock.reviewButton')}
-            </button>
-          </div>
-        ) : (
-          <div className="card p-4 flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              {coachBlocks.activeBlock && coachBlocks.activeBlock.status === 'active' ? (
-                <>
-                  <p className="text-xs font-bold text-text-primary">
-                    {coachBlocks.activeBlock.name} ·{' '}
-                    {t('coachBlock.weekOf', {
-                      n: Math.min(
-                        coachBlocks.activeBlock.weeks.length,
-                        Math.max(
-                          1,
-                          Math.floor(
-                            (parseLocalDate(getLocalTodayStr()).getTime() -
-                              parseLocalDate(coachBlocks.activeBlock.startMonday).getTime()) /
-                              (7 * 86_400_000)
-                          ) + 1
-                        )
-                      ),
-                      total: coachBlocks.activeBlock.weeks.length,
-                    })}
-                  </p>
-                  <p className="text-2xs text-text-muted">
-                    {t('coachBlock.activeHint', {
-                      type: t(`coachBlock.week_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.week_build'),
-                    })}
-                  </p>
-                  {/* SIM-P2-09/10: a week-type label alone explains nothing.
-                      State what the week means for today's loads — and,
-                      for deload, that the 10% cut is review-gated by
-                      design, not silently applied or silently absent. */}
-                  <p className="text-2xs text-text-muted leading-relaxed">
-                    {t(`coachBlock.weekExplain_${weekTypeForDate(coachBlocks.activeBlock, getLocalTodayStr())}` as 'coachBlock.weekExplain_build')}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs font-bold text-text-primary">{t('coachBlock.buildTitle')}</p>
-                  <p className="text-2xs text-text-muted">{t('coachBlock.buildHint')}</p>
-                </>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
-              className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
-            >
-              {coachBlocks.activeBlock ? t('coachBlock.buildNext') : t('coachBlock.buildButton')}
-            </button>
-          </div>
-        )}
-
-        {coachBlocks.plateauProposals
-          .filter((p) => p.status === 'pending')
-          .map((p) => (
-            <div key={p.id} className="card p-4 space-y-2 border-warning/40">
-              <p className="text-xs font-bold text-text-primary">
-                {t('coachBlock.plateauTitle', { name: p.displayName })}
-              </p>
-              <p className="text-2xs text-text-secondary">{p.evidence}</p>
-              <p className="text-2xs text-text-primary font-semibold">{p.changeText}</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => applyPlateauProposal(p.id)}
-                  className="btn-primary py-1.5 px-3 text-xs font-bold cursor-pointer"
-                >
-                  {t('coachBlock.plateauApply')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => dismissPlateauProposal(p.id)}
-                  className="btn-secondary py-1.5 px-3 text-xs font-semibold cursor-pointer"
-                >
-                  {t('coachBlock.plateauDismiss')}
-                </button>
-              </div>
-            </div>
-          ))}
-        {/* Block debrief (PR-C): the block ran its course — results first. */}
-        {coachBlocks.activeBlock &&
-          coachBlocks.activeBlock.status === 'active' &&
-          isBlockEnded(coachBlocks.activeBlock, getLocalTodayStr()) && (
-            <div className="card p-4 flex items-center justify-between gap-3 border-accent/40">
-              <div className="min-w-0">
-                <p className="text-xs font-bold text-text-primary">
-                  {t('weeklyReview.debriefCardTitle', { name: coachBlocks.activeBlock.name })}
-                </p>
-                <p className="text-2xs text-text-muted">{t('weeklyReview.debriefCardHint')}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsDebriefOpen(true)}
-                className="btn-primary py-1.5 px-3 text-xs font-bold shrink-0 cursor-pointer"
-              >
-                {t('weeklyReview.debriefOpen')}
-              </button>
-            </div>
-          )}
-
-        {/* Weekly review row (PR-C) */}
+      {/* Weekly review row (PR-C) — block management now lives in the Coach tab */}
         {weeklyReviews.length > 0 && (
           <button
             type="button"
@@ -2367,7 +2225,6 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <ChevronRight className="w-4 h-4 text-text-muted shrink-0" />
           </button>
         )}
-      </section>
 
       {/* ── Your Plans ── */}
       <section className="space-y-2.5" aria-label={t('train.yourPlans')}>
@@ -3020,8 +2877,10 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       {trainSubTab === 'coach' && (
         <CoachChatTab
           onStartPlan={handleStartPlan}
-          onOpenBlockModal={() => setIsCoachBlockOpen(true)}
+          onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
+          onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
           onOpenWeeklyReview={() => setIsReviewOpen(true)}
+          onOpenDebrief={() => setIsDebriefOpen(true)}
         />
       )}
 

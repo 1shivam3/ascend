@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   adjustSession,
+  checkinSteps,
   swapSessionExercise,
   proteinTargetG,
   weeklySuggestion,
@@ -166,6 +167,31 @@ describe('swapSessionExercise', () => {
 
   it('out-of-range index returns the list unchanged', () => {
     expect(swapSessionExercise(plan.exercises, 9, 'X')).toBe(plan.exercises);
+  });
+});
+
+describe('checkinSteps (chat question order)', () => {
+  it('low freshness inserts the areas question after freshness', () => {
+    expect(checkinSteps(2)).toEqual([
+      'sleep',
+      'freshness',
+      'areas',
+      'energy',
+      'minutes',
+      'location',
+      'pain',
+    ]);
+  });
+
+  it('fresh muscles skip the areas question (it would change nothing)', () => {
+    expect(checkinSteps(4)).toEqual([
+      'sleep',
+      'freshness',
+      'energy',
+      'minutes',
+      'location',
+      'pain',
+    ]);
   });
 });
 
