@@ -4095,7 +4095,7 @@ export default function ActiveWorkoutScreen({
           <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-6 space-y-4">
             {/* Sage Checkmark Circle */}
             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#858076]/20 border-2 border-[#858076] text-[#858076] flex items-center justify-center shadow-lg shadow-[#858076]/10 animate-scale-in">
-              <Check className="w-10 h-10 sm:w-12 sm:h-12 stroke-[3] text-[#858076]" />
+              <Check className="w-10 h-10 sm:w-12 sm:h-12 stroke-[3]" />
             </div>
 
             <div className="space-y-1">

@@ -58,7 +58,14 @@ function getSupabaseAdminClient() {
   });
 }
 
-/** Tables that hold user data and must be purged on account deletion. */
+/** Tables that hold user data and must be purged on account deletion.
+ * NOTE: user_feedback is deliberately NOT here — it has no user_id
+ * column (P1-3: the old loop "deleted" by a nonexistent column and
+ * reported success while feedback PII survived). It is purged
+ * separately below, by the server-validated auth email.
+ * coach_blocks / weekly_reviews (P2-5) exist live with a user_id
+ * column (verified via OpenAPI 2026-10-26) even though no repo SQL
+ * defines them — they hold user data and must be purged too. */
 const TABLES_TO_DELETE: Array<{ table: string; idCol: string }> = [
   { table: 'personal_records', idCol: 'user_id' },
   { table: 'workouts', idCol: 'user_id' },
@@ -70,7 +77,8 @@ const TABLES_TO_DELETE: Array<{ table: string; idCol: string }> = [
   { table: 'notification_deliveries', idCol: 'user_id' },
   { table: 'push_subscriptions', idCol: 'user_id' },
   { table: 'notification_preferences', idCol: 'user_id' },
-  { table: 'user_feedback', idCol: 'user_id' },
+  { table: 'coach_blocks', idCol: 'user_id' },
+  { table: 'weekly_reviews', idCol: 'user_id' },
   { table: 'profiles', idCol: 'id' },
 ];
 
@@ -215,6 +223,22 @@ export async function POST(req: Request) {
     const supabase = getSupabaseServerClient();
     const adminClient = getSupabaseAdminClient();
 
+    // P2-2: deletion with only the anon key is not a degraded deletion
+    // — it is a failed one (RLS blocks the table purges, the auth purge
+    // is skipped) reported as partial 207s. In production, refuse
+    // outright when the service key is missing instead of running a
+    // doomed purge under the anon fallback.
+    if (!adminClient && isProductionEnv()) {
+      return NextResponse.json(
+        {
+          error: 'CONFIGURATION_ERROR',
+          message:
+            'Account deletion cannot be processed: server configuration is incomplete. Please contact support.',
+        },
+        { status: 503, headers: SECURITY_HEADERS }
+      );
+    }
+
     if (!supabase) {
       if (isProductionEnv()) {
         return NextResponse.json(
@@ -350,6 +374,37 @@ export async function POST(req: Request) {
       }
     }
 
+    // P1-3: feedback purge, by the SERVER-VALIDATED email only.
+    // authUser.email comes from Supabase getUser or the signed
+    // verification-token payload — never from the request body (the
+    // body email is already forced to match it above when provided).
+    // The column is user_email, not user_id. Without a validated email
+    // this is reported as failed, not silently "deleted".
+    const validatedEmail = authUser.email?.trim().toLowerCase() || null;
+    if (validatedEmail) {
+      try {
+        const { error } = await supabase
+          .from('user_feedback')
+          .delete()
+          .eq('user_email', validatedEmail);
+        if (error) {
+          deleteResults['user_feedback'] = { deleted: false, error: error.message };
+          allTablesDeleted = false;
+        } else {
+          deleteResults['user_feedback'] = { deleted: true, error: null };
+        }
+      } catch (err: any) {
+        deleteResults['user_feedback'] = { deleted: false, error: err?.message || 'skipped' };
+        allTablesDeleted = false;
+      }
+    } else {
+      deleteResults['user_feedback'] = {
+        deleted: false,
+        error: 'no validated email; feedback retained',
+      };
+      allTablesDeleted = false;
+    }
+
     // ------------------------------------------------------------------
     // 3. Purge user from Supabase Auth (requires service-role key)
     // ------------------------------------------------------------------
@@ -449,7 +504,7 @@ export async function POST(req: Request) {
           emailMatched:
             requestEmail === null ||
             (authUser.email && requestEmail === authUser.email.trim().toLowerCase()),
-          tablesProcessed: TABLES_TO_DELETE.length,
+          tablesProcessed: Object.keys(deleteResults).length,
           tablesSucceeded: Object.values(deleteResults).filter((r) => r.deleted).length,
           authPurged: authUserDeleted,
           timestamp: new Date().toISOString(),

@@ -67,7 +67,7 @@ export default function FitnessGoalsScreen({
   return (
     <div className="min-h-screen w-full bg-bg-primary text-text-primary flex flex-col justify-between pb-8 animate-fade-in">
       {/* Top 3-segment progress indicator (Step 1 of 3) */}
-      <StepProgressBar currentStep={1} onBack={onBack} />
+      <StepProgressBar currentStep={1} totalSteps={2} onBack={onBack} />
 
       {/* Main Content */}
       <div className="w-full max-w-md mx-auto px-6 py-2 my-auto space-y-6">

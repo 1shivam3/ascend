@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import Script from 'next/script';
 import { Inter, Barlow_Condensed, Noto_Sans_Devanagari } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -99,46 +100,13 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                var theme = null;
-                var hasCustom = false;
-                var customFlag = localStorage.getItem('ascend_has_custom_theme');
-                var standaloneTheme = localStorage.getItem('ascend_theme');
-                if (customFlag === 'true' && (standaloneTheme === 'dark' || standaloneTheme === 'light')) {
-                  theme = standaloneTheme;
-                  hasCustom = true;
-                } else if (customFlag === 'false') {
-                  hasCustom = false;
-                } else {
-                  var stored = localStorage.getItem('ascend_store');
-                  if (stored) {
-                    var parsed = JSON.parse(stored);
-                    var s = parsed.state || parsed;
-                    if (s && s.hasCustomTheme) {
-                      theme = s.theme;
-                      hasCustom = true;
-                    }
-                  }
-                }
-                if (!hasCustom && window.matchMedia) {
-                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-                if (theme === 'light') {
-                  document.documentElement.classList.remove('dark');
-                  document.documentElement.classList.add('light');
-                  document.documentElement.setAttribute('data-theme', 'light');
-                } else if (theme === 'dark') {
-                  document.documentElement.classList.add('dark');
-                  document.documentElement.classList.remove('light');
-                  document.documentElement.setAttribute('data-theme', 'dark');
-                }
-              } catch (e) {}
-            `,
-          }}
-        />
+        {/* P2-4: the theme bootstrap used to be an inline script here
+            (the app's only dangerouslySetInnerHTML). It now lives in
+            public/theme-init.js — same logic, same before-paint timing
+            via beforeInteractive — so no app-authored inline script
+            remains. See next.config.js for why script-src still lists
+            'unsafe-inline' (Next 14's own flight-data scripts). */}
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body className={`${inter.variable} ${barlowCondensed.variable} ${notoDevanagari.variable} ${inter.className} font-sans`}>
         {/* Skip to main content for accessibility */}

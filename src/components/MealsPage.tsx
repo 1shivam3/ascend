@@ -67,6 +67,7 @@ import {
 } from '@/lib/nutrition-coach';
 import { CollapsibleDetails } from '@/components/ui/CollapsibleDetails';
 import DietPreferencePicker from '@/components/DietPreferencePicker';
+import FuelPrefsPrompt from '@/components/FuelPrefsPrompt';
 import dynamic from 'next/dynamic';
 
 // The barcode scanner (camera + ZXing glue) is one of the heaviest
@@ -214,6 +215,23 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Modal visibility ──────────────────────────────────────────────────────
   const [isModalOpen,          setIsModalOpen]          = useState(false);
   const [isDietPickerOpen,     setIsDietPickerOpen]     = useState(false);
+  // Progressive prompt (simplified onboarding): activity / weight /
+  // height are asked on the first Fuel visit, not during onboarding.
+  // A card, never a modal — dismissing keeps the estimates and Fuel
+  // stays fully usable. Once asked (answered or dismissed) it is gone.
+  const [showFuelPrefs, setShowFuelPrefs] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage.getItem('ascend_fuel_prefs_asked_v1') !== '1';
+    } catch {
+      return false;
+    }
+  });
+  const handleFuelPrefsDone = () => {
+    try {
+      window.localStorage.setItem('ascend_fuel_prefs_asked_v1', '1');
+    } catch {}
+    setShowFuelPrefs(false);
+  };
   const mealModalRef = useRef<HTMLDivElement>(null); const { dialogProps: mealDialogProps } = useModalA11y(mealModalRef, isModalOpen, () => setIsModalOpen(false));
   const [isScanModalOpen,      setIsScanModalOpen]      = useState(false);
   const [isGoalsModalOpen,     setIsGoalsModalOpen]     = useState(false);
@@ -1590,7 +1608,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-[#FF6B1F] uppercase">{t('meals.eyebrow')}</div>
+            <div className="text-[10px] font-mono font-bold tracking-widest text-accent uppercase">{t('meals.eyebrow')}</div>
             <h1 className="display-title font-display uppercase tracking-tight text-2xl sm:text-3xl text-text-primary">{t('meals.title')}</h1>
           </div>
         </div>
@@ -1691,7 +1709,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 </span>
               </div>
             </div>
-            <span className="text-2xs font-semibold text-text-muted tabular-nums">
+            <span className="text-xs font-semibold text-text-muted tabular-nums">
               {t('meals.ofDailyTarget', { target: displayGoals?.calories || 2400 })}
             </span>
 
@@ -1735,7 +1753,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {((!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
               <CollapsibleDetails label={t('meals.why')} className="w-full">
                 {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
-                  <span className="text-2xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
+                  <span className="text-xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
                     {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
                     {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
                     {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
@@ -1837,6 +1855,11 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             )}
           </section>
 
+          {/* First-visit progressive prompt: activity / weight / height */}
+          {showFuelPrefs && (
+            <FuelPrefsPrompt onDone={handleFuelPrefsDone} />
+          )}
+
           {/* Nutrition coach — quiet, dismissible suggestions (never guilt) */}
           {proteinSuggestion && (
             <section className="card p-4 bg-bg-card border border-border/80">
@@ -1856,7 +1879,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   type="button"
                   onClick={dismissProteinHint}
                   aria-label={t('meals.dismissProtein')}
-                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1885,7 +1908,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   type="button"
                   onClick={dismissAdaptationHint}
                   aria-label={t('meals.dismissDinner')}
-                  className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -1967,7 +1990,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 type="submit"
                 disabled={!naturalQuery.trim() || isNaturalParsing}
                 aria-label={t('meals.logMealAria')}
-                className="px-3 py-1.5 min-h-[44px] rounded-lg bg-[#FF6B1F] hover:bg-[#ff7d3b] text-stone-950 font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
+                className="px-3 py-1.5 min-h-[44px] rounded-lg bg-accent hover:bg-accent-dim text-accent-on font-bold text-xs flex items-center gap-1 disabled:opacity-40 active:scale-95 transition-all shadow-xs cursor-pointer"
               >
                 {isNaturalParsing ? (
                   <span className="text-2xs">...</span>
@@ -2743,7 +2766,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       onClick={() => setMealName(template)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-mono font-semibold border transition-colors ${
                         mealName === template
-                          ? 'bg-[#FF6B1F] text-stone-950 font-bold border-[#FF6B1F]'
+                          ? 'bg-accent text-accent-on font-bold border-accent'
                           : 'bg-bg-elevated border-border text-text-secondary hover:border-accent/60 hover:text-accent'
                       }`}
                     >

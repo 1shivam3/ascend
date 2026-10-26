@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { getLiftLevel, getOverallLevel } from '@/lib/strength-standards';
-import { formatHeightImperial, athleteNameToEmailSlug, plural } from '@/lib/formatters';
+import { formatHeightImperial, plural } from '@/lib/formatters';
 import { ATHLETE_GOAL_CONFIGS } from '@/lib/types';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
@@ -113,7 +113,11 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
     const estimatedCount = levels.filter((l) => l.isStandardUnavailable).length;
     return { ...getOverallLevel(levels), estimatedCount, totalLifts: levels.length };
   }, [prs, profile?.bodyweightKg, profile?.gender]);
-  const athleteEmail = user?.email || profile?.name ? `${athleteNameToEmailSlug(athleteName)}@athlete.local` : t('common.guestAthlete');
+  // UX #13: never show a fabricated email. The old line built
+  // "<name>@athlete.local" for guests — a plausible-looking address
+  // that is not theirs and could be mistaken for one. Guests see the
+  // guest label; signed-in users see their real account email.
+  const athleteEmail = user?.email || t('common.guestAthlete');
   const userUnit = profile?.unit || 'lbs';
 
   // Format height display
@@ -158,15 +162,9 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
           </h1>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate?.('settings')}
-          className="p-2 min-h-[44px] min-w-[44px] rounded-xl bg-bg-card border border-border text-text-secondary hover:text-accent transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-          title={t('profile.appSettings')}
-          aria-label={t('profile.openSettings')}
-        >
-          <Settings className="w-5 h-5 text-accent" />
-        </button>
+        {/* UX #7: no header gear — Settings already has its own row
+            below (and its own tab). A duplicate top-right gear is
+            exactly the clutter the minimal-by-default rule removes. */}
       </header>
 
       {/* ── Screen 22: Athlete Identity Hero Card ───────────────────────────── */}
@@ -193,7 +191,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
                 {athleteName}
               </h2>
               <p className="text-xs text-text-muted font-medium font-sans truncate max-w-[190px]">
-                {user?.email || athleteEmail}
+                {athleteEmail}
               </p>
               <div className="pt-1">
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-2xs font-mono font-semibold uppercase tracking-wider bg-bg-secondary text-text-secondary border border-border">

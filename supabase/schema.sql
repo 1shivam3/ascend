@@ -574,3 +574,50 @@ GRANT EXECUTE ON FUNCTION public.cleanup_expired_deletion_nonces() TO service_ro
 -- Until it runs, the app degrades gracefully: plans still sync, but
 -- description / goalTag / intensityMode stay local-only.
 ALTER TABLE public.planned_workouts ADD COLUMN IF NOT EXISTS extras JSONB;
+
+-- ==============================================================================
+-- 16. Coach Blocks & Weekly Reviews (2026-10-26 security review, P2-5)
+-- ==============================================================================
+-- These tables exist live (created by the 2026-10-24 coach SQL tap) but
+-- were missing from the repo schema — so they had no documented shape
+-- and no own-row policies in code. Columns below match the live tables
+-- exactly (verified via OpenAPI 2026-10-26): id TEXT, user_id UUID,
+-- payload JSONB, updated_at TIMESTAMPTZ. CREATE IF NOT EXISTS is a
+-- no-op live; the policy blocks are the part that matters there — run
+-- this file (or just this section) in the Dashboard SQL Editor to
+-- apply them. NOTE: no client code in this repo currently reads or
+-- writes these tables; the deletion route purges them by user_id so a
+-- deleted account leaves no coach data behind.
+CREATE TABLE IF NOT EXISTS public.coach_blocks (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  payload JSONB NOT NULL DEFAULT '{}'::JSONB,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.weekly_reviews (
+  id TEXT PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  payload JSONB NOT NULL DEFAULT '{}'::JSONB,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_coach_blocks_user_id ON public.coach_blocks (user_id);
+CREATE INDEX IF NOT EXISTS idx_weekly_reviews_user_id ON public.weekly_reviews (user_id);
+
+ALTER TABLE public.coach_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY;
+
+-- Coach Blocks Policy
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Users can manage own coach blocks" ON public.coach_blocks;
+  CREATE POLICY "Users can manage own coach blocks" ON public.coach_blocks
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+END $$;
+
+-- Weekly Reviews Policy
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "Users can manage own weekly reviews" ON public.weekly_reviews;
+  CREATE POLICY "Users can manage own weekly reviews" ON public.weekly_reviews
+    FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+END $$;

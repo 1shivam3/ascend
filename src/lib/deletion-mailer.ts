@@ -40,6 +40,25 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
+export const CANONICAL_DELETION_ORIGIN = 'https://ascendtonext.vercel.app';
+
+export function resolveDeletionOrigin(appOrigin?: string): string {
+  const allowed = new Set<string>([CANONICAL_DELETION_ORIGIN]);
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
+  if (envUrl) allowed.add(envUrl);
+  if (process.env.VERCEL_URL?.trim()) allowed.add(`https://${process.env.VERCEL_URL.trim()}`);
+  if (appOrigin) {
+    try {
+      const parsed = new URL(appOrigin);
+      const normalized = `${parsed.protocol}//${parsed.host}`;
+      if (parsed.protocol === 'https:' && allowed.has(normalized)) return normalized;
+    } catch {
+      // Unparseable origin — fall through to canonical.
+    }
+  }
+  return CANONICAL_DELETION_ORIGIN;
+}
+
 /**
  * Sends a single-use deletion verification email.
  */
@@ -58,10 +77,16 @@ export async function sendDeletionVerificationEmail(
     };
   }
 
-  const origin =
-    appOrigin ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://ascendtonext.vercel.app');
+  // P1-1: the caller passes the request's Origin header as appOrigin,
+  // and the old code trusted it verbatim. A forged Origin would have
+  // put the single-use deletion token (in the URL fragment, readable
+  // by page JS) on an attacker-controlled page — click the emailed
+  // link, land on the attacker's page, token stolen, account deleted.
+  // Now only deployment-controlled origins are ever honored: the
+  // canonical production origin, plus NEXT_PUBLIC_APP_URL / VERCEL_URL
+  // when the deployment itself sets them. Anything else — including a
+  // lookalike domain — falls back to canonical production.
+  const origin = resolveDeletionOrigin(appOrigin);
 
   // Use URI fragment (#token=...&email=...) so that the secret token is never sent in the HTTP
   // request line across the wire and cannot leak into reverse proxy, CDN, or hosting edge access logs.

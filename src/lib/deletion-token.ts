@@ -45,14 +45,25 @@ const inMemoryNonces = new Map<string, { status: NonceStatus; timestamp: number 
 /**
  * Resolves the secret used to sign deletion tokens.
  * Prefers server-only secrets (SUPABASE_SERVICE_ROLE_KEY or CRON_SECRET).
+ *
+ * P1-4: the old chain ended in a hardcoded fallback string shipped in
+ * the public repo — anyone who read it could forge a deletion token
+ * for any account. There is no fallback anymore: with no configured
+ * secret, token creation/verification throws instead of signing with
+ * a public value. Production must set SUPABASE_DELETION_SECRET (or
+ * rely on the service-role key, which is server-only by construction).
  */
 function getSigningSecret(): string {
   const secret =
     process.env.SUPABASE_DELETION_SECRET?.trim() ||
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
     process.env.CRON_SECRET?.trim() ||
-    process.env.APP_SECRET?.trim() ||
-    'ascend-account-deletion-secret-fallback-key';
+    process.env.APP_SECRET?.trim();
+  if (!secret) {
+    throw new Error(
+      'Deletion token signing secret is not configured (set SUPABASE_DELETION_SECRET). Refusing to sign with a fallback.'
+    );
+  }
   return secret;
 }
 

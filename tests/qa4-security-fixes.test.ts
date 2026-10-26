@@ -444,7 +444,9 @@ describe('QA4-002 AI global daily circuit breaker', () => {
   it('has a generous default cap', () => {
     delete process.env.AI_DAILY_GLOBAL_CAP;
     expect(getAiDailyGlobalCap()).toBe(DEFAULT_AI_DAILY_GLOBAL_CAP);
-    expect(DEFAULT_AI_DAILY_GLOBAL_CAP).toBeGreaterThanOrEqual(1000);
+    // REVIEW 2026-10-26 (Track F P2-3): default lowered 2000 -> 500;
+    // 500 is still well above legitimate traffic for this user base.
+    expect(DEFAULT_AI_DAILY_GLOBAL_CAP).toBe(500);
   });
 
   it('trips at the configured cap and fails with a clear error', async () => {

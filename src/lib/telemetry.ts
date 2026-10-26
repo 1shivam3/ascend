@@ -9,23 +9,27 @@ export const TELEMETRY_CONSENT_KEY = 'ascend_telemetry_consent';
 export const TELEMETRY_CONSENT_EVENT = 'ascend_telemetry_consent_changed';
 
 /**
- * Resolves Google Analytics 4 Measurement ID from environment or verified project fallback.
+ * Resolves Google Analytics 4 Measurement ID from environment only.
+ * (2026-10-26 security review: the old dev fallback ID was a real
+ * project identifier baked into the public repo — deleted. Dev builds
+ * without NEXT_PUBLIC_GA_ID simply load no analytics, which is the
+ * correct default: dev traffic must never pollute production data.)
  */
 export function getGaMeasurementId(): string | undefined {
-  const envId = process.env.NEXT_PUBLIC_GA_ID?.trim();
-  return envId || (process.env.NODE_ENV !== 'production' ? 'G-DV7VT2H5LP' : undefined);
+  return process.env.NEXT_PUBLIC_GA_ID?.trim() || undefined;
 }
 
 /**
- * Resolves Microsoft Clarity Project ID from environment or verified project fallback.
+ * Resolves Microsoft Clarity Project ID from environment only.
+ * (Same as above: the dev fallback project ID is deleted.)
  */
 export function getClarityProjectId(): string | undefined {
-  const envId = process.env.NEXT_PUBLIC_CLARITY_ID?.trim();
-  return envId || (process.env.NODE_ENV !== 'production' ? 'ywdt5rqnzv' : undefined);
+  return process.env.NEXT_PUBLIC_CLARITY_ID?.trim() || undefined;
 }
 
 /**
- * Resolves Sentry Browser CDN loader URL from environment or verified DSN key.
+ * Resolves Sentry Browser CDN loader URL from environment only.
+ * (Same as above: the dev fallback loader key is deleted.)
  */
 export function getSentryLoaderUrl(): string | undefined {
   const customScriptUrl = process.env.NEXT_PUBLIC_SENTRY_SCRIPT_URL?.trim();
@@ -38,9 +42,7 @@ export function getSentryLoaderUrl(): string | undefined {
       return `https://js.sentry-cdn.com/${match[1]}.min.js`;
     }
   }
-  return process.env.NODE_ENV !== 'production'
-    ? 'https://js.sentry-cdn.com/5943361d29069b1cc12e20ca7d6e2f90.min.js'
-    : undefined;
+  return undefined;
 }
 
 /**

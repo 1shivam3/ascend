@@ -8,12 +8,16 @@ interface StepProgressBarProps {
   currentStep: 1 | 2 | 3 | 4;
   onBack: () => void;
   title?: string;
+  /** Total segments. Default 4 (legacy flow); the simplified onboarding
+   *  flow passes 2 (goals -> details-lite). */
+  totalSteps?: number;
 }
 
 export default function StepProgressBar({
   currentStep,
   onBack,
   title,
+  totalSteps = 4,
 }: StepProgressBarProps) {
   const { t } = useTranslation();
   return (
@@ -33,6 +37,10 @@ export default function StepProgressBar({
           <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
             {title}
           </span>
+        ) : totalSteps !== 4 ? (
+          <span className="text-xs font-medium text-text-muted">
+            {t('auth.stepOfTotal', { step: currentStep, total: totalSteps })}
+          </span>
         ) : (
           <span className="text-xs font-medium text-text-muted">
             {t('auth.stepOf', { step: currentStep })}
@@ -43,28 +51,23 @@ export default function StepProgressBar({
         <div className="w-10 h-10" aria-hidden="true" />
       </div>
 
-      {/* 4-Segment Progress Bar */}
-      <div className="grid grid-cols-4 gap-2 w-full" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={4}>
-        <div
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 1 ? 'bg-accent' : 'bg-bg-tertiary'
-          }`}
-        />
-        <div
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 2 ? 'bg-accent' : 'bg-bg-tertiary'
-          }`}
-        />
-        <div
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 3 ? 'bg-accent' : 'bg-bg-tertiary'
-          }`}
-        />
-        <div
-          className={`h-1.5 rounded-full transition-all duration-300 ${
-            currentStep >= 4 ? 'bg-accent' : 'bg-bg-tertiary'
-          }`}
-        />
+      {/* Segment Progress Bar (segment count follows totalSteps) */}
+      <div
+        className="grid gap-2 w-full"
+        style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }}
+        role="progressbar"
+        aria-valuenow={currentStep}
+        aria-valuemin={1}
+        aria-valuemax={totalSteps}
+      >
+        {Array.from({ length: totalSteps }, (_, i) => (
+          <div
+            key={i}
+            className={`h-1.5 rounded-full transition-all duration-300 ${
+              currentStep >= i + 1 ? 'bg-accent' : 'bg-bg-tertiary'
+            }`}
+          />
+        ))}
       </div>
     </div>
   );

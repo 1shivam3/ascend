@@ -88,6 +88,7 @@ import ExerciseLibraryModal from '@/components/ExerciseLibraryModal';
 import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
+import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
 import { isBlockEnded } from '@/lib/weekly-review';
@@ -587,7 +588,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
         >
           <h3 className="font-bold text-text-primary truncate leading-tight" title={plan.name}>{plan.name}</h3>
-          <p className="text-2xs text-text-muted font-mono mt-0.5">
+          <p className="text-xs text-text-muted font-mono mt-0.5">
             {plan.exercises.length} exercise{plan.exercises.length !== 1 ? 's' : ''}
             {/* SIM-P2-17: a duration estimate before starting. */}
             {' · '}{(() => { const d = estimatePlanDurationMin(plan); return t('plan.estDuration', { min: d.min, max: d.max }); })()}
@@ -605,6 +606,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
               intensityMode: plan.intensityMode === 'percent' ? 'rpe' : 'percent',
             })}
             title={t('plan.usePercent')}
+            aria-label={t('plan.usePercent')}
             aria-pressed={plan.intensityMode === 'percent'}
             className={`px-2 py-1.5 min-h-[44px] rounded-lg text-2xs font-mono font-bold transition-colors cursor-pointer ${
               plan.intensityMode === 'percent'
@@ -618,7 +620,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             type="button"
             onClick={onDuplicate}
             title="Duplicate plan"
-            className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+            aria-label="Duplicate plan"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Copy className="w-3.5 h-3.5" />
           </button>
@@ -626,7 +629,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             type="button"
             onClick={onShare}
             title="Share plan via WhatsApp or QR"
-            className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+            aria-label="Share plan via WhatsApp or QR"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Share2 className="w-3.5 h-3.5" />
           </button>
@@ -634,7 +638,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             type="button"
             onClick={onEdit}
             title="Edit plan"
-            className="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
+            aria-label="Edit plan"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-accent hover:bg-accent/10 transition-colors"
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
@@ -642,7 +647,8 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             type="button"
             onClick={onDelete}
             title="Delete plan"
-            className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+            aria-label="Delete plan"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -915,6 +921,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   // ── Plan modal state ───────────────────────────────────────────────────────
   const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+  const [isPlanPrefsOpen, setIsPlanPrefsOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlannedWorkout | null>(null);
   const [planToDelete, setPlanToDelete] = useState<PlannedWorkout | null>(null);
   const [isSuggestedModalOpen, setIsSuggestedModalOpen] = useState(false);
@@ -1128,10 +1135,24 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
   }, [activeWorkoutDraft, isModalOpen]);
 
   const handleDiscardDraft = () => {
+    // UX #1: discarding used to be instant and irreversible — a stray
+    // tap erased an in-progress workout draft. Now the toast carries
+    // Undo (6s lifetime, same pattern as plan deletion): the captured
+    // draft + plan linkage are restored exactly.
+    const capturedDraft = activeWorkoutDraft;
+    const capturedPlan = startedFromPlan;
+    const capturedPlanId = startedFromPlanId;
     clearWorkoutDraft();
     setStartedFromPlan(null);
     setStartedFromPlanId(null);
-    toast.info(t('toast.draftDiscarded'), t('toast.titleDraftCleared'));
+    toast.showToast('info', t('toast.draftDiscarded'), t('toast.titleDraftCleared'), undefined, {
+      label: t('common.undo'),
+      onAction: () => {
+        if (capturedDraft) saveWorkoutDraft(capturedDraft);
+        setStartedFromPlan(capturedPlan);
+        setStartedFromPlanId(capturedPlanId);
+      },
+    });
   };
 
   const handleRepeatLastWorkout = () => {
@@ -1793,6 +1814,25 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
 
   const openCreatePlan = () => {
     setEditingPlan(null);
+    // Progressive prompt (simplified onboarding): experience / equipment /
+    // days are asked the first time a plan is built, not during
+    // onboarding. Once asked — answered or skipped — plans open directly.
+    let asked = false;
+    try {
+      asked = window.localStorage.getItem('ascend_plan_prefs_asked_v1') === '1';
+    } catch {}
+    if (!asked) {
+      setIsPlanPrefsOpen(true);
+      return;
+    }
+    setIsPlanModalOpen(true);
+  };
+
+  const handlePlanPrefsDone = () => {
+    try {
+      window.localStorage.setItem('ascend_plan_prefs_asked_v1', '1');
+    } catch {}
+    setIsPlanPrefsOpen(false);
     setIsPlanModalOpen(true);
   };
 
@@ -2077,8 +2117,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 type="button"
                 onClick={() => setIsPlateModalOpen(true)}
                 className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-                title="Plate Calculator"
-                aria-label="Plate Calculator"
+                title={t('tools.plateTitle')}
+                aria-label={t('tools.plateTitle')}
               >
                 <Dumbbell className="w-4 h-4 text-accent" />
               </button>
@@ -2087,8 +2127,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               type="button"
               onClick={() => setIsToolsMenuOpen(true)}
               className="w-11 h-11 rounded-full bg-bg-card border border-border text-text-secondary hover:text-text-primary hover:border-accent/40 transition-colors flex items-center justify-center cursor-pointer shadow-xs"
-              title="Training Tools & Actions"
-              aria-label="Training Tools"
+              title={t('tools.title')}
+              aria-label={t('tools.title')}
             >
               <SlidersHorizontal className="w-4 h-4 text-accent" />
             </button>
@@ -2163,6 +2203,21 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-accent" />
           <h2 className="section-title text-[11px] mb-0">{t('coachBlock.sectionTitle').toUpperCase()}</h2>
+          {/* UX #17: the coach section had no off-switch in place — the
+              only toggle lived in Settings. Shown only while coach tips
+              are on; tapping hides the tips (and this button) at once. */}
+          {coachEnabled && (
+            <button
+              type="button"
+              onClick={() => {
+                setUiPreferences({ coachEnabled: false });
+                toast.info(t('coachBlock.tipsOff'), t('toast.titleDismissed'));
+              }}
+              className="ml-auto text-2xs font-semibold text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0"
+            >
+              {t('coachBlock.turnOffTips')}
+            </button>
+          )}
         </div>
 
         {coachBlocks.pendingProposal ? (
@@ -2334,8 +2389,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 <BookOpen className="w-5 h-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-text-primary">No custom plans saved yet</p>
-                <p className="text-2xs text-text-muted">Build your personalized routine to get started</p>
+                <p className="text-xs font-semibold text-text-primary">{t('workout.emptyPlansTitle')}</p>
+                <p className="text-2xs text-text-muted">{t('workout.emptyPlansHint')}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -2345,9 +2400,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 className="btn-primary py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 text-white" />
-                <span>Create My Own</span>
+                <span>{t('workout.createOwn')}</span>
               </button>
-
+              {/* UX #14: the empty-plans card offered only "Create My Own",
+                  although a suggestion modal already exists — a new user
+                  with no plans had no one-tap suggestion path. */}
+              <button
+                type="button"
+                onClick={() => setIsSuggestedModalOpen(true)}
+                className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl bg-bg-secondary border border-border text-text-primary hover:border-accent/40 transition-colors"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-accent" />
+                <span>{t('workout.suggestOne')}</span>
+              </button>
             </div>
           </div>
         ) : (
@@ -3016,6 +3081,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         variant="danger"
       />
 
+      {/* ── First-plan progressive prompt (simplified onboarding) ──────── */}
+      <PlanPrefsPrompt isOpen={isPlanPrefsOpen} onDone={handlePlanPrefsDone} />
+
       {/* ── Plan Create/Edit Modal ───────────────────────────────────────── */}
       <PlanModal
         isOpen={isPlanModalOpen}
@@ -3292,7 +3360,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
             <div className="flex items-center justify-between border-b border-border/80 pb-3">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-accent" />
-                <h3 className="font-bold text-text-primary text-base">Training Tools</h3>
+                <h3 className="font-bold text-text-primary text-base">{t('tools.title')}</h3>
               </div>
               <button
                 type="button"
@@ -3317,8 +3385,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Dumbbell className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Plate Calculator</h4>
-                    <p className="text-2xs text-text-muted">Calculate exact barbell loading plates</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.plateTitle')}</h4>
+                    <p className="text-2xs text-text-muted">{t('tools.plateHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3338,8 +3406,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Weekly Schedule &amp; Split</h4>
-                    <p className="text-2xs text-text-muted">Assign days, target muscle groups &amp; rest days</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.scheduleTitle')}</h4>
+                    <p className="text-2xs text-text-muted">{t('tools.scheduleHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3358,8 +3426,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <BookOpen className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Exercise Library</h4>
-                    <p className="text-2xs text-text-muted">Browse 100+ movements, cues &amp; substitutions</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.libraryTitle')}</h4>
+                    <p className="text-2xs text-text-muted">{t('tools.libraryHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3378,8 +3446,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Log Past Session</h4>
-                    <p className="text-2xs text-text-muted">Back-fill a workout completed on a previous day</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.pastTitle')}</h4>
+                    <p className="text-2xs text-text-muted">{t('tools.pastHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3398,8 +3466,8 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">Build workout plan</h4>
-                    <p className="text-2xs text-text-muted">Design a reusable custom workout routine</p>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.buildTitle')}</h4>
+                    <p className="text-2xs text-text-muted">{t('tools.buildHint')}</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -3411,7 +3479,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <div>
                 <span className="text-xs font-bold text-text-primary block">{t('workout.viewMode')}</span>
                 <span className="text-2xs text-text-muted">
-                  {workoutMode === 'advanced' ? 'Advanced (All analytics & insights)' : 'Simple (Focused essentials)'}
+                  {workoutMode === 'advanced' ? t('tools.viewAdvanced') : t('tools.viewSimple')}
                   {workoutModeOverride ? '' : ` · ${t('workout.viewAuto')}`}
                 </span>
               </div>

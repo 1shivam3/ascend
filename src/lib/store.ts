@@ -45,12 +45,14 @@ import {
   PolicyDecisionApplicationAudit,
   ApplyPolicyDecisionOptions,
   ApplyPolicyDecisionResult,
+  MAX_ATHLETE_NAME_LENGTH,
 } from './types';
 import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
 import { normalizeHex } from './accent-themes';
-import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes } from './storage';
+import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
 import { ARCHIVED_HISTORY_KEY } from './history-fork';
+import { clearHowToSeenFlag } from './howto-guide';
 import { getTabLeaderGuard } from './tab-leader';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
@@ -75,7 +77,8 @@ import {
   type WeeklyReview,
 } from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId } from './formatters';
+import { safeRandomId, sanitizeAthleteName } from './formatters';
+import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
   canPersistDecisionToLedger,
@@ -515,7 +518,7 @@ export interface AppState {
   dismissBlockProposal: () => void;
   /** Approve the pending proposal (or an edited copy of it from the
    *  review step): materialize plans + schedule + block state atomically. */
-  approveBlockProposal: (editedProposal?: BlockProposal) => void;
+  approveBlockProposal: (editedProposal?: BlockProposal) => boolean;
   /** Coach adopts an existing user plan (schemes derived; plan untouched). */
   adoptPlanForCoaching: (planId: string) => void;
   unadoptPlanForCoaching: (planId: string) => void;
@@ -2678,7 +2681,7 @@ export const useAppStore = create<AppState>()(
       approveBlockProposal: (editedProposal) => {
         const state = get();
         const pending = state.coachBlocks.pendingProposal;
-        if (!pending) return;
+        if (!pending) return false;
         // An edited copy is only honoured when it IS the pending
         // proposal (same id) — anything else is ignored, never trusted.
         const proposal =
@@ -2690,6 +2693,11 @@ export const useAppStore = create<AppState>()(
           state.weeklySchedule,
           todayStr
         );
+        // Refuse a 0-plan materialization: every day empty (injuries +
+        // equipment + session limits) used to create an "active" block
+        // with no plans in it — a block that could never run. The
+        // proposal stays pending so the user can adjust and retry.
+        if (plans.length === state.plannedWorkouts.length) return false;
         const previous = state.coachBlocks.activeBlock;
         set({
           plannedWorkouts: plans,
@@ -2710,6 +2718,7 @@ export const useAppStore = create<AppState>()(
         // action so its invariants (and any schedule-keyed derivations)
         // stay the single source of truth.
         get().refreshAthleteModel();
+        return true;
       },
 
       adoptPlanForCoaching: (planId) => {
@@ -3422,6 +3431,57 @@ export const useAppStore = create<AppState>()(
           localStorage.removeItem('ascend_meals');
           localStorage.removeItem(PROGRESS_PHOTOS_KEY);
         } catch {}
+        // NEW (user decision, 2026-10-26): Start fresh no longer
+        // strands the user on the onboarding start screen. The
+        // archive above already holds the old history, so build the
+        // same default profile untouched onboarding produces and land
+        // on Today: ONBOARDING_DEFAULTS in Onboarding.tsx (beginner /
+        // male / kg / 70 kg / 175 cm / 4 days / full gym / light
+        // activity / non-vegetarian), name 'Athlete' (the details
+        // form's fallback), no injuries, no DOB (age stays unset —
+        // never fabricated), no plans (the plan offer is an onboarding
+        // choice). Goals have no untouched value — onboarding requires
+        // a choice — so use the repo's own fallback DEFAULT_GOALS
+        // (['build_muscle']), the same fallback setProfile applies to
+        // an empty goals list. Macro targets use the same derivation
+        // onboarding calls, with age unspecified (the macro lib
+        // defaults to 25 internally). setProfile also clears the
+        // logged-out flag, exactly as a normal onboarding completion
+        // does; disaster recovery has nothing to resurrect here
+        // (snapshot + legacy keys deleted above). The guide flag is
+        // cleared so the new user sees the guide once on first Today
+        // arrival, same as a fresh onboarding completion.
+        const store = get();
+        store.setProfile({
+          id: getOrCreateGuestId(),
+          name: sanitizeAthleteName('Athlete', MAX_ATHLETE_NAME_LENGTH),
+          gender: 'male',
+          bodyweightKg: 70,
+          bodyweightLbs: Math.round(70 * 2.20462 * 10) / 10,
+          heightCm: 175,
+          unit: 'kg',
+          dietPreference: 'non_vegetarian',
+          createdAt: new Date().toISOString(),
+          goals: [...DEFAULT_GOALS],
+          userMode: 'beginner',
+        });
+        store.setUserMode('beginner');
+        store.setTrainingProfile({
+          goal: 'build_muscle',
+          experience: 'beginner',
+          daysPerWeek: 4,
+          preferredDurationMin: 45,
+          equipment: 'full_gym',
+          activityLevel: 'light',
+          preferredSplit: 'upper_lower',
+          dislikedExercises: [],
+          injuriesOrLimitations: [],
+          coachingStyle: 'balanced',
+        });
+        store.setMacroGoals(
+          calculateRecommendedMacroGoals(70, 'build_muscle', 'male', 175, undefined, 'light')
+        );
+        clearHowToSeenFlag(typeof window !== 'undefined' ? window.localStorage : undefined);
         return true;
       },
 

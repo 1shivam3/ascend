@@ -164,7 +164,7 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       expect(html).toContain('App Settings');
       // FND-05: Log Out moved to Settings → Data & Account; Profile
       // now shows the Data & Account row that lands there.
-      expect(html).toContain('Data &amp; Account');
+      expect(html).toContain('Sign out &amp; account'); // REVIEW 2026-10-26 (Track G #8): section renamed from 'Data & Account'.
     });
 
     it('correctly adapts when unit is lbs', () => {
@@ -218,7 +218,7 @@ describe('Phase 6 — Settings, Profile & Navigation Verification', () => {
       // Live-fix L3: the row is the workout view mode, not athlete
       // experience — the old label misled users on density switches.
       expect(html).toContain('Workout view');
-      expect(html).toContain('Data, Privacy &amp; Legal');
+      expect(html).toContain('Backup &amp; legal'); // REVIEW 2026-10-26 (Track G #8): section renamed from 'Data, Privacy & Legal'.
       expect(html).toContain('Export JSON Backup');
       expect(html).toContain('Import Backup File');
       expect(html).toContain('Anonymous Diagnostics');

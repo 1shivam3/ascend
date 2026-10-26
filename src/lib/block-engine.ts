@@ -255,13 +255,10 @@ function resolveFocus(
         reason: 'Your goal is strength, so the block is built around heavy main lifts with a test week to prove the progress.',
       };
     case 'build_muscle':
-      if (nutritionPhase === 'deficit') {
-        return {
-          focus: 'fat_loss',
-          reason:
-            'Your goal is muscle but your current targets run a calorie deficit, so this block protects strength while the deficit does its work — heavy compounds stay, volume is trimmed.',
-        };
-      }
+      // NOTE: a build_muscle+deficit branch used to live here, but the
+      // store only ever passes nutritionPhase for lose_fat — the branch
+      // was unreachable dead code. Deleted rather than kept "just in
+      // case": a branch that cannot fire is a branch nobody tests.
       return {
         focus: 'hypertrophy',
         reason: 'Your goal is muscle, so the block runs moderate loads in the 6–15 rep ranges where your logged progress has come from.',
@@ -668,6 +665,39 @@ function pickExercisesForMuscle(
   return picked;
 }
 
+/** Pattern of a day, for the fill pass: the label when it names one
+ *  (Push/Pull/Legs/Upper/Lower), otherwise the majority pattern of what
+ *  survived on the day, otherwise full-body. */
+function dayPatternForFill(
+  label: string,
+  exercises: PlannedExercise[]
+): 'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full' {
+  const lower = label.toLowerCase();
+  if (lower.startsWith('push')) return 'push';
+  if (lower.startsWith('pull')) return 'pull';
+  if (lower.startsWith('legs')) return 'legs';
+  if (lower.startsWith('lower')) return 'lower';
+  if (lower.startsWith('upper')) return 'upper';
+  const counts = { push: 0, pull: 0, legs: 0 };
+  for (const ex of exercises) counts[classifyForPpl(ex)]++;
+  if (counts.push > 0 && counts.push >= counts.pull && counts.push >= counts.legs) return 'push';
+  if (counts.pull > 0 && counts.pull >= counts.legs) return 'pull';
+  if (counts.legs > 0) return 'legs';
+  return 'full';
+}
+
+const FILL_MUSCLES: Record<
+  'push' | 'pull' | 'legs' | 'upper' | 'lower' | 'full',
+  MuscleGroup[]
+> = {
+  push: ['Chest', 'Shoulders', 'Arms'],
+  pull: ['Back', 'Arms'],
+  legs: ['Legs', 'Core'],
+  upper: ['Chest', 'Back', 'Shoulders', 'Arms'],
+  lower: ['Legs', 'Core'],
+  full: ['Chest', 'Back', 'Legs', 'Shoulders', 'Core', 'Arms'],
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The generator
 // ─────────────────────────────────────────────────────────────────────────────
@@ -796,27 +826,88 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
     }
   }
 
-  // 5) Session-length budget: trim accessories (never mains) until fit.
+  // 5) Session-length budget — sets first, exercises last, never below
+  //    the floor. The old code deleted accessories first, which is how
+  //    a 5-exercise Upper A became 3 mains: the day kept its heavy
+  //    lifts and lost everything that balanced it. Cutting a set saves
+  //    ~2–4 minutes and keeps the movement; only when sets alone cannot
+  //    fit the session does an exercise go — and never a main lift, a
+  //    weak-point pick, or anything below the 4-exercise floor.
+  const MIN_DAY_EXERCISES = 4;
   skeletons = skeletons.map((day) => {
     let exercises = [...day.exercises];
-    while (
-      exercises.length > 3 &&
-      estimateSessionMinutes({ exercises }) > intake.sessionMinutes
-    ) {
+    const over = () => estimateSessionMinutes({ exercises }) > intake.sessionMinutes;
+    if (over()) {
+      const cutRole = (role: ExerciseRole) => {
+        exercises = exercises.map((ex) =>
+          roleOf(ex.name) === role && (ex.targetSets || 3) > 2
+            ? { ...ex, targetSets: (ex.targetSets || 3) - 1 }
+            : ex
+        );
+      };
+      cutRole('accessory');
+      if (over()) cutRole('secondary');
+      if (over()) cutRole('main');
+    }
+    while (exercises.length > MIN_DAY_EXERCISES && over()) {
       const idx = [...exercises]
         .map((e, i) => ({ e, i }))
         .reverse()
-        .find(({ e }) => !mainCompoundKey(e.name))?.i;
+        .find(
+          ({ e }) =>
+            !mainCompoundKey(e.name) && !weakWhy.has(canonicalizeExerciseName(e.name))
+        )?.i;
       if (idx === undefined) break;
       exercises.splice(idx, 1);
     }
-    if (estimateSessionMinutes({ exercises }) > intake.sessionMinutes + 10) {
+    return { label: day.label, exercises };
+  });
+
+  // 5b) Fill pass: any day below the floor gets pattern-matched work
+  //    through the same filters as the weak-point pass (equipment probe,
+  //    injury families + joints, beginner exclusion, disliked, no
+  //    week-wide duplicates). This is what repairs the old 2-exercise
+  //    days: PPL bucketing, adapter collisions, and pain swaps all
+  //    shrink days, and nothing used to put anything back.
+  const fillWhy = new Map<string, string>();
+  skeletons = skeletons.map((day) => {
+    if (day.exercises.length >= MIN_DAY_EXERCISES) return day;
+    const pattern = dayPatternForFill(day.label, day.exercises);
+    const muscles = FILL_MUSCLES[pattern];
+    const exercises = [...day.exercises];
+    let rotations = 0;
+    while (exercises.length < MIN_DAY_EXERCISES && rotations < muscles.length * 2) {
+      const muscle = muscles[rotations % muscles.length];
+      rotations++;
+      const picks = pickExercisesForMuscle(muscle, 1, pickCtx);
+      if (picks.length === 0) continue;
+      const p = picks[0];
+      exercises.push(p);
+      pickCtx.usedKeys.add(normalizeExerciseKey(p.name));
+      fillWhy.set(
+        canonicalizeExerciseName(p.name),
+        `Added to round out this ${pattern} day — ${muscle.toLowerCase()} work that fits your equipment and limits.`
+      );
+    }
+    if (exercises.length < MIN_DAY_EXERCISES) {
       warnings.push(
-        `${day.label} runs about ${estimateSessionMinutes({ exercises })} minutes at your loads — longer than your ${intake.sessionMinutes}-minute session. The main lifts stay; trim accessories on the day if you are short on time.`
+        exercises.length === 0
+          ? `${day.label} came out empty after injuries, equipment, and session limits — it was left out of the block rather than programmed with work you cannot do.`
+          : `${day.label} has only ${exercises.length} exercises after injuries, equipment, and session limits — fewer than the ${MIN_DAY_EXERCISES}-exercise floor. Add a movement you like, or widen the session length.`
       );
     }
     return { label: day.label, exercises };
   });
+
+  // 5c) Still over budget at the floor: warn, don't gut the day.
+  for (const day of skeletons) {
+    const mins = estimateSessionMinutes({ exercises: day.exercises });
+    if (day.exercises.length > 0 && mins > intake.sessionMinutes + 10) {
+      warnings.push(
+        `${day.label} runs about ${mins} minutes at your loads — longer than your ${intake.sessionMinutes}-minute session. The main lifts stay; trim accessories on the day if you are short on time.`
+      );
+    }
+  }
 
   // 6) Weekdays fitted to recovery + adherence.
   const dayMuscles = skeletons.map(
@@ -861,8 +952,12 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         targetWeight = roundToLoadable(unit === 'lbs' ? kg * 2.20462 : kg, unit);
       }
       const targetReps = Math.min(range.max, Math.max(range.min, ex.targetReps || range.min + 1));
+      // Strength blocks run mains at 5 sets — the old flat 4-set cap
+      // undercut the one goal whose whole point is heavy main-lift
+      // volume. Other focuses keep 4; accessories/secondary keep 3.
+      // Note: this caps but never raises — a trim-pass cut to 2 stays 2.
       const targetSets = Math.min(
-        role === 'main' ? 4 : 3,
+        role === 'main' ? (focus === 'strength' ? 5 : 4) : 3,
         Math.max(2, ex.targetSets || 3)
       );
       const next: PlannedExercise = {
@@ -879,6 +974,8 @@ export function generateBlockProposal(input: BlockEngineInput): BlockProposal {
         : undefined;
       if (weakWhy.has(key)) {
         whyByExercise[key] = weakWhy.get(key)!;
+      } else if (fillWhy.has(key)) {
+        whyByExercise[key] = fillWhy.get(key)!;
       } else if (swapNote) {
         whyByExercise[key] = `${swapNote} — it trains the same pattern within your limits.`;
       } else if (role === 'main') {

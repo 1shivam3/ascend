@@ -104,12 +104,12 @@ function isValidIpFormat(ip: string): boolean {
  * Prioritizes trusted edge headers (Cloudflare, verified proxy) over client-spoofable forwarded headers.
  */
 export function getClientIp(req: Request): string {
-  const cfConnectingIp = req.headers.get('cf-connecting-ip')?.trim();
-  if (cfConnectingIp && isValidIpFormat(cfConnectingIp)) return cfConnectingIp;
-
-  const realIp = req.headers.get('x-real-ip')?.trim();
-  if (realIp && isValidIpFormat(realIp)) return realIp;
-
+  // P1-2: cf-connecting-ip and x-real-ip are NOT set by Vercel's edge —
+  // anyone could send them and rotate their apparent IP at will,
+  // defeating every per-IP rate limit. Only x-forwarded-for is trusted,
+  // first entry only (the edge-written client IP on this hosting), and
+  // only when it parses as an IP. Everything else is the loopback
+  // fallback, which rate-limits as a single bucket rather than a bypass.
   const forwarded = req.headers.get('x-forwarded-for');
   if (forwarded) {
     const firstIp = forwarded.split(',')[0]?.trim();

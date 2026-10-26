@@ -40,6 +40,7 @@ import ReminderCenterModal from '@/components/ReminderCenterModal';
 import DietPreferencePicker from '@/components/DietPreferencePicker';
 import ThemePicker from '@/components/ThemePicker';
 import CustomizeSheet from '@/components/CustomizeSheet';
+import HowToUseGuide from '@/components/HowToUseGuide';
 import SegmentedControl from '@/components/ui/SegmentedControl';
 import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable } from '@/lib/accent-themes';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
@@ -116,6 +117,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     deleteAccount,
   } = useSupabaseSync();
   const logout = useStore((state) => state.logout);
+  const clearAllData = useStore((state) => state.clearAllData);
   const restoreArchivedHistory = useStore((state) => state.restoreArchivedHistory);
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -125,6 +127,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   // FND-05: destructive actions consolidated in the Data & Account
   // section below (moved here from ProfileView and the Data Vault).
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showLogoutClearConfirm, setShowLogoutClearConfirm] = useState(false);
   const [isDataVaultOpen, setIsDataVaultOpen] = useState(false);
   // FND-06: the Start-fresh archive, when one exists — its restore row
   // lives in Data & Account beside the actions that can erase data.
@@ -250,6 +253,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     [uiPreferences.todayLayout],
   );
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const handleToggleSection = (id: string, next: boolean) => {
     setUiPreferences({
       todayLayout: { ...rawTodayLayoutForSheet, visible: { ...rawTodayLayoutForSheet.visible, [id]: next } },
@@ -448,6 +452,26 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     if (onNavigate) onNavigate('home');
   };
 
+  // P2-1: the old logout kept ALL local data with no way to clear it
+  // short of full account deletion — on a shared device that is a
+  // privacy hole. This variant signs out AND wipes the device:
+  // clearAllData (full state + purgeLocalAppData, which removes every
+  // ascend_* local key except config/theme/logged-out flag, including
+  // the new guide/prompt flags) then logout for the session flag.
+  // Cloud data is untouched — the account stays intact.
+  const handleConfirmLogoutClear = async () => {
+    setShowLogoutClearConfirm(false);
+    try {
+      await signOut();
+    } catch (err) {
+      console.warn('Sign out warning:', err);
+    }
+    clearAllData();
+    logout({ clearLocalData: false });
+    toast.info(t('profile.loggedOutMsg'), t('profile.loggedOutTitle'));
+    if (onNavigate) onNavigate('home');
+  };
+
   // FND-06: restoring the archive REPLACES current history — the row
   // and the confirmation both say so before anything is overwritten.
   const handleConfirmRestoreArchived = () => {
@@ -530,6 +554,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.accountSecurity')}
         </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.accountHint')}</p>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
@@ -615,6 +640,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.appearancePersonalization')}
         </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.appearanceHint')}</p>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           {/* Appearance / Theme */}
           <div className="space-y-2">
@@ -750,6 +776,21 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <ChevronRight className="w-4 h-4 text-text-muted" />
             </button>
           </div>
+
+          {/* How-to-use guide — re-opens the first-run guide on demand */}
+          <div className="pt-3 border-t border-border/60">
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(true)}
+              className="w-full flex items-center justify-between cursor-pointer text-left"
+            >
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('guide.title')}</p>
+                <p className="text-2xs text-text-muted">{t('guide.subtitle')}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-text-muted" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -758,6 +799,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.trainingPreferences')}
         </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.trainingHint')}</p>
         <div className="card p-4 sm:p-5 bg-bg-card border border-border rounded-2xl shadow-xs space-y-4">
           {/* Weekly workout target */}
           <div className="space-y-2">
@@ -1037,6 +1079,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.dataPrivacyLegal')}
         </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.backupLegalHint')}</p>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
           {/* Export JSON */}
           <button
@@ -1224,6 +1267,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
           {t('settings.dataAccount')}
         </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.dataAccountHint')}</p>
         <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
           {/* Log Out (moved from ProfileView) */}
           <button
@@ -1238,6 +1282,24 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div>
                 <p className="text-xs font-bold text-text-primary">{t('profile.logOut')}</p>
                 <p className="text-2xs text-text-muted">{user ? t('profile.logoutMsgUser') : t('profile.logoutMsgGuest')}</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted" />
+          </button>
+
+          {/* Sign out & clear this device's data (P2-1) */}
+          <button
+            type="button"
+            onClick={() => setShowLogoutClearConfirm(true)}
+            className="w-full p-3 flex items-center justify-between hover:bg-accent/10 rounded-xl transition-colors cursor-pointer text-left text-accent"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-accent/10 flex items-center justify-center text-accent">
+                <LogOut className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('profile.logOutClear')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.logoutClearMsg')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-text-muted" />
@@ -1336,6 +1398,19 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         icon="logout"
       />
 
+      {/* Sign out & clear data Modal (P2-1: destructive local wipe) */}
+      <ConfirmationModal
+        isOpen={showLogoutClearConfirm}
+        onClose={() => setShowLogoutClearConfirm(false)}
+        onConfirm={handleConfirmLogoutClear}
+        title={t('profile.logoutClearTitle')}
+        message={t('profile.logoutClearMsg')}
+        confirmText={t('profile.logOutClear')}
+        cancelText={t('common.cancel')}
+        variant="danger"
+        icon="logout"
+      />
+
       {/* Restore Archived History Modal (FND-06) */}
       {archivedSummary && (
         <ConfirmationModal
@@ -1384,6 +1459,11 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
+      />
+
+      <HowToUseGuide
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
       />
 
       <CustomizeSheet

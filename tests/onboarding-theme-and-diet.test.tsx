@@ -86,17 +86,20 @@ describe('onboarding diet preference (QA4-019)', () => {
     useStore.getState().setUiPreferences({ language: 'en' });
   });
 
-  it('the details step renders all four diet options (en)', () => {
+  // REVIEW 2026-10-26 (Track A): the details step is now details-lite —
+  // name, gender, DOB picker, injury dropdown. Diet left onboarding: it
+  // defaults to non_vegetarian and is asked progressively on first Fuel
+  // visit (FuelPrefsPrompt). So this test asserts the new step, not diet.
+  it('the details step renders DOB + injury and no diet options (en)', () => {
     const html = renderToStaticMarkup(
       <PersonalDetailsScreen onContinue={() => {}} onBack={() => {}} />,
     );
-    expect(html).toContain('Diet Preference');
-    expect(html).toContain('Vegetarian');
-    expect(html).toContain('Eggetarian');
-    expect(html).toContain('Non-Vegetarian');
-    expect(html).toContain('Vegan');
-    // The default stays non_vegetarian — but now as a visible, chosen option.
-    expect(html).toContain('aria-checked="true"');
+    expect(html).toContain('Date of birth');
+    expect(html).toContain('type="date"');
+    expect(html).toContain('injury-select');
+    expect(html).not.toContain('Diet Preference');
+    expect(html).not.toContain('Vegetarian');
+    expect(html).not.toContain('Vegan');
   });
 
   it('every diet key exists in Hindi too (dictionary parity)', () => {
