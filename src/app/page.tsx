@@ -9,6 +9,7 @@ import { applyTextScale } from '@/lib/text-scale';
 import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
 import HowToUseGuide from '@/components/HowToUseGuide';
+import { HOWTO_SEEN_KEY } from '@/lib/howto-guide';
 import { calculateAgeFromDob, isValidDob } from '@/lib/age';
 import HistoryForkScreen from '@/components/HistoryForkScreen';
 import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
@@ -132,12 +133,12 @@ export default function AppPage() {
     if (!hasCompletedOnboarding || !profile) return;
     if (activeTab !== 'home') return;
     try {
-      if (!window.localStorage.getItem('ascend_howto_seen_v1')) setShowGuide(true);
+      if (!window.localStorage.getItem(HOWTO_SEEN_KEY)) setShowGuide(true);
     } catch {}
   }, [_hasHydrated, persistHydrated, hasCompletedOnboarding, profile, activeTab]);
   const closeGuide = () => {
     try {
-      window.localStorage.setItem('ascend_howto_seen_v1', '1');
+      window.localStorage.setItem(HOWTO_SEEN_KEY, '1');
     } catch {}
     setShowGuide(false);
   };
