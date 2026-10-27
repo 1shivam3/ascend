@@ -554,7 +554,7 @@ export interface AppState {
     options: ApplyPolicyDecisionOptions
   ) => ApplyPolicyDecisionResult;
 
-  clearAllData: () => void;
+  clearAllData: (options?: { convergeOnly?: boolean }) => void;
   logout: (options?: { clearLocalData?: boolean }) => void;
   // FND-06: Start fresh archives instead of deleting, and the archive
   // is restorable from Settings → Data & Account. Local-state only;
@@ -3240,7 +3240,7 @@ export const useAppStore = create<AppState>()(
         };
       },
 
-      clearAllData: () => {
+      clearAllData: (options?: { convergeOnly?: boolean }) => {
         set({
           profile: null,
           prs: [],
@@ -3294,6 +3294,11 @@ export const useAppStore = create<AppState>()(
           policyDecisionApplications: [],
         });
         // Truly purge everything the app stored (see purgeLocalAppData).
+        // Converge-only callers (purge broadcast from another tab)
+        // skip everything below: their memory reset is the whole job,
+        // and re-purging/re-claiming/re-marking would fight the
+        // originating tab's reset.
+        if (options?.convergeOnly) return;
         purgeLocalAppData();
         // Preview-fix B1b: the purge removes the leader record too,
         // leaving a vacuum the OLD leader's tick would win (a follower
@@ -3307,6 +3312,17 @@ export const useAppStore = create<AppState>()(
           getTabLeaderGuard()?.takeOver();
         } catch {
           // The guard must never break the reset.
+        }
+        // Second-round B1b: purge broadcast marker (see
+        // PURGE_MARKER_KEY). Written AFTER the purge so it survives
+        // it; other tabs converge on the storage event, and pending
+        // snapshot timers predating it abort at fire time.
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(PURGE_MARKER_KEY, String(Date.now()));
+          }
+        } catch {
+          // The marker is best-effort; the purge itself already happened.
         }
       },
 
@@ -4421,13 +4437,41 @@ export function getStorageWriteFailed(): boolean {
   return mainStoreWriteFailed || snapshotWriteFailed;
 }
 
+/**
+ * Second-round B1b: purge broadcast marker. clearAllData writes the
+ * purge timestamp here AFTER purging (purgeLocalAppData would remove
+ * a pre-existing marker, so the write must come after the purge).
+ * Other tabs converge on it two ways: (1) the storage-event listener
+ * below resets their in-memory state to fresh, so a later claim or
+ * write cannot resurrect; (2) a pending snapshot timer aborts when
+ * the marker is at or after its schedule time. The marker is
+ * monotonic in practice (one write per purge, timestamps only move
+ * forward across purges); it is never exported in backups and never
+ * blocks a tab that booted after the purge (lastSeen initializes to
+ * the current marker at startup).
+ */
+export const PURGE_MARKER_KEY = 'ascend_purge_at';
+
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
+  let syncTimerScheduledAt = 0;
   const unsubscribe = useAppStore.subscribe((state) => {
+    // Second-round B1b: cancel a pending timer on EVERY state change,
+    // before any guard. Previously clearTimeout lived inside the data
+    // guard below, so the reset-to-defaults set() (profile null, no
+    // workouts, no PRs) never cancelled a timer scheduled by the
+    // pre-reset state — e.g. the rehydrate inside
+    // ensureDeleteWillPersist. That timer then fired after the purge
+    // carrying the OLD state, and passed the fire-time proof below,
+    // because the resetting tab legitimately holds leadership after
+    // re-claim. The resetter's own timer was the systematic vector
+    // behind the second live failure, not the old leader's.
+    clearTimeout(syncTimer);
+    syncTimer = null;
     // QA4-010: a follower tab must not overwrite the leader's snapshot.
     if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
-      clearTimeout(syncTimer);
+      syncTimerScheduledAt = Date.now();
       syncTimer = setTimeout(() => {
         // Preview-fix B1b (TOCTOU): this timer is scheduled while
         // leader but can fire arbitrarily late — background-tab
@@ -4440,6 +4484,22 @@ if (typeof window !== 'undefined') {
         try {
           const guard = getTabLeaderGuard();
           if (guard && !guard.isProvenLeader()) return;
+        } catch {
+          return;
+        }
+        // Second-round B1b: a purge marker at or after this timer's
+        // schedule time means a reset happened after scheduling (the
+        // old leader claims after the resetter unloads, then its
+        // pending timer fires as proven leader). The captured state
+        // predates the purge and must not be written. `>=` is
+        // deliberate: a same-millisecond legitimate timer is just a
+        // skipped redundancy-mirror write (the blob is primary),
+        // while a stale snapshot resurrecting is the bug.
+        try {
+          if (typeof localStorage !== 'undefined') {
+            const marker = Number(localStorage.getItem(PURGE_MARKER_KEY));
+            if (marker && marker >= syncTimerScheduledAt) return;
+          }
         } catch {
           return;
         }
@@ -4484,4 +4544,39 @@ if (typeof window !== 'undefined') {
   };
   window.addEventListener('beforeunload', cleanup);
   window.addEventListener('pagehide', cleanup);
+}
+
+// Second-round B1b: purge convergence. When another tab resets, this
+// tab's in-memory state is stale by definition — without convergence
+// it can resurrect the purged data the moment it claims leadership
+// (resetter unloads) or writes (any later state change that slips
+// past suppression). The storage event fires in every OTHER live tab
+// when the marker is written, so convergence is prompt; it never
+// fires in the originating tab, so no loop is possible. Converging
+// means exactly the clearAllData state reset, WITHOUT re-purging,
+// re-claiming, or re-marking (convergeOnly): the resulting persist
+// write, if any, carries fresh defaults — harmless whether this tab
+// is follower (suppressed) or leader (defaults blob). The
+// reset-to-defaults set() also cancels any pending snapshot timer
+// via the subscribe fix above. A tab that boots after a purge
+// initializes lastSeen to the current marker, so an old purge never
+// wipes a fresh boot (disk is already clean then).
+if (typeof window !== 'undefined') {
+  let lastSeenPurgeAt = 0;
+  try {
+    lastSeenPurgeAt = Number(localStorage.getItem(PURGE_MARKER_KEY)) || 0;
+  } catch {
+    // Storage unavailable — convergence simply never triggers.
+  }
+  window.addEventListener('storage', (event) => {
+    try {
+      if (!event || event.key !== PURGE_MARKER_KEY || !event.newValue) return;
+      const marker = Number(event.newValue);
+      if (!marker || marker <= lastSeenPurgeAt) return;
+      lastSeenPurgeAt = marker;
+      useAppStore.getState().clearAllData({ convergeOnly: true });
+    } catch {
+      // A broadcast must never break the app shell.
+    }
+  });
 }

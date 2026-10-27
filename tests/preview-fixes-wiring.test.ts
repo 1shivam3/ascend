@@ -33,12 +33,17 @@ describe('B1b: reset anti-resurrection wiring', () => {
 
   it('clearAllData re-claims leadership after the purge', () => {
     const s = src('lib/store.ts');
-    const at = s.indexOf('clearAllData: () => {');
+    const at = s.indexOf('clearAllData: (options?: { convergeOnly?: boolean }) => {');
     expect(at).toBeGreaterThan(-1);
-    const block = s.slice(at, at + 4000);
+    const block = s.slice(at, at + 6000);
     expect(block).toContain('purgeLocalAppData();');
     expect(block.indexOf('takeOver()')).toBeGreaterThan(
       block.indexOf('purgeLocalAppData();'),
+    );
+    // Second-round B1b: the purge marker is written after the
+    // re-claim, so it survives the purge it announces.
+    expect(block.indexOf('PURGE_MARKER_KEY')).toBeGreaterThan(
+      block.indexOf('takeOver()'),
     );
   });
 
