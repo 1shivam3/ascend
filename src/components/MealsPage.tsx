@@ -22,7 +22,7 @@ import {
   getSafeMinCalories,
   normalizeCalorieDelta,
 } from '@/lib/macros';
-import { effectiveMacroGoals, dayScaledGoals } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, macroSplitPercentages } from '@/lib/effective-goals';
 import {
   Plus,
   X,
@@ -1343,6 +1343,15 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // ── Fast/festival day pattern + nutrition coach ──────────────────────
   const dayKind = mealDayKinds[todayDate];
   const displayGoals = dayScaledGoals(effectiveGoals, dayKind);
+  // F16 (preview-fix): macro-split percentages from the displayed
+  // grams, not from the day-kind-scaled calorie total — see
+  // macroSplitPercentages. Computed once so the three cards, the
+  // split line, and the ratio bar can never disagree.
+  const macroSplit = macroSplitPercentages(
+    macroGoals?.proteinG || proteinTargetG,
+    displayGoals?.carbsG || 220,
+    displayGoals?.fatG || 70,
+  );
   const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals) : null;
   const [, setHintTick] = useState(0);
   const currentHour = new Date().getHours();
@@ -2649,7 +2658,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {macroGoals?.proteinG || proteinTargetG}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (displayGoals?.calories || 2400)) * 100)}%
+              {macroSplit.proteinPct}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
@@ -2658,7 +2667,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {displayGoals?.carbsG || 220}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((displayGoals?.carbsG || 220) * 4 / (displayGoals?.calories || 2400)) * 100)}%
+              {macroSplit.carbsPct}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
@@ -2667,7 +2676,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {displayGoals?.fatG || 70}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((displayGoals?.fatG || 70) * 9 / (displayGoals?.calories || 2400)) * 100)}%
+              {macroSplit.fatPct}%
             </span>
           </div>
         </div>
@@ -2676,21 +2685,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between text-2xs text-text-muted font-mono">
             <span>{t('meals.macroSplit')}</span>
-            <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (displayGoals?.calories || 2400)) * 100)}% • C {Math.round(((displayGoals?.carbsG || 220) * 4 / (displayGoals?.calories || 2400)) * 100)}% • F {Math.round(((displayGoals?.fatG || 70) * 9 / (displayGoals?.calories || 2400)) * 100)}%</span>
+            <span>P {macroSplit.proteinPct}% • C {macroSplit.carbsPct}% • F {macroSplit.fatPct}%</span>
           </div>
           <div className="h-2 rounded-full overflow-hidden flex bg-bg-secondary">
             <div
-              style={{ width: `${Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (displayGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.proteinPct}%` }}
               className="bg-accent h-full"
               title={t('meals.protein')}
             />
             <div
-              style={{ width: `${Math.round(((displayGoals?.carbsG || 220) * 4 / (displayGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.carbsPct}%` }}
               className="bg-sky-400 h-full"
               title={t('meals.carbs')}
             />
             <div
-              style={{ width: `${Math.round(((displayGoals?.fatG || 70) * 9 / (displayGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.fatPct}%` }}
               className="bg-amber-400 h-full"
               title={t('meals.fat')}
             />

@@ -1001,6 +1001,16 @@ export const mainStoreStorage: StateStorage = {
     } catch {
       // The guard must never break persistence.
     }
+    // Preview-fix B1b: the in-memory flag lags a takeover until the
+    // next heartbeat tick or BroadcastChannel message, but takeOver()
+    // writes the leader record synchronously — a fresh other-owned
+    // record is already proof this tab must not overwrite the new
+    // leader's blob, even before its own flag catches up.
+    try {
+      if (getTabLeaderGuard()?.isOtherLeaderActive()) return;
+    } catch {
+      // The guard must never break persistence.
+    }
     try {
       localStorage.setItem(name, value);
       mainStoreWriteFailed = false;
@@ -1428,7 +1438,11 @@ export const useAppStore = create<AppState>()(
           nextMetrics = [...(nextMetrics || []), entry];
         }
         let nextFavorites = state.favoriteFoods;
-        if (!nextFavorites || nextFavorites.length === 0) {
+        // Preview-fix B1a: seed defaults only when the field is
+        // ABSENT (a legacy blob predating pinned foods). An explicit
+        // empty list is a user clear-all and must survive a profile
+        // save — the old `length === 0` arm reseeded it to defaults.
+        if (!nextFavorites) {
           nextFavorites = DEFAULT_FAVORITE_FOODS;
         }
         if (typeof window !== 'undefined') {
@@ -3281,6 +3295,19 @@ export const useAppStore = create<AppState>()(
         });
         // Truly purge everything the app stored (see purgeLocalAppData).
         purgeLocalAppData();
+        // Preview-fix B1b: the purge removes the leader record too,
+        // leaving a vacuum the OLD leader's tick would win (a follower
+        // tick re-claims when no record exists) — and then its stale
+        // in-memory state would resurrect on its next write. Re-claim
+        // synchronously, in the same task as the purge, so the old
+        // leader's next tick sees a fresh record owned by this tab
+        // and stays follower; the broadcast steps it down instantly
+        // where BroadcastChannel is available.
+        try {
+          getTabLeaderGuard()?.takeOver();
+        } catch {
+          // The guard must never break the reset.
+        }
       },
 
       logout: (options) => {
@@ -3675,7 +3702,25 @@ export const useAppStore = create<AppState>()(
                 }))
               : state.workouts,
             meals: Array.isArray(data.meals) ? data.meals : state.meals,
-            bodyMetrics: Array.isArray(data.bodyMetrics) ? data.bodyMetrics : state.bodyMetrics,
+            // F12 (preview-fix): restore must not bypass the
+            // entry-date rule — a backup carrying future/malformed
+            // body-metric dates used to restore them verbatim, past
+            // both the modal's native validation and the store's
+            // updateBodyMetrics fallback. Same fallback as entry:
+            // invalid dates become today; valid dates pass unchanged.
+            bodyMetrics: Array.isArray(data.bodyMetrics)
+              ? data.bodyMetrics.map((m: any) =>
+                  m && typeof m === 'object'
+                    ? {
+                        ...m,
+                        date:
+                          typeof m.date === 'string' && isValidEntryDate(m.date)
+                            ? m.date
+                            : getLocalTodayStr(),
+                      }
+                    : m,
+                )
+              : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
             macroGoals: data.macroGoals !== undefined ? data.macroGoals : state.macroGoals,
             theme: data.theme || state.theme,
@@ -4147,8 +4192,15 @@ export const useAppStore = create<AppState>()(
                   }
                 }
 
-                // Ensure staple foods are populated if empty
-                if (!currentState.favoriteFoods || currentState.favoriteFoods.length === 0) {
+                // Ensure staple foods are populated if absent.
+                // Preview-fix B1a: an explicit empty list is a user
+                // clear-all, not "never seeded" — the old
+                // `length === 0` arm reseeded it to defaults on every
+                // boot, so a follower-tab clear-all (which persisted
+                // correctly) came back as Roti-through-Eggs after
+                // reload. Only legacy blobs lacking the field get
+                // defaults now.
+                if (!currentState.favoriteFoods) {
                   useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
                 }
 
@@ -4377,6 +4429,20 @@ if (typeof window !== 'undefined') {
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
       clearTimeout(syncTimer);
       syncTimer = setTimeout(() => {
+        // Preview-fix B1b (TOCTOU): this timer is scheduled while
+        // leader but can fire arbitrarily late — background-tab
+        // throttling stretches the 2s debounce, so it can land after
+        // another tab took over and purged. The schedule-time check
+        // above is not enough; prove leadership against the CURRENT
+        // record before writing, or a stale snapshot resurrects
+        // purged data via boot-time disaster recovery. A missing or
+        // stale record is not proof (post-purge there is no record).
+        try {
+          const guard = getTabLeaderGuard();
+          if (guard && !guard.isProvenLeader()) return;
+        } catch {
+          return;
+        }
         try {
           const snapshot = {
             profile: state.profile,

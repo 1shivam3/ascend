@@ -1,4 +1,5 @@
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, ProgressPhoto } from './types';
+import { getLocalTodayStr, isValidEntryDate } from './formatters';
 
 /** Mirrors PROGRESS_PHOTOS_KEY in store.ts (duplicated to avoid an import cycle). */
 const PROGRESS_PHOTOS_STORAGE_KEY = 'ascend_progress_photos_v1';
@@ -449,6 +450,23 @@ export function importFullBackupJSON(jsonString: string): boolean {
       hasCompletedOnboarding: true,
       _hasHydrated: true,
     };
+    // F12 (preview-fix): same entry-date rule as importAllData — this
+    // path writes the blob directly, bypassing importAllData's
+    // validation, so a backup carrying future/malformed body-metric
+    // dates would otherwise restore them verbatim. Invalid dates
+    // become today; valid dates pass unchanged.
+    if (Array.isArray(nextState.bodyMetrics)) {
+      const today = getLocalTodayStr();
+      nextState.bodyMetrics = nextState.bodyMetrics.map((m: any) =>
+        m && typeof m === 'object'
+          ? {
+              ...m,
+              date:
+                typeof m.date === 'string' && isValidEntryDate(m.date) ? m.date : today,
+            }
+          : m,
+      );
+    }
     delete nextState.customBarcodes;
     delete nextState.version;
     delete nextState.exportedAt;

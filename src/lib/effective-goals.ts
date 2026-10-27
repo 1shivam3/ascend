@@ -61,13 +61,35 @@ export function effectiveMacroGoals(
 }
 
 /**
- * Today's display goals: the base goals scaled by today's day kind
- * (one-meal fast / festival / no-grain fast). Returns the base goals
- * unchanged when there is no day kind, and null when there are no
- * base goals. Callers must keep any safe-floor judgement on the BASE
- * goals, not the scaled ones — the floor judges the prescribed
- * target, not today's scaled guidance.
+ * Macro-split percentages for the Fuel Macros display.
+ *
+ * Preview-fix F16: the display used to divide macro calories by the
+ * DISPLAYED (day-kind-scaled) calorie total while the grams stay
+ * unscaled — on a one-meal fast (calories ×0.7, grams unchanged) the
+ * percentages summed to 143% (P28 + C79 + F36). Percentages must
+ * describe the macro split, so the denominator is the macro-calorie
+ * sum itself (4P + 4C + 9F), which always sums to ~100% (independent
+ * rounding may give 99–101). On a normal day the displayed total
+ * equals the macro sum, so values are unchanged. Inputs are the
+ * grams actually displayed, so callers pass the same numbers they
+ * render — never a scaled total against unscaled grams.
  */
+export function macroSplitPercentages(
+  proteinG: number,
+  carbsG: number,
+  fatG: number,
+): { proteinPct: number; carbsPct: number; fatPct: number } {
+  const p = Math.max(0, proteinG || 0);
+  const c = Math.max(0, carbsG || 0);
+  const f = Math.max(0, fatG || 0);
+  const macroCal = p * 4 + c * 4 + f * 9;
+  if (macroCal <= 0) return { proteinPct: 0, carbsPct: 0, fatPct: 0 };
+  return {
+    proteinPct: Math.round(((p * 4) / macroCal) * 100),
+    carbsPct: Math.round(((c * 4) / macroCal) * 100),
+    fatPct: Math.round(((f * 9) / macroCal) * 100),
+  };
+}
 export function dayScaledGoals(
   baseGoals: MacroGoals | null | undefined,
   dayKind: MealDayKind | null | undefined,
