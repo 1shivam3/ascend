@@ -130,7 +130,7 @@ export default function ExerciseSelectorModal({
           </div>
 
           {/* Muscle Category Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
+          <div className="flex flex-wrap items-center gap-1.5 pb-1 text-2xs">
             <button
               type="button"
               onClick={() => setSelectedMuscle('All')}
@@ -162,7 +162,7 @@ export default function ExerciseSelectorModal({
               be added as custom, so it is filed under the right muscle
               instead of a keyword guess. */}
           {searchQuery.trim() && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-2xs">
+            <div className="flex flex-wrap items-center gap-1.5 pb-1 text-2xs">
               <span className="text-text-muted shrink-0 font-semibold">{t('exsel.customMuscle')}</span>
               {MUSCLE_GROUPS.map((m) => {
                 const active = effectiveCustomMuscle(searchQuery.trim()) === m;

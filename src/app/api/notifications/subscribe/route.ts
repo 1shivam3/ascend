@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import {
   generateSubscriptionDeleteToken,
   hashSubscriptionDeleteToken,
@@ -92,7 +92,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    // B2 (audit, F-04 extension): capped body read — a PushSubscription
+    // is a few KB, so 64 KB is generous; malformed bodies still fall
+    // back to {} exactly as the old req.json().catch() did.
+    let body: any = {};
+    try {
+      body = await readJsonBodyWithLimit(req, 64 * 1024);
+    } catch (err) {
+      if (err instanceof RequestBodyTooLargeError) return requestBodyTooLargeResponse();
+      body = {};
+    }
     const { subscription, userAgent, timezone } = body;
 
     if (!subscription || !subscription.endpoint) {
@@ -228,7 +237,14 @@ export async function DELETE(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    // B2 (audit, F-04 extension): capped body read, same as the POST path.
+    let body: any = {};
+    try {
+      body = await readJsonBodyWithLimit(req, 64 * 1024);
+    } catch (err) {
+      if (err instanceof RequestBodyTooLargeError) return requestBodyTooLargeResponse();
+      body = {};
+    }
     const { endpoint, deleteToken } = body;
 
     if (!endpoint) {

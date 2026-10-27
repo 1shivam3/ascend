@@ -16,6 +16,7 @@ import { getWeekDateStrings } from './formatters';
 import { isBodyweightExercise } from './strength-standards';
 import { getExerciseMuscle } from './exercise-library';
 import { buildCompactUserContext } from './ai-context';
+import { getAiAuthHeaders } from './ai-client-auth';
 import { getNextSessionTarget, exerciseHadPain } from './workout-engine';
 
 /**
@@ -659,6 +660,9 @@ async function executeAIRequest<T>(
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      // F-02 (audit): session token when signed in → higher per-account
+      // daily AI quota; guests send nothing.
+      ...(await getAiAuthHeaders()),
     };
 
     const res = await fetch('/api/coach', {

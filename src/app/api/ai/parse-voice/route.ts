@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
+import { checkAiDailyQuota, aiQuotaExceededResponse } from '@/lib/ai-quota';
 import { executeMultiProviderText } from '@/lib/ai-provider';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
@@ -25,6 +26,22 @@ export async function POST(req: Request) {
 
   if (!rateLimit.success) {
     return rateLimitResponse(rateLimit.resetMs);
+  }
+
+  // F-02 (audit): per-actor daily AI quota — signed-in users get a
+  // higher cap, guests a lower one; the shared 500/day global cap
+  // remains the fleet backstop inside the provider layer. Enforced
+  // before body parsing so a denied call consumes nothing downstream.
+  try {
+    const quota = await checkAiDailyQuota(req);
+    if (!quota.allowed) {
+      return aiQuotaExceededResponse(quota.actor, quota.resetMs);
+    }
+  } catch (err) {
+    if (err instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
+    throw err;
   }
 
   try {

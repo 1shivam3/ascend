@@ -243,6 +243,20 @@ export async function checkRateLimit(
 }
 
 /**
+ * Key-based rate limit check (F-02, audit): same distributed backing
+ * store as checkRateLimit, but the caller supplies the full key instead
+ * of it being derived from the client IP. Used for per-actor daily AI
+ * quotas, where the key is a verified account id or a server-derived
+ * anonymous guest key — never a client-supplied identifier.
+ */
+export async function checkRateLimitForKey(
+  key: string,
+  options: RateLimitOptions
+): Promise<RateLimitResult> {
+  return checkRateLimitByKey(key, options);
+}
+
+/**
  * Global (not per-IP) rate limit check sharing the same backing store.
  * Used for fleet-wide circuit breakers — e.g. the AI daily spend cap —
  * where the limit must apply across all clients and instances combined.

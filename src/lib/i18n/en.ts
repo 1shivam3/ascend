@@ -628,7 +628,7 @@ export const en = {
   'toast.planSetsMin': '"{name}": sets must be at least 1.',
   'toast.planRepsMin': '"{name}": reps must be at least 1.',
   'toast.planWeightNeg': '"{name}": weight cannot be negative.',
-  'toast.deleteNotSaved': 'Delete could not be saved — the workout was not deleted. Please try again.',
+  'toast.deleteNotSaved': 'Delete could not be saved — nothing was deleted. Please try again.',
   'toast.workoutResumed': 'Resumed active workout session!',
   'toast.draftDiscarded': 'Workout draft discarded.',
   'toast.emptyWorkout': 'No exercises or planned sets recorded to save.',

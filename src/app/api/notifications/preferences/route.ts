@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { DEFAULT_NOTIFICATION_PREFERENCES, NotificationPreferences } from '@/lib/types';
 
 export const runtime = 'nodejs';
@@ -139,7 +139,16 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    // B2 (audit, F-04 extension): capped body read — preferences are a
+    // small object, so 64 KB is generous; malformed bodies still fall
+    // back to {} exactly as the old req.json().catch() did.
+    let body: any = {};
+    try {
+      body = await readJsonBodyWithLimit(req, 64 * 1024);
+    } catch (err) {
+      if (err instanceof RequestBodyTooLargeError) return requestBodyTooLargeResponse();
+      body = {};
+    }
     const supabase = getSupabaseServerClient();
 
     // Validate and sanitize the preferences body before storage

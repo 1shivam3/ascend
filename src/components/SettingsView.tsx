@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useStore } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { resolveWorkoutMode } from '@/lib/workout-mode';
 import {
   ChevronLeft,
@@ -226,6 +227,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     setDraftHex(uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '');
   };
   const handleResetTheme = () => {
+    // S6 (audit): a no-op reset used to toast anyway. Only announce
+    // when something actually changed.
+    if (uiPreferences.accentTheme === 'vermilion' && uiPreferences.customAccentHex == null) return;
     setUiPreferences({ accentTheme: 'vermilion', customAccentHex: null });
     toast.info(t('settings.themeResetMsg'));
   };
@@ -417,6 +421,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // F12 (audit): pre-read cap — the backup parser only caps at 50 MB
+    // AFTER the read, so an uncapped file was fully buffered first.
+    // Reuses the vault's existing too-large copy (no new strings).
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(t('vault.tooLargeMsg'), t('vault.tooLargeTitle'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -460,6 +472,14 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   // the new guide/prompt flags) then logout for the session flag.
   // Cloud data is untouched — the account stays intact.
   const handleConfirmLogoutClear = async () => {
+    // B1 (audit, F19 extension): logout+wipe in a follower tab would
+    // purge the shared disk copy while the leader's data survives in
+    // memory. Take over first; on failure keep the confirm open.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     setShowLogoutClearConfirm(false);
     try {
       await signOut();

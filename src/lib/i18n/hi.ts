@@ -633,7 +633,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'toast.planSetsMin': '"{name}": सेट कम से कम 1 होना चाहिए।',
   'toast.planRepsMin': '"{name}": रेप्स कम से कम 1 होना चाहिए।',
   'toast.planWeightNeg': '"{name}": वज़न ऋणात्मक नहीं हो सकता।',
-  'toast.deleteNotSaved': 'हटाना सहेजा नहीं जा सका — वर्कआउट हटाया नहीं गया। कृपया फिर से कोशिश करें।',
+  'toast.deleteNotSaved': 'हटाना सहेजा नहीं जा सका — कुछ हटाया नहीं गया। कृपया फिर से कोशिश करें।',
   'toast.workoutResumed': 'सक्रिय वर्कआउट सेशन फिर शुरू हुआ!',
   'toast.draftDiscarded': 'वर्कआउट ड्राफ़्ट हटाया गया।',
   'toast.emptyWorkout': 'सेव करने के लिए कोई एक्सरसाइज़ या नियोजित सेट दर्ज नहीं है।',

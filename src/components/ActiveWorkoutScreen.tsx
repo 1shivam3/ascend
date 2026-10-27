@@ -67,7 +67,7 @@ import ConstraintAdapterModal from '@/components/ConstraintAdapterModal';
 import ExerciseSelectorModal from '@/components/ExerciseSelectorModal';
 import { VoiceWorkoutResult } from '@/lib/voice-logger';
 import { useAppNavigation } from '@/lib/navigation';
-import { safeRandomId, getLocalTodayStr, formatDuration } from '@/lib/formatters';
+import { safeRandomId, getLocalTodayStr, getLocalDateOfTimestamp, formatDuration } from '@/lib/formatters';
 import ConfirmationModal from '@/components/ConfirmationModal';
 
 interface ActiveWorkoutScreenProps {
@@ -1812,7 +1812,14 @@ export default function ActiveWorkoutScreen({
     // QA4-028: in-flight guard — a second tap while finishing must not
     // mint and save a duplicate workout (the id is created below).
     if (isFinishingRef.current) return;
-    const today = getLocalTodayStr();
+    // W4 (audit): date the session by when it STARTED, not when Finish
+    // was tapped — a 23:40 → 00:20 session belongs to the start day for
+    // streaks, adherence, and weekly totals. sessionStartTime is always
+    // defined (defaults to Date.now(), restored from the draft), and
+    // this one `today` feeds the entry AND its PRs, so all three stay
+    // on the same day. Pause-draft dates are untouched: the draft date
+    // is not the record date.
+    const today = getLocalDateOfTimestamp(sessionStartTime);
     const { validExercises, hasCompletedSets, hasMeaningfulData } = finalizeWorkoutExercises(exercises);
 
     if (!hasMeaningfulData) {
@@ -1820,142 +1827,150 @@ export default function ActiveWorkoutScreen({
       return;
     }
 
-    isFinishingRef.current = true;
-    setIsFinishing(true);
+    // W6 (audit): a throw anywhere below used to leave the Save
+    // button disabled for the modal's life — the ref (and the
+    // state flag) were never reset. try/finally restores both.
+    try {
+      isFinishingRef.current = true;
+      setIsFinishing(true);
 
-    // PR detection (only evaluates completed sets)
-    let newPRsCount = 0;
-    if (hasCompletedSets) {
-      const userBW = profile?.bodyweightKg || 75;
-      for (const ex of validExercises) {
-        const isBW = isBodyweightExercise(ex.name);
-        const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
-        const currentBest1RMKg =
-          existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
+      // PR detection (only evaluates completed sets)
+      let newPRsCount = 0;
+      if (hasCompletedSets) {
+        const userBW = profile?.bodyweightKg || 75;
+        for (const ex of validExercises) {
+          const isBW = isBodyweightExercise(ex.name);
+          const existingPRs = prs.filter((p) => p.exercise.toLowerCase() === ex.name.toLowerCase());
+          const currentBest1RMKg =
+            existingPRs.length > 0 ? Math.max(...existingPRs.map((p) => p.oneRepMax)) : 0;
 
-        // PR detection (Both 1RM PRs and Rep PRs at working loads)
-        let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
-        let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
+          // PR detection (Both 1RM PRs and Rep PRs at working loads)
+          let topSet = { weightKg: 0, reps: 0, e1RMKg: 0 };
+          let bestRepPR: { weightKg: number; weightLbs: number; reps: number; prevReps: number; e1RMKg: number } | null = null;
 
-        for (const s of ex.sets) {
-          if (s.isWarmup || !isSetCompleted(s)) continue;
-          const sWeight = parseFloat(String(s.weight)) || 0;
-          const sReps = parseInt(String(s.reps), 10) || 0;
-          if (sReps > 0 && (sWeight > 0 || isBW)) {
-            const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
-            // SIM-P1-06: never let an above-cap load feed PR detection,
-            // even if it arrived via import or an older client.
-            if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
-            const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
-            const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
-            if (e1rm > topSet.e1RMKg) {
-              topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
-            }
+          for (const s of ex.sets) {
+            if (s.isWarmup || !isSetCompleted(s)) continue;
+            const sWeight = parseFloat(String(s.weight)) || 0;
+            const sReps = parseInt(String(s.reps), 10) || 0;
+            if (sReps > 0 && (sWeight > 0 || isBW)) {
+              const wKg = s.unit === 'lbs' ? sWeight * 0.453592 : sWeight;
+              // SIM-P1-06: never let an above-cap load feed PR detection,
+              // even if it arrived via import or an older client.
+              if (!isBW && wKg > MAX_WORKOUT_WEIGHT_KG) continue;
+              const effectiveLoadKg = getEffectiveExerciseLoad(ex.name, wKg, userBW);
+              const e1rm = calculateOneRepMax(effectiveLoadKg, sReps);
+              if (e1rm > topSet.e1RMKg) {
+                topSet = { weightKg: Math.round(wKg * 10) / 10, reps: sReps, e1RMKg: Math.round(e1rm * 10) / 10 };
+              }
 
-            // Scan past workouts to check if this is a Rep PR at this specific working weight
-            let maxPrevRepsAtWeight = 0;
-            for (const pastWk of workouts) {
-              for (const pastEx of pastWk.exercises) {
-                if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
-                  for (const pastSet of pastEx.sets) {
-                    if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
-                    const pw = parseFloat(String(pastSet.weight)) || 0;
-                    const pr = parseInt(String(pastSet.reps), 10) || 0;
-                    const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
-                    if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
-                      maxPrevRepsAtWeight = pr;
+              // Scan past workouts to check if this is a Rep PR at this specific working weight
+              let maxPrevRepsAtWeight = 0;
+              for (const pastWk of workouts) {
+                for (const pastEx of pastWk.exercises) {
+                  if (pastEx.name.toLowerCase() === ex.name.toLowerCase()) {
+                    for (const pastSet of pastEx.sets) {
+                      if (pastSet.isWarmup || !isSetCompleted(pastSet)) continue;
+                      const pw = parseFloat(String(pastSet.weight)) || 0;
+                      const pr = parseInt(String(pastSet.reps), 10) || 0;
+                      const pwKg = pastSet.unit === 'lbs' ? pw * 0.453592 : pw;
+                      if (Math.abs(pwKg - wKg) < 1.0 && pr > maxPrevRepsAtWeight) {
+                        maxPrevRepsAtWeight = pr;
+                      }
                     }
                   }
                 }
               }
-            }
 
-            if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
-              if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
-                bestRepPR = {
-                  weightKg: Math.round(wKg * 10) / 10,
-                  weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
-                  reps: sReps,
-                  prevReps: maxPrevRepsAtWeight,
-                  e1RMKg: Math.round(e1rm * 10) / 10,
-                };
+              if (maxPrevRepsAtWeight > 0 && sReps > maxPrevRepsAtWeight) {
+                if (!bestRepPR || (sReps - maxPrevRepsAtWeight > bestRepPR.reps - bestRepPR.prevReps)) {
+                  bestRepPR = {
+                    weightKg: Math.round(wKg * 10) / 10,
+                    weightLbs: Math.round(wKg * 2.20462 * 10) / 10,
+                    reps: sReps,
+                    prevReps: maxPrevRepsAtWeight,
+                    e1RMKg: Math.round(e1rm * 10) / 10,
+                  };
+                }
               }
             }
           }
-        }
 
-        if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
-          const isFirstExposure = existingPRs.length === 0;
-          const prId = safeRandomId('pr');
-          addPR({
-            id: prId,
-            exercise: ex.name,
-            weightKg: topSet.weightKg,
-            weightLbs: Math.round(topSet.weightKg * 2.20462 * 10) / 10,
-            reps: topSet.reps,
-            oneRepMax: topSet.e1RMKg,
-            date: today,
-            notes: isFirstExposure ? 'Baseline established from first session' : 'All-Time 1RM PR',
-            prType: '1rm',
-          });
-          if (!isFirstExposure) {
+          if (topSet.e1RMKg > currentBest1RMKg && topSet.e1RMKg > 0) {
+            const isFirstExposure = existingPRs.length === 0;
+            const prId = safeRandomId('pr');
+            addPR({
+              id: prId,
+              exercise: ex.name,
+              weightKg: topSet.weightKg,
+              weightLbs: Math.round(topSet.weightKg * 2.20462 * 10) / 10,
+              reps: topSet.reps,
+              oneRepMax: topSet.e1RMKg,
+              date: today,
+              notes: isFirstExposure ? 'Baseline established from first session' : 'All-Time 1RM PR',
+              prType: '1rm',
+            });
+            if (!isFirstExposure) {
+              newPRsCount++;
+            }
+          } else if (bestRepPR) {
+            const prId = safeRandomId('pr_rep');
+            addPR({
+              id: prId,
+              exercise: ex.name,
+              weightKg: bestRepPR.weightKg,
+              weightLbs: bestRepPR.weightLbs,
+              reps: bestRepPR.reps,
+              oneRepMax: bestRepPR.e1RMKg,
+              date: today,
+              notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
+              prType: 'reps',
+            });
             newPRsCount++;
           }
-        } else if (bestRepPR) {
-          const prId = safeRandomId('pr_rep');
-          addPR({
-            id: prId,
-            exercise: ex.name,
-            weightKg: bestRepPR.weightKg,
-            weightLbs: bestRepPR.weightLbs,
-            reps: bestRepPR.reps,
-            oneRepMax: bestRepPR.e1RMKg,
-            date: today,
-            notes: `Rep PR: +${bestRepPR.reps - bestRepPR.prevReps} reps at ${userUnit === 'lbs' ? bestRepPR.weightLbs : bestRepPR.weightKg} ${userUnit}`,
-            prType: 'reps',
-          });
-          newPRsCount++;
         }
       }
-    }
 
-    // Record only what was actually performed or explicitly skipped.
-    // Never fall back to the full plan: an interrupted session with zero
-    // completed sets is saved with zero sets, not 17 phantom ones.
-    const exercisesToSave = getExecutedExercises(validExercises);
+      // Record only what was actually performed or explicitly skipped.
+      // Never fall back to the full plan: an interrupted session with zero
+      // completed sets is saved with zero sets, not 17 phantom ones.
+      const exercisesToSave = getExecutedExercises(validExercises);
 
-    // Honest denominator for adherence: count prescribed sets in the FULL
-    // session (before filtering to executed), so finishing 1 of 17 sets
-    // reports 1/17 — not a re-baselined 1/1 = 100%.
-    let plannedTotalSets: number | undefined;
-    {
-      let prescribed = 0;
-      for (const ex of validExercises) {
-        for (let idx = 0; idx < (ex.sets || []).length; idx++) {
-          try {
-            if (compareSetAdherence(ex.sets[idx], ex.name || '', idx).isPrescribed) prescribed++;
-          } catch { /* treat unparseable sets as unprescribed */ }
+      // Honest denominator for adherence: count prescribed sets in the FULL
+      // session (before filtering to executed), so finishing 1 of 17 sets
+      // reports 1/17 — not a re-baselined 1/1 = 100%.
+      let plannedTotalSets: number | undefined;
+      {
+        let prescribed = 0;
+        for (const ex of validExercises) {
+          for (let idx = 0; idx < (ex.sets || []).length; idx++) {
+            try {
+              if (compareSetAdherence(ex.sets[idx], ex.name || '', idx).isPrescribed) prescribed++;
+            } catch { /* treat unparseable sets as unprescribed */ }
+          }
         }
+        if (prescribed > 0) plannedTotalSets = prescribed;
       }
-      if (prescribed > 0) plannedTotalSets = prescribed;
-    }
 
-    const workoutEntry: WorkoutEntry = {
-      id: safeRandomId('wk'),
-      date: today,
-      name: workoutName,
-      planId,
-      plannedTotalSets,
-      durationMinutes: Math.round(elapsedSeconds / 60),
-      durationSeconds: elapsedSeconds,
-      exercises: exercisesToSave,
-    };
+      const workoutEntry: WorkoutEntry = {
+        id: safeRandomId('wk'),
+        date: today,
+        name: workoutName,
+        planId,
+        plannedTotalSets,
+        durationMinutes: Math.round(elapsedSeconds / 60),
+        durationSeconds: elapsedSeconds,
+        exercises: exercisesToSave,
+      };
 
-    setIsFinishModalOpen(false);
-    if (!hasCompletedSets) {
-      toast.info(t('workout.toastInterrupted'), t('workout.toastInterruptedTitle'));
+      setIsFinishModalOpen(false);
+      if (!hasCompletedSets) {
+        toast.info(t('workout.toastInterrupted'), t('workout.toastInterruptedTitle'));
+      }
+      onFinish(workoutEntry, newPRsCount);
+    } finally {
+      isFinishingRef.current = false;
+      setIsFinishing(false);
     }
-    onFinish(workoutEntry, newPRsCount);
   };
 
   return (

@@ -54,6 +54,7 @@ import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBa
 import { ARCHIVED_HISTORY_KEY } from './history-fork';
 import { clearHowToSeenFlag } from './howto-guide';
 import { getTabLeaderGuard } from './tab-leader';
+import { dropTombstonedRows } from './tombstone-heal';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildAthleteModel, type AthleteModel } from './athlete-model';
@@ -77,7 +78,7 @@ import {
   type WeeklyReview,
 } from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId, sanitizeAthleteName } from './formatters';
+import { safeRandomId, sanitizeAthleteName, isValidEntryDate } from './formatters';
 import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
@@ -2117,7 +2118,13 @@ export const useAppStore = create<AppState>()(
         // (e.g. EditProfileModal). Previously this hardcoded today, so a
         // picked date was silently ignored and the entry overwrote
         // today's real entry.
-        const entryDateStr = entryDate || getLocalTodayStr();
+        // F12 (audit): store-side defense in depth — the modal caps its
+        // date input at today, but the store never enforced it, so a
+        // future or malformed caller-supplied date could reach the store
+        // and the DATE column. Past valid dates pass unchanged; anything
+        // else falls back to today.
+        const rawDate = entryDate || getLocalTodayStr();
+        const entryDateStr = isValidEntryDate(rawDate) ? rawDate : getLocalTodayStr();
         const entry: BodyMetricEntry = {
           id: safeRandomId('bm'),
           date: entryDateStr,
@@ -4163,6 +4170,36 @@ export const useAppStore = create<AppState>()(
                   (!currentState.athleteModel || currentState.athleteModel.todayStr !== getLocalTodayStr())
                 ) {
                   currentState.refreshAthleteModel();
+                }
+
+                // R4 heal (audit): a row that is BOTH local and
+                // tombstoned is a contradiction produced only by
+                // resurrection artifacts (snapshot import, legacy keys,
+                // mid-sync delete, restore) — never by a normal delete
+                // (removes the row) or undo (clears the tombstone).
+                // Deletion wins: drop the row, KEEP the tombstone so
+                // the server delete still propagates on the next push.
+                // Runs last, after every recovery import above.
+                try {
+                  const s = useAppStore.getState();
+                  const healed = dropTombstonedRows({
+                    workouts: s.workouts || [],
+                    meals: s.meals || [],
+                    prs: s.prs || [],
+                    bodyMetrics: s.bodyMetrics || [],
+                    plannedWorkouts: s.plannedWorkouts || [],
+                    deletedWorkoutIds: s.deletedWorkoutIds || [],
+                    deletedMealIds: s.deletedMealIds || [],
+                    deletedPrIds: s.deletedPrIds || [],
+                    deletedBodyMetricIds: s.deletedBodyMetricIds || [],
+                    deletedPlanIds: s.deletedPlanIds || [],
+                  });
+                  if (healed.droppedTotal > 0) {
+                    console.warn('[ascend] Healed poisoned local+tombstoned rows:', healed.dropped);
+                    useAppStore.setState(healed.slices);
+                  }
+                } catch (healErr) {
+                  console.warn('Tombstone heal error:', healErr);
                 }
               } catch (recoveryErr) {
                 console.warn('Disaster recovery check error:', recoveryErr);

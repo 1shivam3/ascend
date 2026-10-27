@@ -1,4 +1,5 @@
 import { MealAnalysisResult, ScannedFoodItem } from './types';
+import { getAiAuthHeaders } from './ai-client-auth';
 import { estimateMacros } from './macros';
 import {
   resizeAndCompressImage,
@@ -77,6 +78,9 @@ export async function analyzeMealPhoto(options: ScanMealOptions): Promise<MealAn
   }
   const response = await fetch('/api/ai/scan-meal', {
     method: 'POST',
+    // F-02 (audit): session token when signed in → higher per-account
+    // daily AI quota; guests send nothing.
+    headers: await getAiAuthHeaders(),
     body: formData,
     signal: options.signal,
   });

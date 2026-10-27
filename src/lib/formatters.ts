@@ -45,6 +45,30 @@ export const getLocalTodayStr = (d: Date = new Date()): string => {
 };
 
 /**
+ * Audit W4: the LOCAL date of an epoch timestamp (same local-parts
+ * logic as getLocalTodayStr). A workout session is dated by when it
+ * STARTED, not when the user tapped Finish — a 23:40 → 00:20 session
+ * belongs to the start day for streaks, adherence, and weekly totals.
+ */
+export const getLocalDateOfTimestamp = (ms: number): string =>
+  getLocalTodayStr(new Date(ms));
+
+/**
+ * Audit F12: strict entry-date validation for the store layer.
+ * YYYY-MM-DD shape, a REAL calendar date (2026-02-30 fails the
+ * round-trip check instead of rolling to Mar 2), and not in the
+ * future. Local-date comparison: for YYYY-MM-DD strings,
+ * lexicographic order equals chronological order.
+ */
+export const isValidEntryDate = (s: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return false;
+  return s <= getLocalTodayStr();
+};
+
+/**
  * Monday-first week helpers. The app treats Monday as the start of the week
  * (Sunday as the end) everywhere: consistency strips, weekly recap, training
  * card, AI coach comparisons.

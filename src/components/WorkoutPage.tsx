@@ -1760,9 +1760,18 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
     setPlanToDelete(plan);
   };
 
-  const confirmDeletePlan = () => {
+  const confirmDeletePlan = async () => {
     if (!planToDelete) return;
     const plan = planToDelete;
+    // F19 (audit): guard FIRST, before the snapshot/draft-unlink below
+    // — a plan deleted in a follower tab never reached storage and came
+    // back after reload behind a success toast. On failure, delete
+    // nothing and keep the confirm modal open for retry.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     // QA4-014: snapshot index + schedule + tombstones BEFORE the delete
     // rewires them, so the toast's Undo can restore the exact prior
     // state. (The draft unlink below is NOT reverted by undo — the
@@ -2452,6 +2461,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               onClick={togglePauseTimer}
               className="p-1.5 rounded-lg bg-accent text-accent-on hover:brightness-105 active:scale-95 transition-all"
               title={isRestRunning ? 'Pause' : 'Start'}
+              aria-label={isRestRunning ? 'Pause' : 'Start'}
             >
               {isRestRunning ? <Pause className="w-3.5 h-3.5 fill-white" /> : <Play className="w-3.5 h-3.5 fill-white" />}
             </button>

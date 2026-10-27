@@ -17,6 +17,7 @@ import {
 import { useStore } from '@/lib/store';
 import { useToday } from '@/lib/use-today';
 import { useToast } from '@/components/ui/Toast';
+import ConfirmationModal from '@/components/ConfirmationModal';
 import { useTranslation } from '@/lib/i18n';
 import {
   toLocalDateString,
@@ -36,6 +37,10 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   const { t } = useTranslation();
   const toast = useToast();
   const [selectedDay, setSelectedDay] = useState<'today' | 'yesterday'>('today');
+  // A4 (audit): the reset confirm used to be a native window.confirm(),
+  // which breaks the modal focus-trap/Escape contract and is not
+  // localised. It is now the app's ConfirmationModal.
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const todayStr = useToday();
   const yesterdayStr = useMemo(() => {
     const d = new Date();
@@ -101,10 +106,13 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   };
 
   const handleReset = () => {
-    if (confirm(t(selectedDay === 'today' ? 'hydration.resetConfirmToday' : 'hydration.resetConfirmYesterday'))) {
-      resetWater(activeDateStr);
-      toast.info(t(selectedDay === 'today' ? 'hydration.resetDoneToday' : 'hydration.resetDoneYesterday'), t('hydration.resetTitle2'));
-    }
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = () => {
+    setShowResetConfirm(false);
+    resetWater(activeDateStr);
+    toast.info(t(selectedDay === 'today' ? 'hydration.resetDoneToday' : 'hydration.resetDoneYesterday'), t('hydration.resetTitle2'));
   };
 
   const handleSaveConfig = () => {
@@ -119,6 +127,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
   };
 
   return (
+    <>
     <div ref={modalRef} {...dialogProps} className="modal-overlay" onClick={onClose}>
       <div
         className="modal-content max-w-md w-full p-5 space-y-4"
@@ -373,5 +382,17 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         )}
       </div>
     </div>
+    <ConfirmationModal
+      isOpen={showResetConfirm}
+      onClose={() => setShowResetConfirm(false)}
+      onConfirm={handleConfirmReset}
+      title={t('hydration.resetTitle2')}
+      message={t(selectedDay === 'today' ? 'hydration.resetConfirmToday' : 'hydration.resetConfirmYesterday')}
+      confirmText={t('hydration.resetTitle')}
+      cancelText={t('common.cancel')}
+      variant="danger"
+      icon="alert"
+    />
+    </>
   );
 }

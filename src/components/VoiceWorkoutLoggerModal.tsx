@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { getAiAuthHeaders } from '@/lib/ai-client-auth';
 import {
   parseHinglishWorkoutVoice,
   createSpeechRecognizer,
@@ -130,7 +131,12 @@ export default function VoiceWorkoutLoggerModal({
       try {
         const res = await fetch('/api/ai/parse-voice', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // F-02 (audit): session token when signed in → higher
+            // per-account daily AI quota; guests send nothing.
+            ...(await getAiAuthHeaders()),
+          },
           body: JSON.stringify({
             transcript: cleanText,
             currentExercise: currentExerciseName,

@@ -48,8 +48,12 @@ export default function LoginScreen({
       setLoading(false);
 
       if (res.error) {
-        setError(res.error);
-        toast.error(res.error, t('auth.loginFailed'));
+        // F-10 (audit): never display the raw provider error — it
+        // leaks whether the account exists (user enumeration). The
+        // Google path was already neutralised; the password paths were
+        // not. Generic copy, same as the catch block below.
+        setError(t('auth.signInFailed'));
+        toast.error(t('auth.signInFailed'), t('auth.loginFailed'));
       } else {
         toast.success(t('auth.welcomeBackMsg'), t('auth.loggedIn'));
         onSuccess();

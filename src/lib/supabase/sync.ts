@@ -10,7 +10,10 @@ import {
   isLocalProfileNewer,
   buildPlanExtras,
   planFieldsFromExtras,
+  recomputePullSlices,
+  type PullSliceKey,
 } from './reconcile';
+import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
 
 /** Map a `planned_workouts` row to a local plan, restoring the
  *  column-less fields (description / goalTag / intensityMode) from the
@@ -174,6 +177,62 @@ export function hasSyncedContentChanged(
     return false;
   }
   return syncedStateSignature(prev) !== syncedStateSignature(next);
+}
+
+/**
+ * F28 (audit) — last-pushed signature persistence.
+ *
+ * The pull can adopt remote edits only when the local copy is unchanged
+ * since the last push. That fact is recorded here: after every
+ * successful push, pushLocalData stores the signature of the state it
+ * just pushed (localStorage, best-effort — a write failure simply
+ * leaves an older signature, which fails safe to "do not adopt").
+ * The pull reads it fresh each time (not cached at init) so a
+ * leader tab's push is visible to follower tabs.
+ *
+ * Why persisted, not just in-memory: the main adoption scenario is a
+ * device switch — device A boots after days away, its last push was in
+ * a previous session. An in-memory-only signature would be null on
+ * every boot, and the first pull after boot would never adopt — the
+ * exact case F28 exists to fix. The comparison itself is the guard:
+ * any local change since that push (edit, heal, restore) changes the
+ * fresh signature, so adoption stays off. A hash collision could in
+ * theory adopt over a changed row, but the signature combines length +
+ * content hash + id-set hash across all six slices, making that
+ * negligible for a sync heuristic (and adoption never resurrects
+ * tombstoned rows regardless).
+ */
+export const LAST_PUSHED_SIGNATURE_KEY = 'ascend_last_pushed_signature';
+
+export function readLastPushedSignature(): string | null {
+  try {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(LAST_PUSHED_SIGNATURE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function writeLastPushedSignature(signature: string): void {
+  try {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(LAST_PUSHED_SIGNATURE_KEY, signature);
+  } catch {
+    // Best-effort only: a failed write leaves the older signature,
+    // which fails safe to "do not adopt" on the next pull.
+  }
+}
+
+/**
+ * Pure adoption decision (F28): adopt only when a last-pushed
+ * signature exists AND the fresh local signature equals it. A null
+ * last-pushed signature (never pushed from this device) never adopts.
+ */
+export function shouldAdoptRemoteChanges(
+  lastPushedSignature: string | null,
+  freshSignature: string,
+): boolean {
+  return lastPushedSignature !== null && lastPushedSignature === freshSignature;
 }
 
 class SupabaseSyncEngine {
@@ -557,6 +616,69 @@ class SupabaseSyncEngine {
     }
   }
 
+  /**
+   * F21-B (audit): Start-fresh with verified sign-out-first — the ONLY
+   * authorized entry point for startFreshFromRetainedHistory (the fork
+   * is its only caller). The store action itself is synchronous and
+   * cannot verify a session, so this method owns the gate:
+   *
+   *  1. If EITHER the engine reports a user OR a Supabase session
+   *     exists, sign out first.
+   *  2. Verify BOTH are gone afterwards. The engine user alone is not
+   *     evidence: signOut() clears engine state before the Supabase
+   *     call completes, so a failed network sign-out still leaves the
+   *     real session alive. The Supabase session is authoritative; a
+   *     getSession failure is treated as unverified (abort).
+   *  3. Only then run the store reset (archive-first, then fresh guest
+   *     defaults). Server-wipe is NOT implemented: the cloud copy
+   *     stays intact and restorable.
+   *
+   * On any failure the reset never runs: no defaults applied, no
+   * profile touched, and the caller gets a clear error to show.
+   * With no session live, no push can overwrite the server profile
+   * afterwards (both push paths return early without a user).
+   */
+  public async startFreshAfterVerifiedSignOut(): Promise<{ ok: boolean; error?: string }> {
+    const supabase = getSupabase();
+    const engineUser = this.getCurrentUser();
+    let session: unknown = null;
+    let sessionCheckFailed = false;
+    try {
+      session = (await supabase?.auth.getSession())?.data?.session ?? null;
+    } catch {
+      sessionCheckFailed = true;
+    }
+    const hadSession = Boolean(engineUser || session || sessionCheckFailed);
+    if (hadSession) {
+      const { error } = await this.signOut();
+      let sessionAfter: unknown;
+      try {
+        sessionAfter = (await supabase?.auth.getSession())?.data?.session ?? null;
+      } catch {
+        // Verification itself failed: fail-safe, do not proceed.
+        sessionAfter = undefined;
+      }
+      const decision = decideStartFreshGate({
+        hadSession: true,
+        signOutError: error ?? null,
+        engineUserAfter: this.getCurrentUser(),
+        sessionAfter,
+      });
+      if (!decision.proceed) {
+        return { ok: false, error: decision.error };
+      }
+    }
+    const ok = useStore.getState().startFreshFromRetainedHistory();
+    if (!ok) {
+      return {
+        ok: false,
+        error:
+          'Could not archive the existing history, so nothing was changed. Please try again.',
+      };
+    }
+    return { ok: true };
+  }
+
    public async deleteAccount(): Promise<{ success: boolean; error?: string }> {
      clearTimeout(this.debounceTimer);
      this.isSyncing = false;
@@ -746,16 +868,24 @@ class SupabaseSyncEngine {
 
       const localState = useStore.getState();
 
-      // Detect if the existing local profile belongs to a DIFFERENT authenticated account
-      const isCrossAccountSwitch = Boolean(
-        localState.profile?.id &&
-        localState.profile.id !== user.id &&
-        !localState.profile.id.startsWith('user_')
-      );
+      // Detect if the existing local profile belongs to a DIFFERENT authenticated account.
+      // F20 (audit): guest profiles (guest_ ids from getOrCreateGuestId,
+      // plus the legacy user_ form) are NOT switches — they route to the
+      // merge (guest-migration) branch. Only a non-guest id different
+      // from the session user is a switch (replace branch). This half
+      // is safe only together with the sign-out-first gate in
+      // startFreshAfterVerifiedSignOut: without it, a signed-in
+      // Start-fresh would merge while a session is still live.
+      const isCrossAccountSwitch = isCrossAccountSwitchFn(localState.profile?.id, user.id);
 
       // 3. Reconcile Cloud -> Local (Recovery on phone, device switch, or account switch)
       let needsLocalUpdate = false;
       const updates: any = {};
+
+      // R2/R5: remote rows mapped during the pull, retained so the apply
+      // step can recompute the slices against FRESH local state instead
+      // of the stale pre-round-trip capture (see recomputePullSlices).
+      const pullRemote: Partial<Record<PullSliceKey, { id: string }[]>> = {};
 
       if (remoteProfile.data) {
         // Authoritative cloud profile for the authenticated account —
@@ -868,6 +998,12 @@ class SupabaseSyncEngine {
           notes: r.notes || undefined,
         }));
         updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
+        // Retain the mapped remote rows for apply-time recompute (R2/R5).
+        pullRemote.prs = updates.prs;
+        pullRemote.workouts = updates.workouts;
+        pullRemote.meals = updates.meals;
+        pullRemote.bodyMetrics = updates.bodyMetrics;
+        pullRemote.plannedWorkouts = updates.plannedWorkouts;
         needsLocalUpdate = true;
       } else {
         // Same account / guest migration: Merge remote cloud records into local store
@@ -886,6 +1022,7 @@ class SupabaseSyncEngine {
             date: r.date,
             notes: r.notes || undefined,
           }));
+          pullRemote.prs = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
             localState.prs || [],
             remoteMapped,
@@ -906,6 +1043,7 @@ class SupabaseSyncEngine {
             notes: r.notes || undefined,
             exercises: r.exercises || [],
           }));
+          pullRemote.workouts = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
             localState.workouts || [],
             remoteMapped,
@@ -924,6 +1062,7 @@ class SupabaseSyncEngine {
             date: r.date,
             foods: r.foods || [],
           }));
+          pullRemote.meals = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
             localState.meals || [],
             remoteMapped,
@@ -943,6 +1082,7 @@ class SupabaseSyncEngine {
             heightCm: r.height_cm ? Number(r.height_cm) : undefined,
             notes: r.notes || undefined,
           }));
+          pullRemote.bodyMetrics = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
             localState.bodyMetrics || [],
             remoteMapped,
@@ -959,6 +1099,7 @@ class SupabaseSyncEngine {
         // server copy.
         if (remotePlans.data && remotePlans.data.length > 0) {
           const remoteMapped = remotePlans.data.map(planFromRemoteRow);
+          pullRemote.plannedWorkouts = remoteMapped;
           const { merged, changed } = mergeRemotePlans(
             localState.plannedWorkouts || [],
             remoteMapped,
@@ -972,6 +1113,59 @@ class SupabaseSyncEngine {
       }
 
       // Apply any pulled cloud data to local store
+      // R2/R5: the merges above were computed from localState captured
+      // BEFORE the network round-trip. A delete, edit, or add made
+      // mid-sync must not be overwritten by those stale arrays, and a
+      // cross-account replace must not resurrect locally tombstoned
+      // rows. Recompute the collection slices against fresh state; the
+      // profile update (if any) still applies as computed — its own
+      // mid-sync race is a documented residual (R2b-profile).
+      const freshState = useStore.getState();
+      // Explicitly id-shaped: the recompute only relies on `.id` and
+      // reference preservation, so the five differently-typed slices
+      // share one input type instead of forcing a single record type.
+      const freshInput: Record<PullSliceKey, { local: { id: string }[]; tombstones: Iterable<string> }> = {
+        prs: { local: freshState.prs || [], tombstones: freshState.deletedPrIds || [] },
+        workouts: { local: freshState.workouts || [], tombstones: freshState.deletedWorkoutIds || [] },
+        meals: { local: freshState.meals || [], tombstones: freshState.deletedMealIds || [] },
+        bodyMetrics: { local: freshState.bodyMetrics || [], tombstones: freshState.deletedBodyMetricIds || [] },
+        plannedWorkouts: { local: freshState.plannedWorkouts || [], tombstones: freshState.deletedPlanIds || [] },
+      };
+      const freshSlices = (() => {
+        // F28: adopt remote edits only in the merge branch AND only
+        // when the fresh local state is unchanged since the last
+        // successful push (signature equality). Any local change since
+        // that push — including a mid-sync edit — disables adoption and
+        // keeps the historical keep-local behaviour (true conflicts stay
+        // last-push-wins, documented in recomputePullSlices). The
+        // profile is never adopted here; it keeps its own LWW.
+        const adoptRemoteChanges =
+          !isCrossAccountSwitch &&
+          shouldAdoptRemoteChanges(
+            readLastPushedSignature(),
+            syncedStateSignature({
+              profile: freshState.profile,
+              prs: freshState.prs || [],
+              workouts: freshState.workouts || [],
+              meals: freshState.meals || [],
+              bodyMetrics: freshState.bodyMetrics || [],
+              plannedWorkouts: freshState.plannedWorkouts || [],
+            }),
+          );
+        return recomputePullSlices(freshInput, pullRemote, isCrossAccountSwitch, adoptRemoteChanges);
+      })();
+      for (const key of Object.keys(pullRemote) as PullSliceKey[]) {
+        if (key in freshSlices) {
+          updates[key] = freshSlices[key];
+        } else if (!isCrossAccountSwitch) {
+          // Merge branch, recompute says nothing new: drop the stale
+          // captured merge so it cannot overwrite a mid-sync change.
+          delete updates[key];
+        }
+      }
+      // The captured needsLocalUpdate reflects pre-round-trip state;
+      // the only thing that matters now is whether updates still has keys.
+      needsLocalUpdate = Object.keys(updates).length > 0;
       if (needsLocalUpdate) {
         useStore.setState(updates);
       }
@@ -1009,9 +1203,24 @@ class SupabaseSyncEngine {
 
     const state = useStore.getState();
 
+    // F29 (audit): upsert errors used to be swallowed (the calls below
+    // never inspected `{ error }`), yet syncPush reported 'synced'
+    // regardless. Record the first failure across all steps, attempt
+    // every step anyway, and throw at the end so both callers report
+    // 'error' instead of a false 'synced'. Deletion propagation (step 7)
+    // is deliberately excluded: it is best-effort by design and keeps
+    // its tombstones for retry on the next push.
+    // Mutable holder (not a plain `let`): TS narrows a captured `let`
+    // to its initializer type across the awaits below, which would make
+    // the final check see `never`. A property read is re-evaluated.
+    const firstError: { current: { message?: string } | null } = { current: null };
+    const record = (e: { message?: string } | null | undefined) => {
+      if (e && !firstError.current) firstError.current = e;
+    };
+
     // 1. Profile
     if (state.profile) {
-      await supabase.from('profiles').upsert({
+      const { error: profileError } = await supabase.from('profiles').upsert({
         id: userId,
         name: state.profile.name,
         gender: state.profile.gender,
@@ -1026,6 +1235,7 @@ class SupabaseSyncEngine {
         // edit made since, and the next pull would clobber it.
         updated_at: state.profile.updatedAt || new Date().toISOString(),
       });
+      record(profileError);
     }
 
     // 2. PRs
@@ -1042,7 +1252,8 @@ class SupabaseSyncEngine {
         notes: p.notes || null,
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from('personal_records').upsert(prRows, { onConflict: 'id' });
+      const { error: prError } = await supabase.from('personal_records').upsert(prRows, { onConflict: 'id' });
+      record(prError);
     }
 
     // 3. Workouts
@@ -1057,7 +1268,8 @@ class SupabaseSyncEngine {
         exercises: w.exercises || [],
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from('workouts').upsert(workoutRows, { onConflict: 'id' });
+      const { error: workoutError } = await supabase.from('workouts').upsert(workoutRows, { onConflict: 'id' });
+      record(workoutError);
     }
 
     // 4. Meals
@@ -1070,7 +1282,8 @@ class SupabaseSyncEngine {
         foods: m.foods || [],
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from('meals').upsert(mealRows, { onConflict: 'id' });
+      const { error: mealError } = await supabase.from('meals').upsert(mealRows, { onConflict: 'id' });
+      record(mealError);
     }
 
     // 5. Body Metrics
@@ -1084,7 +1297,8 @@ class SupabaseSyncEngine {
         notes: b.notes || null,
         updated_at: new Date().toISOString(),
       }));
-      await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
+      const { error: metricError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
+      record(metricError);
     }
 
     // 6. Planned Workouts — description / goalTag / intensityMode have no
@@ -1117,9 +1331,11 @@ class SupabaseSyncEngine {
           /could not find the .* column/i.test(errMsg);
         if (missingExtrasColumn) {
           const bareRows = planRows.map(({ extras: _extras, ...rest }) => rest);
-          await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
+          const { error: bareError } = await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
+          record(bareError);
         } else {
           console.error('Supabase planned_workouts upsert error:', planUpsertError);
+          record(planUpsertError);
         }
       }
     }
@@ -1131,6 +1347,27 @@ class SupabaseSyncEngine {
     // clears tombstones without reaching this path, so a "reset" never
     // wipes the cloud copy.
     await this.propagateAllDeletions(userId);
+
+    // F29: surface the first upsert failure instead of reporting 'synced'.
+    if (firstError.current) {
+      throw new Error(`Supabase push failed: ${firstError.current.message || 'unknown error'}`);
+    }
+
+    // F28: the push succeeded, so record the signature of the state
+    // just pushed (captured `state`, not fresh state — an edit made
+    // mid-push must NOT be folded into the pushed signature, or the
+    // next pull would adopt over it). A later pull adopts remote edits
+    // only while the fresh local signature still equals this value.
+    writeLastPushedSignature(
+      syncedStateSignature({
+        profile: state.profile,
+        prs: state.prs || [],
+        workouts: state.workouts || [],
+        meals: state.meals || [],
+        bodyMetrics: state.bodyMetrics || [],
+        plannedWorkouts: state.plannedWorkouts || [],
+      }),
+    );
   }
 
   /**
@@ -1235,7 +1472,13 @@ class SupabaseSyncEngine {
         this.lastSyncedAt = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         this.notify();
       } catch (err: any) {
+        // F29: a failed push used to leave the previous (usually
+        // 'synced') status in place. Report the failure honestly; the
+        // UI renders 'error' from this status.
         console.warn('Background sync push warning:', err?.message);
+        this.status = 'error';
+        this.errorMessage = err?.message || 'Sync failed';
+        this.notify();
       }
     };
 

@@ -18,10 +18,12 @@ import type { RetainedHistoryCounts } from '@/lib/history-fork';
 export interface HistoryForkScreenProps {
   counts: RetainedHistoryCounts;
   onContinue: () => void;
-  onStartFresh: () => void;
+  onStartFresh: () => void | Promise<void>;
+  /** Start-fresh failure message (e.g. sign-out could not be verified); rendered, never swallowed. */
+  startFreshError?: string | null;
 }
 
-export default function HistoryForkScreen({ counts, onContinue, onStartFresh }: HistoryForkScreenProps) {
+export default function HistoryForkScreen({ counts, onContinue, onStartFresh, startFreshError }: HistoryForkScreenProps) {
   const { t } = useTranslation();
   return (
     <div className="min-h-[100dvh] flex items-center justify-center p-5 bg-bg-primary">
@@ -63,6 +65,11 @@ export default function HistoryForkScreen({ counts, onContinue, onStartFresh }: 
             <span className="block text-sm font-bold text-text-primary">{t('historyFork.startFresh')}</span>
             <span className="block text-2xs text-text-muted">{t('historyFork.startFreshHint')}</span>
           </button>
+          {startFreshError ? (
+            <p role="alert" className="text-xs font-bold text-red-500">
+              {startFreshError}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

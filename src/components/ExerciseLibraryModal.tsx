@@ -207,7 +207,7 @@ export default function ExerciseLibraryModal({
           </div>
 
           {/* Equipment Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
             {([
               { id: 'all', labelKey: 'lib.all' },
               { id: 'barbell', labelKey: 'lib.barbell' },
@@ -232,7 +232,7 @@ export default function ExerciseLibraryModal({
           </div>
 
           {/* Muscle Group Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="flex flex-wrap items-center gap-1.5">
             {([
               { id: 'all', labelKey: 'lib.allMuscles' },
               { id: 'chest', labelKey: 'lib.chest' },

@@ -17,7 +17,10 @@
  * that still suppresses writes afterwards, returns false and the
  * caller MUST NOT delete and MUST NOT show the success toast.
  *
- * Scope: workout-delete path only. No other mutation uses this.
+ * Scope: delete/reset paths that must reach storage (workout, meal,
+ * PR, plan, and metric deletes; food-item, custom-suggestion, and
+ * pinned-food deletes; data-reset and logout-wipe). Other mutations
+ * keep the documented follower-banner behavior.
  */
 
 import { getTabLeaderGuard } from './tab-leader';
