@@ -402,18 +402,26 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         params: { exercise: progressions[0].exerciseName },
       },
     };
-  } else if (sessionsCompleted > 0) {
+  } else if (trainedDays.size > 0) {
+    // Gauntlet Cycle 2 (B-01, second facet): the consistency fallback
+    // used to key on sessionsCompleted, which counts SCHEDULED days
+    // only — so a week with real but unscheduled training fell through
+    // to the quiet branch and the dialog claimed "No sessions were
+    // logged this week" while showing tonnage. "Showed up" must count
+    // days actually trained (scheduled + unscheduled). sessionsCompleted
+    // itself is unchanged (adherence metric, SESSIONS DONE x/y).
+    const trainedCount = trainedDays.size;
     focus = {
       kind: 'consistency',
       headline: 'Consistency is the win this week',
-      detail: `You showed up for ${sessionsCompleted} session${sessionsCompleted === 1 ? '' : 's'}. No stalls, no flags — stacking weeks like this is exactly how the numbers move.`,
+      detail: `You showed up for ${trainedCount} session${trainedCount === 1 ? '' : 's'}. No stalls, no flags — stacking weeks like this is exactly how the numbers move.`,
       headlineI18n: { key: 'weeklyReview.focusConsistencyHeadline' },
       detailI18n: {
         key:
-          sessionsCompleted === 1
+          trainedCount === 1
             ? 'weeklyReview.focusConsistencyDetailOne'
             : 'weeklyReview.focusConsistencyDetailMany',
-        params: { count: sessionsCompleted },
+        params: { count: trainedCount },
       },
     };
   } else {

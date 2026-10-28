@@ -2966,7 +2966,6 @@ export const useAppStore = create<AppState>()(
         const state = get();
         const todayStr = getLocalTodayStr();
         const monday = lastCompletedWeekMonday(todayStr);
-        if (state.weeklyReviews.some((r) => r.weekMonday === monday)) return;
         try {
           const review = buildWeeklyReview({
             anyDateInWeek: monday,
@@ -2983,7 +2982,37 @@ export const useAppStore = create<AppState>()(
             bodyweightKg: state.profile?.bodyweightKg,
             todayStr,
           });
-          set({ weeklyReviews: [...state.weeklyReviews, review].slice(-12) });
+          // Gauntlet Cycle 2 (B-01): the review is a live aggregation, not
+          // a write-once snapshot. The old guard returned early once a
+          // review for the week existed, so a review generated before a
+          // session was logged — e.g. on first Home mount, before the
+          // user past-logged that week's Sunday session — kept showing
+          // "No sessions" forever, while live surfaces (matrix, trends)
+          // counted the session. Rebuild on every refresh, preserving
+          // only the user's own markers: seen, and applied schedule-move
+          // revisions. One entry per weekMonday is still enforced
+          // (filter + append), so no duplicates can accumulate.
+          const prev = state.weeklyReviews.find((r) => r.weekMonday === monday);
+          if (prev?.seen) review.seen = true;
+          if (prev) {
+            const appliedPlanIds = new Set<string>();
+            for (const r of prev.revisions) {
+              if (r.kind === 'schedule_move' && r.applied) appliedPlanIds.add(r.planId);
+            }
+            if (appliedPlanIds.size > 0) {
+              review.revisions = review.revisions.map((r) =>
+                r.kind === 'schedule_move' && appliedPlanIds.has(r.planId)
+                  ? { ...r, applied: true }
+                  : r
+              );
+            }
+          }
+          set({
+            weeklyReviews: [
+              ...state.weeklyReviews.filter((r) => r.weekMonday !== monday),
+              review,
+            ].slice(-12),
+          });
         } catch {
           /* reviews are best-effort, never block the app */
         }

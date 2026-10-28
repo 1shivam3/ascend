@@ -13,6 +13,25 @@ import { isRecognizedBackupData } from './storage';
  *
  * This module never touches the store (no import cycle): the store
  * actions that archive/clear/restore live in store.ts.
+ *
+ * Gauntlet Cycle 2 (B-07 / TRIAGE-PA-01): the TRIGGER below counts
+ * history records only — sessions, meals, plans, PRs, body metrics.
+ * Targets (prTargets, macroGoals) are deliberately NOT a trigger, even
+ * though retainedHistoryCounts still reports them for display. Two
+ * reasons, both proven by the Part B run: (1) onboarding itself sets
+ * macroGoals BEFORE the profile exists (Onboarding.tsx computes
+ * recommended goals while the profile is still staged in
+ * pendingProfile), so counting targets made the fork self-trigger
+ * mid-onboarding and show "0 sessions • 0 meals • 0 plans •
+ * 1 target" in place of the plan-offer/summary screens — and
+ * unmounting onboarding destroyed the staged profile (TRIAGE-PA-01);
+ * (2) onboarding deliberately PRESERVES existing targets on
+ * re-onboarding after a logout, so targets-only state is not history
+ * that must be fork-guarded. The same narrowing also stops a
+ * targets-only logout from overwriting a previous good archive with a
+ * sessions-empty one (the logout guard and the import guard share
+ * this predicate, and both comments already state the "must not
+ * clobber" rule).
  */
 
 /** Single-slot archive key: the latest Start-fresh archive wins. */
@@ -47,14 +66,18 @@ export function retainedHistoryCounts(input: RetainedHistoryInput): RetainedHist
 }
 
 export function hasRetainedHistory(input: RetainedHistoryInput): boolean {
+  // Gauntlet Cycle 2: targets are NOT a trigger (see module comment).
+  // Sessions, meals, plans, PRs, and body metrics are history records
+  // that must never silently attach to the next profile; targets are
+  // set by onboarding itself before any profile exists and are
+  // deliberately preserved across re-onboarding.
   const c = retainedHistoryCounts(input);
   return (
     c.sessions > 0 ||
     c.meals > 0 ||
     c.plans > 0 ||
     (Array.isArray(input.prs) && input.prs.length > 0) ||
-    (Array.isArray(input.bodyMetrics) && input.bodyMetrics.length > 0) ||
-    c.targets > 0
+    (Array.isArray(input.bodyMetrics) && input.bodyMetrics.length > 0)
   );
 }
 
