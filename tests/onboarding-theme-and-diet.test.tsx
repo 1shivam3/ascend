@@ -95,7 +95,13 @@ describe('onboarding diet preference (QA4-019)', () => {
       <PersonalDetailsScreen onContinue={() => {}} onBack={() => {}} />,
     );
     expect(html).toContain('Date of birth');
-    expect(html).toContain('type="date"');
+    // Gauntlet DOB picker (user decision, option B): the native date
+    // input is replaced by three plain selects — same DOB field, DOM
+    // drivable. Asserts the picker, not the old input type.
+    expect(html).toContain('id="details-dob-day"');
+    expect(html).toContain('id="details-dob-month"');
+    expect(html).toContain('id="details-dob-year"');
+    expect(html).not.toContain('type="date"');
     expect(html).toContain('injury-select');
     expect(html).not.toContain('Diet Preference');
     expect(html).not.toContain('Vegetarian');

@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { Gender, Unit, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import { calculateAgeFromDob, dobPickerBounds, isValidDob } from '@/lib/age';
+import DobPicker from '@/components/DobPicker';
 import { round1, sanitizeAthleteName } from '@/lib/formatters';
 import { useAppNavigation } from '@/lib/navigation';
 import { resizeAndCompressImage } from '@/lib/image-processing';
@@ -387,18 +388,16 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="edit-profile-dob" className="text-xs font-semibold text-text-secondary font-sans">{t('onboarding.dateOfBirth')}</label>
-              <input
+              <span className="text-xs font-semibold text-text-secondary font-sans block">{t('onboarding.dateOfBirth')}</span>
+              <DobPicker
                 id="edit-profile-dob"
-                type="date"
                 value={dob}
                 min={dobPickerBounds().min}
                 max={dobPickerBounds().max}
-                onChange={(e) => {
-                  setDob(e.target.value);
+                onChange={(v) => {
+                  setDob(v);
                   if (errors.dob) setErrors((prev) => ({ ...prev, dob: '' }));
                 }}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors font-medium"
               />
               {errors.dob && <p className="text-2xs text-accent mt-0.5">{errors.dob}</p>}
             </div>

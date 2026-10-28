@@ -129,6 +129,10 @@ export const hi: Partial<Record<StringKey, string>> = {
   'onboarding.errDobFuture': 'तारीख़ सही नहीं है',
   'onboarding.errDobUnder13': 'उम्र 13 से कम है',
   'onboarding.errDobRange': 'उम्र 13 से 120 के बीच होनी चाहिए',
+  // New picker labels — composed from basic vocabulary, UNREVIEWED (native-speaker review owed).
+  'dobPicker.day': 'दिन',
+  'dobPicker.month': 'महीना',
+  'dobPicker.year': 'वर्ष',
   // Token-reuse compositions only — flagged for native-speaker review.
   'homeMatrix.title': 'आदत और वर्कआउट मैट्रिक्स',
   'homeMatrix.weekly': 'साप्ताहिक',

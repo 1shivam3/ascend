@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { AlertCircle, Calendar, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { Gender, MAX_ATHLETE_NAME_LENGTH } from '@/lib/types';
 import StepProgressBar from './StepProgressBar';
+import DobPicker from '@/components/DobPicker';
 import { useTranslation } from '@/lib/i18n';
 import { calculateAgeFromDob, dobPickerBounds, dobPreviewAge, isValidDob } from '@/lib/age';
 
@@ -185,18 +186,18 @@ export default function PersonalDetailsScreen({
           </div>
 
           {/* Date of birth — age is calculated from this, never typed.
-              Styled as a card field, but the input underneath stays the
-              NATIVE date input: mobile OS pickers and keyboard entry keep
-              working. The native picker indicator is made transparent and
-              stretched over the whole field (still clickable) so the
-              visible accent Calendar icon is what the user taps; the
-              color-scheme lines keep the native chrome readable in both
-              light and dark mode. */}
+              Custom picker (three plain selects) instead of the native
+              date input, whose popup is browser UI and could not be
+              driven by keyboard users or automation. Value contract is
+              unchanged (YYYY-MM-DD string, '' = no date yet), so the
+              age chip, Continue gating, and error messages below work
+              untouched. All three selects start unselected — never
+              prefilled. */}
           <div className="p-4 rounded-2xl bg-bg-card border border-border shadow-2xs space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <label htmlFor="details-dob" className="block text-xs font-semibold text-text-primary">
+              <span className="block text-xs font-semibold text-text-primary">
                 {t('onboarding.dateOfBirth')}
-              </label>
+              </span>
               {previewAge !== null && (
                 <span className="shrink-0 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/30 text-accent text-xs font-bold">
                   {t('profile.age')} {previewAge}
@@ -206,22 +207,7 @@ export default function PersonalDetailsScreen({
             <span className="block text-2xs text-text-muted">
               {t('onboarding.dateOfBirthHint')}
             </span>
-            <div className="relative rounded-xl border border-border bg-bg-primary focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/40 transition">
-              <input
-                id="details-dob"
-                type="date"
-                value={dob}
-                min={bounds.min}
-                max={bounds.max}
-                onChange={(e) => setDob(e.target.value)}
-                required
-                className="relative w-full min-h-[52px] pl-4 pr-12 py-3 rounded-xl bg-transparent text-base font-semibold text-text-primary outline-none transition [color-scheme:light] dark:[color-scheme:dark] [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:inset-0 [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
-              />
-              <Calendar
-                aria-hidden="true"
-                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-accent"
-              />
-            </div>
+            <DobPicker id="details-dob" value={dob} onChange={setDob} min={bounds.min} max={bounds.max} />
           </div>
 
           {/* Injury — single optional dropdown, verbatim from ScheduleScreen.
