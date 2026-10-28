@@ -2476,7 +2476,7 @@ export const en = {
   'weeklyReview.title': 'Weekly review',
   'weeklyReview.cardTitle': 'Your weekly review',
   'weeklyReview.focusLabel': 'Next week\u2019s focus',
-  'weeklyReview.sessions': 'Sessions done',
+  'weeklyReview.sessions': 'Planned sessions done',
   'weeklyReview.missed': 'Missed: {days}',
   'weeklyReview.tonnage': 'Total tonnage',
   'weeklyReview.vsLastWeek': 'vs last week',

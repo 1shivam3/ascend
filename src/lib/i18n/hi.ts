@@ -2480,7 +2480,7 @@ export const hi: Partial<Record<StringKey, string>> = {
   'weeklyReview.title': 'साप्ताहिक समीक्षा',
   'weeklyReview.cardTitle': 'आपकी साप्ताहिक समीक्षा',
   'weeklyReview.focusLabel': 'अगले हफ़्ते का फ़ोकस',
-  'weeklyReview.sessions': 'पूरे हुए सेशन',
+  'weeklyReview.sessions': 'पूरे हुए नियोजित सेशन',
   'weeklyReview.missed': 'छूटे: {days}',
   'weeklyReview.tonnage': 'कुल टनेज',
   'weeklyReview.vsLastWeek': 'पिछले हफ़्ते से',
