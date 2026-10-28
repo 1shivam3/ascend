@@ -132,13 +132,20 @@ describe('L3 experience label (static)', () => {
   });
 });
 
-describe('L2 simple habit matrix label (static)', () => {
-  it('Simple shows a today label, not MON—SUN', () => {
+describe('L2 habit matrix label (static)', () => {
+  it('the homepage slot renders the matrix, not a today-only column', () => {
     const home = src('src/components/HomePage.tsx');
-    expect(home).toContain("density === 'simple'");
-    expect(home).toContain('toLocaleDateString');
-    // The week-range label survives only for the Detailed branch.
-    expect(home).toMatch(/density === 'simple' \? .* : t\('home\.monSun'\)/);
+    expect(home).toContain('<HomeMatrix');
+    // The today-only mode is gone by design (user order): the slot is
+    // the weekly/monthly matrix, so no today label can lie about it.
+    expect(home).not.toContain('todayOnly');
+    expect(home).not.toContain("t('home.habitsToday')");
+  });
+
+  it('the matrix labels its range honestly (week range / month name)', () => {
+    const mx = src('src/components/HomeMatrix.tsx');
+    expect(mx).toContain('weekLabel');
+    expect(mx).toContain('monthLabel');
   });
 
   it('single-day matrix cells are fixed-width, not stretched', () => {

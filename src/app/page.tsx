@@ -8,8 +8,6 @@ import { useStore } from '@/lib/store';
 import { applyTextScale } from '@/lib/text-scale';
 import { resolveAccentVariant, accentVariantToCssVars, applyAccentVars } from '@/lib/accent-themes';
 import OnboardingScreen from '@/components/Onboarding';
-import HowToUseGuide from '@/components/HowToUseGuide';
-import { HOWTO_SEEN_KEY } from '@/lib/howto-guide';
 import { calculateAgeFromDob, isValidDob } from '@/lib/age';
 import HistoryForkScreen from '@/components/HistoryForkScreen';
 import { hasRetainedHistory, retainedHistoryCounts } from '@/lib/history-fork';
@@ -83,7 +81,7 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, hasCompletedOnboarding } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals } = useStore();
   // FND-06: the fork decision lives only for this session — closing
   // the app undecided re-shows the fork, which is the safe default.
   const [forkResolved, setForkResolved] = useState(false);
@@ -123,26 +121,6 @@ export default function AppPage() {
       state.setProfile({ ...prof, age: computed });
     }
   }, [_hasHydrated, persistHydrated, profile?.dateOfBirth]);
-
-  // First-run how-to-use guide: shown once, over Today, after the
-  // profile gate (onboarding complete + a profile exist). Dismissing —
-  // via the button, the X, backdrop, or Android back — writes the seen
-  // flag, so it never reappears; Settings re-opens it on demand.
-  const [showGuide, setShowGuide] = useState(false);
-  useEffect(() => {
-    if (typeof window === 'undefined' || !_hasHydrated || !persistHydrated) return;
-    if (!hasCompletedOnboarding || !profile) return;
-    if (activeTab !== 'home') return;
-    try {
-      if (!window.localStorage.getItem(HOWTO_SEEN_KEY)) setShowGuide(true);
-    } catch {}
-  }, [_hasHydrated, persistHydrated, hasCompletedOnboarding, profile, activeTab]);
-  const closeGuide = () => {
-    try {
-      window.localStorage.setItem(HOWTO_SEEN_KEY, '1');
-    } catch {}
-    setShowGuide(false);
-  };
 
   // Dynamic device theme synchronization (when not manually overridden in Settings)
   useEffect(() => {
@@ -561,7 +539,6 @@ export default function AppPage() {
                   />
                 )}
                 </div>
-                <HowToUseGuide isOpen={showGuide} onClose={closeGuide} />
                 {showResumeBar && <div aria-hidden className="h-16 lg:hidden" />}
               </main>
 

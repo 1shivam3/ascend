@@ -51,8 +51,7 @@ import { DEFAULT_AI_TRAINING_PROFILE } from './ai-context';
 import { sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from './today-layout';
 import { normalizeHex } from './accent-themes';
 import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBarcodes, getOrCreateGuestId } from './storage';
-import { ARCHIVED_HISTORY_KEY } from './history-fork';
-import { clearHowToSeenFlag } from './howto-guide';
+import { ARCHIVED_HISTORY_KEY, hasRetainedHistory } from './history-fork';
 import { getTabLeaderGuard } from './tab-leader';
 import { dropTombstonedRows } from './tombstone-heal';
 import type { Language } from './i18n/en';
@@ -224,6 +223,13 @@ export interface UiPreferences {
   workoutModeOverride: 'beginner' | 'advanced' | null;
   /** UX redesign — pinned Progress spotlight chart id, or null. Local-only. */
   pinnedProgressChart: string | null;
+  /**
+   * Homepage matrix default view (Settings → Default matrix view).
+   * 'weekly' = Mon–Sun week, 'monthly' = Mon-first calendar grid. The
+   * widget's own toggle is session-local; this is what it opens as.
+   * Old blobs lack the field and resolve to 'weekly' via sanitize.
+   */
+  defaultMatrixView: 'weekly' | 'monthly';
 }
 
 export const DEFAULT_UI_PREFERENCES: UiPreferences = {
@@ -242,6 +248,7 @@ export const DEFAULT_UI_PREFERENCES: UiPreferences = {
   todayLayout: { ...DEFAULT_TODAY_LAYOUT, order: [...DEFAULT_TODAY_LAYOUT.order] },
   workoutModeOverride: null,
   pinnedProgressChart: null,
+  defaultMatrixView: 'weekly',
 };
 
 export interface AppState {
@@ -561,6 +568,11 @@ export interface AppState {
   // no sync/serialization shape changes, no profile partitioning.
   startFreshFromRetainedHistory: () => boolean;
   restoreArchivedHistory: () => boolean;
+  // Logout-to-onboarding: write the current history to the same
+  // single-slot archive Start fresh uses. False on failure or SSR —
+  // callers must NOT clear live state when this fails, or history
+  // would be lost silently instead of staying fork-protected.
+  archiveRetainedHistory: () => boolean;
 
   importAllData: (data: any) => boolean;
 }
@@ -825,6 +837,9 @@ export function sanitizeUiPreferences(
     out.workoutModeOverride = null;
   }
   if (typeof out.pinnedProgressChart !== 'string') out.pinnedProgressChart = null;
+  if (out.defaultMatrixView !== 'weekly' && out.defaultMatrixView !== 'monthly') {
+    out.defaultMatrixView = 'weekly';
+  }
   return out;
 }
 
@@ -1037,6 +1052,67 @@ export const mainStoreStorage: StateStorage = {
     }
   },
 };
+
+/**
+ * Fresh-history slate shared by Start fresh and logout-to-onboarding:
+ * every live slice a new profile must NOT silently inherit (FND-06).
+ * Profile / onboarding / tab fields are NOT in here — callers set
+ * those themselves (Start fresh builds a default profile and lands on
+ * Today; logout leaves profile null so onboarding renders).
+ */
+function buildFreshHistoryState(): Partial<AppState> {
+  return {
+    prs: [],
+    workouts: [],
+    meals: [],
+    bodyMetrics: [],
+    prTargets: {},
+    macroGoals: null,
+    plannedWorkouts: [],
+    favoriteFoods: DEFAULT_FAVORITE_FOODS,
+    customFoods: [],
+    mealDayKinds: {},
+    waterLogs: {},
+    waterBatches: {},
+    hydrationConfig: DEFAULT_HYDRATION_CONFIG,
+    creatineLogs: {},
+    creatineConfig: DEFAULT_CREATINE_CONFIG,
+    creatineSupply: DEFAULT_CREATINE_SUPPLY,
+    dayTypeOverrides: {},
+    aiInsightsCache: {},
+    trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
+    todaysAIWorkoutPlan: undefined,
+    latestWeeklyReview: undefined,
+    trainingDecisions: {},
+    decisionsLedgerHistory: [],
+    lifterProfile: null,
+    athleteModel: null,
+    coachBlocks: getInitialCoachBlocksState(),
+    weeklyReviews: [],
+    policyDecisionRecords: {},
+    policyDecisionsLedgerHistory: [],
+    policyDecisionApplications: [],
+    weeklySchedule: {
+      monday: { workoutPlanId: 'rest' },
+      tuesday: { workoutPlanId: 'rest' },
+      wednesday: { workoutPlanId: 'rest' },
+      thursday: { workoutPlanId: 'rest' },
+      friday: { workoutPlanId: 'rest' },
+      saturday: { workoutPlanId: 'rest' },
+      sunday: { workoutPlanId: 'rest' },
+    },
+    deletedPlanIds: [],
+    deletedPrIds: [],
+    deletedWorkoutIds: [],
+    deletedMealIds: [],
+    deletedBodyMetricIds: [],
+    dailyCheckins: {},
+    coach: getInitialCoachState(),
+    healthSummary: null,
+    goals: [],
+    activeWorkoutDraft: null,
+  };
+}
 
 export const useAppStore = create<AppState>()(
   persist(
@@ -3378,6 +3454,43 @@ export const useAppStore = create<AppState>()(
           return;
         }
 
+        // Logout-to-onboarding (user order): the keep-data logout used
+        // to leave history live, so the !profile boot branch showed the
+        // fork. Archive first (never deletes), then clear the same
+        // fresh slate Start fresh uses, so the boot branch finds no
+        // retained history and renders onboarding directly. Guarded on
+        // retained history actually existing: a logout with nothing
+        // retained must not overwrite a previous archive with an empty
+        // one — and Log Out & Clear already wiped state before reaching
+        // here, so it archives nothing. A failed archive write leaves
+        // live state intact, so the fork still protects it (FND-06)
+        // instead of history being lost silently.
+        const live = get();
+        if (
+          hasRetainedHistory({
+            workouts: live.workouts,
+            meals: live.meals,
+            plannedWorkouts: live.plannedWorkouts,
+            prs: live.prs,
+            bodyMetrics: live.bodyMetrics,
+            prTargets: live.prTargets,
+            macroGoals: live.macroGoals,
+          })
+        ) {
+          if (get().archiveRetainedHistory()) {
+            set({
+              ...buildFreshHistoryState(),
+              progressPhotos: [],
+            });
+            try {
+              localStorage.removeItem('ascend_workouts');
+              localStorage.removeItem('ascend_prs');
+              localStorage.removeItem('ascend_meals');
+              localStorage.removeItem(PROGRESS_PHOTOS_KEY);
+            } catch {}
+          }
+        }
+
         set({
           profile: null,
           hasCompletedOnboarding: false,
@@ -3398,7 +3511,11 @@ export const useAppStore = create<AppState>()(
       // resurrect the cleared history into the fresh profile. The
       // archive survives until a later Start fresh overwrites it or
       // an explicit Delete WebApp Data & Reset purges it.
-      startFreshFromRetainedHistory: () => {
+      // Logout-to-onboarding + Start fresh share this write: a full
+      // backup (storage.ts shape) under the single-slot archive key.
+      // A failed write returns false and the caller must NOT clear
+      // live state — the archive is the only copy.
+      archiveRetainedHistory: () => {
         if (typeof window === 'undefined') return false;
         const state = get();
         try {
@@ -3410,64 +3527,19 @@ export const useAppStore = create<AppState>()(
             archivedAt: new Date().toISOString(),
           };
           localStorage.setItem(ARCHIVED_HISTORY_KEY, JSON.stringify(archive));
+          return true;
         } catch {
           return false;
         }
+      },
+
+      startFreshFromRetainedHistory: () => {
+        if (typeof window === 'undefined') return false;
+        if (!get().archiveRetainedHistory()) return false;
         set({
           profile: null,
-          prs: [],
-          workouts: [],
-          meals: [],
-          bodyMetrics: [],
-          prTargets: {},
-          macroGoals: null,
-          plannedWorkouts: [],
-          favoriteFoods: DEFAULT_FAVORITE_FOODS,
-          customFoods: [],
-          mealDayKinds: {},
           hasCompletedOnboarding: false,
-          waterLogs: {},
-          waterBatches: {},
-          hydrationConfig: DEFAULT_HYDRATION_CONFIG,
-          creatineLogs: {},
-          creatineConfig: DEFAULT_CREATINE_CONFIG,
-          creatineSupply: DEFAULT_CREATINE_SUPPLY,
-          dayTypeOverrides: {},
-          aiInsightsCache: {},
-          trainingProfile: DEFAULT_AI_TRAINING_PROFILE,
-          todaysAIWorkoutPlan: undefined,
-          latestWeeklyReview: undefined,
-          trainingDecisions: {},
-          decisionsLedgerHistory: [],
-          lifterProfile: null,
-          athleteModel: null,
-          coachBlocks: getInitialCoachBlocksState(),
-          weeklyReviews: [],
-          policyDecisionRecords: {},
-          policyDecisionsLedgerHistory: [],
-          policyDecisionApplications: [],
-          // Beyond the logout field set: a fresh profile starts with
-          // no schedule, no deletion tombstones, no pending draft, no
-          // check-ins and a fresh coach state — all of it archived.
-          weeklySchedule: {
-            monday: { workoutPlanId: 'rest' },
-            tuesday: { workoutPlanId: 'rest' },
-            wednesday: { workoutPlanId: 'rest' },
-            thursday: { workoutPlanId: 'rest' },
-            friday: { workoutPlanId: 'rest' },
-            saturday: { workoutPlanId: 'rest' },
-            sunday: { workoutPlanId: 'rest' },
-          },
-          deletedPlanIds: [],
-          deletedPrIds: [],
-          deletedWorkoutIds: [],
-          deletedMealIds: [],
-          deletedBodyMetricIds: [],
-          dailyCheckins: {},
-          coach: getInitialCoachState(),
-          healthSummary: null,
-          goals: [],
-          activeWorkoutDraft: null,
+          ...buildFreshHistoryState(),
           lastActiveTab: 'home',
         });
         try {
@@ -3531,7 +3603,6 @@ export const useAppStore = create<AppState>()(
         store.setMacroGoals(
           calculateRecommendedMacroGoals(70, 'build_muscle', 'male', 175, undefined, 'light')
         );
-        clearHowToSeenFlag(typeof window !== 'undefined' ? window.localStorage : undefined);
         return true;
       },
 

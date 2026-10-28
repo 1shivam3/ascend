@@ -5,7 +5,6 @@ import {
   readArchivedHistory,
   retainedHistoryCounts,
 } from '../src/lib/history-fork';
-import { HOWTO_SEEN_KEY } from '../src/lib/howto-guide';
 import { calculateRecommendedMacroGoals } from '../src/lib/macros';
 import { useStore } from '@/lib/store';
 
@@ -87,8 +86,6 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
   });
 
   it('Start fresh archives the history, then opens a default profile (no onboarding redo)', () => {
-    // Simulate a previous guide dismissal in this browser profile.
-    storage.setItem(HOWTO_SEEN_KEY, '1');
     const ok = useStore.getState().startFreshFromRetainedHistory();
     expect(ok).toBe(true);
     const after = useStore.getState();
@@ -131,10 +128,6 @@ describe('startFreshFromRetainedHistory / restoreArchivedHistory', () => {
     expect(after.bodyMetrics).toHaveLength(1);
     expect(after.bodyMetrics[0].weightKg).toBe(70);
     expect(after.bodyMetrics[0].heightCm).toBe(175);
-    // The guide once-flag is cleared so the new user sees the guide
-    // once on first Today arrival.
-    expect(storage.getItem(HOWTO_SEEN_KEY)).toBeNull();
-
     // Nothing deleted: the archive holds the original history.
     const raw = storage.getItem(ARCHIVED_HISTORY_KEY);
     expect(raw).not.toBeNull();

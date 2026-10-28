@@ -61,7 +61,7 @@ describe('Stage 6 — You/Settings IA regroup', () => {
     for (const key of [
       'home.nutrition',
       'home.coachSection',
-      'home.habitsThisWeek',
+      'homeMatrix.title',
       'home.quickActions',
       'home.hydration',
       'home.readiness',

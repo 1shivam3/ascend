@@ -200,12 +200,16 @@ export function getPreset(id: AccentThemeId): AccentPreset | null {
 
 /**
  * Derive a full custom-accent variant from a requested hex, per
- * personalization-spec §1.3. The requested hex is the accent (light mode);
- * the dark-mode accent is the same hue brightened for the dark background;
- * text is stepped until it meets 4.5:1; `on` is white or near-black,
- * whichever meets 4.5:1 against the accent. Returns null on bad input.
- * Also reports whether any derived value differs from the naive
- * derivation, so the UI can show the corrected-shade note BEFORE Apply.
+ * personalization-spec §1.3. The requested hex is the accent; the
+ * dark-mode accent is the same hue brightened for the dark background;
+ * the light-mode accent is the same hue DARKENED until it reads clearly
+ * (≥3:1 vs the light background for UI use) — a pale hex no longer
+ * ships verbatim and invisible in light mode, it ships corrected (same
+ * hue, darker shade) with the corrected note set. Text is stepped
+ * until it meets 4.5:1; `on` is white or near-black, whichever meets
+ * 4.5:1 against the accent. Returns null on bad input.
+ * Also reports whether any derived value differs from the requested
+ * hex, so the UI can show the corrected-shade note BEFORE Apply.
  */
 export function deriveCustomAccent(
   requestedHex: string,
@@ -217,11 +221,16 @@ export function deriveCustomAccent(
   const hsl = hexToHsl(hex);
   if (!hsl) return null;
 
-  // Accent: requested hex in light mode; brightened in dark mode until it
-  // reads clearly (≥3:1 vs the dark background for UI use) or lightness 0.8.
+  // Accent: darkened in light mode until it reads clearly (≥3:1 vs the
+  // light background) — stepToRatio returns the hex unchanged when it
+  // already passes, so saturated colors are untouched. Brightened in
+  // dark mode until ≥3:1 vs the dark background or lightness 0.8, as
+  // before. The user's chosen hex is what both derivations start from;
+  // only the direction differs per mode.
   let accent = hex;
-  if (mode === 'dark') {
-    accent = hex;
+  if (mode === 'light') {
+    accent = stepToRatio(hex, bg, 3, -1);
+  } else {
     for (let i = 0; i <= 16; i++) {
       const l = Math.min(0.8, hsl.l + 0.05 * i);
       const candidate = hslToHex(hsl.h, hsl.s, l);
@@ -296,22 +305,25 @@ export function deriveCustomAccent(
 
   const variant: AccentVariant = { accent, dim, text: chipText, on, subtle, glow };
   const correctedNote =
-    chipText.toUpperCase() !== hex.toUpperCase()
+    accent.toUpperCase() !== hex.toUpperCase() || chipText.toUpperCase() !== hex.toUpperCase()
       ? `Adjusted for readability — text uses ${chipText}, not ${hex}.`
       : null;
   return { variant, correctedNote };
 }
 
-/** Input gate for custom accents (Stage 9 audit): a custom hex ships a
-    light variant identical to the hex, so it must stand out from the
-    light page background (≥3:1, UI use) or the accent/focus ring would be
-    invisible in light mode. The dark variant is brightened until ≥3:1 by
-    derivation, so only the light pairing needs this gate. A failing hex
-    shows an inline error and blocks Apply — it never reaches the store. */
+/** Input gate for custom accents (Stage 9 audit, corrected): the light
+    variant is now DARKENED by derivation until ≥3:1 vs the light page
+    background, so a pale hex no longer blocks Apply — it applies with
+    the corrected-shade note. The gate therefore checks the DERIVED
+    light variant, not the raw hex: it still blocks (error + no Apply)
+    if derivation somehow failed to reach the bar, so an invisible
+    accent/focus ring can never ship. The bar is not lowered. */
 export function isCustomAccentUsable(hex: string): boolean {
   const normalized = normalizeHex(hex);
   if (!normalized) return false;
-  const ratio = contrastRatio(normalized, PAGE_BACKGROUND.light);
+  const derived = deriveCustomAccent(normalized, 'light');
+  if (!derived) return false;
+  const ratio = contrastRatio(derived.variant.accent, PAGE_BACKGROUND.light);
   return ratio !== null && ratio >= 3;
 }
 
