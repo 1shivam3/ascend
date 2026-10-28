@@ -52,7 +52,7 @@ import CoachWeeklyReviewCard from '@/components/CoachWeeklyReviewCard';
 import CoachNotesSection from '@/components/CoachNotesSection';
 import LevelSheet from '@/components/LevelSheet';
 import ChallengesSheet from '@/components/ChallengesSheet';
-import WeeklyHabitMatrix from '@/components/WeeklyHabitMatrix';
+import HomeMatrix from '@/components/HomeMatrix';
 import CustomizeSheet from '@/components/CustomizeSheet';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -587,7 +587,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const sectionTitles: Record<string, string> = {
     'nutrition-strip': t('home.nutrition'),
     coach: t('home.coachSection'),
-    'habit-matrix': t('home.habitsThisWeek'),
+    'habit-matrix': t('homeMatrix.title'),
     'quick-actions': t('home.quickActions'),
     hydration: t('home.hydration'),
     readiness: t('home.readiness'),
@@ -1145,18 +1145,11 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
       </div>
 
-      {/* ── 8b. HABIT MATRIX (one week: Gym / Water / Creatine / Protein) ──── */}
+      {/* ── 8b. HABIT + WORKOUT MATRIX (weekly/monthly, tap a date for
+          that day's workouts, meals, and habits) ──────────────────────── */}
       <div style={{ order: orderOf('habit-matrix') }} className={(uiPreferences.showHabitMatrix || uiPreferences.gamificationEnabled) && shown('habit-matrix') ? undefined : 'hidden'}>
       {uiPreferences.showHabitMatrix && (
       <div className="bg-bg-card border border-border/80 rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-bold text-text-primary">{density === 'simple' ? t('home.habitsToday') : t('home.habitsThisWeek')}</span>
-          {/* Live-fix L2: Simple shows only today's column (todayOnly),
-              so the week-range label would lie — show today's date instead.
-              No new i18n string: the date is computed, like the matrix's
-              own day header. */}
-          <span className="text-2xs font-mono text-text-muted">{density === 'simple' ? new Date().toLocaleDateString(language === 'hi' ? 'hi-IN' : 'en-US', { weekday: 'short', day: 'numeric' }) : t('home.monSun')}</span>
-        </div>
         {uiPreferences.gamificationEnabled && (
           <div className="flex items-center gap-2 mb-3">
             <Flame className="w-4 h-4 text-accent shrink-0" aria-hidden="true" />
@@ -1178,9 +1171,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             {t('home.freezeCovered')}
           </p>
         )}
-        <WeeklyHabitMatrix
-          compact
-          todayOnly={density === 'simple'}
+        <HomeMatrix
           workouts={workouts}
           waterLogs={waterLogs}
           creatineLogs={creatineLogs}
@@ -1195,12 +1186,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             isCustomTarget: hydrationConfig?.isCustomTarget,
           })}
           proteinTargetG={effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140)}
-          weekStart={(() => {
-            const d = new Date(today);
-            d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-            d.setHours(0, 0, 0, 0);
-            return d;
-          })()}
+          defaultView={uiPreferences.defaultMatrixView ?? 'weekly'}
         />
       </div>
       )}

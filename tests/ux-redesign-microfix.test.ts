@@ -92,19 +92,19 @@ describe('L9b favorites row wraps', () => {
   });
 });
 
-describe('L2 Simple habit heading', () => {
-  it('Simple uses a today heading, Detailed keeps the week heading', () => {
+describe('L2 habit matrix heading', () => {
+  it('the section uses the matrix title in both densities', () => {
     const home = src('src/components/HomePage.tsx');
-    expect(home).toContain(
-      "{density === 'simple' ? t('home.habitsToday') : t('home.habitsThisWeek')}"
-    );
+    expect(home).toContain("t('homeMatrix.title')");
+    expect(home).not.toContain("t('home.habitsToday')");
+    expect(home).not.toContain("t('home.habitsThisWeek')");
   });
 
   it('the new heading key exists in both dictionaries', () => {
-    expect((en as Record<string, string>)['home.habitsToday']).toBe(
-      "Today's habits"
+    expect((en as Record<string, string>)['homeMatrix.title']).toBe(
+      'Habit & workout matrix'
     );
-    expect((hi as Record<string, string>)['home.habitsToday']).toBeTruthy();
+    expect((hi as Record<string, string>)['homeMatrix.title']).toBeTruthy();
   });
 });
 

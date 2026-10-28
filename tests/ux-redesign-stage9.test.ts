@@ -60,14 +60,11 @@ describe('Stage 9 — contrast audit, every use', () => {
     }
   });
 
-  it.each(CUSTOM_CASES)('custom %s: focus ring ≥3:1 and chip ≥4.5:1 in both modes, or rejected at input', (hex) => {
-    // Hexes that fail the light-background UI pairing never ship: the
-    // input gate rejects them (error + Apply blocked) instead of the
-    // derivation silently changing the user's chosen accent.
-    if (!isCustomAccentUsable(hex)) {
-      expect(['#F5EFE0', '#FFEB00']).toContain(hex);
-      return;
-    }
+  it.each(CUSTOM_CASES)('custom %s: focus ring ≥3:1 and chip ≥4.5:1 in both modes', (hex) => {
+    // Derivation corrects pale hexes (light variant darkened until
+    // ≥3:1, same hue) instead of rejecting them, so every valid hex
+    // ships a passing variant in both modes; only invalid input is
+    // rejected at the gate (see the gate test below).
     for (const mode of ['light', 'dark'] as const) {
       const derived = deriveCustomAccent(hex, mode);
       expect(derived, `${hex}/${mode} derives`).not.toBeNull();
@@ -79,9 +76,12 @@ describe('Stage 9 — contrast audit, every use', () => {
     }
   });
 
-  it('input gate rejects near-background hexes and accepts the rest', () => {
-    expect(isCustomAccentUsable('#F5EFE0')).toBe(false);
-    expect(isCustomAccentUsable('#FFEB00')).toBe(false);
+  it('input gate accepts correctable hexes and rejects only invalid input', () => {
+    // Pale hexes apply with a corrected (darkened) light variant — the
+    // gate checks the derived variant, not the raw hex — so they are
+    // usable now; invalid input still never reaches the store.
+    expect(isCustomAccentUsable('#F5EFE0')).toBe(true);
+    expect(isCustomAccentUsable('#FFEB00')).toBe(true);
     expect(isCustomAccentUsable('#1A1A2E')).toBe(true);
     expect(isCustomAccentUsable('#808080')).toBe(true);
     expect(isCustomAccentUsable('#E44427')).toBe(true);

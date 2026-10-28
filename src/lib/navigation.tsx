@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useCallb
 import { useToast } from '@/components/ui/Toast';
 import { useTranslation } from '@/lib/i18n';
 import { useStore } from '@/lib/store';
+import { consumeBootSessionFlag, decideBootTab, hasBootSessionFlag } from '@/lib/boot-home';
 
 export type TabId = 'home' | 'workout' | 'progress' | 'meals' | 'prs' | 'profile' | 'settings';
 export type ProgressTabId = 'overview' | 'strength' | 'prs' | 'bodyweight' | 'training';
@@ -149,9 +150,24 @@ export function getInitialNavigationState(): { tab: TabId; progressTab: Progress
       );
     }
 
-    // Bare launch URL: restore the tab the user was last on.
+    // Bare launch URL: a fresh browser/WebView session starts at Home
+    // even if a previous session ended on another tab (boot-to-home).
+    // The flag is read-only here — it is set exactly once by the
+    // NavigationProvider mount effect below, AFTER the initial tab is
+    // decided, so every getInitialNavigationState() call during boot
+    // agrees. A continuing session restores the saved tab as before.
+    // Refresh is untouched: it keeps the URL tab (above) or finds the
+    // flag present (below). Back is untouched: no history call here.
+    const freshLaunch = !hasBootSessionFlag(
+      typeof window !== 'undefined' ? window.sessionStorage : undefined,
+    );
     const saved = resolveSavedNavigation();
-    if (saved) return saved;
+    const decided = decideBootTab({
+      urlTab: null,
+      saved: saved ? { tab: saved.tab, progressTab: saved.progressTab } : null,
+      freshLaunch,
+    });
+    return toNavigationState(decided.tab, decided.progressTab);
   } catch {}
 
   // First-ever launch: nothing in the URL, nothing saved.
@@ -403,6 +419,16 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     try {
       seedInitialBrowserHistory(initial.tab, initial.progressTab);
       persistActiveTab(initial.tab, initial.progressTab);
+    } catch {}
+
+    // Boot-to-home: mark this browser/WebView session started, AFTER
+    // the initial tab was decided above. Every getInitialNavigationState()
+    // call during this boot read the flag absent and agreed on Home for
+    // a fresh launch; a later refresh in the same session finds the
+    // flag present and restores the last tab. Idempotent, so a
+    // StrictMode double-effect is harmless.
+    try {
+      consumeBootSessionFlag(window.sessionStorage);
     } catch {}
 
     const handlePopState = (event: PopStateEvent) => {

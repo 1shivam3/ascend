@@ -26,6 +26,8 @@ import {
   Calendar,
   Bell,
   LogOut,
+  ChevronDown,
+  MessageCircle,
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
@@ -41,13 +43,26 @@ import ReminderCenterModal from '@/components/ReminderCenterModal';
 import DietPreferencePicker from '@/components/DietPreferencePicker';
 import ThemePicker from '@/components/ThemePicker';
 import CustomizeSheet from '@/components/CustomizeSheet';
-import HowToUseGuide from '@/components/HowToUseGuide';
 import SegmentedControl from '@/components/ui/SegmentedControl';
+import FeedbackModal from '@/components/FeedbackModal';
 import { ACCENT_PRESETS, deriveCustomAccent, normalizeHex, isCustomAccentUsable } from '@/lib/accent-themes';
 import { resolveTodayLayout, sanitizeTodayLayout, DEFAULT_TODAY_LAYOUT } from '@/lib/today-layout';
 import LanguagePicker from '@/components/ui/LanguagePicker';
 import PermissionHelp from '@/components/ui/PermissionHelp';
 import { useTranslation } from '@/lib/i18n';
+import type { StringKey } from '@/lib/i18n/en';
+
+/** Settings FAQ — plain 1–2 sentence answers. The privacy answer links
+ *  to the full Privacy Policy page; nothing here is legal advice. */
+const FAQ_ITEMS: { q: StringKey; a: StringKey; link?: { href: string; label: StringKey } }[] = [
+  { q: 'settings.faqQ1', a: 'settings.faqA1' },
+  { q: 'settings.faqQ2', a: 'settings.faqA2' },
+  { q: 'settings.faqQ3', a: 'settings.faqA3' },
+  { q: 'settings.faqQ4', a: 'settings.faqA4' },
+  { q: 'settings.faqQ5', a: 'settings.faqA5', link: { href: '/privacy', label: 'settings.privacyPolicy' } },
+  { q: 'settings.faqQ6', a: 'settings.faqA6' },
+  { q: 'settings.faqQ7', a: 'settings.faqA7' },
+];
 import {
   isHealthConnectAvailable,
   isHealthConnectSupported,
@@ -145,6 +160,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const trainingSectionRef = useRef<HTMLDivElement>(null);
   const dataSectionRef = useRef<HTMLDivElement>(null);
   const dataAccountSectionRef = useRef<HTMLDivElement>(null);
+  const faqSectionRef = useRef<HTMLDivElement>(null);
   const scrollToSection = (ref: React.RefObject<HTMLDivElement | null>) => {
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -193,11 +209,12 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     uiPreferences.accentTheme === 'custom' ? (uiPreferences.customAccentHex ?? '') : '',
   );
   const normalizedDraft = normalizeHex(draftHex);
-  // A custom accent must stand out from the page background in BOTH modes
-  // (the same hex ships a light variant when the user switches mode). The
-  // dark variant is brightened until ≥3:1 by derivation, so only the light
-  // pairing needs this gate; a failing hex shows an error and blocks Apply
-  // (preview null) instead of shipping an invisible accent/focus ring.
+  // A custom accent must stand out from the page background in BOTH modes.
+  // Derivation corrects both directions (light variant darkened, dark
+  // variant brightened, each until ≥3:1), so a pale hex now applies with
+  // the adjusted note instead of blocking; the gate checks the derived
+  // light variant and still blocks if correction somehow failed, so an
+  // invisible accent/focus ring can never ship (preview null).
   const tooCloseToBackground =
     normalizedDraft !== null && !isCustomAccentUsable(normalizedDraft);
   const customError =
@@ -239,7 +256,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
   const sheetSectionTitles: Record<string, string> = {
     'nutrition-strip': t('home.nutrition'),
     coach: t('home.coachSection'),
-    'habit-matrix': t('home.habitsThisWeek'),
+    'habit-matrix': t('homeMatrix.title'),
     'quick-actions': t('home.quickActions'),
     hydration: t('home.hydration'),
     readiness: t('home.readiness'),
@@ -257,7 +274,8 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
     [uiPreferences.todayLayout],
   );
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const handleToggleSection = (id: string, next: boolean) => {
     setUiPreferences({
       todayLayout: { ...rawTodayLayoutForSheet, visible: { ...rawTodayLayoutForSheet.visible, [id]: next } },
@@ -556,6 +574,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             { labelKey: 'settings.trainingPreferences', ref: trainingSectionRef },
             { labelKey: 'settings.dataPrivacyLegal', ref: dataSectionRef },
             { labelKey: 'settings.dataAccount', ref: dataAccountSectionRef },
+            { labelKey: 'settings.faqTitle', ref: faqSectionRef },
           ] as const
         ).map((chip) => (
           <button
@@ -797,20 +816,6 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             </button>
           </div>
 
-          {/* How-to-use guide — re-opens the first-run guide on demand */}
-          <div className="pt-3 border-t border-border/60">
-            <button
-              type="button"
-              onClick={() => setIsGuideOpen(true)}
-              className="w-full flex items-center justify-between cursor-pointer text-left"
-            >
-              <div>
-                <p className="text-xs font-bold text-text-primary">{t('guide.title')}</p>
-                <p className="text-2xs text-text-muted">{t('guide.subtitle')}</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-text-muted" />
-            </button>
-          </div>
         </div>
       </div>
 
@@ -1036,6 +1041,23 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               label={t('settings.toggleHabitMatrix')}
               on={uiPreferences.showHabitMatrix}
               onToggle={() => setUiPreferences({ showHabitMatrix: !uiPreferences.showHabitMatrix })}
+            />
+          </div>
+
+          {/* Default matrix view — what the homepage matrix opens as.
+              The widget's own Weekly/Monthly toggle is session-local
+              and does not change this default. */}
+          <div className="space-y-2 pt-3 border-t border-border/60">
+            <span className="text-xs font-semibold text-text-secondary font-sans">{t('settings.defaultMatrixView')}</span>
+            <p className="text-2xs text-text-muted leading-relaxed">{t('settings.defaultMatrixViewHint')}</p>
+            <SegmentedControl
+              ariaLabel={t('settings.defaultMatrixView')}
+              value={uiPreferences.defaultMatrixView ?? 'weekly'}
+              options={[
+                { value: 'weekly', label: t('homeMatrix.weekly') },
+                { value: 'monthly', label: t('homeMatrix.monthly') },
+              ]}
+              onChange={(v) => setUiPreferences({ defaultMatrixView: v as 'weekly' | 'monthly' })}
             />
           </div>
 
@@ -1391,6 +1413,69 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       </div>
 
 
+      {/* ── SECTION 6: HELP & FAQ ────────────────────────────────────────────
+          Simple expand/collapse answers to general questions. The
+          Feedback & Support button closes the block, so help and a way
+          to ask for more help sit together. */}
+      <div ref={faqSectionRef} className="space-y-2 scroll-mt-28">
+        <span className="text-2xs font-mono font-bold uppercase tracking-wider text-text-muted px-1">
+          {t('settings.faqTitle')}
+        </span>
+        <p className="text-2xs text-text-muted px-1 -mt-1">{t('settings.faqHint')}</p>
+        <div className="card p-2 sm:p-3 bg-bg-card border border-border rounded-2xl shadow-xs divide-y divide-border/60">
+          {FAQ_ITEMS.map((item, i) => {
+            const open = openFaqIndex === i;
+            return (
+              <div key={item.q} className="p-3">
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(open ? null : i)}
+                  aria-expanded={open}
+                  className="w-full flex items-center justify-between gap-3 text-left cursor-pointer"
+                >
+                  <span className="text-xs font-bold text-text-primary">{t(item.q)}</span>
+                  <ChevronDown
+                    className={`w-4 h-4 text-text-muted shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                {open && (
+                  <div className="pt-2">
+                    <p className="text-2xs text-text-muted leading-relaxed">{t(item.a)}</p>
+                    {item.link && (
+                      <a
+                        href={item.link.href}
+                        className="inline-block mt-1.5 text-2xs font-bold text-accent underline"
+                      >
+                        {t(item.link.label)}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* Feedback & Support — last row of the FAQ block (same modal
+              as Profile's Feedback & Support button, which is untouched). */}
+          <button
+            type="button"
+            onClick={() => setIsFeedbackOpen(true)}
+            className="w-full p-3 flex items-center justify-between hover:bg-bg-secondary/60 rounded-xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-bg-secondary flex items-center justify-center text-text-muted">
+                <MessageCircle className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-text-primary">{t('profile.feedback')}</p>
+                <p className="text-2xs text-text-muted">{t('profile.feedbackHint')}</p>
+              </div>
+            </div>
+            <ChevronRight className="w-4 h-4 text-text-muted" />
+          </button>
+        </div>
+      </div>
+
       {isScheduleModalOpen && (
         <WeeklyScheduleModal
           isOpen={isScheduleModalOpen}
@@ -1481,9 +1566,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         onClose={() => setIsAuthModalOpen(false)}
       />
 
-      <HowToUseGuide
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
       />
 
       <CustomizeSheet

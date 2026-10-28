@@ -10,7 +10,6 @@ import { getOrCreateGuestId } from '@/lib/storage';
 import { estimateSessionMinutes } from '@/lib/workout-engine';
 import { canContinueFromGoalStep } from '@/lib/onboarding';
 import { calculateAgeFromDob } from '@/lib/age';
-import { clearHowToSeenFlag } from '@/lib/howto-guide';
 import { useTranslation } from '@/lib/i18n';
 import { useToast } from '@/components/ui/Toast';
 import { Loader2 } from 'lucide-react';
@@ -452,14 +451,6 @@ export default function Onboarding() {
   };
 
   const completeOnboarding = () => {
-    // How-to-use guide once-flag lives in raw localStorage, outside the
-    // store — so Start fresh / a previous dismissal leaves it set and
-    // a later new user in this browser profile never sees the guide,
-    // while Settings re-open (own local state) keeps working. Clear it
-    // here, on the new profile's completion, before the profile lands:
-    // the page.tsx trigger then reads it absent and shows the guide
-    // once. Returning users never re-run this, so a dismissal sticks.
-    clearHowToSeenFlag(typeof window !== 'undefined' ? window.localStorage : undefined);
     // Live-fix L1: the profile was staged, not applied, so the summary
     // could render (applying it earlier unmounts Onboarding via the
     // page.tsx gate). Apply it here, on the summary's Continue.
@@ -477,10 +468,6 @@ export default function Onboarding() {
   // onboarding, and land on You → Settings, scrolled to the Training
   // Preferences section. The button label names that real destination.
   const handleSummaryEdit = () => {
-    // Same new-profile moment as completeOnboarding (this path lands
-    // on Settings instead of Home): clear the stale guide flag so the
-    // first later Home visit shows the guide once.
-    clearHowToSeenFlag(typeof window !== 'undefined' ? window.localStorage : undefined);
     applyPendingProfile();
     toast.success(t('toast.welcome', { name: savedFirstName }), t('toast.titleAllSet'));
     try {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildTabUrl, getInitialNavigationState } from '@/lib/navigation';
+import { BOOT_SESSION_KEY } from '@/lib/boot-home';
 import { useStore, partializeAppState } from '@/lib/store';
 
 describe('Android & Browser Back Navigation (Task 2)', () => {
@@ -132,6 +133,7 @@ class MockStorage implements Storage {
 }
 
 const mockStorage = new MockStorage();
+const mockSessionStorage = new MockStorage();
 
 function setupBrowserEnvironment(urlPath = '/') {
   const urlObj = new URL(urlPath, 'https://ascendtonext.vercel.app');
@@ -167,16 +169,23 @@ function setupBrowserEnvironment(urlPath = '/') {
       back: vi.fn(),
     },
     localStorage: mockStorage,
+    sessionStorage: mockSessionStorage,
   };
 
   (globalThis as any).window = mockWindow;
   (globalThis as any).localStorage = mockStorage;
+  (globalThis as any).sessionStorage = mockSessionStorage;
 }
 
 describe('Tab URL Synchronization & Refresh Persistence', () => {
 
   beforeEach(() => {
     mockStorage.clear();
+    mockSessionStorage.clear();
+    // Refresh/continuing-session default: the boot flag is present, so
+    // a bare launch restores the saved tab exactly as before. The
+    // fresh-launch test below clears it explicitly.
+    mockSessionStorage.setItem(BOOT_SESSION_KEY, '1');
     setupBrowserEnvironment('/');
     // Reset the live store's saved tab so tests stay independent.
     useStore.setState({ lastActiveTab: 'home', lastProgressSubTab: 'overview', lastTrainSubTab: 'plans' });
@@ -276,6 +285,19 @@ describe('Tab URL Synchronization & Refresh Persistence', () => {
 
     const initial = getInitialNavigationState();
     expect(initial.tab).toBe('workout');
+  });
+
+  it('fresh launch on a bare URL goes Home even with a saved tab (boot-to-home)', () => {
+    window.history.replaceState({}, '', '/');
+    mockSessionStorage.clear();
+    localStorage.setItem(
+      'ascend_store',
+      JSON.stringify({ state: { lastActiveTab: 'meals', lastProgressSubTab: 'overview' }, version: 0 })
+    );
+
+    const initial = getInitialNavigationState();
+    expect(initial.tab).toBe('home');
+    expect(initial.progressTab).toBe('overview');
   });
 
   it('ignores a corrupted saved tab and falls back to home', () => {
