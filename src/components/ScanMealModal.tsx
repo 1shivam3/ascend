@@ -10,14 +10,18 @@ import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsF
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
 import {
   classifyPhoto,
+  detectPhoto,
   isOfflineScanAvailable,
   shouldUseOfflineScan,
   routeOfflineResult,
   buildOfflineDraft,
+  buildDraftFromDetections,
   buildItemForCandidate,
+  isResolvedLabel,
   alternativesFor,
   displayNameForLabel,
   type OfflineCandidate,
+  type OfflineDetection,
 } from '@/lib/offline-scan';
 import { isNativeApp } from '@/lib/app-settings';
 import { useTranslation } from '@/lib/i18n';
@@ -100,6 +104,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   // on web, where nothing in this flow changes.
   const [offlineReady, setOfflineReady] = useState(false);
   const [offlineCandidates, setOfflineCandidates] = useState<OfflineCandidate[] | null>(null);
+  const [offlineDetections, setOfflineDetections] = useState<OfflineDetection[] | null>(null);
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
   const [scanSource, setScanSource] = useState<'offline' | 'server' | null>(null);
   const [isOfflineClassifying, setIsOfflineClassifying] = useState(false);
@@ -338,6 +343,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     offlineRunRef.current++;
     setIsOfflineClassifying(false);
     setOfflineCandidates(null);
+    setOfflineDetections(null);
     setDraftLabel(null);
     setScanSource(null);
     stopLiveCamera();
@@ -537,6 +543,20 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setStep('review');
   };
 
+  // Multi-item landing: one review item per qualifying detection.
+  const landDetectionDraft = (detections: OfflineDetection[]) => {
+    const draft = buildDraftFromDetections(detections);
+    if (!draft) return false;
+    const result = applyLearnedPortionPreferences(draft);
+    setOilLevels({});
+    setAnalysis(result);
+    setMealName(result.mealName || 'Scanned Meal');
+    setDraftLabel(draft.items[0]?.name ?? null);
+    setScanSource('offline');
+    setStep('review');
+    return true;
+  };
+
   const startOfflineScan = async () => {
     if (!processedBlob) {
       toast.error('Please take or upload a food photo first.', 'No Image');
@@ -547,6 +567,26 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     setIsOfflineClassifying(true);
     setStep('analyzing');
     try {
+      // Detector-first: containers → crops → v11. Falls through to
+      // the whole-photo classify when the detector finds nothing or
+      // its bridge method is unavailable (older plugin build).
+      let detections: OfflineDetection[] = [];
+      try {
+        detections = await detectPhoto(processedBlob);
+      } catch {
+        detections = [];
+      }
+      if (offlineRunRef.current !== runId) return; // reset/closed mid-run
+      if (detections.length > 0) {
+        setOfflineDetections(detections);
+        if (landDetectionDraft(detections)) return;
+        // No detection qualified for auto-draft: offer every crop's
+        // top candidates as choices (user picks; unmapped labels
+        // never draft — the cloud scan stays the fallback).
+        setOfflineCandidates(detections.flatMap((d) => d.candidates));
+        setStep('choices');
+        return;
+      }
       const candidates = await classifyPhoto(processedBlob);
       if (offlineRunRef.current !== runId) return; // reset/closed mid-run
       setOfflineCandidates(candidates);
@@ -569,6 +609,15 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
   const pickOfflineCandidate = (label: string) => {
     if (!offlineCandidates) return;
+    // Unmapped labels never draft (no honest nutrition exists for
+    // them): stay on choices, where the AI scan is the fallback.
+    if (!isResolvedLabel(label)) {
+      toast.info(
+        'No nutrition entry for this dish yet — use the AI scan for it instead.',
+        'Not in the offline list'
+      );
+      return;
+    }
     landOfflineDraft(offlineCandidates, label);
   };
 
@@ -578,8 +627,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     if (!offlineCandidates || !analysis) return;
     const candidate = offlineCandidates.find((c) => c.label === label);
     if (!candidate) return;
+    const swapped = buildItemForCandidate(candidate);
+    if (!swapped) return; // unresolved label — never drafts
     const itemsCopy = [...analysis.items];
-    itemsCopy[0] = buildItemForCandidate(candidate);
+    itemsCopy[0] = swapped;
     setAnalysis(recalculateMealResult(analysis, itemsCopy));
     setMealName(itemsCopy[0].name);
     setDraftLabel(label);
@@ -1233,6 +1284,11 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                 >
                   <span className="font-bold text-sm text-text-primary">
                     {displayNameForLabel(candidate.label)}
+                    {!isResolvedLabel(candidate.label) && (
+                      <span className="block text-[11px] font-medium text-text-muted">
+                        No nutrition entry yet — use the AI scan for this dish
+                      </span>
+                    )}
                   </span>
                   <span className="text-xs font-mono font-semibold text-accent shrink-0">
                     {Math.round(candidate.score * 100)}%
@@ -1264,6 +1320,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   onClick={() => {
                     cleanupPreview();
                     setOfflineCandidates(null);
+                    setOfflineDetections(null);
                     setStep('select');
                   }}
                   className="btn-secondary py-2.5 text-xs font-semibold flex-1 flex items-center justify-center gap-1.5"

@@ -1,15 +1,619 @@
+adhirasam
+adobo
+almond jelly
+aloo gobi
+aloo masala
+aloo methi
+aloo mutter
+aloo paratha
+aloo shimla mirch
+aloo tikki
+ambrosia
+amritsari kulcha
+anarsa
+anda curry
+appam
+apple pie
+apple turnover
+applesauce
+applesauce cake
+ariselu
+avial
+ayam bakar
+ayam goreng
+baati
+babi guling
+baby back ribs
+bacon and eggs
+bagel
+bak kut teh
+baked alaska
+baked salmon
+baklava
+ball shaped bun with pork
+balushahi
+banana chips
+bandar laddu
+barbecued red pork in sauce with rice
+barbecued spareribs
+basundi
+bean curd family style
+beef bourguignon
+beef bowl
+beef carpaccio
+beef curry
+beef in oyster sauce
+beef noodle
+beef noodle soup
+beef stroganoff
+beef tartare
+beef wellington
+beet salad
+beignet
+besan laddu
+bhatura
+bhindi masala
+bibimbap
 biryani
+blancmange
+blt sandwich
+boiled chicken and vegetables
+boiled egg
+boiled fish
+boned, sliced hainan style chicken with marinated rice
+boondi
+boondi laddu
+boston cream pie
+braised pork meat ball with napa cabbage
+bread pudding
+breakfast burrito
+brisket
+broiled eel bowl
+brownie
+bruschetta
+bubble and squeak
+bubur ayam
+buffalo wings
+burger
+burrito
+butter chicken
+butter naan
+cabbage roll
+caesar salad
+cannelloni
+cannoli
+caprese salad
+carbonnade flamande
+carrot cake
+casserole
+ceviche
+chaas
+chai
+chak hao kheer
+cham cham
+champon
+chana masala
+chapati
+charcoal boiled pork neck
+chawanmushi
+cheese plate
+cheesecake
+chhena kheeri
+chicken cordon bleu
+chicken curry
+chicken cutlet
+chicken kiev
+chicken marengo
+chicken nugget
+chicken pizza
+chicken provencale
+chicken quesadilla
+chicken rezala
+chicken rice
+chicken rice curry with coconut
+chicken tikka
+chicken tikka masala
+chicken wings
+chiffon cake
+chikki
+chili
+chilled noodle
+chinese pumpkin pie
+chinese soup
+chip butty
+chivda
+chocolate cake
+chocolate mousse
 chole bhature
+chop suey
+chow mein
+churma
+churros
+clam chowder
+clams
+clear soup
+club sandwich
+cockles
+coconut cake
+coconut chutney
+coconut milk flavored crepes with shrimp and beef
+coconut milk soup
+coffee cake
+cold tofu
+compote
+confit
+coq au vin
+coquilles saint jacques
+cottage pie
+couscous
+crab
+crab cakes
+crayfish
+cream puff
+creme brulee
+crepe
+crispy noodles
+croissant
+croque madame
+croquette
+cruller
+crumb cake
+crumpet
+cupcake
+curd rice
+curry puff
+custard
+custard tart
+cutlet curry
 dabeli
+dak galbi
 dal
+dal baati churma
+dal khichdi
+dal makhani
+dal puri
+dal tadka
+deep fried chicken wing
+deviled eggs
+dharwad pedha
 dhokla
+dipping noodles
+dish consisting of stir fried potato, eggplant and green pepper
+dolmas
+donut
+doodhpak
 dosa
+double ka meetha
+dried fish
+dry curry
+dum aloo
+dumplings
+eccles cake
+edamame
+eels on rice
+egg roll
+eggplant with garlic sauce
+eggs benedict
+eight treasure rice
+enchilada
+entrecote
+escargots
+falafel
+falooda
+farfalle
+fettuccine
+filet mignon
+fine white noodles
+fish and chips
+fish ball soup
+fish curry
+fish stick
+flan
+foie gras
+fondue
+french bread
+french fries
+french onion soup
+french toast
+fried calamari
+fried chicken
+fried egg
+fried fish
+fried mussel pancakes
+fried noodle
+fried pork in scoop
+fried rice
+fried shrimp
+frittata
+fritter
+frozen yogurt
+fruitcake
+gajar ka halwa
+galantine
+ganmodoki
+garlic bread
+garlic naan
+gavvalu
+ghevar
+ginger pork saute
+gingerbread
+glutinous oil rice
+glutinous rice balls
+gnocchi
+goya chanpuru
+gratin
+greek salad
+green chutney
+green curry
+green salad
+grilled cheese sandwich
+grilled eggplant
+grilled pacific saury
+grilled salmon
+grilled sandwich
+guacamole
+gujhia
+gulab jamun
+gulai
+gyoza
+gyro
+haggis
+ham and eggs
+ham cutlet
+ham sandwich
+hambarg steak
+hara bhara kabab
+haupia
+hot and sour soup
+hot and sour, fish and vegetable ragout
+hot dog
+hot pot
+hue beef rice vermicelli soup
+huevos rancheros
+hummus
+ice cream
+idiyappam
+idli
+imarti
+inarizushi
 jalebi
+jambalaya
+japanese tofu and vegetable chowder
+jerky
+jjigae
+kachori
+kadai paneer
+kadhi
+kajjikaya
+kaju katli
+kakinada khaja
+kalakand
+kamameshi
+karela bharta
 kathi roll
+kaya toast
+kebab
+kedgeree
+khakhra
+khao soi
+kheer
+kinpira style sauteed burdock
+knish
 kofta
+kulfi
+kung pao chicken
+kushikatsu
+laksa
+lamb kebabs
+lasagna
+lassi
+laulau
+ledikeni
+lemon fig jelly
+lightly roasted fish
+limpet
+linguine
+litti chokha
+lobster
+lobster bisque
+lobster roll sandwich
+lobster thermidor
+loco moco
+lumpia
+lutefisk
+lyangcha
+maach jhol
+macaron
+macaroni and cheese
+macaroni salad
+makki di roti sarson da saag
+malasada
+malpua
+mango pudding
+manicotti
+marble cake
+margherita pizza
+masala dosa
+masala papad
+matzo ball
+meat loaf
+meatball
+medu vada
+mie ayam
+mie goreng
+minced meat cutlet
+minced pork rice
+minestrone
+misal pav
+miso soup
+missi roti
+misti doi
+mixed rice
+modak
+momos
+moo goo gai pan
+moon cake
+moong dal halwa
+mostaccioli
+moussaka
+mozuku
+muffin
+murukku
+mushroom risotto
+mussel
+mutton curry
+mysore pak
 naan
+nachos
+namero
+nanbanzuke
+nasi campur
+nasi goreng
+nasi padang
+nasi uduk
+natto
+navratan korma
+neer dosa
+noodles with fish curry
+oatmeal
+oden
+okinawa soba
+okonomiyaki
+olan
+omelette
+omurice
+onion rings
+orzo
+oshiruko
+osso buco
+oxtail soup
+oyakodon
+oyster omelette
+oysters
+pad thai
+paella
 pakora
+palak paneer
+pancakes
 paneer
+paneer butter masala
+paneer masala
+paneer pizza
 pani puri
+paniyaram
+panna cotta
+papdi chaat
+parfait
+pate
+patrode
 pav bhaji
+pavlova
+peach melba
+peking duck
+penne
+pepper steak
+pepperoni pizza
+phirni
+pho
+pilaf
+pirogi
+pithe
+pizza
+pizza toast
+poached egg
+poha
+poi
+pongal
+poornalu
+pootharekulu
+popcorn
+pork belly
+pork chop
+pork cutlet
+pork cutlet on rice
+pork fillet cutlet
+pork loin cutlet
+pork miso soup
+pork satay
+pork sticky noodles
+pork with lemon
+porridge
+pot au feu
+potage
+potato salad
+potpie
+pound cake
+poutine
+prime rib
+profiterole
+pulled pork sandwich
+puri bhaji
+puttu
+qubani ka meetha
+rabri
+raisin bread
+raita
+rajma chawal
+rajma curry
+ramen
+rare cheesecake
+rasgulla
+rasmalai
+rava dosa
+ravioli
+red velvet cake
+reuben
+rice
+rice ball
+rice crispy pork
+rice gratin
+rice gruel
+rice vermicelli
+rice with roast duck
+rigatoni
+risotto
+rissole
+roast chicken
+roast duck
+rock cake
+roll bread
+roulade
+rugulah
+sabudana khichdi
+sabudana vada
+salisbury steak
+salmon meuniere
+salt and pepper fried shrimp with shell
+sambar
+samosa
+samul
+sandesh
+sandwich
+sashimi
+sashimi bowl
+sauerbraten
+sauerkraut
+sausage
+sausage roll
+sauteed spinach
+sauteed vegetables
+savarin
+scallop
+scampi
+schnitzel
+scone
+scotch egg
+scrambled eggs
+scrapple
+seasoned beef with potatoes
+seaweed salad
+seekh kebab
+set dosa
+sev puri
+shahi paneer
+shankarpali
+sheer korma
+sheera
+shirred egg
+shrikhand
+shrimp and grits
+shrimp patties
+shrimp with chill source
+simmered pork
+sirloin cutlet
+sloppy joe
+small steamed savory rice pancake
+soan papdi
+soba noodle
+sohan halwa
+solkadhi
+souffle
+sour prawn soup
+spaghetti
+spaghetti bolognese
+spaghetti carbonara
+spam musubi
+spicy chicken salad
+spicy chili flavored tofu
+sponge cake
+spring roll
+steak
+steamed meat dumpling
+steamed rice roll
+steamed spareribs
+stew
+stewed pork leg
+stinky tofu
+stir fried beef and peppers
+stir fried mixed vegetables
+strawberry shortcake
+streusel
+strudel
+stuffed cabbage
+stuffed peppers
+stuffed tomato
+succotash
+sukiyaki
+sushi
+sushi bowl
+sutar feni
+sweet and sour pork
+syllabub
+tacos
+tagliatelle
+taiyaki
+takoyaki
+tamale
+tamale pie
+tandoori chicken
+tanmen
+tapenade
+tempura
+tempura bowl
+tempura udon
+tenderloin
+tenshin noodle
+teriyaki grilled fish
+terrine
+tetrazzini
+thai papaya salad
+thali
+thinly sliced raw horsemeat
+thoran
+three cup chicken
+thukpa
+tiramisu
+toad in the hole
+toast
+tomato chutney
+torte
+tortellini
+tortilla
+tostada
+trunip pudding
+tuna tartare
+twice cooked pork
+udon noodle
+unni appam
+upma
+upside down cake
+uttapam
 vada pav
+veal cordon bleu
+vegetable tempura
+vermicelli
+vermicelli noodles with snails
+victoria sandwich
+vol au vent
+waffles
+welsh rarebit
+winter melon soup
+wonton
+wonton soup
+xiao long bao
+yakitori
+yellow curry
+yudofu
+zha jiang mian
+ziti
+zoni
