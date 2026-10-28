@@ -12,6 +12,8 @@ import {
   buildPlanExtras,
   planFieldsFromExtras,
   recomputePullSlices,
+  filterRowsForPush,
+  shouldPushRow,
   type PullSliceKey,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
@@ -49,6 +51,9 @@ function planFromRemoteRow(r: any): PlannedWorkout {
     name: r.name,
     exercises: r.exercises || [],
     createdAt: r.created_at || new Date().toISOString(),
+    // R1/DI-08: carry the server stamp into the local row so
+    // newest-wins comparisons work on the next sync.
+    ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
     ...planFieldsFromExtras(r.extras),
   };
 }
@@ -77,7 +82,12 @@ export function bodyMetricRowForPush(b: BodyMetricEntry, userId: string): Record
     waist_in: b.waistIn ?? null,
     hips_in: b.hipsIn ?? null,
     notes: b.notes || null,
-    updated_at: new Date().toISOString(),
+    // R1/DI-08: carry the row's own last-edit stamp up — stamping
+    // `now` here used to make every push look newest and overwrite
+    // newer remote rows. Rows without a stamp still get `now` (the
+    // push gate only upserts those when they are absent remotely,
+    // where there is nothing to clobber).
+    updated_at: b.updatedAt || new Date().toISOString(),
   };
 }
 
@@ -92,6 +102,8 @@ export function bodyMetricFromRemoteRow(r: any): BodyMetricEntry {
     waistIn: r.waist_in != null ? Number(r.waist_in) : undefined,
     hipsIn: r.hips_in != null ? Number(r.hips_in) : undefined,
     notes: r.notes || undefined,
+    // R1/DI-08: carry the server stamp into the local row.
+    ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
   };
 }
 
@@ -1074,6 +1086,7 @@ class SupabaseSyncEngine {
           oneRepMax: Number(r.one_rep_max),
           date: r.date,
           notes: r.notes || undefined,
+          ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
         }));
         updates.workouts = (remoteWorkouts.data || []).map((r: any) => ({
           id: r.id,
@@ -1084,12 +1097,14 @@ class SupabaseSyncEngine {
           durationMinutes: r.duration_minutes || undefined,
           notes: r.notes || undefined,
           exercises: r.exercises || [],
+          ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
         }));
         updates.meals = (remoteMeals.data || []).map((r: any) => ({
           id: r.id,
           name: r.name,
           date: r.date,
           foods: r.foods || [],
+          ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
         }));
         updates.bodyMetrics = (remoteMetrics.data || []).map((r: any) => bodyMetricFromRemoteRow(r));
         updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
@@ -1116,6 +1131,7 @@ class SupabaseSyncEngine {
             oneRepMax: Number(r.one_rep_max),
             date: r.date,
             notes: r.notes || undefined,
+            ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
           }));
           pullRemote.prs = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
@@ -1138,6 +1154,7 @@ class SupabaseSyncEngine {
             durationMinutes: r.duration_minutes || undefined,
             notes: r.notes || undefined,
             exercises: r.exercises || [],
+            ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
           }));
           pullRemote.workouts = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
@@ -1157,6 +1174,7 @@ class SupabaseSyncEngine {
             name: r.name,
             date: r.date,
             foods: r.foods || [],
+            ...(r.updated_at ? { updatedAt: r.updated_at } : {}),
           }));
           pullRemote.meals = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
@@ -1225,10 +1243,12 @@ class SupabaseSyncEngine {
         // F28: adopt remote edits only in the merge branch AND only
         // when the fresh local state is unchanged since the last
         // successful push (signature equality). Any local change since
-        // that push — including a mid-sync edit — disables adoption and
-        // keeps the historical keep-local behaviour (true conflicts stay
-        // last-push-wins, documented in recomputePullSlices). The
-        // profile is never adopted here; it keeps its own LWW.
+        // that push — including a mid-sync edit — disables adoption
+        // and falls through to R1/DI-08 newest-wins per row
+        // (documented in recomputePullSlices): the newer stamp wins,
+        // ties go remote, and the push gate below only uploads
+        // strictly-newer rows. The profile is never adopted here; it
+        // keeps its own LWW.
         const adoptRemoteChanges =
           !isCrossAccountSwitch &&
           shouldAdoptRemoteChanges(
@@ -1287,6 +1307,116 @@ class SupabaseSyncEngine {
     return this.pendingSyncPromise;
   }
 
+  /**
+   * R1/DI-08 push gate — fetch one table's remote (id, updated_at)
+   * stamps for this user. Returns null on ANY fetch failure: the
+   * caller then skips that table's upserts and records an error, so
+   * a failed stamp read can never degrade to an ungated overwrite
+   * (fail-safe, never fail-open to last-push-wins).
+   */
+  private async fetchRemoteStamps(
+    table: string,
+    column: string,
+    value: string,
+  ): Promise<Map<string, string | null> | null> {
+    try {
+      const supabase = getSupabase();
+      if (!supabase) return null;
+      const { data, error } = await supabase
+        .from(table)
+        .select('id,updated_at')
+        .eq(column, value);
+      if (error) return null;
+      const stamps = new Map<string, string | null>();
+      for (const row of data || []) {
+        stamps.set((row as any).id as string, ((row as any).updated_at as string | null) ?? null);
+      }
+      return stamps;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Body-metric upsert with the DI-02 missing-column retry, applied
+   * ONLY to gate-passing rows. Extracted from pushLocalData so the
+   * R1/DI-08 gate can run first without duplicating the retry.
+   */
+  private async pushBodyMetricRows(
+    rows: BodyMetricEntry[],
+    userId: string,
+    record: (e: { message?: string } | null | undefined) => void,
+  ): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const metricRows = rows.map((b) => bodyMetricRowForPush(b, userId));
+    const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
+    if (metricUpsertError) {
+      // Gauntlet DI-02: measurement columns exist only after the
+      // 2026102801 migration. Pre-migration, PostgREST rejects rows
+      // carrying them — retry without them (same missing-column
+      // pattern as planned_workouts extras). Any other error is
+      // recorded, never masked by the retry.
+      const errMsg = metricUpsertError.message || '';
+      const missingMeasurementColumn =
+        metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
+        /column .* does not exist/i.test(errMsg) ||
+        /could not find the .* column/i.test(errMsg);
+      if (missingMeasurementColumn) {
+        const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
+        const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict: 'id' });
+        record(bareError);
+      } else {
+        record(metricUpsertError);
+      }
+    }
+  }
+
+  /**
+   * Plan upsert with the QA4-006 extras missing-column retry, applied
+   * ONLY to gate-passing rows. Extracted from pushLocalData so the
+   * R1/DI-08 gate can run first without duplicating the retry.
+   */
+  private async pushPlanRows(
+    rows: PlannedWorkout[],
+    userId: string,
+    record: (e: { message?: string } | null | undefined) => void,
+  ): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const planRows = rows.map((p) => ({
+      id: p.id,
+      user_id: userId,
+      name: p.name,
+      exercises: p.exercises || [],
+      // Own stamp, not `now` (see the profile comment in pushLocalData).
+      updated_at: p.updatedAt || new Date().toISOString(),
+      extras: buildPlanExtras(p) ?? null,
+    }));
+    const { error: planUpsertError } = await supabase
+      .from('planned_workouts')
+      .upsert(planRows, { onConflict: 'id' });
+    if (planUpsertError) {
+      // LOOP-2: the bare retry exists ONLY for the pre-migration case
+      // where the `extras` column itself is missing. Any other error
+      // must not be masked by a silent retry without extras.
+      const errMsg = planUpsertError.message || '';
+      const missingExtrasColumn =
+        planUpsertError.code === 'PGRST204' ||
+        planUpsertError.code === '42703' ||
+        /column .* does not exist/i.test(errMsg) ||
+        /could not find the .* column/i.test(errMsg);
+      if (missingExtrasColumn) {
+        const bareRows = planRows.map(({ extras: _extras, ...rest }) => rest);
+        const { error: bareError } = await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
+        record(bareError);
+      } else {
+        console.error('Supabase planned_workouts upsert error:', planUpsertError);
+        record(planUpsertError);
+      }
+    }
+  }
+
   private async pushLocalData(userId: string) {
     const supabase = getSupabase();
     if (!supabase) return;
@@ -1308,99 +1438,145 @@ class SupabaseSyncEngine {
       if (e && !firstError.current) firstError.current = e;
     };
 
-    // 1. Profile
+    // R1/DI-08 push gate (applies to every upsert below): before
+    // upserting a collection, fetch remote (id, updated_at) and
+    // upsert ONLY rows whose local stamp is strictly newer than
+    // remote, or rows absent remotely. Rows where remote is newer —
+    // or where either stamp is missing/unparseable — are SKIPPED,
+    // never overwritten. A stamp-fetch failure skips that table and
+    // records an error (fail-safe); it never falls back to ungated
+    // upserts. Skips are silent, not errors: the rule working as
+    // designed must not report 'error' on every sync.
+    //
+    // RESIDUAL (scope boundary, edits only): explicit deletions are
+    // NOT stamp-gated — propagateAllDeletions below deletes tombstoned
+    // remote rows regardless of stamps, so a newer remote edit can
+    // still lose to an older local delete. Tombstone propagation is
+    // unchanged by design.
+    //
+    // RESIDUAL DI-08.5 (clock skew): "newest" is judged by device
+    // clocks; skewed clocks can pick the wrong winner. Server-side
+    // stamping would need a DB migration and is out of scope.
+
+    // 1. Profile — gated like every other collection (the old code
+    // preserved the local stamp but upserted unconditionally, so a
+    // push-only sync still overwrote a newer remote profile). The
+    // pull's profile LWW stays as the complementary half: when remote
+    // is newer, the pull rebuilds local from remote first, so a
+    // skipped profile push is a no-op, not a divergence.
     if (state.profile) {
-      const { error: profileError } = await supabase.from('profiles').upsert({
-        id: userId,
-        name: state.profile.name,
-        gender: state.profile.gender,
-        bodyweight_kg: state.profile.bodyweightKg,
-        bodyweight_lbs: state.profile.bodyweightLbs,
-        height_cm: state.profile.heightCm || null,
-        unit: state.profile.unit,
-        goals: state.profile.goals || ['build_muscle'],
-        diet_preference: state.profile.dietPreference || 'non_vegetarian',
-        // Carry the local last-edit stamp up (QA4A-001): writing "now"
-        // here would make the server row look newer than any offline
-        // edit made since, and the next pull would clobber it.
-        updated_at: state.profile.updatedAt || new Date().toISOString(),
-      });
-      record(profileError);
+      const profileStamps = await this.fetchRemoteStamps('profiles', 'id', userId);
+      if (profileStamps === null) {
+        record({ message: 'Could not read remote profile stamp; profile push skipped' });
+      } else if (shouldPushRow(state.profile.updatedAt, profileStamps.get(userId))) {
+        const { error: profileError } = await supabase.from('profiles').upsert({
+          id: userId,
+          name: state.profile.name,
+          gender: state.profile.gender,
+          bodyweight_kg: state.profile.bodyweightKg,
+          bodyweight_lbs: state.profile.bodyweightLbs,
+          height_cm: state.profile.heightCm || null,
+          unit: state.profile.unit,
+          goals: state.profile.goals || ['build_muscle'],
+          diet_preference: state.profile.dietPreference || 'non_vegetarian',
+          // Carry the local last-edit stamp up (QA4A-001): writing "now"
+          // here would make the server row look newer than any offline
+          // edit made since, and the next pull would clobber it.
+          updated_at: state.profile.updatedAt || new Date().toISOString(),
+        });
+        record(profileError);
+      }
     }
 
     // 2. PRs
     if (state.prs && state.prs.length > 0) {
-      const prRows = state.prs.map((p) => ({
-        id: p.id,
-        user_id: userId,
-        exercise: p.exercise,
-        weight_kg: p.weightKg,
-        weight_lbs: p.weightLbs,
-        reps: p.reps,
-        one_rep_max: p.oneRepMax,
-        date: p.date,
-        notes: p.notes || null,
-        updated_at: new Date().toISOString(),
-      }));
-      const { error: prError } = await supabase.from('personal_records').upsert(prRows, { onConflict: 'id' });
-      record(prError);
-    }
-
-    // 3. Workouts
-    if (state.workouts && state.workouts.length > 0) {
-      const workoutRows = state.workouts.map((w) => ({
-        id: w.id,
-        user_id: userId,
-        name: w.name || null,
-        date: w.date,
-        duration_minutes: w.durationMinutes || null,
-        notes: w.notes || null,
-        exercises: w.exercises || [],
-        updated_at: new Date().toISOString(),
-      }));
-      const { error: workoutError } = await supabase.from('workouts').upsert(workoutRows, { onConflict: 'id' });
-      record(workoutError);
-    }
-
-    // 4. Meals
-    if (state.meals && state.meals.length > 0) {
-      const mealRows = state.meals.map((m) => ({
-        id: m.id,
-        user_id: userId,
-        name: m.name,
-        date: m.date,
-        foods: m.foods || [],
-        updated_at: new Date().toISOString(),
-      }));
-      const { error: mealError } = await supabase.from('meals').upsert(mealRows, { onConflict: 'id' });
-      record(mealError);
-    }
-
-    // 5. Body Metrics
-    if (state.bodyMetrics && state.bodyMetrics.length > 0) {
-      const metricRows = state.bodyMetrics.map((b) => bodyMetricRowForPush(b, userId));
-      const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
-      if (metricUpsertError) {
-        // Gauntlet DI-02: measurement columns exist only after the
-        // 2026102801 migration. Pre-migration, PostgREST rejects rows
-        // carrying them — retry without them (same missing-column
-        // pattern as planned_workouts extras). Any other error is
-        // recorded, never masked by the retry.
-        const errMsg = metricUpsertError.message || '';
-        const missingMeasurementColumn =
-          metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
-          /column .* does not exist/i.test(errMsg) ||
-          /could not find the .* column/i.test(errMsg);
-        if (missingMeasurementColumn) {
-          const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
-          const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict: 'id' });
-          record(bareError);
-        } else {
-          record(metricUpsertError);
+      const prStamps = await this.fetchRemoteStamps('personal_records', 'user_id', userId);
+      if (prStamps === null) {
+        record({ message: 'Could not read remote PR stamps; PR push skipped' });
+      } else {
+        const { toUpsert } = filterRowsForPush(state.prs, prStamps);
+        if (toUpsert.length > 0) {
+          const prRows = toUpsert.map((p) => ({
+            id: p.id,
+            user_id: userId,
+            exercise: p.exercise,
+            weight_kg: p.weightKg,
+            weight_lbs: p.weightLbs,
+            reps: p.reps,
+            one_rep_max: p.oneRepMax,
+            date: p.date,
+            notes: p.notes || null,
+            // Own stamp, not `now` (see the profile comment above).
+            // Stamp-less rows reach here only when absent remotely,
+            // where there is nothing to clobber.
+            updated_at: p.updatedAt || new Date().toISOString(),
+          }));
+          const { error: prError } = await supabase.from('personal_records').upsert(prRows, { onConflict: 'id' });
+          record(prError);
         }
       }
     }
 
+    // 3. Workouts
+    if (state.workouts && state.workouts.length > 0) {
+      const workoutStamps = await this.fetchRemoteStamps('workouts', 'user_id', userId);
+      if (workoutStamps === null) {
+        record({ message: 'Could not read remote workout stamps; workout push skipped' });
+      } else {
+        const { toUpsert } = filterRowsForPush(state.workouts, workoutStamps);
+        if (toUpsert.length > 0) {
+          const workoutRows = toUpsert.map((w) => ({
+            id: w.id,
+            user_id: userId,
+            name: w.name || null,
+            date: w.date,
+            duration_minutes: w.durationMinutes || null,
+            notes: w.notes || null,
+            exercises: w.exercises || [],
+            updated_at: w.updatedAt || new Date().toISOString(),
+          }));
+          const { error: workoutError } = await supabase.from('workouts').upsert(workoutRows, { onConflict: 'id' });
+          record(workoutError);
+        }
+      }
+    }
+
+    // 4. Meals
+    if (state.meals && state.meals.length > 0) {
+      const mealStamps = await this.fetchRemoteStamps('meals', 'user_id', userId);
+      if (mealStamps === null) {
+        record({ message: 'Could not read remote meal stamps; meal push skipped' });
+      } else {
+        const { toUpsert } = filterRowsForPush(state.meals, mealStamps);
+        if (toUpsert.length > 0) {
+          const mealRows = toUpsert.map((m) => ({
+            id: m.id,
+            user_id: userId,
+            name: m.name,
+            date: m.date,
+            foods: m.foods || [],
+            updated_at: m.updatedAt || new Date().toISOString(),
+          }));
+          const { error: mealError } = await supabase.from('meals').upsert(mealRows, { onConflict: 'id' });
+          record(mealError);
+        }
+      }
+    }
+
+    // 5. Body Metrics (gated; bodyMetricRowForPush already carries
+    // each entry's own stamp, defaulting to `now` only for
+    // stamp-less rows, which reach here solely when absent remotely).
+    if (state.bodyMetrics && state.bodyMetrics.length > 0) {
+      const metricStamps = await this.fetchRemoteStamps('body_metrics', 'user_id', userId);
+      if (metricStamps === null) {
+        record({ message: 'Could not read remote body-metric stamps; body-metric push skipped' });
+      } else {
+        const { toUpsert } = filterRowsForPush(state.bodyMetrics, metricStamps);
+        if (toUpsert.length > 0) {
+          await this.pushBodyMetricRows(toUpsert, userId, record);
+        }
+      }
+    }
     // 6. Planned Workouts — description / goalTag / intensityMode have no
     // columns on the table, so they travel in the `extras` jsonb payload
     // (QA4-006). The column exists only after the user runs the migration
@@ -1408,38 +1584,16 @@ class SupabaseSyncEngine {
     // `extras`, so on a missing-column error we retry without it — plans
     // keep syncing and those three fields stay local-only in the meantime.
     if (state.plannedWorkouts && state.plannedWorkouts.length > 0) {
-      const planRows = state.plannedWorkouts.map((p) => ({
-        id: p.id,
-        user_id: userId,
-        name: p.name,
-        exercises: p.exercises || [],
-        updated_at: new Date().toISOString(),
-        extras: buildPlanExtras(p) ?? null,
-      }));
-      const { error: planUpsertError } = await supabase
-        .from('planned_workouts')
-        .upsert(planRows, { onConflict: 'id' });
-      if (planUpsertError) {
-        // LOOP-2: the bare retry exists ONLY for the pre-migration case
-        // where the `extras` column itself is missing. Any other error
-        // must not be masked by a silent retry without extras.
-        const errMsg = planUpsertError.message || '';
-        const missingExtrasColumn =
-          planUpsertError.code === 'PGRST204' ||
-          planUpsertError.code === '42703' ||
-          /column .* does not exist/i.test(errMsg) ||
-          /could not find the .* column/i.test(errMsg);
-        if (missingExtrasColumn) {
-          const bareRows = planRows.map(({ extras: _extras, ...rest }) => rest);
-          const { error: bareError } = await supabase.from('planned_workouts').upsert(bareRows, { onConflict: 'id' });
-          record(bareError);
-        } else {
-          console.error('Supabase planned_workouts upsert error:', planUpsertError);
-          record(planUpsertError);
+      const planStamps = await this.fetchRemoteStamps('planned_workouts', 'user_id', userId);
+      if (planStamps === null) {
+        record({ message: 'Could not read remote plan stamps; plan push skipped' });
+      } else {
+        const { toUpsert } = filterRowsForPush(state.plannedWorkouts, planStamps);
+        if (toUpsert.length > 0) {
+          await this.pushPlanRows(toUpsert, userId, record);
         }
       }
     }
-
     // 7. Deletion propagation: the push path historically only upserted,
     // so a locally deleted record stayed on the server forever and the
     // union pull-merge resurrected it on the next sync. Delete exactly the

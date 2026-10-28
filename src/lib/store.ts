@@ -910,6 +910,23 @@ export function migratePersistedState(
   return next;
 }
 
+/**
+ * R1/DI-08 edit stamping. `stampNewRow` preserves an incoming stamp
+ * (callers passing an already-stamped row) and stamps `now`
+ * otherwise — for creates and full-list sets. `stampEditedRow`
+ * always refreshes to `now` — a genuine edit IS the newest version
+ * of the row. Undo/insert paths deliberately use NEITHER: they
+ * restore old content, so the old stamp (or its absence) stays
+ * honest, and the push gate + pull newest-wins decide against remote.
+ */
+export function stampNewRow<T extends { updatedAt?: string }>(row: T): T {
+  return { ...row, updatedAt: row.updatedAt ?? new Date().toISOString() };
+}
+
+export function stampEditedRow<T>(row: T): T & { updatedAt: string } {
+  return { ...row, updatedAt: new Date().toISOString() };
+}
+
 export function partializeAppState(state: AppState): Record<string, unknown> {
   return {
   profile: state.profile,
@@ -1406,10 +1423,16 @@ export const useAppStore = create<AppState>()(
         const { upserts } = mergeHealthWeights(state.bodyMetrics || [], result.weights || []);
         let nextMetrics = state.bodyMetrics || [];
         if (upserts.length > 0) {
-          const byId = new Map(upserts.map((u) => [u.id, u]));
+          // R1/DI-08: Health Connect writes are new data for these
+          // rows (a refresh carries a new weight) — stamp them so
+          // they compete honestly. Manual entries are never in this
+          // list (mergeHealthWeights never overwrites them), so no
+          // manual edit is clobbered by this stamp.
+          const stamped = upserts.map((u) => stampEditedRow(u));
+          const byId = new Map(stamped.map((u) => [u.id, u]));
           const existingIds = new Set(nextMetrics.map((m) => m.id));
           nextMetrics = [
-            ...upserts.filter((u) => !existingIds.has(u.id)),
+            ...stamped.filter((u) => !existingIds.has(u.id)),
             ...nextMetrics.map((m) => byId.get(m.id) ?? m),
           ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
         }
@@ -1524,6 +1547,8 @@ export const useAppStore = create<AppState>()(
             weightKg: profile.bodyweightKg,
             heightCm: profile.heightCm,
             notes: 'Baseline calibration',
+            // R1/DI-08: new row, stamped at creation.
+            updatedAt: new Date().toISOString(),
           };
           nextMetrics = [...(nextMetrics || []), entry];
         }
@@ -1640,7 +1665,7 @@ export const useAppStore = create<AppState>()(
         );
         if (isDuplicate) return;
         set((state) => ({
-          prs: [...state.prs, pr],
+          prs: [...state.prs, pr ? stampNewRow(pr) : pr],
           // Explicitly re-adding a PR clears its deletion tombstone.
           deletedPrIds: pr?.id
             ? (state.deletedPrIds || []).filter((d) => d !== pr.id)
@@ -1650,7 +1675,7 @@ export const useAppStore = create<AppState>()(
       },
       addMultiplePRs: (newPrs) => {
         set((state) => ({
-          prs: [...state.prs, ...newPrs],
+          prs: [...state.prs, ...newPrs.map((p) => (p ? stampNewRow(p) : p))],
           deletedPrIds: (state.deletedPrIds || []).filter(
             (d) => !newPrs.some((p) => p?.id === d)
           ),
@@ -1659,7 +1684,7 @@ export const useAppStore = create<AppState>()(
         if (events.length > 0) get().awardXpEvents(events);
       },
       updatePR: (id, updatedFields) => set((state) => ({
-        prs: state.prs.map(pr => pr.id === id ? { ...pr, ...updatedFields } : pr)
+        prs: state.prs.map(pr => pr.id === id ? stampEditedRow({ ...pr, ...updatedFields }) : pr)
       })),
       deletePR: (id) => set((state) => ({
         prs: state.prs.filter(pr => pr.id !== id),
@@ -1687,6 +1712,9 @@ export const useAppStore = create<AppState>()(
 
         const sanitizedWorkout: WorkoutEntry = {
           ...workout,
+          // R1/DI-08: new row — preserve an incoming stamp (none in
+          // practice for fresh logs), else stamp at creation.
+          updatedAt: workout.updatedAt ?? new Date().toISOString(),
           // Gauntlet DI-01: the store boundary enforces the YYYY-MM-DD
           // contract (see WorkoutEntry.date). Log Past producers pass an
           // ISO timestamp; without this, the row silently drops out of
@@ -2082,7 +2110,7 @@ export const useAppStore = create<AppState>()(
           return;
         }
         set((state) => ({
-          meals: [...state.meals, meal],
+          meals: [...state.meals, meal ? stampNewRow(meal) : meal],
           // Explicitly re-adding a meal clears its deletion tombstone.
           deletedMealIds: meal?.id
             ? (state.deletedMealIds || []).filter((d) => d !== meal.id)
@@ -2136,17 +2164,17 @@ export const useAppStore = create<AppState>()(
         };
       }),
       updateMeal: (id, updated) => set((state) => ({
-        meals: state.meals.map(meal => meal.id === id ? { ...meal, ...updated } : meal),
+        meals: state.meals.map(meal => meal.id === id ? stampEditedRow({ ...meal, ...updated }) : meal),
       })),
       deleteFoodFromMeal: (mealId, foodIndex) => set((state) => {
         const nextMeals = state.meals
           .map((meal) => {
             if (meal.id !== mealId) return meal;
             const nextFoods = meal.foods.filter((_, idx) => idx !== foodIndex);
-            return {
+            return stampEditedRow({
               ...meal,
               foods: nextFoods,
-            };
+            });
           })
           .filter((meal) => meal.foods.length > 0);
         // Removing a meal's last food deletes the meal itself — tombstone
@@ -2174,6 +2202,9 @@ export const useAppStore = create<AppState>()(
             ...m,
             id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `m_${Date.now()}_${Math.random()}`,
             date: tgt,
+            // New rows (new ids): stamped at creation, never the
+            // source row's stamp — the clone is not the source's edit.
+            updatedAt: new Date().toISOString(),
             foods: m.foods.map(f => ({ ...f }))
           }));
 
@@ -2192,7 +2223,7 @@ export const useAppStore = create<AppState>()(
           .filter(m => m.date === entry.date && m.id !== entry.id)
           .map(m => m.id);
         return {
-          bodyMetrics: [entry, ...state.bodyMetrics.filter(m => m.date !== entry.date)],
+          bodyMetrics: [stampNewRow(entry), ...state.bodyMetrics.filter(m => m.date !== entry.date)],
           deletedBodyMetricIds: [
             ...new Set([
               ...(state.deletedBodyMetricIds || []).filter((d) => d !== entry.id),
@@ -2238,6 +2269,8 @@ export const useAppStore = create<AppState>()(
         const entry: BodyMetricEntry = {
           id: safeRandomId('bm'),
           date: entryDateStr,
+          // R1/DI-08: new entry, stamped at creation.
+          updatedAt: new Date().toISOString(),
           weightKg: Math.round(weightKg * 10) / 10,
           heightCm: heightCm ? Math.round(heightCm) : undefined,
           bodyFatPct: typeof bodyFatPct === 'number' && !isNaN(bodyFatPct) ? Math.round(bodyFatPct * 10) / 10 : undefined,
@@ -2291,7 +2324,7 @@ export const useAppStore = create<AppState>()(
             finalName = `${plan.name} (Copy ${copyIdx++})`;
           }
         }
-        const finalPlan = finalName === plan.name ? plan : { ...plan, name: finalName };
+        const finalPlan = stampNewRow(finalName === plan.name ? plan : { ...plan, name: finalName });
         const nextPlans = [finalPlan, ...state.plannedWorkouts.filter(p => p.id !== finalPlan.id)];
         const currentSched = state.weeklySchedule;
         const todayDay = getTodayDayOfWeek();
@@ -2328,7 +2361,7 @@ export const useAppStore = create<AppState>()(
       }),
 
       updatePlannedWorkout: (id, plan) => set((state) => {
-        const nextPlans = state.plannedWorkouts.map(p => p.id === id ? plan : p);
+        const nextPlans = state.plannedWorkouts.map(p => p.id === id ? stampEditedRow(plan) : p);
         let nextSchedule = state.weeklySchedule;
         if (nextSchedule) {
           const updatedSched = { ...nextSchedule };
@@ -2412,7 +2445,10 @@ export const useAppStore = create<AppState>()(
         );
         const nextSchedule = hasValidSchedule ? currentSched : buildDefaultWeeklySchedule(plans, state.trainingProfile?.daysPerWeek || 4);
         return {
-          plannedWorkouts: plans,
+          // R1/DI-08: callers mix existing plans (keep their stamps —
+          // refreshing them would falsify recency) with new plans
+          // (stamp at introduction).
+          plannedWorkouts: plans.map((p) => stampNewRow(p)),
           weeklySchedule: nextSchedule,
           // A full list replacement (backup restore / onboarding accept)
           // restores the listed plans: drop their tombstones.
@@ -2626,10 +2662,10 @@ export const useAppStore = create<AppState>()(
         if (existingIndex >= 0) {
           const updatedMeals = [...state.meals];
           const existingMeal = updatedMeals[existingIndex];
-          updatedMeals[existingIndex] = {
+          updatedMeals[existingIndex] = stampEditedRow({
             ...existingMeal,
             foods: [...existingMeal.foods, newFood],
-          };
+          });
           return { meals: updatedMeals };
         } else {
           const newMeal: MealEntry = {
@@ -2637,6 +2673,7 @@ export const useAppStore = create<AppState>()(
             date: d,
             name: 'Quick Protein',
             foods: [newFood],
+            updatedAt: new Date().toISOString(),
           };
           return { meals: [newMeal, ...state.meals] };
         }
@@ -3835,10 +3872,16 @@ export const useAppStore = create<AppState>()(
                 : state.profile;
             return {
               profile: validatedProfile || state.profile,
-            prs: Array.isArray(data.prs) ? data.prs : state.prs,
+            prs: Array.isArray(data.prs)
+              // R1/DI-08: a restore is the user's newest intent (same
+              // rule as the profile stamp above) — stamp every
+              // imported row so sync doesn't undo the restore.
+              ? data.prs.map((e: any) => (e && typeof e === 'object' ? { ...e, updatedAt: new Date().toISOString() } : e))
+              : state.prs,
             workouts: Array.isArray(data.workouts)
               ? data.workouts.map((w: any) => ({
                   ...w,
+                  updatedAt: new Date().toISOString(),
                   exercises: Array.isArray(w.exercises)
                     ? w.exercises.map((ex: any) => ({
                         ...ex,
@@ -3861,7 +3904,9 @@ export const useAppStore = create<AppState>()(
                     : [],
                 }))
               : state.workouts,
-            meals: Array.isArray(data.meals) ? data.meals : state.meals,
+            meals: Array.isArray(data.meals)
+              ? data.meals.map((e: any) => (e && typeof e === 'object' ? { ...e, updatedAt: new Date().toISOString() } : e))
+              : state.meals,
             // F12 (preview-fix): restore must not bypass the
             // entry-date rule — a backup carrying future/malformed
             // body-metric dates used to restore them verbatim, past
@@ -3873,6 +3918,7 @@ export const useAppStore = create<AppState>()(
                   m && typeof m === 'object'
                     ? {
                         ...m,
+                        updatedAt: new Date().toISOString(),
                         date:
                           typeof m.date === 'string' && isValidEntryDate(m.date)
                             ? m.date
@@ -3889,7 +3935,9 @@ export const useAppStore = create<AppState>()(
               data.hasCompletedOnboarding !== undefined
                 ? data.hasCompletedOnboarding
                 : (data.profile ? true : state.hasCompletedOnboarding),
-            plannedWorkouts: Array.isArray(data.plannedWorkouts) ? data.plannedWorkouts : state.plannedWorkouts,
+            plannedWorkouts: Array.isArray(data.plannedWorkouts)
+              ? data.plannedWorkouts.map((e: any) => (e && typeof e === 'object' ? { ...e, updatedAt: new Date().toISOString() } : e))
+              : state.plannedWorkouts,
             deletedPlanIds: restoredTombstones(state.deletedPlanIds, data.deletedPlanIds, data.plannedWorkouts),
             deletedPrIds: restoredTombstones(state.deletedPrIds, data.deletedPrIds, data.prs),
             deletedWorkoutIds: restoredTombstones(state.deletedWorkoutIds, data.deletedWorkoutIds, data.workouts),
@@ -4335,6 +4383,8 @@ export const useAppStore = create<AppState>()(
                     weightKg: currentState.profile.bodyweightKg,
                     heightCm: currentState.profile.heightCm,
                     notes: 'Baseline calibration',
+                    // R1/DI-08: boot-recovery backfill creates this row now.
+                    updatedAt: new Date().toISOString(),
                   };
                   useAppStore.setState({ bodyMetrics: [...(currentState.bodyMetrics || []), entry] });
                 } else if (currentState.bodyMetrics && currentState.bodyMetrics.length > 0) {

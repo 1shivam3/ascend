@@ -133,6 +133,17 @@ export interface BodyMetricEntry {
   waistIn?: number;
   hipsIn?: number;
   notes?: string;
+  /**
+   * Local last-edit stamp (ISO). Gauntlet R1/DI-08 newest-wins sync:
+   * every store edit path stamps this; push upserts only rows whose
+   * stamp is strictly newer than the server row's `updated_at`, and
+   * pull adopts the newer side per row. Absent on rows created before
+   * stamping existed — those fail to the server (never overwrite
+   * remote) until edited. Persisted with the row (partialize carries
+   * whole slices) and restored from the server row's `updated_at` on
+   * pull, so comparisons work across devices.
+   */
+  updatedAt?: string;
 }
 
 export interface UserProfile {
@@ -177,6 +188,8 @@ export interface PersonalRecord {
   notes?: string;
   isBaseline?: boolean;
   prType?: '1rm' | 'reps';
+  /** Local last-edit stamp (ISO) for R1/DI-08 newest-wins sync — see BodyMetricEntry.updatedAt. */
+  updatedAt?: string;
 }
 
 export type SetExecutionStatus = 'pending' | 'completed' | 'skipped' | 'not_attempted';
@@ -346,6 +359,8 @@ export interface WorkoutEntry {
   requestHold?: boolean;
   /** Explicit structured athlete safety flags */
   athleteFlags?: AthleteSafetyFlags;
+  /** Local last-edit stamp (ISO) for R1/DI-08 newest-wins sync — see BodyMetricEntry.updatedAt. */
+  updatedAt?: string;
 }
 
 export interface ActiveWorkoutDraft {
@@ -455,6 +470,8 @@ export interface MealEntry {
   date: string; // YYYY-MM-DD
   name: string;
   foods: FoodItem[];
+  /** Local last-edit stamp (ISO) for R1/DI-08 newest-wins sync — see BodyMetricEntry.updatedAt. */
+  updatedAt?: string;
 }
 
 export interface MacroTotals {
@@ -536,6 +553,8 @@ export interface PlannedWorkout {
    * column-less fields, so it degrades gracefully until the column exists.
    */
   coachBlockId?: string;
+  /** Local last-edit stamp (ISO) for R1/DI-08 newest-wins sync — see BodyMetricEntry.updatedAt. */
+  updatedAt?: string;
 }
 
 export interface FavoriteFood {
