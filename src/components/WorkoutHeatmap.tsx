@@ -228,7 +228,7 @@ export default function WorkoutHeatmap({
       </div>
 
       {/* Habit Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+      <div className="flex flex-wrap items-center gap-1.5 pb-1 text-xs">
         <button
           type="button"
           onClick={() => setActiveFilter('all')}

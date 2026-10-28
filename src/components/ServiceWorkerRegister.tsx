@@ -63,7 +63,15 @@ export default function ServiceWorkerRegister() {
         });
     };
 
-    window.addEventListener('load', onLoad);
+    // PWA3 (audit): if the component mounts after window load already
+    // fired (layout placement mounts on first paint today, so this is
+    // latent, not live), the listener above would never run and the
+    // worker would never register. Run immediately when already loaded.
+    if (document.readyState === 'complete') {
+      onLoad();
+    } else {
+      window.addEventListener('load', onLoad);
+    }
     return () => window.removeEventListener('load', onLoad);
   }, []);
 
@@ -72,7 +80,7 @@ export default function ServiceWorkerRegister() {
   return (
     <div
       role="status"
-      className="fixed bottom-24 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-xl bg-accent px-4 py-3 text-white shadow-lg"
+      className="fixed bottom-24 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-xl bg-accent px-4 py-3 text-accent-on shadow-lg"
     >
       <span className="text-sm font-semibold">New version available</span>
       <span className="flex items-center gap-2">
@@ -87,7 +95,7 @@ export default function ServiceWorkerRegister() {
           type="button"
           aria-label="Dismiss update notice"
           onClick={() => setUpdateAvailable(false)}
-          className="cursor-pointer rounded-lg px-2 py-1.5 text-sm font-semibold text-white/80 hover:text-white"
+          className="cursor-pointer rounded-lg px-2 py-1.5 text-sm font-semibold text-accent-on"
         >
           ✕
         </button>

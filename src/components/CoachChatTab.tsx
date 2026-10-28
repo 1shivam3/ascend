@@ -113,7 +113,7 @@ function CoachBubble({ children }: { children: React.ReactNode }) {
 function UserBubble({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-3 py-2 text-sm font-bold text-white">
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-accent px-3 py-2 text-sm font-bold text-accent-on">
         {children}
       </div>
     </div>
@@ -391,7 +391,7 @@ export default function CoachChatTab({
                 saveCheckin({ soreAreas });
                 setStepIndex((i) => i + 1);
               }}
-              className="px-4 py-2 rounded-full bg-accent text-white text-sm font-bold cursor-pointer"
+              className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
             >
               {t('coachChat.chatAreasDone')}
             </button>
@@ -474,7 +474,7 @@ export default function CoachChatTab({
                     saveCheckin({ painAreas });
                     setStepIndex((i) => i + 1);
                   }}
-                  className="px-4 py-2 rounded-full bg-accent text-white text-sm font-bold cursor-pointer"
+                  className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
                 >
                   {t('coachChat.chatAreasDone')}
                 </button>
@@ -497,7 +497,7 @@ export default function CoachChatTab({
           <button
             type="button"
             onClick={onBuildBlock}
-            className="px-4 py-2 rounded-full bg-accent text-white text-sm font-bold cursor-pointer"
+            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
           >
             {t('coachChat.buildBlock')}
           </button>
@@ -733,7 +733,7 @@ export default function CoachChatTab({
             <button
               type="button"
               onClick={() => setRestedToday(true)}
-              className="px-4 py-2 rounded-full bg-accent text-white text-sm font-bold cursor-pointer"
+              className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer"
             >
               {t('coachChat.restToday')}
             </button>
@@ -815,7 +815,7 @@ export default function CoachChatTab({
             type="button"
             onClick={startSession}
             disabled={sessionExercises.length === 0}
-            className="px-4 py-2 rounded-full bg-accent text-white text-sm font-bold cursor-pointer disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-accent text-accent-on text-sm font-bold cursor-pointer disabled:opacity-50"
           >
             {t('coachChat.startSession')}
           </button>

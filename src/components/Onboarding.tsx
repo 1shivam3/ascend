@@ -48,6 +48,7 @@ export default function Onboarding() {
 
   // Calibration Form State
   const [athleteName, setAthleteName] = useState('');
+  const [dob, setDob] = useState('');
   const [athleteEmail, setAthleteEmail] = useState('');
   const [selectedGoals, setSelectedGoals] = useState<AthleteGoal[]>([]);
   // Simplified onboarding: these are DEFAULTS, not answers — the user is
@@ -271,6 +272,10 @@ export default function Onboarding() {
     dateOfBirth: string;
     limitations: string[];
   }) => {
+    // O3 (audit): hold the typed DOB in the parent FIRST, before any
+    // validation return — backing into the details screen remounts it,
+    // and without this the date was lost while name/gender survived.
+    setDob(details.dateOfBirth);
     // Never silently fall back to a default goal: the athlete must choose.
     if (selectedGoals.length === 0) {
       toast.error(t('toast.chooseGoal'), t('toast.titleGoalRequired'));
@@ -530,6 +535,13 @@ export default function Onboarding() {
   const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // F12 (audit): pre-read cap, same rationale as SettingsView's
+    // restore — the parser's 50 MB cap only runs after the read.
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(t('vault.tooLargeMsg'), t('vault.tooLargeTitle'));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = async (event) => {
       try {
@@ -698,6 +710,7 @@ export default function Onboarding() {
       <PersonalDetailsScreen
         initialName={athleteName}
         initialGender={gender}
+        initialDob={dob}
         initialLimitations={trainingProfile?.injuriesOrLimitations || []}
         onContinue={handleFinishCalibration}
         onBack={() => setCurrentScreen('goals')}

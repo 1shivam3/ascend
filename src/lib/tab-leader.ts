@@ -103,6 +103,44 @@ export class TabLeaderGuard {
     return this.started && !this.leader && this.otherPresent;
   }
 
+  /**
+   * Synchronous leadership proof, re-read from localStorage on every
+   * call — unlike the in-memory `leader` flag, which lags a takeover
+   * until the next heartbeat tick (≤2s, longer when the tab is
+   * background-throttled) or BroadcastChannel message.
+   *
+   * Preview-fix B1b: a follower-tab reset purges the shared blob and
+   * snapshot, but the OLD leader's in-memory state can win back if any
+   * of its writers fires after the purge — its debounced emergency
+   * snapshot (2s debounce, arbitrarily delayed by background
+   * throttling) or a persist write in the takeover window. Writers
+   * must therefore prove leadership against the CURRENT record at
+   * write time, not at schedule time.
+   *
+   * True only when a fresh record owned by THIS tab exists. A missing
+   * record (post-purge vacuum) or a stale record is NOT proof: after
+   * a purge the record is gone, and a writer that proceeds on "no
+   * record" would resurrect the purged data.
+   */
+  isProvenLeader(): boolean {
+    const record = this.readRecord();
+    if (!record || record.tabId !== this.tabId) return false;
+    return this.isFresh(record);
+  }
+
+  /**
+   * True when a fresh record owned by ANOTHER tab exists. Persist
+   * writers use this as a second suppression signal: the in-memory
+   * flag may still say "leader" in the window between another tab's
+   * takeover (a synchronous localStorage write) and this tab's
+   * step-down, but the record already proves the takeover happened.
+   */
+  isOtherLeaderActive(): boolean {
+    const record = this.readRecord();
+    if (!record || record.tabId === this.tabId) return false;
+    return this.isFresh(record);
+  }
+
   subscribe(cb: () => void): () => void {
     this.listeners.add(cb);
     return () => {

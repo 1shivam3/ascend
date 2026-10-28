@@ -53,8 +53,10 @@ export default function CreateAccountScreen({
       setLoading(false);
 
       if (res.error) {
-        setError(res.error);
-        toast.error(res.error, t('auth.signUpFailed'));
+        // F-10 (audit): generic copy, never the raw provider error
+        // (user enumeration) — same rationale as LoginScreen.
+        setError(t('auth.createFailed'));
+        toast.error(t('auth.createFailed'), t('auth.signUpFailed'));
       } else {
         if (res.requiresEmailVerification) {
           toast.info(

@@ -33,6 +33,7 @@ export interface PersonalDetailsData {
 interface PersonalDetailsScreenProps {
   initialName?: string;
   initialGender?: Gender;
+  initialDob?: string;
   initialLimitations?: string[];
   onContinue: (details: PersonalDetailsData) => void;
   onBack: () => void;
@@ -42,6 +43,7 @@ interface PersonalDetailsScreenProps {
 export default function PersonalDetailsScreen({
   initialName = '',
   initialGender = 'male',
+  initialDob = '',
   initialLimitations = [],
   onContinue,
   onBack,
@@ -52,7 +54,10 @@ export default function PersonalDetailsScreen({
   const [genderSelection, setGenderSelection] = useState<'male' | 'female' | 'other'>(
     initialGender || 'male'
   );
-  const [dob, setDob] = useState('');
+  // O3 (audit): DOB used to initialise to '' unconditionally, so backing
+  // into this screen from plan-offer/summary (a remount) wiped the typed
+  // date while name/gender/limitations survived via their initial* props.
+  const [dob, setDob] = useState(initialDob || '');
   const [limitations, setLimitations] = useState<string[]>(initialLimitations || []);
 
   const [error, setError] = useState<string | null>(null);

@@ -124,7 +124,7 @@ export default function PolicyDecisionLedger({
 
       {/* ── Status Filter Chips (WAI-ARIA Tablist) ── */}
       <div
-        className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+        className="flex flex-wrap items-center gap-1.5 pb-1"
         role="tablist"
         aria-label={t('ledger.filterAria')}
       >

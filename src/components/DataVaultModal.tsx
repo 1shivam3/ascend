@@ -4,6 +4,7 @@ import React, { useState, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
 import { useStore, getStorageWriteFailed } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { parseWorkoutCSV } from '@/lib/workout-import';
 import { toUserMessage } from '@/lib/user-error';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
@@ -175,6 +176,15 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // F12 (audit): pre-read cap, mirroring the JSON handler above —
+    // without it a multi-hundred-MB CSV was fully read into memory
+    // before any size check ran.
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error(t('vault.tooLargeMsg'), t('vault.tooLargeTitle'));
+      if (csvFileInputRef.current) csvFileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -215,7 +225,18 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
   };
 
   // Download backup then delete
-  const handleDeleteWithBackup = () => {
+  const handleDeleteWithBackup = async () => {
+    // B1 (audit, F19 extension): a reset in a follower tab purges the
+    // shared on-disk blob (purgeLocalAppData bypasses the persist
+    // guard) while the leader's data survives in memory — a fake
+    // success, plus a data-loss window if the leader closes unwritten.
+    // Take over first so the reset applies as leader; on failure keep
+    // the modal open so the user can retry.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     handleExportBackup();
     setTimeout(() => {
       clearAllData();
@@ -226,7 +247,14 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
   };
 
   // Delete without backup
-  const handleDeleteWithoutBackup = () => {
+  const handleDeleteWithoutBackup = async () => {
+    // B1 (audit, F19 extension): same follower-tab guard as the
+    // with-backup reset — see handleDeleteWithBackup.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     if (typeof window !== 'undefined') {
       localStorage.removeItem('ascend_emergency_snapshot');
     }

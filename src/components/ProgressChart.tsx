@@ -323,7 +323,7 @@ export default function ProgressChart() {
       </div>
 
       {/* ── Exercise Toggles: Squat | Bench | Deadlift | OHP ── */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex flex-wrap gap-1.5 pb-1">
         {displayTabs.map((ex) => {
           const isSelected = selectedExercise.toLowerCase() === ex.toLowerCase();
           const hasRecord = availableExercises.some((ae) => ae.toLowerCase() === ex.toLowerCase());

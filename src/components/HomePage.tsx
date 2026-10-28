@@ -85,6 +85,7 @@ const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), 
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
+import { effectiveMacroGoals, dayScaledGoals } from '@/lib/effective-goals';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
@@ -108,6 +109,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     workouts,
     meals,
     macroGoals,
+    mealDayKinds,
     trainingProfile,
     plannedWorkouts,
     addPlannedWorkout,
@@ -309,7 +311,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   // Hydration quick-add state for today.
   const todayWaterMl = waterLogs?.[todayStr] || 0;
-  const hydrationTargetMl = hydrationConfig?.dailyTargetMl || 2700;
+  // F16 (audit): use the same formula every other screen uses
+  // (bw x 35, round-50, floor 1500; custom target wins) instead of the
+  // stale `dailyTargetMl || 2700` snapshot, which disagreed with Fuel
+  // for every bodyweight except ~77 kg.
+  const hydrationTargetMl = calculateHydrationTarget({
+    bodyweightKg: profile?.bodyweightKg || 75,
+    customTargetMl: hydrationConfig?.dailyTargetMl,
+    isCustomTarget: hydrationConfig?.isCustomTarget,
+  });
   const hydrationPct = Math.min(100, Math.round((todayWaterMl / hydrationTargetMl) * 100));
 
   // Scanned barcode food → logged straight to today's meals.
@@ -500,8 +510,14 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     const macros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
 
     const bwKg = profile?.bodyweightKg || 72;
-    const calTarget = macroGoals?.calories || 2400;
-    const protTarget = macroGoals?.proteinG || Math.round(bwKg * 2.0);
+    // N2/N3 (audit): one canonical derivation — stored goals, else the
+    // profile-derived recommendation — then today's day-kind scaling,
+    // so Today and Fuel can no longer disagree about today's targets.
+    // Zero change when stored goals exist and there is no day kind.
+    const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
+    const todayScaled = dayScaledGoals(effectiveGoals, mealDayKinds?.[todayStr]);
+    const calTarget = todayScaled?.calories ?? effectiveGoals?.calories ?? 2400;
+    const protTarget = todayScaled?.proteinG ?? effectiveGoals?.proteinG ?? Math.round(bwKg * 2.0);
 
     return {
       calories: Math.round(macros.calories),
@@ -511,7 +527,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       carbs: Math.round(macros.carbsG),
       fat: Math.round(macros.fatG),
     };
-  }, [meals, profile?.bodyweightKg, macroGoals, todayStr]);
+  }, [meals, profile, macroGoals, mealDayKinds, todayStr]);
 
   // Quiet protein-coach line for veg/eggitarian users tracking low —
   // one line under the nutrition cards, dismissible from the Meals tab.
@@ -1178,7 +1194,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             customTargetMl: hydrationConfig?.dailyTargetMl,
             isCustomTarget: hydrationConfig?.isCustomTarget,
           })}
-          proteinTargetG={macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140)}
+          proteinTargetG={effectiveMacroGoals(macroGoals, profile)?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140)}
           weekStart={(() => {
             const d = new Date(today);
             d.setDate(d.getDate() - ((d.getDay() + 6) % 7));

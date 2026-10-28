@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, redactSecrets } from '@/lib/server-security';
 import {
   createDeletionToken,
   verifyDeletionToken,
@@ -29,10 +29,13 @@ const SECURITY_HEADERS = {
  * (Production) vs. an offline dev mode (non-Production).
  */
 function isProductionEnv(): boolean {
+  // F-13 (audit): the old `!!process.env.VERCEL_ENV` clause treated ANY
+  // Vercel env — including preview deploys — as production, so preview
+  // builds took the production 503 branch when config was missing.
+  // Only an explicit production marker counts now.
   return (
     process.env.NODE_ENV === 'production' ||
-    process.env.VERCEL_ENV === 'production' ||
-    !!process.env.VERCEL_ENV
+    process.env.VERCEL_ENV === 'production'
   );
 }
 
@@ -97,7 +100,22 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
+    // B2 (audit, F-04 extension): capped body read — action/email/token
+    // are tiny, so 64 KB is generous; malformed bodies still fall back
+    // to {} exactly as the old req.json().catch() did. The 413 keeps
+    // this route's SECURITY_HEADERS, matching its other responses.
+    let body: any = {};
+    try {
+      body = await readJsonBodyWithLimit(req, 64 * 1024);
+    } catch (err) {
+      if (err instanceof RequestBodyTooLargeError) {
+        return NextResponse.json(
+          { error: 'PAYLOAD_TOO_LARGE', message: 'Request body is too large.' },
+          { status: 413, headers: SECURITY_HEADERS }
+        );
+      }
+      body = {};
+    }
     const action = body.action || (body.requestVerification ? 'request_verification' : 'delete');
     const requestEmail =
       typeof body.email === 'string' ? body.email.trim().toLowerCase() : null;

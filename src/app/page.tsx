@@ -83,10 +83,11 @@ export default function AppPage() {
   const [sharedProgram, setSharedProgram] = useState<DecodedProgram | null>(null);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [pendingStartPlan, setPendingStartPlan] = useState<PlannedWorkout | null>(null);
-  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, startFreshFromRetainedHistory, hasCompletedOnboarding } = useStore();
+  const { profile, theme, hasCustomTheme, setTheme, _hasHydrated, activeWorkoutDraft, uiPreferences, workouts, meals, plannedWorkouts, prs, bodyMetrics, prTargets, macroGoals, hasCompletedOnboarding } = useStore();
   // FND-06: the fork decision lives only for this session — closing
   // the app undecided re-shows the fork, which is the safe default.
   const [forkResolved, setForkResolved] = useState(false);
+  const [startFreshError, setStartFreshError] = useState<string | null>(null);
 
   // True zustand-persist hydration (distinct from the _hasHydrated splash
   // fallback, which can fire before the persisted state is merged). Theme
@@ -387,17 +388,25 @@ export default function AppPage() {
           <HistoryForkScreen
             counts={retainedHistoryCounts(retainedInput)}
             onContinue={() => setForkResolved(true)}
-            onStartFresh={() => {
-              // Start fresh now lands on Today with a default profile
-              // (store action). Navigate home explicitly: the
+            startFreshError={startFreshError}
+            onStartFresh={async () => {
+              // F21-B (audit): Start-fresh runs ONLY through the
+              // verified sign-out-first gate — never while a session
+              // is still active. On failure the fork stays with the
+              // error shown, so the user can retry or Continue, and
+              // nothing was applied. On success the fresh defaults
+              // land on Today; navigate home explicitly because the
               // saved-navigation restore may otherwise reopen the tab
               // the user was last on (e.g. Settings, where logout
-              // lives). On archive-write failure the action returns
-              // false and the fork stays, so the user can retry or
-              // Continue.
-              if (startFreshFromRetainedHistory()) {
+              // lives).
+              const { syncEngine } = await import('@/lib/supabase/sync');
+              const result = await syncEngine.startFreshAfterVerifiedSignOut();
+              if (result.ok) {
+                setStartFreshError(null);
                 setForkResolved(true);
                 navigate('home', { clearHistory: true });
+              } else {
+                setStartFreshError(result.error || 'Start-fresh could not be applied. Please try again.');
               }
             }}
           />

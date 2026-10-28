@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { getAiAuthHeaders } from '@/lib/ai-client-auth';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import type { StringKey } from '@/lib/i18n/en';
@@ -20,6 +22,7 @@ import {
   getSafeMinCalories,
   normalizeCalorieDelta,
 } from '@/lib/macros';
+import { effectiveMacroGoals, dayScaledGoals, macroSplitPercentages } from '@/lib/effective-goals';
 import {
   Plus,
   X,
@@ -156,10 +159,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   // food's index BEFORE deleting; the toast action restores via the
   // store (including the case where the food was the meal's last item
   // and the whole meal disappeared with it).
-  const handleDeleteFoodWithUndo = (e: React.MouseEvent, meal: MealEntry, idx: number) => {
+  const handleDeleteFoodWithUndo = async (e: React.MouseEvent, meal: MealEntry, idx: number) => {
     e.stopPropagation();
     const food = meal.foods[idx];
     if (!food) return;
+    // B1 (audit, F19 extension): the same follower-tab guard as entity
+    // deletes — without it the removal shows a success toast but never
+    // reaches storage, and the food comes back on reload.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     const mealIndex = meals.findIndex((m) => m.id === meal.id);
     const snapshot: MealEntry = { ...meal, foods: [...meal.foods] };
     deleteFoodFromMeal(meal.id, idx);
@@ -673,8 +684,14 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     }
   };
 
-  const handleDeleteCustomSuggestion = (index: number, result: FoodSearchResult) => {
+  const handleDeleteCustomSuggestion = async (index: number, result: FoodSearchResult) => {
     if (!result.customFood) return;
+    // B1 (audit, F19 extension): same follower-tab guard as entity deletes.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     deleteCustomFood(result.customFood.id);
     setFoodSuggestions((s) => ({
       ...s,
@@ -839,12 +856,24 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     setIsEditPinnedOpen(false);
   };
 
-  const handleDeletePinned = (id: string, name: string) => {
+  const handleDeletePinned = async (id: string, name: string) => {
+    // B1 (audit, F19 extension): same follower-tab guard as entity deletes.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     deleteFavoriteFood(id);
     toast.info(t('toast.pinnedRemoved', { name }), t('toast.titleFoodUnpinned'));
   };
 
-  const handleClearAllPinned = () => {
+  const handleClearAllPinned = async () => {
+    // B1 (audit, F19 extension): same follower-tab guard as entity deletes.
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
     clearAllFavoriteFoods();
     setConfirmClearAll(false);
     setIsManagePinnedOpen(false);
@@ -991,8 +1020,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
     if (editingMeal) {
       const mergedFoods: FoodItem[] = mergeEditedMealFoods(cleanedFoods, editingMeal.foods);
       updateMeal(editingMeal.id, { name: finalMealName, foods: mergedFoods });
+      // N6 (audit): the toast used to read mealMacros (cleanedFoods,
+      // pre-merge) while the persisted row is mergedFoods. The numbers
+      // agree today because the merge only carries provenance flags,
+      // but the toast must read the row it actually saved.
+      const mergedMacros = calculateMealMacros(mergedFoods);
       toast.success(
-        t('toast.mealUpdated', { name: finalMealName, kcal: Math.round(mealMacros.calories), protein: Math.round(mealMacros.proteinG), tilde: tildeForFoods(mergedFoods) }),
+        t('toast.mealUpdated', { name: finalMealName, kcal: Math.round(mergedMacros.calories), protein: Math.round(mergedMacros.proteinG), tilde: tildeForFoods(mergedFoods) }),
         t('toast.titleMealLogged')
       );
       resetBuilderForm();
@@ -1170,6 +1204,10 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          // F-02 (audit): send the session token when signed in so the
+          // server grants the higher per-account daily AI quota; guests
+          // send nothing and get the lower guest quota.
+          ...(await getAiAuthHeaders()),
         },
         body: JSON.stringify({
           query: q,
@@ -1294,15 +1332,27 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
   const todayDate   = getLocalTodayStr();
   const todayMeals  = meals.filter((m) => m.date === todayDate);
   const todayMacros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
-  const proteinTargetG = macroGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
+  // N2/N3 (audit): one canonical derivation — stored goals, else the
+  // profile-derived recommendation — so the header, the pacing block,
+  // and the suggestion below can no longer disagree. Zero change when
+  // stored goals exist and there is no day kind.
+  const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
+  const proteinTargetG = effectiveGoals?.proteinG || (profile?.bodyweightKg ? Math.round(profile.bodyweightKg * 1.8) : 140);
   const proteinRemaining = Math.max(0, proteinTargetG - todayMacros.proteinG);
 
   // ── Fast/festival day pattern + nutrition coach ──────────────────────
   const dayKind = mealDayKinds[todayDate];
-  const dayTargets = macroGoals ? getDayKindTargets(dayKind, macroGoals) : null;
-  const displayGoals = macroGoals && dayTargets
-    ? { ...macroGoals, calories: dayTargets.calories, proteinG: dayTargets.proteinG ?? macroGoals.proteinG }
-    : macroGoals;
+  const displayGoals = dayScaledGoals(effectiveGoals, dayKind);
+  // F16 (preview-fix): macro-split percentages from the displayed
+  // grams, not from the day-kind-scaled calorie total — see
+  // macroSplitPercentages. Computed once so the three cards, the
+  // split line, and the ratio bar can never disagree.
+  const macroSplit = macroSplitPercentages(
+    macroGoals?.proteinG || proteinTargetG,
+    displayGoals?.carbsG || 220,
+    displayGoals?.fatG || 70,
+  );
+  const dayTargets = effectiveGoals ? getDayKindTargets(dayKind, effectiveGoals) : null;
   const [, setHintTick] = useState(0);
   const currentHour = new Date().getHours();
   const proteinSuggestion = uiPreferences.coachEnabled && !isHintDismissed(todayDate, 'protein')
@@ -1335,16 +1385,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
 
   // Goal pacing & surplus/deficit evaluation
   const goalNutritionStatus = useMemo(() => {
-    if (!macroGoals) return null;
-    const calDelta = Math.round(todayMacros.calories - macroGoals.calories);
-    const protDelta = Math.round(todayMacros.proteinG - (macroGoals.proteinG || proteinTargetG));
+    if (!displayGoals || !effectiveGoals) return null;
+    // N2 (audit): pacing judges TODAY's scaled guidance, not the raw
+    // stored goals — on a one-meal fast the header said -30% kcal while
+    // pacing still judged the unscaled target. The safe-floor check
+    // below deliberately stays on the BASE (effective) goals: it judges
+    // the prescribed target, not today's scaled guidance.
+    const calDelta = Math.round(todayMacros.calories - displayGoals.calories);
+    const protDelta = Math.round(todayMacros.proteinG - (displayGoals.proteinG || proteinTargetG));
 
     switch (primaryGoal) {
       case 'lose_fat': {
         const isDeficitKept = calDelta <= 0;
         // Legacy targets below the safe floor (set before the floor was
         // enforced in the editor) must never be praised as a kept deficit.
-        if (macroGoals.calories < getSafeMinCalories(profile?.gender || 'male')) {
+        if (effectiveGoals.calories < getSafeMinCalories(profile?.gender || 'male')) {
           return {
             isPositive: false,
             badgeText: 'Target Below Safe Minimum',
@@ -1409,7 +1464,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         };
       }
     }
-  }, [macroGoals, todayMacros, primaryGoal, proteinTargetG]);
+  }, [displayGoals, effectiveGoals, todayMacros, primaryGoal, proteinTargetG]);
 
 
   const waterToday = waterLogs[todayDate] || 0;
@@ -1750,18 +1805,18 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             {/* Target math stays one tap away: the ring and macro numbers
                 above are the glanceable part; the formula, deficit/surplus
                 note, and sugar line live behind this detail tap. */}
-            {((!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
+            {((!dayKind && displayGoals?.maintenanceCalories !== undefined && displayGoals?.calorieDelta !== undefined && displayGoals.calorieDelta !== 0) || typeof todayMacros.sugarG === 'number') && (
               <CollapsibleDetails label={t('meals.why')} className="w-full">
-                {!dayKind && macroGoals?.maintenanceCalories !== undefined && macroGoals?.calorieDelta !== undefined && macroGoals.calorieDelta !== 0 && (
+                {!dayKind && displayGoals?.maintenanceCalories !== undefined && displayGoals?.calorieDelta !== undefined && displayGoals.calorieDelta !== 0 && (
                   <span className="text-xs text-text-muted tabular-nums text-center leading-relaxed px-2 block">
-                    {macroGoals.calories.toLocaleString()} = {macroGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
-                    {macroGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(macroGoals.calorieDelta).toLocaleString()}{' '}
-                    {macroGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
-                    {macroGoals.calorieDelta < 0 && (
-                      <> · ≈{(Math.abs(macroGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
+                    {displayGoals.calories.toLocaleString()} = {displayGoals.maintenanceCalories.toLocaleString()} {t('meals.maintenanceWord')}{' '}
+                    {displayGoals.calorieDelta < 0 ? '−' : '+'}{Math.abs(displayGoals.calorieDelta).toLocaleString()}{' '}
+                    {displayGoals.calorieDelta < 0 ? t('meals.deficitWord') : t('meals.surplusWord')}
+                    {displayGoals.calorieDelta < 0 && (
+                      <> · ≈{(Math.abs(displayGoals.calorieDelta * 7) / 7000).toFixed(2)} {t('meals.perWeek')}</>
                     )}
                     <span className="block text-4xs opacity-80">
-                      {macroGoals.calorieDelta < 0
+                      {displayGoals.calorieDelta < 0
                         ? t('meals.deficitNote', { floor: getSafeMinCalories(profile?.gender || 'male').toLocaleString() })
                         : t('meals.surplusNote')}
                     </span>
@@ -1797,7 +1852,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {Math.round(todayMacros.carbsG)}g
                 </span>
                 <span className="text-2xs text-text-muted block">
-                  / {macroGoals?.carbsG || 220}g
+                  / {displayGoals?.carbsG || 220}g
                 </span>
               </div>
 
@@ -1808,7 +1863,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                   {Math.round(todayMacros.fatG)}g
                 </span>
                 <span className="text-2xs text-text-muted block">
-                  / {macroGoals?.fatG || 70}g
+                  / {displayGoals?.fatG || 70}g
                 </span>
               </div>
             </div>
@@ -2593,7 +2648,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
             <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.targetWord')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
-              {macroGoals?.calories || 2400}
+              {displayGoals?.calories || 2400}
             </span>
             <span className="text-2xs text-text-muted">cal</span>
           </div>
@@ -2603,25 +2658,25 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               {macroGoals?.proteinG || proteinTargetG}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%
+              {macroSplit.proteinPct}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
             <span className="text-2xs uppercase font-bold text-text-secondary block">{t('meals.carbs')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
-              {macroGoals?.carbsG || 220}g
+              {displayGoals?.carbsG || 220}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%
+              {macroSplit.carbsPct}%
             </span>
           </div>
           <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/50">
             <span className="text-2xs uppercase font-bold text-text-muted block">{t('meals.fat')}</span>
             <span className="text-lg font-black text-text-primary tabular-nums block font-mono">
-              {macroGoals?.fatG || 70}g
+              {displayGoals?.fatG || 70}g
             </span>
             <span className="text-2xs text-text-muted">
-              {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%
+              {macroSplit.fatPct}%
             </span>
           </div>
         </div>
@@ -2630,21 +2685,21 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
         <div className="space-y-1.5 pt-1">
           <div className="flex justify-between text-2xs text-text-muted font-mono">
             <span>{t('meals.macroSplit')}</span>
-            <span>P {Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}% • C {Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}% • F {Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%</span>
+            <span>P {macroSplit.proteinPct}% • C {macroSplit.carbsPct}% • F {macroSplit.fatPct}%</span>
           </div>
           <div className="h-2 rounded-full overflow-hidden flex bg-bg-secondary">
             <div
-              style={{ width: `${Math.round(((macroGoals?.proteinG || proteinTargetG) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.proteinPct}%` }}
               className="bg-accent h-full"
               title={t('meals.protein')}
             />
             <div
-              style={{ width: `${Math.round(((macroGoals?.carbsG || 220) * 4 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.carbsPct}%` }}
               className="bg-sky-400 h-full"
               title={t('meals.carbs')}
             />
             <div
-              style={{ width: `${Math.round(((macroGoals?.fatG || 70) * 9 / (macroGoals?.calories || 2400)) * 100)}%` }}
+              style={{ width: `${macroSplit.fatPct}%` }}
               className="bg-amber-400 h-full"
               title={t('meals.fat')}
             />
@@ -2664,13 +2719,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex justify-between text-2xs font-mono">
               <span className="font-semibold text-text-primary">{t('meals.calories')}</span>
               <span className="text-text-muted">
-                {Math.round(todayMacros.calories)} / {macroGoals?.calories || 2400} cal ({Math.round((todayMacros.calories / (macroGoals?.calories || 2400)) * 100)}%)
+                {Math.round(todayMacros.calories)} / {displayGoals?.calories || 2400} cal ({Math.round((todayMacros.calories / (displayGoals?.calories || 2400)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
                 className="h-full bg-accent transition-all duration-500 rounded-full"
-                style={{ width: `${Math.min(100, (todayMacros.calories / (macroGoals?.calories || 2400)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayMacros.calories / (displayGoals?.calories || 2400)) * 100)}%` }}
               />
             </div>
           </div>
@@ -2696,13 +2751,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex justify-between text-2xs font-mono">
               <span className="font-semibold text-text-primary">{t('meals.carbohydrates')}</span>
               <span className="text-text-muted">
-                {Math.round(todayMacros.carbsG)}g / {macroGoals?.carbsG || 220}g ({Math.round((todayMacros.carbsG / (macroGoals?.carbsG || 220)) * 100)}%)
+                {Math.round(todayMacros.carbsG)}g / {displayGoals?.carbsG || 220}g ({Math.round((todayMacros.carbsG / (displayGoals?.carbsG || 220)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
                 className="h-full bg-sky-400 transition-all duration-500 rounded-full"
-                style={{ width: `${Math.min(100, (todayMacros.carbsG / (macroGoals?.carbsG || 220)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayMacros.carbsG / (displayGoals?.carbsG || 220)) * 100)}%` }}
               />
             </div>
           </div>
@@ -2712,13 +2767,13 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <div className="flex justify-between text-2xs font-mono">
               <span className="font-semibold text-text-primary">{t('meals.dietaryFat')}</span>
               <span className="text-text-muted">
-                {Math.round(todayMacros.fatG)}g / {macroGoals?.fatG || 70}g ({Math.round((todayMacros.fatG / (macroGoals?.fatG || 70)) * 100)}%)
+                {Math.round(todayMacros.fatG)}g / {displayGoals?.fatG || 70}g ({Math.round((todayMacros.fatG / (displayGoals?.fatG || 70)) * 100)}%)
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-bg-secondary overflow-hidden">
               <div
                 className="h-full bg-amber-400 transition-all duration-500 rounded-full"
-                style={{ width: `${Math.min(100, (todayMacros.fatG / (macroGoals?.fatG || 70)) * 100)}%` }}
+                style={{ width: `${Math.min(100, (todayMacros.fatG / (displayGoals?.fatG || 70)) * 100)}%` }}
               />
             </div>
           </div>
@@ -3869,7 +3924,17 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
               </button>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
+                  // F19 (audit): the same follower-tab guard as workout
+                  // deletes. Without it, a meal deleted in a follower tab
+                  // never reached storage and came back after reload
+                  // behind a success toast. On failure, delete nothing
+                  // and keep the modal open so the user can retry.
+                  const willPersist = await ensureDeleteWillPersist();
+                  if (!willPersist) {
+                    toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+                    return;
+                  }
                   // QA4-014: snapshot the full meal + its index before
                   // deleting so the toast's Undo restores it exactly in
                   // place (mealToDelete itself only carries id + name).

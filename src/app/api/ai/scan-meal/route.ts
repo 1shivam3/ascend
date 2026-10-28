@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { MealAnalysisResult } from '@/lib/types';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
+import { checkAiDailyQuota, aiQuotaExceededResponse } from '@/lib/ai-quota';
 import { executeMultiProviderVision } from '@/lib/ai-provider';
 import { generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
-import { rateLimitResponse, rateLimitUnavailableResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export const runtime = 'nodejs';
 
@@ -47,6 +48,22 @@ export async function POST(req: Request) {
     return rateLimitResponse(rateLimit.resetMs);
   }
 
+  // F-02 (audit): per-actor daily AI quota — signed-in users get a
+  // higher cap, guests a lower one; the shared 500/day global cap
+  // remains the fleet backstop inside the provider layer. Enforced
+  // before body parsing so a denied call consumes nothing downstream.
+  try {
+    const quota = await checkAiDailyQuota(req);
+    if (!quota.allowed) {
+      return aiQuotaExceededResponse(quota.actor, quota.resetMs);
+    }
+  } catch (err) {
+    if (err instanceof RateLimitUnavailableError) {
+      return rateLimitUnavailableResponse();
+    }
+    throw err;
+  }
+
   try {
     const contentType = req.headers.get('content-type') || '';
 
@@ -56,6 +73,17 @@ export async function POST(req: Request) {
     let hiddenIngredients: string[] = [];
 
     if (contentType.includes('multipart/form-data')) {
+      // B2 (audit, F-04 extension): content-length pre-check — formData()
+      // buffers the whole multipart body before the 10 MB file cap below
+      // can run. 12 MB covers a 10 MB image + multipart overhead.
+      // Chunked bodies (no content-length) still hit the post-parse cap.
+      const declaredLength = Number(req.headers.get('content-length') || 0);
+      if (declaredLength > 12 * 1024 * 1024) {
+        return NextResponse.json(
+          { error: 'IMAGE_TOO_LARGE', message: 'Image exceeds maximum allowed size (10MB).' },
+          { status: 413 }
+        );
+      }
       const formData = await req.formData();
       const imageFile = formData.get('image') as Blob | null;
 
@@ -100,7 +128,13 @@ export async function POST(req: Request) {
         }
       }
     } else {
-      const body: ScanMealRequestBody = await req.json();
+      // F-04 (audit): pre-parse cap on the JSON path, mirroring
+      // parse-meal/coach. 16 MB is safe: the largest legitimate body
+      // is the 14 MB base64 cap below plus JSON wrapper (< 15 MB), so
+      // no real scan is rejected. Honest scope: readJsonBodyWithLimit
+      // buffers via req.text() and rejects BEFORE JSON.parse — the gain
+      // is fail-before-parse, not zero buffering.
+      const body: ScanMealRequestBody = await readJsonBodyWithLimit(req, 16 * 1024 * 1024);
       const { imageBase64, mimeType: bodyMime = 'image/jpeg', userNotes: bodyNotes = '', hiddenIngredients: bodyHidden = [] } = body;
 
       if (!imageBase64) {
@@ -300,6 +334,9 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
 
     return NextResponse.json(resultJson);
   } catch (error: any) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return requestBodyTooLargeResponse();
+    }
     const rawMsg = error?.message || 'Failed to analyze food image with Gemini.';
     console.error('Scan Meal API Route Error:', redactSecrets(rawMsg));
     return NextResponse.json(

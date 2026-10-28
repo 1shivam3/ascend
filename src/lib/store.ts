@@ -54,6 +54,7 @@ import { purgeLocalAppData, isRecognizedBackupData, buildFullBackup, getCustomBa
 import { ARCHIVED_HISTORY_KEY } from './history-fork';
 import { clearHowToSeenFlag } from './howto-guide';
 import { getTabLeaderGuard } from './tab-leader';
+import { dropTombstonedRows } from './tombstone-heal';
 import type { Language } from './i18n/en';
 import { generateLifterTwinProfile, generateTrainingDecision } from './lifter-twin';
 import { buildAthleteModel, type AthleteModel } from './athlete-model';
@@ -77,7 +78,7 @@ import {
   type WeeklyReview,
 } from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId, sanitizeAthleteName } from './formatters';
+import { safeRandomId, sanitizeAthleteName, isValidEntryDate } from './formatters';
 import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
@@ -553,7 +554,7 @@ export interface AppState {
     options: ApplyPolicyDecisionOptions
   ) => ApplyPolicyDecisionResult;
 
-  clearAllData: () => void;
+  clearAllData: (options?: { convergeOnly?: boolean }) => void;
   logout: (options?: { clearLocalData?: boolean }) => void;
   // FND-06: Start fresh archives instead of deleting, and the archive
   // is restorable from Settings → Data & Account. Local-state only;
@@ -1000,6 +1001,16 @@ export const mainStoreStorage: StateStorage = {
     } catch {
       // The guard must never break persistence.
     }
+    // Preview-fix B1b: the in-memory flag lags a takeover until the
+    // next heartbeat tick or BroadcastChannel message, but takeOver()
+    // writes the leader record synchronously — a fresh other-owned
+    // record is already proof this tab must not overwrite the new
+    // leader's blob, even before its own flag catches up.
+    try {
+      if (getTabLeaderGuard()?.isOtherLeaderActive()) return;
+    } catch {
+      // The guard must never break persistence.
+    }
     try {
       localStorage.setItem(name, value);
       mainStoreWriteFailed = false;
@@ -1427,7 +1438,11 @@ export const useAppStore = create<AppState>()(
           nextMetrics = [...(nextMetrics || []), entry];
         }
         let nextFavorites = state.favoriteFoods;
-        if (!nextFavorites || nextFavorites.length === 0) {
+        // Preview-fix B1a: seed defaults only when the field is
+        // ABSENT (a legacy blob predating pinned foods). An explicit
+        // empty list is a user clear-all and must survive a profile
+        // save — the old `length === 0` arm reseeded it to defaults.
+        if (!nextFavorites) {
           nextFavorites = DEFAULT_FAVORITE_FOODS;
         }
         if (typeof window !== 'undefined') {
@@ -2117,7 +2132,13 @@ export const useAppStore = create<AppState>()(
         // (e.g. EditProfileModal). Previously this hardcoded today, so a
         // picked date was silently ignored and the entry overwrote
         // today's real entry.
-        const entryDateStr = entryDate || getLocalTodayStr();
+        // F12 (audit): store-side defense in depth — the modal caps its
+        // date input at today, but the store never enforced it, so a
+        // future or malformed caller-supplied date could reach the store
+        // and the DATE column. Past valid dates pass unchanged; anything
+        // else falls back to today.
+        const rawDate = entryDate || getLocalTodayStr();
+        const entryDateStr = isValidEntryDate(rawDate) ? rawDate : getLocalTodayStr();
         const entry: BodyMetricEntry = {
           id: safeRandomId('bm'),
           date: entryDateStr,
@@ -3219,7 +3240,7 @@ export const useAppStore = create<AppState>()(
         };
       },
 
-      clearAllData: () => {
+      clearAllData: (options?: { convergeOnly?: boolean }) => {
         set({
           profile: null,
           prs: [],
@@ -3273,7 +3294,36 @@ export const useAppStore = create<AppState>()(
           policyDecisionApplications: [],
         });
         // Truly purge everything the app stored (see purgeLocalAppData).
+        // Converge-only callers (purge broadcast from another tab)
+        // skip everything below: their memory reset is the whole job,
+        // and re-purging/re-claiming/re-marking would fight the
+        // originating tab's reset.
+        if (options?.convergeOnly) return;
         purgeLocalAppData();
+        // Preview-fix B1b: the purge removes the leader record too,
+        // leaving a vacuum the OLD leader's tick would win (a follower
+        // tick re-claims when no record exists) — and then its stale
+        // in-memory state would resurrect on its next write. Re-claim
+        // synchronously, in the same task as the purge, so the old
+        // leader's next tick sees a fresh record owned by this tab
+        // and stays follower; the broadcast steps it down instantly
+        // where BroadcastChannel is available.
+        try {
+          getTabLeaderGuard()?.takeOver();
+        } catch {
+          // The guard must never break the reset.
+        }
+        // Second-round B1b: purge broadcast marker (see
+        // PURGE_MARKER_KEY). Written AFTER the purge so it survives
+        // it; other tabs converge on the storage event, and pending
+        // snapshot timers predating it abort at fire time.
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem(PURGE_MARKER_KEY, String(Date.now()));
+          }
+        } catch {
+          // The marker is best-effort; the purge itself already happened.
+        }
       },
 
       logout: (options) => {
@@ -3668,7 +3718,25 @@ export const useAppStore = create<AppState>()(
                 }))
               : state.workouts,
             meals: Array.isArray(data.meals) ? data.meals : state.meals,
-            bodyMetrics: Array.isArray(data.bodyMetrics) ? data.bodyMetrics : state.bodyMetrics,
+            // F12 (preview-fix): restore must not bypass the
+            // entry-date rule — a backup carrying future/malformed
+            // body-metric dates used to restore them verbatim, past
+            // both the modal's native validation and the store's
+            // updateBodyMetrics fallback. Same fallback as entry:
+            // invalid dates become today; valid dates pass unchanged.
+            bodyMetrics: Array.isArray(data.bodyMetrics)
+              ? data.bodyMetrics.map((m: any) =>
+                  m && typeof m === 'object'
+                    ? {
+                        ...m,
+                        date:
+                          typeof m.date === 'string' && isValidEntryDate(m.date)
+                            ? m.date
+                            : getLocalTodayStr(),
+                      }
+                    : m,
+                )
+              : state.bodyMetrics,
             prTargets: data.prTargets || state.prTargets,
             macroGoals: data.macroGoals !== undefined ? data.macroGoals : state.macroGoals,
             theme: data.theme || state.theme,
@@ -4140,8 +4208,15 @@ export const useAppStore = create<AppState>()(
                   }
                 }
 
-                // Ensure staple foods are populated if empty
-                if (!currentState.favoriteFoods || currentState.favoriteFoods.length === 0) {
+                // Ensure staple foods are populated if absent.
+                // Preview-fix B1a: an explicit empty list is a user
+                // clear-all, not "never seeded" — the old
+                // `length === 0` arm reseeded it to defaults on every
+                // boot, so a follower-tab clear-all (which persisted
+                // correctly) came back as Roti-through-Eggs after
+                // reload. Only legacy blobs lacking the field get
+                // defaults now.
+                if (!currentState.favoriteFoods) {
                   useAppStore.setState({ favoriteFoods: DEFAULT_FAVORITE_FOODS });
                 }
 
@@ -4163,6 +4238,36 @@ export const useAppStore = create<AppState>()(
                   (!currentState.athleteModel || currentState.athleteModel.todayStr !== getLocalTodayStr())
                 ) {
                   currentState.refreshAthleteModel();
+                }
+
+                // R4 heal (audit): a row that is BOTH local and
+                // tombstoned is a contradiction produced only by
+                // resurrection artifacts (snapshot import, legacy keys,
+                // mid-sync delete, restore) — never by a normal delete
+                // (removes the row) or undo (clears the tombstone).
+                // Deletion wins: drop the row, KEEP the tombstone so
+                // the server delete still propagates on the next push.
+                // Runs last, after every recovery import above.
+                try {
+                  const s = useAppStore.getState();
+                  const healed = dropTombstonedRows({
+                    workouts: s.workouts || [],
+                    meals: s.meals || [],
+                    prs: s.prs || [],
+                    bodyMetrics: s.bodyMetrics || [],
+                    plannedWorkouts: s.plannedWorkouts || [],
+                    deletedWorkoutIds: s.deletedWorkoutIds || [],
+                    deletedMealIds: s.deletedMealIds || [],
+                    deletedPrIds: s.deletedPrIds || [],
+                    deletedBodyMetricIds: s.deletedBodyMetricIds || [],
+                    deletedPlanIds: s.deletedPlanIds || [],
+                  });
+                  if (healed.droppedTotal > 0) {
+                    console.warn('[ascend] Healed poisoned local+tombstoned rows:', healed.dropped);
+                    useAppStore.setState(healed.slices);
+                  }
+                } catch (healErr) {
+                  console.warn('Tombstone heal error:', healErr);
                 }
               } catch (recoveryErr) {
                 console.warn('Disaster recovery check error:', recoveryErr);
@@ -4332,14 +4437,72 @@ export function getStorageWriteFailed(): boolean {
   return mainStoreWriteFailed || snapshotWriteFailed;
 }
 
+/**
+ * Second-round B1b: purge broadcast marker. clearAllData writes the
+ * purge timestamp here AFTER purging (purgeLocalAppData would remove
+ * a pre-existing marker, so the write must come after the purge).
+ * Other tabs converge on it two ways: (1) the storage-event listener
+ * below resets their in-memory state to fresh, so a later claim or
+ * write cannot resurrect; (2) a pending snapshot timer aborts when
+ * the marker is at or after its schedule time. The marker is
+ * monotonic in practice (one write per purge, timestamps only move
+ * forward across purges); it is never exported in backups and never
+ * blocks a tab that booted after the purge (lastSeen initializes to
+ * the current marker at startup).
+ */
+export const PURGE_MARKER_KEY = 'ascend_purge_at';
+
 if (typeof window !== 'undefined') {
   let syncTimer: any = null;
+  let syncTimerScheduledAt = 0;
   const unsubscribe = useAppStore.subscribe((state) => {
+    // Second-round B1b: cancel a pending timer on EVERY state change,
+    // before any guard. Previously clearTimeout lived inside the data
+    // guard below, so the reset-to-defaults set() (profile null, no
+    // workouts, no PRs) never cancelled a timer scheduled by the
+    // pre-reset state — e.g. the rehydrate inside
+    // ensureDeleteWillPersist. That timer then fired after the purge
+    // carrying the OLD state, and passed the fire-time proof below,
+    // because the resetting tab legitimately holds leadership after
+    // re-claim. The resetter's own timer was the systematic vector
+    // behind the second live failure, not the old leader's.
+    clearTimeout(syncTimer);
+    syncTimer = null;
     // QA4-010: a follower tab must not overwrite the leader's snapshot.
     if (getTabLeaderGuard()?.shouldSuppressWrites()) return;
     if (state.profile || (state.workouts && state.workouts.length > 0) || (state.prs && state.prs.length > 0)) {
-      clearTimeout(syncTimer);
+      syncTimerScheduledAt = Date.now();
       syncTimer = setTimeout(() => {
+        // Preview-fix B1b (TOCTOU): this timer is scheduled while
+        // leader but can fire arbitrarily late — background-tab
+        // throttling stretches the 2s debounce, so it can land after
+        // another tab took over and purged. The schedule-time check
+        // above is not enough; prove leadership against the CURRENT
+        // record before writing, or a stale snapshot resurrects
+        // purged data via boot-time disaster recovery. A missing or
+        // stale record is not proof (post-purge there is no record).
+        try {
+          const guard = getTabLeaderGuard();
+          if (guard && !guard.isProvenLeader()) return;
+        } catch {
+          return;
+        }
+        // Second-round B1b: a purge marker at or after this timer's
+        // schedule time means a reset happened after scheduling (the
+        // old leader claims after the resetter unloads, then its
+        // pending timer fires as proven leader). The captured state
+        // predates the purge and must not be written. `>=` is
+        // deliberate: a same-millisecond legitimate timer is just a
+        // skipped redundancy-mirror write (the blob is primary),
+        // while a stale snapshot resurrecting is the bug.
+        try {
+          if (typeof localStorage !== 'undefined') {
+            const marker = Number(localStorage.getItem(PURGE_MARKER_KEY));
+            if (marker && marker >= syncTimerScheduledAt) return;
+          }
+        } catch {
+          return;
+        }
         try {
           const snapshot = {
             profile: state.profile,
@@ -4381,4 +4544,39 @@ if (typeof window !== 'undefined') {
   };
   window.addEventListener('beforeunload', cleanup);
   window.addEventListener('pagehide', cleanup);
+}
+
+// Second-round B1b: purge convergence. When another tab resets, this
+// tab's in-memory state is stale by definition — without convergence
+// it can resurrect the purged data the moment it claims leadership
+// (resetter unloads) or writes (any later state change that slips
+// past suppression). The storage event fires in every OTHER live tab
+// when the marker is written, so convergence is prompt; it never
+// fires in the originating tab, so no loop is possible. Converging
+// means exactly the clearAllData state reset, WITHOUT re-purging,
+// re-claiming, or re-marking (convergeOnly): the resulting persist
+// write, if any, carries fresh defaults — harmless whether this tab
+// is follower (suppressed) or leader (defaults blob). The
+// reset-to-defaults set() also cancels any pending snapshot timer
+// via the subscribe fix above. A tab that boots after a purge
+// initializes lastSeen to the current marker, so an old purge never
+// wipes a fresh boot (disk is already clean then).
+if (typeof window !== 'undefined') {
+  let lastSeenPurgeAt = 0;
+  try {
+    lastSeenPurgeAt = Number(localStorage.getItem(PURGE_MARKER_KEY)) || 0;
+  } catch {
+    // Storage unavailable — convergence simply never triggers.
+  }
+  window.addEventListener('storage', (event) => {
+    try {
+      if (!event || event.key !== PURGE_MARKER_KEY || !event.newValue) return;
+      const marker = Number(event.newValue);
+      if (!marker || marker <= lastSeenPurgeAt) return;
+      lastSeenPurgeAt = marker;
+      useAppStore.getState().clearAllData({ convergeOnly: true });
+    } catch {
+      // A broadcast must never break the app shell.
+    }
+  });
 }

@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { useStore } from '@/lib/store';
 import {
   getLiftLevel,
@@ -687,6 +688,21 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
   const { t } = useTranslation();
   const { goBack, canGoBack, registerBackHandler } = useAppNavigation();
 
+  // F19 (audit): the single PR-delete handler for all four render
+  // spots below. A PR deleted in a follower tab never reached storage
+  // and came back after reload behind a success toast; the guard
+  // refuses the delete (and the success toast) when the tab cannot
+  // persist, exactly like the workout delete.
+  const handleDeletePR = async (id: string, date: string, ex: string) => {
+    const willPersist = await ensureDeleteWillPersist();
+    if (!willPersist) {
+      toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+      return;
+    }
+    deletePR(id);
+    toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
+  };
+
   const bigThreeStats = useMemo(() => getBigThreeStats(prs || []), [prs]);
   const dotsScore = useMemo(() => {
     // SIM-P1-07: DOTS is defined only for a full S/B/D total. A
@@ -1252,7 +1268,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
           </div>
 
           {/* Equipment Filter Chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex flex-wrap items-center gap-1.5 pb-1">
             {[
               { id: 'all', label: t('prs.equipmentAll'), count: exerciseStats.length, icon: null },
               { id: 'barbell', label: t('prs.equipmentBarbell'), count: equipmentCounts.barbell, icon: Dumbbell },
@@ -1342,10 +1358,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   setTargetModalExercise(item.exercise);
                   setTargetWeightInput(item.nextMilestone.toString());
                 }}
-                onDeletePR={(id, date, ex) => {
-                  deletePR(id);
-                  toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
-                }}
+                onDeletePR={handleDeletePR}
               />
             ))}
           </div>
@@ -1398,10 +1411,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                         setTargetModalExercise(item.exercise);
                         setTargetWeightInput(item.nextMilestone.toString());
                       }}
-                      onDeletePR={(id, date, ex) => {
-                        deletePR(id);
-                        toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
-                      }}
+                      onDeletePR={handleDeletePR}
                     />
                   ))}
                 </div>
@@ -1478,10 +1488,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                               setTargetModalExercise(item.exercise);
                               setTargetWeightInput(item.nextMilestone.toString());
                             }}
-                            onDeletePR={(id, date, ex) => {
-                              deletePR(id);
-                              toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
-                            }}
+                            onDeletePR={handleDeletePR}
                           />
                         ))}
                       </div>
@@ -1525,10 +1532,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                           setTargetModalExercise(item.exercise);
                           setTargetWeightInput(item.nextMilestone.toString());
                         }}
-                        onDeletePR={(id, date, ex) => {
-                          deletePR(id);
-                          toast.info(t('prs.toastDeleted', { exercise: ex, date }), t('prs.toastRemovedTitle'));
-                        }}
+                        onDeletePR={handleDeletePR}
                       />
                     ))}
                   </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { useStore } from '@/lib/store';
 import { X, Scale, History, Trash2, Plus } from 'lucide-react';
 import { getLocalTodayStr, round1 } from '@/lib/formatters';
@@ -624,7 +625,18 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
 
                     <button
                       type="button"
-                      onClick={() => deleteBodyMetric(entry.id)}
+                      onClick={async () => {
+                        // F19 (audit): the same follower-tab guard as
+                        // workout deletes — without it a metric deleted
+                        // in a follower tab never reached storage and
+                        // came back after reload behind no warning.
+                        const willPersist = await ensureDeleteWillPersist();
+                        if (!willPersist) {
+                          toast.error(t('toast.deleteNotSaved'), t('toast.titleDeleteNotSaved'));
+                          return;
+                        }
+                        deleteBodyMetric(entry.id);
+                      }}
                       className="p-1 text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
                       title={t('bodyMetrics.deleteRecord')}
                     >
