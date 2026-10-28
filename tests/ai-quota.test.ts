@@ -18,8 +18,10 @@ import {
  * Audit F-02 (brief option A): per-account + per-guest daily AI quotas.
  * Identity is NEVER taken from a client claim: the actor is a verified
  * uid (Bearer token via auth.getUser) or a server-derived guest bucket
- * (sha256 of IP + User-Agent). These tests prove the separation, the
- * caps, and the anti-spoofing rule against the real in-memory limiter.
+ * (sha256 of the server-observed IP only; gauntlet SEC-01 removed the
+ * User-Agent from the key because rotating it minted fresh buckets).
+ * These tests prove the separation, the caps, and the anti-spoofing
+ * rule against the real in-memory limiter.
  */
 
 function req(headers: Record<string, string> = {}): Request {
@@ -53,23 +55,21 @@ afterEach(() => {
 
 describe('deriveAiActorKey / quota keys', () => {
   it('verified uid → per-account key; no uid → guest bucket key', () => {
-    const user = deriveAiActorKey({ verifiedUserId: 'user-a', ip: '1.2.3.4', userAgent: 'ua' });
+    const user = deriveAiActorKey({ verifiedUserId: 'user-a', ip: '1.2.3.4' });
     expect(user.kind).toBe('user');
     expect(aiActorQuotaKey(user)).toBe('ai-daily:user:user-a');
 
-    const guest = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
+    const guest = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
     expect(guest.kind).toBe('guest');
     expect(aiActorQuotaKey(guest)).toMatch(/^ai-daily:guest:[0-9a-f]{64}$/);
   });
 
-  it('guest bucket is stable for the same IP+UA and differs across IP or UA', () => {
-    const a = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
-    const b = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
-    const c = deriveAiActorKey({ verifiedUserId: null, ip: '5.6.7.8', userAgent: 'ua' });
-    const d = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'other' });
+  it('guest bucket is stable for the same IP and differs across IPs (UA no longer participates)', () => {
+    const a = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
+    const b = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
+    const c = deriveAiActorKey({ verifiedUserId: null, ip: '5.6.7.8' });
     expect(aiActorQuotaKey(a)).toBe(aiActorQuotaKey(b));
     expect(aiActorQuotaKey(a)).not.toBe(aiActorQuotaKey(c));
-    expect(aiActorQuotaKey(a)).not.toBe(aiActorQuotaKey(d));
   });
 
   it('defaults are 50 signed-in / 10 guest; positive env overrides win, junk env is ignored', () => {

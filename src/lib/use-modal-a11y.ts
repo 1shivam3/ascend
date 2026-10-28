@@ -144,6 +144,45 @@ export function handleModalKeyDown(
 
 export interface UseModalA11yOptions {
   closeOnEscape?: boolean;
+  /** Explicit accessible name; wins over any derived heading id. */
+  label?: string;
+  /** Explicit aria-labelledby id; wins over any derived heading id. */
+  labelledBy?: string;
+}
+
+type HeadingLike = {
+  id?: string;
+  textContent?: string | null;
+};
+
+type HeadingContainerLike = {
+  querySelector?: (selector: string) => HeadingLike | null;
+};
+
+let dialogTitleIdCounter = 0;
+
+/**
+ * Gauntlet A11Y-02: derive a dialog's accessible name from its first
+ * heading. Most dialogs in this codebase render an h2 (some an h3)
+ * title but never wired aria-labelledby, so ~30 dialogs were unnamed
+ * for assistive tech. Pure / testable: given a container, return the
+ * id to use for aria-labelledby — the heading's existing id, or a
+ * generated `modal-title-N` id assigned to it (idempotent on repeat
+ * calls). Returns null when there is no non-empty heading: such
+ * dialogs stay unnamed and need an explicit `label`/`labelledBy`
+ * option instead. The heuristic assumes the first heading is the
+ * dialog title, which holds wherever titles precede section content.
+ */
+export function resolveDialogLabelledBy(
+  container: HeadingContainerLike | null | undefined,
+): string | null {
+  if (!container || typeof container.querySelector !== 'function') return null;
+  const heading = container.querySelector('h1, h2, h3');
+  if (!heading || !heading.textContent?.trim()) return null;
+  if (heading.id) return heading.id;
+  dialogTitleIdCounter += 1;
+  heading.id = `modal-title-${dialogTitleIdCounter}`;
+  return heading.id;
 }
 
 /**
@@ -169,6 +208,10 @@ export function useModalA11y<T extends HTMLElement>(
     onCloseRef.current = onClose;
   }, [onClose]);
   const closeOnEscape = options?.closeOnEscape;
+  // Gauntlet A11Y-02: heading-derived accessible name, applied
+  // imperatively on open (see below). No useState: the hook's tests
+  // mock React with useRef/useEffect only, and the name is a DOM
+  // attribute, not render output — the effect is the right place.
 
   useEffect(() => {
     if (!isOpen) return;
@@ -177,10 +220,30 @@ export function useModalA11y<T extends HTMLElement>(
     previouslyFocusedRef.current =
       (document.activeElement as HTMLElement | null) ?? null;
 
+    // Gauntlet A11Y-02: track the imperatively-set name so cleanup can
+    // remove exactly what this open added (never an explicit prop).
+    let autoLabelledBy: string | null = null;
+
     const container = containerRef.current as unknown as
       | (T & ContainerLike)
       | null;
     if (container) {
+      // Gauntlet A11Y-02: name the dialog from its first heading.
+      // Imperative, not via dialogProps: the id is only known after
+      // mount, and React props cannot carry it on the first render.
+      // Explicit options (below) take precedence and need no help.
+      // setAttribute is guarded for non-DOM test containers.
+      if (!options?.label && !options?.labelledBy) {
+        autoLabelledBy = resolveDialogLabelledBy(
+          container as unknown as HeadingContainerLike,
+        );
+        const settable = container as unknown as {
+          setAttribute?: (name: string, value: string) => void;
+        };
+        if (autoLabelledBy && typeof settable.setAttribute === 'function') {
+          settable.setAttribute('aria-labelledby', autoLabelledBy);
+        }
+      }
       // If an element inside the dialog already has focus (e.g. an
       // `autoFocus` search/input field), leave it there — it is
       // already inside the trap.
@@ -212,6 +275,16 @@ export function useModalA11y<T extends HTMLElement>(
       const idx = modalStack.indexOf(stackEntry);
       if (idx !== -1) modalStack.splice(idx, 1);
       document.removeEventListener('keydown', handleKeyDown, true);
+      // Gauntlet A11Y-02: remove only the name this open set, from the
+      // same container this effect opened (never re-read the ref).
+      if (autoLabelledBy) {
+        const settable = container as unknown as {
+          removeAttribute?: (name: string) => void;
+        } | null;
+        if (typeof settable?.removeAttribute === 'function') {
+          settable.removeAttribute('aria-labelledby');
+        }
+      }
       const prev = previouslyFocusedRef.current;
       previouslyFocusedRef.current = null;
       if (prev && typeof prev.focus === 'function') {
@@ -227,11 +300,19 @@ export function useModalA11y<T extends HTMLElement>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, closeOnEscape]);
 
+  // Gauntlet A11Y-02: explicit label / labelledBy ride in dialogProps.
+  // The heading-derived name is applied imperatively in the effect
+  // (it is only known after mount). Dialogs with no heading and no
+  // explicit option stay unnamed (documented residual, not faked).
   return {
     dialogProps: {
       role: 'dialog' as const,
       'aria-modal': true as const,
       tabIndex: -1,
+      ...(options?.label ? { 'aria-label': options.label } : {}),
+      ...(options?.label || !options?.labelledBy
+        ? {}
+        : { 'aria-labelledby': options.labelledBy }),
     },
   };
 }

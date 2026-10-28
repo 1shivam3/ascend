@@ -1,5 +1,6 @@
 import { getSupabase } from './client';
-import { useStore, resolveAvatar } from '../store';
+import { normalizeDateToLocalDay } from '../formatters';
+import { useStore, resolveAvatar, buildFreshHistoryState, PROGRESS_PHOTOS_KEY } from '../store';
 import { getTabLeaderGuard } from '../tab-leader';
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, BodyMetricEntry, PlannedWorkout } from '../types';
 import {
@@ -15,6 +16,29 @@ import {
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
 
+/**
+ * Gauntlet DI-03: the unsynced-slice reset applied on a cross-account
+ * switch, as a pure, testable builder. The switch branch's comment
+ * promises "Replace local store completely", but only the 6 synced
+ * slices were replaced — coach blocks, weekly reviews, water/creatine
+ * logs, habits, goals, XP, streak, challenges and friends survived into
+ * the next account on the same device. This returns the fresh slate
+ * MINUS the synced collections (the caller overwrites those from remote
+ * rows) plus the separately-persisted progress photos and the Health
+ * Connect timestamp. Device-level preferences (theme, language,
+ * density, today layout, notification prefs, ui prefs) are deliberately
+ * NOT reset: they belong to the device, not the account.
+ */
+export function buildCrossAccountResetUpdates(): Record<string, unknown> {
+  const fresh = buildFreshHistoryState() as Record<string, unknown>;
+  const { prs: _prs, workouts: _workouts, meals: _meals, bodyMetrics: _bodyMetrics, plannedWorkouts: _plannedWorkouts, ...unsynced } = fresh;
+  return {
+    ...unsynced,
+    progressPhotos: [],
+    healthConnectLastSyncedAt: null,
+  };
+}
+
 /** Map a `planned_workouts` row to a local plan, restoring the
  *  column-less fields (description / goalTag / intensityMode) from the
  *  row's `extras` jsonb when present (QA4-006). Rows from a database
@@ -26,6 +50,48 @@ function planFromRemoteRow(r: any): PlannedWorkout {
     exercises: r.exercises || [],
     createdAt: r.created_at || new Date().toISOString(),
     ...planFieldsFromExtras(r.extras),
+  };
+}
+
+/**
+ * Gauntlet DI-02: body-metric measurement columns. The local entry
+ * carries bodyFatPct / chestIn / waistIn / hipsIn and CSV export
+ * includes them, but the sync push/pull field lists dropped them and
+ * the table has no such columns — so measurements tracked on one
+ * device vanished on the next. The push mapping carries the fields;
+ * the pull mapping restores them when present and tolerates their
+ * absence pre-migration (select * simply omits missing columns).
+ * The push retry (see pushLocalData) strips them on a missing-column
+ * error, so this code is safe to ship before the 2026102801 migration
+ * is applied — and starts syncing measurements the moment it is.
+ */
+export function bodyMetricRowForPush(b: BodyMetricEntry, userId: string): Record<string, unknown> {
+  return {
+    id: b.id,
+    user_id: userId,
+    date: b.date,
+    weight_kg: b.weightKg,
+    height_cm: b.heightCm || null,
+    body_fat_pct: b.bodyFatPct ?? null,
+    chest_in: b.chestIn ?? null,
+    waist_in: b.waistIn ?? null,
+    hips_in: b.hipsIn ?? null,
+    notes: b.notes || null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export function bodyMetricFromRemoteRow(r: any): BodyMetricEntry {
+  return {
+    id: r.id,
+    date: r.date,
+    weightKg: Number(r.weight_kg),
+    heightCm: r.height_cm ? Number(r.height_cm) : undefined,
+    bodyFatPct: r.body_fat_pct != null ? Number(r.body_fat_pct) : undefined,
+    chestIn: r.chest_in != null ? Number(r.chest_in) : undefined,
+    waistIn: r.waist_in != null ? Number(r.waist_in) : undefined,
+    hipsIn: r.hips_in != null ? Number(r.hips_in) : undefined,
+    notes: r.notes || undefined,
   };
 }
 
@@ -966,6 +1032,39 @@ class SupabaseSyncEngine {
 
       if (isCrossAccountSwitch) {
         // Cross-account switch: Replace local store completely with current user's remote records
+        // Gauntlet DI-03: the replace above covered only the 6 synced
+        // slices, so the previous account's unsynced data (coach blocks,
+        // water/creatine logs, habits, goals, XP, streak, challenges,
+        // photos) survived into the next account on this device.
+        // Archive first — the single-slot archive is restorable via
+        // Settings, so the wipe below is recoverable — then reset every
+        // unsynced account slice. The remote assignments that follow
+        // overwrite the synced slices. Device-level preferences are
+        // intentionally kept (see buildCrossAccountResetUpdates).
+        try {
+          useStore.getState().archiveRetainedHistory();
+        } catch {
+          // Best-effort: the reset below must still run.
+        }
+        Object.assign(updates, buildCrossAccountResetUpdates());
+        try {
+          if (typeof window !== 'undefined') localStorage.removeItem(PROGRESS_PHOTOS_KEY);
+        } catch {
+          // Best-effort: the in-memory reset above already clears photos.
+        }
+        // Gauntlet DI-03 (Cycle 4 catch): custom barcodes are user-created
+        // local-only data (storage key ascend_custom_barcodes, written by
+        // store.ts:3667; the server table is never written by this client)
+        // and live outside the store slices, so the builder cannot clear
+        // them. Remove them here — the archive-first call above already
+        // saved them (archive includes customBarcodes via buildFullBackup
+        // extras), so the previous account's barcodes stay restorable via
+        // Settings instead of leaking to the new account.
+        try {
+          if (typeof window !== 'undefined') localStorage.removeItem('ascend_custom_barcodes');
+        } catch {
+          // Best-effort: barcodes are a lookup aid, not a synced slice.
+        }
         updates.prs = (remotePRs.data || []).map((r: any) => ({
           id: r.id,
           exercise: r.exercise,
@@ -979,7 +1078,9 @@ class SupabaseSyncEngine {
         updates.workouts = (remoteWorkouts.data || []).map((r: any) => ({
           id: r.id,
           name: r.name || undefined,
-          date: r.date,
+          // Gauntlet DI-01: legacy cloud rows may carry ISO timestamps
+          // from the Log Past flow; the store contract is YYYY-MM-DD.
+          date: normalizeDateToLocalDay(r.date),
           durationMinutes: r.duration_minutes || undefined,
           notes: r.notes || undefined,
           exercises: r.exercises || [],
@@ -990,13 +1091,7 @@ class SupabaseSyncEngine {
           date: r.date,
           foods: r.foods || [],
         }));
-        updates.bodyMetrics = (remoteMetrics.data || []).map((r: any) => ({
-          id: r.id,
-          date: r.date,
-          weightKg: Number(r.weight_kg),
-          heightCm: r.height_cm ? Number(r.height_cm) : undefined,
-          notes: r.notes || undefined,
-        }));
+        updates.bodyMetrics = (remoteMetrics.data || []).map((r: any) => bodyMetricFromRemoteRow(r));
         updates.plannedWorkouts = (remotePlans.data || []).map(planFromRemoteRow);
         // Retain the mapped remote rows for apply-time recompute (R2/R5).
         pullRemote.prs = updates.prs;
@@ -1038,7 +1133,8 @@ class SupabaseSyncEngine {
           const remoteMapped = remoteWorkouts.data.map((r: any) => ({
             id: r.id,
             name: r.name || undefined,
-            date: r.date,
+            // Gauntlet DI-01: see the cross-account mapping above.
+            date: normalizeDateToLocalDay(r.date),
             durationMinutes: r.duration_minutes || undefined,
             notes: r.notes || undefined,
             exercises: r.exercises || [],
@@ -1075,13 +1171,7 @@ class SupabaseSyncEngine {
         }
 
         if (remoteMetrics.data && remoteMetrics.data.length > 0) {
-          const remoteMapped = remoteMetrics.data.map((r: any) => ({
-            id: r.id,
-            date: r.date,
-            weightKg: Number(r.weight_kg),
-            heightCm: r.height_cm ? Number(r.height_cm) : undefined,
-            notes: r.notes || undefined,
-          }));
+          const remoteMapped = remoteMetrics.data.map((r: any) => bodyMetricFromRemoteRow(r));
           pullRemote.bodyMetrics = remoteMapped;
           const { merged, changed } = mergeRemoteRecords(
             localState.bodyMetrics || [],
@@ -1288,17 +1378,27 @@ class SupabaseSyncEngine {
 
     // 5. Body Metrics
     if (state.bodyMetrics && state.bodyMetrics.length > 0) {
-      const metricRows = state.bodyMetrics.map((b) => ({
-        id: b.id,
-        user_id: userId,
-        date: b.date,
-        weight_kg: b.weightKg,
-        height_cm: b.heightCm || null,
-        notes: b.notes || null,
-        updated_at: new Date().toISOString(),
-      }));
-      const { error: metricError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
-      record(metricError);
+      const metricRows = state.bodyMetrics.map((b) => bodyMetricRowForPush(b, userId));
+      const { error: metricUpsertError } = await supabase.from('body_metrics').upsert(metricRows, { onConflict: 'id' });
+      if (metricUpsertError) {
+        // Gauntlet DI-02: measurement columns exist only after the
+        // 2026102801 migration. Pre-migration, PostgREST rejects rows
+        // carrying them — retry without them (same missing-column
+        // pattern as planned_workouts extras). Any other error is
+        // recorded, never masked by the retry.
+        const errMsg = metricUpsertError.message || '';
+        const missingMeasurementColumn =
+          metricUpsertError.code === 'PGRST204' || metricUpsertError.code === '42703' ||
+          /column .* does not exist/i.test(errMsg) ||
+          /could not find the .* column/i.test(errMsg);
+        if (missingMeasurementColumn) {
+          const bareRows = metricRows.map(({ body_fat_pct: _bf, chest_in: _c, waist_in: _w, hips_in: _h, ...rest }) => rest);
+          const { error: bareError } = await supabase.from('body_metrics').upsert(bareRows, { onConflict: 'id' });
+          record(bareError);
+        } else {
+          record(metricUpsertError);
+        }
+      }
     }
 
     // 6. Planned Workouts — description / goalTag / intensityMode have no

@@ -98,7 +98,9 @@ Respond with ONLY raw JSON matching this schema:
     if (!parsed || typeof parsed.reps !== 'number' || parsed.reps <= 0) {
       return NextResponse.json({
         error: 'PARSE_FAILED',
-        message: lastError?.message || 'Could not extract valid weight and reps',
+        // Gauntlet SEC-15: the 500 path below redacts, but this path
+        // returned the raw provider error verbatim.
+        message: redactSecrets(lastError?.message || 'Could not extract valid weight and reps'),
       }, { status: 422 });
     }
 

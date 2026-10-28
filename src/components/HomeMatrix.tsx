@@ -206,7 +206,7 @@ export default function HomeMatrix({
           </div>
           {rowIds.map((id) => (
             <div key={id} className="flex items-center gap-1.5">
-              <span className="w-14 shrink-0 text-[10px] uppercase font-bold" style={{ color: ROW_COLORS[id] }}>
+              <span className={`w-14 shrink-0 text-[10px] uppercase font-bold matrix-row-label-${id}`}>
                 {rowLabel[id]}
               </span>
               <div className="flex items-center gap-1 flex-1">
@@ -214,13 +214,15 @@ export default function HomeMatrix({
                   const ds = toDateStr(d);
                   const done = getDaySummary(ds, inputs).habits.find((h) => h.id === id)?.done ?? false;
                   const isToday = ds === todayStr;
+                  // Gauntlet UX-06: weekly-view day cells were h-5 (20px),
+                  // below the 24px WCAG target-size minimum — now h-6.
                   return (
                     <button
                       key={ds}
                       type="button"
                       onClick={() => toggleDate(ds)}
                       aria-label={`${rowLabel[id]} — ${ds}`}
-                      className={`h-5 flex-1 rounded cursor-pointer ${
+                      className={`h-6 flex-1 rounded cursor-pointer ${
                         done ? '' : 'bg-bg-secondary border border-border/40'
                       } ${isToday && !done ? 'ring-1 ring-accent/60' : ''} ${
                         ds === selected ? 'ring-1 ring-accent' : ''

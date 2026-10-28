@@ -216,8 +216,12 @@ export async function POST(req: Request) {
           'If an account is associated with this email address, a single-use verification link has been sent.',
       };
 
-      // In test/dev environment, expose debugToken and delivery status
-      if (process.env.NODE_ENV === 'test') {
+      // In test/dev environment, expose debugToken and delivery status.
+      // Gauntlet SEC-04: NODE_ENV alone is not a sufficient gate — a
+      // test-env deployment would return a LIVE single-use deletion
+      // token to unauthenticated callers. The debug payload additionally
+      // requires an explicit opt-in env var, off by default everywhere.
+      if (process.env.NODE_ENV === 'test' && process.env.ALLOW_DELETION_DEBUG_TOKEN === 'true') {
         if (generatedToken) {
           responsePayload.debugToken = generatedToken;
         }

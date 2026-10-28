@@ -144,6 +144,8 @@ describe('QA4-007 deletion lookup pagination', () => {
     ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key-123456789012345';
     ENV.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key-9876543210';
     ENV.NODE_ENV = 'test';
+    // Gauntlet SEC-04: the debug payload now needs this explicit opt-in.
+    ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
     setupMocks();
     resetRateLimitStoreForTests();
     resetConsumedNoncesForTests();
@@ -156,6 +158,7 @@ describe('QA4-007 deletion lookup pagination', () => {
     delete ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete ENV.SUPABASE_SERVICE_ROLE_KEY;
     delete ENV.NODE_ENV;
+    delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
   });
 
   it('finds a user at position 175 (past the old 50-user first page)', async () => {

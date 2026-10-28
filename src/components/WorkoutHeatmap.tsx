@@ -245,7 +245,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('gym')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'gym'
-              ? 'bg-[#FF6A1A] text-white shadow-xs'
+              ? 'bg-[#FF6A1A] text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -257,7 +257,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('water')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'water'
-              ? 'bg-sky-600 text-white shadow-xs'
+              ? 'bg-sky-600 text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -281,7 +281,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('protein')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'protein'
-              ? 'bg-[#22C55E] text-white shadow-xs'
+              ? 'bg-[#22C55E] text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -336,7 +336,7 @@ export default function WorkoutHeatmap({
                   className={`aspect-square rounded-xl flex flex-col items-center justify-between p-1 text-xs font-mono transition-all duration-150 relative select-none border ${
                     activeFilter !== 'all'
                       ? isHabitDone
-                        ? 'bg-emerald-500 text-white font-bold border-transparent'
+                        ? 'bg-emerald-500 text-black font-bold border-transparent'
                         : isFuture
                         ? 'bg-bg-secondary/40 text-text-muted/40 border-transparent'
                         : 'bg-bg-secondary text-text-secondary border-border/50'

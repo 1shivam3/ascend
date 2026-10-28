@@ -18,7 +18,6 @@ import {
 import { useStore } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
-import { useEscapeToClose } from '@/lib/use-escape-to-close';
 import { useTranslation } from '@/lib/i18n';
 
 interface FeedbackModalProps {
@@ -35,7 +34,6 @@ export default function FeedbackModal({
   initialCategory = 'review',
 }: FeedbackModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const { dialogProps } = useModalA11y(modalRef, isOpen, onClose);
   const profile = useStore((state) => state.profile);
   const { t } = useTranslation();
   const toast = useToast();
@@ -51,22 +49,8 @@ export default function FeedbackModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRefId, setSubmittedRefId] = useState<string | null>(null);
 
-  // Sync category if prop changes
-  useEffect(() => {
-    if (initialCategory) setCategory(initialCategory);
-  }, [initialCategory]);
-
-  // Back button registration
-  useEffect(() => {
-    if (!isOpen) return;
-    return registerBackHandler(() => {
-      onClose();
-      return true;
-    }, 120);
-  }, [isOpen, registerBackHandler, onClose]);
-
-  // LOOP-3: every close path (X, overlay, Cancel, Done — and now
-  // Escape) must reset the draft; calling the raw onClose prop left a
+  // LOOP-3: every close path (X, overlay, Cancel, Done, Escape, back)
+  // must reset the draft; calling the raw onClose prop left a
   // half-written feedback form behind for the next open.
   const handleResetAndClose = useCallback(() => {
     setSubmittedRefId(null);
@@ -76,7 +60,28 @@ export default function FeedbackModal({
     onClose();
   }, [onClose]);
 
-  useEscapeToClose(isOpen, handleResetAndClose);
+  // Gauntlet A11Y-03: useModalA11y (capture-phase document listener)
+  // used to receive the RAW onClose, so its Escape handler stopped
+  // propagation before the bubble-phase useEscapeToClose reset handler
+  // ever ran — Escape (and the back handler above) skipped the draft
+  // reset. The trap now closes via the resetting handler, and the
+  // redundant bubble-phase hook is gone (it could never fire: the
+  // capture handler consumes Escape first).
+  const { dialogProps } = useModalA11y(modalRef, isOpen, handleResetAndClose);
+
+  // Sync category if prop changes
+  useEffect(() => {
+    if (initialCategory) setCategory(initialCategory);
+  }, [initialCategory]);
+
+  // Back button registration
+  useEffect(() => {
+    if (!isOpen) return;
+    return registerBackHandler(() => {
+      handleResetAndClose();
+      return true;
+    }, 120);
+  }, [isOpen, registerBackHandler, handleResetAndClose]);
 
   if (!isOpen) return null;
 

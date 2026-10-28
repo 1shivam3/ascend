@@ -82,7 +82,7 @@ export default function AuthModal({ isOpen, onClose }: AuthModalProps) {
         {isPermanentUser ? (
           <div className="space-y-3.5 py-1">
             <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-emerald-500/30 space-y-1.5">
-              <div className="flex items-center gap-2 text-emerald-400">
+              <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span className="text-xs font-bold">{t('auth.connected')}</span>
               </div>

@@ -2252,7 +2252,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
             <span className="text-text-muted mx-1">•</span>
             <span className="text-emerald-400">{todayMeals.length === 0 ? '' : tildeForFoods(todayMeals.flatMap((m) => m.foods))}{Math.round(todayMacros.proteinG)}g P</span>
             {todayMeals.length > 0 && !foodsAllExact(todayMeals.flatMap((m) => m.foods)) && (
-              <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans font-bold">{t('common.estimatedShort')}</span>
+              <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-sans font-bold">{t('common.estimatedShort')}</span>
             )}
           </div>
         </div>
@@ -2289,7 +2289,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                           {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                         </span>
                         {!foodsAllExact(meal.foods) && (
-                          <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                          <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400">
                             {t('common.estimatedShort')}
                           </span>
                         )}
@@ -2347,9 +2347,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                             </span>
                             {food.isUnmatched ? (
-                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-400">{t('meals.notInDbShort')}</span>
                             ) : food.isApproximateMatch ? (
-                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                              <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
                             ) : (
                               <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
                             )}
@@ -2516,7 +2516,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                 {tildeForFoods(meal.foods)}{Math.round(mMacros.proteinG)}g P
                               </span>
                               {!foodsAllExact(meal.foods) && (
-                                <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                                <span className="text-2xs font-sans font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400">
                                   {t('common.estimatedShort')}
                                 </span>
                               )}
@@ -2573,9 +2573,9 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                                     ({food.quantity ? `${food.quantity} ${food.unit}` : food.unit})
                                   </span>
                                   {food.isUnmatched ? (
-                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400">{t('meals.notInDbShort')}</span>
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-400">{t('meals.notInDbShort')}</span>
                                   ) : food.isApproximateMatch ? (
-                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
+                                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-2xs font-bold text-amber-700 dark:text-amber-400" aria-label={t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}>{t('common.estimatedShort')}</span>
                                   ) : (
                                     <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-2xs font-bold text-emerald-400">{t('meals.exactChip')}</span>
                                   )}
@@ -3072,8 +3072,8 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                               ) : (
                                 <div className="space-y-1.5">
                                   {(food.isUnmatched || food.isApproximateMatch) && (
-                                    <div className="flex items-center gap-1.5 text-2xs text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
-                                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-400" />
+                                    <div className="flex items-center gap-1.5 text-2xs text-amber-700 dark:text-amber-400 bg-amber-500/10 px-2 py-1 rounded border border-amber-500/20 font-mono">
+                                      <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 text-amber-700 dark:text-amber-400" />
                                       {/* Approximate rows carry another entry's values: name the
                                           entry so the estimate is never mistaken for a match. */}
                                       <span>{food.isUnmatched ? t('meals.notInDb') : t('meals.estimatedFrom', { entry: food.matchedEntry ?? '' })}</span>
@@ -3202,7 +3202,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                 <span className="text-text-muted">{t('meals.mealTotal')}</span>
                 {/* Live-fix L8: builder total follows the same rule —
                     exact only when every builder food is exact. */}
-                <span className="font-bold text-accent">{foods.length === 0 ? '' : tildeForFoods(foods)}{Math.round(currentMealMacros.calories)} kcal{foods.length > 0 && !foodsAllExact(foods) && <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 font-sans text-2xs">{t('common.estimatedShort')}</span>}</span>
+                <span className="font-bold text-accent">{foods.length === 0 ? '' : tildeForFoods(foods)}{Math.round(currentMealMacros.calories)} kcal{foods.length > 0 && !foodsAllExact(foods) && <span className="ml-1.5 px-1 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-sans text-2xs">{t('common.estimatedShort')}</span>}</span>
               </div>
               <div className="flex justify-between text-xs text-text-secondary mb-4 font-mono">
                 <span>{foods.length === 0 ? '' : tildeForFoods(foods)}{round1(currentMealMacros.proteinG)}g P</span>
@@ -3356,7 +3356,7 @@ export default function MealsPage({ onNavigate }: MealsPageProps = {}) {
                       <span className="text-text-muted">{t('meals.macroSum')} </span>
                       <span className="font-bold text-text-primary">{macroSum} kcal</span>
                       {Math.abs(delta) > 5 ? (
-                        <span className={`ml-1.5 text-2xs font-semibold ${delta > 0 ? 'text-amber-400' : 'text-sky-400'}`}>
+                        <span className={`ml-1.5 text-2xs font-semibold ${delta > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-sky-400'}`}>
                           ({delta > 0 ? `+${delta}` : `${delta}`} kcal)
                         </span>
                       ) : (

@@ -1004,7 +1004,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       {bodyweightAnalytics.latestWeight ? `${bodyweightAnalytics.latestWeight} ${userUnit}` : '—'}
                     </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {bodyweightAnalytics.deltaText}
                   </span>
                 </div>
@@ -1084,7 +1084,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                         {big3Analytics.latest1RM ? `${big3Analytics.latest1RM} ${userUnit}` : '—'}
                       </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {big3Analytics.deltaText}
                     </span>
                   </div>
@@ -1150,7 +1150,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   </div>
                   <span className="text-2xs text-text-muted font-mono">Current 1RM (your estimated best single lift)</span>
                 </div>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
                   {heroLiftAnalytics.deltaText}
                 </span>
               </div>
@@ -1358,7 +1358,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                     <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
                     {selectedExerciseAnalytics.deltaText}
                   </span>
                 </div>
@@ -1503,7 +1503,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#858076]">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold font-mono bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096]">
                       {bodyweightAnalytics.deltaText}
                     </span>
                   </div>

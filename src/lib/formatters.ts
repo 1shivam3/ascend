@@ -54,6 +54,25 @@ export const getLocalDateOfTimestamp = (ms: number): string =>
   getLocalTodayStr(new Date(ms));
 
 /**
+ * Gauntlet DI-01: normalize any workout/entry date to the YYYY-MM-DD local
+ * day. Producers must store YYYY-MM-DD (see WorkoutEntry.date), but the
+ * Log Past flow built `new Date(`${date}T12:00:00`).toISOString()`, an
+ * ISO timestamp that `===` day comparisons (streaks) and `<= todayStr`
+ * checks (athlete model, weekly reviews) silently miss. YYYY-MM-DD input
+ * passes through unchanged; an ISO timestamp converts by LOCAL parts
+ * (not the UTC date part, which shifts for +13/+14 zones); an
+ * unparseable string passes through unchanged rather than being
+ * destroyed — callers with validation (e.g. body metrics) refuse it.
+ */
+export const normalizeDateToLocalDay = (dateStr: string): string => {
+  if (!dateStr) return dateStr;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  const ms = Date.parse(dateStr);
+  if (Number.isNaN(ms)) return dateStr;
+  return getLocalDateOfTimestamp(ms);
+};
+
+/**
  * Audit F12: strict entry-date validation for the store layer.
  * YYYY-MM-DD shape, a REAL calendar date (2026-02-30 fails the
  * round-trip check instead of rolling to Mar 2), and not in the

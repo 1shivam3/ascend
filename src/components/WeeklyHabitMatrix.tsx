@@ -91,6 +91,16 @@ export default function WeeklyHabitMatrix({
     return map;
   }, [meals]);
 
+  // Gauntlet A11Y-04: row-label text uses the light/dark label classes
+  // (see globals.css) instead of the bright fill colour, which fails
+  // on light chalk. Unknown colours fall back to the inline style.
+  const LABEL_CLASS_BY_COLOR: Record<string, string> = {
+    '#FF6A1A': 'matrix-row-label-workout',
+    '#38BDF8': 'matrix-row-label-water',
+    '#F5B301': 'matrix-row-label-creatine',
+    '#22C55E': 'matrix-row-label-protein',
+  };
+
   const rows: { label: string; color: string; done: (dateStr: string) => boolean }[] = [
     { label: t('habit.gym'), color: '#FF6A1A', done: (d) => workoutDays.has(d) },
     { label: t('habit.water'), color: '#38BDF8', done: (d) => (waterLogs[d] || 0) >= waterTargetMl * 0.85 },
@@ -143,7 +153,10 @@ export default function WeeklyHabitMatrix({
 
       {rows.map((row) => (
         <div key={row.label} className="flex items-center gap-1.5">
-          <span className="w-14 shrink-0 text-[10px] uppercase font-bold" style={{ color: row.color }}>
+          <span
+            className={`w-14 shrink-0 text-[10px] uppercase font-bold ${LABEL_CLASS_BY_COLOR[row.color] ?? ''}`}
+            style={LABEL_CLASS_BY_COLOR[row.color] ? undefined : { color: row.color }}
+          >
             {row.label}
           </span>
           <div className="flex items-center gap-1 flex-1">
@@ -153,10 +166,23 @@ export default function WeeklyHabitMatrix({
               const cellClass = `${compact ? 'h-5' : 'h-6'} ${singleDay ? 'w-10 shrink-0' : 'flex-1'} rounded ${
                 onSelectDate ? 'cursor-pointer' : ''
               } ${done ? '' : 'bg-bg-secondary border border-border/40'} ${isToday && !done ? 'ring-1 ring-accent/60' : ''}`;
-              return (
+              // Gauntlet A11Y-01: date cells were mouse-only <span
+              // onClick> — invisible to keyboard and screen-reader users.
+              // Clickable cells are real buttons now (with an accessible
+              // name); non-clickable cells stay plain spans.
+              return onSelectDate ? (
+                <button
+                  key={d.dateStr}
+                  type="button"
+                  onClick={() => onSelectDate(d.dateStr)}
+                  aria-label={`${row.label} — ${d.dateStr}`}
+                  title={`${row.label} — ${d.dateStr}`}
+                  className={cellClass}
+                  style={done ? { backgroundColor: row.color } : undefined}
+                />
+              ) : (
                 <span
                   key={d.dateStr}
-                  onClick={onSelectDate ? () => onSelectDate(d.dateStr) : undefined}
                   className={cellClass}
                   style={done ? { backgroundColor: row.color } : undefined}
                   title={`${row.label} — ${d.dateStr}`}

@@ -198,6 +198,7 @@ describe('Account Deletion & Data Safety Specification', () => {
     ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key-123456789012345';
     ENV.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key-9876543210';
     ENV.NODE_ENV = 'test';
+    ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
 
     const setup = setupLocalStorage();
     mockStorage = setup.storage;
@@ -217,6 +218,7 @@ describe('Account Deletion & Data Safety Specification', () => {
     delete ENV.SUPABASE_SERVICE_ROLE_KEY;
     delete ENV.RESEND_API_KEY;
     delete ENV.NODE_ENV;
+    delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
     delete ENV.VERCEL_ENV;
   });
 
@@ -331,6 +333,22 @@ describe('Account Deletion & Data Safety Specification', () => {
     expect(dataUnknown.success).toBe(true);
     expect(dataUnknown.message).toBe(dataExisting.message);
     expect(dataUnknown.debugToken).toBeUndefined();
+  });
+
+  it('gauntlet SEC-04: NODE_ENV=test alone does NOT expose debugToken without the explicit opt-in', async () => {
+    const route = await import('../src/app/api/auth/delete-account/route');
+    delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
+    const req = new Request('https://ascendtonext.vercel.app/api/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request_verification', email: 'external@example.com' }),
+    });
+    const res = await route.POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.debugToken).toBeUndefined();
+    ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
   });
 
   it('handles email delivery when provider is configured and dispatches single-use link', async () => {

@@ -77,7 +77,7 @@ import {
   type WeeklyReview,
 } from './weekly-review';
 import { buildDefaultWeeklySchedule, getTodayDayOfWeek, getWorkoutBodyParts, DAYS_OF_WEEK } from './workout-schedule';
-import { safeRandomId, sanitizeAthleteName, isValidEntryDate } from './formatters';
+import { safeRandomId, sanitizeAthleteName, isValidEntryDate, normalizeDateToLocalDay } from './formatters';
 import { calculateRecommendedMacroGoals } from './macros';
 import {
   evaluateTrainingDecisionPolicyV0,
@@ -574,7 +574,7 @@ export interface AppState {
   // would be lost silently instead of staying fork-protected.
   archiveRetainedHistory: () => boolean;
 
-  importAllData: (data: any) => boolean;
+  importAllData: (data: any, opts?: { archiveFirst?: boolean }) => boolean;
 }
 
 function getLocalTodayStr(d: Date = new Date()): string {
@@ -1060,7 +1060,7 @@ export const mainStoreStorage: StateStorage = {
  * those themselves (Start fresh builds a default profile and lands on
  * Today; logout leaves profile null so onboarding renders).
  */
-function buildFreshHistoryState(): Partial<AppState> {
+export function buildFreshHistoryState(): Partial<AppState> {
   return {
     prs: [],
     workouts: [],
@@ -1111,6 +1111,20 @@ function buildFreshHistoryState(): Partial<AppState> {
     healthSummary: null,
     goals: [],
     activeWorkoutDraft: null,
+    // Gauntlet DI-06: these account-attributable slices were missing from
+    // the fresh slate, so Start-fresh / logout-to-onboarding / account
+    // switch left the previous user's XP, streak, challenges, run
+    // program, gym logs, portion preferences and custom muscles behind.
+    // Device-level preferences (theme, language, density, today layout,
+    // notification prefs, ui prefs) are deliberately NOT reset here.
+    xp: getInitialXpState(),
+    streak: getInitialStreakXState(),
+    challenges: getInitialChallengesXState(),
+    friendChallenges: getInitialFriendChallengesState(),
+    runProgram: null,
+    gymLogs: {},
+    userPortionPreferences: {},
+    customExerciseMuscles: {},
   };
 }
 
@@ -1673,6 +1687,12 @@ export const useAppStore = create<AppState>()(
 
         const sanitizedWorkout: WorkoutEntry = {
           ...workout,
+          // Gauntlet DI-01: the store boundary enforces the YYYY-MM-DD
+          // contract (see WorkoutEntry.date). Log Past producers pass an
+          // ISO timestamp; without this, the row silently drops out of
+          // streak (===), athlete-model (<= todayStr) and weekly-review
+          // day matching.
+          date: normalizeDateToLocalDay(workout.date),
           exercises: (workout.exercises || []).map((ex) => ({
             ...ex,
             sets: (ex.sets || []).map((s) => {
@@ -3618,7 +3638,9 @@ export const useAppStore = create<AppState>()(
           const raw = localStorage.getItem(ARCHIVED_HISTORY_KEY);
           if (!raw) return false;
           const parsed = JSON.parse(raw);
-          const ok = get().importAllData(parsed);
+          // Gauntlet R4: restoring the archive must NOT re-archive the
+          // current state over it — the archive stays repeatable.
+          const ok = get().importAllData(parsed, { archiveFirst: false });
           if (!ok) return false;
           // The archive was written from a logged-out state, so its
           // hasCompletedOnboarding is false — a restore from inside
@@ -3651,7 +3673,7 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      importAllData: (data) => {
+      importAllData: (data, opts) => {
         try {
           if (!data || typeof data !== 'object') return false;
           // Shape gate (QA4-013): a payload with none of the backup's
@@ -3660,6 +3682,28 @@ export const useAppStore = create<AppState>()(
           // to "restore" successfully). Partial imports carrying at
           // least one recognized field still apply.
           if (!isRecognizedBackupData(data)) return false;
+          // Gauntlet R4: an import replaces every slice the backup
+          // carries, with no undo. Archive the current state first so
+          // Settings → Restore archived can undo the import. Gated on
+          // retained history (an empty state must not clobber a previous
+          // archive — the logout rule) and skipped for archive restores
+          // themselves, whose archive must stay repeatable.
+          if (opts?.archiveFirst !== false && typeof window !== 'undefined') {
+            const live = get();
+            if (
+              hasRetainedHistory({
+                workouts: live.workouts,
+                meals: live.meals,
+                plannedWorkouts: live.plannedWorkouts,
+                prs: live.prs,
+                bodyMetrics: live.bodyMetrics,
+                prTargets: live.prTargets,
+                macroGoals: live.macroGoals,
+              })
+            ) {
+              get().archiveRetainedHistory();
+            }
+          }
           if (typeof window !== 'undefined') {
             try {
               localStorage.removeItem('ascend_logged_out');
