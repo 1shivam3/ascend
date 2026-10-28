@@ -24,7 +24,6 @@ import {
   type OfflineDetection,
 } from '@/lib/offline-scan';
 import { isNativeApp } from '@/lib/app-settings';
-import { useTranslation } from '@/lib/i18n';
 import { estimateMacros } from '@/lib/macros';
 import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr } from '@/lib/formatters';
