@@ -90,6 +90,7 @@ import PostWorkoutTakeModal from '@/components/PostWorkoutTakeModal';
 import SuggestedWorkoutModal from '@/components/SuggestedWorkoutModal';
 import CoachBlockModal from '@/components/CoachBlockModal';
 import CoachChatTab from '@/components/CoachChatTab';
+import CoachChatSection from '@/components/CoachChatSection';
 import PlanPrefsPrompt from '@/components/PlanPrefsPrompt';
 import CoachWeeklyReviewModal from '@/components/CoachWeeklyReviewModal';
 import BlockDebriefModal from '@/components/BlockDebriefModal';
@@ -2886,13 +2887,19 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       {/* ── TAB: COACH (simple coach chat — designs today's session from
           the check-in; readiness comes from the existing coach engine) ── */}
       {trainSubTab === 'coach' && (
-        <CoachChatTab
-          onStartPlan={handleStartPlan}
-          onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
-          onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
-          onOpenWeeklyReview={() => setIsReviewOpen(true)}
-          onOpenDebrief={() => setIsDebriefOpen(true)}
-        />
+        <div className="space-y-4">
+          <CoachChatTab
+            onStartPlan={handleStartPlan}
+            onBuildBlock={() => { setCoachBlockAtReview(false); setIsCoachBlockOpen(true); }}
+            onReviewBlock={() => { setCoachBlockAtReview(true); setIsCoachBlockOpen(true); }}
+            onOpenWeeklyReview={() => setIsReviewOpen(true)}
+            onOpenDebrief={() => setIsDebriefOpen(true)}
+          />
+          {/* Conversational coach chat — an inline section below the
+              guided check-in (not a drawer; the removed drawer stays
+              removed). Answers are grounded in the user's own data. */}
+          <CoachChatSection />
+        </div>
       )}
 
       {/* ── Run Session Player ─────────────────────────────────────────── */}
