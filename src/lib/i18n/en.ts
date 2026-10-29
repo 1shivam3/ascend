@@ -3045,6 +3045,13 @@ export const en = {
   'coachChat.you': 'You',
   'coachChat.coach': 'Coach',
   'coachChat.dailyLeft': '{n} messages left today',
+
+  // ── App chrome (re-audit UX-R4: system surfaces localized) ──────────
+  'app.skipToContent': 'Skip to main content',
+  'app.offlineBanner': 'Offline Gym Mode Active • Tap for details',
+  'sw.updateAvailable': 'New version available',
+  'sw.refresh': 'Refresh',
+  'sw.dismissUpdate': 'Dismiss update notice',
 } as const;
 
 export type StringKey = keyof typeof en;

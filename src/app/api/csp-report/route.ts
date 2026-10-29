@@ -25,7 +25,9 @@ export async function POST(req: Request) {
     }
     const body = await readTextBodyWithLimit(req, 32 * 1024).catch(() => '');
     if (body) {
-      console.warn('[CSP] violation report:', redactSecrets(body.slice(0, 2000)));
+      // Re-audit SEC-R6: strip CR/LF so an attacker-supplied report body
+      // cannot inject forged lines into the server log.
+      console.warn('[CSP] violation report:', redactSecrets(body.slice(0, 2000)).replace(/[\r\n]+/g, ' '));
     }
   } catch {
     // Reporting must never fail loudly.

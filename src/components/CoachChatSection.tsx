@@ -288,7 +288,7 @@ export default function CoachChatSection() {
         <p className="card p-3 text-xs text-text-secondary">{t('coachChat.coldStart')}</p>
       )}
 
-      <div ref={listRef} className="card p-3 space-y-3 max-h-80 overflow-y-auto">
+      <div ref={listRef} aria-live="polite" className="card p-3 space-y-3 max-h-80 overflow-y-auto">
         {messages.length === 0 && (
           <p className="text-xs text-text-muted">{t('coachChat.placeholder')}</p>
         )}
@@ -313,9 +313,9 @@ export default function CoachChatSection() {
         {sending && <p className="text-xs text-text-muted">{t('coachChat.sending')}</p>}
       </div>
 
-      {error === 'generic' && <p className="text-xs text-red-500">{t('coachChat.errorGeneric')}</p>}
-      {error === 'cap' && <p className="text-xs text-red-500">{t('coachChat.errorCap')}</p>}
-      {error === 'rate' && <p className="text-xs text-red-500">{t('coachChat.errorRateLimit')}</p>}
+      {error === 'generic' && <p role="alert" className="text-xs text-red-500">{t('coachChat.errorGeneric')}</p>}
+      {error === 'cap' && <p role="alert" className="text-xs text-red-500">{t('coachChat.errorCap')}</p>}
+      {error === 'rate' && <p role="alert" className="text-xs text-red-500">{t('coachChat.errorRateLimit')}</p>}
       {dailyLeft !== null && (
         <p className="text-2xs text-text-muted">{t('coachChat.dailyLeft', { n: dailyLeft })}</p>
       )}

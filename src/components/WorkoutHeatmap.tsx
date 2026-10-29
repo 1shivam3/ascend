@@ -212,6 +212,7 @@ export default function WorkoutHeatmap({
             <button
               type="button"
               onClick={prevMonth}
+              aria-label={t('homeMatrix.prevMonth')}
               className="p-1 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
@@ -219,6 +220,7 @@ export default function WorkoutHeatmap({
             <button
               type="button"
               onClick={nextMonth}
+              aria-label={t('homeMatrix.nextMonth')}
               className="p-1 rounded-lg hover:bg-bg-secondary text-text-muted hover:text-text-primary transition-colors"
             >
               <ChevronRight className="w-4 h-4" />

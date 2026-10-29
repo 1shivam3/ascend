@@ -61,6 +61,15 @@ const PAIN_PATTERNS: RegExp[] = [
   /\bswell(ing|en)\b/i,
   /\bsharp pain\b/i,
   /\bpopped\b/i,
+  // Hindi (Devanagari) equivalents — the app is bilingual, and a safety
+  // scan that only understands English leaves Hindi users unprotected
+  // (re-audit SEC-R1/E2E-R2). दर्द = pain, चोट = injury, सूजन = swelling,
+  // मोच = sprain. Starter set mirroring the English categories; flagged
+  // for native-speaker expansion in the re-audit ledger.
+  /दर्द/,
+  /चोट/,
+  /सूजन/,
+  /मोच/,
 ];
 
 /**
@@ -79,6 +88,8 @@ const RESTRICTION_PATTERNS: RegExp[] = [
   /\bthrow(ing)? up\b/i,
   /\beat nothing\b/i,
   /\bstop eating\b/i,
+  // Hindi: उल्टी = vomiting / purging (re-audit SEC-R1/E2E-R2).
+  /उल्टी/,
 ];
 
 export type CoachChatSafetyStop = 'pain' | 'restriction' | null;
@@ -87,6 +98,33 @@ export type CoachChatSafetyStop = 'pain' | 'restriction' | null;
 export function detectSafetyStop(message: string): CoachChatSafetyStop {
   if (PAIN_PATTERNS.some((re) => re.test(message))) return 'pain';
   if (RESTRICTION_PATTERNS.some((re) => re.test(message))) return 'restriction';
+  return null;
+}
+
+/**
+ * Whole-request safety scan (re-audit SEC-R1/E2E-R2): the pre-provider
+ * stop must cover everything that will be forwarded to the model — not
+ * just the current message, but also the user's history turns and the
+ * grounding context (which carries check-in notes). A stop found in any
+ * channel returns the same refer-out; the current message wins ties so
+ * the copy matches what the user just said.
+ */
+export function findSafetyStop(input: {
+  message: string;
+  history?: CoachChatHistoryTurn[];
+  contextText?: string;
+}): CoachChatSafetyStop {
+  const fromMessage = detectSafetyStop(input.message);
+  if (fromMessage) return fromMessage;
+  const userTurns = (input.history ?? [])
+    .filter((t) => t.role === 'user')
+    .map((t) => t.content)
+    .join('\n');
+  if (userTurns) {
+    const fromHistory = detectSafetyStop(userTurns);
+    if (fromHistory) return fromHistory;
+  }
+  if (input.contextText) return detectSafetyStop(input.contextText);
   return null;
 }
 
@@ -104,6 +142,183 @@ export const COACH_CHAT_REFER_OUT: Record<
     hi: 'मैं अत्यधिक परहेज़ या उल्टी जैसे व्यवहारों में मदद नहीं कर सकता — ये आपकी सेहत को गंभीर नुकसान पहुँचा सकते हैं। ट्रेनिंग से उबरने के लिए पर्याप्त भोजन ज़रूरी है। संतुलित तरीका अपनाएँ, और योजना के लिए डॉक्टर या पंजीकृत आहार विशेषज्ञ से बात करें।',
   },
 };
+
+// ── Topic gate (re-audit E2E-R1: mechanical enforcement of the lock) ──────
+/**
+ * Decline copy for the mechanical topic gate, mirroring the wording the
+ * model itself used under prompt rule 7 (live-verified at the PR #59
+ * merge). The Hindi line is machine-written — flagged for the same
+ * native-speaker review as the rest of the chat copy.
+ */
+export const COACH_CHAT_TOPIC_DECLINE: { en: string; hi: string } = {
+  en: "I can only help with your training, nutrition, recovery, or sleep. Let's focus on your workout or fitness plan.",
+  hi: 'मैं केवल आपकी ट्रेनिंग, पोषण, रिकवरी या नींद में मदद कर सकता हूँ। चलिए आपके वर्कआउट या फ़िटनेस योजना पर ध्यान देते हैं।',
+};
+
+/**
+ * In-scope signal lexicon (English stems, prefix-matched): training
+ * movements and muscles, nutrition, recovery/sleep, and the user's own
+ * ASCEND data. Deliberately generous — the gate fires ONLY when a
+ * message carries zero in-scope signal, so breadth here is what keeps
+ * legitimate fitness questions (however phrased) away from the decline.
+ */
+const TOPIC_SIGNAL_EN =
+  /\b(train|workout|exercis|lift|squat|bench|deadlift|press|curl|row|pull[- ]?up|push[- ]?up|lunge|plank|stretch|cardio|gym|muscle|chest|back|shoulder|bicep|tricep|glute|quad|hamstring|calf|calves|core|abs|protein|calorie|kcal|carb|diet|meal|food|nutrition|macro|creatine|supplement|whey|sleep|slept|rest|recover|sore|tired|fatigue|energy|nap|deload|plan|program|programme|block|schedule|streak|progress|goal|coach|ascend|app|weight|weigh|scale|reps?|sets?|record|session|hydration|water|run|running|jog|cycl|swim|yoga|walk|steps?|egg|chicken|rice|dal|roti|paneer|milk|oats?|banana|fish|soy|peanut|almond|vegetable|fruit|salad|bread|pasta|potato|hunger|hungry|eat|eating|breakfast|lunch|dinner|snack|body|fitness|health|strong|strength|muscle|form|technique|warm[- ]?up|cooldown|mobility|flexibility|endurance|stamina|heart rate|pr)\b/i;
+
+/** Starter Hindi (Devanagari) signal set — substring-matched. */
+const TOPIC_SIGNAL_HI: string[] = [
+  'ट्रेनिंग', 'वर्कआउट', 'व्यायाम', 'कसरत', 'जिम', 'मांसपेशी', 'मांसपेशियाँ',
+  'प्रोटीन', 'कैलोरी', 'खाना', 'भोजन', 'डाइट', 'पोषण', 'नींद', 'सोना', 'सोने',
+  'आराम', 'रिकवरी', 'वजन', 'वज़न', 'शरीर', 'थकान', 'ऊर्जा', 'योजना', 'लक्ष्य',
+  'कोच', 'ऐप', 'प्रगति', 'हफ़्ता', 'हफ्ता', 'पानी', 'अंडा', 'अंडे', 'चिकन',
+  'चावल', 'दाल', 'रोटी', 'दूध', 'पनीर', 'केला', 'मछली', 'सोया', 'बादाम',
+  'सब्ज़ी', 'सब्जी', 'फल', 'सेहत', 'ताकत', 'मज़बूत', 'मजबूत', 'छाती', 'कंधा',
+  'कंधे', 'पीठ', 'टांग', 'बांह', 'पेट',
+];
+
+/** A number tied to a fitness unit counts as in-scope signal on its own. */
+const TOPIC_UNIT_SIGNAL =
+  /\d+(?:\.\d+)?\s?(kg|lbs?|km|cm|reps?|sets?|mins?|minutes|hours?|kcal|cal|g|%|x\b)/i;
+
+/**
+ * Deterministic topic gate (re-audit E2E-R1): is this message about
+ * training, nutrition, recovery, sleep, or the user's own ASCEND data?
+ * In-scope when ANY signal hits — a lexicon term (EN stem or HI
+ * substring) or a number-with-unit. Continuation rule: with history
+ * present, a short reply (< 6 words) is treated as an in-scope
+ * follow-up ("yes", "and on Tuesdays?", "what about legs") rather than
+ * a new topic. The route declines ONLY on zero signal.
+ */
+export function isCoachChatInScope(
+  message: string,
+  history: CoachChatHistoryTurn[] = [],
+): boolean {
+  const text = message.trim();
+  if (!text) return false;
+  if (history.length > 0 && text.split(/\s+/).length < 6) return true;
+  if (TOPIC_SIGNAL_EN.test(text)) return true;
+  if (TOPIC_SIGNAL_HI.some((term) => text.includes(term))) return true;
+  if (TOPIC_UNIT_SIGNAL.test(text)) return true;
+  return false;
+}
+
+// ── Reply caution enforcement (re-audit E2E-R1, prompt rule 8 by code) ────
+export type CoachChatReplyRisk = 'near-max' | 'large-deficit' | 'volume-jump';
+
+/**
+ * Deterministic scan for the rule-8 risk categories the SEC-22 output
+ * guardrails do NOT already hard-block: near-maximal load prescriptions
+ * (≥90% of 1RM / RPE 9.5–10 / max attempts), large deficits (an explicit
+ * ≥600 kcal deficit, a 1200–1499 kcal/day total prescription — sub-1200
+ * directives are guardrail-blocked — or ≥1 kg / ≥2 lb loss per week),
+ * and sharp volume jumps (doubling, ≥50% increases, ≥2× weekly
+ * frequency). Conservative by design: borderline phrasing passes
+ * unflagged rather than decorating ordinary advice with cautions.
+ */
+export function findReplyRisk(reply: string): CoachChatReplyRisk | null {
+  // Near-maximal loads.
+  if (
+    /\b(9\d|100)\s?%\s?(of\s+)?(your\s+)?(1\s?rm|one[- ]rep max|max)\b/i.test(reply) ||
+    /\brpe\s*(9\.5|10)\b/i.test(reply) ||
+    /\b(test|attempt|go for|try)\s+(a\s+|your\s+)?(new\s+)?(1\s?rm|one[- ]rep max|max single)\b/i.test(reply) ||
+    /\bmax(imum)?\s+(effort|single|attempt)\b/i.test(reply)
+  ) {
+    return 'near-max';
+  }
+  // Large calorie deficits / aggressive loss rates.
+  const deficitAfter = reply.match(/(\d{3,4})\s?(kcal|calories?|cal)\b[^.]{0,25}?\bdeficit\b/i);
+  const deficitBefore = reply.match(/\bdeficit\b[^.]{0,25}?(\d{3,4})\s?(kcal|calories?|cal)\b/i);
+  if (
+    (deficitAfter && Number(deficitAfter[1]) >= 600) ||
+    (deficitBefore && Number(deficitBefore[1]) >= 600)
+  ) {
+    return 'large-deficit';
+  }
+  const dailyTotal = reply.match(/(\d{4})\s?(kcal|calories?|cal)\b[^.]{0,15}?\b(a day|per day|daily|each day)\b/i);
+  if (dailyTotal && Number(dailyTotal[1]) >= 1200 && Number(dailyTotal[1]) < 1500) {
+    return 'large-deficit';
+  }
+  const lossRate = reply.match(
+    /\blose\b[^.]{0,20}?(\d+(?:\.\d+)?)\s?(kg|lbs?|pounds?)\b[^.]{0,15}?\b(a|per|each|every)\s?(week|wk)\b/i,
+  );
+  if (lossRate) {
+    const amount = Number(lossRate[1]);
+    const isKg = /^kg$/i.test(lossRate[2]);
+    if ((isKg && amount >= 1) || (!isKg && amount >= 2)) return 'large-deficit';
+  }
+  // Sharp volume jumps.
+  if (
+    /\bdouble\b[^.]{0,20}\b(volume|sets?|training|workouts?|frequency)\b/i.test(reply) ||
+    /\btwice\b[^.]{0,15}\b(as (much|many)|the)\b[^.]{0,15}\b(volume|sets?|training)\b/i.test(reply)
+  ) {
+    return 'volume-jump';
+  }
+  const pctJump = reply.match(/\b(\d+)\s?%\s?(more|increase)\b[^.]{0,20}\b(volume|sets?|training)\b/i);
+  if (pctJump && Number(pctJump[1]) >= 50) return 'volume-jump';
+  const freqJump = reply.match(/\bfrom\s+(\d+)\s*(?:to|→)\s*(\d+)\s*(days?|sessions?|workouts?)\b[^.]{0,10}?\b(a|per)\s?week\b/i);
+  if (freqJump && Number(freqJump[2]) >= 2 * Number(freqJump[1])) return 'volume-jump';
+  return null;
+}
+
+/** Caution lines, prepended verbatim when a risky reply lacks one. The
+ * Hindi lines are machine-written — flagged for native-speaker review. */
+export const COACH_CHAT_CAUTION: Record<CoachChatReplyRisk, { en: string; hi: string }> = {
+  'near-max': {
+    en: 'Caution: near-maximal loads carry injury risk — build up gradually and stop if your form breaks down.',
+    hi: 'सावधानी: अधिकतम के करीब भार से चोट का जोखिम रहता है — धीरे-धीरे बढ़ाएं और फ़ॉर्म बिगड़ते ही रुक जाएं।',
+  },
+  'large-deficit': {
+    en: 'Caution: a deficit this large can cost muscle, energy, and recovery — a smaller deficit is safer and easier to sustain.',
+    hi: 'सावधानी: इतनी बड़ी कैलोरी कटौती से मांसपेशी, ऊर्जा और रिकवरी घट सकती है — छोटी कटौती अधिक सुरक्षित और टिकाऊ होती है।',
+  },
+  'volume-jump': {
+    en: 'Caution: jumping training volume this fast raises injury risk — increase gradually so your body can adapt.',
+    hi: 'सावधानी: ट्रेनिंग की मात्रा इतनी तेज़ी से बढ़ाने से चोट का जोखिम बढ़ता है — धीरे-धीरे बढ़ाएं ताकि शरीर ढल सके।',
+  },
+};
+
+function hasCautionLine(reply: string): boolean {
+  return /(^|\n)\s*(caution:|सावधानी:)/i.test(reply);
+}
+
+/**
+ * Enforce prompt rule 8 mechanically: a reply matching a risk category
+ * without a caution line gets the localized caution PREPENDED, naming
+ * the risk with a safer alternative. A reply that already carries a
+ * caution line (either language) is returned untouched.
+ */
+export function ensureReplyCaution(
+  reply: string,
+  language: 'en' | 'hi',
+): { reply: string; risk: CoachChatReplyRisk | null } {
+  const risk = findReplyRisk(reply);
+  if (!risk || hasCautionLine(reply)) return { reply, risk: null };
+  return { reply: `${COACH_CHAT_CAUTION[risk][language]}\n\n${reply}`, risk };
+}
+
+// ── Citation integrity (re-audit E2E-R1) ──────────────────────────────────
+const CITATION_PHRASE_EN =
+  '(?:based on your data|as per your (?:data|logs?)|from your (?:data|logs?)|according to your (?:data|logs?)|going by your (?:data|logs?))';
+const CITATION_LINE_ONLY_EN = new RegExp(`^\\s*${CITATION_PHRASE_EN}\\s*[:\\-–—]?\\s*$`, 'i');
+const CITATION_LINE_ONLY_HI = /^\s*आपके (?:डेटा|लॉग) के अनुसार\s*[:\-–—]?\s*$/;
+const CITATION_LEAD_IN_EN = new RegExp(`^\\s*${CITATION_PHRASE_EN}\\s*[:\\-–—]\\s*`, 'i');
+
+/**
+ * Citations reach the user ONLY via the server-attached evidence array
+ * (the client renders its own "Based on your data:" header from it).
+ * A model that writes its own attribution line duplicates that header
+ * and can imply sourcing the server never vouched for — strip lines
+ * that consist solely of an attribution phrase, plus a leading
+ * attribution prefix at the very start of the reply. Ordinary sentences
+ * that merely mention the user's data mid-text are untouched.
+ */
+export function stripModelCitations(reply: string): string {
+  const kept = reply
+    .split('\n')
+    .filter((line) => !CITATION_LINE_ONLY_EN.test(line) && !CITATION_LINE_ONLY_HI.test(line));
+  const joined = kept.join('\n').replace(CITATION_LEAD_IN_EN, '');
+  return joined.replace(/\n{3,}/g, '\n\n').trim();
+}
 
 // ── User data slice (the personalization contract) ────────────────────────
 export interface CoachChatLiftSummary {
@@ -428,7 +643,10 @@ export interface CoachChatHistoryTurn {
   content: string;
 }
 
-/** Sanitize conversation history: cap turns and per-message length. */
+/** Sanitize conversation history: cap turns and per-message length.
+ * Keeps the MOST RECENT turns (re-audit SEC-R8/E2E-R4: the original loop
+ * broke at the cap and kept the first turns, so long conversations lost
+ * exactly the context that matters most). */
 export function sanitizeHistory(history: unknown): CoachChatHistoryTurn[] {
   if (!Array.isArray(history)) return [];
   const turns: CoachChatHistoryTurn[] = [];
@@ -438,9 +656,8 @@ export function sanitizeHistory(history: unknown): CoachChatHistoryTurn[] {
     if (rec.role !== 'user' && rec.role !== 'assistant') continue;
     if (typeof rec.content !== 'string') continue;
     turns.push({ role: rec.role, content: rec.content.slice(0, COACH_CHAT_MAX_MESSAGE_CHARS) });
-    if (turns.length >= COACH_CHAT_MAX_HISTORY_TURNS) break;
   }
-  return turns;
+  return turns.slice(-COACH_CHAT_MAX_HISTORY_TURNS);
 }
 
 /** Render history for the model prompt (oldest first). */

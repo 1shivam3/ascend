@@ -52,6 +52,41 @@ export function mergeRemoteRecords<T extends { id: string }>(
 }
 
 /**
+ * Re-audit DI-R1: body_metrics carries a UNIQUE (user_id, date) constraint
+ * (migration 2026102903) and every single-device write path enforces one
+ * entry per date — but the id-keyed union merge above does not. Two
+ * devices logging the same date under different ids union into duplicate
+ * local rows, and the next push (upsert onConflict 'id') violates the
+ * constraint. This post-merge pass restores the invariant: per date, the
+ * row with the newest updatedAt wins (missing stamp = oldest; ties keep
+ * the earlier row, which is the local one — mergeRemoteRecords puts local
+ * first). Losers are returned as supersededIds so the caller can
+ * tombstone them: they must neither be re-pushed nor resurrected.
+ */
+export function dedupeBodyMetricsByDate<T extends { id: string; date?: string; updatedAt?: string }>(
+  rows: T[],
+): { rows: T[]; supersededIds: string[] } {
+  const bestByDate = new Map<string, T>();
+  for (const r of rows) {
+    if (!r || typeof r.date !== 'string' || !r.date) continue;
+    const cur = bestByDate.get(r.date);
+    if (!cur) {
+      bestByDate.set(r.date, r);
+      continue;
+    }
+    const curTs = cur.updatedAt ? Date.parse(cur.updatedAt) || 0 : 0;
+    const rTs = r.updatedAt ? Date.parse(r.updatedAt) || 0 : 0;
+    if (rTs > curTs) bestByDate.set(r.date, r);
+  }
+  const keep = new Set(Array.from(bestByDate.values()).map((r) => r.id));
+  const out = rows.filter((r) => !r || typeof r.date !== 'string' || !r.date || keep.has(r.id));
+  const supersededIds = rows
+    .filter((r) => r && typeof r.date === 'string' && r.date && !keep.has(r.id))
+    .map((r) => r.id);
+  return { rows: out, supersededIds };
+}
+
+/**
  * Union-merge remote plans into the local list, but never resurrect a plan
  * the user deleted: rows whose id is in `tombstonedIds` are skipped.
  */

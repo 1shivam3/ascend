@@ -30,7 +30,12 @@ export type DeletionTokenVerificationResult =
   | { valid: true; payload: DeletionTokenPayload }
   | {
       valid: false;
-      error: 'INVALID_TOKEN' | 'TOKEN_EXPIRED' | 'TOKEN_ALREADY_USED' | 'EMAIL_MISMATCH';
+      error:
+        | 'INVALID_TOKEN'
+        | 'TOKEN_EXPIRED'
+        | 'TOKEN_ALREADY_USED'
+        | 'EMAIL_MISMATCH'
+        | 'REPLAY_CHECK_UNAVAILABLE';
       message: string;
     };
 
@@ -212,31 +217,54 @@ export async function verifyDeletionToken(
 
   // Check durable Supabase ledger (across serverless restarts & instances)
   if (dbClient) {
+    // Re-audit SEC-R5: the replay check fails CLOSED. When a durable
+    // ledger was supplied but the read errors or throws, verification
+    // is rejected outright — degrading to the per-instance memory map
+    // (the old behavior) let a token consumed on another instance
+    // verify again inside its window whenever the ledger hiccuped.
+    // Same fail-closed doctrine as the AI limiters (SEC-02); the
+    // token's HMAC + 15-minute expiry still bound everything else.
+    let ledgerRow: { status?: unknown } | null = null;
     try {
       const { data, error } = await dbClient
         .from('consumed_deletion_nonces')
         .select('jti, status')
         .eq('jti', payload.jti)
         .maybeSingle();
-
-      if (!error && data) {
-        // Cache locally for subsequent calls
-        inMemoryNonces.set(payload.jti, {
-          status: (data.status as NonceStatus) || 'consumed',
-          timestamp: Date.now(),
-        });
-
-        if (data.status === 'consumed') {
-          return {
-            valid: false,
-            error: 'TOKEN_ALREADY_USED',
-            message: 'Verification token has already been used. Tokens are strictly single-use.',
-          };
-        }
-        // If data.status === 'partial', we explicitly ALLOW retry to complete incomplete deletion!
+      if (error) {
+        return {
+          valid: false,
+          error: 'REPLAY_CHECK_UNAVAILABLE',
+          message:
+            'Token verification is temporarily unavailable. Please request a new verification link.',
+        };
       }
+      ledgerRow = data;
     } catch {
-      // Degrade to memory check if database query fails
+      return {
+        valid: false,
+        error: 'REPLAY_CHECK_UNAVAILABLE',
+        message:
+          'Token verification is temporarily unavailable. Please request a new verification link.',
+      };
+    }
+
+    if (ledgerRow) {
+      const data = ledgerRow as { status?: NonceStatus };
+      // Cache locally for subsequent calls
+      inMemoryNonces.set(payload.jti, {
+        status: (data.status as NonceStatus) || 'consumed',
+        timestamp: Date.now(),
+      });
+
+      if (data.status === 'consumed') {
+        return {
+          valid: false,
+          error: 'TOKEN_ALREADY_USED',
+          message: 'Verification token has already been used. Tokens are strictly single-use.',
+        };
+      }
+      // If data.status === 'partial', we explicitly ALLOW retry to complete incomplete deletion!
     }
   }
 

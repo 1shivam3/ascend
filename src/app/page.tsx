@@ -472,11 +472,18 @@ export default function AppPage() {
                 <aside
                   role="status"
                   aria-live="polite"
+                  tabIndex={0}
                   onClick={() => setShowOfflineModal(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setShowOfflineModal(true);
+                    }
+                  }}
                   className="sticky top-0 z-50 flex cursor-pointer items-center justify-center border-b border-amber-500/30 bg-amber-950/70 px-3 py-1.5 text-center text-xs text-amber-200 backdrop-blur transition-colors hover:bg-amber-950/90"
                 >
                   <span className="mr-2 h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  <span>Offline Gym Mode Active &bull; Tap for details</span>
+                  <span>{t('app.offlineBanner')}</span>
                 </aside>
               )}
               <main id="main-content" className="w-full">

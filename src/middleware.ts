@@ -71,25 +71,38 @@ function apiRateLimited(ip: string, now: number): boolean {
 }
 
 function clientIp(req: NextRequest): string {
+  // Re-audit SEC-R2: validate the header values before trusting them as
+  // rate-limit keys — same rule the main limiter applies
+  // (lib/rate-limit.ts isValidIpFormat). An unvalidated first
+  // x-forwarded-for entry lets a client mint unlimited fresh buckets.
+  const isValidIpFormat = (ip: string) => ip.length <= 45 && /^[0-9a-fA-F:.]+$/.test(ip);
   const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return req.headers.get('x-real-ip') || 'unknown';
+  const first = forwarded?.split(',')[0].trim();
+  if (first && isValidIpFormat(first)) return first;
+  const real = req.headers.get('x-real-ip')?.trim();
+  if (real && isValidIpFormat(real)) return real;
+  return 'unknown';
 }
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const normalized =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
-  if (!KNOWN_API_ROUTES.has(normalized)) {
-    return NextResponse.json(
-      { error: 'NOT_FOUND', message: 'Unknown API route.' },
-      { status: 404 },
-    );
-  }
+  // Re-audit SEC-R3: the per-IP ceiling runs BEFORE the allowlist 404,
+  // so probing unknown routes is throttled by the floor too — an
+  // enumerator now burns the same 300/min budget as legitimate
+  // traffic. Both response shapes are unchanged (429 RATE_LIMITED with
+  // Retry-After once over the ceiling; 404 NOT_FOUND otherwise).
   if (apiRateLimited(clientIp(req), Date.now())) {
     return NextResponse.json(
       { error: 'RATE_LIMITED', message: 'Too many requests. Please slow down.' },
       { status: 429, headers: { 'Retry-After': '60' } },
+    );
+  }
+  if (!KNOWN_API_ROUTES.has(normalized)) {
+    return NextResponse.json(
+      { error: 'NOT_FOUND', message: 'Unknown API route.' },
+      { status: 404 },
     );
   }
   return NextResponse.next();
