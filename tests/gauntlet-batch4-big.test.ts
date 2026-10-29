@@ -1,6 +1,6 @@
 /**
  * Gauntlet batch-4 (big items): SEC-22 coach output validation,
- * SEC-16/SEC-20 middleware, SEC-17 short-term (report route + sink
+ * SEC-16/SEC-20 middleware (middleware pre-Next-16), SEC-17 short-term (report route + sink
  * scan), TRIAGE-PA-02.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

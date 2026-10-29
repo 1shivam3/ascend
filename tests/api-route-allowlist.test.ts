@@ -1,14 +1,14 @@
 /**
  * SEC-20 route-allowlist parity (regression for the coach-chat 404).
  *
- * The API middleware (src/middleware.ts) 404s every /api/* path that is
- * not in its hardcoded KNOWN_API_ROUTES set. When /api/ai/coach-chat was
- * added (PR #59) without a matching allowlist entry, the middleware
- * silently 404'd every chat request even though the route existed and
- * its own tests passed — the failure was only visible live. This test
- * derives the real route set from the filesystem and pins it to the
- * allowlist, in both directions, so the next new route cannot ship
- * unreachable.
+ * The API middleware (src/middleware.ts, the Next 16 rename of middleware.ts)
+ * 404s every /api/* path that is not in its hardcoded
+ * KNOWN_API_ROUTES set. When /api/ai/coach-chat was added (PR #59)
+ * without a matching allowlist entry, the middleware silently 404'd every
+ * chat request even though the route existed and its own tests
+ * passed — the failure was only visible live. This test derives the
+ * real route set from the filesystem and pins it to the allowlist,
+ * in both directions, so the next new route cannot ship unreachable.
  */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
