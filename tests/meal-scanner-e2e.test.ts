@@ -1,7 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { POST } from '../src/app/api/ai/scan-meal/route';
+import {
+  resetRateLimitStoreForTests,
+  setRateLimiterSupabaseForTests,
+} from '../src/lib/rate-limit';
 import { recalculateMealResult, generateOfflineMealEstimate } from '../src/lib/ai-scan-meal';
 import { MealAnalysisResult, MealEntry } from '../src/lib/types';
 import { calculateMealMacros } from '../src/lib/macros';
@@ -27,6 +31,37 @@ if (!process.env.GEMINI_API_KEY && !process.env.GOOGLE_API_KEY) {
 }
 
 describe('Meal Scanner API & Nutrition Pipeline', () => {
+  beforeAll(() => {
+    // SEC-02 contract change (2026-10-29): the route's AI quota and
+    // limiter are fail-closed — with no distributed limiter configured
+    // they now reject with 503 instead of degrading to per-instance
+    // memory. This suite exercises the real route, so it installs a
+    // fake ascend_check_rate_limit RPC client (fixed-window counting)
+    // to provide the distributed limiter production gets from
+    // Supabase. Request validation/behaviour assertions are unchanged.
+    const counts = new Map<string, number>();
+    resetRateLimitStoreForTests();
+    setRateLimiterSupabaseForTests({
+      rpc: async (
+        _fn: string,
+        params: { p_key: string; p_window_ms: number; p_max_requests: number }
+      ) => {
+        const next = (counts.get(params.p_key) ?? 0) + 1;
+        counts.set(params.p_key, next);
+        return {
+          data: [
+            {
+              allowed: next <= params.p_max_requests,
+              count: next,
+              reset_ms: params.p_window_ms,
+            },
+          ],
+          error: null,
+        };
+      },
+    });
+  });
+
   it('returns 400 when no image data is provided in FormData', async () => {
     const formData = new FormData();
     formData.append('userNotes', 'Just a note');

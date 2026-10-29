@@ -387,7 +387,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -427,7 +427,7 @@ export default function WeeklyRecapModal({ isOpen, onClose }: WeeklyRecapModalPr
           <button
             type="button"
             onClick={handleDownload}
-            className="py-2.5 rounded-xl bg-bg-secondary hover:bg-accent/15 border border-border hover:border-accent/50 text-text-primary hover:text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
+            className="py-2.5 rounded-xl bg-bg-secondary hover:bg-accent/15 border border-border hover:border-accent/50 text-text-primary hover:text-accent-text font-bold text-xs flex items-center justify-center gap-1.5 transition-all active:scale-95"
           >
             <Download className="w-4 h-4 text-accent" />
             <span>{t('recap.saveImage')}</span>

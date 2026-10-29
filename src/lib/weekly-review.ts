@@ -44,6 +44,7 @@ import {
   type CoachBlocksState,
 } from './block-engine';
 import { mainCompoundKey } from './percent-1rm';
+import { calculateWorkoutVolumeKg } from './volume';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shapes
@@ -159,22 +160,12 @@ function weekTonnageKg(
   monday: string,
   bodyweightKg: number | undefined
 ): number {
+  // Gauntlet DI-05: canonical volume from lib/volume — warmups count,
+  // bodyweight work counts at full body weight, same as everywhere.
   let total = 0;
   for (const w of workouts) {
     if (!inWeek(w.date, monday)) continue;
-    for (const ex of w.exercises ?? []) {
-      for (const s of ex.sets ?? []) {
-        if (!isSetCompleted(s) || s.isWarmup) continue;
-        if (!(s.reps > 0)) continue;
-        let kg = 0;
-        if (typeof s.weight === 'number' && s.weight > 0) {
-          kg = s.unit === 'lbs' ? s.weight / 2.20462 : s.weight;
-        } else if (bodyweightKg && bodyweightKg > 0) {
-          kg = bodyweightKg;
-        }
-        total += kg * s.reps;
-      }
-    }
+    total += calculateWorkoutVolumeKg(w, bodyweightKg);
   }
   return Math.round(total);
 }
@@ -402,18 +393,26 @@ export function buildWeeklyReview(input: WeeklyReviewInput): WeeklyReview {
         params: { exercise: progressions[0].exerciseName },
       },
     };
-  } else if (sessionsCompleted > 0) {
+  } else if (trainedDays.size > 0) {
+    // Gauntlet Cycle 2 (B-01, second facet): the consistency fallback
+    // used to key on sessionsCompleted, which counts SCHEDULED days
+    // only — so a week with real but unscheduled training fell through
+    // to the quiet branch and the dialog claimed "No sessions were
+    // logged this week" while showing tonnage. "Showed up" must count
+    // days actually trained (scheduled + unscheduled). sessionsCompleted
+    // itself is unchanged (adherence metric, SESSIONS DONE x/y).
+    const trainedCount = trainedDays.size;
     focus = {
       kind: 'consistency',
       headline: 'Consistency is the win this week',
-      detail: `You showed up for ${sessionsCompleted} session${sessionsCompleted === 1 ? '' : 's'}. No stalls, no flags — stacking weeks like this is exactly how the numbers move.`,
+      detail: `You showed up for ${trainedCount} session${trainedCount === 1 ? '' : 's'}. No stalls, no flags — stacking weeks like this is exactly how the numbers move.`,
       headlineI18n: { key: 'weeklyReview.focusConsistencyHeadline' },
       detailI18n: {
         key:
-          sessionsCompleted === 1
+          trainedCount === 1
             ? 'weeklyReview.focusConsistencyDetailOne'
             : 'weeklyReview.focusConsistencyDetailMany',
-        params: { count: sessionsCompleted },
+        params: { count: trainedCount },
       },
     };
   } else {

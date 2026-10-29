@@ -31,7 +31,7 @@ export default function HistoryForkScreen({ counts, onContinue, onStartFresh, st
         <div className="space-y-2 text-center">
           <h1 className="text-xl font-extrabold text-text-primary">{t('historyFork.title')}</h1>
           <p className="text-xs text-text-secondary leading-relaxed">{t('historyFork.subtitle')}</p>
-          <p className="text-xs font-mono font-bold text-accent">
+          <p className="text-xs font-mono font-bold text-accent-text">
             {t('historyFork.counts', {
               sessions: counts.sessions,
               meals: counts.meals,

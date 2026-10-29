@@ -149,7 +149,7 @@ export default function HomeMatrix({
           <button
             type="button"
             onClick={goToday}
-            className="px-2 py-1 rounded-lg text-2xs font-bold text-accent hover:bg-bg-secondary transition-colors cursor-pointer"
+            className="px-2 py-1 rounded-lg text-2xs font-bold text-accent-text hover:bg-bg-secondary transition-colors cursor-pointer"
           >
             {t('homeMatrix.today')}
           </button>
@@ -190,11 +190,11 @@ export default function HomeMatrix({
                     type="button"
                     onClick={() => toggleDate(ds)}
                     aria-pressed={isSelected}
-                    className={`flex-1 text-center text-[9px] rounded py-0.5 cursor-pointer ${
+                    className={`flex-1 text-center text-[0.5625rem] rounded py-0.5 cursor-pointer ${
                       isSelected
-                        ? 'bg-accent/15 text-accent font-bold ring-1 ring-accent/60'
+                        ? 'bg-accent/15 text-accent-text font-bold ring-1 ring-accent/60'
                         : isToday
-                          ? 'text-accent font-bold'
+                          ? 'text-accent-text font-bold'
                           : 'text-text-muted'
                     }`}
                   >
@@ -206,7 +206,7 @@ export default function HomeMatrix({
           </div>
           {rowIds.map((id) => (
             <div key={id} className="flex items-center gap-1.5">
-              <span className="w-14 shrink-0 text-[10px] uppercase font-bold" style={{ color: ROW_COLORS[id] }}>
+              <span className={`w-14 shrink-0 text-[0.625rem] uppercase font-bold matrix-row-label-${id}`}>
                 {rowLabel[id]}
               </span>
               <div className="flex items-center gap-1 flex-1">
@@ -214,13 +214,15 @@ export default function HomeMatrix({
                   const ds = toDateStr(d);
                   const done = getDaySummary(ds, inputs).habits.find((h) => h.id === id)?.done ?? false;
                   const isToday = ds === todayStr;
+                  // Gauntlet UX-06: weekly-view day cells were h-5 (20px),
+                  // below the 24px WCAG target-size minimum — now h-6.
                   return (
                     <button
                       key={ds}
                       type="button"
                       onClick={() => toggleDate(ds)}
                       aria-label={`${rowLabel[id]} — ${ds}`}
-                      className={`h-5 flex-1 rounded cursor-pointer ${
+                      className={`h-6 flex-1 rounded cursor-pointer ${
                         done ? '' : 'bg-bg-secondary border border-border/40'
                       } ${isToday && !done ? 'ring-1 ring-accent/60' : ''} ${
                         ds === selected ? 'ring-1 ring-accent' : ''
@@ -237,7 +239,7 @@ export default function HomeMatrix({
         <div className="space-y-1">
           <div className="grid grid-cols-7 gap-1">
             {dayLetters.map((letter, i) => (
-              <div key={i} className="text-center text-[9px] text-text-muted font-mono">
+              <div key={i} className="text-center text-[0.5625rem] text-text-muted font-mono">
                 {letter}
               </div>
             ))}
@@ -265,7 +267,7 @@ export default function HomeMatrix({
                           : 'hover:bg-bg-secondary'
                     }`}
                   >
-                    <span className={`text-xs font-mono ${isToday ? 'text-accent font-bold' : 'text-text-primary'}`}>
+                    <span className={`text-xs font-mono ${isToday ? 'text-accent-text font-bold' : 'text-text-primary'}`}>
                       {d.getDate()}
                     </span>
                     <span className="flex gap-0.5" aria-hidden="true">
@@ -296,7 +298,7 @@ export default function HomeMatrix({
               type="button"
               onClick={() => setSelected(null)}
               aria-label={t('common.close')}
-              className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
+              className="p-1 min-h-[28px] min-w-[28px] inline-flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

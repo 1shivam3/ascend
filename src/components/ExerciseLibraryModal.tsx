@@ -177,7 +177,7 @@ export default function ExerciseLibraryModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -308,7 +308,7 @@ export default function ExerciseLibraryModal({
                       <span className="text-2xs uppercase font-mono px-1.5 py-0.2 rounded bg-bg-secondary text-text-muted">
                         {ex.equipment}
                       </span>
-                      <span className="text-2xs uppercase font-mono px-1.5 py-0.2 rounded bg-accent/10 text-accent">
+                      <span className="text-2xs uppercase font-mono px-1.5 py-0.2 rounded bg-accent/10 text-accent-text">
                         {ex.muscle}
                       </span>
                     </div>
@@ -349,7 +349,7 @@ export default function ExerciseLibraryModal({
                       onSelectExercise(ex.name);
                       onClose();
                     }}
-                    className="btn-secondary py-1.5 px-3 text-xs font-semibold shrink-0 flex items-center gap-1 border-accent/40 text-accent hover:bg-accent/10 transition-colors"
+                    className="btn-secondary py-1.5 px-3 text-xs font-semibold shrink-0 flex items-center gap-1 border-accent/40 text-accent-text hover:bg-accent/10 transition-colors"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>{t('lib.select')}</span>
@@ -368,7 +368,7 @@ export default function ExerciseLibraryModal({
                         {cues.length > 0 ? (
                           cues.map((cue, idx) => (
                             <div key={idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-bg-secondary border border-border/60">
-                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
+                              <span className="w-5 h-5 rounded-full bg-accent/15 text-accent-text text-2xs font-bold flex items-center justify-center shrink-0 mt-0.5 font-mono">
                                 {idx + 1}
                               </span>
                               <p className="text-xs text-text-secondary leading-relaxed">{cue}</p>

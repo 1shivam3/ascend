@@ -86,7 +86,8 @@ interface CoachRequestBody {
 }
 
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { checkAiDailyQuota, aiQuotaExceededResponse } from '@/lib/ai-quota';
+import { validateCoachOutput } from '@/lib/coach-output';
+import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
 import { getServerGeminiApiKey, rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 
 export async function POST(req: Request) {
@@ -122,6 +123,13 @@ export async function POST(req: Request) {
       return aiQuotaExceededResponse(quota.actor, quota.resetMs);
     }
   } catch (err) {
+    if (err instanceof AiActorAuthError) {
+      // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
+        { status: 401 }
+      );
+    }
     if (err instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse();
     }
@@ -268,12 +276,24 @@ Schema:
       timeoutMs: 15000,
     });
 
+    // Gauntlet SEC-22: never return model JSON verbatim — validate
+    // against the task's schema (allowlisted fields, caps, clamps)
+    // and scan the text against the route's own health guardrails.
+    const validated = validateCoachOutput(task, execResult.data);
+    if (!validated) {
+      return NextResponse.json(
+        { error: 'INVALID_MODEL_OUTPUT', message: 'The coach returned an unreadable response. Please try again.' },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       task,
       source: execResult.provider,
       model: execResult.model,
-      data: execResult.data,
+      data: validated.data,
+      ...(validated.safetyFiltered ? { safetyFiltered: true } : {}),
     });
   } catch (error: any) {
     if (error instanceof RequestBodyTooLargeError) {

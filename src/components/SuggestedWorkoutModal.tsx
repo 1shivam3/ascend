@@ -629,7 +629,7 @@ export default function SuggestedWorkoutModal({
                   <Calendar className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-wider block">
+                  <span className="text-[0.625rem] font-mono font-bold text-accent-text uppercase tracking-wider block">
                     {t('sg.todayRoutine')}
                   </span>
                   <h3 className="text-xs sm:text-sm font-bold text-text-primary">
@@ -669,7 +669,7 @@ export default function SuggestedWorkoutModal({
                 <span className="text-label font-bold text-text-muted">
                   {t('sg.trainToday')}
                 </span>
-                <span className="text-2xs text-accent font-bold font-mono">
+                <span className="text-2xs text-accent-text font-bold font-mono">
                   {t('sg.selected', { count: selectedBodyParts.length })}
                 </span>
               </div>
@@ -687,7 +687,7 @@ export default function SuggestedWorkoutModal({
                     key={preset.labelKey}
                     type="button"
                     onClick={() => setSelectedBodyParts(preset.parts)}
-                    className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent border border-border/80 text-text-secondary text-2xs font-semibold active:scale-95 transition-all cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg bg-bg-secondary hover:bg-accent/15 hover:text-accent-text border border-border/80 text-text-secondary text-2xs font-semibold active:scale-95 transition-all cursor-pointer"
                   >
                     {t(preset.labelKey)}
                   </button>
@@ -715,10 +715,10 @@ export default function SuggestedWorkoutModal({
                         <Icon className="w-3.5 h-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
+                        <span className={`text-xs block font-bold truncate ${isSelected ? 'text-accent-text' : 'text-text-primary'}`}>
                           {t(bp.labelKey)}
                         </span>
-                        <span className="text-[10px] text-text-muted truncate block">
+                        <span className="text-[0.625rem] text-text-muted truncate block">
                           {t(bp.descKey)}
                         </span>
                       </div>
@@ -733,7 +733,7 @@ export default function SuggestedWorkoutModal({
           {/* ── MODE 2: SPLIT SELECTION ── */}
           {activeTab === 'split' && (
             <div className="space-y-3">
-              <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
+              <span className="text-[0.625rem] font-mono uppercase font-bold text-text-muted tracking-wider block">
                 {t('sg.chooseSplit')}
               </span>
 
@@ -755,7 +755,7 @@ export default function SuggestedWorkoutModal({
                           : 'bg-bg-secondary border-border/80 text-text-secondary hover:border-accent/40'
                       }`}
                     >
-                      <span className={`text-xs font-bold block ${isSelected ? 'text-accent' : 'text-text-primary'}`}>
+                      <span className={`text-xs font-bold block ${isSelected ? 'text-accent-text' : 'text-text-primary'}`}>
                         {s.name}
                       </span>
                       <span className="text-2xs text-text-muted line-clamp-1 mt-0.5">
@@ -818,7 +818,7 @@ export default function SuggestedWorkoutModal({
 
           {/* Intensity Selector */}
           <div className="space-y-1.5 pt-1">
-            <span className="text-[10px] font-mono uppercase font-bold text-text-muted tracking-wider block">
+            <span className="text-[0.625rem] font-mono uppercase font-bold text-text-muted tracking-wider block">
               {t('sg.intensity')}
             </span>
             <div className="grid grid-cols-3 gap-2">
@@ -836,7 +836,7 @@ export default function SuggestedWorkoutModal({
                     }`}
                   >
                     <span className="text-xs font-bold block">{t(int.labelKey)}</span>
-                    <span className="text-[9px] text-text-muted font-mono block mt-0.5 truncate">
+                    <span className="text-[0.5625rem] text-text-muted font-mono block mt-0.5 truncate">
                       {t(int.tagKey)}
                     </span>
                   </button>
@@ -864,7 +864,7 @@ export default function SuggestedWorkoutModal({
               <button
                 type="button"
                 onClick={() => setShowAddDrawer(!showAddDrawer)}
-                className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent hover:bg-accent/10"
+                className="btn-secondary py-1 px-2.5 text-2xs font-semibold flex items-center gap-1 border-accent/40 text-accent-text hover:bg-accent/10"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{t('sg.addExercise')}</span>
@@ -915,7 +915,7 @@ export default function SuggestedWorkoutModal({
                   className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border flex items-center justify-between gap-2"
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[10px] font-mono font-bold text-text-muted shrink-0">
+                    <span className="w-5 h-5 rounded-full bg-bg-elevated flex items-center justify-center text-[0.625rem] font-mono font-bold text-text-muted shrink-0">
                       {idx + 1}
                     </span>
                     <span className="text-xs font-bold text-text-primary truncate">
@@ -926,7 +926,7 @@ export default function SuggestedWorkoutModal({
                   {/* Steppers for Sets & Reps */}
                   <div className="flex items-center gap-1.5 shrink-0 font-mono text-xs">
                     <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px] pl-1">{t('sg.sets')}</span>
+                      <span className="text-text-muted text-[0.625rem] pl-1">{t('sg.sets')}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetSets', Math.max(1, ex.targetSets - 1))}
@@ -947,7 +947,7 @@ export default function SuggestedWorkoutModal({
                     </div>
 
                     <div className="flex items-center gap-1 bg-bg-card px-1.5 py-0.5 rounded-lg border border-border">
-                      <span className="text-text-muted text-[10px] pl-1">{t('sg.reps')}</span>
+                      <span className="text-text-muted text-[0.625rem] pl-1">{t('sg.reps')}</span>
                       <button
                         type="button"
                         onClick={() => handleUpdateExercise(idx, 'targetReps', Math.max(1, ex.targetReps - 1))}

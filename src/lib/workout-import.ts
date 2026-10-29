@@ -1,5 +1,6 @@
 import { WorkoutEntry, WorkoutExercise, WorkoutSet, PersonalRecord, Unit } from './types';
 import { calculateOneRepMax } from './strength-standards';
+import { parseImportedDateString } from './formatters';
 
 /**
  * Universal CSV Workout Importer for Strong, Hevy, FitNotes, and generic workout logs.
@@ -9,6 +10,8 @@ export interface ImportWorkoutResult {
   exercisesFound: number;
   totalSets: number;
   newPRsCount: number;
+  /** Gauntlet DI-07: rows whose date had to be normalized. */
+  datesNormalized: number;
   workouts: WorkoutEntry[];
   newPRs: PersonalRecord[];
 }
@@ -63,6 +66,7 @@ function parseDurationMinutes(raw: string): number | undefined {
 }
 
 export function parseWorkoutCSV(csvText: string, options: ParseWorkoutCSVOptions = {}): ImportWorkoutResult {
+  let datesNormalized = 0;
   const lines = csvText.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) {
     throw new Error('CSV file is empty or missing headers.');
@@ -124,22 +128,19 @@ export function parseWorkoutCSV(csvText: string, options: ParseWorkoutCSVOptions
       continue;
     }
 
-    // Normalize date to YYYY-MM-DD
-    let normalizedDate = '';
-    const parsedDate = new Date(rawDate);
-    if (!isNaN(parsedDate.getTime())) {
-      normalizedDate = parsedDate.toISOString().split('T')[0];
-    } else {
-      // Try parsing YYYY-MM-DD or DD/MM/YYYY
-      const dateParts = rawDate.split(/[-/]/);
-      if (dateParts.length === 3) {
-        if (dateParts[0].length === 4) {
-          normalizedDate = `${dateParts[0]}-${dateParts[1].padStart(2, '0')}-${dateParts[2].padStart(2, '0')}`;
-        } else {
-          normalizedDate = `${dateParts[2]}-${dateParts[1].padStart(2, '0')}-${dateParts[0].padStart(2, '0')}`;
-        }
-      }
+    // Normalize date to YYYY-MM-DD. Gauntlet DI-07: explicit parsing
+    // only — the old `new Date(rawDate)` read the date as UTC (day
+    // shift in positive-offset timezones), silently read ambiguous
+    // slash dates as US format, and accepted future dates.
+    // parseImportedDateString disambiguates slash dates by range,
+    // takes the LOCAL day of ISO datetimes, and rejects non-calendar
+    // and future dates; an unparseable date skips the row.
+    const parsedDay = parseImportedDateString(rawDate);
+    if (!parsedDay) {
+      continue;
     }
+    if (parsedDay !== rawDate.trim()) datesNormalized += 1;
+    const normalizedDate = parsedDay;
 
     if (!normalizedDate || normalizedDate === '__proto__' || normalizedDate === 'constructor' || normalizedDate === 'prototype') {
       continue;
@@ -269,6 +270,7 @@ export function parseWorkoutCSV(csvText: string, options: ParseWorkoutCSVOptions
     exercisesFound: exerciseNamesSet.size,
     totalSets,
     newPRsCount: newPRs.length,
+    datesNormalized,
     workouts,
     newPRs,
   };

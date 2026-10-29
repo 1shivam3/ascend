@@ -63,7 +63,7 @@ export default function TrainingDecisionCard({
       {/* Header Row: Exercise Name & Delta */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
+          <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-accent-text block">
             {t('decision.ledger')}
           </span>
           <h3 className="text-base font-black font-display text-text-primary tracking-tight">
@@ -91,25 +91,25 @@ export default function TrainingDecisionCard({
       {/* Comparison: Previous vs Next (Understandable in 3 seconds) */}
       <div className="grid grid-cols-2 gap-2.5 font-mono">
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70 text-center">
-          <span className="text-[9px] uppercase font-bold text-text-muted block">{t('decision.previous')}</span>
+          <span className="text-[0.5625rem] uppercase font-bold text-text-muted block">{t('decision.previous')}</span>
           <span className="text-sm font-bold text-text-primary block mt-0.5">
             {decision.previousPerformance.weight} {userUnit} × {decision.previousPerformance.reps}
           </span>
           {decision.previousPerformance.rpe && (
-            <span className="text-[10px] text-text-muted block">
+            <span className="text-[0.625rem] text-text-muted block">
               @{decision.previousPerformance.rpe} RPE
             </span>
           )}
         </div>
 
         <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 text-center">
-          <span className="text-[9px] uppercase font-bold text-accent block">{t('decision.next')}</span>
+          <span className="text-[0.5625rem] uppercase font-bold text-accent-text block">{t('decision.next')}</span>
           <span className="text-sm font-black text-text-primary block mt-0.5">
             {isOverridden
               ? t('decision.manual', { weight: decision.userOverrideWeight ?? '', unit: userUnit })
               : `${decision.nextPrescription.weight} ${userUnit} × ${decision.nextPrescription.reps}`}
           </span>
-          <span className="text-[10px] text-accent block">
+          <span className="text-[0.625rem] text-accent-text block">
             {t('decision.target', { rpe: decision.expectedRpe || decision.nextPrescription.targetRpe || 8 })}
           </span>
         </div>
@@ -118,8 +118,8 @@ export default function TrainingDecisionCard({
       {/* Why? Audit & Evidence */}
       <div className="p-2.5 rounded-xl bg-bg-secondary/60 border border-border/60 text-left space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono font-bold text-accent uppercase">{t('decision.why')}</span>
-          <span className="text-[10px] font-mono text-text-muted">
+          <span className="text-[0.625rem] font-mono font-bold text-accent-text uppercase">{t('decision.why')}</span>
+          <span className="text-[0.625rem] font-mono text-text-muted">
             {t(decision.evidenceCount === 1 ? 'decision.evidenceOne' : 'decision.evidence', { count: decision.evidenceCount })}
           </span>
         </div>
@@ -131,7 +131,7 @@ export default function TrainingDecisionCard({
       {/* Action Controls: Accept / Override */}
       {isOverriding ? (
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/80 space-y-2 animate-fade-in text-left">
-          <span className="text-[10px] font-mono font-bold uppercase text-text-muted block">
+          <span className="text-[0.625rem] font-mono font-bold uppercase text-text-muted block">
             {t('decision.customWeight', { unit: userUnit })}
           </span>
           <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export default function TrainingDecisionCard({
               <span>{t('decision.manualActive')}</span>
             </div>
           ) : (
-            <span className="text-[10px] text-text-muted font-mono">
+            <span className="text-[0.625rem] text-text-muted font-mono">
               {t('decision.suggested')}
             </span>
           )}

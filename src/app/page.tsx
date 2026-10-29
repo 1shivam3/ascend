@@ -21,6 +21,7 @@ import OfflineState from '@/components/OfflineState';
 import HomePage from '@/components/HomePage';
 import TabSkeleton from '@/components/TabSkeleton';
 import TabGuardBanner from '@/components/ui/TabGuardBanner';
+import SyncErrorBanner from '@/components/SyncErrorBanner';
 
 // Non-home tabs are code-split: on a 2 GB phone the old single chunk
 // (~1.1 MB) paid the full parse cost for screens the user may never
@@ -428,12 +429,14 @@ export default function AppPage() {
   return (
     <div className="min-h-[100dvh] bg-bg-primary text-text-primary relative selection:bg-accent/20">
       <TabGuardBanner />
+      {/* Gauntlet R3: persistent sync-failure banner (all tabs). */}
+      <SyncErrorBanner />
             {showChrome && (
               <nav
                 aria-label="Main Navigation"
                 className="fixed bottom-0 left-0 top-0 z-40 hidden w-[232px] flex-col border-r border-border bg-bg-primary px-3 py-4 lg:flex"
               >
-                <div className="font-display px-2 pb-5 text-[28px] font-semibold leading-none tracking-wide">
+                <div className="font-display px-2 pb-5 text-[1.75rem] font-semibold leading-none tracking-wide">
                   ASCEND
                 </div>
                 {tabs.map((entry) => {
@@ -447,7 +450,7 @@ export default function AppPage() {
                       aria-label={t(entry.labelKey as StringKey)}
                       onClick={() => goTab(entry)}
                       className={`pressable mb-1 flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-medium ${
-                        active ? 'bg-accent-subtle text-accent' : 'text-text-secondary hover:text-text-primary'
+                        active ? 'bg-accent-subtle text-accent-text' : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
                       <Icon size={20} strokeWidth={active ? 2.2 : 1.75} />
@@ -567,7 +570,7 @@ export default function AppPage() {
                         >
                           {isActive && <div className="native-tab-indicator" />}
                           <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} className={isActive ? 'text-accent' : 'text-text-muted'} />
-                          <span className={`mt-1 text-[12px] ${isActive ? 'font-semibold text-accent' : 'font-normal text-text-muted'}`}>
+                          <span className={`mt-1 text-[0.75rem] ${isActive ? 'font-semibold text-accent-text' : 'font-normal text-text-muted'}`}>
                             {t(tab.labelKey as StringKey)}
                           </span>
                         </button>

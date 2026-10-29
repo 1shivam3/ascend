@@ -20,38 +20,20 @@
  *   forgiveness with a popup would punish the miss by drawing attention to it.
  */
 import { getLocalTodayStr, getMondayOfWeek } from './formatters';
-import { isSetCompleted } from './types';
 import type { WorkoutEntry, MealEntry } from './types';
+// Gauntlet DI-14: the activity predicates live in day-activity.ts —
+// the single definition shared with home-matrix. Re-exported here so
+// existing imports keep working.
+import { dayIsActive } from './day-activity';
+export { dayIsActive, dayHasWorkoutEffort, MEALS_FOR_ACTIVE_DAY } from './day-activity';
 
 export const FREEZES_PER_WEEK = 1;
-
-/** Minimum meals in a day for the day to count as active without a workout. */
-export const MEALS_FOR_ACTIVE_DAY = 3;
 
 function shiftDate(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number);
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + days);
   return getLocalTodayStr(dt);
-}
-
-/** True when the day has real logged effort: a workout (>=1 completed set),
- *  a logged run session, or 3+ meals. */
-export function dayIsActive(
-  dateStr: string,
-  workouts: WorkoutEntry[],
-  meals: MealEntry[],
-): boolean {
-  const dayWorkouts = workouts.filter((w) => w.date === dateStr);
-  const realWorkout = dayWorkouts.some((w) =>
-    w.exercises.some((ex) => ex.sets.some((s) => isSetCompleted(s))),
-  );
-  if (realWorkout) return true;
-  if (dayWorkouts.some((w) => w.kind === 'run')) return true;
-  const mealCount = meals.filter(
-    (m) => m.date === dateStr && m.foods.length > 0,
-  ).length;
-  return mealCount >= MEALS_FOR_ACTIVE_DAY;
 }
 
 /** Collapse workout + meal history into the sorted set of active day strings. */

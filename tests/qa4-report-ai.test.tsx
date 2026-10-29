@@ -87,7 +87,9 @@ describe('QA4-043 ReportAIModal reachability', () => {
         `data-testid="${testId}"`
       );
       expect(source, `${file} report button needs an accessible label`).toContain(
-        'aria-label="Report AI content"'
+        // Gauntlet A11Y-10 localized the label; it resolves to
+        // "Report AI content" in English via common.reportAiContent.
+        "aria-label={t('common.reportAiContent')}"
       );
       // The modal receives the surface context so reports are attributable.
       expect(source, `${file} must pass its sourceFeature`).toContain(

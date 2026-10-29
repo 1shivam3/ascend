@@ -9,6 +9,8 @@
  */
 
 import type { WorkoutEntry, MealEntry, CreatineLog } from './types';
+import { calculateMealMacros } from './macros';
+import { dayHasWorkoutEffort } from './day-activity';
 
 export type MatrixHabitId = 'workout' | 'water' | 'creatine' | 'protein';
 
@@ -51,17 +53,22 @@ function dayOf(entryDate: string | undefined): string {
   return (entryDate ?? '').split('T')[0];
 }
 
+/**
+ * Gauntlet DI-04: day totals used to sum raw food fields, skipping the
+ * Atwater reconciliation calculateMealMacros applies (a 0-kcal food
+ * with macros present gets 4*P + 4*C + 9*F). Fuel/Home day totals call
+ * calculateMealMacros over the day's FLAT food list, so this does
+ * exactly that — same function, same input shape, same totals on
+ * every screen.
+ */
 function sumMealMacros(meals: MealEntry[]): DayMacros {
-  const out: DayMacros = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
-  for (const m of meals) {
-    for (const f of m.foods ?? []) {
-      out.calories += f.calories || 0;
-      out.proteinG += f.proteinG || 0;
-      out.carbsG += f.carbsG || 0;
-      out.fatG += f.fatG || 0;
-    }
-  }
-  return out;
+  const totals = calculateMealMacros(meals.flatMap((m) => m.foods ?? []));
+  return {
+    calories: totals.calories,
+    proteinG: totals.proteinG,
+    carbsG: totals.carbsG,
+    fatG: totals.fatG,
+  };
 }
 
 /**
@@ -73,12 +80,16 @@ export function getDaySummary(dateStr: string, inputs: MatrixInputs): DaySummary
   const workouts = (inputs.workouts ?? []).filter((w) => dayOf(w.date) === dateStr);
   const meals = (inputs.meals ?? []).filter((m) => dayOf(m.date) === dateStr);
   const waterMl = inputs.waterLogs?.[dateStr] || 0;
-  const proteinG = meals.reduce(
-    (acc, m) => acc + (m.foods ?? []).reduce((a, f) => a + (f.proteinG || 0), 0),
-    0,
-  );
+  // Gauntlet DI-04: the protein done-rule used the same raw sums as the
+  // old sumMealMacros; it now uses the reconciled day macros, so the
+  // habit and the displayed totals can never disagree.
+  const macros = sumMealMacros(meals);
+  const proteinG = macros.proteinG;
   const habits: HabitStatus[] = [
-    { id: 'workout', done: workouts.length > 0, value: workouts.length, target: null },
+    // Gauntlet DI-14: "workout done" uses the shared effort predicate
+    // (day-activity.ts) — an empty workout shell no longer marks the
+    // day done, matching the streak rule.
+    { id: 'workout', done: dayHasWorkoutEffort(dateStr, inputs.workouts), value: workouts.length, target: null },
     { id: 'water', done: waterMl >= inputs.waterTargetMl * 0.85, value: waterMl, target: inputs.waterTargetMl },
     ...(inputs.showCreatine
       ? [{
@@ -92,7 +103,7 @@ export function getDaySummary(dateStr: string, inputs: MatrixInputs): DaySummary
   ];
   const empty =
     workouts.length === 0 && meals.length === 0 && !habits.some((h) => h.done);
-  return { dateStr, workouts, meals, macros: sumMealMacros(meals), habits, empty };
+  return { dateStr, workouts, meals, macros, habits, empty };
 }
 
 /** Monday (local, midnight) of the week containing `date`. */

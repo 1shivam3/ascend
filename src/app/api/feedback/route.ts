@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { checkRateLimit } from '@/lib/rate-limit';
-import { rateLimitResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, redactSecrets, readTextBodyWithLimit, RequestBodyTooLargeError } from '@/lib/server-security';
+import { sanitizeFeedbackSubmission } from '@/lib/feedback-sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -63,9 +64,14 @@ export async function POST(req: Request) {
   if (declaredLength > MAX_FEEDBACK_BODY_BYTES) {
     return tooLarge();
   }
-  const rawBody = await req.text().catch(() => '');
-  if (new TextEncoder().encode(rawBody).length > MAX_FEEDBACK_BODY_BYTES) {
-    return tooLarge();
+  // Gauntlet SEC-11: stream with the cap instead of req.text() +
+  // measure-after-read, so chunked oversized bodies abort early.
+  let rawBody: string;
+  try {
+    rawBody = await readTextBodyWithLimit(req, MAX_FEEDBACK_BODY_BYTES);
+  } catch (err) {
+    if (err instanceof RequestBodyTooLargeError) return tooLarge();
+    rawBody = '';
   }
 
   // 1. Rate limiting: 10 feedback requests per 10 minutes per IP
@@ -82,30 +88,51 @@ export async function POST(req: Request) {
   try {
     const body: FeedbackRequestBody = JSON.parse(rawBody);
 
-    const category = body.category && ['bug', 'feature', 'review', 'general'].includes(body.category)
-      ? body.category
-      : 'general';
+    // Gauntlet R5 / SEC-13: resolve an OPTIONAL verified session.
+    // A valid Bearer token anchors identity (email forced from the
+    // session); an absent or invalid token means guest — feedback
+    // stays available to guests, only identity handling changes
+    // (guest rows are anonymous, diagnostics allowlist-filtered).
+    // This deliberately does NOT 401 guests: the route's delivery
+    // contract is best-effort feedback, and the sanitizer below is
+    // what closes the PII/diagnostics hole.
+    const supabase = getSupabaseServerClient();
+    let sessionUser: { email?: string | null; name?: string | null } | null = null;
+    const authHeader = req.headers.get('authorization');
+    if (supabase && authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+      const token = authHeader.substring(7).trim();
+      if (token) {
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser(token);
+          if (user) {
+            const meta = (user.user_metadata || {}) as Record<string, unknown>;
+            sessionUser = {
+              email: user.email ?? null,
+              name:
+                (typeof meta.full_name === 'string' ? meta.full_name : null) ||
+                (typeof meta.name === 'string' ? meta.name : null),
+            };
+          }
+        } catch {
+          sessionUser = null;
+        }
+      }
+    }
 
-    const message = (body.message || '').trim().slice(0, 3000);
-    if (!message || message.length < 3) {
+    const sanitized = sanitizeFeedbackSubmission(body, sessionUser);
+    if (!sanitized) {
       return NextResponse.json(
         { error: 'INVALID_MESSAGE', message: 'Please provide feedback or bug details (minimum 3 characters).' },
         { status: 400 }
       );
     }
-
-    const title = (body.title || '').trim().slice(0, 200);
-    const userEmail = (body.userEmail || '').trim().slice(0, 150);
-    const userName = (body.userName || '').trim().slice(0, 100);
-    const rating = typeof body.rating === 'number' && body.rating >= 1 && body.rating <= 5
-      ? Math.round(body.rating)
-      : undefined;
-
-    const diag = body.diagnostics || {};
+    const { category, message, title, userEmail, userName, rating } = sanitized;
+    const diag = sanitized.diagnostics;
 
     // 2. Step 1: Durable Database Persistence in Supabase (if configured)
     let dbRecordId: string | null = null;
-    const supabase = getSupabaseServerClient();
 
     if (supabase) {
       try {

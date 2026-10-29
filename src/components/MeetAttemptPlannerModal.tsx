@@ -97,7 +97,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
               <p className="text-2xs text-text-muted font-mono">{t('meet.subtitle', { pct: thirdAttemptPercent })}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label={t('common.close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -105,7 +105,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
         <div className="p-4 space-y-4">
           {/* Strategy Tip */}
           <div className="card p-3 bg-accent/10 border border-accent/25 space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-accent">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-accent-text">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{t('meet.strategy')}</span>
             </div>
@@ -145,7 +145,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           {/* Squat Plan Card */}
           <div className="card p-3.5 bg-bg-card border border-border space-y-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-black font-mono text-accent">{t('meet.squat')}</span>
+              <span className="text-xs font-black font-mono text-accent-text">{t('meet.squat')}</span>
               <div className="flex items-center gap-1.5 text-2xs">
                 <span className="text-text-muted">{t('meet.max')}</span>
                 <input
@@ -173,8 +173,8 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-accent/15 border border-accent/30">
-                <span className="text-2xs font-mono text-accent font-bold block">{t('meet.third', { pct: thirdAttemptPercent })}</span>
-                <span className="text-sm font-black font-mono text-accent block mt-0.5">
+                <span className="text-2xs font-mono text-accent-text font-bold block">{t('meet.third', { pct: thirdAttemptPercent })}</span>
+                <span className="text-sm font-black font-mono text-accent-text block mt-0.5">
                   {plan.squat.third} {userUnit}
                 </span>
               </div>
@@ -262,7 +262,7 @@ export default function MeetAttemptPlannerModal({ isOpen, onClose }: MeetAttempt
           {/* Projected Total & DOTS Banner */}
           <div className="p-4 rounded-2xl bg-gradient-to-r from-accent/20 via-bg-card to-accent/10 border border-accent/40 flex items-center justify-between">
             <div>
-              <span className="text-2xs font-mono uppercase font-bold text-accent block">
+              <span className="text-2xs font-mono uppercase font-bold text-accent-text block">
                 {t('meet.projectedTotal')}
               </span>
               <span className="text-2xl font-black font-mono text-text-primary mt-0.5 block">

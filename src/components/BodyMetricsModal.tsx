@@ -359,7 +359,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -409,6 +409,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             <div className="relative">
               <input
                 id="modal-weight-input"
+                aria-invalid={!!errors.weight}
+                aria-describedby={errors.weight ? 'modal-weight-error' : undefined}
                 type="number"
                 step="0.1"
                 min={unit === 'kg' ? 30 : 66}
@@ -424,7 +426,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 {unit}
               </span>
             </div>
-            {errors.weight && <p className="text-danger text-xs mt-1.5 font-medium">{errors.weight}</p>}
+            {errors.weight && <p id="modal-weight-error" className="text-danger text-xs mt-1.5 font-medium">{errors.weight}</p>}
           </div>
 
           {/* Height Field */}
@@ -435,6 +437,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             <div className="relative">
               <input
                 id="modal-height-input"
+                aria-invalid={!!errors.height}
+                aria-describedby={errors.height ? 'modal-height-error' : undefined}
                 type="number"
                 step="1"
                 min="100"
@@ -451,7 +455,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             <p className="text-2xs text-text-muted mt-1 font-mono">
               {t('bodyMetrics.heightHint')}
             </p>
-            {errors.height && <p className="text-danger text-xs mt-1.5 font-medium">{errors.height}</p>}
+            {errors.height && <p id="modal-height-error" className="text-danger text-xs mt-1.5 font-medium">{errors.height}</p>}
           </div>
 
           {/* Circumference & Body Fat Fields (Optional) */}
@@ -466,6 +470,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 </label>
                 <input
                   id="modal-fat-input"
+                aria-invalid={!!errors.bodyFat}
+                aria-describedby={errors.bodyFat ? 'modal-bodyFat-error' : undefined}
                   type="number"
                   step="0.1"
                   min="3"
@@ -475,7 +481,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder="12.5"
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
-                {errors.bodyFat && <p className="text-danger text-xs mt-1 font-medium">{errors.bodyFat}</p>}
+                {errors.bodyFat && <p id="modal-bodyFat-error" className="text-danger text-xs mt-1 font-medium">{errors.bodyFat}</p>}
               </div>
               <div>
                 <label htmlFor="modal-chest-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
@@ -483,6 +489,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 </label>
                 <input
                   id="modal-chest-input"
+                aria-invalid={!!errors.chest}
+                aria-describedby={errors.chest ? 'modal-chest-error' : undefined}
                   type="number"
                   step="0.5"
                   min="20"
@@ -492,7 +500,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '42' : '107'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
-                {errors.chest && <p className="text-danger text-xs mt-1 font-medium">{errors.chest}</p>}
+                {errors.chest && <p id="modal-chest-error" className="text-danger text-xs mt-1 font-medium">{errors.chest}</p>}
               </div>
               <div>
                 <label htmlFor="modal-waist-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
@@ -500,6 +508,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 </label>
                 <input
                   id="modal-waist-input"
+                aria-invalid={!!errors.waist}
+                aria-describedby={errors.waist ? 'modal-waist-error' : undefined}
                   type="number"
                   step="0.5"
                   min="20"
@@ -509,7 +519,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '32' : '81'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
-                {errors.waist && <p className="text-danger text-xs mt-1 font-medium">{errors.waist}</p>}
+                {errors.waist && <p id="modal-waist-error" className="text-danger text-xs mt-1 font-medium">{errors.waist}</p>}
               </div>
               <div>
                 <label htmlFor="modal-hips-input" className="text-2xs font-mono text-text-muted uppercase block mb-1">
@@ -517,6 +527,8 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                 </label>
                 <input
                   id="modal-hips-input"
+                aria-invalid={!!errors.hips}
+                aria-describedby={errors.hips ? 'modal-hips-error' : undefined}
                   type="number"
                   step="0.5"
                   min="20"
@@ -526,7 +538,7 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                   placeholder={unit === 'lbs' ? '38' : '96'}
                   className="w-full text-xs font-mono font-bold py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
                 />
-                {errors.hips && <p className="text-danger text-xs mt-1 font-medium">{errors.hips}</p>}
+                {errors.hips && <p id="modal-hips-error" className="text-danger text-xs mt-1 font-medium">{errors.hips}</p>}
               </div>
             </div>
           </div>
@@ -539,13 +551,15 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
             <div className="relative">
               <input
                 id="modal-date-input"
+                aria-invalid={!!errors.date}
+                aria-describedby={errors.date ? 'modal-date-error' : undefined}
                 type="date"
                 value={dateInput}
                 onChange={(e) => setDateInput(e.target.value)}
                 max={getLocalTodayStr()}
                 className="w-full text-sm font-mono py-2 px-3 rounded-xl bg-bg-secondary border border-border/80 text-text-primary focus:outline-none focus:border-accent"
               />
-              {errors.date && <p className="text-danger text-xs mt-1 font-medium">{errors.date}</p>}
+              {errors.date && <p id="modal-date-error" className="text-danger text-xs mt-1 font-medium">{errors.date}</p>}
             </div>
           </div>
 
@@ -637,8 +651,9 @@ export default function BodyMetricsModal({ isOpen, onClose }: BodyMetricsModalPr
                         }
                         deleteBodyMetric(entry.id);
                       }}
-                      className="p-1 text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
+                      className="p-1 min-h-[28px] min-w-[28px] inline-flex items-center justify-center text-text-muted hover:text-rose-400 transition-colors cursor-pointer"
                       title={t('bodyMetrics.deleteRecord')}
+                      aria-label={t('bodyMetrics.deleteRecord')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

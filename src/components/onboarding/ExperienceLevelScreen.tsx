@@ -88,7 +88,7 @@ export default function ExperienceLevelScreen({
                     <h2 className="text-base font-bold text-text-primary">
                       {item.title}
                     </h2>
-                    <span className="text-xs font-semibold text-accent">
+                    <span className="text-xs font-semibold text-accent-text">
                       &bull; {item.subtitle}
                     </span>
                   </div>

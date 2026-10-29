@@ -382,7 +382,14 @@ describe('LOOP-3 Escape invokes cleanup wrappers', () => {
 
   it('FeedbackModal: Escape resets the form via handleResetAndClose', () => {
     const modal = readSrc('src/components/FeedbackModal.tsx');
-    expect(modal).toContain('useEscapeToClose(isOpen, handleResetAndClose)');
+    // Gauntlet A11Y-03: the trap (useModalA11y, capture-phase) used to
+    // receive the RAW onClose, so its Escape handler stopped
+    // propagation before the bubble-phase useEscapeToClose reset handler
+    // ever ran — Escape skipped the draft reset. The trap now closes
+    // via the resetting handler directly, so the bubble hook is gone
+    // (it could never fire). The assertion tracks the real Escape path.
+    expect(modal).toContain('useModalA11y(modalRef, isOpen, handleResetAndClose)');
+    expect(modal).not.toContain('useModalA11y(modalRef, isOpen, onClose)');
     expect(modal).not.toContain('useEscapeToClose(isOpen, onClose)');
   });
 });

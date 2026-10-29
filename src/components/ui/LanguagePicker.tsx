@@ -39,7 +39,7 @@ export default function LanguagePicker({
       : 'bg-bg-card text-text-primary shadow-xs border border-border';
   const idleCls =
     variant === 'light'
-      ? 'text-[#858076] hover:text-[#171916]'
+      ? 'text-[#5E615A] hover:text-[#171916]'
       : 'text-text-muted hover:text-text-primary';
 
   return (

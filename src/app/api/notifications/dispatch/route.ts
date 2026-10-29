@@ -11,6 +11,12 @@ import {
   generateIdempotencyKey,
   formatNotificationPayload,
 } from '@/lib/notifications';
+import {
+  claimNotificationDelivery,
+  fetchAllSubscriptions,
+  markDeliverySuccess,
+  markDeliveryFailed,
+} from '@/lib/notification-dispatch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,99 +41,6 @@ function timingSafeTokenCompare(givenToken: string, expectedSecret: string): boo
     return false;
   }
   return crypto.timingSafeEqual(bufA, bufB);
-}
-
-async function claimNotificationDelivery(
-  supabase: any,
-  params: {
-    idempotencyKey: string;
-    endpoint: string;
-    userId: string | null;
-    notificationType: string;
-  }
-): Promise<boolean> {
-  // 1. Try atomic PostgreSQL function
-  try {
-    const { data, error } = await supabase.rpc('claim_notification_delivery', {
-      p_idempotency_key: params.idempotencyKey,
-      p_endpoint: params.endpoint,
-      p_user_id: params.userId,
-      p_notification_type: params.notificationType,
-    });
-    if (!error && typeof data === 'boolean') {
-      return data;
-    }
-  } catch {}
-
-  // 2. Direct database query fallback
-  try {
-    const { data: existing } = await supabase
-      .from('notification_deliveries')
-      .select('status, updated_at, attempt_count')
-      .eq('idempotency_key', params.idempotencyKey)
-      .maybeSingle();
-
-    if (existing) {
-      if (existing.status === 'sent') {
-        return false;
-      }
-      const isStale =
-        existing.status === 'processing' &&
-        new Date().getTime() - new Date(existing.updated_at).getTime() > 5 * 60 * 1000;
-      if (existing.status === 'failed' || isStale) {
-        const { error } = await supabase
-          .from('notification_deliveries')
-          .update({
-            status: 'processing',
-            attempt_count: (existing.attempt_count || 1) + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('idempotency_key', params.idempotencyKey);
-        return !error;
-      }
-      return false; // currently processing by another worker
-    }
-
-    const { error } = await supabase.from('notification_deliveries').insert({
-      idempotency_key: params.idempotencyKey,
-      subscription_endpoint: params.endpoint,
-      user_id: params.userId,
-      notification_type: params.notificationType,
-      status: 'processing',
-      attempt_count: 1,
-      updated_at: new Date().toISOString(),
-    });
-
-    return !error;
-  } catch {
-    return false;
-  }
-}
-
-async function markDeliverySuccess(supabase: any, idempotencyKey: string) {
-  try {
-    await supabase
-      .from('notification_deliveries')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('idempotency_key', idempotencyKey);
-  } catch {}
-}
-
-async function markDeliveryFailed(supabase: any, idempotencyKey: string, error: string) {
-  try {
-    await supabase
-      .from('notification_deliveries')
-      .update({
-        status: 'failed',
-        last_error: redactSecrets(error),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('idempotency_key', idempotencyKey);
-  } catch {}
 }
 
 export async function POST(req: Request) {
@@ -223,21 +136,26 @@ export async function POST(req: Request) {
   }
 
   try {
-    // 4. Fetch subscriptions in bounded batch
-    const BATCH_SIZE = 500;
-    const { data: subscriptions, error: subErr } = await supabase
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth, user_id, timezone')
-      .limit(BATCH_SIZE);
-
-    if (subErr) {
+    // 4. Fetch subscriptions, paginated (gauntlet SEC-09 helper —
+    // see notification-dispatch.ts for the cap/truncation contract).
+    // No per-IP rate limit here on purpose: this endpoint is
+    // secret-authenticated (QStash signature or cron Bearer <redacted>
+    // a per-IP limiter keyed on QStash's rotating egress IPs could
+    // break legitimate cron runs.
+    let subscriptions: any[];
+    let truncated = false;
+    try {
+      const fetched = await fetchAllSubscriptions(supabase);
+      subscriptions = fetched.subscriptions;
+      truncated = fetched.truncated;
+    } catch (pageErr: any) {
       return NextResponse.json(
-        { error: 'DATABASE_ERROR', message: redactSecrets(subErr.message) },
+        { error: 'DATABASE_ERROR', message: redactSecrets(pageErr?.message || 'Failed') },
         { status: 500 }
       );
     }
 
-    if (!subscriptions || subscriptions.length === 0) {
+    if (subscriptions.length === 0) {
       return NextResponse.json({
         success: true,
         stats: {
@@ -397,7 +315,8 @@ export async function POST(req: Request) {
         expired,
         skipped,
       },
-      message: `Examined ${examined} subscriptions: ${sent} sent, ${skipped} skipped, ${failed} failed, ${expired} expired`,
+      ...(truncated ? { truncated: true } : {}),
+      message: `Examined ${examined} subscriptions: ${sent} sent, ${skipped} skipped, ${failed} failed, ${expired} expired${truncated ? ' (subscription list truncated at safety cap)' : ''}`,
     });
   } catch (err: any) {
     return NextResponse.json(

@@ -165,7 +165,7 @@ export default function ThemePicker({
       <button
         type="button"
         onClick={onReset}
-        className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+        className="text-xs font-semibold text-accent-text hover:underline cursor-pointer"
       >
         {t('settings.resetTheme')}
       </button>

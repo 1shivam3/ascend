@@ -76,7 +76,7 @@ export default function NotFound() {
         </div>
 
         {/* Footer info */}
-        <p className="text-[11px] font-mono text-text-muted pt-4 border-t border-border/40">
+        <p className="text-[0.6875rem] font-mono text-text-muted pt-4 border-t border-border/40">
           {t('nf.footer')}
         </p>
       </div>

@@ -212,6 +212,17 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
+  // Gauntlet SEC-18: this GET previously had no rate limit at all.
+  // Same 30/min/IP budget shape as the POST path.
+  const rateLimit = await checkRateLimit(req, {
+    windowMs: 60 * 1000,
+    maxRequests: 30,
+    keyPrefix: 'push-prefs-get',
+  });
+  if (!rateLimit.success) {
+    return rateLimitResponse(rateLimit.resetMs);
+  }
+
   try {
     const supabase = getSupabaseServerClient();
     if (!supabase) {

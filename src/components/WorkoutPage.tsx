@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
 import { useTranslation } from '@/lib/i18n';
 import { validatePlanExercises } from '@/lib/plan-validation';
@@ -271,7 +272,7 @@ function PlanModal({
               {initial ? 'Modify your saved plan' : 'Build a reusable workout template'}
             </p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label={t('common.close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -352,7 +353,7 @@ function PlanModal({
                     setTargetExerciseIndex(null);
                     setIsSelectorOpen(true);
                   }}
-                  className="text-text-muted hover:text-accent text-xs font-semibold flex items-center gap-1 transition-colors"
+                  className="text-text-muted hover:text-accent-text text-xs font-semibold flex items-center gap-1 transition-colors"
                 >
                   <Dumbbell className="w-3.5 h-3.5" />
                   <span>Browse Library</span>
@@ -360,7 +361,7 @@ function PlanModal({
                 <button
                   type="button"
                   onClick={addExercise}
-                  className="text-accent text-xs font-semibold flex items-center gap-1 hover:brightness-110"
+                  className="text-accent-text text-xs font-semibold flex items-center gap-1 hover:brightness-110"
                 >
                   <Plus className="w-3.5 h-3.5" /> Add Exercise
                 </button>
@@ -371,7 +372,7 @@ function PlanModal({
               {planExercises.map((ex, i) => (
                 <div key={i} className="border border-border rounded-xl p-3.5 bg-bg-elevated/40">
                   <div className="flex items-center justify-between mb-2.5">
-                    <span className="text-xs font-mono text-accent font-semibold">EXERCISE {i + 1}</span>
+                    <span className="text-xs font-mono text-accent-text font-semibold">EXERCISE {i + 1}</span>
                     <button
                       type="button"
                       onClick={() => removeExercise(i)}
@@ -391,7 +392,7 @@ function PlanModal({
                         setTargetExerciseIndex(i);
                         setIsSelectorOpen(true);
                       }}
-                      className="text-2xs text-accent hover:underline font-mono"
+                      className="text-2xs text-accent-text hover:underline font-mono"
                     >
                       Pick from library
                     </button>
@@ -462,7 +463,7 @@ function PlanModal({
                     const weights = percentSetWeights(e1rmKg, ex.targetSets || 1, unit);
                     const e1rmDisplay = unit === 'lbs' ? Math.round(e1rmKg * 2.20462) : Math.round(e1rmKg);
                     return (
-                      <p className="mt-2 text-2xs font-mono text-accent">
+                      <p className="mt-2 text-2xs font-mono text-accent-text">
                         {t('plan.suggestedFrom1rm', {
                           weight: weights[0],
                           unit,
@@ -610,7 +611,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
             className={`px-2 py-1.5 min-h-[44px] rounded-lg text-2xs font-mono font-bold transition-colors cursor-pointer ${
               plan.intensityMode === 'percent'
                 ? 'bg-accent text-accent-on'
-                : 'text-text-muted hover:text-accent hover:bg-accent/10'
+                : 'text-text-muted hover:text-accent-text hover:bg-accent/10'
             }`}
           >
             %1RM
@@ -689,7 +690,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
           plan can be adopted by the coach without changing it. */}
       {(isBlockPlan || isAdopted) && (
         <div className="flex items-center gap-1.5">
-          <span className="text-2xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+          <span className="text-2xs font-mono font-bold text-accent-text bg-accent/15 px-2 py-0.5 rounded-md">
             {isBlockPlan ? t('coachBlock.badgeBlock') : t('coachBlock.badgeManaged')}
           </span>
           {isAdopted && !isBlockPlan && (
@@ -707,7 +708,7 @@ function PlanCard({ plan, onStart, onEdit, onDelete, onShare, onDuplicate, onOpe
         <button
           type="button"
           onClick={() => adoptPlanForCoaching(plan.id)}
-          className="self-start text-2xs font-semibold text-accent hover:underline cursor-pointer"
+          className="self-start text-2xs font-semibold text-accent-text hover:underline cursor-pointer"
         >
           {t('coachBlock.coachThisPlan')}
         </button>
@@ -2143,7 +2144,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       </header>
 
       {/* ── Segmented Control: Plans + Coach + History ── */}
-      <div role="tablist" aria-label="Train navigation" className="segmented-control">
+      <div role="tablist" aria-label="Train navigation" className="segmented-control" onKeyDown={tabListKeyDown((i) => setTrainSubTab((['plans', 'coach', 'history'] as const)[i]))}>
         <button
           type="button"
           role="tab"
@@ -2240,9 +2241,9 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">{t('train.yourPlans').toUpperCase()}</h2>
+            <h2 className="section-title text-[0.6875rem] mb-0">{t('train.yourPlans').toUpperCase()}</h2>
             {plannedWorkouts.length > 0 && (
-              <span className="text-2xs bg-accent/15 text-accent font-bold px-1.5 py-0.5 rounded-md font-mono">
+              <span className="text-2xs bg-accent/15 text-accent-text font-bold px-1.5 py-0.5 rounded-md font-mono">
                 {plannedWorkouts.length}
               </span>
             )}
@@ -2313,7 +2314,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
       <section className="space-y-2.5" aria-label={t('run.title')}>
         <div className="flex items-center gap-2">
           <Footprints className="w-4 h-4 text-accent" />
-          <h2 className="section-title text-[11px] mb-0">{t('run.title').toUpperCase()}</h2>
+          <h2 className="section-title text-[0.6875rem] mb-0">{t('run.title').toUpperCase()}</h2>
         </div>
         <div className="card p-4 sm:p-5 space-y-3">
           {!runProgram ? (
@@ -2360,7 +2361,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                 <button
                   type="button"
                   onClick={() => enrollRunProgram(getLocalTodayStr())}
-                  className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl border border-accent/50 text-accent hover:bg-accent/10 transition-all"
+                  className="py-2 px-4 text-xs font-bold flex items-center justify-center gap-1.5 flex-1 cursor-pointer rounded-xl border border-accent/50 text-accent-text hover:bg-accent/10 transition-all"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>{t('run.restartProgram')}</span>
@@ -2542,7 +2543,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
           >
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-accent" />
-              <h2 className="section-title text-[11px] mb-0 font-mono">
+              <h2 className="section-title text-[0.6875rem] mb-0 font-mono">
                 {activePolicyDecision
                   ? 'TRAINING DECISION POLICY RECOMMENDATION'
                   : 'WHY DID MY PRESCRIPTION CHANGE?'}
@@ -2596,7 +2597,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-accent" />
-            <h2 className="section-title text-[11px] mb-0">RECENT WORKOUTS</h2>
+            <h2 className="section-title text-[0.6875rem] mb-0">RECENT WORKOUTS</h2>
           </div>
           {sortedWorkouts.length > 0 && (
             <span className="text-2xs text-text-muted font-medium">
@@ -2690,7 +2691,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         return (
                           <div key={i} className="bg-bg-elevated p-3 rounded-lg space-y-2">
                             <div className="flex items-center justify-between flex-wrap gap-1">
-                              <p className="font-medium text-accent text-sm">{ex.name}</p>
+                              <p className="font-medium text-accent-text text-sm">{ex.name}</p>
                               {effortSummary && effortSummary.averageRpe > 0 && (
                                 <div className="flex items-center gap-1.5 text-2xs font-mono">
                                   <span className="text-text-muted">Effort:</span>
@@ -2753,7 +2754,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                     <div className="flex items-center gap-1 shrink-0">
                                       {isSkipped && (
                                         <span
-                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
+                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-rose-500/20 text-rose-400 font-bold"
                                           title="Skipped Set"
                                         >
                                           SKIPPED
@@ -2761,7 +2762,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                       )}
                                       {isNotAttempted && (
                                         <span
-                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-bg-secondary text-text-muted border border-border/60 font-bold"
+                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-bg-secondary text-text-muted border border-border/60 font-bold"
                                           title="Not Attempted"
                                         >
                                           NOT ATTEMPTED
@@ -2769,7 +2770,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                       )}
                                       {isDone && rpeVal !== undefined && (
                                         <span
-                                          className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent font-bold"
+                                          className="text-2xs font-mono px-1.5 py-0.5 rounded bg-accent/15 text-accent-text font-bold"
                                           title={`RPE @${rpeVal} (${rirVal} RIR - Reps in Reserve)`}
                                         >
                                           @{rpeVal}
@@ -2777,7 +2778,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                                       )}
                                       {isDone && set.isPR && (
                                         <span
-                                          className="text-[9px] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
+                                          className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold"
                                           title="Personal Record Set"
                                         >
                                           PR
@@ -2859,7 +2860,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setShowAllHistory(true)}
-                className="btn-secondary w-full py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-1.5 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent transition-colors shadow-xs cursor-pointer"
+                className="btn-secondary w-full py-2.5 px-4 text-xs font-bold flex items-center justify-center gap-1.5 border border-border/80 hover:border-accent/40 text-text-secondary hover:text-accent-text transition-colors shadow-xs cursor-pointer"
               >
                 <span>View All ({filteredWorkouts.length}) Workouts</span>
                 <ChevronDown className="w-3.5 h-3.5 text-accent" />
@@ -2870,7 +2871,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               <button
                 type="button"
                 onClick={() => setShowAllHistory(false)}
-                className="text-2xs text-text-muted hover:text-accent mx-auto py-1.5 flex items-center gap-1 transition-colors cursor-pointer"
+                className="text-2xs text-text-muted hover:text-accent-text mx-auto py-1.5 flex items-center gap-1 transition-colors cursor-pointer"
               >
                 <span>Show Recent 3 Only</span>
                 <ChevronUp className="w-3 h-3" />
@@ -3114,7 +3115,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-xs font-bold text-text-primary block group-hover:text-accent transition-colors">
+                    <span className="text-xs font-bold text-text-primary block group-hover:text-accent-text transition-colors">
                       Log Finished / Past Workout
                     </span>
                     <span className="text-2xs text-text-muted">
@@ -3127,7 +3128,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
               {/* My Workouts & Weekly Schedule */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
+                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent-text">
                     MY WORKOUTS &amp; SCHEDULE
                   </span>
                   <div className="flex items-center gap-2">
@@ -3137,7 +3138,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         setIsChangeWorkoutOpen(false);
                         setIsScheduleModalOpen(true);
                       }}
-                      className="text-xs font-semibold text-text-muted hover:text-accent flex items-center gap-1 transition-colors"
+                      className="text-xs font-semibold text-text-muted hover:text-accent-text flex items-center gap-1 transition-colors"
                       title="Customize which day you train which workout"
                     >
                       <Calendar className="w-3.5 h-3.5 text-accent" />
@@ -3149,7 +3150,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         setIsChangeWorkoutOpen(false);
                         openCreatePlan();
                       }}
-                      className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                      className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-1"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>New Plan</span>
@@ -3177,7 +3178,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                         >
                           <div className="min-w-0 pr-2">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-sm text-text-primary block group-hover:text-accent">
+                              <span className="font-bold text-sm text-text-primary block group-hover:text-accent-text">
                                 {plan.name}
                               </span>
                               {scheduledDays.length > 0 && (
@@ -3187,7 +3188,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                               )}
                             </div>
                             {bodyParts.length > 0 ? (
-                              <span className="text-2xs text-accent font-medium block mt-0.5">
+                              <span className="text-2xs text-accent-text font-medium block mt-0.5">
                                 {bodyParts.join(' • ')}
                               </span>
                             ) : null}
@@ -3274,7 +3275,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Dumbbell className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.plateTitle')}</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('tools.plateTitle')}</h4>
                     <p className="text-2xs text-text-muted">{t('tools.plateHint')}</p>
                   </div>
                 </div>
@@ -3295,7 +3296,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Calendar className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.scheduleTitle')}</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('tools.scheduleTitle')}</h4>
                     <p className="text-2xs text-text-muted">{t('tools.scheduleHint')}</p>
                   </div>
                 </div>
@@ -3315,7 +3316,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <BookOpen className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.libraryTitle')}</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('tools.libraryTitle')}</h4>
                     <p className="text-2xs text-text-muted">{t('tools.libraryHint')}</p>
                   </div>
                 </div>
@@ -3335,7 +3336,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.pastTitle')}</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('tools.pastTitle')}</h4>
                     <p className="text-2xs text-text-muted">{t('tools.pastHint')}</p>
                   </div>
                 </div>
@@ -3355,7 +3356,7 @@ export default function WorkoutPage({ onNavigate, startPlanOnMount }: WorkoutPag
                     <Plus className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">{t('tools.buildTitle')}</h4>
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">{t('tools.buildTitle')}</h4>
                     <p className="text-2xs text-text-muted">{t('tools.buildHint')}</p>
                   </div>
                 </div>

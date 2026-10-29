@@ -197,7 +197,10 @@ describe('Account Deletion & Data Safety Specification', () => {
     ENV.NEXT_PUBLIC_SUPABASE_URL = 'https://fake-project.supabase.co';
     ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key-123456789012345';
     ENV.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key-9876543210';
+    // Gauntlet SEC-19: deletion tokens now require the dedicated secret.
+    ENV.SUPABASE_DELETION_SECRET = 'test-deletion-secret-abcdef123456';
     ENV.NODE_ENV = 'test';
+    ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
 
     const setup = setupLocalStorage();
     mockStorage = setup.storage;
@@ -215,8 +218,10 @@ describe('Account Deletion & Data Safety Specification', () => {
     delete ENV.NEXT_PUBLIC_SUPABASE_URL;
     delete ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete ENV.SUPABASE_SERVICE_ROLE_KEY;
+    delete ENV.SUPABASE_DELETION_SECRET;
     delete ENV.RESEND_API_KEY;
     delete ENV.NODE_ENV;
+    delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
     delete ENV.VERCEL_ENV;
   });
 
@@ -331,6 +336,22 @@ describe('Account Deletion & Data Safety Specification', () => {
     expect(dataUnknown.success).toBe(true);
     expect(dataUnknown.message).toBe(dataExisting.message);
     expect(dataUnknown.debugToken).toBeUndefined();
+  });
+
+  it('gauntlet SEC-04: NODE_ENV=test alone does NOT expose debugToken without the explicit opt-in', async () => {
+    const route = await import('../src/app/api/auth/delete-account/route');
+    delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
+    const req = new Request('https://ascendtonext.vercel.app/api/auth/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request_verification', email: 'external@example.com' }),
+    });
+    const res = await route.POST(req);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.debugToken).toBeUndefined();
+    ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
   });
 
   it('handles email delivery when provider is configured and dispatches single-use link', async () => {
@@ -909,7 +930,7 @@ describe('Account Deletion & Data Safety Specification', () => {
 
   it('enforces rate limiting on verification requests (blocks after 5 attempts)', async () => {
     const route = await import('../src/app/api/auth/delete-account/route');
-    // Ensure rate limiter runs in-memory sliding window
+    // Ensure rate limiter runs in-memory anchored fixed window
     mockSupabase.rpc.mockResolvedValue({ data: null, error: new Error('RPC unavailable') });
 
     const makeReq = () =>

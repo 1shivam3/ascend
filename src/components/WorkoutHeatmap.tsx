@@ -171,7 +171,7 @@ export default function WorkoutHeatmap({
       {/* Header with Title and Month Navigation */}
       <div className="flex items-start justify-between">
         <div>
-          <span className="section-title text-[11px] block">{t('heat.matrix', { month: monthName })}</span>
+          <span className="section-title text-[0.6875rem] block">{t('heat.matrix', { month: monthName })}</span>
           <div className="mt-0.5">
             <span className="text-xl sm:text-2xl font-black text-text-primary block font-sans">
               {t(monthWorkoutsCount === 1 ? 'heat.dayTrained' : 'heat.daysTrained', { count: monthWorkoutsCount })}
@@ -245,7 +245,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('gym')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'gym'
-              ? 'bg-[#FF6A1A] text-white shadow-xs'
+              ? 'bg-[#FF6A1A] text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -257,7 +257,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('water')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'water'
-              ? 'bg-sky-600 text-white shadow-xs'
+              ? 'bg-sky-600 text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -281,7 +281,7 @@ export default function WorkoutHeatmap({
           onClick={() => setActiveFilter('protein')}
           className={`px-2.5 py-1 rounded-lg font-bold transition-all shrink-0 flex items-center gap-1 ${
             activeFilter === 'protein'
-              ? 'bg-[#22C55E] text-white shadow-xs'
+              ? 'bg-[#22C55E] text-black shadow-xs'
               : 'bg-bg-secondary text-text-secondary hover:text-text-primary'
           }`}
         >
@@ -293,7 +293,7 @@ export default function WorkoutHeatmap({
       {/* ── View Mode: Calendar Grid ────────────────────────────────────────── */}
       {viewMode === 'calendar' ? (
         <div className="space-y-1.5">
-          <div className="grid grid-cols-7 gap-1 text-center font-mono text-[10px] text-text-muted font-bold">
+          <div className="grid grid-cols-7 gap-1 text-center font-mono text-[0.625rem] text-text-muted font-bold">
             {weekdayNames(language, 'short').map((d) => (
               <span key={d}>{d}</span>
             ))}
@@ -336,7 +336,7 @@ export default function WorkoutHeatmap({
                   className={`aspect-square rounded-xl flex flex-col items-center justify-between p-1 text-xs font-mono transition-all duration-150 relative select-none border ${
                     activeFilter !== 'all'
                       ? isHabitDone
-                        ? 'bg-emerald-500 text-white font-bold border-transparent'
+                        ? 'bg-emerald-500 text-black font-bold border-transparent'
                         : isFuture
                         ? 'bg-bg-secondary/40 text-text-muted/40 border-transparent'
                         : 'bg-bg-secondary text-text-secondary border-border/50'
@@ -355,7 +355,7 @@ export default function WorkoutHeatmap({
                     isSelected ? 'scale-105 z-10 ring-2 ring-text-primary shadow-md' : ''
                   }`}
                 >
-                  <span className="text-[11px] leading-none font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
+                  <span className="text-[0.6875rem] leading-none font-semibold text-slate-800 dark:text-slate-200 tabular-nums">
                     {dayNum}
                   </span>
 
@@ -371,6 +371,29 @@ export default function WorkoutHeatmap({
                 </button>
               );
             })}
+          </div>
+
+          {/* Gauntlet UX-20: legend for the four habit dots (the
+              filter chips above only hint at the mapping once the
+              user connects them; this row states it outright). */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-2xs text-text-muted">
+            {(
+              [
+                ['#FF6A1A', t('heat.gym')],
+                ['#38BDF8', t('heat.water')],
+                ['#F5B301', t('heat.creatine')],
+                ['#22C55E', t('heat.protein')],
+              ] as const
+            ).map(([color, label]) => (
+              <span key={label} className="inline-flex items-center gap-1">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: color }}
+                  aria-hidden="true"
+                />
+                {label}
+              </span>
+            ))}
           </div>
         </div>
       ) : (
@@ -409,7 +432,7 @@ export default function WorkoutHeatmap({
                 })}
               </span>
               {selectedDate === todayStr && (
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-accent/15 text-accent font-bold">
+                <span className="px-1.5 py-0.5 rounded text-[0.625rem] bg-accent/15 text-accent-text font-bold">
                   {t('sched.today')}
                 </span>
               )}
@@ -442,7 +465,7 @@ export default function WorkoutHeatmap({
                   : { text: t('heat.rest'), cls: 'text-text-muted' };
 
                 return (
-                  <span className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${status.cls}`}>
+                  <span className={`font-bold text-[0.625rem] px-1.5 py-0.5 rounded ${status.cls}`}>
                     {status.text}
                   </span>
                 );
@@ -455,7 +478,7 @@ export default function WorkoutHeatmap({
                 <Droplet className="w-3.5 h-3.5 text-sky-500" />
                 <span className="font-semibold text-text-primary">{t('heat.hydration')}</span>
               </div>
-              <span className="font-bold text-[10px] text-sky-600">
+              <span className="font-bold text-[0.625rem] text-sky-600">
                 {formatWaterLiters(selectedWater)}
               </span>
             </div>
@@ -467,7 +490,7 @@ export default function WorkoutHeatmap({
                 <span className="font-semibold text-text-primary">{t('heat.creatine')}</span>
               </div>
               <span
-                className={`font-bold text-[10px] px-1.5 py-0.5 rounded ${
+                className={`font-bold text-[0.625rem] px-1.5 py-0.5 rounded ${
                   selectedCreatine?.taken
                     ? 'bg-amber-500/10 text-amber-600'
                     : 'text-text-muted'
@@ -483,7 +506,7 @@ export default function WorkoutHeatmap({
                 <UtensilsCrossed className="w-3.5 h-3.5 text-orange-500" />
                 <span className="font-semibold text-text-primary">{t('heat.protein')}</span>
               </div>
-              <span className="font-bold text-[10px] text-orange-600">
+              <span className="font-bold text-[0.625rem] text-orange-600">
                 {selectedProtein}g / {proteinTargetG}g
               </span>
             </div>

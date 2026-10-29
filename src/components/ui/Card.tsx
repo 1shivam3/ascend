@@ -77,7 +77,7 @@ export function Section({
         <div className="flex items-center justify-between px-0.5">
           <div>
             {title && (
-              <h2 className="text-[13px] font-bold font-mono tracking-wider uppercase text-text-muted">
+              <h2 className="text-[0.8125rem] font-bold font-mono tracking-wider uppercase text-text-muted">
                 {title}
               </h2>
             )}

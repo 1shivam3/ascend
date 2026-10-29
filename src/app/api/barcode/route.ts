@@ -447,12 +447,18 @@ export async function GET(req: Request) {
     }
 
     // 3. Fallback: Open Food Facts v0 API endpoint
+    // Gauntlet SEC-12: the v2 fetch above has a 6.5s abort timeout but
+    // this fallback had none — a stalled v0 hung the route indefinitely.
+    let v0TimeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
+      const v0Controller = new AbortController();
+      v0TimeoutId = setTimeout(() => v0Controller.abort(), 6500);
       const v0Res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`, {
         headers: {
           'User-Agent': 'ASCEND-StrengthTracker/2.0 (web@ascend.app)',
           'Accept': 'application/json',
         },
+        signal: v0Controller.signal,
       });
       if (v0Res.ok) {
         const v0Data = await v0Res.json();
@@ -480,7 +486,9 @@ export async function GET(req: Request) {
           });
         }
       }
-    } catch {}
+    } catch {} finally {
+      if (v0TimeoutId) clearTimeout(v0TimeoutId);
+    }
 
     // Not found in any database
     return NextResponse.json({

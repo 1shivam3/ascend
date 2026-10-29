@@ -24,12 +24,18 @@
  * ignored outright). Exactly two sources exist:
  *  - a Bearer token VERIFIED via Supabase auth.getUser → per-account
  *    quota keyed by the verified uid;
- *  - otherwise a guest key the SERVER derives as sha256(ip + UA).
+ *  - a missing token → a guest key the SERVER derives as sha256(ip);
+ *  - a present-but-unverifiable token → 401 (gauntlet R7, fail closed;
+ *    never a silent guest downgrade).
  *    The guest key is a quota bucket, not an identity: users behind one
  *    NAT share it, and a guest who rotates IPs gets a fresh bucket.
  *    That is acceptable for a low guest tier, and the per-minute IP
  *    limits plus the global cap still bound a distributed guest attack
  *    (it now needs many more actors to exhaust the day than before).
+ *    Gauntlet SEC-01: the key used to be sha256(ip + UA), but the
+ *    User-Agent is attacker-controlled, so rotating it minted a fresh
+ *    daily bucket per request and one IP could burn the shared 500/day
+ *    fleet cap. UA no longer participates in the key at all.
  *
  * Residual risk (documented, not hidden): a sufficiently distributed
  * caller can still exhaust the shared 500/day global cap, since the
@@ -39,8 +45,8 @@
  *
  * Tuning: AI_DAILY_SIGNED_IN_CAP / AI_DAILY_GUEST_CAP env vars override
  * the defaults below when they parse to a positive integer. The window
- * is a rolling 24h (same sliding-window semantics as the per-minute
- * limiter), not a calendar day.
+ * is an anchored fixed 24h window (same semantics as the per-minute
+ * limiter, gauntlet SEC-24), not a calendar day.
  */
 
 import { NextResponse } from 'next/server';
@@ -73,21 +79,23 @@ export type AiActor = { kind: 'user'; userId: string } | { kind: 'guest'; guestK
 
 /**
  * Pure actor-key derivation. Takes ONLY a verified uid (or null) plus
- * server-observed IP and User-Agent. There is deliberately no parameter
- * for a client-claimed identity: a caller cannot influence its quota
- * bucket by sending an id, because no such input exists.
+ * the server-observed IP. There is deliberately no parameter for a
+ * client-claimed identity: a caller cannot influence its quota bucket
+ * by sending an id, because no such input exists. Gauntlet SEC-01: the
+ * User-Agent used to be mixed into the guest key, but it is
+ * attacker-controlled, so it is no longer read here at all — rotating
+ * it must not mint a fresh bucket.
  */
 export function deriveAiActorKey(input: {
   verifiedUserId: string | null;
   ip: string;
-  userAgent: string;
 }): AiActor {
   if (input.verifiedUserId) {
     return { kind: 'user', userId: input.verifiedUserId };
   }
   // The guest key is a quota bucket, not an identity: sha256 of the
-  // server-observed IP + User-Agent. No client input participates.
-  const digest = createHash('sha256').update(`${input.ip}\n${input.userAgent}`).digest('hex');
+  // server-observed IP only. No client input participates.
+  const digest = createHash('sha256').update(input.ip).digest('hex');
   return { kind: 'guest', guestKey: digest };
 }
 
@@ -122,34 +130,56 @@ function getVerifierClient(): AiActorVerifier | null {
 }
 
 /**
+ * Thrown when a request carries a Bearer token that cannot be verified
+ * (invalid, expired, or unverifiable). Gauntlet R7: a present-but-bad
+ * token must fail closed with 401 — it must NOT silently fall back to
+ * the guest quota bucket, which let a caller with a dead session spend
+ * guest quota and masked auth failures. Routes map this to 401.
+ */
+export class AiActorAuthError extends Error {
+  constructor(message = 'Invalid or expired session token. Sign in again to continue.') {
+    super(message);
+    this.name = 'AiActorAuthError';
+  }
+}
+
+/**
  * Resolve the calling actor for one request. Bearer token, when present
- * and valid, wins; anything else — missing token, invalid token,
- * verification error — falls back to the server-derived guest key.
- * Forged identity headers and body fields are never read here.
+ * and valid, wins. A MISSING token means guest (server-derived key).
+ * A PRESENT token that fails verification — invalid, expired, or
+ * unverifiable because no verifier client exists — throws
+ * AiActorAuthError (gauntlet R7, fail closed). Forged identity headers
+ * and body fields are never read here.
  */
 export async function resolveAiActor(
   req: Request,
   clientOverride?: AiActorVerifier | null,
 ): Promise<AiActor> {
   const ip = getClientIp(req);
-  const userAgent = req.headers.get('user-agent') || '';
   const authHeader = req.headers.get('authorization');
   let verifiedUserId: string | null = null;
   if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
     const token = authHeader.substring(7).trim();
     if (token) {
+      let verified = false;
       try {
         const client = clientOverride !== undefined ? clientOverride : getVerifierClient();
         const { data } = await (client?.auth.getUser(token) as Promise<{
           data: { user: { id: string } | null };
         }>);
-        if (data?.user?.id) verifiedUserId = data.user.id;
+        if (data?.user?.id) {
+          verifiedUserId = data.user.id;
+          verified = true;
+        }
       } catch {
-        verifiedUserId = null;
+        verified = false;
+      }
+      if (!verified) {
+        throw new AiActorAuthError();
       }
     }
   }
-  return deriveAiActorKey({ verifiedUserId, ip, userAgent });
+  return deriveAiActorKey({ verifiedUserId, ip });
 }
 
 export interface AiQuotaCheck {

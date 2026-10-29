@@ -61,6 +61,43 @@ export function effectiveMacroGoals(
 }
 
 /**
+ * Gauntlet DI-11: the ONE no-goals fallback set. Home used bw x 2.0,
+ * Meals used bw x 1.8 (or a flat 140), and the macro split used
+ * hardcoded 220 g carbs / 70 g fat — three different answers on the
+ * same empty state. Everything now derives from the canonical
+ * recommendation: protein at the same 1.8 g/kg the recommended-goals
+ * derivation uses for the default goal, flat 140 g when no bodyweight
+ * is known at all.
+ */
+export const FALLBACK_BODYWEIGHT_KG = 72;
+
+export function fallbackProteinTargetG(bodyweightKg?: number | null): number {
+  return bodyweightKg && bodyweightKg > 0 ? Math.round(bodyweightKg * 1.8) : 140;
+}
+
+/** Full fallback goals (canonical recommendation at the fallback bw). */
+export function fallbackMacroGoals(
+  profile: EffectiveGoalsProfile | null | undefined,
+): MacroGoals & { carbsG: number; fatG: number } {
+  const goals = calculateRecommendedMacroGoals(
+    profile?.bodyweightKg && profile.bodyweightKg > 0
+      ? profile.bodyweightKg
+      : FALLBACK_BODYWEIGHT_KG,
+    resolvePrimaryGoal(profile?.goals),
+    profile?.gender ?? 'male',
+    profile?.heightCm ?? undefined,
+    profile?.age ?? undefined,
+    profile?.activityLevel,
+  );
+  // The canonical derivation always computes carbs/fat; the type
+  // marks them optional (stored goals may omit them), so narrow here
+  // once — display callers divide by these and need real numbers.
+  // The ?? values are the historical split defaults, unreachable in
+  // practice, kept only as a type-level guarantee.
+  return { ...goals, carbsG: goals.carbsG ?? 220, fatG: goals.fatG ?? 70 };
+}
+
+/**
  * Macro-split percentages for the Fuel Macros display.
  *
  * Preview-fix F16: the display used to divide macro calories by the

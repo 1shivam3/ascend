@@ -2,8 +2,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Gauntlet SEC-23: allowBackup disabled — the WebView local
+         database holds the user's full fitness data (plus the synced
+         avatar data URL); Android Auto Backup must not exfiltrate it
+         to a third-party cloud backup. Note: `npx cap sync` regenerates
+         parts of this file from capacitor.config — verify the value
+         survives a sync before each release build. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

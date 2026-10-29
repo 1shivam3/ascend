@@ -48,7 +48,7 @@ export default function TermsPage() {
 
       {/* Summary Box */}
       <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2 font-mono text-xs text-text-secondary">
-        <span className="text-2xs uppercase tracking-wider font-bold text-accent block">
+        <span className="text-2xs uppercase tracking-wider font-bold text-accent-text block">
           Key Takeaways
         </span>
         <ul className="space-y-1.5 text-2xs">
@@ -181,7 +181,7 @@ export default function TermsPage() {
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <Link
           href="/privacy"
-          className="text-2xs font-mono text-accent hover:underline"
+          className="text-2xs font-mono text-accent-text hover:underline"
         >
           View Privacy Policy &rarr;
         </Link>

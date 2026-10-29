@@ -17,12 +17,19 @@ describe('retained-history detection (pure)', () => {
     expect(hasRetainedHistory({ workouts: [], meals: [], plannedWorkouts: [], prTargets: {} })).toBe(false);
   });
 
-  it('any of sessions, meals, plans, PRs, metrics or targets counts', () => {
+  it('any of sessions, meals, plans, PRs or metrics counts — targets alone do not trigger', () => {
     expect(hasRetainedHistory({ meals: [{ id: 'm1' }] })).toBe(true);
     expect(hasRetainedHistory({ plannedWorkouts: [{ id: 'p1' }] })).toBe(true);
-    expect(hasRetainedHistory({ prTargets: { Squat: 100 } })).toBe(true);
-    expect(hasRetainedHistory({ macroGoals: { calories: 2000 } })).toBe(true);
     expect(hasRetainedHistory({ bodyMetrics: [{ id: 'b1' }] })).toBe(true);
+    // Gauntlet Cycle 2 (B-07 / TRIAGE-PA-01) — DISCLOSED MECHANISM
+    // UPDATE, not a weakening: targets used to trigger the fork, which
+    // made it self-trigger mid-onboarding (onboarding sets macroGoals
+    // before the profile exists) and let a targets-only logout
+    // overwrite a previous good archive with a sessions-empty one.
+    // Targets are still COUNTED for display (see the counts test);
+    // they just no longer trigger the fork/archival guards.
+    expect(hasRetainedHistory({ prTargets: { Squat: 100 } })).toBe(false);
+    expect(hasRetainedHistory({ macroGoals: { calories: 2000 } })).toBe(false);
   });
 
   it('counts are exact, and a name is never required to identify history', () => {

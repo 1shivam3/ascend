@@ -1318,7 +1318,7 @@ describe('Prescription-to-Outcome Loop (Task 3C-8)', () => {
       expect(context).toContain('- Pull-ups: BW×10');
     });
 
-    it('11. verifies getMonthlyAscensionReport excludes unmeasured loads, warmups, and uncompleted sets from tonnage', () => {
+    it('11. verifies getMonthlyAscensionReport counts warmups (DI-05 canonical volume) and excludes uncompleted/unmeasured sets from tonnage', () => {
       const monthPrefix = '2026-10';
       const mixedWorkout: WorkoutEntry = {
         id: 'w_monthly_tonnage_test',
@@ -1329,7 +1329,7 @@ describe('Prescription-to-Outcome Loop (Task 3C-8)', () => {
             sets: [
               // Completed work set: 100kg * 5 = 500kg
               { weight: 100, reps: 5, unit: 'kg', status: 'completed', completed: true, isWarmup: false },
-              // Warmup set: must NOT count
+              // Warmup set: COUNTS since DI-05 (canonical volume includes warmups): 60kg * 5 = 300kg
               { weight: 60, reps: 5, unit: 'kg', status: 'completed', completed: true, isWarmup: true },
               // Uncompleted set: must NOT count
               { weight: 100, reps: 5, unit: 'kg', status: 'pending', completed: false, isWarmup: false },
@@ -1350,8 +1350,9 @@ describe('Prescription-to-Outcome Loop (Task 3C-8)', () => {
         creatineLogs: {},
       });
 
-      // Total volume should be exactly 500kg = 0.5 tonnes
-      expect(report.totalVolumeTonnes).toBe(0.5);
+      // Total volume: 500 + 300 (warmup, DI-05) = 800kg = 0.8 tonnes.
+      // Was 0.5 before DI-05, when the monthly report excluded warmups.
+      expect(report.totalVolumeTonnes).toBe(0.8);
     });
 
     it('12. verifies addWorkout preserves undefined actualExecution.weight on unmeasured non-BW decisions and 0 on bodyweight decisions', () => {

@@ -13,6 +13,7 @@ import {
   DEFAULT_GOALS,
   isSetCompleted,
 } from './types';
+import { getLocalTodayStr } from './formatters';
 import {
   calculateOneRepMax,
   isMainCompoundLift,
@@ -222,7 +223,7 @@ export function generateTrainingDecision(
   const lastSetsCount = lastSets.length;
   const effort = lastSession.fatigue;
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = getLocalTodayStr(); // DI-10: local day key, not UTC
   const increment = userUnit === 'lbs' ? 5 : 2.5;
 
   const confidenceTier = getConfidenceTier(evidenceCount);

@@ -70,7 +70,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
 
           <div className="flex items-center gap-2">
             <span
-              className="text-2xs font-mono px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent font-bold"
+              className="text-2xs font-mono px-2 py-0.5 rounded-full bg-accent/15 border border-accent/30 text-accent-text font-bold"
               title={t('pva.completionTitle')}
             >
               {t('pva.setCompletion', { rate: completionSummary.completionRateFormatted ?? '' })}
@@ -79,7 +79,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
             <button
               type="button"
               onClick={() => setIsDetailsOpen((prev) => !prev)}
-              className="text-xs font-mono text-text-secondary hover:text-accent flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded hover:bg-bg-primary"
+              className="text-xs font-mono text-text-secondary hover:text-accent-text flex items-center gap-1 transition-colors px-1.5 py-0.5 rounded hover:bg-bg-primary"
               aria-expanded={isDetailsOpen}
               aria-label={isDetailsOpen ? t('pva.collapseAria') : t('pva.expandAria')}
             >
@@ -149,7 +149,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
               className="p-2.5 rounded-lg bg-bg-secondary/70 border border-border/80 space-y-2"
             >
               <div className="flex items-center justify-between flex-wrap gap-1">
-                <span className="font-semibold text-xs text-accent">
+                <span className="font-semibold text-xs text-accent-text">
                   {exSummary.exerciseName}
                 </span>
                 {exSummary.hasPrescriptionData && exSummary.setCompletionPercentage !== null && (
@@ -178,7 +178,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                           </span>
                           {setComp.isWarmup && (
                             <span
-                              className="text-[9px] font-mono px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30"
+                              className="text-[0.5625rem] font-mono px-1 py-0.5 rounded bg-purple-500/20 text-purple-400 font-bold border border-purple-500/30"
                               title={t('pva.warmupTitle')}
                             >
                               {t('pva.warmup')}
@@ -186,7 +186,7 @@ export const PlanVsActualReview: React.FC<PlanVsActualReviewProps> = ({
                           )}
                         </div>
                         <span
-                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${badge.badgeClass}`}
+                          className={`text-[0.5625rem] font-mono px-1.5 py-0.5 rounded font-bold ${badge.badgeClass}`}
                         >
                           {badge.label}
                         </span>

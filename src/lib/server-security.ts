@@ -87,15 +87,92 @@ export class RequestBodyTooLargeError extends Error {
 }
 
 /**
+ * Reads a request body through a counting stream reader that aborts
+ * past the cap (gauntlet SEC-11). The old implementation did
+ * `await req.text()` THEN measured length, so an oversized body was
+ * fully buffered before rejection; chunked bodies (no
+ * content-length) bypassed the declared-length pre-checks entirely.
+ * This reads chunk by chunk and cancels the stream as soon as the
+ * cap is exceeded, so at most cap + one chunk is ever buffered.
+ * Falls back to req.text() when the request has no stream body
+ * (GET requests, some test doubles).
+ */
+export async function readBytesBodyWithLimit(req: Request, maxBytes: number): Promise<Uint8Array> {
+  const stream = (req as unknown as { body?: ReadableStream<Uint8Array> | null }).body;
+  if (!stream || typeof stream.getReader !== 'function') {
+    const text = await req.text();
+    if (new TextEncoder().encode(text).length > maxBytes) {
+      throw new RequestBodyTooLargeError(maxBytes);
+    }
+    return new TextEncoder().encode(text);
+  }
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > maxBytes) {
+          try {
+            await reader.cancel();
+          } catch {
+            // Best effort: the throw below is the signal.
+          }
+          throw new RequestBodyTooLargeError(maxBytes);
+        }
+        chunks.push(value);
+      }
+    }
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {
+      // Already cancelled or released.
+    }
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged;
+}
+
+/** Streaming text-body read with the same cap semantics. */
+export async function readTextBodyWithLimit(req: Request, maxBytes: number): Promise<string> {
+  return new TextDecoder().decode(await readBytesBodyWithLimit(req, maxBytes));
+}
+
+/**
+ * Streaming multipart read with a byte cap. formData() buffers the
+ * whole body before any file-size cap can run, so chunked multipart
+ * uploads bypassed the scan-meal 10 MB file cap. This streams with
+ * the cap first (at most cap + one chunk buffered), then parses the
+ * buffered bytes — the parse itself never sees more than the cap.
+ */
+export async function readMultipartFormDataWithLimit(req: Request, maxBytes: number): Promise<FormData> {
+  const bytes = await readBytesBodyWithLimit(req, maxBytes);
+  const contentType = req.headers.get('content-type') || '';
+  const reparsed = new Request(req.url, {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body: bytes as unknown as BodyInit,
+  });
+  return reparsed.formData();
+}
+
+/**
  * Reads and JSON-parses a request body with a hard byte cap, so oversized
  * payloads are rejected before parsing instead of being buffered whole
- * (QA4-033). Returns the parsed value ({} for an empty body).
+ * (QA4-033). Returns the parsed value ({} for an empty body). The cap
+ * is enforced while streaming (SEC-11), not after a full read.
  */
 export async function readJsonBodyWithLimit<T = any>(req: Request, maxBytes: number): Promise<T> {
-  const text = await req.text();
-  if (new TextEncoder().encode(text).length > maxBytes) {
-    throw new RequestBodyTooLargeError(maxBytes);
-  }
+  const text = await readTextBodyWithLimit(req, maxBytes);
   if (!text.trim()) return {} as T;
   return JSON.parse(text) as T;
 }

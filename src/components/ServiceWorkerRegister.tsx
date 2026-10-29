@@ -3,6 +3,23 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
+ * Gauntlet R10: how long after a dismissal the update banner may
+ * resurface while the new worker is still waiting. The old banner
+ * was one-shot per mount, and SPA/PWA sessions run for days, so a
+ * dismissed update prompt never came back.
+ */
+export const UPDATE_REPROMPT_MS = 30 * 60 * 1000;
+
+export function shouldResurfaceUpdate(
+  dismissedAtMs: number | null,
+  nowMs: number,
+  waitingExists: boolean,
+  intervalMs: number = UPDATE_REPROMPT_MS,
+): boolean {
+  return waitingExists && dismissedAtMs !== null && nowMs - dismissedAtMs >= intervalMs;
+}
+
+/**
  * Registers the PWA service worker on the client after initial load.
  * Extracted from the previous inline script to comply with strict CSP
  * (no 'unsafe-inline' in script-src).
@@ -21,6 +38,38 @@ import { useEffect, useRef, useState } from 'react';
 export default function ServiceWorkerRegister() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const promptedRef = useRef(false);
+  const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
+  const dismissedAtRef = useRef<number | null>(null);
+  const repromptTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // R10: while a dismissed update is still waiting, re-check on an
+  // interval and resurface the banner once the quiet period elapses.
+  const startRepromptWatch = () => {
+    if (repromptTimerRef.current) return;
+    repromptTimerRef.current = setInterval(() => {
+      const waiting = registrationRef.current?.waiting ?? null;
+      if (shouldResurfaceUpdate(dismissedAtRef.current, Date.now(), !!waiting)) {
+        dismissedAtRef.current = null;
+        if (repromptTimerRef.current) {
+          clearInterval(repromptTimerRef.current);
+          repromptTimerRef.current = null;
+        }
+        setUpdateAvailable(true);
+      }
+    }, UPDATE_REPROMPT_MS);
+  };
+
+  const dismissUpdate = () => {
+    dismissedAtRef.current = Date.now();
+    setUpdateAvailable(false);
+    startRepromptWatch();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (repromptTimerRef.current) clearInterval(repromptTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -41,6 +90,7 @@ export default function ServiceWorkerRegister() {
       navigator.serviceWorker
         .register('/sw.js', { scope: '/' })
         .then((registration) => {
+          registrationRef.current = registration;
           // A waiting worker found at registration time (the browser
           // already discovered the update before we attached listeners).
           if (registration.waiting && navigator.serviceWorker.controller) {
@@ -94,7 +144,7 @@ export default function ServiceWorkerRegister() {
         <button
           type="button"
           aria-label="Dismiss update notice"
-          onClick={() => setUpdateAvailable(false)}
+          onClick={dismissUpdate}
           className="cursor-pointer rounded-lg px-2 py-1.5 text-sm font-semibold text-accent-on"
         >
           ✕

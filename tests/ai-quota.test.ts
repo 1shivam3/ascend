@@ -5,6 +5,7 @@ import {
   aiActorDailyLimit,
   resolveAiActor,
   checkAiDailyQuota,
+  AiActorAuthError,
   DEFAULT_AI_QUOTA_SIGNED_IN_DAILY,
   DEFAULT_AI_QUOTA_GUEST_DAILY,
   type AiActorVerifier,
@@ -18,8 +19,17 @@ import {
  * Audit F-02 (brief option A): per-account + per-guest daily AI quotas.
  * Identity is NEVER taken from a client claim: the actor is a verified
  * uid (Bearer token via auth.getUser) or a server-derived guest bucket
- * (sha256 of IP + User-Agent). These tests prove the separation, the
- * caps, and the anti-spoofing rule against the real in-memory limiter.
+ * (sha256 of the server-observed IP only; gauntlet SEC-01 removed the
+ * User-Agent from the key because rotating it minted fresh buckets).
+ * These tests prove the separation, the caps, and the anti-spoofing
+ * rule against a fake distributed limiter.
+ *
+ * SEC-02 contract change (2026-10-29): checkAiDailyQuota is
+ * fail-closed, and fail-closed calls no longer degrade to the
+ * in-memory limiter when the distributed backend is missing — they
+ * throw. The enforcement tests therefore inject a fake
+ * ascend_check_rate_limit RPC client (fixed-window counting in a
+ * Map) instead of pinning the null-client in-memory path.
  */
 
 function req(headers: Record<string, string> = {}): Request {
@@ -35,12 +45,40 @@ const fakeVerifier: AiActorVerifier = {
   },
 };
 
+/**
+ * Fake distributed limiter: implements the ascend_check_rate_limit
+ * RPC contract (anchored fixed-window count per key) in a Map, so
+ * quota enforcement is exercised end-to-end without a live backend.
+ */
+function makeFakeDistributedLimiter() {
+  const counts = new Map<string, number>();
+  return {
+    rpc: async (
+      _fn: string,
+      params: { p_key: string; p_window_ms: number; p_max_requests: number }
+    ) => {
+      const next = (counts.get(params.p_key) ?? 0) + 1;
+      counts.set(params.p_key, next);
+      return {
+        data: [
+          {
+            allowed: next <= params.p_max_requests,
+            count: next,
+            reset_ms: params.p_window_ms,
+          },
+        ],
+        error: null,
+      };
+    },
+  };
+}
+
 beforeEach(() => {
-  // In-memory limiter only: reset clears the store, and the null client
-  // with "attempted" set pins the in-memory path even if Supabase env
-  // vars happen to be present in the test runner.
+  // Distributed path only (SEC-02): a fresh fake RPC client per test.
+  // The fail-closed quota check throws when no distributed limiter
+  // exists, so the old null-client in-memory pinning is gone.
   resetRateLimitStoreForTests();
-  setRateLimiterSupabaseForTests(null);
+  setRateLimiterSupabaseForTests(makeFakeDistributedLimiter());
   delete process.env.AI_DAILY_SIGNED_IN_CAP;
   delete process.env.AI_DAILY_GUEST_CAP;
 });
@@ -53,23 +91,21 @@ afterEach(() => {
 
 describe('deriveAiActorKey / quota keys', () => {
   it('verified uid → per-account key; no uid → guest bucket key', () => {
-    const user = deriveAiActorKey({ verifiedUserId: 'user-a', ip: '1.2.3.4', userAgent: 'ua' });
+    const user = deriveAiActorKey({ verifiedUserId: 'user-a', ip: '1.2.3.4' });
     expect(user.kind).toBe('user');
     expect(aiActorQuotaKey(user)).toBe('ai-daily:user:user-a');
 
-    const guest = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
+    const guest = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
     expect(guest.kind).toBe('guest');
     expect(aiActorQuotaKey(guest)).toMatch(/^ai-daily:guest:[0-9a-f]{64}$/);
   });
 
-  it('guest bucket is stable for the same IP+UA and differs across IP or UA', () => {
-    const a = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
-    const b = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'ua' });
-    const c = deriveAiActorKey({ verifiedUserId: null, ip: '5.6.7.8', userAgent: 'ua' });
-    const d = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4', userAgent: 'other' });
+  it('guest bucket is stable for the same IP and differs across IPs (UA no longer participates)', () => {
+    const a = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
+    const b = deriveAiActorKey({ verifiedUserId: null, ip: '1.2.3.4' });
+    const c = deriveAiActorKey({ verifiedUserId: null, ip: '5.6.7.8' });
     expect(aiActorQuotaKey(a)).toBe(aiActorQuotaKey(b));
     expect(aiActorQuotaKey(a)).not.toBe(aiActorQuotaKey(c));
-    expect(aiActorQuotaKey(a)).not.toBe(aiActorQuotaKey(d));
   });
 
   it('defaults are 50 signed-in / 10 guest; positive env overrides win, junk env is ignored', () => {
@@ -106,12 +142,17 @@ describe('resolveAiActor anti-spoofing', () => {
     expect(actor).toEqual({ kind: 'user', userId: 'user-a' });
   });
 
-  it('invalid token → guest bucket (no error, no account quota)', async () => {
-    const actor = await resolveAiActor(
-      req({ Authorization: 'Bearer forged-token' }),
-      fakeVerifier,
-    );
-    expect(actor.kind).toBe('guest');
+  it('invalid token → AiActorAuthError (gauntlet R7: never a silent guest downgrade)', async () => {
+    // Pre-R7 behavior bucketed a forged/expired token as a guest,
+    // which handed quota-dodgers a fresh bucket and hid expired
+    // sessions. A PRESENT but unverifiable token now throws; the AI
+    // routes map it to 401. Guests are only requests with NO token.
+    await expect(
+      resolveAiActor(req({ Authorization: 'Bearer forged-token' }), fakeVerifier),
+    ).rejects.toBeInstanceOf(AiActorAuthError);
+    await expect(
+      checkAiDailyQuota(req({ Authorization: 'Bearer forged-token' }), fakeVerifier),
+    ).rejects.toBeInstanceOf(AiActorAuthError);
   });
 
   it('spoofable IP headers are ignored: x-real-ip does not change the bucket', async () => {
@@ -121,7 +162,7 @@ describe('resolveAiActor anti-spoofing', () => {
   });
 });
 
-describe('checkAiDailyQuota enforcement (real in-memory limiter)', () => {
+describe('checkAiDailyQuota enforcement (fake distributed limiter)', () => {
   it('guest cap: 10 allowed, 11th denied', async () => {
     for (let i = 0; i < 10; i++) {
       const r = await checkAiDailyQuota(req(), fakeVerifier);

@@ -232,7 +232,7 @@ export default function PostWorkoutTakeModal({
           </div>
           <div>
             <span className="text-2xs uppercase tracking-wider text-text-muted block">{t('take.volume')}</span>
-            <span className="font-bold text-xs sm:text-sm text-accent font-mono truncate block" title={totalVolume}>
+            <span className="font-bold text-xs sm:text-sm text-accent-text font-mono truncate block" title={totalVolume}>
               {totalVolume}
             </span>
           </div>
@@ -285,7 +285,7 @@ export default function PostWorkoutTakeModal({
                       <span className="font-black text-amber-400 text-xs block">
                         {displayWeight} {userUnit} × {pr.reps}
                       </span>
-                      <span className="text-[10px] text-text-muted uppercase font-sans font-semibold">
+                      <span className="text-[0.625rem] text-text-muted uppercase font-sans font-semibold">
                         {isRepPR ? t('take.repPr') : t('take.oneRmPr')}
                       </span>
                     </div>
@@ -323,7 +323,7 @@ export default function PostWorkoutTakeModal({
                 <button
                   type="button"
                   onClick={() => setShowReportAI(true)}
-                  aria-label="Report AI content"
+                  aria-label={t('common.reportAiContent')}
                   title="Report AI content"
                   data-testid="report-ai-coach-take"
                   className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
@@ -362,7 +362,7 @@ export default function PostWorkoutTakeModal({
         {/* Vs your block (PR-C) — coach-managed workouts only */}
         {blockDebrief && (
           <div className="p-4 rounded-xl bg-bg-secondary border border-border space-y-2 animate-fade-in">
-            <span className="font-bold uppercase tracking-wider text-accent flex items-center gap-1 text-2xs">
+            <span className="font-bold uppercase tracking-wider text-accent-text flex items-center gap-1 text-2xs">
               <Flag className="w-3.5 h-3.5" /> {t('weeklyReview.vsBlockTitle')}
             </span>
             {blockDebrief.lines.map((line, i) => (

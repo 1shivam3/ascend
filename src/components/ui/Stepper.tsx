@@ -57,7 +57,7 @@ export function Stepper({
   return (
     <div className={`flex flex-col items-center select-none ${className}`}>
       {/* Label & Context */}
-      <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-text-muted mb-1.5">
+      <span className="text-[0.6875rem] font-mono font-bold tracking-wider uppercase text-text-muted mb-1.5">
         {label} {unit && <span className="text-text-secondary">({unit})</span>}
       </span>
 
@@ -86,7 +86,7 @@ export function Stepper({
             className="w-full text-center font-mono font-black text-2xl sm:text-3xl text-text-primary bg-transparent outline-none border-b border-border/60 focus:border-accent py-0.5 tracking-tight tabular-nums transition-colors"
           />
           {sublabel && (
-            <span className="text-[10px] text-accent font-semibold mt-0.5 truncate max-w-[90px]">
+            <span className="text-[0.625rem] text-accent-text font-semibold mt-0.5 truncate max-w-[90px]">
               {sublabel}
             </span>
           )}
@@ -112,7 +112,7 @@ export function Stepper({
               key={inc}
               type="button"
               onClick={() => handleIncrement(inc)}
-              className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-secondary hover:text-accent border border-border/60 active:scale-95 transition-all"
+              className="text-[0.6875rem] font-mono font-bold px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary text-text-secondary hover:text-accent-text border border-border/60 active:scale-95 transition-all"
             >
               +{inc}
             </button>

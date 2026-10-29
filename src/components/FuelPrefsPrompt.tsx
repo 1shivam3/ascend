@@ -111,14 +111,14 @@ export default function FuelPrefsPrompt({ onDone }: FuelPrefsPromptProps) {
           type="button"
           onClick={onDone}
           aria-label={t('common.close')}
-          className="p-1 text-text-muted hover:text-text-primary cursor-pointer shrink-0"
+          className="p-1 min-h-[28px] min-w-[28px] inline-flex items-center justify-center text-text-muted hover:text-text-primary cursor-pointer shrink-0"
         >
           <X className="w-4 h-4" />
         </button>
       </div>
 
       {error && (
-        <p className="text-2xs text-accent">{error}</p>
+        <p className="text-2xs text-accent-text">{error}</p>
       )}
 
       <div className="space-y-2">

@@ -101,7 +101,7 @@ export default function PlateCalculatorModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -111,7 +111,7 @@ export default function PlateCalculatorModal({
         {(exerciseName || bestSetWeight || milestoneWeight) && (
           <div className="p-2.5 rounded-lg bg-bg-secondary/70 border border-border/80 flex flex-col gap-1.5 font-mono text-xs">
             {exerciseName && (
-              <span className="font-bold text-accent text-xs capitalize">
+              <span className="font-bold text-accent-text text-xs capitalize">
                 {exerciseName}
               </span>
             )}
@@ -122,11 +122,11 @@ export default function PlateCalculatorModal({
                   onClick={() => setTargetWeight(bestSetWeight)}
                   className={`flex-1 py-1.5 px-2 rounded-lg border text-2xs transition-colors flex flex-col items-center justify-center ${
                     targetWeight === bestSetWeight
-                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                      ? 'bg-accent/15 border-accent text-accent-text font-bold'
                       : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  <span className="text-[10px] text-text-muted">{t('plates.bestSet')}</span>
+                  <span className="text-[0.625rem] text-text-muted">{t('plates.bestSet')}</span>
                   <span className="font-bold">{bestSetWeight} {unit}</span>
                 </button>
               )}
@@ -136,11 +136,11 @@ export default function PlateCalculatorModal({
                   onClick={() => setTargetWeight(milestoneWeight)}
                   className={`flex-1 py-1.5 px-2 rounded-lg border text-2xs transition-colors flex flex-col items-center justify-center ${
                     targetWeight === milestoneWeight
-                      ? 'bg-accent/15 border-accent text-accent font-bold'
+                      ? 'bg-accent/15 border-accent text-accent-text font-bold'
                       : 'bg-bg-elevated border-border text-text-secondary hover:text-text-primary'
                   }`}
                 >
-                  <span className="text-[10px] text-text-muted">{t('plates.target1rm')}</span>
+                  <span className="text-[0.625rem] text-text-muted">{t('plates.target1rm')}</span>
                   <span className="font-bold">{milestoneWeight} {unit}</span>
                 </button>
               )}
@@ -205,7 +205,7 @@ export default function PlateCalculatorModal({
                   <button
                     type="button"
                     onClick={() => stepWeight(step)}
-                    className="flex-1 py-1 rounded bg-bg-secondary hover:bg-bg-elevated border border-border text-2xs text-accent font-semibold transition-colors"
+                    className="flex-1 py-1 rounded bg-bg-secondary hover:bg-bg-elevated border border-border text-2xs text-accent-text font-semibold transition-colors"
                   >
                     +{step}
                   </button>
@@ -218,7 +218,7 @@ export default function PlateCalculatorModal({
           <div className="p-2.5 rounded-xl bg-bg-secondary border border-border text-xs font-mono space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-text-muted font-bold text-2xs uppercase">{t('plates.barbellType')}</span>
-              <span className="text-accent text-2xs font-bold">{t('plates.barUnit', { weight: barWeight, unit })}</span>
+              <span className="text-accent-text text-2xs font-bold">{t('plates.barUnit', { weight: barWeight, unit })}</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {BARBELL_PRESETS.map((preset) => {
@@ -254,7 +254,7 @@ export default function PlateCalculatorModal({
           <div className="h-28 flex items-center justify-start bg-bg-secondary/70 rounded-lg px-4 border border-border/40 relative overflow-x-auto">
             {/* Barbell Inner Shaft */}
             <div className="w-12 h-4 bg-zinc-600 rounded-l flex-shrink-0 relative">
-              <span className="absolute -top-4 left-1 text-[9px] font-mono text-text-muted">
+              <span className="absolute -top-4 left-1 text-[0.5625rem] font-mono text-text-muted">
                 {t('plates.bar')}
               </span>
             </div>
@@ -278,7 +278,7 @@ export default function PlateCalculatorModal({
                         height: `${Math.max(34, plate.heightRatio * 76)}px`,
                         width: '20px',
                       }}
-                      className="rounded-sm flex flex-col items-center justify-center text-[9px] font-mono font-black shadow-md flex-shrink-0 z-10 border border-black/20 select-none"
+                      className="rounded-sm flex flex-col items-center justify-center text-[0.5625rem] font-mono font-black shadow-md flex-shrink-0 z-10 border border-black/20 select-none"
                       title={`${plate.weight} ${unit}`}
                     >
                       <span className="rotate-90 origin-center whitespace-nowrap">
@@ -346,7 +346,7 @@ export default function PlateCalculatorModal({
               <button
                 type="button"
                 onClick={() => setShowWarmupRamp(!showWarmupRamp)}
-                className="text-2xs font-mono text-accent hover:underline"
+                className="text-2xs font-mono text-accent-text hover:underline"
               >
                 {showWarmupRamp ? t('plates.hide') : t('plates.showRamp')}
               </button>
@@ -375,12 +375,12 @@ export default function PlateCalculatorModal({
                       <button
                         type="button"
                         onClick={() => setTargetWeight(ws.weight)}
-                        className="px-2 py-0.5 rounded bg-bg-elevated border border-border text-2xs text-text-primary hover:border-accent hover:text-accent transition-colors"
+                        className="px-2 py-0.5 rounded bg-bg-elevated border border-border text-2xs text-text-primary hover:border-accent hover:text-accent-text transition-colors"
                       >
                         {t('plates.loadPlates')}
                       </button>
                     ) : (
-                      <span className="text-2xs text-accent font-semibold px-2 py-0.5">
+                      <span className="text-2xs text-accent-text font-semibold px-2 py-0.5">
                         {t('plates.current')}
                       </span>
                     )}

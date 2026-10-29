@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { checkAiDailyQuota, aiQuotaExceededResponse } from '@/lib/ai-quota';
+import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
 import { executeMultiProviderText } from '@/lib/ai-provider';
 import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
 import { parseNaturalMealOffline, calculateMealMacros } from '@/lib/macros';
@@ -44,6 +44,13 @@ export async function POST(req: Request) {
       return aiQuotaExceededResponse(quota.actor, quota.resetMs);
     }
   } catch (err) {
+    if (err instanceof AiActorAuthError) {
+      // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
+        { status: 401 }
+      );
+    }
     if (err instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse();
     }

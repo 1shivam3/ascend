@@ -63,7 +63,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -71,7 +71,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
 
         {/* The one focus */}
         <div className="p-3 rounded-xl bg-accent/10 border border-accent/30">
-          <p className="text-2xs font-mono font-bold uppercase text-accent">
+          <p className="text-2xs font-mono font-bold uppercase text-accent-text">
             {t('weeklyReview.focusLabel')}
           </p>
           <p className="text-sm font-bold text-text-primary mt-0.5">{renderLocalizedSentence(t, language, review.focus.headlineI18n, review.focus.headline)}</p>
@@ -196,7 +196,7 @@ export default function CoachWeeklyReviewModal({ isOpen, onClose, review }: Coac
                   <p className="text-xs text-text-secondary">{rev.text}</p>
                   {rev.kind === 'schedule_move' &&
                     (rev.applied ? (
-                      <p className="text-2xs text-accent font-semibold mt-1.5 flex items-center gap-1">
+                      <p className="text-2xs text-accent-text font-semibold mt-1.5 flex items-center gap-1">
                         <Check className="w-3 h-3" /> {t('weeklyReview.moveApplied')}
                       </p>
                     ) : (

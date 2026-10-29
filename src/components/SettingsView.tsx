@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useStore } from '@/lib/store';
+import { useStore, getLastImportNormalizedCount } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
 import { useToast } from '@/components/ui/Toast';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
+import { getLocalTodayStr } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
 import { useAppNavigation } from '@/lib/navigation';
 import { getTelemetryConsent, setTelemetryConsent, TelemetryConsent, TELEMETRY_CONSENT_EVENT } from '@/lib/telemetry';
@@ -396,7 +397,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getLocalTodayStr(); // DI-10: local date, not UTC
       link.href = url;
       link.download = `ascend_backup_${dateStr}.json`;
       document.body.appendChild(link);
@@ -422,7 +423,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getLocalTodayStr(); // DI-10: local date, not UTC
       link.href = url;
       link.download = `ascend_export_${dateStr}.csv`;
       document.body.appendChild(link);
@@ -455,7 +456,13 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         const success = importAllData(parsed);
         importFullBackupJSON(content);
         if (success) {
-          toast.success(t('settings.restoredMsg'), t('settings.restoredTitle'));
+          // Gauntlet DI-07: report any dates the import had to fix.
+          const fixedDates = getLastImportNormalizedCount();
+          toast.success(
+            t('settings.restoredMsg') +
+              (fixedDates > 0 ? ` ${t('vault.datesFixed', { count: fixedDates })}` : ''),
+            t('settings.restoredTitle'),
+          );
         } else {
           toast.error(t('settings.invalidBackupMsg'), t('settings.restoreFailedTitle'));
         }
@@ -581,7 +588,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
             key={chip.labelKey}
             type="button"
             onClick={() => scrollToSection(chip.ref)}
-            className="shrink-0 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent hover:border-accent/40 transition-colors cursor-pointer"
+            className="shrink-0 px-3 py-1.5 rounded-full bg-bg-secondary border border-border text-2xs font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors cursor-pointer"
           >
             {t(chip.labelKey)}
           </button>
@@ -627,7 +634,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 type="button"
                 onClick={handleManualSync}
                 disabled={isSyncing}
-                className="p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-text-secondary hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+                className="p-2.5 rounded-xl bg-bg-secondary hover:bg-bg-tertiary border border-border text-text-secondary hover:text-accent-text transition-colors cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
                 title={t('settings.syncNow')}
               >
                 <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin text-accent' : ''}`} />
@@ -1358,7 +1365,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                 <Trash2 className="w-4 h-4" />
               </div>
               <div>
-                <p className="text-xs font-bold text-accent">{t('settings.deleteAccount')}</p>
+                <p className="text-xs font-bold text-accent-text">{t('settings.deleteAccount')}</p>
                 <p className="text-2xs text-text-muted">{t('settings.deleteAccountHint')}</p>
               </div>
             </div>
@@ -1378,6 +1385,9 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
               <div>
                 <p className="text-xs font-bold text-rose-400">{t('vault.deleteReset')}</p>
                 <p className="text-2xs text-text-muted">{t('vault.safeguardBody')}</p>
+                {/* Gauntlet UX-19: distinguish this permanent purge from
+                    Start fresh (which archives) right at the entry. */}
+                <p className="text-2xs text-text-muted">{t('vault.deleteResetHint')}</p>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-rose-400" />
@@ -1444,7 +1454,7 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
                     {item.link && (
                       <a
                         href={item.link.href}
-                        className="inline-block mt-1.5 text-2xs font-bold text-accent underline"
+                        className="inline-block mt-1.5 text-2xs font-bold text-accent-text underline"
                       >
                         {t(item.link.label)}
                       </a>

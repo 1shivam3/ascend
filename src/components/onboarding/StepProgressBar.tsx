@@ -51,13 +51,18 @@ export default function StepProgressBar({
         <div className="w-10 h-10" aria-hidden="true" />
       </div>
 
-      {/* Segment Progress Bar (segment count follows totalSteps) */}
+      {/* Segment Progress Bar (segment count follows totalSteps).
+          Gauntlet A11Y-16: progressbar semantics — a 0-based scale
+          (valuemin 0), an accessible name, and a valuetext carrying
+          the same "Step N of M" the sighted user sees next to it. */}
       <div
         className="grid gap-2 w-full"
         style={{ gridTemplateColumns: `repeat(${totalSteps}, minmax(0, 1fr))` }}
         role="progressbar"
+        aria-label={t('auth.stepOfTotal', { step: currentStep, total: totalSteps })}
+        aria-valuetext={t('auth.stepOfTotal', { step: currentStep, total: totalSteps })}
         aria-valuenow={currentStep}
-        aria-valuemin={1}
+        aria-valuemin={0}
         aria-valuemax={totalSteps}
       >
         {Array.from({ length: totalSteps }, (_, i) => (

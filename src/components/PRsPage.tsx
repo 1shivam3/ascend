@@ -213,7 +213,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                         setSearch('');
                       }}
                       className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm text-left hover:bg-accent/10 transition-colors ${
-                        value === ex ? 'bg-accent/15 text-accent font-semibold' : 'text-text-primary'
+                        value === ex ? 'bg-accent/15 text-accent-text font-semibold' : 'text-text-primary'
                       }`}
                     >
                       <span className={`text-2xs font-mono px-1 py-0.5 rounded ${pillCfg?.color || ''} opacity-60`}>
@@ -236,7 +236,7 @@ function ExerciseDropdown({ value, onChange }: ExerciseDropdownProps) {
                   setSearch('');
                 }}
                 className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm text-left hover:bg-accent/10 transition-colors ${
-                  value === 'Custom' ? 'bg-accent/15 text-accent font-semibold' : 'text-text-secondary'
+                  value === 'Custom' ? 'bg-accent/15 text-accent-text font-semibold' : 'text-text-secondary'
                 }`}
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -311,7 +311,7 @@ function LevelProgressionModal({
             <h3 className="font-bold text-text-primary text-base capitalize leading-tight">{exercise}</h3>
             <p className="text-2xs text-text-muted font-mono mt-0.5">{t('prs.levelProgression')}</p>
           </div>
-          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label="Close">
+          <button type="button" onClick={onClose} className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer" aria-label={t('common.close')}>
             <X size={18} />
           </button>
         </div>
@@ -412,7 +412,7 @@ function LevelProgressionModal({
                       )}
                       <RankBadge rank={t.rank} size="sm" />
                     </div>
-                    <span className={`text-2xs font-mono font-semibold ${isCurrent ? 'text-accent' : 'text-text-muted'}`}>
+                    <span className={`text-2xs font-mono font-semibold ${isCurrent ? 'text-accent-text' : 'text-text-muted'}`}>
                       LV {t.range}
                     </span>
                   </div>
@@ -496,7 +496,7 @@ function LiftCard({
               </strong>
             </span>
             {isBaselineLift && (
-              <span className="text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-sans">
+              <span className="text-[0.625rem] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20 font-sans">
                 {t('prs.baseline')}
               </span>
             )}
@@ -508,7 +508,7 @@ function LiftCard({
             {display1RM}{' '}
             <span className="text-xs font-normal text-text-muted">{userUnit}</span>
           </span>
-          <span className="text-[10px] text-text-muted font-mono uppercase block mt-0.5">
+          <span className="text-[0.625rem] text-text-muted font-mono uppercase block mt-0.5">
             Estimated 1RM (best single lift)
           </span>
         </div>
@@ -527,12 +527,12 @@ function LiftCard({
             <button
               type="button"
               onClick={onOpenTargetModal}
-              className="text-2xs text-text-muted hover:text-accent underline"
+              className="text-2xs text-text-muted hover:text-accent-text underline"
               title={t('prs.setTarget')}
             >
               {t('prs.editTarget')}
             </button>
-            <span className="font-bold text-accent text-xs font-mono tabular-nums">
+            <span className="font-bold text-accent-text text-xs font-mono tabular-nums">
               {toGo > 0 ? t('prs.toGo', { amount: toGo, unit: userUnit }) : t('prs.targetReached')}
             </span>
           </div>
@@ -565,7 +565,7 @@ function LiftCard({
         <button
           type="button"
           onClick={onOpenPlateModal}
-          className="text-2xs text-text-muted hover:text-accent font-medium flex items-center gap-1 py-0.5"
+          className="text-2xs text-text-muted hover:text-accent-text font-medium flex items-center gap-1 py-0.5"
           title={t('prs.plateCalcTitle')}
         >
           <Dumbbell className="w-3 h-3 text-accent" />
@@ -582,7 +582,7 @@ function LiftCard({
               <button
                 type="button"
                 onClick={onOpenLevelModal}
-                className="text-xs font-semibold text-accent hover:underline flex items-center gap-1"
+                className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-1"
                 title={t('prs.viewTier')}
               >
                 <span>{t('prs.level', { level: item.levelInfo.level })}</span>
@@ -593,7 +593,7 @@ function LiftCard({
               <span className="text-2xs text-text-muted font-mono">{item.levelInfo.ratio}× BW</span>
             </div>
             {isMain && (
-              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/25 uppercase">
+              <span className="text-2xs font-mono font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent-text border border-accent/25 uppercase">
                 {t('prs.coreLift')}
               </span>
             )}
@@ -623,25 +623,25 @@ function LiftCard({
                         {isBWRecord ? t('prs.equipmentBodyweight') : `${w} ${userUnit}`} × {t('prs.repsWord', { reps: p.reps })}
                       </span>
                       {isAllTimePeak && (
-                        <span className="text-[9px] font-sans font-black text-accent bg-accent/20 px-1.5 py-0.5 rounded border border-accent/40 flex items-center gap-1 shadow-2xs">
+                        <span className="text-[0.5625rem] font-sans font-black text-accent-text bg-accent/20 px-1.5 py-0.5 rounded border border-accent/40 flex items-center gap-1 shadow-2xs">
                           <Trophy className="w-2.5 h-2.5 text-accent" />
                           <span>{t('prs.allTimeRecord')}</span>
                         </span>
                       )}
                       {p.prType === 'reps' && (
-                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
+                        <span className="text-[0.5625rem] font-sans font-bold text-accent-text bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
                           <Zap className="w-2.5 h-2.5 text-accent fill-accent" />
                           <span>{t('prs.repPr')}</span>
                         </span>
                       )}
                       {(p.prType === '1rm' || (!p.prType && p.reps === 1)) && (
-                        <span className="text-[9px] font-sans font-bold text-accent bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
+                        <span className="text-[0.5625rem] font-sans font-bold text-accent-text bg-accent/10 px-1.5 py-0.5 rounded border border-accent/25 flex items-center gap-1">
                           <Award className="w-2.5 h-2.5 text-accent" />
                           <span>{t('prs.oneRmPr')}</span>
                         </span>
                       )}
                       {(p.isBaseline || p.notes?.includes('Baseline')) && (
-                        <span className="text-[9px] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
+                        <span className="text-[0.5625rem] font-sans font-semibold text-amber-500 bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/20">
                           {t('prs.baseline')}
                         </span>
                       )}
@@ -1116,7 +1116,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
             </button>
           )}
           <div>
-            <div className="text-[10px] font-mono font-bold tracking-widest text-accent uppercase">{t('prs.personalBests')}</div>
+            <div className="text-[0.625rem] font-mono font-bold tracking-widest text-accent-text uppercase">{t('prs.personalBests')}</div>
             <h1 className="display-title uppercase">
               {t('prs.title')}
             </h1>
@@ -1150,7 +1150,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
         <div className="card space-y-3 bg-bg-card border border-border">
           <div className="flex justify-between items-baseline">
             <div>
-              <span className="section-title text-[11px] mb-0 font-sans">
+              <span className="section-title text-[0.6875rem] mb-0 font-sans">
                 {profile?.goals?.includes('get_stronger') ? t('prs.scoreboardPowerlifting') : t('prs.scoreboardCompounds')}
               </span>
               <div className="flex items-baseline gap-2 mt-1">
@@ -1251,7 +1251,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`text-[10px] font-mono ${prTypeFilter === tab.id ? 'opacity-80' : 'opacity-50'}`}>
+                <span className={`text-[0.625rem] font-mono ${prTypeFilter === tab.id ? 'opacity-80' : 'opacity-50'}`}>
                   ({tab.count})
                 </span>
               </button>
@@ -1287,7 +1287,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                     onClick={() => setSelectedEquipmentFilter(chip.id as any)}
                     className={`px-2.5 py-1 rounded-lg text-2xs font-bold border transition-colors whitespace-nowrap flex items-center gap-1.5 ${
                       selectedEquipmentFilter === chip.id
-                        ? 'bg-accent/15 border-accent text-accent'
+                        ? 'bg-accent/15 border-accent text-accent-text'
                         : 'bg-bg-card border-border text-text-secondary hover:border-accent/40'
                     }`}
                   >
@@ -1371,9 +1371,9 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                 <div className="flex items-center justify-between px-0.5">
                   <div className="flex items-center gap-2">
                     <Dumbbell className="w-4 h-4 text-accent" />
-                    <h3 className="section-title text-[11px] mb-0">{t('prs.mainCompounds')}</h3>
+                    <h3 className="section-title text-[0.6875rem] mb-0">{t('prs.mainCompounds')}</h3>
                   </div>
-                  <span className="text-2xs font-bold px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent font-mono">
+                  <span className="text-2xs font-bold px-2 py-0.5 rounded-md bg-accent/10 border border-accent/20 text-accent-text font-mono">
                     {t('prs.coreLiftsCount', { count: mainCompoundLifts.length })}
                   </span>
                 </div>
@@ -1434,7 +1434,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                           <Layers className="w-4 h-4" />
                         </div>
                         <div>
-                          <span className="text-xs font-bold text-text-primary group-hover:text-accent block">
+                          <span className="text-xs font-bold text-text-primary group-hover:text-accent-text block">
                             {t('prs.otherExercises', { count: otherLifts.length })}
                           </span>
                           <span className="text-2xs text-text-muted">
@@ -1442,7 +1442,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                           </span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-accent bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-accent-text bg-accent/10 px-2.5 py-1 rounded-lg border border-accent/20">
                         <span>{showAllOtherLifts ? t('prs.showLess') : t('prs.showMore', { count: otherLifts.length })}</span>
                         <ChevronDown
                           className={`w-3.5 h-3.5 transition-transform duration-200 ${
@@ -1498,7 +1498,7 @@ export default function PRsPage({ onNavigate }: PRsPageProps = {}) {
                   // If no main compound lifts have been logged yet, show other lifts directly
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-0.5">
-                      <h3 className="section-title text-[11px] mb-0">{t('prs.loggedExercises')}</h3>
+                      <h3 className="section-title text-[0.6875rem] mb-0">{t('prs.loggedExercises')}</h3>
                       <span className="text-2xs text-text-muted">{t('prs.loggedCount', { count: otherLifts.length })}</span>
                     </div>
                     {otherLifts.map((item) => (

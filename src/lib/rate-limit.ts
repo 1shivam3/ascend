@@ -1,10 +1,23 @@
 /**
  * Server-Side Rate Limiter for Next.js API Routes
  *
- * Implements a sliding-window counter with a Supabase-backed distributed
- * store so that limits are enforced consistently across serverless function
- * instances. Falls back to in-process memory when Supabase is unavailable
- * (e.g. offline mode or local development without credentials).
+ * Implements an anchored fixed-window counter with a Supabase-backed
+ * distributed store so that limits are enforced consistently across
+ * serverless function instances. Calls that do NOT opt into
+ * `failClosed` fall back to in-process memory when Supabase is
+ * unavailable (e.g. offline mode or local development without
+ * credentials). Fail-closed calls never degrade: when the
+ * distributed limiter cannot run — including when the service key
+ * is absent entirely (gauntlet SEC-02) — they throw
+ * RateLimitUnavailableError so the caller can reject with 503.
+ *
+ * Gauntlet SEC-24: the in-memory fallback used to be sliding-window
+ * while the Supabase RPC is fixed-window (reset_at bucket), so the two
+ * backends behaved differently at window boundaries. Both are now
+ * anchored fixed-window: a window starts at the first request after
+ * the previous window expired and lasts exactly windowMs. The
+ * boundary-burst property (up to 2x maxRequests across a boundary)
+ * is therefore identical in both backends — documented, not hidden.
  *
  * Prevents API quota exhaustion, DoS attacks, and credential stuffing.
  */
@@ -12,7 +25,12 @@
 import { createClient } from '@supabase/supabase-js';
 
 interface RateLimitRecord {
-  timestamps: number[];
+  /** Start of the current anchored window (ms since epoch). */
+  windowStartMs: number;
+  /** Requests counted in the current window. */
+  count: number;
+  /** Window length this record was created with (ms). */
+  windowMs: number;
 }
 
 /**
@@ -60,27 +78,35 @@ function getRateLimiterSupabase() {
   return supabaseRateLimiter;
 }
 
+/**
+ * Prunes expired in-memory windows. Gauntlet SEC-05: the old cleanup
+ * dropped every timestamp older than a hardcoded 10 minutes, which
+ * silently truncated every longer window (15-min deletion, 24-h AI
+ * daily) to 10 minutes. Cleanup now respects each record's own
+ * window: only windows that have fully expired are removed.
+ * Exported for tests; the interval below calls it in production.
+ */
+export function pruneRateLimitStoreForTests(now: number = Date.now()): void {
+  for (const [key, record] of rateLimitStore.entries()) {
+    if (now >= record.windowStartMs + record.windowMs) {
+      rateLimitStore.delete(key);
+    }
+  }
+}
+
 // Cleanup stale in-memory rate limit entries every 5 minutes
 if (typeof setInterval !== 'undefined') {
   const CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
-  setInterval(() => {
-    const now = Date.now();
-    for (const [key, record] of rateLimitStore.entries()) {
-      const recent = record.timestamps.filter((ts) => now - ts < 10 * 60 * 1000);
-      if (recent.length === 0) {
-        rateLimitStore.delete(key);
-      } else {
-        record.timestamps = recent;
-      }
-    }
-  }, CLEANUP_INTERVAL_MS).unref?.();
+  setInterval(() => pruneRateLimitStoreForTests(), CLEANUP_INTERVAL_MS).unref?.();
 }
 
 export interface RateLimitOptions {
   windowMs: number;
   maxRequests: number;
   keyPrefix?: string;
-  /** When true, returns 503 if distributed rate limiter is unavailable */
+  /** When true, returns 503 (throws RateLimitUnavailableError) if the
+   * distributed rate limiter is unavailable OR not configured at all
+   * (service key absent — gauntlet SEC-02). */
   failClosed?: boolean;
 }
 
@@ -120,37 +146,36 @@ export function getClientIp(req: Request): string {
 }
 
 /**
- * In-process sliding window rate limit check (fallback when Supabase is unavailable).
+ * In-process anchored fixed-window rate limit check (fallback when
+ * Supabase is unavailable). Matches the Supabase RPC semantics
+ * (SEC-24): a window starts at the first request after the previous
+ * window expired and lasts exactly windowMs; requests past the limit
+ * inside the window are denied until the window rolls over.
  */
 function checkRateLimitInMemory(key: string, options: RateLimitOptions): RateLimitResult {
   const now = Date.now();
-  const windowStart = now - options.windowMs;
 
   let record = rateLimitStore.get(key);
-  if (!record) {
-    record = { timestamps: [] };
+  if (!record || record.windowMs !== options.windowMs || now >= record.windowStartMs + record.windowMs) {
+    record = { windowStartMs: now, count: 0, windowMs: options.windowMs };
     rateLimitStore.set(key, record);
   }
 
-  record.timestamps = record.timestamps.filter((ts) => ts > windowStart);
-
-  if (record.timestamps.length >= options.maxRequests) {
-    const oldestTimestamp = record.timestamps[0] || now;
-    const resetMs = Math.max(0, oldestTimestamp + options.windowMs - now);
+  if (record.count >= options.maxRequests) {
     return {
       success: false,
       limit: options.maxRequests,
       remaining: 0,
-      resetMs,
+      resetMs: Math.max(0, record.windowStartMs + record.windowMs - now),
     };
   }
 
-  record.timestamps.push(now);
+  record.count += 1;
   return {
     success: true,
     limit: options.maxRequests,
-    remaining: Math.max(0, options.maxRequests - record.timestamps.length),
-    resetMs: options.windowMs,
+    remaining: Math.max(0, options.maxRequests - record.count),
+    resetMs: Math.max(0, record.windowStartMs + record.windowMs - now),
   };
 }
 
@@ -227,6 +252,19 @@ async function checkRateLimitByKey(
         `Distributed rate limiter unavailable for key prefix: ${options.keyPrefix || 'global'}`
       );
     }
+  } else if (options.failClosed) {
+    // Gauntlet SEC-02 (user decision 2026-10-29: reject-all). The
+    // distributed limiter is not configured at all — the service-role
+    // key is absent. Fail-closed callers must NOT silently degrade to
+    // per-instance in-memory counting here: every serverless instance
+    // would mint its own bucket and multiply the cap by the instance
+    // count. Reject instead; callers map this error to 503. (The
+    // in-memory fallback below remains for callers that never opted
+    // into failClosed — local/guest surfaces and the SEC-20 edge
+    // floor are unaffected.)
+    throw new RateLimitUnavailableError(
+      `Distributed rate limiter not configured (service key absent) for key prefix: ${options.keyPrefix || 'global'}`
+    );
   }
 
   // Fall back to in-process memory when Supabase is not configured

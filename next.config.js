@@ -32,6 +32,10 @@ const nextConfig = {
           value: '1; mode=block',
         },
         {
+          key: 'Reporting-Endpoints',
+          value: 'csp="/api/csp-report"',
+        },
+        {
           key: 'Content-Security-Policy',
           value: [
             "default-src 'self'",
@@ -46,12 +50,23 @@ const nextConfig = {
             // carries 8 inline <script> tags, 7 of them framework flight
             // data. Dropping 'unsafe-inline' without a nonce mechanism
             // would block those payloads and break hydration (SSR HTML
-            // renders, client interactivity dies). This repo has no
-            // middleware and no nonce plumbing, so the correct follow-up
-            // is a middleware nonce mechanism (Next 14.2 supports
-            // nonces via middleware request headers), NOT deleting this
-            // token. style-src 'unsafe-inline' stays for the same class
-            // of reason (styled-jsx/Tailwind runtime styles).
+            // renders, client interactivity dies).
+            //
+            // GAUNTLET SEC-16 UPDATE (2026-10-29): the middleware nonce
+            // mechanism WAS built and live-tested — and it does not
+            // work for this app. The pages are statically generated
+            // (build output: / and /delete-account are ○ static), so
+            // their HTML is prerendered at build time and Next never
+            // tags the inline scripts with the per-request nonce:
+            // served home page carried the nonce in the CSP header but
+            // on 0 of its 8 inline scripts, which the browser would
+            // have blocked. Nonce CSP only works with per-request
+            // dynamic rendering. Removing 'unsafe-inline' therefore
+            // still waits on an explicit decision to force dynamic
+            // rendering app-wide (SSR cost on every page) — until
+            // then this token stays, compensated by the SEC-17 sink
+            // scan (no dangerouslySetInnerHTML/eval anywhere in src)
+            // and the violation reporting wired below.
             "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://*.google-analytics.com https://www.clarity.ms https://*.clarity.ms https://js.sentry-cdn.com",
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data: blob: https://*.supabase.co https://images.openfoodfacts.org https://*.openfoodfacts.org https://lh3.googleusercontent.com https://*.google-analytics.com https://*.googletagmanager.com https://*.clarity.ms",
@@ -62,6 +77,9 @@ const nextConfig = {
             "frame-ancestors 'none'",
             "form-action 'self'",
             "base-uri 'self'",
+            // Gauntlet SEC-17 (short-term): violation reporting.
+            'report-uri /api/csp-report',
+            'report-to csp',
           ].join('; '),
         },
       ],

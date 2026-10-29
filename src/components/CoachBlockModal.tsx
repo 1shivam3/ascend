@@ -269,7 +269,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -451,7 +451,7 @@ export default function CoachBlockModal({ isOpen, onClose, startAtReview }: Coac
                       w.type === 'deload'
                         ? 'bg-warning/15 text-warning'
                         : w.type === 'test'
-                          ? 'bg-accent/15 text-accent'
+                          ? 'bg-accent/15 text-accent-text'
                           : 'bg-bg-secondary text-text-muted border border-border/60'
                     }`}
                   >

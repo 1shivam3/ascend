@@ -2,11 +2,12 @@
 
 import React, { useState, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
-import { useStore, getStorageWriteFailed } from '@/lib/store';
+import { useStore, getStorageWriteFailed, getLastImportNormalizedCount } from '@/lib/store';
 import { useToast } from '@/components/ui/Toast';
 import { ensureDeleteWillPersist } from '@/lib/delete-persist-guard';
 import { parseWorkoutCSV } from '@/lib/workout-import';
 import { toUserMessage } from '@/lib/user-error';
+import { getLocalTodayStr } from '@/lib/formatters';
 import { buildFullBackup, getCustomBarcodes } from '@/lib/storage';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -84,7 +85,9 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
 
-      const dateStr = new Date().toISOString().split('T')[0];
+      // Gauntlet DI-10: local date for the filename (toISOString is
+      // UTC — near midnight IST the file was stamped with yesterday).
+      const dateStr = getLocalTodayStr();
       link.href = url;
       link.download = `ascend_backup_${dateStr}.json`;
       document.body.appendChild(link);
@@ -152,7 +155,14 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
         const success = importAllData(parsed);
         if (success) {
           toast.success(t('vault.restoredToast'), t('vault.dataRestored'));
-          setMessage({ text: t('vault.restoredMsg'), type: 'success' });
+          // Gauntlet DI-07: tell the user when import had to fix dates.
+          const fixedDates = getLastImportNormalizedCount();
+          setMessage({
+            text:
+              t('vault.restoredMsg') +
+              (fixedDates > 0 ? ` ${t('vault.datesFixed', { count: fixedDates })}` : ''),
+            type: 'success',
+          });
         } else {
           toast.error(t('vault.invalidToast'), t('vault.invalidTitle'));
           setMessage({ text: t('vault.invalidMsg'), type: 'error' });
@@ -204,7 +214,10 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
           t('vault.historyImported')
         );
         setMessage({
-          text: t('vault.csvMsg', { workouts: result.workoutsImported, sets: result.totalSets, prs: result.newPRsCount }),
+          text:
+            t('vault.csvMsg', { workouts: result.workoutsImported, sets: result.totalSets, prs: result.newPRsCount }) +
+            // Gauntlet DI-07: report normalized CSV dates too.
+            (result.datesNormalized > 0 ? ` ${t('vault.datesFixed', { count: result.datesNormalized })}` : ''),
           type: 'success',
         });
       } catch (err: any) {
@@ -336,7 +349,7 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
             <p className="text-2xs text-text-secondary leading-relaxed">
               {t('vault.accessBody')}
             </p>
-            <p className="text-[11px] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60 flex items-center gap-1.5">
+            <p className="text-[0.6875rem] text-text-muted bg-bg-secondary/70 p-2 rounded border border-border/60 flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-accent shrink-0" />
               <span><strong>{t('vault.privacyNotice')}</strong> {t('vault.privacyBody')}</span>
             </p>
@@ -413,7 +426,7 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
                 >
                   <Download className="w-5 h-5 text-accent" />
                   <span className="text-xs font-semibold text-text-primary">{t('vault.downloadBackup')}</span>
-                  <span className="text-[10px] text-text-muted font-mono">{t('vault.saveJson')}</span>
+                  <span className="text-[0.625rem] text-text-muted font-mono">{t('vault.saveJson')}</span>
                 </button>
 
                 <button
@@ -423,7 +436,7 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
                 >
                   <Upload className="w-5 h-5 text-emerald-400" />
                   <span className="text-xs font-semibold text-text-primary">{t('vault.restoreBackup')}</span>
-                  <span className="text-[10px] text-text-muted font-mono">{t('vault.uploadJson')}</span>
+                  <span className="text-[0.625rem] text-text-muted font-mono">{t('vault.uploadJson')}</span>
                 </button>
               </div>
 
@@ -449,7 +462,7 @@ export default function DataVaultModal({ isOpen, onClose, startAtDeleteConfirm }
                     {t('vault.csvTitle')}
                   </span>
                 </div>
-                <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent font-semibold font-mono">
+                <span className="text-2xs px-2 py-0.5 rounded-full bg-accent/10 text-accent-text font-semibold font-mono">
                   Strong / Hevy / FitNotes
                 </span>
               </div>

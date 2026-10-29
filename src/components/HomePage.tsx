@@ -85,7 +85,7 @@ const BodyMetricsModal = dynamic(() => import('@/components/BodyMetricsModal'), 
 
 import ThemeToggle from '@/components/ui/ThemeToggle';
 import { calculateMealMacros, scaleMacroGoalsToCalories } from '@/lib/macros';
-import { effectiveMacroGoals, dayScaledGoals } from '@/lib/effective-goals';
+import { effectiveMacroGoals, dayScaledGoals, fallbackMacroGoals, fallbackProteinTargetG } from '@/lib/effective-goals';
 import { toLocalDateString, calculateHydrationTarget } from '@/lib/habits';
 import { getTimeGreeting, getWeekRange } from '@/lib/formatters';
 import { useToast } from '@/components/ui/Toast';
@@ -509,15 +509,17 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     const todayMeals = meals.filter((m) => m.date === todayStr);
     const macros = calculateMealMacros(todayMeals.flatMap((m) => m.foods));
 
-    const bwKg = profile?.bodyweightKg || 72;
     // N2/N3 (audit): one canonical derivation — stored goals, else the
     // profile-derived recommendation — then today's day-kind scaling,
     // so Today and Fuel can no longer disagree about today's targets.
     // Zero change when stored goals exist and there is no day kind.
+    // Gauntlet DI-11: the last-resort fallbacks come from the shared
+    // fallback derivation too (was: calories 2400 / protein bw x 2.0
+    // here vs bw x 1.8 on the Fuel screen).
     const effectiveGoals = effectiveMacroGoals(macroGoals, profile);
     const todayScaled = dayScaledGoals(effectiveGoals, mealDayKinds?.[todayStr]);
-    const calTarget = todayScaled?.calories ?? effectiveGoals?.calories ?? 2400;
-    const protTarget = todayScaled?.proteinG ?? effectiveGoals?.proteinG ?? Math.round(bwKg * 2.0);
+    const calTarget = todayScaled?.calories ?? effectiveGoals?.calories ?? fallbackMacroGoals(profile).calories;
+    const protTarget = todayScaled?.proteinG ?? effectiveGoals?.proteinG ?? fallbackProteinTargetG(profile?.bodyweightKg);
 
     return {
       calories: Math.round(macros.calories),
@@ -1333,7 +1335,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               {/* Available Routines */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent">
+                  <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent-text">
                     {t('home.availableRoutines')}
                   </span>
                   <button
@@ -1342,7 +1344,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       setIsChangeWorkoutOpen(false);
                       onNavigate('workout');
                     }}
-                    className="text-xs font-semibold text-accent hover:underline flex items-center gap-1 cursor-pointer"
+                    className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-1 cursor-pointer"
                   >
                     <span>{t('home.managePlans')}</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -1377,7 +1379,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                                 )}
                               </div>
                               {bodyParts.length > 0 && (
-                                <span className="text-2xs text-accent font-medium block mt-0.5">
+                                <span className="text-2xs text-accent-text font-medium block mt-0.5">
                                   {bodyParts.map((b) => (BODY_PART_KEY[b] ? t(BODY_PART_KEY[b]) : b)).join(' • ')}
                                 </span>
                               )}
@@ -1393,7 +1395,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                               onClick={() => handleSelectWorkoutForToday(plan)}
                               className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex-1 text-center cursor-pointer ${
                                 isSelected
-                                  ? 'bg-accent/20 text-accent border border-accent/40'
+                                  ? 'bg-accent/20 text-accent-text border border-accent/40'
                                   : 'bg-bg-elevated hover:bg-bg-secondary text-text-primary border border-border'
                               }`}
                             >

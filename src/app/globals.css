@@ -256,12 +256,12 @@
   /* Reference Display Heading — Barlow Condensed, display roles only
      (≥28px + wordmark). 32/36 mobile, 40/44 desktop. */
   .display-title {
-    @apply font-display tracking-tight text-[32px] leading-[36px] lg:text-[40px] lg:leading-[44px] font-semibold text-text-primary;
+    @apply font-display tracking-tight text-[2rem] leading-[2.25rem] lg:text-[2.5rem] lg:leading-[2.75rem] font-semibold text-text-primary;
   }
 
   /* Typographic Hierarchy Classes */
   .page-title {
-    @apply font-sans text-[22px] leading-[28px] font-semibold tracking-tight text-text-primary;
+    @apply font-sans text-[1.375rem] leading-[1.75rem] font-semibold tracking-tight text-text-primary;
   }
 
   .section-heading {
@@ -270,7 +270,7 @@
 
   /* Section Title: disciplined 12-13px meta header */
   .section-title {
-    @apply text-[12px] sm:text-[13px] font-semibold tracking-wide text-text-muted font-sans;
+    @apply text-[0.75rem] sm:text-[0.8125rem] font-semibold tracking-wide text-text-muted font-sans;
   }
 
   .card-title {
@@ -291,8 +291,24 @@
 
   /* Sage Supporting Status & Metric Badges (#858076) */
   .badge-sage {
-    @apply bg-[#858076]/15 text-[#858076] dark:text-[#A5A096] border border-[#858076]/30 px-2 py-0.5 rounded-full text-2xs font-bold inline-flex items-center gap-1;
+    /* Gauntlet A11Y-04: light-mode text was #858076 (~3.15 on its wash);
+       #5E615A passes (5.05). Dark text unchanged (passes). */
+    @apply bg-[#858076]/15 text-[#5E615A] dark:text-[#A5A096] border border-[#858076]/30 px-2 py-0.5 rounded-full text-2xs font-bold inline-flex items-center gap-1;
   }
+
+  /* Gauntlet A11Y-04: matrix row labels. The bright habit colours pass
+     as text on dark backgrounds but fail on light chalk (1.63–2.51), so
+     light mode uses darkened variants (all >= 4.5 on #F3F0E7: workout
+     4.54, water 5.21, creatine 6.22, protein 6.26). Cell fills keep the
+     bright colours — they carry no text. */
+  .matrix-row-label-workout { color: #C2410C; }
+  .dark .matrix-row-label-workout { color: #FF6A1A; }
+  .matrix-row-label-water { color: #0369A1; }
+  .dark .matrix-row-label-water { color: #38BDF8; }
+  .matrix-row-label-creatine { color: #92400E; }
+  .dark .matrix-row-label-creatine { color: #F5B301; }
+  .matrix-row-label-protein { color: #166534; }
+  .dark .matrix-row-label-protein { color: #22C55E; }
 
   .level-bar {
     @apply h-1.5 rounded-full bg-bg-secondary border border-border/40 overflow-hidden;

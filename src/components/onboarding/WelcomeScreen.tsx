@@ -62,7 +62,7 @@ export default function WelcomeScreen({
               <button
                 type="button"
                 onClick={onRestoreBackup}
-                className="mt-2 text-xs font-semibold text-accent hover:underline cursor-pointer"
+                className="mt-2 text-xs font-semibold text-accent-text hover:underline cursor-pointer"
               >
                 Restore Saved Data &rarr;
               </button>

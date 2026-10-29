@@ -491,7 +491,7 @@ export default function LogPastWorkoutModal({
               type="button"
               onClick={onClose}
               className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-            aria-label="Close"
+            aria-label={t('common.close')}
             >
               <X className="w-5 h-5" />
             </button>
@@ -519,7 +519,7 @@ export default function LogPastWorkoutModal({
                 {/* Quick Log: mark a planned workout complete in one tap */}
                 {plannedWorkouts.length > 0 && (
                   <div className="sm:col-span-3 p-3 rounded-xl bg-accent/5 border border-accent/25 space-y-2">
-                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent block">
+                    <span className="text-2xs font-mono font-bold uppercase tracking-wider text-accent-text block">
                       {t('lp.quickLog')}
                     </span>
                     <div className="flex gap-2">
@@ -561,7 +561,7 @@ export default function LogPastWorkoutModal({
                         type="button"
                         onClick={() => setDate(todayStr)}
                         className={`text-2xs font-mono px-1.5 py-0.5 rounded transition-colors ${
-                          date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
+                          date === todayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent-text bg-bg-card'
                         }`}
                       >
                         {t('lp.today')}
@@ -570,7 +570,7 @@ export default function LogPastWorkoutModal({
                         type="button"
                         onClick={() => setDate(yesterdayStr)}
                         className={`text-2xs font-mono px-1.5 py-0.5 rounded transition-colors ${
-                          date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent bg-bg-card'
+                          date === yesterdayStr ? 'bg-accent text-bg-primary font-bold' : 'text-text-muted hover:text-accent-text bg-bg-card'
                         }`}
                       >
                         {t('lp.yesterday')}
@@ -654,7 +654,7 @@ export default function LogPastWorkoutModal({
                 <button
                   type="button"
                   onClick={() => setIsExerciseSelectorOpen(true)}
-                  className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 rounded-xl border border-accent/30 text-accent hover:border-accent cursor-pointer"
+                  className="btn-secondary py-1.5 px-3 text-xs font-bold flex items-center gap-1.5 rounded-xl border border-accent/30 text-accent-text hover:border-accent cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>{t('lp.addExercise')}</span>
@@ -671,7 +671,7 @@ export default function LogPastWorkoutModal({
                     {/* Exercise Card Header */}
                     <div className="flex items-center justify-between pb-1 border-b border-border/50">
                       <div className="flex items-center gap-2.5">
-                        <span className="w-6 h-6 rounded-lg bg-accent/15 text-accent font-mono text-xs font-bold flex items-center justify-center">
+                        <span className="w-6 h-6 rounded-lg bg-accent/15 text-accent-text font-mono text-xs font-bold flex items-center justify-center">
                           {exIdx + 1}
                         </span>
                         <div>
@@ -686,7 +686,7 @@ export default function LogPastWorkoutModal({
                         <button
                           type="button"
                           onClick={() => handleAddSet(exIdx)}
-                          className="text-xs font-semibold text-accent hover:bg-accent/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                          className="text-xs font-semibold text-accent-text hover:bg-accent/10 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>{t('lp.set')}</span>
@@ -697,6 +697,7 @@ export default function LogPastWorkoutModal({
                             onClick={() => handleRemoveExercise(exIdx)}
                             className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                             title={t('lp.removeExercise')}
+                            aria-label={t('lp.removeExercise')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -708,6 +709,7 @@ export default function LogPastWorkoutModal({
                           type="button"
                           onClick={() => setExercises((prev) => prev.map((e, i) => i === exIdx ? { ...e, reportsPain: !e.reportsPain } : e))}
                           title={t('lp.painToggleHint')}
+                            aria-label={t('lp.painToggleHint')}
                           className={`text-xs font-semibold px-2 py-1 rounded-lg transition-colors cursor-pointer ${ex.reportsPain ? 'text-red-400 bg-red-500/10' : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'}`}
                         >
                           {ex.reportsPain ? '✓ ' : ''}{t('lp.painToggle')}
@@ -718,7 +720,7 @@ export default function LogPastWorkoutModal({
                     {/* Sets Table */}
                     <div className="space-y-2">
                       {/* Table Column Labels */}
-                      <div className="grid grid-cols-12 gap-2 text-[10px] font-mono font-semibold uppercase text-text-muted px-1">
+                      <div className="grid grid-cols-12 gap-2 text-[0.625rem] font-mono font-semibold uppercase text-text-muted px-1">
                         <span className="col-span-1 text-center">#</span>
                         <span className="col-span-5 text-center">{isBW ? t('lp.added', { unit: userUnit }) : t('lp.load', { unit: userUnit })}</span>
                         <span className="col-span-3 text-center">{t('lp.reps')}</span>
@@ -784,6 +786,7 @@ export default function LogPastWorkoutModal({
                               onChange={(e) => handleSetChange(exIdx, sIdx, 'rpe', e.target.value)}
                               className="w-full bg-bg-secondary border border-border/60 rounded-xl px-1.5 py-1.5 text-xs font-mono font-bold text-text-primary outline-none focus:border-accent cursor-pointer text-center truncate"
                               title={t('lp.rpeTitle')}
+                            aria-label={t('lp.rpeTitle')}
                             >
                               {RPE_PRESETS.map((p) => (
                                 <option key={p.value} value={p.value}>
@@ -801,6 +804,7 @@ export default function LogPastWorkoutModal({
                                 onClick={() => handleRemoveSet(exIdx, sIdx)}
                                 className="p-1 rounded text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
                                 title={t('lp.removeSet')}
+                            aria-label={t('lp.removeSet')}
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
@@ -810,6 +814,7 @@ export default function LogPastWorkoutModal({
                                 onClick={() => handleDuplicateSet(exIdx, sIdx)}
                                 className="p-1 rounded text-text-muted hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
                                 title={t('lp.duplicateSet')}
+                            aria-label={t('lp.duplicateSet')}
                               >
                                 <Copy className="w-3 h-3" />
                               </button>
@@ -829,7 +834,7 @@ export default function LogPastWorkoutModal({
                               key={delta}
                               type="button"
                               onClick={() => handleAdjustWeight(exIdx, ex.sets.length - 1, delta)}
-                              className="px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/60 text-text-secondary hover:text-text-primary text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+                              className="px-2 py-0.5 rounded-lg bg-bg-secondary hover:bg-bg-tertiary border border-border/60 text-text-secondary hover:text-text-primary text-[0.625rem] font-mono font-bold active:scale-95 transition-all cursor-pointer"
                             >
                               {delta > 0 ? `+${delta}` : delta}
                             </button>
@@ -847,7 +852,7 @@ export default function LogPastWorkoutModal({
             <button
               type="button"
               onClick={() => setIsExerciseSelectorOpen(true)}
-              className="w-full py-3.5 rounded-2xl border-2 border-dashed border-border/80 hover:border-accent/60 bg-bg-secondary/30 hover:bg-accent/5 text-text-secondary hover:text-accent font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-3.5 rounded-2xl border-2 border-dashed border-border/80 hover:border-accent/60 bg-bg-secondary/30 hover:bg-accent/5 text-text-secondary hover:text-accent-text font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
               <span>{t('lp.addAnother')}</span>
