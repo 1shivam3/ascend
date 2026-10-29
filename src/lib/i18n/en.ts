@@ -72,8 +72,6 @@ export const en = {
   'home.coachSection': 'Coach',
   'home.quickActions': 'Quick actions',
   'home.monthlyChallenge': 'Monthly challenge',
-  'home.welcomeBack': 'Welcome back — last session {date}. Start light?',
-  'home.welcomeBackPlan': 'Welcome back — last session {date}, {plan}. Start light?',
   'home.syncSyncing': 'Syncing…',
   'home.syncSynced': 'Synced',
   'home.syncFailed': 'Sync failed',
