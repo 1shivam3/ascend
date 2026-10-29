@@ -514,7 +514,7 @@ export default function CoachChatTab({
       <section className="space-y-2.5" aria-label={t('coachBlock.sectionTitle')}>
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-accent" />
-          <h2 className="section-title text-[11px] mb-0">{t('coachBlock.sectionTitle').toUpperCase()}</h2>
+          <h2 className="section-title text-[0.6875rem] mb-0">{t('coachBlock.sectionTitle').toUpperCase()}</h2>
           {coachEnabled && (
             <button
               type="button"
@@ -670,7 +670,7 @@ export default function CoachChatTab({
             <button
               type="button"
               onClick={() => setStepIndex(0)}
-              className="text-xs font-bold text-accent cursor-pointer"
+              className="text-xs font-bold text-accent-text cursor-pointer"
             >
               {t('coachChat.chatEdit')}
             </button>
@@ -678,7 +678,7 @@ export default function CoachChatTab({
             <button
               type="button"
               onClick={applyUsual}
-              className="text-xs font-bold text-accent cursor-pointer"
+              className="text-xs font-bold text-accent-text cursor-pointer"
             >
               {t('coachChat.sameAsUsual')}
             </button>
@@ -699,7 +699,7 @@ export default function CoachChatTab({
                   setSelectedPlanId(missedPlan.id);
                   setSwaps({});
                 }}
-                className="text-xs font-bold text-accent cursor-pointer mt-1"
+                className="text-xs font-bold text-accent-text cursor-pointer mt-1"
               >
                 {t('coachChat.doItToday')}
               </button>
@@ -870,7 +870,7 @@ export default function CoachChatTab({
           <button
             type="button"
             onClick={onOpenWeeklyReview}
-            className="text-sm font-bold text-accent cursor-pointer"
+            className="text-sm font-bold text-accent-text cursor-pointer"
           >
             {t('coachChat.openFullReview')}
           </button>

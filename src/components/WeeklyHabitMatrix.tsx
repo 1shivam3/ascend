@@ -143,7 +143,7 @@ export default function WeeklyHabitMatrix({
           {days.map((d) => (
             <div
               key={d.dateStr}
-              className={`${singleDay ? 'w-10 shrink-0' : 'flex-1'} text-center text-[9px] ${d.dateStr === todayStr ? 'text-accent font-bold' : 'text-text-muted'}`}
+              className={`${singleDay ? 'w-10 shrink-0' : 'flex-1'} text-center text-[0.5625rem] ${d.dateStr === todayStr ? 'text-accent-text font-bold' : 'text-text-muted'}`}
             >
               {d.letter} {d.date.getDate()}
             </div>
@@ -154,7 +154,7 @@ export default function WeeklyHabitMatrix({
       {rows.map((row) => (
         <div key={row.label} className="flex items-center gap-1.5">
           <span
-            className={`w-14 shrink-0 text-[10px] uppercase font-bold ${LABEL_CLASS_BY_COLOR[row.color] ?? ''}`}
+            className={`w-14 shrink-0 text-[0.625rem] uppercase font-bold ${LABEL_CLASS_BY_COLOR[row.color] ?? ''}`}
             style={LABEL_CLASS_BY_COLOR[row.color] ? undefined : { color: row.color }}
           >
             {row.label}

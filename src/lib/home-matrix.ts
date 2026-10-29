@@ -10,6 +10,7 @@
 
 import type { WorkoutEntry, MealEntry, CreatineLog } from './types';
 import { calculateMealMacros } from './macros';
+import { dayHasWorkoutEffort } from './day-activity';
 
 export type MatrixHabitId = 'workout' | 'water' | 'creatine' | 'protein';
 
@@ -85,7 +86,10 @@ export function getDaySummary(dateStr: string, inputs: MatrixInputs): DaySummary
   const macros = sumMealMacros(meals);
   const proteinG = macros.proteinG;
   const habits: HabitStatus[] = [
-    { id: 'workout', done: workouts.length > 0, value: workouts.length, target: null },
+    // Gauntlet DI-14: "workout done" uses the shared effort predicate
+    // (day-activity.ts) — an empty workout shell no longer marks the
+    // day done, matching the streak rule.
+    { id: 'workout', done: dayHasWorkoutEffort(dateStr, inputs.workouts), value: workouts.length, target: null },
     { id: 'water', done: waterMl >= inputs.waterTargetMl * 0.85, value: waterMl, target: inputs.waterTargetMl },
     ...(inputs.showCreatine
       ? [{

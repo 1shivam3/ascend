@@ -197,6 +197,8 @@ describe('Account Deletion & Data Safety Specification', () => {
     ENV.NEXT_PUBLIC_SUPABASE_URL = 'https://fake-project.supabase.co';
     ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'fake-anon-key-123456789012345';
     ENV.SUPABASE_SERVICE_ROLE_KEY = 'fake-service-role-key-9876543210';
+    // Gauntlet SEC-19: deletion tokens now require the dedicated secret.
+    ENV.SUPABASE_DELETION_SECRET = 'test-deletion-secret-abcdef123456';
     ENV.NODE_ENV = 'test';
     ENV.ALLOW_DELETION_DEBUG_TOKEN = 'true';
 
@@ -216,6 +218,7 @@ describe('Account Deletion & Data Safety Specification', () => {
     delete ENV.NEXT_PUBLIC_SUPABASE_URL;
     delete ENV.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     delete ENV.SUPABASE_SERVICE_ROLE_KEY;
+    delete ENV.SUPABASE_DELETION_SECRET;
     delete ENV.RESEND_API_KEY;
     delete ENV.NODE_ENV;
     delete ENV.ALLOW_DELETION_DEBUG_TOKEN;
@@ -927,7 +930,7 @@ describe('Account Deletion & Data Safety Specification', () => {
 
   it('enforces rate limiting on verification requests (blocks after 5 attempts)', async () => {
     const route = await import('../src/app/api/auth/delete-account/route');
-    // Ensure rate limiter runs in-memory sliding window
+    // Ensure rate limiter runs in-memory anchored fixed window
     mockSupabase.rpc.mockResolvedValue({ data: null, error: new Error('RPC unavailable') });
 
     const makeReq = () =>

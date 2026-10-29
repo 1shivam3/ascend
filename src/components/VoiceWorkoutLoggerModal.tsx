@@ -341,7 +341,7 @@ export default function VoiceWorkoutLoggerModal({
                 const nextLang = speechLang === 'en-IN' ? 'hi-IN' : 'en-IN';
                 setSpeechLang(nextLang);
               }}
-              className="py-1 px-2 rounded-lg bg-bg-secondary border border-border/80 text-2xs font-mono font-bold text-text-secondary hover:text-accent hover:border-accent/40 flex items-center gap-1 transition-colors"
+              className="py-1 px-2 rounded-lg bg-bg-secondary border border-border/80 text-2xs font-mono font-bold text-text-secondary hover:text-accent-text hover:border-accent/40 flex items-center gap-1 transition-colors"
               title={t('voice.toggleLang')}
             >
               <Globe className="w-2.5 h-2.5 text-accent" />
@@ -440,7 +440,7 @@ export default function VoiceWorkoutLoggerModal({
 
             {/* AI Parsing Spinner */}
             {isAiParsing && (
-              <div className="flex items-center justify-center gap-1.5 text-accent text-2xs font-mono py-1">
+              <div className="flex items-center justify-center gap-1.5 text-accent-text text-2xs font-mono py-1">
                 <Sparkles className="w-3.5 h-3.5 animate-spin" />
                 <span>{t('voice.interpreting')}</span>
               </div>
@@ -463,7 +463,7 @@ export default function VoiceWorkoutLoggerModal({
                   <button
                     type="button"
                     onClick={() => setShowReportAI(true)}
-                    aria-label="Report AI content"
+                    aria-label={t('common.reportAiContent')}
                     title="Report AI content"
                     data-testid="report-ai-voice-parse"
                     className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
@@ -619,7 +619,7 @@ export default function VoiceWorkoutLoggerModal({
                       setTranscript(eg);
                       handleProcessTranscript(eg);
                     }}
-                    className="text-2xs font-mono px-2 py-0.5 rounded bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent hover:border-accent/40 transition-colors"
+                    className="text-2xs font-mono px-2 py-0.5 rounded bg-bg-secondary border border-border/60 text-text-secondary hover:text-accent-text hover:border-accent/40 transition-colors"
                   >
                     &quot;{eg}&quot;
                   </button>

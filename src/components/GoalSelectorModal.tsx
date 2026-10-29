@@ -146,7 +146,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -154,7 +154,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
         {/* Dynamic Synergy Banner */}
         {(isPowerbuilding || isRecomp || isAthletic) && (
-          <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 flex items-center gap-2 text-2xs text-accent">
+          <div className="p-2.5 rounded-xl bg-accent/10 border border-accent/30 flex items-center gap-2 text-2xs text-accent-text">
             <Zap className="w-4 h-4 shrink-0" />
             <span>
               {isPowerbuilding
@@ -231,7 +231,7 @@ export default function GoalSelectorModal({ isOpen, onClose }: GoalSelectorModal
 
         {/* Real Impact Summary */}
         <div className="p-3 rounded-xl bg-bg-secondary/70 border border-border/80 space-y-1.5 text-left">
-          <div className="flex items-center gap-1.5 text-2xs font-mono font-bold uppercase text-accent">
+          <div className="flex items-center gap-1.5 text-2xs font-mono font-bold uppercase text-accent-text">
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>{t('goals.howTitle')}</span>
           </div>

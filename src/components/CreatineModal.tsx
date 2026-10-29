@@ -126,7 +126,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -135,7 +135,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
         {/* 1-Tap Intake Action Card */}
         <div className="card p-4 bg-gradient-to-br from-bg-card to-amber-500/5 border border-amber-500/25 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="section-title text-[10px] text-amber-600 block mb-0">
+            <span className="section-title text-[0.625rem] text-amber-600 block mb-0">
               {t('creatine.todaysIntake')}
             </span>
             <span className="text-xs font-semibold text-text-muted">
@@ -169,7 +169,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
         {/* 30-Day Consistency & Saturation */}
         <div className="card p-4 bg-bg-card border border-border space-y-3">
           <div className="flex items-center justify-between">
-            <span className="section-title text-[10px] block mb-0">
+            <span className="section-title text-[0.625rem] block mb-0">
               {t('creatine.consistency')}
             </span>
             <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
@@ -198,7 +198,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                 style={{ width: `${stats.consistencyPct}%` }}
               />
             </div>
-            <p className="text-[11px] text-text-secondary leading-tight mt-1 font-medium">
+            <p className="text-[0.6875rem] text-text-secondary leading-tight mt-1 font-medium">
               {stats.message}
             </p>
           </div>
@@ -209,14 +209,14 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
               <Package className="w-4 h-4 text-accent" />
-              <span className="section-title text-[10px] block mb-0">
+              <span className="section-title text-[0.625rem] block mb-0">
                 {t('creatine.supplyTracker')}
               </span>
             </div>
             <button
               type="button"
               onClick={handleRefill}
-              className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+              className="text-xs font-bold text-accent-text hover:underline flex items-center gap-1"
             >
               <RotateCw className="w-3 h-3" />
               <span>{t('creatine.refill')}</span>
@@ -235,15 +235,15 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
 
           <div className="grid grid-cols-3 gap-2 py-2 px-3 rounded-xl bg-bg-secondary text-center text-xs font-sans">
             <div>
-              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.container')}</span>
+              <span className="text-[0.625rem] text-text-muted uppercase font-bold block">{t('creatine.container')}</span>
               <span className="font-bold text-text-primary text-sm">{containerSizeG}g</span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.remaining')}</span>
+              <span className="text-[0.625rem] text-text-muted uppercase font-bold block">{t('creatine.remaining')}</span>
               <span className="font-bold text-text-primary text-sm">{currentAmountG}g</span>
             </div>
             <div className="border-l border-border">
-              <span className="text-[10px] text-text-muted uppercase font-bold block">{t('creatine.estDays')}</span>
+              <span className="text-[0.625rem] text-text-muted uppercase font-bold block">{t('creatine.estDays')}</span>
               <span
                 className={`font-bold text-sm ${
                   isLowSupply ? 'text-amber-500' : 'text-emerald-600'
@@ -266,7 +266,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
               <Sliders className="w-3.5 h-3.5 text-accent" />
               <span>{t('creatine.configure')}</span>
             </div>
-            <span className="text-[11px] text-accent font-medium">
+            <span className="text-[0.6875rem] text-accent-text font-medium">
               {showConfig ? t('creatine.hide') : t('creatine.editSettings')}
             </span>
           </button>
@@ -275,7 +275,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
             <div className="mt-3 p-3 rounded-xl bg-bg-secondary space-y-3 text-xs animate-fade-in">
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-semibold text-text-secondary block mb-1">
+                  <label className="text-[0.6875rem] font-semibold text-text-secondary block mb-1">
                     {t('creatine.dailyDose')}
                   </label>
                   <input
@@ -289,10 +289,10 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-text-secondary block mb-1">
+                  <label className="text-[0.6875rem] font-semibold text-text-secondary block mb-1">
                     {t('creatine.doseReminder')}
                   </label>
-                  <p className="text-[11px] text-text-muted leading-relaxed pt-1.5">
+                  <p className="text-[0.6875rem] text-text-muted leading-relaxed pt-1.5">
                     {t('creatine.reminderNote')}
                   </p>
                 </div>
@@ -300,7 +300,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-semibold text-text-secondary block mb-1">
+                  <label className="text-[0.6875rem] font-semibold text-text-secondary block mb-1">
                     {t('creatine.containerSize')}
                   </label>
                   <input
@@ -314,7 +314,7 @@ export default function CreatineModal({ isOpen, onClose }: CreatineModalProps) {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-text-secondary block mb-1">
+                  <label className="text-[0.6875rem] font-semibold text-text-secondary block mb-1">
                     {t('creatine.currentRemaining')}
                   </label>
                   <input

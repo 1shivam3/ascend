@@ -611,7 +611,7 @@ export default function BarcodeScannerModal({
             type="button"
             onClick={handleClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -687,7 +687,7 @@ export default function BarcodeScannerModal({
                       <button
                         type="button"
                         onClick={startCamera}
-                        className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
+                        className="mt-3 px-4 py-2 rounded-xl bg-bg-secondary border border-border text-xs text-accent-text font-semibold flex items-center justify-center gap-1.5 hover:bg-bg-secondary/80 transition-colors cursor-pointer"
                       >
                         <RefreshCw className="w-3.5 h-3.5" /> {t('scan2.retryCamera')}
                       </button>
@@ -755,7 +755,7 @@ export default function BarcodeScannerModal({
                   <button
                     type="button"
                     onClick={handleScanAgain}
-                    className="text-2xs font-mono text-text-muted hover:text-accent flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-card border border-border cursor-pointer transition-colors"
+                    className="text-2xs font-mono text-text-muted hover:text-accent-text flex items-center gap-1 px-2 py-1 rounded-lg bg-bg-card border border-border cursor-pointer transition-colors"
                   >
                     <RefreshCw className="w-3 h-3" /> {t('scan2.scanAnother')}
                   </button>
@@ -780,7 +780,7 @@ export default function BarcodeScannerModal({
                         type="button"
                         onClick={() => labelInputRef.current?.click()}
                         disabled={isScanningLabel}
-                        className="w-full py-2 px-3 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                        className="w-full py-2 px-3 rounded-xl bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent-text font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                       >
                         {isScanningLabel ? (
                           <>
@@ -806,7 +806,7 @@ export default function BarcodeScannerModal({
                         <button
                           type="button"
                           onClick={() => setShowReportAI(true)}
-                          aria-label="Report AI content"
+                          aria-label={t('common.reportAiContent')}
                           title="Report AI content"
                           data-testid="report-ai-label-scan"
                           className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-danger transition-colors"
@@ -840,7 +840,7 @@ export default function BarcodeScannerModal({
                               className="w-full text-left px-3 py-2 text-xs font-medium text-text-primary hover:bg-bg-secondary flex items-center justify-between cursor-pointer"
                             >
                               <span>{s}</span>
-                              <span className="text-2xs font-mono text-accent">{t('scan2.autoFill')}</span>
+                              <span className="text-2xs font-mono text-accent-text">{t('scan2.autoFill')}</span>
                             </button>
                           ))}
                         </div>
@@ -867,7 +867,7 @@ export default function BarcodeScannerModal({
                         <label className="text-2xs font-mono font-semibold text-text-muted uppercase">
                           {t('scan2.per100')}
                         </label>
-                        <span className="text-2xs font-mono text-accent">{t('scan2.editable')}</span>
+                        <span className="text-2xs font-mono text-accent-text">{t('scan2.editable')}</span>
                       </div>
                       <div className="grid grid-cols-4 gap-2">
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
@@ -878,7 +878,7 @@ export default function BarcodeScannerModal({
                             placeholder="0"
                             value={manualCalories}
                             onChange={(e) => setManualCalories(e.target.value)}
-                            className="w-full text-center font-mono font-bold text-xs text-accent bg-transparent outline-none tabular-nums p-0"
+                            className="w-full text-center font-mono font-bold text-xs text-accent-text bg-transparent outline-none tabular-nums p-0"
                           />
                         </div>
                         <div className="bg-bg-card p-1.5 rounded-xl border border-border text-center">
@@ -921,7 +921,7 @@ export default function BarcodeScannerModal({
                   /* Verified Product Display */
                   <div>
                     {scannedProduct.brand && (
-                      <span className="text-2xs font-mono text-accent font-bold tracking-wider uppercase block mb-0.5">
+                      <span className="text-2xs font-mono text-accent-text font-bold tracking-wider uppercase block mb-0.5">
                         {scannedProduct.brand}
                       </span>
                     )}
@@ -989,7 +989,7 @@ export default function BarcodeScannerModal({
                 {/* Calculated Portion Macros Grid */}
                 <div className="grid grid-cols-4 gap-2 text-center font-mono">
                   <div className="p-2 rounded-xl bg-bg-card border border-border/80">
-                    <span className="text-xs font-bold text-accent block">
+                    <span className="text-xs font-bold text-accent-text block">
                       {currentFoodItem.calories}
                     </span>
                     <span className="text-2xs text-text-muted uppercase">CAL</span>

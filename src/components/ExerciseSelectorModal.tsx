@@ -99,7 +99,7 @@ export default function ExerciseSelectorModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -212,7 +212,7 @@ export default function ExerciseSelectorModal({
                 className="w-full p-2.5 rounded-xl hover:bg-bg-secondary/70 flex items-center justify-between text-left transition-colors group cursor-pointer"
               >
                 <div className="space-y-0.5 pr-2">
-                  <span className="text-xs font-semibold text-text-primary group-hover:text-accent transition-colors block">
+                  <span className="text-xs font-semibold text-text-primary group-hover:text-accent-text transition-colors block">
                     {ex.name}
                   </span>
                   <div className="flex items-center gap-1.5 text-2xs font-mono text-text-muted">
@@ -243,7 +243,7 @@ export default function ExerciseSelectorModal({
               <button
                 type="button"
                 onClick={handleAddCustom}
-                className="w-full p-2 rounded-lg border border-dashed border-accent/40 text-accent hover:bg-accent/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                className="w-full p-2 rounded-lg border border-dashed border-accent/40 text-accent-text hover:bg-accent/10 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{t('exsel.addCustom', { name: searchQuery.trim() })}</span>

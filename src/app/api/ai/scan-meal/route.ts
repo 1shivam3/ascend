@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { MealAnalysisResult } from '@/lib/types';
 import { RateLimitUnavailableError, checkRateLimit } from '@/lib/rate-limit';
-import { checkAiDailyQuota, aiQuotaExceededResponse } from '@/lib/ai-quota';
+import { checkAiDailyQuota, aiQuotaExceededResponse, AiActorAuthError } from '@/lib/ai-quota';
 import { executeMultiProviderVision } from '@/lib/ai-provider';
 import { generateOfflineMealEstimate } from '@/lib/ai-scan-meal';
-import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
+import { rateLimitResponse, rateLimitUnavailableResponse, readJsonBodyWithLimit, readMultipartFormDataWithLimit, RequestBodyTooLargeError, requestBodyTooLargeResponse, redactSecrets } from '@/lib/server-security';
+import { sanitizeScannedItems, recomputeMealTotals } from '@/lib/scan-meal-sanitize';
 
 export const runtime = 'nodejs';
 
@@ -58,6 +59,13 @@ export async function POST(req: Request) {
       return aiQuotaExceededResponse(quota.actor, quota.resetMs);
     }
   } catch (err) {
+    if (err instanceof AiActorAuthError) {
+      // Gauntlet R7: present-but-unverifiable Bearer token fails closed.
+      return NextResponse.json(
+        { error: 'UNAUTHORIZED', message: 'Invalid or expired session token. Sign in again to continue.' },
+        { status: 401 }
+      );
+    }
     if (err instanceof RateLimitUnavailableError) {
       return rateLimitUnavailableResponse();
     }
@@ -73,10 +81,12 @@ export async function POST(req: Request) {
     let hiddenIngredients: string[] = [];
 
     if (contentType.includes('multipart/form-data')) {
-      // B2 (audit, F-04 extension): content-length pre-check — formData()
-      // buffers the whole multipart body before the 10 MB file cap below
-      // can run. 12 MB covers a 10 MB image + multipart overhead.
-      // Chunked bodies (no content-length) still hit the post-parse cap.
+      // B2 (audit, F-04 extension) + gauntlet SEC-11: content-length
+      // pre-check first (fast path), then a STREAMING capped read:
+      // the old formData() call buffered the whole multipart body
+      // before the 10 MB file cap below could run, so chunked bodies
+      // (no content-length) bypassed the cap entirely. 12 MB covers
+      // a 10 MB image + multipart overhead.
       const declaredLength = Number(req.headers.get('content-length') || 0);
       if (declaredLength > 12 * 1024 * 1024) {
         return NextResponse.json(
@@ -84,7 +94,18 @@ export async function POST(req: Request) {
           { status: 413 }
         );
       }
-      const formData = await req.formData();
+      let formData: FormData;
+      try {
+        formData = await readMultipartFormDataWithLimit(req, 12 * 1024 * 1024);
+      } catch (err) {
+        if (err instanceof RequestBodyTooLargeError) {
+          return NextResponse.json(
+            { error: 'IMAGE_TOO_LARGE', message: 'Image exceeds maximum allowed size (10MB).' },
+            { status: 413 }
+          );
+        }
+        throw err;
+      }
       const imageFile = formData.get('image') as Blob | null;
 
       if (!imageFile || imageFile.size === 0) {
@@ -272,53 +293,27 @@ Return ONLY valid, parseable JSON matching this schema with NO markdown ticks or
       const parsed = execResult.data;
 
       if (parsed && Array.isArray(parsed.items)) {
-        const calculatedTotalCalories = parsed.items.reduce(
-          (sum: number, it: any) => sum + (Number(it.calories) || 0),
-          0
-        );
-        const calculatedTotalProtein = Number(
-          parsed.items
-            .reduce((sum: number, it: any) => sum + (Number(it.proteinG) || 0), 0)
-            .toFixed(1)
-        );
-        const calculatedTotalCarbs = Number(
-          parsed.items
-            .reduce((sum: number, it: any) => sum + (Number(it.carbsG) || 0), 0)
-            .toFixed(1)
-        );
-        const calculatedTotalFat = Number(
-          parsed.items
-            .reduce((sum: number, it: any) => sum + (Number(it.fatG) || 0), 0)
-            .toFixed(1)
-        );
+        // Gauntlet SEC-14: totals are ALWAYS recomputed from the
+        // sanitized items. Model-reported totals are ignored outright
+        // (the old code preferred them whenever present), and
+        // per-item values are clamped to sane maxima.
+        const sanitizedItems = sanitizeScannedItems(parsed.items);
+        const totals = recomputeMealTotals(sanitizedItems);
 
         resultJson = {
           mealName: parsed.mealName || 'Scanned Meal',
-          items: parsed.items.map((it: any) => ({
-            name: String(it.name || 'Food Item'),
-            quantity: String(it.quantity || `${it.estimatedGrams || 100}g`),
-            estimatedGrams: Number(it.estimatedGrams) || 100,
-            calories: Math.round(Number(it.calories) || 0),
-            proteinG: Number(Number(it.proteinG || 0).toFixed(1)),
-            carbsG: Number(Number(it.carbsG || 0).toFixed(1)),
-            fatG: Number(Number(it.fatG || 0).toFixed(1)),
-            confidence: (['high', 'medium', 'low'].includes(it.confidence)
-              ? it.confidence
-              : 'high') as 'high' | 'medium' | 'low',
-            preparation: it.preparation || undefined,
-            notes: it.notes || undefined,
-          })),
-          totalCalories: Math.round(parsed.totalCalories || calculatedTotalCalories),
-          totalProtein: Number((parsed.totalProtein || calculatedTotalProtein).toFixed(1)),
-          totalCarbs: Number((parsed.totalCarbs || calculatedTotalCarbs).toFixed(1)),
-          totalFat: Number((parsed.totalFat || calculatedTotalFat).toFixed(1)),
+          items: sanitizedItems,
+          totalCalories: totals.totalCalories,
+          totalProtein: totals.totalProtein,
+          totalCarbs: totals.totalCarbs,
+          totalFat: totals.totalFat,
           hiddenIngredients: parsed.hiddenIngredients || hiddenIngredients,
           confidence: (['high', 'medium', 'low'].includes(parsed.confidence)
             ? parsed.confidence
             : 'high') as 'high' | 'medium' | 'low',
           coachingNote:
             parsed.coachingNote ||
-            `Logged ~${calculatedTotalCalories} kcal and ${calculatedTotalProtein}g protein toward today's goals (${providerUsed}).`,
+            `Logged ~${totals.totalCalories} kcal and ${totals.totalProtein}g protein toward today's goals (${providerUsed}).`,
           timestamp: new Date().toISOString(),
         };
       }

@@ -94,7 +94,7 @@ export default function ImportProgramModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -106,7 +106,7 @@ export default function ImportProgramModal({
             <h4 className="text-lg font-black text-text-primary tracking-tight font-sans">
               {program.name}
             </h4>
-            <span className="text-2xs font-mono font-bold text-accent bg-accent/15 px-2 py-0.5 rounded-md">
+            <span className="text-2xs font-mono font-bold text-accent-text bg-accent/15 px-2 py-0.5 rounded-md">
               {t('import.exercises', { count: program.exercises.length })}
             </span>
           </div>
@@ -137,7 +137,7 @@ export default function ImportProgramModal({
                 className="flex items-center justify-between p-2 rounded-lg bg-bg-card border border-border/40 text-xs font-mono"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-2xs text-accent font-bold">#{idx + 1}</span>
+                  <span className="text-2xs text-accent-text font-bold">#{idx + 1}</span>
                   <span className="font-bold text-text-primary">{ex.name}</span>
                 </div>
                 <div className="text-2xs text-text-secondary">

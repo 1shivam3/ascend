@@ -131,7 +131,7 @@ export default function LoginScreen({
                 <button
                   type="button"
                   onClick={() => setIsForgotOpen(true)}
-                  className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-accent-text hover:underline cursor-pointer"
                 >
                   {t('auth.forgot')}
                 </button>

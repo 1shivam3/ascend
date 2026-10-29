@@ -5,6 +5,7 @@ import {
   aiActorDailyLimit,
   resolveAiActor,
   checkAiDailyQuota,
+  AiActorAuthError,
   DEFAULT_AI_QUOTA_SIGNED_IN_DAILY,
   DEFAULT_AI_QUOTA_GUEST_DAILY,
   type AiActorVerifier,
@@ -106,12 +107,17 @@ describe('resolveAiActor anti-spoofing', () => {
     expect(actor).toEqual({ kind: 'user', userId: 'user-a' });
   });
 
-  it('invalid token → guest bucket (no error, no account quota)', async () => {
-    const actor = await resolveAiActor(
-      req({ Authorization: 'Bearer forged-token' }),
-      fakeVerifier,
-    );
-    expect(actor.kind).toBe('guest');
+  it('invalid token → AiActorAuthError (gauntlet R7: never a silent guest downgrade)', async () => {
+    // Pre-R7 behavior bucketed a forged/expired token as a guest,
+    // which handed quota-dodgers a fresh bucket and hid expired
+    // sessions. A PRESENT but unverifiable token now throws; the AI
+    // routes map it to 401. Guests are only requests with NO token.
+    await expect(
+      resolveAiActor(req({ Authorization: 'Bearer forged-token' }), fakeVerifier),
+    ).rejects.toBeInstanceOf(AiActorAuthError);
+    await expect(
+      checkAiDailyQuota(req({ Authorization: 'Bearer forged-token' }), fakeVerifier),
+    ).rejects.toBeInstanceOf(AiActorAuthError);
   });
 
   it('spoofable IP headers are ignored: x-real-ip does not change the bucket', async () => {

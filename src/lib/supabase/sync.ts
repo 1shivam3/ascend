@@ -14,6 +14,7 @@ import {
   recomputePullSlices,
   filterRowsForPush,
   shouldPushRow,
+  shouldDropStaleProfileUpdate,
   type PullSliceKey,
 } from './reconcile';
 import { isCrossAccountSwitch as isCrossAccountSwitchFn, decideStartFreshGate } from '../start-fresh-guard';
@@ -964,6 +965,10 @@ class SupabaseSyncEngine {
       // step can recompute the slices against FRESH local state instead
       // of the stale pre-round-trip capture (see recomputePullSlices).
       const pullRemote: Partial<Record<PullSliceKey, { id: string }[]>> = {};
+      // Gauntlet DI-09: the remote profile stamp the pending
+      // updates.profile was built from, retained for the apply-time
+      // staleness re-check.
+      let pulledRemoteProfileUpdatedAt: string | null = null;
 
       if (remoteProfile.data) {
         // Authoritative cloud profile for the authenticated account —
@@ -975,13 +980,15 @@ class SupabaseSyncEngine {
         // rebuild and the push below carries the local edit to the server.
         // Cross-account rebuilds always take the server row — it is a
         // different account's data, not an older copy of this one.
-        // NOTE: the avatar lives only on this device (no avatar column in
-        // cloud profiles) — always preserve the local one, otherwise every
-        // sync wipes the user's profile picture. Same-account rebuilds also
-        // spread the local profile first so any other device-local fields
-        // survive; cross-account rebuilds start clean (no field leakage
-        // from the previous account on this device).
+        // NOTE: the avatar syncs via the profiles.avatar_url column
+        // (gauntlet R11). When the column is absent (older deployment)
+        // or empty, fall back to the device-local avatar — otherwise
+        // every sync would wipe the user's profile picture.
+        // Cross-account rebuilds start clean (no field leakage from
+        // the previous account on this device) except for the new
+        // account's own synced avatar.
         const rp = remoteProfile.data;
+        pulledRemoteProfileUpdatedAt = rp.updated_at ?? null;
         const localProfileIsNewer =
           !isCrossAccountSwitch &&
           localState.profile?.id === rp.id &&
@@ -1000,9 +1007,12 @@ class SupabaseSyncEngine {
             dietPreference: rp.diet_preference || 'non_vegetarian',
             createdAt: rp.created_at,
             ...(rp.updated_at ? { updatedAt: rp.updated_at } : {}),
-            avatar: isCrossAccountSwitch
-              ? undefined
-              : resolveAvatar(localState.profile?.avatar),
+            avatar:
+              typeof (rp as any).avatar_url === 'string' && (rp as any).avatar_url
+                ? (rp as any).avatar_url
+                : isCrossAccountSwitch
+                  ? undefined
+                  : resolveAvatar(localState.profile?.avatar),
           };
           updates.hasCompletedOnboarding = true;
           needsLocalUpdate = true;
@@ -1273,6 +1283,22 @@ class SupabaseSyncEngine {
           delete updates[key];
         }
       }
+      // Gauntlet DI-09: the profile is not a PullSliceKey, so the
+      // recompute above never re-validated updates.profile — it was
+      // built from the pre-round-trip capture. If the user edited
+      // their profile mid-sync, the fresh local profile is now newer
+      // than the remote row that update was built from: drop the
+      // stale update (the push below carries the fresh edit up).
+      if (
+        updates.profile &&
+        shouldDropStaleProfileUpdate({
+          freshLocalUpdatedAt: freshState.profile?.updatedAt,
+          remoteUpdatedAt: pulledRemoteProfileUpdatedAt,
+          isCrossAccountSwitch,
+        })
+      ) {
+        delete updates.profile;
+      }
       // The captured needsLocalUpdate reflects pre-round-trip state;
       // the only thing that matters now is whether updates still has keys.
       needsLocalUpdate = Object.keys(updates).length > 0;
@@ -1469,7 +1495,7 @@ class SupabaseSyncEngine {
       if (profileStamps === null) {
         record({ message: 'Could not read remote profile stamp; profile push skipped' });
       } else if (shouldPushRow(state.profile.updatedAt, profileStamps.get(userId))) {
-        const { error: profileError } = await supabase.from('profiles').upsert({
+        const profileRow = {
           id: userId,
           name: state.profile.name,
           gender: state.profile.gender,
@@ -1483,7 +1509,18 @@ class SupabaseSyncEngine {
           // here would make the server row look newer than any offline
           // edit made since, and the next pull would clobber it.
           updated_at: state.profile.updatedAt || new Date().toISOString(),
-        });
+        };
+        // Gauntlet R11: the avatar rides along in avatar_url. On
+        // deployments where the column does not exist yet (migration
+        // 20261029_profiles_avatar_url.sql not applied), retry
+        // without it so the profile push itself never breaks — the
+        // DI-02 missing-column tolerance pattern.
+        let { error: profileError } = await supabase
+          .from('profiles')
+          .upsert({ ...profileRow, avatar_url: state.profile.avatar ?? null });
+        if (profileError && /avatar_url/.test(profileError.message || '')) {
+          ({ error: profileError } = await supabase.from('profiles').upsert(profileRow));
+        }
         record(profileError);
       }
     }

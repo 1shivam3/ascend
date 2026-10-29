@@ -202,7 +202,7 @@ export default function WeeklyScheduleModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -349,7 +349,7 @@ export default function WeeklyScheduleModal({
                               onClick={() => handleToggleBodyPart(day, part)}
                               className={`px-2 py-0.5 rounded-full text-2xs font-semibold border transition-all ${
                                 isSelected
-                                  ? 'bg-accent/15 border-accent text-accent'
+                                  ? 'bg-accent/15 border-accent text-accent-text'
                                   : 'bg-bg-card border-border/70 text-text-muted hover:border-border'
                               }`}
                             >

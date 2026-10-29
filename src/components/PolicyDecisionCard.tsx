@@ -268,10 +268,10 @@ export default function PolicyDecisionCard({
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">
+            <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-accent-text">
               POLICY V{decision.policyVersion}
             </span>
-            <span className="text-[10px] font-mono text-text-muted">
+            <span className="text-[0.625rem] font-mono text-text-muted">
               • {t('pdc.session', { date: sessionDate })}
             </span>
           </div>
@@ -347,7 +347,7 @@ export default function PolicyDecisionCard({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-center">
         {/* Current Target */}
         <div className="p-2.5 rounded-xl bg-bg-secondary border border-border/70">
-          <span className="text-[9px] uppercase font-bold text-text-muted block">
+          <span className="text-[0.5625rem] uppercase font-bold text-text-muted block">
             {t('pdc.currentTarget')}
           </span>
           <span className="text-sm font-bold text-text-primary block mt-0.5">
@@ -356,7 +356,7 @@ export default function PolicyDecisionCard({
               : t('pdc.unconfigured')}
           </span>
           {decision.currentPrescription.targetRpe && (
-            <span className="text-[10px] text-text-muted block">
+            <span className="text-[0.625rem] text-text-muted block">
               {t('pdc.targetRpe', { rpe: decision.currentPrescription.targetRpe })}
             </span>
           )}
@@ -373,8 +373,8 @@ export default function PolicyDecisionCard({
           }`}
         >
           <span
-            className={`text-[9px] uppercase font-bold block ${
-              isOverridden ? 'text-accent' : isAccepted ? 'text-emerald-400' : 'text-text-muted'
+            className={`text-[0.5625rem] uppercase font-bold block ${
+              isOverridden ? 'text-accent-text' : isAccepted ? 'text-emerald-400' : 'text-text-muted'
             }`}
           >
             {isOverridden
@@ -389,11 +389,11 @@ export default function PolicyDecisionCard({
               : t('pdc.wxr', { weight: decision.proposedPrescription.weight ?? 0, unit: userUnit, reps: decision.proposedPrescription.reps ?? 0 })}
           </span>
           {isOverridden && decision.userOverride?.overrideReason ? (
-            <span className="text-[10px] text-accent block truncate" title={decision.userOverride.overrideReason}>
+            <span className="text-[0.625rem] text-accent-text block truncate" title={decision.userOverride.overrideReason}>
               {t('pdc.reason', { reason: decision.userOverride.overrideReason })}
             </span>
           ) : (
-            <span className="text-[10px] text-text-muted block">
+            <span className="text-[0.625rem] text-text-muted block">
               {t('pdc.targetRpe', { rpe: decision.proposedPrescription.targetRpe ?? 8 })}
             </span>
           )}
@@ -421,12 +421,12 @@ export default function PolicyDecisionCard({
         >
           <div className="flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-accent" />
-            <span className="text-[11px] font-mono font-bold text-text-secondary">
+            <span className="text-[0.6875rem] font-mono font-bold text-text-secondary">
               {t('pdc.evidence', { count: decision.evidenceCount })}
             </span>
           </div>
           <div className="flex items-center gap-1 text-text-muted">
-            <span className="text-[10px] font-mono hidden sm:inline">
+            <span className="text-[0.625rem] font-mono hidden sm:inline">
               {showEvidenceDetails ? t('pdc.hide') : t('pdc.details')}
             </span>
             {showEvidenceDetails ? (
@@ -440,7 +440,7 @@ export default function PolicyDecisionCard({
         {showEvidenceDetails && (
           <div className="p-3 border-t border-border/60 bg-bg-secondary/30 space-y-2.5 text-xs animate-fade-in">
             {/* Metric Breakdown */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[10px]">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[0.625rem]">
               <div className="p-2 rounded-lg bg-bg-secondary border border-border/60">
                 <span className="text-text-muted block">{t('pdc.prescribedSets')}</span>
                 <span className="font-bold text-text-primary">
@@ -463,7 +463,7 @@ export default function PolicyDecisionCard({
             </div>
 
             {/* Technical Rule ID & Policy Version (kept secondary) */}
-            <div className="text-[10px] font-mono text-text-muted pt-1 border-t border-border/40 flex items-center justify-between flex-wrap gap-1">
+            <div className="text-[0.625rem] font-mono text-text-muted pt-1 border-t border-border/40 flex items-center justify-between flex-wrap gap-1">
               <span>{t('pdc.ruleId', { id: decision.ruleId })}</span>
               <span>{t('pdc.model', { model: decision.progressionModel })}</span>
               <span>{t('pdc.schema', { version: decision.policyVersion })}</span>
@@ -472,11 +472,11 @@ export default function PolicyDecisionCard({
             {/* Relevant Limitations & Missing Data */}
             {hasLimitations && (
               <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 space-y-1">
-                <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[10px] uppercase font-mono">
+                <div className="flex items-center gap-1.5 text-amber-400 font-bold text-[0.625rem] uppercase font-mono">
                   <AlertTriangle className="w-3 h-3" />
                   <span>{t('pdc.limitations')}</span>
                 </div>
-                <ul className="space-y-1 text-[11px] text-text-secondary list-disc pl-4">
+                <ul className="space-y-1 text-[0.6875rem] text-text-secondary list-disc pl-4">
                   {decision.evidenceAudit.limitations.map((lim, idx) => (
                     <li key={idx} className="leading-snug">
                       {lim}
@@ -500,7 +500,7 @@ export default function PolicyDecisionCard({
           }}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono font-bold uppercase text-accent">
+            <span className="text-[0.625rem] font-mono font-bold uppercase text-accent-text">
               {t('pdc.athleteTargetOverride')}
             </span>
             <button
@@ -517,7 +517,7 @@ export default function PolicyDecisionCard({
             <div>
               <label
                 htmlFor={`override-weight-${decision.id}`}
-                className="text-[10px] font-mono text-text-muted block mb-1"
+                className="text-[0.625rem] font-mono text-text-muted block mb-1"
               >
                 {t('pdc.weightLabel', { unit: userUnit })}
               </label>
@@ -535,7 +535,7 @@ export default function PolicyDecisionCard({
             <div>
               <label
                 htmlFor={`override-reps-${decision.id}`}
-                className="text-[10px] font-mono text-text-muted block mb-1"
+                className="text-[0.625rem] font-mono text-text-muted block mb-1"
               >
                 {t('pdc.reps')}
               </label>
@@ -554,7 +554,7 @@ export default function PolicyDecisionCard({
           <div>
             <label
               htmlFor={`override-reason-${decision.id}`}
-              className="text-[10px] font-mono text-text-muted block mb-1"
+              className="text-[0.625rem] font-mono text-text-muted block mb-1"
             >
               {t('pdc.optionalReason')}
             </label>
@@ -588,7 +588,7 @@ export default function PolicyDecisionCard({
       ) : (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-border/50">
           {/* Resolved State Confirmation Text */}
-          <div className="text-[11px] font-mono text-text-muted">
+          <div className="text-[0.6875rem] font-mono text-text-muted">
             {isAccepted && (
               <div className="space-y-0.5">
                 {isApplied ? (
@@ -597,7 +597,7 @@ export default function PolicyDecisionCard({
                       <CheckCheck className="w-3.5 h-3.5 inline shrink-0" />
                       {t('pdc.appliedTo', { plan: appliedPlanName, date: decision.appliedAt?.split('T')[0] ?? '' })}
                     </span>
-                    <span className="text-[10px] text-text-muted block">
+                    <span className="text-[0.625rem] text-text-muted block">
                       {t('pdc.appliedNote')}
                     </span>
                   </>
@@ -607,7 +607,7 @@ export default function PolicyDecisionCard({
                       <CheckCircle2 className="w-3.5 h-3.5 inline shrink-0" />
                       {t('pdc.acceptedOn', { date: decision.acceptedAt ? decision.acceptedAt.split('T')[0] : t('pdc.recentReview') })}
                     </span>
-                    <span className="text-[10px] text-text-muted block">
+                    <span className="text-[0.625rem] text-text-muted block">
                       {t('pdc.acceptedNote')}
                     </span>
                   </>
@@ -620,7 +620,7 @@ export default function PolicyDecisionCard({
                   <Sparkles className="w-3.5 h-3.5 inline shrink-0" />
                   {t('pdc.overriddenMsg')}
                 </span>
-                <span className="text-[10px] text-text-muted block">
+                <span className="text-[0.625rem] text-text-muted block">
                   {t('pdc.overriddenNote')}
                 </span>
               </div>
@@ -631,7 +631,7 @@ export default function PolicyDecisionCard({
                   <XCircle className="w-3.5 h-3.5 inline shrink-0" />
                   {t('pdc.dismissedMsg')}
                 </span>
-                <span className="text-[10px] text-text-muted block">
+                <span className="text-[0.625rem] text-text-muted block">
                   {t('pdc.dismissedNote')}
                 </span>
               </div>
@@ -724,7 +724,7 @@ export default function PolicyDecisionCard({
             <div className="flex items-start justify-between gap-3 border-b border-border/70 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent">
+                  <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-accent-text">
                     {t('pdc.deliberate')}
                   </span>
                 </div>
@@ -754,7 +754,7 @@ export default function PolicyDecisionCard({
                 <p className="text-text-secondary leading-relaxed">
                   {t('pdc.noPlansBody', { exercise: decision.exerciseName })}
                 </p>
-                <p className="text-text-muted text-[11px] leading-relaxed">
+                <p className="text-text-muted text-[0.6875rem] leading-relaxed">
                   {t('pdc.noPlansHint', { exercise: decision.exerciseName })}
                 </p>
                 <div className="pt-2 flex justify-end">
@@ -769,7 +769,7 @@ export default function PolicyDecisionCard({
                 <div className="space-y-1.5">
                   <label
                     htmlFor={`select-plan-${decision.id}`}
-                    className="text-[11px] font-mono font-bold text-text-secondary block"
+                    className="text-[0.6875rem] font-mono font-bold text-text-secondary block"
                   >
                     {t('pdc.selectPlan')}
                   </label>
@@ -802,7 +802,7 @@ export default function PolicyDecisionCard({
                   <div className="space-y-1.5">
                     <label
                       htmlFor={`select-ex-instance-${decision.id}`}
-                      className="text-[11px] font-mono font-bold text-text-secondary block"
+                      className="text-[0.6875rem] font-mono font-bold text-text-secondary block"
                     >
                       {t('pdc.selectInstance')}
                     </label>
@@ -824,7 +824,7 @@ export default function PolicyDecisionCard({
                 {/* Side-by-side Targets Comparison */}
                 <div className="grid grid-cols-2 gap-2 font-mono text-center">
                   <div className="p-3 rounded-xl bg-bg-secondary border border-border/80">
-                    <span className="text-[9px] uppercase font-bold text-text-muted block">
+                    <span className="text-[0.5625rem] uppercase font-bold text-text-muted block">
                       {t('pdc.currentTemplate')}
                     </span>
                     <span className="text-sm font-bold text-text-primary block mt-1">
@@ -833,27 +833,27 @@ export default function PolicyDecisionCard({
                           : t('pdc.unsetCap')}{' '}
                       × {selectedTargetExercise?.targetReps ?? '—'} {t('pdc.reps').toLowerCase()}
                     </span>
-                    <span className="text-[10px] text-text-muted block mt-0.5">
+                    <span className="text-[0.625rem] text-text-muted block mt-0.5">
                       {t('pdc.sets', { sets: selectedTargetExercise?.targetSets ?? 3 })}
                       {selectedTargetExercise?.targetRpe ? ` @ RPE ${selectedTargetExercise.targetRpe}` : ''}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                    <span className="text-[9px] uppercase font-bold text-emerald-400 block">
+                    <span className="text-[0.5625rem] uppercase font-bold text-emerald-400 block">
                       {t('pdc.newTemplate')}
                     </span>
                     <span className="text-sm font-black text-text-primary block mt-1">
                       {t('pdc.wxr', { weight: decision.proposedPrescription.weight ?? 0, unit: decision.proposedPrescription.unit ?? userUnit, reps: decision.proposedPrescription.reps ?? 0 })}
                     </span>
-                    <span className="text-[10px] text-emerald-400 block mt-0.5">
+                    <span className="text-[0.625rem] text-emerald-400 block mt-0.5">
                       {t('pdc.setsRpe', { sets: decision.proposedPrescription.sets ?? 0, rpe: decision.proposedPrescription.targetRpe ?? 8 })}
                     </span>
                   </div>
                 </div>
 
                 {/* Progression Delta */}
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/70 border border-border/60 font-mono text-[11px]">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-bg-secondary/70 border border-border/60 font-mono text-[0.6875rem]">
                   <span className="text-text-muted">{t('pdc.progression')}</span>
                   <span className="font-bold text-accent">
                     {decision.proposedPrescription.deltaWeight && decision.proposedPrescription.deltaWeight > 0
@@ -866,10 +866,10 @@ export default function PolicyDecisionCard({
 
                 {/* Plain-Language Explanation */}
                 <div className="p-2.5 rounded-xl bg-bg-secondary/50 border border-border/50 space-y-1">
-                  <span className="text-[10px] font-mono font-bold text-text-muted uppercase block">
+                  <span className="text-[0.625rem] font-mono font-bold text-text-muted uppercase block">
                     {t('pdc.rationale')}
                   </span>
-                  <p className="text-[11px] text-text-secondary leading-relaxed">
+                  <p className="text-[0.6875rem] text-text-secondary leading-relaxed">
                     {decision.explanation}
                   </p>
                 </div>
@@ -877,11 +877,11 @@ export default function PolicyDecisionCard({
                 {/* Validation Warnings / Blocks */}
                 {validationResult && !validationResult.valid && (
                   <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 space-y-1 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-[0.6875rem]">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       <span>{t('pdc.blocked')}</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-rose-300">
+                    <p className="text-[0.6875rem] leading-relaxed text-rose-300">
                       {validationResult.message}
                     </p>
                   </div>
@@ -890,18 +890,18 @@ export default function PolicyDecisionCard({
                 {/* Already Applied Notice */}
                 {validationResult?.alreadyApplied && (
                   <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1 text-xs">
-                    <div className="flex items-center gap-1.5 font-bold font-mono text-[11px]">
+                    <div className="flex items-center gap-1.5 font-bold font-mono text-[0.6875rem]">
                       <CheckCheck className="w-3.5 h-3.5" />
                       <span>{t('pdc.alreadyApplied')}</span>
                     </div>
-                    <p className="text-[11px] leading-relaxed text-emerald-300">
+                    <p className="text-[0.6875rem] leading-relaxed text-emerald-300">
                       {t('pdc.alreadyBody')}
                     </p>
                   </div>
                 )}
 
                 {/* Explicit Invariant Disclaimer */}
-                <div className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/40 text-[10px] text-text-muted leading-relaxed font-mono">
+                <div className="p-2.5 rounded-xl bg-bg-secondary/30 border border-border/40 text-[0.625rem] text-text-muted leading-relaxed font-mono">
                   {t('pdc.guard', { plan: currentSelectedPlan?.name ?? '' })}
                 </div>
 

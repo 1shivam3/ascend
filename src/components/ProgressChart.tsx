@@ -261,7 +261,7 @@ export default function ProgressChart() {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-accent" />
-          <h2 className="section-title text-[11px] mb-0">
+          <h2 className="section-title text-[0.6875rem] mb-0">
             {metricMode === 'e1rm' ? t('chart.strengthTrend') : t('chart.volumeDrift')}
           </h2>
         </div>

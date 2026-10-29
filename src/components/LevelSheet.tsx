@@ -143,7 +143,7 @@ export default function LevelSheet({
                   <p className="text-xs font-bold text-text-primary">{t(row.labelKey)}</p>
                   <p className="text-2xs text-text-muted">{t(row.detailKey)}</p>
                 </div>
-                <span className="text-xs font-bold text-accent tabular-nums shrink-0">+{row.xp} XP</span>
+                <span className="text-xs font-bold text-accent-text tabular-nums shrink-0">+{row.xp} XP</span>
               </div>
             ))}
           </div>

@@ -101,8 +101,9 @@ export interface PullSliceInput {
  *   instead of resurrected. Server-side cleanup of those rows happens
  *   on the next push, which is unchanged behaviour for this branch.
  *
- * The profile update is deliberately NOT recomputed here — it carries
- * its own last-write-wins logic and is a documented residual (R2b-profile).
+ * The profile update is NOT recomputed here — it carries its own
+ * last-write-wins logic; its mid-sync race is guarded at the apply
+ * site instead (gauntlet DI-09, shouldDropStaleProfileUpdate below).
  * Pure function: vitest-regressable without a Supabase client.
  *
  * F28 (audit) — adoptRemoteChanges (merge branch ONLY, never replace):
@@ -248,6 +249,29 @@ export function isLocalProfileNewer(
   const remote = Date.parse(remoteUpdatedAt);
   if (Number.isNaN(local) || Number.isNaN(remote)) return false;
   return local > remote;
+}
+
+/**
+ * Gauntlet DI-09 — the profile race the recompute above cannot see.
+ *
+ * updates.profile is built during the pull from the PRE-round-trip
+ * local capture, and the profile is not a PullSliceKey, so the
+ * fresh-state recompute never re-validates it. If the user edits
+ * their profile while a sync round-trip is in flight, applying the
+ * captured update would clobber that edit with the older remote row.
+ * At apply time the caller re-checks: when the FRESH local profile is
+ * strictly newer than the remote row the pending update was built
+ * from (and this is not a cross-account switch, where the remote
+ * profile is a different account's data), the stale update must be
+ * dropped — the push that follows carries the fresh edit up instead.
+ */
+export function shouldDropStaleProfileUpdate(args: {
+  freshLocalUpdatedAt?: string | null;
+  remoteUpdatedAt?: string | null;
+  isCrossAccountSwitch: boolean;
+}): boolean {
+  if (args.isCrossAccountSwitch) return false;
+  return isLocalProfileNewer(args.freshLocalUpdatedAt, args.remoteUpdatedAt);
 }
 
 /**

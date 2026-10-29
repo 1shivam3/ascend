@@ -256,12 +256,12 @@
   /* Reference Display Heading — Barlow Condensed, display roles only
      (≥28px + wordmark). 32/36 mobile, 40/44 desktop. */
   .display-title {
-    @apply font-display tracking-tight text-[32px] leading-[36px] lg:text-[40px] lg:leading-[44px] font-semibold text-text-primary;
+    @apply font-display tracking-tight text-[2rem] leading-[2.25rem] lg:text-[2.5rem] lg:leading-[2.75rem] font-semibold text-text-primary;
   }
 
   /* Typographic Hierarchy Classes */
   .page-title {
-    @apply font-sans text-[22px] leading-[28px] font-semibold tracking-tight text-text-primary;
+    @apply font-sans text-[1.375rem] leading-[1.75rem] font-semibold tracking-tight text-text-primary;
   }
 
   .section-heading {
@@ -270,7 +270,7 @@
 
   /* Section Title: disciplined 12-13px meta header */
   .section-title {
-    @apply text-[12px] sm:text-[13px] font-semibold tracking-wide text-text-muted font-sans;
+    @apply text-[0.75rem] sm:text-[0.8125rem] font-semibold tracking-wide text-text-muted font-sans;
   }
 
   .card-title {

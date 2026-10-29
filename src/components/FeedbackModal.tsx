@@ -16,6 +16,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useStore } from '@/lib/store';
+import { getSupabase } from '@/lib/supabase/client';
 import { useToast } from '@/components/ui/Toast';
 import { useAppNavigation } from '@/lib/navigation';
 import { useTranslation } from '@/lib/i18n';
@@ -133,9 +134,26 @@ export default function FeedbackModal({
         diagnostics,
       };
 
+      // Gauntlet R5: send the session token when signed in so the
+      // server can anchor identity to the verified session (email
+      // forced from session; guest submissions stay anonymous).
+      // Guests simply send no header — feedback still works.
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const supabase = getSupabase();
+        const {
+          data: { session },
+        } = (await supabase?.auth.getSession()) || { data: { session: null } };
+        if (session?.access_token) {
+          headers.Authorization = `Bearer ${session.access_token}`;
+        }
+      } catch {
+        // No session: guest submission, no header.
+      }
+
       const res = await fetch('/api/feedback', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -226,12 +244,13 @@ export default function FeedbackModal({
           <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
             {/* Category Selector */}
             <div className="space-y-1.5">
-              <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
+              <label id="fb-category-label" className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted">
                 {t('fb.sharing')}
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2" role="group" aria-labelledby="fb-category-label">
                 <button
                   type="button"
+                  aria-pressed={category === 'review'}
                   onClick={() => setCategory('review')}
                   className={`p-2.5 rounded-xl border text-center transition-all ${
                     category === 'review'
@@ -244,6 +263,7 @@ export default function FeedbackModal({
                 </button>
                 <button
                   type="button"
+                  aria-pressed={category === 'bug'}
                   onClick={() => setCategory('bug')}
                   className={`p-2.5 rounded-xl border text-center transition-all ${
                     category === 'bug'
@@ -256,6 +276,7 @@ export default function FeedbackModal({
                 </button>
                 <button
                   type="button"
+                  aria-pressed={category === 'feature'}
                   onClick={() => setCategory('feature')}
                   className={`p-2.5 rounded-xl border text-center transition-all ${
                     category === 'feature'
@@ -292,10 +313,11 @@ export default function FeedbackModal({
                   <button
                     key={star}
                     type="button"
+                    aria-label={t('fb.rateStar', { count: star })}
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-1 hover:scale-110 active:scale-95 transition-transform"
+                    className="p-1 min-h-[28px] min-w-[28px] inline-flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
                   >
                     <Star
                       className={`w-5 h-5 transition-colors ${
@@ -311,10 +333,11 @@ export default function FeedbackModal({
 
             {/* Title / Summary */}
             <div className="space-y-1">
-              <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
+              <label htmlFor="fb-title" className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted">
                 {t('fb.titleLabel')}
               </label>
               <input
+                id="fb-title"
                 type="text"
                 placeholder={
                   category === 'bug'
@@ -333,7 +356,7 @@ export default function FeedbackModal({
             {/* Message / Description */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
+                <label htmlFor="fb-message" className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted">
                   {t('fb.description')} <span className="text-accent">*</span>
                 </label>
                 <span className="text-2xs font-mono text-text-muted">
@@ -341,6 +364,7 @@ export default function FeedbackModal({
                 </span>
               </div>
               <textarea
+                id="fb-message"
                 rows={4}
                 required
                 placeholder={categoryPlaceholders[category]}
@@ -353,10 +377,11 @@ export default function FeedbackModal({
 
             {/* Contact Email (Optional) */}
             <div className="space-y-1">
-              <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted">
+              <label htmlFor="fb-email" className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted">
                 {t('fb.emailLabel')}
               </label>
               <input
+                id="fb-email"
                 type="email"
                 placeholder="athlete@example.com"
                 value={contactEmail}

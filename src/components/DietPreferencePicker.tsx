@@ -50,7 +50,7 @@ export default function DietPreferencePicker() {
               }}
               className={`p-2.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer text-left ${
                 active
-                  ? 'border-accent bg-accent/10 text-accent'
+                  ? 'border-accent bg-accent/10 text-accent-text'
                   : 'border-border bg-bg-secondary text-text-primary hover:border-text-muted'
               }`}
             >

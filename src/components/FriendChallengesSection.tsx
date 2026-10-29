@@ -71,7 +71,7 @@ function CodeShareBox({ text, shareText }: { text: string; shareText: string }) 
         href={whatsappUrl(shareText)}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent hover:underline"
+        className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-text hover:underline"
       >
         <Share2 className="w-3 h-3" />
         WhatsApp
@@ -316,7 +316,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
           type="button"
           onClick={handleJoin}
           disabled={!joinDraft.trim()}
-          className="py-2 px-3.5 rounded-xl bg-bg-secondary border border-accent/50 text-accent text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
+          className="py-2 px-3.5 rounded-xl bg-bg-secondary border border-accent/50 text-accent-text text-xs font-bold flex items-center gap-1.5 disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
         >
           <UserPlus className="w-3.5 h-3.5" />
           {t('friends.join')}
@@ -438,7 +438,7 @@ export default function FriendChallengesSection({ active }: FriendChallengesSect
                   type="button"
                   onClick={() => handleAddScore(def)}
                   disabled={!(scoreDrafts[def.id] || '').trim()}
-                  className="py-2 px-3 rounded-xl bg-bg-primary border border-accent/50 text-accent text-xs font-bold disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
+                  className="py-2 px-3 rounded-xl bg-bg-primary border border-accent/50 text-accent-text text-xs font-bold disabled:opacity-40 active:scale-95 transition-all cursor-pointer shrink-0"
                 >
                   {t('friends.addScore')}
                 </button>

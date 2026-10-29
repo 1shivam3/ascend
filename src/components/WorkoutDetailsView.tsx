@@ -98,7 +98,7 @@ export default function WorkoutDetailsView({
           <ChevronLeft className="w-5 h-5" />
         </button>
 
-        <span className="text-xs font-semibold tracking-wider uppercase text-[#858076]">
+        <span className="text-xs font-semibold tracking-wider uppercase text-[#A5A096]">
           Workout Details
         </span>
 
@@ -110,7 +110,7 @@ export default function WorkoutDetailsView({
               aria-label="Share workout plan"
               className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
-              <Share2 className="w-4 h-4 text-[#858076]" />
+              <Share2 className="w-4 h-4 text-[#A5A096]" />
             </button>
           )}
           {onEdit && (
@@ -120,7 +120,7 @@ export default function WorkoutDetailsView({
               aria-label="Edit workout plan"
               className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
-              <Edit2 className="w-4 h-4 text-[#858076]" />
+              <Edit2 className="w-4 h-4 text-[#A5A096]" />
             </button>
           )}
           {onDelete && (
@@ -130,7 +130,7 @@ export default function WorkoutDetailsView({
               aria-label="Delete workout plan"
               className="w-11 h-11 rounded-full bg-[#212420] border border-[#2C302B] flex items-center justify-center text-[#F3F0E7] hover:bg-[#2A2E29] active:scale-95 transition-all cursor-pointer"
             >
-              <Trash2 className="w-4 h-4 text-[#858076]" />
+              <Trash2 className="w-4 h-4 text-[#A5A096]" />
             </button>
           )}
         </div>
@@ -168,17 +168,17 @@ export default function WorkoutDetailsView({
             {bodyParts.map((tag, i) => (
               <span
                 key={i}
-                className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#212420] text-[#858076] border border-[#2C302B]"
+                className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#212420] text-[#A5A096] border border-[#2C302B]"
               >
                 {tag}
               </span>
             ))}
-            <span className="text-xs text-[#858076]">
+            <span className="text-xs text-[#A5A096]">
               {estimatedDuration} min · {exerciseCount} exercises
             </span>
           </div>
 
-          <p className="text-sm text-[#858076] leading-relaxed pt-1">
+          <p className="text-sm text-[#A5A096] leading-relaxed pt-1">
             {defaultDescription}
           </p>
         </div>
@@ -189,7 +189,7 @@ export default function WorkoutDetailsView({
             <h2 className="text-base font-bold text-[#F3F0E7] tracking-tight">
               {t('train.exercises')}
             </h2>
-            <span className="text-xs text-[#858076]">
+            <span className="text-xs text-[#A5A096]">
               {exerciseCount} total
             </span>
           </div>
@@ -198,7 +198,7 @@ export default function WorkoutDetailsView({
           <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-[#212420] border border-[#2C302B]">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[#F3F0E7]">{t('packed.toggle')}</p>
-              <p className="text-xs text-[#858076] mt-0.5 leading-relaxed">
+              <p className="text-xs text-[#A5A096] mt-0.5 leading-relaxed">
                 {gymPacked && packedResult
                   ? t('packed.swappedCount', { count: packedResult.swappedCount })
                   : t('packed.previewHint')}
@@ -235,20 +235,20 @@ export default function WorkoutDetailsView({
                   className="p-3.5 rounded-xl bg-[#212420] border border-[#2C302B] flex items-center justify-between gap-3 shadow-xs hover:border-[#858076]/40 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-[#2A2E29] border border-[#2C302B] flex items-center justify-center shrink-0 text-[#858076]">
+                    <div className="w-10 h-10 rounded-lg bg-[#2A2E29] border border-[#2C302B] flex items-center justify-center shrink-0 text-[#A5A096]">
                       <Dumbbell className="w-4 h-4 text-accent" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="font-semibold text-sm text-[#F3F0E7] truncate">
                         {ex.name}
                       </h3>
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-[#858076] mt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-[#A5A096] mt-0.5">
                         <span>
                           {targetSets} sets · {targetReps} reps
                           {targetW ? ` @ ${targetW} ${ex.targetUnit || userUnit}` : ''}
                         </span>
                         {!targetW && percentSuggestions[idx] && (
-                          <span className="text-2xs text-accent font-mono">
+                          <span className="text-2xs text-accent-text font-mono">
                             {t('plan.suggestedFrom1rm', {
                               weight: percentSuggestions[idx].weights[0],
                               unit: percentSuggestions[idx].unit,
@@ -261,18 +261,18 @@ export default function WorkoutDetailsView({
                           </span>
                         )}
                         {lastPerf && lastPerf.bestWeight > 0 && (
-                          <span className="text-2xs text-[#858076]/80 font-mono">
+                          <span className="text-2xs text-[#A5A096]/80 font-mono">
                             • Prev: {lastPerf.bestWeight} {userUnit} × {lastPerf.bestReps}
                           </span>
                         )}
                       </div>
                       {gymPacked && ex.notes && (
-                        <p className="text-2xs text-accent mt-0.5">{ex.notes}</p>
+                        <p className="text-2xs text-accent-text mt-0.5">{ex.notes}</p>
                       )}
                     </div>
                   </div>
 
-                  <ChevronRight className="w-4 h-4 text-[#858076] shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-[#A5A096] shrink-0" />
                 </div>
               );
             })}

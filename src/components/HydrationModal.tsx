@@ -150,7 +150,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -187,7 +187,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         {/* Target & Current Progress Display */}
         <div className="card p-4 bg-gradient-to-br from-bg-card to-sky-500/5 border border-sky-500/20 space-y-3">
           <div className="flex items-baseline justify-between">
-            <span className="section-title text-[10px] text-sky-600 block mb-0">
+            <span className="section-title text-[0.625rem] text-sky-600 block mb-0">
               {selectedDay === 'today' ? t('hydration.todayTarget') : t('hydration.yesterdayTarget')}
             </span>
             <span className="text-xs font-semibold text-text-muted">
@@ -217,7 +217,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <div className="flex justify-between items-center text-[10px] text-text-muted font-mono font-medium">
+            <div className="flex justify-between items-center text-[0.625rem] text-text-muted font-mono font-medium">
               <span>0 ml</span>
               <span>{t('hydration.saturated', { pct })}</span>
               <span>{formatWaterLiters(currentTargetMl)}</span>
@@ -227,7 +227,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
 
         {/* 1-Tap Quick Log Strip */}
         <div className="space-y-1.5">
-          <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block px-1">
+          <span className="text-[0.625rem] uppercase font-bold text-text-muted tracking-wider block px-1">
             {t('hydration.quickLog')}
           </span>
           <div className="grid grid-cols-4 gap-2">
@@ -241,7 +241,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                 <span className="text-xs group-hover:text-sky-600 block leading-tight">
                   +{amt}
                 </span>
-                <span className="text-[10px] text-text-muted font-normal">ml</span>
+                <span className="text-[0.625rem] text-text-muted font-normal">ml</span>
               </button>
             ))}
           </div>
@@ -287,7 +287,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               <Sliders className="w-3.5 h-3.5 text-accent" />
               <span>{t('hydration.estimator')}</span>
             </div>
-            <span className="text-[11px] text-accent font-medium">
+            <span className="text-[0.6875rem] text-accent-text font-medium">
               {showConfig ? t('hydration.hide') : t('hydration.customize')}
             </span>
           </button>
@@ -297,7 +297,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-semibold text-text-primary block">{t('hydration.hotEnv')}</span>
-                  <span className="text-[11px] text-text-muted">{t('hydration.hotEnvHint')}</span>
+                  <span className="text-[0.6875rem] text-text-muted">{t('hydration.hotEnvHint')}</span>
                 </div>
                 <input
                   type="checkbox"
@@ -310,7 +310,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
               <div className="flex items-center justify-between">
                 <div>
                   <span className="font-semibold text-text-primary block">{t('hydration.manualTarget')}</span>
-                  <span className="text-[11px] text-text-muted">{t('hydration.manualTargetHint')}</span>
+                  <span className="text-[0.6875rem] text-text-muted">{t('hydration.manualTargetHint')}</span>
                 </div>
                 <input
                   type="checkbox"
@@ -322,7 +322,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
 
               {isCustom && (
                 <div className="space-y-1">
-                  <label className="text-[11px] font-semibold text-text-secondary block">
+                  <label className="text-[0.6875rem] font-semibold text-text-secondary block">
                     {t('hydration.dailyTargetMl')}
                   </label>
                   <input
@@ -352,7 +352,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
         {/* Log Batches */}
         {waterBatches.length > 0 && (
           <div className="border-t border-border pt-3 space-y-2">
-            <span className="text-[10px] uppercase font-bold text-text-muted tracking-wider block">
+            <span className="text-[0.625rem] uppercase font-bold text-text-muted tracking-wider block">
               {selectedDay === 'today' ? t('hydration.todayEntries') : t('hydration.yesterdayEntries')} ({waterBatches.length})
             </span>
             <div className="max-h-28 overflow-y-auto space-y-1 text-xs pr-1">
@@ -369,7 +369,7 @@ export default function HydrationModal({ isOpen, onClose }: HydrationModalProps)
                     key={b.id}
                     className="flex justify-between items-center py-1 px-2 rounded-lg bg-bg-secondary text-text-primary"
                   >
-                    <span className="text-text-muted flex items-center gap-1 text-[11px]">
+                    <span className="text-text-muted flex items-center gap-1 text-[0.6875rem]">
                       <Clock className="w-3 h-3" />
                       {timeStr}
                     </span>

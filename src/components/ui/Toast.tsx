@@ -104,6 +104,7 @@ export function ToastItem({
   toast: ToastMessage;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`pointer-events-auto flex items-start gap-2.5 p-3.5 rounded-xl border shadow-xl backdrop-blur-md animate-fade-in transition-all ${
@@ -149,7 +150,8 @@ export function ToastItem({
       <button
         type="button"
         onClick={onClose}
-        className="text-white/60 hover:text-white p-0.5 rounded transition-colors flex-shrink-0"
+        aria-label={t('common.close')}
+        className="text-white/60 hover:text-white p-2 -m-1 rounded transition-colors flex-shrink-0"
       >
         <X className="w-3.5 h-3.5" />
       </button>

@@ -18,6 +18,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { getSupabase } from '@/lib/supabase/client';
+import { parseDeletionUrl } from '@/lib/deletion-url';
 import { SUPPORT_EMAIL } from '@/lib/legal';
 import { toUserMessage } from '@/lib/user-error';
 import { useTranslation } from '@/lib/i18n';
@@ -62,25 +63,15 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
     let mounted = true;
 
     async function checkAuthAndUrl() {
-      // Check for token in URL fragment (#token=...&email=...) or query (?token=...&email=...)
-      // URI fragments are never transmitted to server/edge hosting logs, ensuring zero hosting log leakage
+      // Check for token in the URL fragment ONLY (#token=...&email=...).
+      // URI fragments are never transmitted to server/edge hosting logs,
+      // ensuring zero hosting log leakage. Gauntlet SEC-06: the old
+      // query-string fallback (?token=...&email=...) defeated this design
+      // — query strings ARE sent to the server and land in access logs —
+      // so it is removed outright. Links carry the token in the
+      // fragment (see deletion-mailer); query links simply do not work.
       if (typeof window !== 'undefined') {
-        let urlToken: string | null = null;
-        let urlEmail: string | null = null;
-
-        // 1. Check URI fragment (#...)
-        if (window.location.hash && window.location.hash.length > 1) {
-          const hashParams = new URLSearchParams(window.location.hash.slice(1));
-          urlToken = hashParams.get('token');
-          urlEmail = hashParams.get('email');
-        }
-
-        // 2. Check query string (?...) as fallback
-        if (!urlToken) {
-          const searchParams = new URLSearchParams(window.location.search);
-          urlToken = searchParams.get('token');
-          urlEmail = urlEmail || searchParams.get('email');
-        }
+        const { token: urlToken, email: urlEmail } = parseDeletionUrl(window.location.href);
 
         if (urlEmail) {
           setEmail(urlEmail.trim().toLowerCase());
@@ -90,7 +81,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
         }
 
         // Immediately scrub sensitive token from browser address bar, hash, and history to prevent leakage
-        if ((urlToken || urlEmail || window.location.hash || window.location.search) && window.history?.replaceState) {
+        if ((urlToken || urlEmail || window.location.hash) && window.history?.replaceState) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -488,7 +479,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
               {/* STEP 1: Request Verification Link (if not signed in and no token) */}
               {!sessionUser && !verificationToken && (
                 <div className="p-3.5 rounded-lg bg-bg-primary border border-border space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-bold text-accent">
+                  <div className="flex items-center gap-2 text-xs font-bold text-accent-text">
                     <KeyRound className="size-3.5" />
                     <span>{t('del.step1Title')}</span>
                   </div>
@@ -535,7 +526,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
                   {status === 'token_requested' && (
                     <div
                       data-testid="token-requested-banner"
-                      className="p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-accent text-2xs"
+                      className="p-2.5 rounded-lg bg-accent/10 border border-accent/30 text-accent-text text-2xs"
                     >
                       {statusDetails}
                     </div>
@@ -651,7 +642,7 @@ export function DeleteAccountView(props: DeleteAccountViewProps) {
 
       {/* Footer Links */}
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
-        <Link href="/privacy" className="text-2xs font-mono text-accent hover:underline">
+        <Link href="/privacy" className="text-2xs font-mono text-accent-text hover:underline">
           {t('del.viewPolicy')}
         </Link>
         <Link

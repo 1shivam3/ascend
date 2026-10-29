@@ -103,13 +103,14 @@ export default function ConstraintAdapterModal({
               <button
                 type="button"
                 onClick={() => setStep('summary')}
-                className="p-1 -ml-1 text-text-muted hover:text-text-primary cursor-pointer"
+                aria-label={t('common.back')}
+                className="p-1 min-h-[28px] min-w-[28px] inline-flex items-center justify-center -ml-1 text-text-muted hover:text-text-primary cursor-pointer"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
             )}
             <div>
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-accent block">
+              <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-accent-text block">
                 {t('adapt.system')}
               </span>
               <h2 className="text-xl font-black text-text-primary tracking-tight font-display">
@@ -121,7 +122,7 @@ export default function ConstraintAdapterModal({
             type="button"
             onClick={onClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-4 h-4" />
           </button>
@@ -131,7 +132,7 @@ export default function ConstraintAdapterModal({
           <>
             {/* 1. Why? Reason selector */}
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+              <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted block">
                 {t('adapt.why')}
               </span>
               <div className="grid grid-cols-3 gap-2">
@@ -146,7 +147,7 @@ export default function ConstraintAdapterModal({
                 >
                   <Clock className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'time' ? 'text-accent' : 'text-text-muted'}`} />
                   <span className="text-xs font-bold block">{t('adapt.minLimit', { minutes: selectedMinutes })}</span>
-                  <span className="text-[10px] text-text-muted">{t('adapt.shortTime')}</span>
+                  <span className="text-[0.625rem] text-text-muted">{t('adapt.shortTime')}</span>
                 </button>
 
                 <button
@@ -160,7 +161,7 @@ export default function ConstraintAdapterModal({
                 >
                   <BatteryLow className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'readiness' ? 'text-accent' : 'text-text-muted'}`} />
                   <span className="text-xs font-bold block">{t('adapt.tired')}</span>
-                  <span className="text-[10px] text-text-muted">{t('adapt.lowEnergy')}</span>
+                  <span className="text-[0.625rem] text-text-muted">{t('adapt.lowEnergy')}</span>
                 </button>
 
                 <button
@@ -177,7 +178,7 @@ export default function ConstraintAdapterModal({
                 >
                   <Dumbbell className={`w-4 h-4 mb-1.5 ${activeConstraintType === 'equipment' ? 'text-accent' : 'text-text-muted'}`} />
                   <span className="text-xs font-bold block">{t('adapt.equipmentBusy')}</span>
-                  <span className="text-[10px] text-text-muted">{t('adapt.stationTaken')}</span>
+                  <span className="text-[0.625rem] text-text-muted">{t('adapt.stationTaken')}</span>
                 </button>
               </div>
 
@@ -205,7 +206,7 @@ export default function ConstraintAdapterModal({
 
             {/* 2. ASCEND will: Clean bullet list */}
             <div className="space-y-1.5 pt-1">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+              <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted block">
                 {t('adapt.will')}
               </span>
               <div className="p-3.5 rounded-xl bg-bg-secondary/70 border border-border/70 space-y-1.5">
@@ -237,7 +238,7 @@ export default function ConstraintAdapterModal({
               <button
                 type="button"
                 onClick={() => setShowDetailedExplanation((prev) => !prev)}
-                className="text-xs text-accent hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                className="text-xs text-accent-text hover:underline flex items-center gap-1 cursor-pointer font-semibold"
               >
                 <span>{showDetailedExplanation ? t('adapt.hideDetails') : t('adapt.viewDetails')}</span>
                 {showDetailedExplanation ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -274,7 +275,7 @@ export default function ConstraintAdapterModal({
           /* Step 2: Equipment Swap Picker */
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+              <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted block">
                 {t('adapt.whichOccupied')}
               </span>
               <select
@@ -294,7 +295,7 @@ export default function ConstraintAdapterModal({
             </div>
 
             <div className="space-y-1.5">
-              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-text-muted block">
+              <span className="text-[0.625rem] font-mono font-bold uppercase tracking-wider text-text-muted block">
                 {t('adapt.selectSub')}
               </span>
               {availableSwaps.length > 0 ? (
@@ -315,7 +316,7 @@ export default function ConstraintAdapterModal({
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-xs text-text-primary">{alt.target}</span>
-                        <span className="text-[10px] font-mono text-accent">
+                        <span className="text-[0.625rem] font-mono text-accent-text">
                           {alt.targetSets}×{alt.targetReps} @{alt.targetRpe}
                         </span>
                       </div>

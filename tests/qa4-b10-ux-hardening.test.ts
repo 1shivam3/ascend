@@ -126,14 +126,17 @@ describe('QA4-030 micro-type floors', () => {
   it('ScanMealModal carries no 9px text and its macro labels are 11px', () => {
     const src = read('src/components/ScanMealModal.tsx');
     expect(src).not.toContain('text-[9px]');
-    expect(src).toContain('text-[11px] font-mono uppercase text-text-muted block">Calories</label>');
+    // Gauntlet UX-15 converted px arbitrary values to rem
+    // (0.6875rem === 11px at the default root) so Large/XLarge text
+    // settings scale micro-type too. Same floor, relative unit.
+    expect(src).toContain('text-[0.6875rem] font-mono uppercase text-text-muted block">Calories</label>');
   });
 
   it('ErrorState diagnostics render full-opacity at 11px (no /60 muted)', () => {
     const src = read('src/components/ErrorState.tsx');
     expect(src).not.toContain('text-text-muted/60');
-    expect(src).toContain('text-[11px] font-mono text-text-secondary break-words');
-    expect(src).toContain('text-[11px] font-mono text-text-secondary pt-0.5');
+    expect(src).toContain('text-[0.6875rem] font-mono text-text-secondary break-words');
+    expect(src).toContain('text-[0.6875rem] font-mono text-text-secondary pt-0.5');
   });
 });
 
@@ -197,11 +200,18 @@ describe('QA4A-008 ReportAIModal copy tells the truth', () => {
 });
 
 describe('QA4-035(b) CSP hardening', () => {
-  it("script-src no longer allows 'unsafe-eval' (production build verified eval-free)", () => {
+  it("script-src allows no 'unsafe-eval'; 'unsafe-inline' stays per the SEC-16 verdict", () => {
     const cfg = read('next.config.js');
     const scriptSrc = cfg.match(/"script-src[^"]*"/)?.[0] ?? '';
     expect(scriptSrc).not.toContain('unsafe-eval');
-    // 'unsafe-inline' is explicitly out of scope for this batch and stays.
+    // Gauntlet SEC-16 (2026-10-29): a middleware nonce CSP was
+    // built and live-tested, then reverted — the pages are
+    // statically generated, so prerendered inline scripts never
+    // receive a per-request nonce and hydration would break.
+    // 'unsafe-inline' therefore stays until an explicit
+    // force-dynamic-rendering decision; violation reporting
+    // (SEC-17 short-term) is wired in its place.
     expect(scriptSrc).toContain('unsafe-inline');
+    expect(cfg).toContain('report-uri /api/csp-report');
   });
 });

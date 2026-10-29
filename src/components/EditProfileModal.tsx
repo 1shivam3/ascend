@@ -293,7 +293,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
                 disabled={isUploadingAvatar}
-                className="text-xs font-bold text-accent hover:underline text-left cursor-pointer disabled:opacity-50"
+                className="text-xs font-bold text-accent-text hover:underline text-left cursor-pointer disabled:opacity-50"
               >
                 {isUploadingAvatar ? t('editProfile.uploading') : avatar ? t('editProfile.changePhotoShort') : t('editProfile.addPhoto')}
               </button>
@@ -333,7 +333,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
               maxLength={MAX_ATHLETE_NAME_LENGTH}
               className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
             />
-            {errors.name && <p className="text-2xs text-accent mt-0.5">{errors.name}</p>}
+            {errors.name && <p className="text-2xs text-accent-text mt-0.5">{errors.name}</p>}
           </div>
 
           {/* Gender Selection (Supports Male, Female, Other) */}
@@ -399,7 +399,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                   if (errors.dob) setErrors((prev) => ({ ...prev, dob: '' }));
                 }}
               />
-              {errors.dob && <p className="text-2xs text-accent mt-0.5">{errors.dob}</p>}
+              {errors.dob && <p className="text-2xs text-accent-text mt-0.5">{errors.dob}</p>}
             </div>
 
             <div className="space-y-1">
@@ -430,7 +430,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                   className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
                 />
               )}
-              {errors.age && <p className="text-2xs text-accent mt-0.5">{errors.age}</p>}
+              {errors.age && <p className="text-2xs text-accent-text mt-0.5">{errors.age}</p>}
             </div>
           </div>
 
@@ -453,7 +453,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 placeholder={unit === 'lbs' ? '175.0' : '79.5'}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
               />
-              {errors.weight && <p className="text-2xs text-accent mt-0.5">{errors.weight}</p>}
+              {errors.weight && <p className="text-2xs text-accent-text mt-0.5">{errors.weight}</p>}
             </div>
 
             <div className="space-y-1">
@@ -475,7 +475,7 @@ export default function EditProfileModal({ isOpen, onClose }: EditProfileModalPr
                 placeholder={unit === 'lbs' ? '70.0' : '178'}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-bg-secondary border border-border focus:border-accent text-sm text-text-primary outline-none transition-colors"
               />
-              {errors.height && <p className="text-2xs text-accent mt-0.5">{errors.height}</p>}
+              {errors.height && <p className="text-2xs text-accent-text mt-0.5">{errors.height}</p>}
             </div>
           </div>
 

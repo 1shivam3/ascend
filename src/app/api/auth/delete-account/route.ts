@@ -8,6 +8,7 @@ import {
   consumeDeletionNonce,
   DeletionTokenPayload,
 } from '@/lib/deletion-token';
+import { findUserByEmail } from '@/lib/auth-admin-lookup';
 import {
   sendDeletionVerificationEmail,
   isEmailDeliveryConfigured,
@@ -85,6 +86,24 @@ const TABLES_TO_DELETE: Array<{ table: string; idCol: string }> = [
   { table: 'profiles', idCol: 'id' },
 ];
 
+/**
+ * Gauntlet TRIAGE-PA-02: the route is POST-only. Without an explicit
+ * GET handler, the platform answered GET probes with an opaque
+ * ERR_INVALID_RESPONSE at the edge instead of a well-formed HTTP
+ * response. This returns a clean 405 JSON (and documents the
+ * contract). The unauthenticated preferences-GET half of TRIAGE-PA-02
+ * is NOT a defect: it returns only the shared
+ * DEFAULT_NOTIFICATION_PREFERENCES constant (no per-user data) so the
+ * client can render defaults offline, and it is now rate-limited
+ * (SEC-18).
+ */
+export async function GET() {
+  return NextResponse.json(
+    { error: 'METHOD_NOT_ALLOWED', message: 'Account deletion requires POST.' },
+    { status: 405, headers: { Allow: 'POST' } },
+  );
+}
+
 export async function POST(req: Request) {
   // 1. Rate limiting: 5 requests per 15 minutes per IP
   const rateLimit = await checkRateLimit(req, {
@@ -138,58 +157,16 @@ export async function POST(req: Request) {
       let matchedUserId: string | null = null;
       let matchedUserEmail: string | null = null;
 
+      // Gauntlet SEC-07 / QA4-007: email→user lookup lives in
+      // auth-admin-lookup.ts (capped at 20 pages × 100, ledger
+      // fallback for partial deletions). The old inline loop walked
+      // up to 100 pages (10,000 accounts) per unauthenticated
+      // request; the cap bounds that amplification.
       if (adminClient) {
-        // 1. Look up in Supabase Auth admin, paginating through ALL
-        // accounts. listUsers() defaults to the first 50 users, so a
-        // single unpaginated call silently misses everyone past
-        // position 50 (QA4-007). Loop pages until the user is found
-        // or a short page shows the list is exhausted. The page cap
-        // is a safety bound against a misbehaving API returning full
-        // pages forever (100 pages × 100 = 10,000 accounts).
-        try {
-          const PER_PAGE = 100;
-          const MAX_PAGES = 100;
-          for (let page = 1; page <= MAX_PAGES && !matchedUserId; page++) {
-            const { data: usersData } = await adminClient.auth.admin.listUsers({
-              page,
-              perPage: PER_PAGE,
-            });
-            const users = usersData?.users ?? [];
-            const authMatch = users.find(
-              (u) => u.email?.trim().toLowerCase() === requestEmail
-            );
-            if (authMatch) {
-              matchedUserId = authMatch.id;
-              matchedUserEmail = authMatch.email || requestEmail;
-              break;
-            }
-            if (users.length < PER_PAGE) break;
-          }
-        } catch {
-          // Swallow lookup error to prevent timing and enumeration attacks
-        }
-
-        if (!matchedUserId) {
-          // 2. Fallback check partial deletion recovery ledger — in its
-          // own try so an Auth-listing failure above cannot skip the
-          // recovery path for an already-purged account.
-          // (There is deliberately no profiles-table fallback: the
-          // production profiles table has no email column, so such a
-          // query could only ever error — QA4A-002.)
-          try {
-            const { data: partialRow } = await adminClient
-              .from('consumed_deletion_nonces')
-              .select('user_id, email')
-              .eq('email', requestEmail)
-              .eq('status', 'partial')
-              .maybeSingle();
-            if (partialRow) {
-              matchedUserId = partialRow.user_id;
-              matchedUserEmail = partialRow.email || requestEmail;
-            }
-          } catch {
-            // Swallow lookup error to prevent timing and enumeration attacks
-          }
+        const found = await findUserByEmail(adminClient, requestEmail);
+        if (found) {
+          matchedUserId = found.id;
+          matchedUserEmail = found.email;
         }
       }
 
@@ -206,6 +183,14 @@ export async function POST(req: Request) {
           token: generatedToken,
           appOrigin: req.headers.get('origin') || undefined,
         });
+      } else {
+        // Gauntlet SEC-07 timing normalization: the matched path
+        // generates a token and sends an email (slow); without this
+        // delay the unmatched path returns visibly faster, a weak
+        // enumeration oracle despite the identical response body.
+        // This narrows, not eliminates, the oracle; the 5/15 min rate
+        // limit remains the primary control.
+        await new Promise((resolve) => setTimeout(resolve, 500));
       }
 
       // Requirement 4: Prevent account enumeration — always return 200 with identical copy

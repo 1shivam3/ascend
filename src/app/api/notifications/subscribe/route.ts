@@ -152,7 +152,14 @@ export async function POST(req: Request) {
     try {
       existing = await findSubscription(supabase, endpoint);
     } catch {
-      existing = null; // upsert below surfaces any real database error
+      // Gauntlet SEC-08: fail CLOSED on lookup error. The old code set
+      // existing = null and let the upsert below re-own a victim's
+      // endpoint row (user_id from the caller), bypassing the 403
+      // ownership guard that only fires when existing.user_id is known.
+      return NextResponse.json(
+        { error: 'DATABASE_ERROR', message: 'Could not look up subscription' },
+        { status: 500 }
+      );
     }
 
     if (existing?.user_id && existing.user_id !== userId) {

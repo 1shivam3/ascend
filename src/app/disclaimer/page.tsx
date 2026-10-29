@@ -177,7 +177,7 @@ export default function DisclaimerPage() {
       <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <Link
           href="/terms"
-          className="text-2xs font-mono text-accent hover:underline"
+          className="text-2xs font-mono text-accent-text hover:underline"
         >
           View Full Terms of Service &rarr;
         </Link>

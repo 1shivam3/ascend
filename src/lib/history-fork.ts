@@ -34,8 +34,13 @@ import { isRecognizedBackupData } from './storage';
  * clobber" rule).
  */
 
-/** Single-slot archive key: the latest Start-fresh archive wins. */
+/** Archive keys (gauntlet DI-13): two slots. The latest Start-fresh
+ * archive lives under ARCHIVED_HISTORY_KEY; archiving again first
+ * rotates the current archive into ARCHIVED_HISTORY_PREV_KEY, so one
+ * accidental second Start-fresh can no longer destroy the only copy
+ * of the older history. Restore reads the main slot (unchanged). */
 export const ARCHIVED_HISTORY_KEY = 'ascend_archived_history';
+export const ARCHIVED_HISTORY_PREV_KEY = 'ascend_archived_history_prev';
 
 export interface RetainedHistoryInput {
   workouts?: unknown[] | null;

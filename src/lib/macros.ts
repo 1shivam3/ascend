@@ -1647,7 +1647,12 @@ export function validateMealFoods(foods: FoodItem[]): MealFoodsValidation {
 export function scaleFoodByQuantity(prevItem: FoodItem, newQty: number): FoodItem {
   const prevQty =
     typeof prevItem.quantity === 'number' && prevItem.quantity > 0 ? prevItem.quantity : null;
-  if (!prevQty || !(prevItem.calories > 0) || !(newQty > 0)) return prevItem;
+  // Gauntlet DI-12: refuse only when the scaling inputs are unusable
+  // (no positive previous quantity, or a non-positive target). A
+  // zero-calorie item (water, black coffee) used to be refused too,
+  // so its quantity silently never updated — scaling its (zero)
+  // macros is well-defined, so it goes through like any other item.
+  if (!prevQty || !(newQty > 0)) return prevItem;
   const ratio = newQty / prevQty;
   return {
     ...prevItem,

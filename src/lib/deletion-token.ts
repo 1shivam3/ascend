@@ -44,21 +44,22 @@ const inMemoryNonces = new Map<string, { status: NonceStatus; timestamp: number 
 
 /**
  * Resolves the secret used to sign deletion tokens.
- * Prefers server-only secrets (SUPABASE_SERVICE_ROLE_KEY or CRON_SECRET).
  *
- * P1-4: the old chain ended in a hardcoded fallback string shipped in
- * the public repo — anyone who read it could forge a deletion token
- * for any account. There is no fallback anymore: with no configured
- * secret, token creation/verification throws instead of signing with
- * a public value. Production must set SUPABASE_DELETION_SECRET (or
- * rely on the service-role key, which is server-only by construction).
+ * Gauntlet SEC-19: the old chain fell back to the service-role key,
+ * the cron secret, or APP_SECRET. Those are shared secrets with other
+ * jobs: rotating or leaking either one would forge deletion tokens,
+ * and token validity silently depended on unrelated config. Only a
+ * dedicated secret is accepted now; with none configured, token
+ * creation/verification throws instead of signing with a fallback.
+ *
+ * DEPLOY NOTE: SUPABASE_DELETION_SECRET must be set in the hosting
+ * environment BEFORE this change ships, or deletion verification
+ * breaks outright (fail-closed by design). Tokens live 15 minutes,
+ * so switching secrets invalidates at most one outstanding token
+ * generation window.
  */
 function getSigningSecret(): string {
-  const secret =
-    process.env.SUPABASE_DELETION_SECRET?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    process.env.APP_SECRET?.trim();
+  const secret = process.env.SUPABASE_DELETION_SECRET?.trim();
   if (!secret) {
     throw new Error(
       'Deletion token signing secret is not configured (set SUPABASE_DELETION_SECRET). Refusing to sign with a fallback.'

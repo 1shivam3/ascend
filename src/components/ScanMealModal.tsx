@@ -743,7 +743,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
             type="button"
             onClick={handleClose}
             className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors cursor-pointer"
-          aria-label="Close"
+          aria-label={t('common.close')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -767,7 +767,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   <button
                     type="button"
                     onClick={handleOfflineEstimate}
-                    className="text-2xs font-semibold text-accent hover:underline flex items-center gap-1"
+                    className="text-2xs font-semibold text-accent-text hover:underline flex items-center gap-1"
                   >
                     <Zap className="w-3 h-3 text-amber-400" />
                     <span>{t('scan.estimateOfflineDb')}</span>
@@ -948,7 +948,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                           onClick={() => toggleHiddenIngredient(opt)}
                           className={`text-2xs font-semibold py-1 px-2.5 rounded-lg border transition-colors ${
                             isSelected
-                              ? 'bg-accent/15 border-accent text-accent'
+                              ? 'bg-accent/15 border-accent text-accent-text'
                               : 'bg-bg-secondary border-border text-text-secondary hover:border-accent/40'
                           }`}
                         >
@@ -1029,7 +1029,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   }
                   handleOfflineEstimate();
                 }}
-                className="btn-ghost w-full py-2 text-xs text-accent font-semibold hover:bg-accent/10 flex items-center justify-center gap-1"
+                className="btn-ghost w-full py-2 text-xs text-accent-text font-semibold hover:bg-accent/10 flex items-center justify-center gap-1"
               >
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
                 <span>{t('scan.instantOffline')}</span>
@@ -1081,7 +1081,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     <button
                       type="button"
                       onClick={() => setShowReportAI(true)}
-                      aria-label="Report AI content"
+                      aria-label={t('common.reportAiContent')}
                       title="Report AI content"
                       data-testid="report-ai-scan-meal-empty"
                       className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-danger transition-colors"
@@ -1177,7 +1177,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   {/* MEAL ESTIMATE Summary Header */}
                   <div className="card p-4 bg-bg-card border border-border space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="section-title text-[11px] mb-0">{t('scan.mealEstimate')}</span>
+                      <span className="section-title text-[0.6875rem] mb-0">{t('scan.mealEstimate')}</span>
                       <div className="flex items-center gap-1.5">
                         <span className="text-2xs font-semibold px-2 py-0.5 rounded-full bg-bg-secondary text-text-muted border border-border">
                           {t('scan.estimatedBadge')}
@@ -1185,7 +1185,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                         <button
                           type="button"
                           onClick={() => setShowReportAI(true)}
-                          aria-label="Report AI content"
+                          aria-label={t('common.reportAiContent')}
                           title="Report AI content"
                           data-testid="report-ai-scan-meal"
                           className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
@@ -1289,7 +1289,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                       <button
                         type="button"
                         onClick={() => setShowAddItem(true)}
-                        className="text-xs font-bold text-accent hover:underline flex items-center gap-1"
+                        className="text-xs font-bold text-accent-text hover:underline flex items-center gap-1"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>{t('scan.addItem')}</span>
@@ -1385,7 +1385,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                               {/* Macros & Action Buttons */}
                               <div className="flex items-center gap-2 shrink-0">
                                 <div className="text-right">
-                                  <span className="font-bold text-xs text-accent block">
+                                  <span className="font-bold text-xs text-accent-text block">
                                     ~{adjItem.calories} kcal
                                   </span>
                                   <span className="text-2xs text-text-muted block">
@@ -1446,7 +1446,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                             {isEditing && (
                               <div className="pt-2 border-t border-border/60 space-y-2.5 animate-fade-in bg-bg-secondary/40 -mx-3 -mb-3 p-3 rounded-b-xl">
                                 <div className="space-y-1">
-                                  <label htmlFor={`scan-edit-name-${idx}`} className="text-[11px] font-mono uppercase tracking-wider text-text-muted block">{t('scan.foodNameLabel')}</label>
+                                  <label htmlFor={`scan-edit-name-${idx}`} className="text-[0.6875rem] font-mono uppercase tracking-wider text-text-muted block">{t('scan.foodNameLabel')}</label>
                                   <input
                                     id={`scan-edit-name-${idx}`}
                                     type="text"
@@ -1459,8 +1459,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
                                 <div className="space-y-1">
                                   <div className="flex items-center justify-between">
-                                    <label htmlFor={`scan-edit-grams-${idx}`} className="text-[11px] font-mono uppercase tracking-wider text-text-muted">{t('scan.portionWeight')}</label>
-                                    <span className="text-[10px] text-accent font-mono font-medium">{t('scan.autoScales')}</span>
+                                    <label htmlFor={`scan-edit-grams-${idx}`} className="text-[0.6875rem] font-mono uppercase tracking-wider text-text-muted">{t('scan.portionWeight')}</label>
+                                    <span className="text-[0.625rem] text-accent-text font-mono font-medium">{t('scan.autoScales')}</span>
                                   </div>
                                   <div className="flex items-center gap-1.5">
                                     <button
@@ -1490,17 +1490,17 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 {/* Direct Macro Adjustments */}
                                 <div className="grid grid-cols-4 gap-1.5 pt-1">
                                   <div>
-                                    <label htmlFor={`scan-edit-calories-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">Calories</label>
+                                    <label htmlFor={`scan-edit-calories-${idx}`} className="text-[0.6875rem] font-mono uppercase text-text-muted block">Calories</label>
                                     <input
                                       id={`scan-edit-calories-${idx}`}
                                       type="number"
                                       value={editCalories}
                                       onChange={(e) => setEditCalories(Math.max(0, Number(e.target.value)))}
-                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-accent outline-none text-center font-bold"
+                                      className="w-full py-1 px-1.5 rounded bg-bg-card border border-border text-xs font-mono text-accent-text outline-none text-center font-bold"
                                     />
                                   </div>
                                   <div>
-                                    <label htmlFor={`scan-edit-protein-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.proteinLabel')}</label>
+                                    <label htmlFor={`scan-edit-protein-${idx}`} className="text-[0.6875rem] font-mono uppercase text-text-muted block">{t('scan.proteinLabel')}</label>
                                     <input
                                       id={`scan-edit-protein-${idx}`}
                                       type="number"
@@ -1510,7 +1510,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     />
                                   </div>
                                   <div>
-                                    <label htmlFor={`scan-edit-carbs-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.carbsLabel')}</label>
+                                    <label htmlFor={`scan-edit-carbs-${idx}`} className="text-[0.6875rem] font-mono uppercase text-text-muted block">{t('scan.carbsLabel')}</label>
                                     <input
                                       id={`scan-edit-carbs-${idx}`}
                                       type="number"
@@ -1520,7 +1520,7 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                     />
                                   </div>
                                   <div>
-                                    <label htmlFor={`scan-edit-fat-${idx}`} className="text-[11px] font-mono uppercase text-text-muted block">{t('scan.fatLabel')}</label>
+                                    <label htmlFor={`scan-edit-fat-${idx}`} className="text-[0.6875rem] font-mono uppercase text-text-muted block">{t('scan.fatLabel')}</label>
                                     <input
                                       id={`scan-edit-fat-${idx}`}
                                       type="number"

@@ -468,7 +468,7 @@ export default function ReminderCenterModal({ isOpen, onClose }: ReminderCenterM
                             onClick={() => handleToggleDay(item.day)}
                             className={`flex-1 py-1.5 rounded-lg text-2xs font-mono font-bold transition-colors cursor-pointer ${
                               isSelected
-                                ? 'bg-accent/20 text-accent border border-accent/40'
+                                ? 'bg-accent/20 text-accent-text border border-accent/40'
                                 : 'bg-bg-secondary text-text-muted border border-border'
                             }`}
                           >

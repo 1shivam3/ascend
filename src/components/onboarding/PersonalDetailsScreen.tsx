@@ -199,7 +199,7 @@ export default function PersonalDetailsScreen({
                 {t('onboarding.dateOfBirth')}
               </span>
               {previewAge !== null && (
-                <span className="shrink-0 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/30 text-accent text-xs font-bold">
+                <span className="shrink-0 px-2.5 py-1 rounded-full bg-accent/10 border border-accent/30 text-accent-text text-xs font-bold">
                   {t('profile.age')} {previewAge}
                 </span>
               )}

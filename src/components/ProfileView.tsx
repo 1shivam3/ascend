@@ -440,7 +440,7 @@ export default function ProfileView({ onBack, onNavigate }: ProfileViewProps) {
             } catch {}
             onNavigate?.('settings');
           }}
-          className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border text-xs font-bold text-text-secondary hover:text-accent transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+          className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-bg-card hover:bg-bg-secondary border border-border text-xs font-bold text-text-secondary hover:text-accent-text transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
         >
           <LogOut className="w-4 h-4 text-accent" />
           <span>{t('settings.dataAccount')}</span>

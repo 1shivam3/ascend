@@ -151,7 +151,7 @@ export default function PolicyDecisionLedger({
               <Icon className="w-3.5 h-3.5" />
               <span>{t(tab.labelKey)}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                className={`text-[0.625rem] px-1.5 py-0.2 rounded-full font-bold ${
                   isActive ? 'bg-white/20 text-white' : 'bg-bg-secondary text-text-muted'
                 }`}
               >

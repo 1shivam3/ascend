@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useModalA11y } from '@/lib/use-modal-a11y';
+import { tabListKeyDown } from '@/lib/tab-keyboard';
 import { useStore } from '@/lib/store';
 import { toUserMessage } from '@/lib/user-error';
 import { isSetCompleted, BodyMetricEntry, WorkoutEntry, resolvePrimaryGoal } from '@/lib/types';
@@ -941,7 +942,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {/* ── TOP SEGMENTED CONTROL: STRENGTH | BODY | CONSISTENCY ───────────── */}
       {/* Visible on Screen 14 overview */}
       {activeTab === 'strength' && strengthSubView === 'overview' && (
-        <div role="tablist" aria-label={t('progress.viewsAria')} className="segmented-control">
+        <div role="tablist" aria-label={t('progress.viewsAria')} className="segmented-control" onKeyDown={tabListKeyDown((i) => { const k = (['strength', 'body', 'consistency'] as const)[i]; if (k === 'strength') { setActiveTab('strength'); setStrengthSubView('overview'); } else { setActiveTab(k); } })}>
           {(['strength', 'body', 'consistency'] as const).map((tabKey) => (
             <button
               key={tabKey}
@@ -1064,7 +1065,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                   <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionBig3')}</h2>
                   <span className="text-xs font-semibold text-text-secondary">{t('progress.chartBig3')}</span>
                 </div>
-                <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
+                <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
               </div>
               <SegmentedControl
                 ariaLabel={t('progress.chartBig3')}
@@ -1139,7 +1140,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 <div>
                   <h2 className="text-base font-bold text-text-primary">{t('progress.spotQuestionE1rm', { lift: heroLift.name })}</h2>
                   <span className="text-xs font-semibold text-text-secondary">{heroLift.name}</span>
-                  <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
+                  <span className="ml-2 rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
                 </div>
                 <ChevronRight className="w-4 h-4 text-text-muted group-hover:text-accent transition-colors" />
               </div>
@@ -1245,7 +1246,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <button
                 type="button"
                 onClick={() => setStrengthSubView('records')}
-                className="text-xs font-semibold text-accent hover:underline flex items-center gap-0.5 cursor-pointer"
+                className="text-xs font-semibold text-accent-text hover:underline flex items-center gap-0.5 cursor-pointer"
               >
                 <span>{t('progress.viewAll')}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -1284,7 +1285,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'strength' && strengthSubView !== 'overview' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Progress | Records */}
-          <div role="tablist" aria-label={t('progress.strengthViewsAria')} className="segmented-control">
+          <div role="tablist" aria-label={t('progress.strengthViewsAria')} className="segmented-control" onKeyDown={tabListKeyDown((i) => setStrengthSubView((['analytics', 'records'] as const)[i]))}>
             <button
               type="button"
               role="tab"
@@ -1354,7 +1355,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       <div className="text-4xl font-black text-text-primary font-sans tabular-nums">
                         {selectedExerciseAnalytics.latest1RM ? `${selectedExerciseAnalytics.latest1RM} ${userUnit}` : '—'}
                       </div>
-                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent">{t('common.estimatedShort')}</span>
+                      <span className="rounded bg-accent/15 px-1.5 py-0.5 text-2xs font-bold text-accent-text">{t('common.estimatedShort')}</span>
                     </div>
                     <span className="text-2xs text-text-muted font-mono">Estimated 1RM (best single lift, worked out from your sets)</span>
                   </div>
@@ -1444,7 +1445,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                           <span className="text-2xs font-mono font-medium text-text-secondary block">
                             {formatShortDate(s.date)}
                           </span>
-                          <span className="text-2xs font-mono text-[#858076] font-bold">
+                          <span className="text-2xs font-mono text-[#5E615A] dark:text-[#A5A096] font-bold">
                             {s.deltaStr}
                           </span>
                         </div>
@@ -1468,7 +1469,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'body' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Measurements | Photos */}
-          <div role="tablist" aria-label={t('progress.bodyViewsAria')} className="segmented-control">
+          <div role="tablist" aria-label={t('progress.bodyViewsAria')} className="segmented-control" onKeyDown={tabListKeyDown((i) => setBodySubView((['measurements', 'photos'] as const)[i]))}>
             <button
               type="button"
               role="tab"
@@ -1707,7 +1708,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                       <div key={photo.id} className="relative group rounded-xl overflow-hidden border border-border bg-bg-elevated">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={photo.dataUrl} alt={`Progress photo from ${photo.date}`} className="w-full aspect-[3/4] object-cover" />
-                        <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-[10px] font-mono text-white flex items-center justify-between">
+                        <div className="absolute bottom-0 inset-x-0 px-2 py-1 bg-black/55 text-[0.625rem] font-mono text-white flex items-center justify-between">
                           <span>{formatProgressDate(photo.date)}{photo.label ? ` · ${photo.label}` : ''}</span>
                           <button
                             type="button"
@@ -1737,7 +1738,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
       {activeTab === 'consistency' && (
         <div className="space-y-4 animate-fade-in">
           {/* Sub-tabs: Overview | Streaks */}
-          <div role="tablist" aria-label={t('progress.consistencyViewsAria')} className="segmented-control">
+          <div role="tablist" aria-label={t('progress.consistencyViewsAria')} className="segmented-control" onKeyDown={tabListKeyDown((i) => setConsistencySubView((['overview', 'streaks'] as const)[i]))}>
             <button
               type="button"
               role="tab"
@@ -1827,7 +1828,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
               <div className="card p-5 bg-bg-card border border-border space-y-3.5 shadow-xs">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-text-primary font-sans">{t('progress.last4Weeks')}</h3>
-                  <span className="text-xs font-mono font-bold text-[#858076]">
+                  <span className="text-xs font-mono font-bold text-[#5E615A] dark:text-[#A5A096]">
                     {consistencyStats.fourWeeksCompleted}/{consistencyStats.fourWeeksTarget} workouts ({consistencyStats.consistencyPct}%)
                   </span>
                 </div>
@@ -1962,7 +1963,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <Share2 className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">
                       {t('progress.weeklyShareCard')}
                     </h4>
                     <p className="text-2xs text-text-muted">{t('progress.exportCardHint')}</p>
@@ -1980,11 +1981,11 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                 className="w-full p-3 rounded-xl bg-bg-secondary hover:bg-bg-secondary/80 border border-border flex items-center justify-between transition-colors text-left group cursor-pointer"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#858076]/20 text-[#858076] flex items-center justify-center shrink-0">
+                  <div className="w-9 h-9 rounded-lg bg-[#858076]/20 text-[#5E615A] dark:text-[#A5A096] flex items-center justify-center shrink-0">
                     <Scale className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">
                       {t('progress.logBodyweightMeasurements')}
                     </h4>
                     <p className="text-2xs text-text-muted">{t('progress.measurementsHint')}</p>
@@ -2006,7 +2007,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <Trophy className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">
                       {t('progress.meetPlanner')}
                     </h4>
                     <p className="text-2xs text-text-muted">{t('progress.meetHint')}</p>
@@ -2028,7 +2029,7 @@ export default function ProgressPage({ initialTab = 'strength', onNavigate }: Pr
                     <Award className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent transition-colors">
+                    <h4 className="text-xs font-bold text-text-primary group-hover:text-accent-text transition-colors">
                       {t('progress.dotsStandards')}
                     </h4>
                     <p className="text-2xs text-text-muted">

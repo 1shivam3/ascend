@@ -1,5 +1,5 @@
 import { UserProfile, PersonalRecord, WorkoutEntry, MealEntry, ProgressPhoto } from './types';
-import { getLocalTodayStr, isValidEntryDate } from './formatters';
+import { normalizeRowDates, normalizeAndDedupeBodyMetricDates } from './formatters';
 
 /** Mirrors PROGRESS_PHOTOS_KEY in store.ts (duplicated to avoid an import cycle). */
 const PROGRESS_PHOTOS_STORAGE_KEY = 'ascend_progress_photos_v1';
@@ -387,19 +387,53 @@ export function exportFullBackupJSON(): string {
   }
 }
 
+/** Gauntlet R12: hard cap for backup imports + recorded reason. */
+export const MAX_BACKUP_IMPORT_BYTES = 10 * 1024 * 1024; // 10 MB
+
+let lastImportError: string | null = null;
+
+/** The reason the most recent import attempt was rejected, if any. */
+export function getLastImportError(): string | null {
+  return lastImportError;
+}
+
+let lastBackupNormalizedCount = 0;
+
+/** Gauntlet DI-07: rows whose dates the last import normalized. */
+export function getLastImportNormalizedCount(): number {
+  return lastBackupNormalizedCount;
+}
+
 export function importFullBackupJSON(jsonString: string): boolean {
+  lastImportError = null;
   if (typeof window === 'undefined') return false;
   try {
-    if (!jsonString || typeof jsonString !== 'string' || jsonString.length > 50 * 1024 * 1024) {
-      // Reject empty or oversized payloads (> 50MB)
+    if (!jsonString || typeof jsonString !== 'string') {
+      lastImportError = 'That backup file is empty or unreadable.';
+      return false;
+    }
+    // Gauntlet R12: the cap was 50 MB — no real backup is anywhere
+    // near that, and a hostile or corrupted file that large can hang
+    // a phone during JSON.parse. 10 MB is still far above any real
+    // backup, and the rejection reason is recorded for the caller.
+    if (jsonString.length > MAX_BACKUP_IMPORT_BYTES) {
+      lastImportError = `Backup file is too large (max ${Math.round(
+        MAX_BACKUP_IMPORT_BYTES / (1024 * 1024),
+      )} MB).`;
       return false;
     }
 
     const rawData = JSON.parse(jsonString);
-    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) return false;
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+      lastImportError = 'That file is not a valid ASCEND backup.';
+      return false;
+    }
     // Shape gate (QA4-013): reject payloads with no recognized ASCEND
     // fields instead of merging nothing and reporting success.
-    if (!isRecognizedBackupData(rawData)) return false;
+    if (!isRecognizedBackupData(rawData)) {
+      lastImportError = 'That file does not look like an ASCEND backup.';
+      return false;
+    }
 
     // Deep sanitize imported object to prevent prototype pollution and unauthorized credential injection
     const data = sanitizeImportObject(rawData);
@@ -450,22 +484,25 @@ export function importFullBackupJSON(jsonString: string): boolean {
       hasCompletedOnboarding: true,
       _hasHydrated: true,
     };
-    // F12 (preview-fix): same entry-date rule as importAllData — this
-    // path writes the blob directly, bypassing importAllData's
-    // validation, so a backup carrying future/malformed body-metric
-    // dates would otherwise restore them verbatim. Invalid dates
-    // become today; valid dates pass unchanged.
+    // F12 (preview-fix) + gauntlet DI-07: same entry-date rule as
+    // importAllData — this path writes the blob directly, bypassing
+    // importAllData's validation, so ALL date-bearing collections are
+    // normalized here too (valid days unchanged, salvageable formats
+    // localized, invalid/future → today), and body metrics are
+    // deduped by date. The count is readable via
+    // getLastImportNormalizedCount().
+    lastBackupNormalizedCount = 0;
+    for (const key of ['workouts', 'meals', 'prs'] as const) {
+      if (Array.isArray(nextState[key])) {
+        const { rows, normalizedCount } = normalizeRowDates(nextState[key]);
+        lastBackupNormalizedCount += normalizedCount;
+        nextState[key] = rows;
+      }
+    }
     if (Array.isArray(nextState.bodyMetrics)) {
-      const today = getLocalTodayStr();
-      nextState.bodyMetrics = nextState.bodyMetrics.map((m: any) =>
-        m && typeof m === 'object'
-          ? {
-              ...m,
-              date:
-                typeof m.date === 'string' && isValidEntryDate(m.date) ? m.date : today,
-            }
-          : m,
-      );
+      const { rows, normalizedCount } = normalizeAndDedupeBodyMetricDates(nextState.bodyMetrics);
+      lastBackupNormalizedCount += normalizedCount;
+      nextState.bodyMetrics = rows;
     }
     delete nextState.customBarcodes;
     delete nextState.version;
@@ -488,6 +525,7 @@ export function importFullBackupJSON(jsonString: string): boolean {
     return true;
   } catch (err) {
     console.error('Error importing full backup JSON', err);
+    lastImportError = 'That backup file could not be read (invalid or corrupted file).';
     return false;
   }
 }
