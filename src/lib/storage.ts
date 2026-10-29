@@ -404,6 +404,54 @@ export function getLastImportNormalizedCount(): number {
   return lastBackupNormalizedCount;
 }
 
+/**
+ * Restores the two backup payload parts that live OUTSIDE the store
+ * blob: custom barcodes (merged into their own storage key) and
+ * progress photos (their dedicated key). Shared by importFullBackupJSON
+ * (the direct-blob path, used by Onboarding) and the Settings restore,
+ * which since re-audit DI-R4 routes store fields exclusively through
+ * the store's validated, R1-stamped importAllData path and calls this
+ * helper only for the side keys — the same split the store's own
+ * restoreArchivedHistory already uses.
+ *
+ * Expects a sanitized payload object (importFullBackupJSON passes its
+ * sanitized copy; the barcode block sanitizes its sub-object again,
+ * and photos are shape-filtered, so a raw parsed payload is equally
+ * safe). Mutates the passed object the way the original inline code
+ * did: progressPhotos is removed so it never lands in the store blob.
+ */
+export function restoreBackupSideData(data: Record<string, any>): void {
+  if (typeof window === 'undefined' || !data || typeof data !== 'object') return;
+
+  // Restore custom barcodes if present
+  if (data.customBarcodes && typeof data.customBarcodes === 'object') {
+    const current = getCustomBarcodes();
+    const safeBarcodes = sanitizeImportObject(data.customBarcodes);
+    const merged = { ...current, ...safeBarcodes };
+    save('custom_barcodes', merged);
+  }
+
+  // Restore progress photos to their dedicated key if present (they
+  // live outside the store blob by design).
+  if (Array.isArray(data.progressPhotos)) {
+    const validPhotos = data.progressPhotos.filter(
+      (p: any) =>
+        p &&
+        typeof p === 'object' &&
+        typeof p.id === 'string' &&
+        typeof p.dataUrl === 'string' &&
+        p.dataUrl.startsWith('data:image/')
+    );
+    try {
+      window.localStorage.setItem(
+        PROGRESS_PHOTOS_STORAGE_KEY,
+        JSON.stringify(validPhotos.slice(0, 24))
+      );
+    } catch {}
+    delete data.progressPhotos;
+  }
+}
+
 export function importFullBackupJSON(jsonString: string): boolean {
   lastImportError = null;
   if (typeof window === 'undefined') return false;
@@ -438,33 +486,11 @@ export function importFullBackupJSON(jsonString: string): boolean {
     // Deep sanitize imported object to prevent prototype pollution and unauthorized credential injection
     const data = sanitizeImportObject(rawData);
 
-    // Restore custom barcodes if present
-    if (data.customBarcodes && typeof data.customBarcodes === 'object') {
-      const current = getCustomBarcodes();
-      const safeBarcodes = sanitizeImportObject(data.customBarcodes);
-      const merged = { ...current, ...safeBarcodes };
-      save('custom_barcodes', merged);
-    }
-
-    // Restore progress photos to their dedicated key if present (they
-    // live outside the store blob by design).
-    if (Array.isArray(data.progressPhotos)) {
-      const validPhotos = data.progressPhotos.filter(
-        (p: any) =>
-          p &&
-          typeof p === 'object' &&
-          typeof p.id === 'string' &&
-          typeof p.dataUrl === 'string' &&
-          p.dataUrl.startsWith('data:image/')
-      );
-      try {
-        window.localStorage.setItem(
-          PROGRESS_PHOTOS_STORAGE_KEY,
-          JSON.stringify(validPhotos.slice(0, 24))
-        );
-      } catch {}
-      delete data.progressPhotos;
-    }
+    // Restore the parts that live outside the store blob (custom
+    // barcodes, progress photos) — shared with the Settings restore
+    // path (re-audit DI-R4). Mutates `data` as the original inline
+    // code did (progressPhotos removed before the blob build below).
+    restoreBackupSideData(data);
 
     // Restore main ascend_store
     const rawStore = window.localStorage.getItem('ascend_store');

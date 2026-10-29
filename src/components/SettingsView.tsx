@@ -29,7 +29,7 @@ import {
   ChevronDown,
   MessageCircle,
 } from 'lucide-react';
-import { exportFullBackupJSON, importFullBackupJSON } from '@/lib/storage';
+import { exportFullBackupJSON, restoreBackupSideData } from '@/lib/storage';
 import { buildCombinedCsvExport } from '@/lib/csv-export';
 import { getLocalTodayStr } from '@/lib/formatters';
 import { useSupabaseSync } from '@/lib/supabase/useSupabaseSync';
@@ -454,7 +454,18 @@ export default function SettingsView({ onBack, onNavigate, isModal = false }: Se
         const content = event.target?.result as string;
         const parsed = JSON.parse(content);
         const success = importAllData(parsed);
-        importFullBackupJSON(content);
+        // Re-audit DI-R4: single-path restore. Store fields go ONLY
+        // through importAllData above (validated, archive-first, and
+        // R1-stamped so sync's newest-wins keeps the restore). The old
+        // second call rewrote the ascend_store blob from the raw
+        // payload, silently discarding those stamps — on the next
+        // reload the unstamped blob won and sync could undo restored
+        // rows. The two payload parts that live outside the store
+        // (custom barcodes, progress photos) go to their own keys via
+        // the shared helper, mirroring restoreArchivedHistory.
+        if (success) {
+          restoreBackupSideData(parsed);
+        }
         if (success) {
           // Gauntlet DI-07: report any dates the import had to fix.
           const fixedDates = getLastImportNormalizedCount();
