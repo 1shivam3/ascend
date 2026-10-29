@@ -4,14 +4,18 @@ import type { NextRequest } from 'next/server';
 /**
  * Central API floor (gauntlet SEC-20).
  *
+ * Next 16 renamed the middleware convention to proxy.ts (this file,
+ * formerly src/middleware.ts; the exported handler is `proxy`). The
+ * behavior below is unchanged from the middleware version.
+ *
  * /api/* used to rely on every route opting into rate limiting
- * individually. This middleware adds the floor for ALL API traffic:
+ * individually. This proxy adds the floor for ALL API traffic:
  * unknown API paths are denied outright (the route set below is the
  * inventory from src/app/api), and every known route gets a default
  * per-IP ceiling on top of its own stricter limits. The limiter is
  * an in-memory anchored fixed window (same semantics as
- * lib/rate-limit.ts) implemented inline: middleware runs on the edge
- * runtime and must not import the Node-oriented limiter module.
+ * lib/rate-limit.ts) implemented inline: the proxy must not import
+ * the Node-oriented limiter module.
  * Per-instance, like the in-memory fallback everywhere else.
  *
  * SEC-16 NOTE: a nonce-CSP branch for pages was built here and
@@ -66,7 +70,7 @@ function clientIp(req: NextRequest): string {
   return req.headers.get('x-real-ip') || 'unknown';
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const normalized =
     pathname.length > 1 && pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
