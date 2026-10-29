@@ -3050,4 +3050,12 @@ export const hi: Partial<Record<StringKey, string>> = {
   'coachChat.you': 'आप',
   'coachChat.coach': 'कोच',
   'coachChat.dailyLeft': 'आज {n} संदेश बाकी हैं',
+
+  // ── App chrome (re-audit UX-R4; Hindi machine-written, flagged for
+  // native-speaker review like the coach-chat additions) ──
+  'app.skipToContent': 'मुख्य सामग्री पर जाएं',
+  'app.offlineBanner': 'ऑफ़लाइन जिम मोड सक्रिय है • विवरण के लिए टैप करें',
+  'sw.updateAvailable': 'नया संस्करण उपलब्ध है',
+  'sw.refresh': 'रीफ़्रेश करें',
+  'sw.dismissUpdate': 'अपडेट सूचना बंद करें',
 };

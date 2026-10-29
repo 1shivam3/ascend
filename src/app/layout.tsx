@@ -6,6 +6,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { NavigationProvider } from '@/lib/navigation';
 import TelemetryProvider from '@/components/TelemetryProvider';
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister';
+import SkipLink from '@/components/SkipLink';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'optional' });
 // Devanagari fallback (Round 4, SIM-P2-02): Inter is Latin-only, so Hindi
@@ -109,13 +110,9 @@ export default function RootLayout({
         <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body className={`${inter.variable} ${barlowCondensed.variable} ${notoDevanagari.variable} ${inter.className} font-sans`}>
-        {/* Skip to main content for accessibility */}
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-accent focus:text-accent-on focus:font-bold focus:rounded-lg focus:shadow-lg focus:outline-none"
-        >
-          Skip to main content
-        </a>
+        {/* Skip to main content for accessibility (re-audit UX-R4:
+            label localized via the SkipLink client component) */}
+        <SkipLink />
 
         {/* Environment-driven & consent-gated telemetry */}
         <TelemetryProvider />

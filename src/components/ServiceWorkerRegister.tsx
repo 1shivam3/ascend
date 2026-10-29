@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@/lib/i18n';
 
 /**
  * Gauntlet R10: how long after a dismissal the update banner may
@@ -33,9 +34,12 @@ export function shouldResurfaceUpdate(
  *
  * Note: this component renders outside ToastProvider (see layout.tsx),
  * and useToast() degrades to a no-op without a provider, so the prompt
- * is a minimal fixed banner instead of a toast.
+ * is a minimal fixed banner instead of a toast. Its copy still goes
+ * through i18n (re-audit UX-R4) — useTranslation reads the store
+ * directly and needs no provider.
  */
 export default function ServiceWorkerRegister() {
+  const { t } = useTranslation();
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const promptedRef = useRef(false);
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null);
@@ -132,18 +136,18 @@ export default function ServiceWorkerRegister() {
       role="status"
       className="fixed bottom-24 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center justify-between gap-3 rounded-xl bg-accent px-4 py-3 text-accent-on shadow-lg"
     >
-      <span className="text-sm font-semibold">New version available</span>
+      <span className="text-sm font-semibold">{t('sw.updateAvailable')}</span>
       <span className="flex items-center gap-2">
         <button
           type="button"
           onClick={() => window.location.reload()}
           className="cursor-pointer rounded-lg bg-white/20 px-3 py-1.5 text-sm font-semibold hover:bg-white/30"
         >
-          Refresh
+          {t('sw.refresh')}
         </button>
         <button
           type="button"
-          aria-label="Dismiss update notice"
+          aria-label={t('sw.dismissUpdate')}
           onClick={dismissUpdate}
           className="cursor-pointer rounded-lg px-2 py-1.5 text-sm font-semibold text-accent-on"
         >

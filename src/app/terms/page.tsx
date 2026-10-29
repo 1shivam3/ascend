@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import LegalLangSync from '@/components/LegalLangSync';
 import { Dumbbell, ArrowLeft, Scale, Shield, AlertTriangle, FileText, CheckCircle2, Sparkles, HardDrive, Flag } from 'lucide-react';
 import type { Metadata } from 'next';
 import { SUPPORT_EMAIL, LEGAL_LAST_UPDATED, LEGAL_VERSION } from '@/lib/legal';
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main id="main-content" className="min-h-screen bg-bg-primary text-text-primary px-4 py-8 max-w-xl mx-auto space-y-6">
+      <LegalLangSync />
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border/60 pb-4">
         <Link

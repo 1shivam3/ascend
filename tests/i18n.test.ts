@@ -110,7 +110,9 @@ describe('i18n wiring coverage (pinned)', () => {
   // exception is justified here.
   const EXPECTED_UNWIRED = [
     // No user-visible strings (verified): pure layout/logic/providers.
-    'src/components/ServiceWorkerRegister.tsx',
+    // LegalLangSync (re-audit UX-R5) carries no copy — it only syncs
+    // <html lang> from the stored locale on the legal pages.
+    'src/components/LegalLangSync.tsx',
     'src/components/TabSkeleton.tsx',
     'src/components/TelemetryProvider.tsx',
     'src/components/ui/Badge.tsx',
@@ -129,6 +131,9 @@ describe('i18n wiring coverage (pinned)', () => {
     'src/app/delete-account/page.tsx',
     'src/app/disclaimer/page.tsx',
     'src/app/error.tsx',
+    // Re-audit PERF-R3: global-error mirrors error.tsx — it replaces the
+    // root layout on failure, so it must stay self-contained/off-i18n.
+    'src/app/global-error.tsx',
     'src/app/layout.tsx',
     'src/app/loading.tsx',
     'src/app/privacy/page.tsx',

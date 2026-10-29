@@ -8,7 +8,13 @@
  */
 
 import { DeleteAccountView } from '@/components/DeleteAccountView';
+import LegalLangSync from '@/components/LegalLangSync';
 
 export default function DeleteAccountPage() {
-  return <DeleteAccountView />;
+  return (
+    <>
+      <LegalLangSync />
+      <DeleteAccountView />
+    </>
+  );
 }
