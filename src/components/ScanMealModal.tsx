@@ -8,6 +8,22 @@ import { analyzeMealPhoto, recalculateMealResult, generateOfflineMealEstimate } 
 import { resolveIndianMeta, householdDraftFor } from '@/lib/indian-foods';
 import { OIL_LEVELS, defaultOilForFood, applyOilDelta, tspForOilLevel, servingsForOil } from '@/lib/oil-adjust';
 import { validateImageFile, resizeAndCompressImage, captureVideoFrame, MAX_IMAGE_DIMENSION } from '@/lib/image-processing';
+import {
+  classifyPhoto,
+  detectPhoto,
+  isOfflineScanAvailable,
+  shouldUseOfflineScan,
+  routeOfflineResult,
+  buildOfflineDraft,
+  buildDraftFromDetections,
+  buildItemForCandidate,
+  isResolvedLabel,
+  alternativesFor,
+  displayNameForLabel,
+  type OfflineCandidate,
+  type OfflineDetection,
+} from '@/lib/offline-scan';
+import { isNativeApp } from '@/lib/app-settings';
 import { estimateMacros } from '@/lib/macros';
 import { tildeForFoods } from '@/lib/meal-display';
 import { getLocalTodayStr } from '@/lib/formatters';
@@ -79,8 +95,19 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Flow states: 'select' | 'analyzing' | 'review'
-  const [step, setStep] = useState<'select' | 'analyzing' | 'review'>('select');
+  // Flow states: 'select' | 'analyzing' | 'choices' | 'review'
+  // ('choices' = offline scan wasn't sure — user picks from top-3)
+  const [step, setStep] = useState<'select' | 'analyzing' | 'choices' | 'review'>('select');
+
+  // Offline (on-device) scan state — Android app only, all null/false
+  // on web, where nothing in this flow changes.
+  const [offlineReady, setOfflineReady] = useState(false);
+  const [offlineCandidates, setOfflineCandidates] = useState<OfflineCandidate[] | null>(null);
+  const [offlineDetections, setOfflineDetections] = useState<OfflineDetection[] | null>(null);
+  const [draftLabel, setDraftLabel] = useState<string | null>(null);
+  const [scanSource, setScanSource] = useState<'offline' | 'server' | null>(null);
+  const [isOfflineClassifying, setIsOfflineClassifying] = useState(false);
+  const offlineRunRef = useRef(0);
 
   // Input state: only stores the compact resized/compressed Blob (~80-150KB), NEVER raw 20MB Camera File!
   const [processedBlob, setProcessedBlob] = useState<Blob | null>(null);
@@ -246,6 +273,30 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
     };
   }, [stopLiveCamera]);
 
+  // Offline scan availability: native app + preference on + the
+  // bundled model actually loads. Anything less → the modal behaves
+  // exactly as it did before this feature existed.
+  const offlinePrefEnabled = store.uiPreferences.offlineScan !== false;
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      if (!isNativeApp() || !offlinePrefEnabled) {
+        if (!cancelled) setOfflineReady(false);
+        return;
+      }
+      const modelAvailable = await isOfflineScanAvailable();
+      if (!cancelled) {
+        setOfflineReady(
+          shouldUseOfflineScan({ isNative: true, prefEnabled: offlinePrefEnabled, modelAvailable })
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, offlinePrefEnabled]);
+
   const { registerBackHandler } = useAppNavigation();
 
   // If live camera is active inside the scanner, Back stops the camera
@@ -288,6 +339,12 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       scanAbortControllerRef.current.abort();
       scanAbortControllerRef.current = null;
     }
+    offlineRunRef.current++;
+    setIsOfflineClassifying(false);
+    setOfflineCandidates(null);
+    setOfflineDetections(null);
+    setDraftLabel(null);
+    setScanSource(null);
     stopLiveCamera();
     cleanupPreview();
     setStep('select');
@@ -410,6 +467,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setOilLevels({});
       setAnalysis(result);
       setMealName(result.mealName || t('scan.estimatedMealName'));
+      setScanSource(null);
+      setDraftLabel(null);
       setStep('review');
       toast.info(t('scan.offlineEstimateMsg'), t('scan.offlineEstimateTitle'));
     } catch (err: any) {
@@ -443,6 +502,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
       setOilLevels({});
       setAnalysis(result);
       setMealName(result.mealName || t('scan.defaultMealName'));
+      setScanSource('server');
+      setDraftLabel(null);
       setStep('review');
     } catch (err: any) {
       if (err?.name === 'AbortError' || err?.message?.toLowerCase().includes('abort')) {
@@ -462,6 +523,121 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         scanAbortControllerRef.current = null;
       }
     }
+  };
+
+  // ── Offline (on-device) scan flow ──────────────────────────────────
+  // Runs FIRST when available: a confident, DB-resolvable top-1 lands
+  // straight in review; anything else goes to the choices step. The
+  // server flow above remains untouched as the escape hatch.
+
+  const landOfflineDraft = (candidates: OfflineCandidate[], label: string) => {
+    const draft = buildOfflineDraft(candidates, label);
+    if (!draft) return;
+    const result = applyLearnedPortionPreferences(draft);
+    setOilLevels({});
+    setAnalysis(result);
+    setMealName(result.mealName || 'Scanned Meal');
+    setDraftLabel(label);
+    setScanSource('offline');
+    setStep('review');
+  };
+
+  // Multi-item landing: one review item per qualifying detection.
+  const landDetectionDraft = (detections: OfflineDetection[]) => {
+    const draft = buildDraftFromDetections(detections);
+    if (!draft) return false;
+    const result = applyLearnedPortionPreferences(draft);
+    setOilLevels({});
+    setAnalysis(result);
+    setMealName(result.mealName || 'Scanned Meal');
+    setDraftLabel(draft.items[0]?.name ?? null);
+    setScanSource('offline');
+    setStep('review');
+    return true;
+  };
+
+  const startOfflineScan = async () => {
+    if (!processedBlob) {
+      toast.error('Please take or upload a food photo first.', 'No Image');
+      return;
+    }
+    const runId = ++offlineRunRef.current;
+    setScanError(null);
+    setIsOfflineClassifying(true);
+    setStep('analyzing');
+    try {
+      // Detector-first: containers → crops → v11. Falls through to
+      // the whole-photo classify when the detector finds nothing or
+      // its bridge method is unavailable (older plugin build).
+      let detections: OfflineDetection[] = [];
+      try {
+        detections = await detectPhoto(processedBlob);
+      } catch {
+        detections = [];
+      }
+      if (offlineRunRef.current !== runId) return; // reset/closed mid-run
+      if (detections.length > 0) {
+        setOfflineDetections(detections);
+        if (landDetectionDraft(detections)) return;
+        // No detection qualified for auto-draft: offer every crop's
+        // top candidates as choices (user picks; unmapped labels
+        // never draft — the cloud scan stays the fallback).
+        setOfflineCandidates(detections.flatMap((d) => d.candidates));
+        setStep('choices');
+        return;
+      }
+      const candidates = await classifyPhoto(processedBlob);
+      if (offlineRunRef.current !== runId) return; // reset/closed mid-run
+      setOfflineCandidates(candidates);
+      if (routeOfflineResult(candidates) === 'draft') {
+        landOfflineDraft(candidates, candidates[0].label);
+      } else {
+        setStep('choices');
+      }
+    } catch (err: any) {
+      if (offlineRunRef.current !== runId) return;
+      console.error('Offline scan failed:', err);
+      setScanError(
+        'Offline scan could not read this photo. You can use the AI scan or the offline database estimate instead.'
+      );
+      setStep('select');
+    } finally {
+      if (offlineRunRef.current === runId) setIsOfflineClassifying(false);
+    }
+  };
+
+  const pickOfflineCandidate = (label: string) => {
+    if (!offlineCandidates) return;
+    // Unmapped labels never draft (no honest nutrition exists for
+    // them): stay on choices, where the AI scan is the fallback.
+    if (!isResolvedLabel(label)) {
+      toast.info(
+        'No nutrition entry for this dish yet — use the AI scan for it instead.',
+        'Not in the offline list'
+      );
+      return;
+    }
+    landOfflineDraft(offlineCandidates, label);
+  };
+
+  // "Did you mean…?" — swap the drafted dish for another candidate,
+  // keeping any extra items the user already added below it.
+  const swapDraftCandidate = (label: string) => {
+    if (!offlineCandidates || !analysis) return;
+    const candidate = offlineCandidates.find((c) => c.label === label);
+    if (!candidate) return;
+    const swapped = buildItemForCandidate(candidate);
+    if (!swapped) return; // unresolved label — never drafts
+    const itemsCopy = [...analysis.items];
+    itemsCopy[0] = swapped;
+    setAnalysis(recalculateMealResult(analysis, itemsCopy));
+    setMealName(itemsCopy[0].name);
+    setDraftLabel(label);
+    setOilLevels((prev) => {
+      const next = { ...prev };
+      delete next[0];
+      return next;
+    });
   };
 
   const openEditItem = (index: number) => {
@@ -623,6 +799,8 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
         });
         setOilLevels({});
         setAnalysis(refinedResult);
+        setScanSource('server');
+        setDraftLabel(null);
         toast.success(t('scan.aiRefinedMsg'), t('scan.aiRefinedTitle'));
         setRefinementInput('');
       } catch {
@@ -959,15 +1137,41 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                   </div>
                 </div>
 
-                {/* Action CTA */}
-                <button
-                  type="button"
-                  onClick={startAnalysis}
-                  className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/20 mt-2"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>{t('scan.analyzeCta')}</span>
-                </button>
+                {/* Action CTA — offline scan first when available
+                    (native + preference + model); the server AI flow
+                    stays one tap away and is the only flow on web. */}
+                {offlineReady ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={startOfflineScan}
+                      className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/20 mt-2"
+                    >
+                      <Zap className="w-4 h-4" />
+                      <span>{t('scan.offlineCta')}</span>
+                    </button>
+                    <p className="text-center text-2xs text-text-muted">
+                      {t('scan.offlineNote')}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={startAnalysis}
+                      className="btn-secondary w-full py-2.5 text-xs font-bold flex items-center justify-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4 text-accent" />
+                      <span>{t('scan.useAiInstead')}</span>
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={startAnalysis}
+                    className="btn-primary w-full py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md shadow-accent/20 mt-2"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>{t('scan.analyzeCta')}</span>
+                  </button>
+                )}
 
                 <div className="flex items-center justify-center gap-2 pt-1 text-2xs text-text-muted">
                   <span>{t('scan.preferOffline')}</span>
@@ -994,17 +1198,21 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
 
             <div className="space-y-1.5">
               <h3 className="font-black text-lg text-text-primary">
-                {t('scan.analyzingTitle')}
+                {isOfflineClassifying ? t('scan.recognizingOffline') : t('scan.analyzingTitle')}
               </h3>
               <p className="text-xs text-text-muted max-w-xs mx-auto">
-                {t('scan.analyzingHint')}
+                {isOfflineClassifying
+                  ? t('scan.offlineNote')
+                  : t('scan.analyzingHint')}
               </p>
             </div>
 
-            <div className="flex items-center justify-center gap-1.5 text-2xs text-text-secondary font-mono">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />
-              <span>{t('scan.checkingDb')}</span>
-            </div>
+            {!isOfflineClassifying && (
+              <div className="flex items-center justify-center gap-1.5 text-2xs text-text-secondary font-mono">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-accent" />
+                <span>{t('scan.checkingDb')}</span>
+              </div>
+            )}
 
             <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2 max-w-xs mx-auto">
               <button
@@ -1014,6 +1222,10 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                     scanAbortControllerRef.current.abort();
                     scanAbortControllerRef.current = null;
                   }
+                  // Abandon any in-flight offline run too — its result
+                  // is ignored via the run id.
+                  offlineRunRef.current++;
+                  setIsOfflineClassifying(false);
                   setStep('select');
                 }}
                 className="btn-secondary w-full py-2 text-xs font-semibold"
@@ -1034,6 +1246,88 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                 <Zap className="w-3.5 h-3.5 text-amber-400" />
                 <span>{t('scan.instantOffline')}</span>
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── STEP 2b: OFFLINE CHOICES (model unsure — user picks) ──────── */}
+        {step === 'choices' && (
+          <div className="p-4 sm:p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+            {previewUrl && (
+              <div className="relative rounded-2xl overflow-hidden border border-border aspect-video bg-black/40 flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={previewUrl}
+                  alt="Meal preview"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <h3 className="font-black text-base text-text-primary">
+                {t('scan.offlineChoicesTitle')}
+              </h3>
+              <p className="text-xs text-text-muted leading-relaxed">
+                {t('scan.offlineChoicesHint')}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {(offlineCandidates ?? []).map((candidate) => (
+                <button
+                  key={candidate.label}
+                  type="button"
+                  onClick={() => pickOfflineCandidate(candidate.label)}
+                  className="w-full p-3 rounded-xl border border-border bg-bg-card hover:border-accent/60 transition-colors flex items-center justify-between gap-2 text-left"
+                >
+                  <span className="font-bold text-sm text-text-primary">
+                    {displayNameForLabel(candidate.label)}
+                    {!isResolvedLabel(candidate.label) && (
+                      <span className="block text-[11px] font-medium text-text-muted">
+                        No nutrition entry yet — use the AI scan for this dish
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-xs font-mono font-semibold text-accent shrink-0">
+                    {Math.round(candidate.score * 100)}%
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-col gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={startAnalysis}
+                className="btn-primary py-2.5 text-xs font-bold flex items-center justify-center gap-1.5"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>{t('scan.useAiInstead')}</span>
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleOfflineEstimate}
+                  className="btn-secondary py-2.5 text-xs font-semibold flex-1 flex items-center justify-center gap-1.5"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Estimate with Offline DB</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cleanupPreview();
+                    setOfflineCandidates(null);
+                    setOfflineDetections(null);
+                    setStep('select');
+                  }}
+                  className="btn-secondary py-2.5 text-xs font-semibold flex-1 flex items-center justify-center gap-1.5"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span>Retake Photo</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1174,6 +1468,23 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
               ) : (
                 /* Successful Detection Review State */
                 <>
+                  {/* Offline provenance + escape hatch to the AI scan */}
+                  {scanSource === 'offline' && (
+                    <div className="p-3 rounded-xl bg-accent/5 border border-accent/25 flex items-center justify-between gap-2 animate-fade-in">
+                      <span className="text-2xs text-text-secondary flex items-center gap-1.5 leading-relaxed">
+                        <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>{t('scan.offlineNote')}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={startAnalysis}
+                        className="text-2xs font-bold text-accent hover:underline shrink-0"
+                      >
+                        {t('scan.useAiInstead')}
+                      </button>
+                    </div>
+                  )}
+
                   {/* MEAL ESTIMATE Summary Header */}
                   <div className="card p-4 bg-bg-card border border-border space-y-2">
                     <div className="flex items-center justify-between">
@@ -1413,6 +1724,32 @@ export default function ScanMealModal({ isOpen, onClose, onMealSaved }: ScanMeal
                                 </div>
                               </div>
                             </div>
+
+                            {/* Offline alternatives — the model's other
+                                candidates, one tap swaps the draft. */}
+                            {idx === 0 &&
+                              scanSource === 'offline' &&
+                              draftLabel &&
+                              alternativesFor(offlineCandidates ?? [], draftLabel).length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                                  <span className="text-3xs text-text-muted font-mono shrink-0">
+                                    {t('scan.didYouMean')}
+                                  </span>
+                                  {alternativesFor(offlineCandidates ?? [], draftLabel).map(
+                                    (alt) => (
+                                      <button
+                                        key={alt.label}
+                                        type="button"
+                                        onClick={() => swapDraftCandidate(alt.label)}
+                                        className="px-2 py-0.5 rounded-md text-3xs font-semibold bg-bg-secondary text-text-secondary border border-border/60 hover:border-accent hover:text-accent transition-colors cursor-pointer"
+                                      >
+                                        {displayNameForLabel(alt.label)} ·{' '}
+                                        {Math.round(alt.score * 100)}%
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              )}
 
                             {/* Ghee/oil honesty prompt — the AI can't see
                                 absorbed fat; one tap corrects it. */}

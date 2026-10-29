@@ -1,0 +1,5 @@
+bowl_katori
+flatbread
+rice_mound
+side_item
+whole_dish

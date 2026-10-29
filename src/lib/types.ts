@@ -711,6 +711,10 @@ export interface ScannedFoodItem {
   confidence: 'high' | 'medium' | 'low';
   preparation?: string;
   notes?: string;
+  /** Offline-scan provenance: detector box (fractions of the photo). */
+  detectionBox?: { x1: number; y1: number; x2: number; y2: number };
+  /** Offline-scan provenance: detector container class. */
+  container?: string;
 }
 
 export interface MealAnalysisResult {
