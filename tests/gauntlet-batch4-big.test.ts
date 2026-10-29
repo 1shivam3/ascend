@@ -132,6 +132,20 @@ describe('SEC-16 + SEC-20: middleware', () => {
     // A different IP is unaffected.
     expect(middleware(apiReq('/api/feedback', '198.51.100.78')).status).toBe(200);
   });
+
+  it('SEC-R3: probing unknown routes burns the same ceiling (ceiling runs before the 404)', () => {
+    // Re-audit SEC-R3: the ceiling check moved above the allowlist, so
+    // route enumeration is throttled too. First probes still get the
+    // plain 404 shape; once the per-IP budget is spent the floor
+    // answers 429 instead.
+    const ip = '198.51.100.99';
+    expect(middleware(apiReq('/api/definitely-not-a-route', ip)).status).toBe(404);
+    let last: ReturnType<typeof middleware> | null = null;
+    for (let i = 0; i < 300; i += 1) {
+      last = middleware(apiReq('/api/definitely-not-a-route', ip));
+    }
+    expect(last!.status).toBe(429);
+  });
 });
 
 describe('SEC-20: every API route keeps its own rate limit (dispatch exempt by design)', () => {
