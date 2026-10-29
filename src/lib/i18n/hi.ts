@@ -71,8 +71,6 @@ export const hi: Partial<Record<StringKey, string>> = {
   'home.coachSection': 'कोच',
   'home.quickActions': 'क्विक एक्शन',
   'home.monthlyChallenge': 'मासिक चैलेंज',
-  'home.welcomeBack': 'वापसी पर स्वागत है — पिछला सेशन {date}। हल्के से शुरू करें।',
-  'home.welcomeBackPlan': 'वापसी पर स्वागत है — पिछला सेशन {date}, {plan}। हल्के से शुरू करें।',
   'home.syncSyncing': 'सिंक हो रहा है…',
   'home.syncSynced': 'सिंक हो गया',
   'home.syncFailed': 'सिंक विफल',

@@ -609,29 +609,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     : syncStatus === 'error' ? t('home.syncFailed')
     : t('home.syncLocalOnly');
 
-  // Welcome-back: returning after >= 2 days away, no guilt copy. A user
-  // with no workouts ever gets the new-user state, not this line.
-  const lastWorkout = useMemo(() => {
-    if (!workouts || workouts.length === 0) return null;
-    const sorted = [...workouts].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    return sorted[0] || null;
-  }, [workouts]);
-  const welcomeBack = useMemo(() => {
-    if (!lastWorkout?.date) return null;
-    const lastDate = lastWorkout.date.split('T')[0];
-    const diffDays = Math.floor(
-      (new Date(`${todayStr}T00:00:00`).getTime() - new Date(`${lastDate}T00:00:00`).getTime()) / 86400000,
-    );
-    if (diffDays < 2) return null;
-    const dateLabel = new Date(`${lastDate}T00:00:00`).toLocaleDateString(
-      language === 'hi' ? 'hi-IN' : 'en-US',
-      { month: 'short', day: 'numeric' },
-    );
-    return lastWorkout.name
-      ? t('home.welcomeBackPlan', { date: dateLabel, plan: lastWorkout.name })
-      : t('home.welcomeBack', { date: dateLabel });
-  }, [lastWorkout, todayStr, language, t]);
-
   return (
     <div className="page animate-fade-in flex flex-col gap-6 page-bottom-safe max-w-md mx-auto px-5 pt-3">
       {/* ── 1. HEADER (Screen 8 & Screen 9) ─────────────────────────────────── */}
@@ -658,9 +635,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </button>
         </div>
       </header>
-      {welcomeBack && (
-        <p className="-mt-4 text-sm text-text-secondary">{welcomeBack}</p>
-      )}
       <p className="-mt-4 text-right text-2xs text-text-muted">{syncText}</p>
 
       {/* ── 2. TODAY'S WORKOUT CARD (Screen 8 & Screen 9) ──────────────────── */}
